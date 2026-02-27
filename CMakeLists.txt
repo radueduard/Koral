@@ -13,6 +13,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(assimp REQUIRED)
+find_package(Vulkan COMPONENTS glslc REQUIRED)
 
 file (GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.c")
 file (GLOB_RECURSE HEADER_FILES "src/*.h" "src/*.hpp")
@@ -29,6 +30,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_include_directories(${PROJECT_NAME} PRIVATE ${Stb_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW OpenGL::GL)
 target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GLX)

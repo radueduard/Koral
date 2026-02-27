@@ -5,7 +5,7 @@
 #pragma once
 #include <GL/glew.h>
 
-#include "core/resources/shader.h"
+#include "../../core/shader.h"
 
 namespace gfx::ogl {
     class Shader final : public gfx::Shader {

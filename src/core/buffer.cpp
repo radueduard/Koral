@@ -3,7 +3,7 @@
 //
 
 #include "buffer.h"
-#include "impl/open_gl/resources/buffer.h"
+#include "impl/open_gl/buffer.h"
 
 #include "io/window.h"
 

@@ -3,7 +3,7 @@
 //
 
 #include "shader.h"
-#include "impl/open_gl/resources/shader.h"
+#include "impl/open_gl/shader.h"
 
 #include "context.h"
 #include "io/window.h"

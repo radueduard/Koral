@@ -11,7 +11,6 @@
 #include "computePipeline.h"
 #include "graphicsPipeline.h"
 #include "mesh.h"
-#include "core/resources/mesh.h"
 
 namespace gfx::ogl
 {

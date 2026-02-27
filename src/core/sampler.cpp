@@ -3,7 +3,7 @@
 //
 
 #include "sampler.h"
-#include "impl/open_gl/resources/sampler.h"
+#include "impl/open_gl/sampler.h"
 
 #include "context.h"
 #include "io/window.h"

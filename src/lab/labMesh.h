@@ -5,8 +5,8 @@
 #pragma once
 #include <memory>
 
-#include "core/resources/descriptorBinding.h"
-#include "core/resources/mesh.h"
+#include "../core/descriptorBinding.h"
+#include "../core/mesh.h"
 #include "scenes/scene.h"
 
 class LabMesh : public gfx::Scene

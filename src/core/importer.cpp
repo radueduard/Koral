@@ -9,6 +9,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
+#include "mesh.h"
+
 namespace gfx
 {
     Importer::Importer(std::filesystem::path path)
@@ -52,7 +54,7 @@ namespace gfx
                 .build();
 
             stagingBuffer->Map();
-            stagingBuffer->Write(0, positions.size() * sizeof(float), reinterpret_cast<const std::byte*>(positions.data()));
+            stagingBuffer->Write(std::span { positions });
             stagingBuffer->Unmap();
 
             positionsBuffer->CopyFrom(*stagingBuffer, 0, 0, positions.size() * sizeof(float));
@@ -93,7 +95,7 @@ namespace gfx
                 .build();
 
             stagingBuffer->Map();
-            stagingBuffer->Write(0, normals.size() * sizeof(float), reinterpret_cast<const std::byte*>(normals.data()));
+            stagingBuffer->Write(std::span { normals } );
             stagingBuffer->Unmap();
 
             uvBuffer->CopyFrom(*stagingBuffer, 0, 0, normals.size() * sizeof(float));
@@ -133,7 +135,7 @@ namespace gfx
                 .build();
 
             stagingBuffer->Map();
-            stagingBuffer->Write(0, uvs.size() * sizeof(float), reinterpret_cast<const std::byte*>(uvs.data()));
+            stagingBuffer->Write(std::span { uvs });
             stagingBuffer->Unmap();
 
             normalBuffer->CopyFrom(*stagingBuffer, 0, 0, uvs.size() * sizeof(float));
@@ -173,7 +175,7 @@ namespace gfx
                 .build();
 
             stagingBuffer->Map();
-            stagingBuffer->Write(0, indices.size() * sizeof(unsigned int), reinterpret_cast<const std::byte*>(indices.data()));
+            stagingBuffer->Write(std::span { indices });
             stagingBuffer->Unmap();
 
             indexBuffer->CopyFrom(*stagingBuffer, 0, 0, indices.size() * sizeof(unsigned int));
@@ -209,7 +211,7 @@ namespace gfx
             .build();
 
         stagingBuffer->Map();
-        stagingBuffer->Write(0, width * height * 4, reinterpret_cast<const std::byte*>(data));
+        stagingBuffer->Write(std::span { data, static_cast<unsigned long long>(width * height * 4) });
         stagingBuffer->Unmap();
 
         image->CopyFrom(*stagingBuffer);

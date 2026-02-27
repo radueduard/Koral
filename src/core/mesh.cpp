@@ -3,7 +3,7 @@
 //
 
 #include "mesh.h"
-#include "impl/open_gl/resources/mesh.h"
+#include "impl/open_gl/mesh.h"
 
 #include "io/window.h"
 

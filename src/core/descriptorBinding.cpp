@@ -3,7 +3,7 @@
 //
 
 #include "descriptorBinding.h"
-#include "impl/open_gl/resources/descriptorBinding.h"
+#include "impl/open_gl/descriptorBinding.h"
 
 #include "io/window.h"
 

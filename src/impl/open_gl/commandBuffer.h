@@ -4,7 +4,7 @@
 
 #pragma once
 #include "framebuffer.h"
-#include "core/resources/comandBuffer.h"
+#include "../../core/comandBuffer.h"
 
 namespace gfx::ogl
 {

@@ -3,9 +3,9 @@
 //
 #pragma once
 
-#include "core/resources/buffer.h"
-#include "core/resources/descriptorBinding.h"
-#include "core/resources/graphicsPipeline.h"
+#include "../core/buffer.h"
+#include "../core/descriptorBinding.h"
+#include "../core/graphicsPipeline.h"
 #include "scenes/scene.h"
 
 namespace gfx

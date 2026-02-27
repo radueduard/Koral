@@ -4,7 +4,7 @@
 
 #pragma once
 #include <GL/glew.h>
-#include "core/resources/framebuffer.h"
+#include "../../core/framebuffer.h"
 
 namespace gfx::ogl {
     class Framebuffer final : public gfx::Framebuffer {

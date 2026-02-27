@@ -3,7 +3,7 @@
 //
 
 #include "framebuffer.h"
-#include "impl/open_gl/resources/framebuffer.h"
+#include "impl/open_gl/framebuffer.h"
 
 #include "context.h"
 #include "io/window.h"

@@ -5,8 +5,8 @@
 #pragma once
 #include <glm/fwd.hpp>
 
-#include "core/resources/buffer.h"
-#include "core/resources/shader.h"
+#include "buffer.h"
+#include "shader.h"
 
 namespace gfx
 {

@@ -16,7 +16,7 @@
 
 namespace gfx::io
 {
-    Window& Manager::createWindow(const Window::CreateInfo& createInfo)
+    Window& Manager::createWindow(const Window::Builder& createInfo)
     {
         auto window = new Window(createInfo);
         auto windowRef = std::ref(*window);

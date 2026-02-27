@@ -7,7 +7,7 @@
 #include "buffer.h"
 #include "imageView.h"
 #include "sampler.h"
-#include "core/resources/descriptorBinding.h"
+#include "../../core/descriptorBinding.h"
 
 namespace gfx::ogl
 {

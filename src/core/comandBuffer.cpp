@@ -4,7 +4,7 @@
 
 #include "comandBuffer.h"
 
-#include "impl/open_gl/resources/commandBuffer.h"
+#include "impl/open_gl/commandBuffer.h"
 #include "io/window.h"
 
 namespace gfx

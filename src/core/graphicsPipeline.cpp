@@ -3,7 +3,7 @@
 //
 
 #include "graphicsPipeline.h"
-#include "impl/open_gl/resources/graphicsPipeline.h"
+#include "impl/open_gl/graphicsPipeline.h"
 
 #include "context.h"
 #include "io/window.h"

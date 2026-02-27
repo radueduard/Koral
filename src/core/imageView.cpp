@@ -3,7 +3,7 @@
 //
 
 #include "imageView.h"
-#include "impl/open_gl/resources/imageView.h"
+#include "impl/open_gl/imageView.h"
 
 
 #include "context.h"

@@ -5,7 +5,7 @@
 #pragma once
 #include <GL/glew.h>
 
-#include "core/resources/computePipeline.h"
+#include "../../core/computePipeline.h"
 
 namespace gfx::ogl
 {

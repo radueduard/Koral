@@ -94,14 +94,26 @@ namespace gfx
             return { static_cast<std::byte*>(_mappedPtr) + offset, static_cast<size_t>(size) };
         }
 
-        void Write(const glm::i64 offset, const glm::i64 size, const std::byte* data) const
+        template <typename T> requires std::is_trivially_copyable_v<T>
+        void Write(const std::span<T> data, const glm::i64 offset = 0)
         {
             if (!_mappedPtr) {
                 std::cerr << "Warning: Buffer is not mapped! Attempting to write to buffer which is not currently mapped." << std::endl;
                 return;
             }
 
-            std::memcpy(static_cast<std::byte*>(_mappedPtr) + offset, data, size);
+            std::memcpy(static_cast<std::byte*>(_mappedPtr) + offset, data.data(), data.size() * sizeof(T));
+        }
+
+        template <typename T> requires std::is_trivially_copyable_v<T>
+        void Write(const T& data, const glm::i64 offset = 0)
+        {
+            if (!_mappedPtr) {
+                std::cerr << "Warning: Buffer is not mapped! Attempting to write to buffer which is not currently mapped." << std::endl;
+                return;
+            }
+
+            std::memcpy(static_cast<std::byte*>(_mappedPtr) + offset, &data, sizeof(T));
         }
 
         virtual void Map() = 0;

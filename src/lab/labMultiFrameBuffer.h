@@ -5,10 +5,10 @@
 #pragma once
 #include <memory>
 
-#include "core/resources/buffer.h"
-#include "core/resources/mesh.h"
-#include "core/resources/descriptorBinding.h"
-#include "core/resources/comandBuffer.h"
+#include "core/buffer.h"
+#include "core/mesh.h"
+#include "core/descriptorBinding.h"
+#include "core/comandBuffer.h"
 
 #include "scenes/scene.h"
 

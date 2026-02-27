@@ -4,15 +4,12 @@
 
 #include "labTriangle.h"
 
-#include <stb_image_write.h>
 
-#include "core/resources/buffer.h"
-#include "core/resources/comandBuffer.h"
-#include "core/resources/image.h"
-#include "core/resources/sampler.h"
-#include "core/resources/shader.h"
-#include "core/resources/descriptorBinding.h"
-#include "core/resources/computePipeline.h"
+#include "core/buffer.h"
+#include "core/comandBuffer.h"
+#include "core/sampler.h"
+#include "core/shader.h"
+#include "core/descriptorBinding.h"
 #include "io/window.h"
 
 using namespace gfx;
@@ -53,7 +50,7 @@ void LabTriangle::Initialize()
 void LabTriangle::Update() {
     const float time = io::Time::WindowTime();
     _timeBuffer->Map();
-    _timeBuffer->Write(0, sizeof(float), reinterpret_cast<const std::byte*>(&time));
+    _timeBuffer->Write(time);
     _timeBuffer->Unmap();
 
     _commandBuffer->Reset();

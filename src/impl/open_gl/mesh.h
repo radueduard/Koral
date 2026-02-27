@@ -6,7 +6,7 @@
 #include <GL/glew.h>
 
 #include "buffer.h"
-#include "core/resources/mesh.h"
+#include "../../core/mesh.h"
 
 namespace gfx::ogl
 {

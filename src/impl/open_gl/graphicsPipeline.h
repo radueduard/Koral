@@ -6,7 +6,7 @@
 #include <GL/glew.h>
 
 #include "shader.h"
-#include "core/resources/graphicsPipeline.h"
+#include "../../core/graphicsPipeline.h"
 #include "utils/ogl_err_handling.h"
 
 namespace gfx::ogl

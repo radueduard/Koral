@@ -2,7 +2,7 @@
 // Created by radue on 2/21/2026.
 //
 #include "computePipeline.h"
-#include "impl/open_gl/resources/computePipeline.h"
+#include "impl/open_gl/computePipeline.h"
 
 #include "io/window.h"
 

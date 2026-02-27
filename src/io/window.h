@@ -18,6 +18,7 @@
 #include "context.h"
 #include "io/time.h"
 #include "../scenes/scene.h"
+#include "core/framebuffer.h"
 
 namespace gfx::io {
     class Window {
@@ -26,7 +27,7 @@ namespace gfx::io {
         friend class Manager;
         friend class Time;
     public:
-        struct CreateInfo {
+        struct Builder {
             std::string title = "GFXFramework";
             glm::uvec2 extent = { 1280, 720 };
             bool resizable = true;
@@ -34,32 +35,34 @@ namespace gfx::io {
             API api = API::OpenGL;
             std::reference_wrapper<Scene> scene;
 
-            explicit CreateInfo(Scene& scene) : scene(scene) {}
+            explicit Builder(Scene& scene) : scene(scene) {}
 
-            CreateInfo& setTitle(const std::string& title) {
+            Builder& setTitle(const std::string& title) {
                 this->title = title;
                 return *this;
             }
 
-            CreateInfo& setExtent(const glm::uvec2& extent) {
+            Builder& setExtent(const glm::uvec2& extent) {
                 this->extent = extent;
                 return *this;
             }
 
-            CreateInfo& setResizable(bool resizable) {
+            Builder& setResizable(bool resizable) {
                 this->resizable = resizable;
                 return *this;
             }
 
-            CreateInfo& setFullscreen(bool fullscreen) {
+            Builder& setFullscreen(bool fullscreen) {
                 this->fullscreen = fullscreen;
                 return *this;
             }
 
-            CreateInfo& setAPI(API api) {
+            Builder& setAPI(API api) {
                 this->api = api;
                 return *this;
             }
+
+            [[nodiscard]] void build() const;
         };
 
         ~Window();
@@ -99,7 +102,7 @@ namespace gfx::io {
 
 
     private:
-        explicit Window(const CreateInfo&);
+        explicit Window(const Builder&);
 
         void initContext();
 

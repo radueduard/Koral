@@ -7,7 +7,6 @@
 
 #include "computePipeline.h"
 #include "descriptorBinding.h"
-#include "framebuffer.h"
 #include "graphicsPipeline.h"
 #include "utils/flags.h"
 

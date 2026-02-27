@@ -6,8 +6,8 @@
 
 #include <GL/glew.h>
 
-#include "core/resources/buffer.h"
-#include "core/resources/image.h"
+#include "../../core/buffer.h"
+#include "../../core/image.h"
 
 namespace gfx::ogl {
     class Image : public gfx::Image {

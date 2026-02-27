@@ -3,7 +3,7 @@
 //
 
 #include "image.h"
-#include "impl/open_gl/resources/image.h"
+#include "impl/open_gl/image.h"
 
 #include "context.h"
 #include "io/window.h"

@@ -5,7 +5,7 @@
 #pragma once
 #include <GL/glew.h>
 
-#include "core/resources/sampler.h"
+#include "../../core/sampler.h"
 
 namespace gfx::ogl
 {

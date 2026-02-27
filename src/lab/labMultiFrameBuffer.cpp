@@ -8,8 +8,8 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.inl>
 
-#include "core/resources/importer.h"
-#include "impl/open_gl/resources/image.h"
+#include "../core/importer.h"
+#include "../impl/open_gl/image.h"
 #include "io/window.h"
 
 void LabMultiFrameBuffer::Initialize()
@@ -61,29 +61,29 @@ void LabMultiFrameBuffer::Initialize()
         .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent)
         .build();
 
-    glm::mat4 viewMatrix = glm::lookAt(
+    const glm::mat4 viewMatrix = glm::lookAt(
         glm::vec3(0.0f, 0.0f, -5.0f),
         glm::vec3(0.0f, 0.0f, 0.0f),
         glm::vec3(0.f, 1.f, 0.f)
     );
 
-    glm::mat4 projectionMatrix = glm::perspective(
+    const glm::mat4 projectionMatrix = glm::perspective(
         glm::radians(45.f),
         static_cast<float>(gfx::Context::Window().getExtent().x) / static_cast<float>(gfx::Context::Window().getExtent().y),
         0.1f,
         100.f
     );
 
-    glm::mat4 modelMatrix = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f)) *
+    const glm::mat4 modelMatrix = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f)) *
                             glm::rotate(glm::mat4(1.f), glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f));
 
     _uniformBufferCamera->Map();
-    _uniformBufferCamera->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(viewMatrix)));
-    _uniformBufferCamera->Write(64, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(projectionMatrix)));
+    _uniformBufferCamera->Write(viewMatrix);
+    _uniformBufferCamera->Write(projectionMatrix, 64);
     _uniformBufferCamera->Unmap();
 
     _uniformBufferModel->Map();
-    _uniformBufferModel->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(modelMatrix)));
+    _uniformBufferModel->Write(modelMatrix);
     _uniformBufferModel->Unmap();
 
     _albedoImageView = gfx::ImageView::Builder(*_albedoImage).build();
@@ -164,12 +164,10 @@ void LabMultiFrameBuffer::Render()
         .BindDescriptor(2, _descriptorBinding2.get())
         .DrawMesh(_mesh.get(), 1, 0)
         .EndRendering()
-
         .BeginRendering(gfx::Context::DefaultFramebuffer())
         .BindPipeline(_pipeline2.get())
         .DrawMesh(_mesh.get(), 1, 0)
         .EndRendering()
-
         .End();
 
     _commandBuffer->Submit();

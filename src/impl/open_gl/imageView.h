@@ -6,7 +6,7 @@
 #include <GL/glew.h>
 
 #include "image.h"
-#include "core/resources/imageView.h"
+#include "../../core/imageView.h"
 
 namespace gfx::ogl
 {

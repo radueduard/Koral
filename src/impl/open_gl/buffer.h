@@ -8,7 +8,7 @@
 #include <optional>
 #include <GL/glew.h>
 
-#include "core/resources/buffer.h"
+#include "../../core/buffer.h"
 #include "utils/ogl_err_handling.h"
 
 namespace gfx::ogl
