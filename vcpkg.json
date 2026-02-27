@@ -1,0 +1,27 @@
+{
+  "name" : "untitled1",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "d4d51d2f2229583ed971fb53a3cbd5cd2c5219ce",
+  "dependencies" : [ {
+    "name" : "glfw3",
+    "version>=" : "3.4#1"
+  }, {
+    "name" : "magic-enum",
+    "version>=" : "0.9.7#1"
+  }, {
+    "name" : "glm",
+    "version>=" : "1.0.3"
+  }, {
+    "name" : "stb",
+    "version>=" : "2024-07-29#1"
+  }, {
+    "name" : "glad",
+    "version>=" : "0.1.36"
+  }, {
+    "name" : "glew",
+    "version>=" : "2.3.0"
+  }, {
+    "name" : "assimp",
+    "version>=" : "6.0.2#1"
+  } ]
+}

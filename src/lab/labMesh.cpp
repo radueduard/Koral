@@ -1,0 +1,166 @@
+//
+// Created by radue on 2/23/2026.
+//
+
+#include "labMesh.h"
+
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.inl>
+
+#include "core/resources/comandBuffer.h"
+#include "core/resources/importer.h"
+#include "io/time.h"
+#include "io/window.h"
+
+void LabMesh::Initialize()
+{
+    _mesh = gfx::Importer::LoadMesh(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
+    _albedoImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_albedo.jpg"));
+
+    const auto vertexShader = gfx::Shader::Create(gfx::Shader::CreateInfo()
+        .setPath(gfx::shader("albedo.vert.glsl"))
+        .setStage(gfx::Shader::Stage::eVertex));
+
+    const auto fragmentShader = gfx::Shader::Create(gfx::Shader::CreateInfo()
+        .setPath(gfx::shader("albedo.frag.glsl"))
+        .setStage(gfx::Shader::Stage::eFragment));
+
+    _pipeline = gfx::GraphicsPipeline::Create(gfx::GraphicsPipeline::Builder()
+        .setVertexStage({ .shader = *vertexShader })
+        .setFragmentShader(*fragmentShader));
+
+    _uniformBufferCamera = gfx::Buffer::Create(gfx::Buffer::CreateInfo()
+        .setSize(128)
+        .setUsage(gfx::Buffer::Usage::eUniform)
+        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostVisible)
+        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent));
+
+    _uniformBufferModel = gfx::Buffer::Create(gfx::Buffer::CreateInfo()
+        .setSize(64)
+        .setUsage(gfx::Buffer::Usage::eUniform)
+        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostVisible)
+        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent));
+
+    glm::mat4 viewMatrix = glm::lookAt(
+        _cameraPosition,
+        _cameraPosition + _cameraForward,
+        glm::vec3(0.f, 1.f, 0.f)
+    );
+
+    glm::mat4 projectionMatrix = glm::perspective(
+        glm::radians(45.f),
+        static_cast<float>(gfx::Context::Window().getExtent().x) / static_cast<float>(gfx::Context::Window().getExtent().y),
+        0.1f,
+        100.f
+    );
+
+    glm::mat4 modelMatrix = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(1.f, 0.f, 0.f)) *
+                            glm::rotate(glm::mat4(1.f), glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f));
+
+    _uniformBufferCamera->Map();
+    _uniformBufferCamera->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(viewMatrix)));
+    _uniformBufferCamera->Write(64, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(projectionMatrix)));
+    _uniformBufferCamera->Unmap();
+
+    _uniformBufferModel->Map();
+    _uniformBufferModel->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(modelMatrix)));
+    _uniformBufferModel->Unmap();
+
+    _albedoImageView = gfx::ImageView::Create(*_albedoImage, gfx::ImageView::CreateInfo());
+    _sampler = gfx::Sampler::Create(gfx::Sampler::CreateInfo());
+
+    _descriptorBinding0 = gfx::Descriptor::Create(gfx::Descriptor::CreateInfo()
+        .setType(gfx::Descriptor::Type::eUniformBuffer)
+        .setBuffer(_uniformBufferCamera.get(), 0, 128));
+    _descriptorBinding1 = gfx::Descriptor::Create(gfx::Descriptor::CreateInfo()
+        .setType(gfx::Descriptor::Type::eUniformBuffer)
+        .setBuffer(_uniformBufferModel.get(), 0, 64));
+    _descriptorBinding2 = gfx::Descriptor::Create(gfx::Descriptor::CreateInfo()
+        .setType(gfx::Descriptor::Type::eCombinedImageSampler)
+        .setImage(_albedoImageView.get(), _sampler.get()));
+
+    _commandBuffer = gfx::CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics);
+}
+
+void LabMesh::Update()
+{
+    _commandBuffer->Reset();
+
+    if (!gfx::io::Input::isMouseButtonHeld(gfx::io::MouseButton::eRight)) {
+        return;
+    }
+
+    bool changed = false;
+    // move
+    {
+        glm::vec3 delta = { 0.0f, 0.0f, 0.0f };
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eW)) {
+            delta.z += 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eS)) {
+            delta.z -= 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eA)) {
+            delta.x -= 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eD)) {
+            delta.x += 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eQ)) {
+            delta.y -= 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eE)) {
+            delta.y += 1.f;
+        }
+
+        if (delta != glm::vec3(0.f)) {
+            delta = glm::normalize(delta) * 5.f * gfx::io::Time::FrameTime();
+            _cameraPosition += delta.x * _cameraRight + delta.y * glm::vec3(0.f, 1.f, 0.f) + delta.z * _cameraForward;
+            changed = true;
+        }
+    }
+
+    // rotate
+    {
+        if (const glm::vec2 mouseDelta = gfx::io::Input::getMousePositionDelta(); mouseDelta != glm::vec2(0.f))
+        {
+            constexpr float sensitivity = 0.2f;
+            _cameraForward = glm::rotate(glm::mat4(1.f), glm::radians(-mouseDelta.x * sensitivity), glm::vec3(0.f, 1.f, 0.f)) *
+                             glm::rotate(glm::mat4(1.f), glm::radians(-mouseDelta.y * sensitivity), _cameraRight) *
+                             glm::vec4(_cameraForward, 0.f);
+
+            _cameraRight = glm::normalize(glm::cross(_cameraForward, glm::vec3(0.f, 1.f, 0.f)));
+            changed = true;
+        }
+    }
+
+    if (!changed) {
+        return;
+    }
+
+    glm::mat4 viewMatrix = glm::lookAt(
+        _cameraPosition,
+        _cameraPosition + _cameraForward,
+        glm::vec3(0.f, 1.f, 0.f)
+    );
+
+    _uniformBufferCamera->Map();
+    _uniformBufferCamera->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(viewMatrix)));
+    _uniformBufferCamera->Unmap();
+}
+
+void LabMesh::Render()
+{
+    _commandBuffer->Begin()
+        .BeginRendering(gfx::Context::DefaultFramebuffer())
+        .SetViewport(0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y)
+        .BindPipeline(_pipeline.get())
+        .BindDescriptor(0, _descriptorBinding0.get())
+        .BindDescriptor(1, _descriptorBinding1.get())
+        .BindDescriptor(2, _descriptorBinding2.get())
+        .DrawMesh(_mesh.get(), 1, 0)
+        .EndRendering()
+        .End();
+    _commandBuffer->Submit();
+}
