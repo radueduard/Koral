@@ -22,41 +22,42 @@ namespace gfx
             glm::i32 clearStencil = 0;
         };
 
-        struct CreateInfo {
+        struct Builder {
             std::vector<std::reference_wrapper<const ImageView>> colorAttachments;
             std::optional<std::reference_wrapper<const ImageView>> depthStencilAttachment;
             ClearValues clearValues;
 
-            CreateInfo& addColorAttachment(const ImageView& imageView, glm::vec4 clearColor) {
+            Builder& addColorAttachment(const ImageView& imageView, glm::vec4 clearColor) {
                 colorAttachments.emplace_back(imageView);
                 clearValues.clearColor.emplace_back(clearColor);
                 return *this;
             }
 
-            CreateInfo& setDepthStencilAttachment(const ImageView& imageView, float depth, glm::i32 stencil) {
+            Builder& setDepthStencilAttachment(const ImageView& imageView, float depth, glm::i32 stencil) {
                 depthStencilAttachment = imageView;
                 clearValues.clearDepth = depth;
                 clearValues.clearStencil = stencil;
                 return *this;
             }
+
+            [[nodiscard]] std::unique_ptr<Framebuffer> build() const;
         };
         virtual ~Framebuffer() = default;
 
-        static std::unique_ptr<Framebuffer> Create(const CreateInfo& createInfo);
         static std::unique_ptr<Framebuffer> CreateDefault();
 
-        virtual bool hasDepthStencilAttachment() const;
-        const std::vector<std::reference_wrapper<const ImageView>>& getColorAttachments() const;
+        [[nodiscard]] virtual bool hasDepthStencilAttachment() const;
+        [[nodiscard]] const std::vector<std::reference_wrapper<const ImageView>>& getColorAttachments() const;
 
-        const ImageView& getDepthStencilAttachment() const;
+        [[nodiscard]] const ImageView& getDepthStencilAttachment() const;
 
-        const glm::vec4& getClearColor(glm::u32 index) const;
-        float getClearDepth() const;
-        glm::i32 getClearStencil() const;
+        [[nodiscard]] const glm::vec4& getClearColor(glm::u32 index) const;
+        [[nodiscard]] float getClearDepth() const;
+        [[nodiscard]] glm::i32 getClearStencil() const;
 
     protected:
         Framebuffer() = default;
-        explicit Framebuffer(const CreateInfo& createInfo);
+        explicit Framebuffer(const Builder& createInfo);
 
         std::vector<std::reference_wrapper<const ImageView>> colorAttachments;
         std::optional<std::reference_wrapper<const ImageView>> depthStencilAttachment;

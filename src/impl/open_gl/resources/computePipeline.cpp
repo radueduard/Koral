@@ -10,8 +10,11 @@
 
 namespace gfx::ogl
 {
-    ComputePipeline::ComputePipeline(const CreateInfo& createInfo) : gfx::ComputePipeline(createInfo) {
-        const auto& shader = dynamic_cast<const Shader&>(createInfo.computeShader.get());
+    ComputePipeline::ComputePipeline(const Builder& createInfo) : gfx::ComputePipeline(createInfo) {
+        if (!createInfo.computeShader.has_value())
+            throw std::runtime_error("You can not create a compute pipeline without a compute shader!");
+
+        const auto& shader = dynamic_cast<const Shader&>(createInfo.computeShader.value().get());
         if (shader.getStage() != Shader::Stage::eCompute) {
             throw std::runtime_error("The shader provided to the compute pipeline must be a compute shader!");
         }

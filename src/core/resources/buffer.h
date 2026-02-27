@@ -43,99 +43,43 @@ namespace gfx
             eStd430 = 1 << 1,
         };
 
-        struct CreateInfo {
+        struct Builder {
             glm::i64 size = 64;
             Flags<Usage> usage = Usage::eUniform;
             Flags<MemoryProperty> memoryProperties = MemoryProperty::eHostVisible;
             Layout layout = Layout::eStd140;
 
-            CreateInfo& setSize(const glm::u64 size) {
+            Builder& setSize(const glm::u64 size) {
                 this->size = size;
                 return *this;
             }
 
-            CreateInfo& setUsage(const Flags<Usage> usage) {
+            Builder& setUsage(const Flags<Usage> usage) {
                 this->usage = usage;
                 return *this;
             }
 
-            CreateInfo& setMemoryProperties(const Flags<MemoryProperty> memoryProperties) {
+            Builder& setMemoryProperties(const Flags<MemoryProperty> memoryProperties) {
                 this->memoryProperties = memoryProperties;
                 return *this;
             }
 
-            CreateInfo& setLayout(const Layout layout) {
+            Builder& setLayout(const Layout layout) {
                 this->layout = layout;
                 return *this;
             }
 
-            CreateInfo& addUsage(Usage usage) {
+            Builder& addUsage(Usage usage) {
                 this->usage |= usage;
                 return *this;
             }
 
-            CreateInfo& addMemoryProperty(const MemoryProperty memoryProperty) {
+            Builder& addMemoryProperty(const MemoryProperty memoryProperty) {
                 this->memoryProperties |= memoryProperty;
                 return *this;
             }
-        };
 
-        struct Builder
-        {
-            explicit Builder(const CreateInfo& createInfo) : _createInfo(createInfo) {}
-
-            template <typename T>
-            Builder& addUniform(const std::string& name, const T& value) {
-                switch (_createInfo.layout) {
-                case Layout::eStd140:
-                    _uniformOffsets[name] = _data.size();
-                    _data.resize(_data.size() + sizeof(T) + 16 - (sizeof(T) % 16));
-                    break;
-                case Layout::eStd430:
-
-                    _uniformOffsets[name] = _data.size();
-                    auto padding = sizeof(T) % 16;
-                    _data.resize(_data.size() + sizeof(T) + (padding == 0 ? 0 : 16 - padding));
-                    break;
-                }
-                std::memcpy(_data.data() + _uniformOffsets[name], &value, sizeof(T));
-                return *this;
-            }
-
-            std::unique_ptr<Buffer> build() {
-                if (_createInfo.memoryProperties & MemoryProperty::eDeviceLocal) {
-                    _createInfo.addUsage(Usage::eTransferDst);
-                    auto buffer = Create(_createInfo);
-                    CreateInfo stagingCreateInfo = _createInfo;
-                    stagingCreateInfo
-                        .setUsage(Usage::eTransferSrc)
-                        .setMemoryProperties(MemoryProperty::eHostVisible)
-                        .addMemoryProperty(MemoryProperty::eHostCoherent);
-
-                    const auto stagingBuffer = Create(stagingCreateInfo);
-
-                    stagingBuffer->Map();
-                    stagingBuffer->Write(0, _data.size(), _data.data());
-                    stagingBuffer->Unmap();
-
-                    buffer->CopyFrom(*stagingBuffer, 0, 0, _data.size());
-                    return buffer;
-                }
-
-                auto buffer = Create(_createInfo);
-                buffer->Map();
-                buffer->Write(0, _data.size(), _data.data());
-                if (!(_createInfo.memoryProperties & MemoryProperty::eHostCoherent)) {
-                    buffer->Flush(0, _data.size());
-                }
-                buffer->Unmap();
-                return buffer;
-            }
-
-        private:
-            CreateInfo _createInfo;
-            std::unordered_map<std::string, glm::u64> _uniformOffsets;
-            std::vector<std::byte> _data;
+            [[nodiscard]] std::unique_ptr<Buffer> build() const;
         };
 
         virtual ~Buffer() = default;
@@ -171,9 +115,8 @@ namespace gfx
         [[nodiscard]] Flags<MemoryProperty> getMemoryProperties() const { return memoryProperties; }
         [[nodiscard]] Layout getLayout() const { return layout; }
 
-        static std::unique_ptr<Buffer> Create(const CreateInfo& createInfo);
     protected:
-        explicit Buffer(const CreateInfo& createInfo);
+        explicit Buffer(const Builder& createInfo);
 
         glm::u64 size = 64;
         Flags<Usage> usage = Usage::eUniform;

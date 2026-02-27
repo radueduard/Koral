@@ -9,7 +9,7 @@
 
 namespace gfx::ogl
 {
-    Shader::Shader(const gfx::Shader::CreateInfo& createInfo) : gfx::Shader(createInfo)
+    Shader::Shader(const gfx::Shader::Builder& createInfo) : gfx::Shader(createInfo)
     {
         if (createInfo.lang != Lang::eGLSL) {
             throw std::runtime_error("Only GLSL shaders are supported in OpenGL!");

@@ -132,11 +132,12 @@ namespace gfx
                 this->unnormalizedCoordinates = unnormalizedCoordinates;
                 return *this;
             }
+
+            [[nodiscard]] std::unique_ptr<Sampler> build() const;
         };
 
         virtual ~Sampler() = default;
 
-        static std::unique_ptr<Sampler> Create(const CreateInfo& createInfo);
     protected:
         explicit Sampler() = default;
     };

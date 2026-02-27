@@ -13,12 +13,12 @@ namespace gfx::ogl
     class ImageView : public gfx::ImageView
     {
     public:
-        ImageView(const Image& image, const CreateInfo& createInfo);
+        explicit ImageView(const Builder& createInfo);
         ~ImageView() override = default;
 
         GLuint operator*() const { return *_image; }
 
-        GLenum getFormat() const { return _image.getGLFormat(); }
+        [[nodiscard]] GLenum getFormat() const { return _image.getGLFormat(); }
 
     private:
         const Image& _image;

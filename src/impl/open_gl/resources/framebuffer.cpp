@@ -16,7 +16,7 @@ namespace gfx::ogl
         clearValues.clearColor.emplace_back(glm::vec4 { 0.0, 0.0, 0.0, 1.0 });
     }
 
-    Framebuffer::Framebuffer(const gfx::Framebuffer::CreateInfo& createInfo) : gfx::Framebuffer(createInfo) {
+    Framebuffer::Framebuffer(const gfx::Framebuffer::Builder& createInfo) : gfx::Framebuffer(createInfo) {
         glCreateFramebuffers(1, &_id);
         glCheckError();
 

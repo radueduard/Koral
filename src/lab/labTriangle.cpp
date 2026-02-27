@@ -19,82 +19,33 @@ using namespace gfx;
 
 void LabTriangle::Initialize()
 {
-    const auto buffer = Buffer::Builder(Buffer::CreateInfo()
-        .setSize(64)
-        .setUsage(Buffer::Usage::eUniform)
-        .setLayout(Buffer::Layout::eStd430)
-        .addMemoryProperty(Buffer::MemoryProperty::eDeviceLocal)
-    )
-        .addUniform("position", glm::vec3(.5f, .5f, 0.f))
-        .addUniform("color", glm::vec4(1.f, .5f, 0.f, 1.f))
-        .addUniform("size", .75f)
+    const auto vertexShader = Shader::Builder()
+        .setStage(Shader::Stage::eVertex)
+        .setPath(shader("triangle.vert.glsl"))
         .build();
 
-    const auto image = Image::Create(Image::CreateInfo()
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eRGBA8_UNORM)
-        .setExtent({ 512, 512 })
-        .setMipLevels(1)
-        .setArrayLayers(1)
-        .setMSAA(Image::MSAA::eNone)
-        .setUsage(Image::Usage::eStorage)
-        .addUsage(Image::Usage::eTransferSrc));
-
-    const auto imageView = ImageView::Create(*image, ImageView::CreateInfo());
-    const auto sampler = Sampler::Create(Sampler::CreateInfo());
-
-    const auto binding0 = Descriptor::Create(Descriptor::CreateInfo()
-        .setType(Descriptor::Type::eUniformBuffer)
-        .setBuffer(buffer.get()));
-
-    const auto binding1 = Descriptor::Create(Descriptor::CreateInfo()
-        .setType(Descriptor::Type::eStorageImage)
-        .setImage(imageView.get()));
-
-    const auto computeShader = Shader::Create(Shader::CreateInfo()
-        .setStage(Shader::Stage::eCompute)
-        .setLang(Shader::Lang::eGLSL)
-        .setPath(shader("test.comp.glsl")));
-
-    const auto computePipeline = ComputePipeline::Create(ComputePipeline::CreateInfo(*computeShader));
-    const auto commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-
-    commandBuffer->Begin()
-        .BindPipeline(computePipeline.get())
-        .BindDescriptor(0, binding0.get())
-        .BindDescriptor(1, binding1.get())
-        .Dispatch(512 / 16, 512 / 16, 1)
-        .End();
-    commandBuffer->Submit();
-
-    const auto data = image->ReadData();
-    stbi_write_png("output.png", static_cast<int>(image->getExtent().x), static_cast<int>(image->getExtent().y), 4, data.data(), static_cast<int>(image->getExtent().x) * 4);
-
-    const auto vertexShader = Shader::Create(Shader::CreateInfo()
-        .setStage(Shader::Stage::eVertex)
-        .setPath(shader("triangle.vert.glsl")));
-
-    const auto fragmentShader = Shader::Create(Shader::CreateInfo()
+    const auto fragmentShader = Shader::Builder()
         .setStage(Shader::Stage::eFragment)
-        .setPath(shader("triangle.frag.glsl")));
+        .setPath(shader("triangle.frag.glsl"))
+        .build();
 
-    _graphicsPipeline = GraphicsPipeline::Create(GraphicsPipeline::Builder()
-        .setVertexStage(VertexState { .shader = *vertexShader } )
-        .setFragmentShader(*fragmentShader));
+    _graphicsPipeline = GraphicsPipeline::Builder()
+        .setVertexShader(*vertexShader)
+        .setFragmentShader(*fragmentShader)
+        .build();
 
-    _timeBuffer = Buffer::Builder(Buffer::CreateInfo()
+    _timeBuffer = Buffer::Builder()
         .setSize(sizeof(float))
         .setUsage(Buffer::Usage::eUniform)
         .setLayout(Buffer::Layout::eStd430)
         .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
-        .addMemoryProperty(Buffer::MemoryProperty::eHostVisible))
-
-        .addUniform("time", 0.f)
+        .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
         .build();
 
-    _timeDescriptor = Descriptor::Create(Descriptor::CreateInfo()
+    _timeDescriptor = Descriptor::Builder()
         .setType(Descriptor::Type::eUniformBuffer)
-        .setBuffer(_timeBuffer.get()));
+        .setBuffer(_timeBuffer.get())
+        .build();
 
     _commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
 }

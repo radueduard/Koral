@@ -9,11 +9,11 @@
 
 namespace gfx
 {
-    std::unique_ptr<Buffer> Buffer::Create(const CreateInfo& createInfo)
+    std::unique_ptr<Buffer> Buffer::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::OpenGL:
-            return std::make_unique<ogl::Buffer>(createInfo);
+            return std::make_unique<ogl::Buffer>(*this);
         case API::Vulkan:
             throw std::runtime_error("Vulkan is not supported yet!");
         default:
@@ -21,7 +21,7 @@ namespace gfx
         }
     }
 
-    Buffer::Buffer(const CreateInfo& createInfo) :
+    Buffer::Buffer(const Builder& createInfo) :
         size(createInfo.size),
         usage(createInfo.usage),
         memoryProperties(createInfo.memoryProperties),

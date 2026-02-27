@@ -123,7 +123,7 @@ namespace gfx
             eDepthStencilAttachment = 1 << 5,
         };
 
-        struct CreateInfo {
+        struct Builder {
             Type type = Type::e2D;
             Format format = Format::eRGBA8_UNORM;
             glm::uvec3 extent = { 1, 1, 1 };
@@ -132,58 +132,58 @@ namespace gfx
             MSAA msaa = MSAA::eNone;
             Flags<Usage> usage = Usage::eSampled;
 
-            CreateInfo& setType(const Type type) {
+            Builder& setType(const Type type) {
                 this->type = type;
                 return *this;
             }
 
-            CreateInfo& setFormat(const Format format) {
+            Builder& setFormat(const Format format) {
                 this->format = format;
                 return *this;
             }
 
-            CreateInfo& setExtent(const glm::u32& extent) {
+            Builder& setExtent(const glm::u32& extent) {
                 this->extent = { extent, extent, extent };
                 return *this;
             }
 
-            CreateInfo& setExtent(const glm::uvec2& extent) {
+            Builder& setExtent(const glm::uvec2& extent) {
                 this->extent = { extent, 1 };
                 return *this;
             }
 
-            CreateInfo& setExtent(const glm::uvec3& extent) {
+            Builder& setExtent(const glm::uvec3& extent) {
                 this->extent = extent;
                 return *this;
             }
 
-            CreateInfo& setMipLevels(const glm::u32 mipLevels) {
+            Builder& setMipLevels(const glm::u32 mipLevels) {
                 this->mipLevels = mipLevels;
                 return *this;
             }
 
-            CreateInfo& setArrayLayers(const glm::u32 arrayLayers) {
+            Builder& setArrayLayers(const glm::u32 arrayLayers) {
                 this->arrayLayers = arrayLayers;
                 return *this;
             }
 
-            CreateInfo& setMSAA(const MSAA msaa) {
+            Builder& setMSAA(const MSAA msaa) {
                 this->msaa = msaa;
                 return *this;
             }
 
-            CreateInfo& setUsage(const Flags<Usage>& usage) {
+            Builder& setUsage(const Flags<Usage>& usage) {
                 this->usage = usage;
                 return *this;
             }
 
-            CreateInfo& addUsage(const Usage usage) {
+            Builder& addUsage(const Usage usage) {
                 this->usage |= usage;
                 return *this;
             }
-        };
 
-        static std::unique_ptr<Image> Create(const CreateInfo& createInfo);
+            [[nodiscard]] std::unique_ptr<Image> build() const;
+        };
 
         virtual ~Image() = default;
 
@@ -193,7 +193,7 @@ namespace gfx
         glm::uvec3 getExtent() const { return extent; }
 
     protected:
-        explicit Image(const CreateInfo&);
+        explicit Image(const Builder&);
 
         Type type;
         Format format;

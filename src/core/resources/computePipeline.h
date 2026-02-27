@@ -12,13 +12,18 @@ namespace gfx
 {
     class ComputePipeline {
     public:
-        struct CreateInfo {
-            std::reference_wrapper<const Shader> computeShader;
+        struct Builder {
+            std::optional<std::reference_wrapper<const Shader>> computeShader;
 
-            explicit CreateInfo(const Shader& computeShader) : computeShader(computeShader) {}
+            Builder& setComputeShader(const Shader& computeShader)
+            {
+                this->computeShader = computeShader;
+                return *this;
+            }
+
+
+            [[nodiscard]] std::unique_ptr<ComputePipeline> build() const;
         };
-
-        static std::unique_ptr<ComputePipeline> Create(const CreateInfo& createInfo);
 
         virtual ~ComputePipeline() = default;
 
@@ -49,7 +54,7 @@ namespace gfx
 
     protected:
         mutable bool _bound = false;
-        explicit ComputePipeline(const CreateInfo& createInfo) {};
+        explicit ComputePipeline(const Builder& createInfo) {};
     };
 }
 

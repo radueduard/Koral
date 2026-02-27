@@ -39,25 +39,7 @@ namespace gfx
     }
 
 
-    struct VertexInputAttributeDescription
-    {
-        glm::u32 location;
-        glm::u32 binding;
-        glm::u32 channelCount;
-        ChannelType channelType;
-        glm::u32 offset;
-    };
 
-    struct VertexInputBindingDescription
-    {
-        glm::u32 binding;
-        glm::u32 stride;
-    };
-
-    struct VertexInputState {
-        std::vector<VertexInputAttributeDescription> attributes = {};
-        std::vector<VertexInputBindingDescription> bindings = {};
-    };
 
     enum class Topology : uint8_t
     {
@@ -80,19 +62,11 @@ namespace gfx
         bool primitiveRestartEnable = false;
     };
 
-    struct VertexState
-    {
-        std::reference_wrapper<const Shader> shader;
-        VertexInputState vertexInputState;
-        InputAssemblyState inputAssemblyState;
-    };
-
     struct TessellationState
     {
         std::reference_wrapper<const Shader> controlShader;
         std::reference_wrapper<const Shader> evalShader;
         glm::u32 patchControlPoints = 3;
-
     };
 
     enum class PolygonMode : uint8_t
@@ -271,7 +245,7 @@ namespace gfx
     {
     public:
         struct Builder {
-            std::optional<VertexState> vertexState = std::nullopt;
+            std::optional<std::reference_wrapper<const Shader>> vertexShader = std::nullopt;
             std::optional<TessellationState> tessellationState = std::nullopt;
             std::optional<std::reference_wrapper<const Shader>> geometryShader = std::nullopt;
             std::optional<std::reference_wrapper<const Shader>> fragmentShader = std::nullopt;
@@ -279,12 +253,13 @@ namespace gfx
             std::optional<std::reference_wrapper<const Shader>> taskShader = std::nullopt;
             std::optional<std::reference_wrapper<const Shader>> meshShader = std::nullopt;
 
+            InputAssemblyState inputAssemblyState = {};
             RasterizationState rasterizationState = {};
             MultisampleState multisampleState = {};
             DepthStencilState depthStencilState = {};
             ColorBlendState colorBlendState = {};
 
-            Builder& setVertexStage(const VertexState& vertexState);
+            Builder& setVertexShader(const Shader& vertexShader);
             Builder& setTessellationState(const TessellationState& tessellationState);
             Builder& setGeometryShader(const Shader& geometryShader);
             Builder& setFragmentShader(const Shader& fragmentShader);
@@ -292,13 +267,14 @@ namespace gfx
             Builder& setTaskShader(const Shader& taskShader);
             Builder& setMeshShader(const Shader& meshShader);
 
+            Builder& setInputAssemblyState(const InputAssemblyState& inputAssemblyState);
             Builder& setRasterizationState(const RasterizationState& rasterizationState);
             Builder& setMultisampleState(const MultisampleState& multisampleState);
             Builder& setDepthStencilState(const DepthStencilState& depthStencilState);
             Builder& setColorBlendState(const ColorBlendState& colorBlendState);
-        };
 
-        static std::unique_ptr<GraphicsPipeline> Create(const Builder& createInfo);
+            [[nodiscard]] std::unique_ptr<GraphicsPipeline> build() const;
+        };
 
         virtual ~GraphicsPipeline() = default;
 
@@ -308,7 +284,7 @@ namespace gfx
     protected:
         explicit GraphicsPipeline(const Builder& createInfo);
 
-        std::optional<VertexState> _vertexState;
+        std::optional<std::reference_wrapper<const Shader>> _vertexShader;
         std::optional<TessellationState> _tessellationState;
         std::optional<std::reference_wrapper<const Shader>> _geometryShader;
         std::optional<std::reference_wrapper<const Shader>> _fragmentShader;
@@ -316,6 +292,7 @@ namespace gfx
         std::optional<std::reference_wrapper<const Shader>> _taskShader;
         std::optional<std::reference_wrapper<const Shader>> _meshShader;
 
+        InputAssemblyState _inputAssemblyState;
         RasterizationState _rasterizationState;
         MultisampleState _multisampleState;
         DepthStencilState _depthStencilState;

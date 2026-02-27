@@ -11,19 +11,21 @@
 
 namespace gfx
 {
-    std::unique_ptr<ImageView> ImageView::Create(const Image& image, const CreateInfo& createInfo)
+    ImageView::Builder::Builder(const Image& image) : image(image){}
+
+    std::unique_ptr<ImageView> ImageView::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
-            case API::OpenGL:
-                return std::make_unique<ogl::ImageView>(dynamic_cast<const ogl::Image&>(image), createInfo);
-            case API::Vulkan:
-                throw std::runtime_error("The Vulkan API is not yet supported!");
-            default:
-                throw std::runtime_error("Unknown graphics API!");
+        case API::OpenGL:
+            return std::make_unique<ogl::ImageView>(*this);
+        case API::Vulkan:
+            throw std::runtime_error("The Vulkan API is not yet supported!");
+        default:
+            throw std::runtime_error("Unknown graphics API!");
         }
     }
 
-    ImageView::ImageView(const CreateInfo& createInfo) :
+    ImageView::ImageView(const Builder& createInfo) :
         _viewType(createInfo.viewType),
         _baseMipLevel(createInfo.baseMipLevel),
         _mipLevelCount(createInfo.mipLevelCount),

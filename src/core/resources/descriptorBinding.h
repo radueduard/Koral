@@ -24,7 +24,7 @@ namespace gfx
         virtual ~Descriptor() = default;
         virtual void Bind(glm::u32 bindingPoint) const = 0;
 
-        struct CreateInfo
+        struct Builder
         {
             Type type;
             union
@@ -42,12 +42,12 @@ namespace gfx
                 };
             };
 
-            CreateInfo& setType(const Type type) {
+            Builder& setType(const Type type) {
                 this->type = type;
                 return *this;
             }
 
-            CreateInfo& setBuffer(const Buffer* buffer, const glm::u32 offset = 0, glm::u32 range = 0) {
+            Builder& setBuffer(const Buffer* buffer, const glm::u32 offset = 0, glm::u32 range = 0) {
                 if (range == 0)
                 {
                     range = buffer->getSize() - offset;
@@ -78,17 +78,18 @@ namespace gfx
              * create info struct is set to nullptr, the sampler field is ignored and can be set to nullptr as well.
              *
              */
-            CreateInfo& setImage(const ImageView* imageView, const Sampler* sampler = nullptr) {
+            Builder& setImage(const ImageView* imageView, const Sampler* sampler = nullptr) {
                 this->imageView = imageView;
                 this->sampler = sampler;
                 return *this;
             }
+
+            [[nodiscard]] std::unique_ptr<Descriptor> build() const;
         };
 
-        static std::unique_ptr<Descriptor> Create(const CreateInfo& createInfo);
 
     protected:
-        explicit Descriptor(const CreateInfo& createInfo);
+        explicit Descriptor(const Builder& createInfo);
 
         Type _type = Type::eUniformBuffer;
         union

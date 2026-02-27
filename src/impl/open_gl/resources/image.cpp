@@ -33,7 +33,7 @@ namespace gfx::ogl
         }
     }
 
-    Image::Image(const gfx::Image::CreateInfo& createInfo) : gfx::Image(createInfo)
+    Image::Image(const gfx::Image::Builder& createInfo) : gfx::Image(createInfo)
     {
         if (createInfo.msaa != MSAA::eNone && createInfo.type != Type::e2D) {
             std::cerr << "Error: Multisampled images are only supported for 2D images! Attempting to create a multisampled image with type " << magic_enum::enum_name(createInfo.type) << std::endl;

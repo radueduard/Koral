@@ -10,7 +10,7 @@
 
 namespace gfx::ogl
 {
-    Buffer::Buffer(const gfx::Buffer::CreateInfo& createInfo) : gfx::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo.usage))
+    Buffer::Buffer(const gfx::Buffer::Builder& createInfo) : gfx::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo.usage))
     {
         if (createInfo.usage & Usage::eUniform) {
             if (createInfo.size > 0xFFFF) {

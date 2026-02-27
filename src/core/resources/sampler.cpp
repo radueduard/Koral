@@ -10,11 +10,11 @@
 
 namespace gfx
 {
-    std::unique_ptr<Sampler> Sampler::Create(const CreateInfo& createInfo)
+    std::unique_ptr<Sampler> Sampler::CreateInfo::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::OpenGL:
-            return std::make_unique<ogl::Sampler>(createInfo);
+            return std::make_unique<ogl::Sampler>(*this);
         case API::Vulkan:
             throw std::runtime_error("Vulkan is not supported yet!");
         default:

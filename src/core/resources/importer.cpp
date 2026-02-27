@@ -37,17 +37,19 @@ namespace gfx
                 }
             }
 
-            auto positionsBuffer = Buffer::Create(Buffer::CreateInfo()
+            auto positionsBuffer = Buffer::Builder()
                 .setSize(positions.size() * sizeof(float))
                 .setUsage(Buffer::Usage::eVertex)
                 .addUsage(Buffer::Usage::eTransferDst)
-                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal));
+                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal)
+                .build();
 
-            const auto stagingBuffer = Buffer::Create(Buffer::CreateInfo()
+            const auto stagingBuffer = Buffer::Builder()
                 .setSize(positions.size() * sizeof(float))
                 .setUsage(Buffer::Usage::eTransferSrc)
                 .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
-                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent));
+                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
+                .build();
 
             stagingBuffer->Map();
             stagingBuffer->Write(0, positions.size() * sizeof(float), reinterpret_cast<const std::byte*>(positions.data()));
@@ -76,17 +78,19 @@ namespace gfx
                 }
             }
 
-            auto uvBuffer = Buffer::Create(Buffer::CreateInfo()
+            auto uvBuffer = Buffer::Builder()
                 .setSize(normals.size() * sizeof(float))
                 .setUsage(Buffer::Usage::eVertex)
                 .addUsage(Buffer::Usage::eTransferDst)
-                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal));
+                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal)
+                .build();
 
-            const auto stagingBuffer = Buffer::Create(Buffer::CreateInfo()
+            const auto stagingBuffer = Buffer::Builder()
                 .setSize(normals.size() * sizeof(float))
                 .setUsage(Buffer::Usage::eTransferSrc)
                 .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
-                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent));
+                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
+                .build();
 
             stagingBuffer->Map();
             stagingBuffer->Write(0, normals.size() * sizeof(float), reinterpret_cast<const std::byte*>(normals.data()));
@@ -114,17 +118,19 @@ namespace gfx
                 }
             }
 
-            auto normalBuffer = Buffer::Create(Buffer::CreateInfo()
+            auto normalBuffer = Buffer::Builder()
                 .setSize(uvs.size() * sizeof(float))
                 .setUsage(Buffer::Usage::eVertex)
                 .addUsage(Buffer::Usage::eTransferDst)
-                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal));
+                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal)
+                .build();
 
-            const auto stagingBuffer = Buffer::Create(Buffer::CreateInfo()
+            const auto stagingBuffer = Buffer::Builder()
                 .setSize(uvs.size() * sizeof(float))
                 .setUsage(Buffer::Usage::eTransferSrc)
                 .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
-                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent));
+                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
+                .build();
 
             stagingBuffer->Map();
             stagingBuffer->Write(0, uvs.size() * sizeof(float), reinterpret_cast<const std::byte*>(uvs.data()));
@@ -152,17 +158,19 @@ namespace gfx
                 }
             }
 
-            auto indexBuffer = Buffer::Create(Buffer::CreateInfo()
+            auto indexBuffer = Buffer::Builder()
                 .setSize(indices.size() * sizeof(unsigned int))
                 .setUsage(Buffer::Usage::eIndex)
                 .addUsage(Buffer::Usage::eTransferDst)
-                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal));
+                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal)
+                .build();
 
-            const auto stagingBuffer = Buffer::Create(Buffer::CreateInfo()
+            const auto stagingBuffer = Buffer::Builder()
                 .setSize(indices.size() * sizeof(unsigned int))
                 .setUsage(Buffer::Usage::eTransferSrc)
                 .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
-                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent));
+                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
+                .build();
 
             stagingBuffer->Map();
             stagingBuffer->Write(0, indices.size() * sizeof(unsigned int), reinterpret_cast<const std::byte*>(indices.data()));
@@ -185,18 +193,20 @@ namespace gfx
             throw std::runtime_error("Failed to load image: " + path.string());
         }
 
-        auto image = Image::Create(Image::CreateInfo()
+        auto image = Image::Builder()
             .setType(Image::Type::e2D)
             .setExtent({ static_cast<glm::u32>(width), static_cast<glm::u32>(height) })
             .setFormat(Image::Format::eRGBA8_UNORM)
             .setUsage(Image::Usage::eSampled)
-            .addUsage(Image::Usage::eTransferDst));
+            .addUsage(Image::Usage::eTransferDst)
+            .build();
 
-        const auto stagingBuffer = Buffer::Create(Buffer::CreateInfo()
+        const auto stagingBuffer = Buffer::Builder()
             .setSize(width * height * 4)
             .setUsage(Buffer::Usage::eTransferSrc)
             .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
-            .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent));
+            .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
+            .build();
 
         stagingBuffer->Map();
         stagingBuffer->Write(0, width * height * 4, reinterpret_cast<const std::byte*>(data));

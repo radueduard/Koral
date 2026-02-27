@@ -6,6 +6,7 @@
 
 namespace gfx::ogl
 {
-    ImageView::ImageView(const Image& image, const CreateInfo& createInfo) :
-        gfx::ImageView(createInfo), _image(image) {}
+    ImageView::ImageView(const Builder& createInfo) :
+        gfx::ImageView(createInfo),
+        _image(dynamic_cast<const ogl::Image&>(createInfo.image)) {}
 }

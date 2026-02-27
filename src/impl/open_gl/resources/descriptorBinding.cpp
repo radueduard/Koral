@@ -8,7 +8,7 @@
 namespace gfx::ogl
 {
 
-    Descriptor::Descriptor(const CreateInfo& createInfo) : gfx::Descriptor(createInfo) {}
+    Descriptor::Descriptor(const Builder& createInfo) : gfx::Descriptor(createInfo) {}
 
     void Descriptor::Bind(const glm::u32 bindingPoint) const
     {

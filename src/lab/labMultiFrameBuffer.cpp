@@ -17,45 +17,49 @@ void LabMultiFrameBuffer::Initialize()
     _mesh = gfx::Importer::LoadMesh(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
     _albedoImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_albedo.jpg"));
 
-    const auto geometryPassVertexShader = gfx::Shader::Create(gfx::Shader::CreateInfo()
+    const auto geometryPassVertexShader = gfx::Shader::Builder()
         .setPath(gfx::shader("geometryPass.vert.glsl"))
-        .setLang(gfx::Shader::Lang::eGLSL)
-        .setStage(gfx::Shader::Stage::eVertex));
+        .setStage(gfx::Shader::Stage::eVertex)
+        .build();
 
-    const auto geometryPassFragmentShader = gfx::Shader::Create(gfx::Shader::CreateInfo()
+    const auto geometryPassFragmentShader = gfx::Shader::Builder()
         .setPath(gfx::shader("geometryPass.frag.glsl"))
-        .setLang(gfx::Shader::Lang::eGLSL)
-        .setStage(gfx::Shader::Stage::eFragment));
+        .setStage(gfx::Shader::Stage::eFragment)
+        .build();
 
-    _pipeline1 = gfx::GraphicsPipeline::Create(gfx::GraphicsPipeline::Builder()
-        .setVertexStage({ .shader = *geometryPassVertexShader })
-        .setFragmentShader(*geometryPassFragmentShader));
+    _pipeline1 = gfx::GraphicsPipeline::Builder()
+        .setVertexShader(*geometryPassVertexShader)
+        .setFragmentShader(*geometryPassFragmentShader)
+        .build();
 
-    const auto vertexShader = gfx::Shader::Create(gfx::Shader::CreateInfo()
+    const auto vertexShader = gfx::Shader::Builder()
         .setPath(gfx::shader("albedo.vert.glsl"))
-        .setLang(gfx::Shader::Lang::eGLSL)
-        .setStage(gfx::Shader::Stage::eVertex));
+        .setStage(gfx::Shader::Stage::eVertex)
+        .build();
 
-    const auto fragmentShader = gfx::Shader::Create(gfx::Shader::CreateInfo()
+    const auto fragmentShader = gfx::Shader::Builder()
         .setPath(gfx::shader("albedo.frag.glsl"))
-        .setLang(gfx::Shader::Lang::eGLSL)
-        .setStage(gfx::Shader::Stage::eFragment));
+        .setStage(gfx::Shader::Stage::eFragment)
+        .build();
 
-    _pipeline2 = gfx::GraphicsPipeline::Create(gfx::GraphicsPipeline::Builder()
-        .setVertexStage({ .shader = *vertexShader })
-        .setFragmentShader(*fragmentShader));
+    _pipeline2 = gfx::GraphicsPipeline::Builder()
+        .setVertexShader(*vertexShader)
+        .setFragmentShader(*fragmentShader)
+        .build();
 
-    _uniformBufferCamera = gfx::Buffer::Create(gfx::Buffer::CreateInfo()
+    _uniformBufferCamera = gfx::Buffer::Builder()
         .setSize(128)
         .setUsage(gfx::Buffer::Usage::eUniform)
         .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostVisible)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent));
+        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent)
+        .build();
 
-    _uniformBufferModel = gfx::Buffer::Create(gfx::Buffer::CreateInfo()
+    _uniformBufferModel = gfx::Buffer::Builder()
         .setSize(64)
         .setUsage(gfx::Buffer::Usage::eUniform)
         .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostVisible)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent));
+        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent)
+        .build();
 
     glm::mat4 viewMatrix = glm::lookAt(
         glm::vec3(0.0f, 0.0f, -5.0f),
@@ -82,56 +86,64 @@ void LabMultiFrameBuffer::Initialize()
     _uniformBufferModel->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(modelMatrix)));
     _uniformBufferModel->Unmap();
 
-    _albedoImageView = gfx::ImageView::Create(*_albedoImage, gfx::ImageView::CreateInfo());
-    _sampler = gfx::Sampler::Create(gfx::Sampler::CreateInfo());
+    _albedoImageView = gfx::ImageView::Builder(*_albedoImage).build();
+    _sampler = gfx::Sampler::CreateInfo().build();
 
-    _descriptorBinding0 = gfx::Descriptor::Create(gfx::Descriptor::CreateInfo()
+    _descriptorBinding0 = gfx::Descriptor::Builder()
         .setType(gfx::Descriptor::Type::eUniformBuffer)
-        .setBuffer(_uniformBufferCamera.get(), 0, 128));
-    _descriptorBinding1 = gfx::Descriptor::Create(gfx::Descriptor::CreateInfo()
+        .setBuffer(_uniformBufferCamera.get(), 0, 128)
+        .build();
+    _descriptorBinding1 = gfx::Descriptor::Builder()
         .setType(gfx::Descriptor::Type::eUniformBuffer)
-        .setBuffer(_uniformBufferModel.get(), 0, 64));
-    _descriptorBinding2 = gfx::Descriptor::Create(gfx::Descriptor::CreateInfo()
+        .setBuffer(_uniformBufferModel.get(), 0, 64)
+        .build();
+    _descriptorBinding2 = gfx::Descriptor::Builder()
         .setType(gfx::Descriptor::Type::eCombinedImageSampler)
-        .setImage(_albedoImageView.get(), _sampler.get()));
+        .setImage(_albedoImageView.get(), _sampler.get())
+        .build();
 
-    _positionsImage = gfx::Image::Create(gfx::Image::CreateInfo()
+    _positionsImage = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eColorAttachment)
-        .setFormat(gfx::Image::Format::eRGB32_SFLOAT));
+        .setFormat(gfx::Image::Format::eRGB32_SFLOAT)
+        .build();
 
-    _positionsImageView = gfx::ImageView::Create(*_positionsImage, gfx::ImageView::CreateInfo());
+    _positionsImageView = gfx::ImageView::Builder(*_positionsImage).build();
 
-    _colorsImage = gfx::Image::Create(gfx::Image::CreateInfo()
+    _colorsImage = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eColorAttachment)
-        .setFormat(gfx::Image::Format::eRGBA8_UNORM));
+        .setFormat(gfx::Image::Format::eRGBA8_UNORM)
+        .build();
 
-    _colorsImageView = gfx::ImageView::Create(*_colorsImage, gfx::ImageView::CreateInfo());
+    _colorsImageView = gfx::ImageView::Builder(*_colorsImage).build();
 
-    _normalsImage = gfx::Image::Create(gfx::Image::CreateInfo()
+    _normalsImage = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eColorAttachment)
-        .setFormat(gfx::Image::Format::eRGB32_SFLOAT));
+        .setFormat(gfx::Image::Format::eRGB32_SFLOAT)
+        .build();
 
-    _normalsImageView = gfx::ImageView::Create(*_normalsImage, gfx::ImageView::CreateInfo());
+    _normalsImageView = gfx::ImageView::Builder(*_normalsImage).build();
 
-    _depthImage = gfx::Image::Create(gfx::Image::CreateInfo()
+    _depthImage = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
-        .setFormat(gfx::Image::Format::eD24_UNORM_S8_UINT));
+        .setFormat(gfx::Image::Format::eD24_UNORM_S8_UINT)
+        .build();
 
-    _depthImageView = gfx::ImageView::Create(*_depthImage, gfx::ImageView::CreateInfo());
+    _depthImageView = gfx::ImageView::Builder(*_depthImage).build();
 
-    _framebuffer = gfx::Framebuffer::Create(gfx::Framebuffer::CreateInfo()
+    _framebuffer = gfx::Framebuffer::Builder()
         .addColorAttachment(*_positionsImageView, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
         .addColorAttachment(*_colorsImageView, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
         .addColorAttachment(*_normalsImageView, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
-        .setDepthStencilAttachment(*_depthImageView, 1.f, 0));
+        .setDepthStencilAttachment(*_depthImageView, 1.f, 0)
+        .build();
 
     _commandBuffer = gfx::CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics);
 }

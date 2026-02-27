@@ -42,35 +42,36 @@ namespace gfx
             eSPIRV,
         };
 
-        struct CreateInfo {
+        struct Builder {
             Stage stage = Stage::eCompute;
             Lang lang = Lang::eGLSL;
             std::filesystem::path path = std::filesystem::path();
 
-            CreateInfo& setStage(const Stage stage) {
+            Builder& setStage(const Stage stage) {
                 this->stage = stage;
                 return *this;
             }
 
-            CreateInfo& setLang(const Lang lang) {
+            Builder& setLang(const Lang lang) {
                 this->lang = lang;
                 return *this;
             }
 
-            CreateInfo& setPath(const std::filesystem::path& path) {
+            Builder& setPath(const std::filesystem::path& path) {
                 this->path = path;
                 return *this;
             }
+
+            [[nodiscard]] std::unique_ptr<Shader> build() const;
         };
 
         virtual ~Shader() = default;
-        static std::unique_ptr<Shader> Create(const CreateInfo& createInfo);
 
         [[nodiscard]] Stage getStage() const { return _stage; }
         [[nodiscard]] Lang getLang() const { return _lang; }
 
     protected:
-        explicit Shader(const CreateInfo& createInfo);
+        explicit Shader(const Builder& createInfo);
         Stage _stage;
         Lang _lang;
         std::filesystem::path _path;

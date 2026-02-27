@@ -13,6 +13,26 @@
 
 namespace gfx
 {
+    struct VertexInputAttributeDescription
+    {
+        glm::u32 location;
+        glm::u32 binding;
+        glm::u32 channelCount;
+        ChannelType channelType;
+        glm::u32 offset;
+    };
+
+    struct VertexInputBindingDescription
+    {
+        glm::u32 binding;
+        glm::u32 stride;
+    };
+
+    struct VertexInputState {
+        std::vector<VertexInputAttributeDescription> attributes = {};
+        std::vector<VertexInputBindingDescription> bindings = {};
+    };
+
     class Mesh
     {
     public:

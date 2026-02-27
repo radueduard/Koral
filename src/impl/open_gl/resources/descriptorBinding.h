@@ -14,7 +14,7 @@ namespace gfx::ogl
     class Descriptor final : public gfx::Descriptor
     {
     public:
-        explicit Descriptor(const CreateInfo& createInfo);
+        explicit Descriptor(const Builder& createInfo);
 
         void Bind(glm::u32 bindingPoint) const override;
     };

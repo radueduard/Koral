@@ -10,9 +10,9 @@
 
 namespace gfx
 {
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setVertexStage(const VertexState& vertexState)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setVertexShader(const Shader& vertexShader)
     {
-        this->vertexState = vertexState;
+        this->vertexShader = vertexShader;
         return *this;
     }
 
@@ -46,6 +46,12 @@ namespace gfx
         return *this;
     }
 
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setInputAssemblyState(const InputAssemblyState& inputAssemblyState)
+    {
+        this->inputAssemblyState = inputAssemblyState;
+        return *this;
+    }
+
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setRasterizationState(const RasterizationState& rasterizationState)
     {
         this->rasterizationState = rasterizationState;
@@ -70,11 +76,11 @@ namespace gfx
         return *this;
     }
 
-    std::unique_ptr<GraphicsPipeline> GraphicsPipeline::Create(const Builder& createInfo)
+    std::unique_ptr<GraphicsPipeline> GraphicsPipeline::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::OpenGL:
-            return std::make_unique<ogl::GraphicsPipeline>(createInfo);
+            return std::make_unique<ogl::GraphicsPipeline>(*this);
         case API::Vulkan:
             throw std::runtime_error("vulkan is not supported");
         default:
@@ -83,26 +89,27 @@ namespace gfx
     }
 
     GraphicsPipeline::GraphicsPipeline(const Builder& createInfo) :
-        _vertexState(createInfo.vertexState),
+        _vertexShader(createInfo.vertexShader),
         _tessellationState(createInfo.tessellationState),
         _geometryShader(createInfo.geometryShader),
         _fragmentShader(createInfo.fragmentShader),
         _taskShader(createInfo.taskShader),
         _meshShader(createInfo.meshShader),
+        _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),
         _depthStencilState(createInfo.depthStencilState),
         _colorBlendState(createInfo.colorBlendState)
     {
-        if (!_vertexState.has_value() && !_meshShader.has_value()) {
+        if (!_vertexShader.has_value() && !_meshShader.has_value()) {
             throw std::runtime_error("Graphics pipeline must have either a vertex shader or a mesh shader!");
         }
 
-        if (!_vertexState.has_value() && _tessellationState.has_value()) {
+        if (!_vertexShader.has_value() && _tessellationState.has_value()) {
             throw std::runtime_error("Tessellation state cannot be set if there is no vertex shader!");
         }
 
-        if (!_vertexState.has_value() && _geometryShader.has_value()) {
+        if (!_vertexShader.has_value() && _geometryShader.has_value()) {
             throw std::runtime_error("Geometry shader cannot be set if there is no vertex shader!");
         }
 

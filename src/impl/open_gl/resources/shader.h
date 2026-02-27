@@ -10,7 +10,7 @@
 namespace gfx::ogl {
     class Shader final : public gfx::Shader {
     public:
-        explicit Shader(const gfx::Shader::CreateInfo& createInfo);
+        explicit Shader(const gfx::Shader::Builder& createInfo);
         ~Shader() override;
 
         GLuint operator*() const { return _id; }

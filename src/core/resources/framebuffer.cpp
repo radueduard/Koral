@@ -9,10 +9,11 @@
 #include "io/window.h"
 
 namespace gfx {
-    std::unique_ptr<Framebuffer> Framebuffer::Create(const CreateInfo& createInfo) {
+    std::unique_ptr<Framebuffer> Framebuffer::Builder::build() const
+    {
         switch (Context::Window().getAPI()) {
         case API::OpenGL:
-            return std::make_unique<ogl::Framebuffer>(createInfo);
+            return std::make_unique<ogl::Framebuffer>(*this);
         case API::Vulkan:
             throw std::runtime_error("Vulkan is not supported yet!");
         default:
@@ -61,7 +62,7 @@ namespace gfx {
         return clearValues.clearStencil;
     }
 
-    Framebuffer::Framebuffer(const CreateInfo& createInfo) :
+    Framebuffer::Framebuffer(const Builder& createInfo) :
         colorAttachments(createInfo.colorAttachments),
         depthStencilAttachment(createInfo.depthStencilAttachment),
         clearValues(createInfo.clearValues) {}

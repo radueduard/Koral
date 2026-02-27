@@ -9,11 +9,11 @@
 
 namespace gfx
 {
-    std::unique_ptr<Descriptor> Descriptor::Create(const CreateInfo& createInfo)
+    std::unique_ptr<Descriptor> Descriptor::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::OpenGL:
-            return std::make_unique<ogl::Descriptor>(createInfo);
+            return std::make_unique<ogl::Descriptor>(*this);
         case API::Vulkan:
             throw std::runtime_error("vulkan is not supported");
         default:
@@ -21,7 +21,7 @@ namespace gfx
         }
     }
 
-    Descriptor::Descriptor(const CreateInfo& createInfo): _type(createInfo.type)
+    Descriptor::Descriptor(const Builder& createInfo): _type(createInfo.type)
     {
         switch (createInfo.type) {
         case Type::eUniformBuffer:

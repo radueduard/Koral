@@ -12,7 +12,7 @@
 namespace gfx::ogl {
     class Image : public gfx::Image {
     public:
-        explicit Image(const gfx::Image::CreateInfo& createInfo);
+        explicit Image(const gfx::Image::Builder& createInfo);
         ~Image() override;
 
         GLuint operator*() const { return _id; }

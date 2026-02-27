@@ -33,9 +33,9 @@ namespace gfx::ogl
     {
         _id = glCreateProgram();
 
-        if (_vertexState.has_value())
+        if (_vertexShader.has_value())
         {
-            const auto& vertexShader = dynamic_cast<const ogl::Shader&>(_vertexState->shader.get());
+            const auto& vertexShader = dynamic_cast<const ogl::Shader&>(_vertexShader.value().get());
             glAttachShader(_id, *vertexShader);
             glCheckError();
         }
@@ -101,25 +101,6 @@ namespace gfx::ogl
         glUseProgram(_id);
         glCheckError();
         _bound = true;
-
-        if (_vertexState.has_value())
-        {
-            for (const auto& [binding, stride] : _vertexState->vertexInputState.bindings) {
-                glEnableVertexAttribArray(binding);
-                glCheckError();
-                for (const auto& attr : _vertexState->vertexInputState.attributes) {
-                    if (attr.binding == binding) {
-                        glVertexAttribPointer(attr.location, attr.channelCount, static_cast<GLenum>(attr.channelType), GL_FALSE, stride, reinterpret_cast<void*>(attr.offset));
-                        glCheckError();
-                    }
-                }
-            }
-
-            if (_vertexState->inputAssemblyState.primitiveRestartEnable) {
-                glEnable(GL_PRIMITIVE_RESTART);
-                glCheckError();
-            }
-        }
 
         if (_tessellationState.has_value()) {
             glPatchParameteri(GL_PATCH_VERTICES, _tessellationState->patchControlPoints);
@@ -207,14 +188,9 @@ namespace gfx::ogl
             throw std::runtime_error("Graphics pipeline is not bound!");
         }
 
-        if (_vertexState.has_value() && _vertexState->inputAssemblyState.primitiveRestartEnable) {
+        if (_vertexShader.has_value() && _inputAssemblyState.primitiveRestartEnable) {
             glDisable(GL_PRIMITIVE_RESTART);
             glCheckError();
-
-            for (const auto& [binding, _] : _vertexState->vertexInputState.bindings) {
-                glDisableVertexAttribArray(binding);
-                glCheckError();
-            }
         }
 
         if (_tessellationState.has_value()) {
@@ -264,7 +240,7 @@ namespace gfx::ogl
 
     GLenum GraphicsPipeline::getMode() const
     {
-        switch (_vertexState->inputAssemblyState.topology)
+        switch (_inputAssemblyState.topology)
         {
         case Topology::ePointList: return GL_POINTS;
         case Topology::eLineList: return GL_LINES;

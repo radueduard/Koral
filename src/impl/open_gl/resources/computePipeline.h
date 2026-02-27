@@ -11,7 +11,7 @@ namespace gfx::ogl
 {
     class ComputePipeline final : public gfx::ComputePipeline {
     public:
-        explicit ComputePipeline(const CreateInfo& createInfo);
+        explicit ComputePipeline(const Builder& createInfo);
         ~ComputePipeline() override;
         void Bind() const override;
         void Unbind() const override;

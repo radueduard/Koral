@@ -11,42 +11,47 @@ namespace gfx
 {
     class ImageView {
     public:
-        struct CreateInfo {
+        struct Builder {
+            const Image& image;
             Image::Type viewType = Image::Type::e2D;
             glm::u32 baseMipLevel = 0;
             glm::u32 mipLevelCount = 1;
             glm::u32 baseArrayLayer = 0;
             glm::u32 arrayLayerCount = 1;
 
-            CreateInfo& setViewType(Image::Type viewType) {
+            explicit Builder(const Image& image);
+
+            Builder& setViewType(Image::Type viewType) {
                 this->viewType = viewType;
                 return *this;
             }
 
-            CreateInfo& setBaseMipLevel(glm::u32 baseMipLevel) {
+            Builder& setBaseMipLevel(glm::u32 baseMipLevel) {
                 this->baseMipLevel = baseMipLevel;
                 return *this;
             }
 
-            CreateInfo& setMipLevelCount(glm::u32 mipLevelCount) {
+            Builder& setMipLevelCount(glm::u32 mipLevelCount) {
                 this->mipLevelCount = mipLevelCount;
                 return *this;
             }
 
-            CreateInfo& setBaseArrayLayer(glm::u32 baseArrayLayer) {
+            Builder& setBaseArrayLayer(glm::u32 baseArrayLayer) {
                 this->baseArrayLayer = baseArrayLayer;
                 return *this;
             }
 
-            CreateInfo& setArrayLayerCount(glm::u32 arrayLayerCount) {
+            Builder& setArrayLayerCount(glm::u32 arrayLayerCount) {
                 this->arrayLayerCount = arrayLayerCount;
                 return *this;
             }
+
+            [[nodiscard]] std::unique_ptr<ImageView> build() const;
         };
 
         virtual ~ImageView() = default;
 
-        static std::unique_ptr<ImageView> Create(const Image& image, const CreateInfo& createInfo);
+        static std::unique_ptr<ImageView> Create(const Image& image, const Builder& createInfo);
 
         [[nodiscard]] Image::Type GetViewType() const { return _viewType; }
         [[nodiscard]] glm::u32 GetBaseMipLevel() const { return _baseMipLevel; }
@@ -55,7 +60,7 @@ namespace gfx
         [[nodiscard]] glm::u32 GetArrayLayerCount() const { return _arrayLayerCount; }
 
     protected:
-        explicit ImageView(const CreateInfo& createInfo);
+        explicit ImageView(const Builder& createInfo);
         Image::Type _viewType;
         glm::u32 _baseMipLevel;
         glm::u32 _mipLevelCount;

@@ -8,6 +8,7 @@
 #include "io/window.h"
 #include "lab/labMesh.h"
 #include "lab/labMultiFrameBuffer.h"
+#include "lab/labRectangle.h"
 #include "lab/labTriangle.h"
 
 
@@ -23,6 +24,12 @@ namespace gfx
 void gfx::Engine::Run()
 {
     glewExperimental = GL_TRUE;
+
+    auto labRectangle = LabRectangle();
+    io::Manager::createWindow(io::Window::CreateInfo(labRectangle)
+        .setExtent({1280, 720})
+        .setFullscreen(false)
+        .setAPI(API::OpenGL));
 
     auto labTriangle = LabTriangle();
     io::Manager::createWindow(io::Window::CreateInfo(labTriangle)

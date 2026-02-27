@@ -10,11 +10,11 @@
 
 namespace gfx
 {
-    std::unique_ptr<Image> Image::Create(const CreateInfo& createInfo)
+    std::unique_ptr<Image> Image::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::OpenGL:
-            return std::make_unique<ogl::Image>(createInfo);
+            return std::make_unique<ogl::Image>(*this);
         case API::Vulkan:
             throw std::runtime_error("Vulkan is not supported yet!");
         default:
@@ -22,7 +22,7 @@ namespace gfx
         }
     }
 
-    Image::Image(const CreateInfo& createInfo) :
+    Image::Image(const Builder& createInfo) :
         type(createInfo.type),
         format(createInfo.format),
         extent(createInfo.extent),

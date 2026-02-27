@@ -11,7 +11,7 @@ namespace gfx::ogl {
     public:
         Framebuffer();
 
-        explicit Framebuffer(const gfx::Framebuffer::CreateInfo& createInfo);
+        explicit Framebuffer(const gfx::Framebuffer::Builder& createInfo);
         ~Framebuffer() override;
 
         GLuint operator*() const { return _id; }

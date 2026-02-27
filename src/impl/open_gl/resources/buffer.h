@@ -16,7 +16,7 @@ namespace gfx::ogl
     class Buffer : public gfx::Buffer
     {
     public:
-        explicit Buffer(const gfx::Buffer::CreateInfo& createInfo);
+        explicit Buffer(const gfx::Buffer::Builder& createInfo);
         ~Buffer() override;
 
         void Map() override;
