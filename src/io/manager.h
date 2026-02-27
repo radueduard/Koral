@@ -23,7 +23,7 @@ namespace gfx::io
         friend int ::main();
         friend class gfx::Engine;
     public:
-        static Window& createWindow(const Window::CreateInfo& createInfo);
+        static Window& createWindow(const Window::Builder& createInfo);
         static void removeWindow(Window* window);
 
         ~Manager();

@@ -53,7 +53,7 @@ void LabTriangle::Initialize()
 void LabTriangle::Update() {
     const float time = io::Time::WindowTime();
     _timeBuffer->Map();
-    _timeBuffer->Write(0, sizeof(float), reinterpret_cast<const std::byte*>(&time));
+    _timeBuffer->Write(time);
     _timeBuffer->Unmap();
 
     _commandBuffer->Reset();

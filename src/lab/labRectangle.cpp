@@ -26,14 +26,14 @@ void LabRectangle::Initialize()
         .addMemoryProperty(gfx::ogl::Buffer::MemoryProperty::eHostCoherent)
         .build();
 
-    struct {
+    constexpr struct {
         glm::vec3 position = glm::vec3(.5f, .5f, 0.0f);
         float size = 0.75f;
         glm::vec4 color = glm::vec4(1.0f, .5f, 1.0f, 1.0f);
     } rectangleData {};
 
     buffer->Map();
-    buffer->Write(0, sizeof(rectangleData), reinterpret_cast<std::byte*>(&rectangleData));
+    buffer->Write(rectangleData);
     buffer->Unmap();
 
     const auto image = gfx::Image::Builder()

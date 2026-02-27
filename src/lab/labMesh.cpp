@@ -64,12 +64,12 @@ void LabMesh::Initialize()
                             glm::rotate(glm::mat4(1.f), glm::radians(180.f), glm::vec3(0.f, 1.f, 0.f));
 
     _uniformBufferCamera->Map();
-    _uniformBufferCamera->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(viewMatrix)));
-    _uniformBufferCamera->Write(64, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(projectionMatrix)));
+    _uniformBufferCamera->Write(viewMatrix);
+    _uniformBufferCamera->Write(projectionMatrix, 64);
     _uniformBufferCamera->Unmap();
 
     _uniformBufferModel->Map();
-    _uniformBufferModel->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(modelMatrix)));
+    _uniformBufferModel->Write(modelMatrix);
     _uniformBufferModel->Unmap();
 
     _albedoImageView = gfx::ImageView::Builder(*_albedoImage).build();
@@ -154,7 +154,7 @@ void LabMesh::Update()
     );
 
     _uniformBufferCamera->Map();
-    _uniformBufferCamera->Write(0, 64, reinterpret_cast<const std::byte*>(glm::value_ptr(viewMatrix)));
+    _uniformBufferCamera->Write(viewMatrix);
     _uniformBufferCamera->Unmap();
 }
 

@@ -13,7 +13,7 @@
 #include "manager.h"
 
 namespace gfx::io {
-    Window::Window(const CreateInfo& createInfo) :
+    Window::Window(const Builder& createInfo) :
         _title(createInfo.title),
         _extent(createInfo.extent),
         _resizable(createInfo.resizable),
@@ -78,6 +78,11 @@ namespace gfx::io {
         
         glfwMakeContextCurrent(_window);
         glewInit();
+    }
+
+    void Window::Builder::build() const
+    {
+        Manager::createWindow(*this);
     }
 
     Window::~Window() {
