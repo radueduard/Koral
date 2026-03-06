@@ -19,6 +19,6 @@ layout(binding = 0) uniform Time {
 };
 
 void main() {
-    fragColor = colors[gl_VertexID] * ((sin(time) + 1.f) / 2.f);
-    gl_Position = vec4(vertices[gl_VertexID], 1.0);
+    fragColor = colors[gl_VertexIndex] * ((sin(time) + 1.f) / 2.f);
+    gl_Position = vec4(vertices[gl_VertexIndex], 1.0);
 }

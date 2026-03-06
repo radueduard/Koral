@@ -37,7 +37,8 @@ namespace gfx
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
         virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline) = 0;
         virtual CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline) = 0;
-        virtual CommandBuffer& BindDescriptor(glm::u32 bindingPoint, const Descriptor* binding) = 0;
+        // virtual CommandBuffer& BindDescriptor(glm::u32 bindingPoint, const Descriptor* binding) = 0;
+        virtual CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* descriptorSet) = 0;
         virtual CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) = 0;
         virtual CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) = 0;
         virtual CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) = 0;

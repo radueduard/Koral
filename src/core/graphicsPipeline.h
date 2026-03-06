@@ -4,6 +4,7 @@
 
 #pragma once
 #include <optional>
+#include <unordered_map>
 #include <glm/fwd.hpp>
 
 #include "shader.h"
@@ -12,34 +13,7 @@
 
 namespace gfx
 {
-    enum class ChannelType : uint32_t
-    {
-        eFloat = 0,
-        eInt = 1,
-        eUInt = 2,
-        eShort = 3,
-        eUShort = 4,
-        eByte = 5,
-        eUByte = 6,
-        eDouble = 7
-    };
-
-    inline glm::u32 sizeofChannelType(const ChannelType channelType) {
-        switch (channelType) {
-        case ChannelType::eFloat: return sizeof(float);
-        case ChannelType::eInt: return sizeof(int);
-        case ChannelType::eUInt: return sizeof(unsigned int);
-        case ChannelType::eShort: return sizeof(short);
-        case ChannelType::eUShort: return sizeof(unsigned short);
-        case ChannelType::eByte: return sizeof(char);
-        case ChannelType::eUByte: return sizeof(unsigned char);
-        case ChannelType::eDouble: return sizeof(double);
-        default: throw std::runtime_error("Unknown channel type!");
-        }
-    }
-
-
-
+    class DescriptorSetLayout;
 
     enum class Topology : uint8_t
     {
@@ -281,6 +255,8 @@ namespace gfx
         virtual void Bind() const = 0;
         virtual void Unbind() const = 0;
 
+        [[nodiscard]] const gfx::DescriptorSetLayout& getSetLayout(glm::u32 index) const;
+
     protected:
         explicit GraphicsPipeline(const Builder& createInfo);
 
@@ -297,5 +273,7 @@ namespace gfx
         MultisampleState _multisampleState;
         DepthStencilState _depthStencilState;
         ColorBlendState _colorBlendState;
+
+        std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts;
     };
 }

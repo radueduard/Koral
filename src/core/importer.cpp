@@ -214,7 +214,7 @@ namespace gfx
         stagingBuffer->Write(std::span { data, static_cast<unsigned long long>(width * height * 4) });
         stagingBuffer->Unmap();
 
-        image->CopyFrom(*stagingBuffer);
+        image->CopyFrom(*stagingBuffer, 0, 0);
 
         return image;
     }

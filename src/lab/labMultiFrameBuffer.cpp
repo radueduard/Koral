@@ -87,19 +87,12 @@ void LabMultiFrameBuffer::Initialize()
     _uniformBufferModel->Unmap();
 
     _albedoImageView = gfx::ImageView::Builder(*_albedoImage).build();
-    _sampler = gfx::Sampler::CreateInfo().build();
+    _sampler = gfx::Sampler::Builder().build();
 
-    _descriptorBinding0 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eUniformBuffer)
-        .setBuffer(_uniformBufferCamera.get(), 0, 128)
-        .build();
-    _descriptorBinding1 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eUniformBuffer)
-        .setBuffer(_uniformBufferModel.get(), 0, 64)
-        .build();
-    _descriptorBinding2 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eCombinedImageSampler)
-        .setImage(_albedoImageView.get(), _sampler.get())
+    _descriptorSet = gfx::DescriptorSet::Builder(_pipeline1->getSetLayout(0))
+        .write(0, gfx::Descriptor(_uniformBufferCamera.get()))
+        .write(1, gfx::Descriptor(_uniformBufferModel.get()))
+        .write(2, gfx::Descriptor(_albedoImageView.get(), _sampler.get()))
         .build();
 
     _positionsImage = gfx::Image::Builder()
@@ -159,9 +152,7 @@ void LabMultiFrameBuffer::Render()
         .BeginRendering(_framebuffer.get())
         .SetViewport(0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y)
         .BindPipeline(_pipeline1.get())
-        .BindDescriptor(0, _descriptorBinding0.get())
-        .BindDescriptor(1, _descriptorBinding1.get())
-        .BindDescriptor(2, _descriptorBinding2.get())
+        .BindDescriptorSet(0, _descriptorSet.get())
         .DrawMesh(_mesh.get(), 1, 0)
         .EndRendering()
         .BeginRendering(gfx::Context::DefaultFramebuffer())

@@ -4,6 +4,12 @@
 
 #include "graphicsPipeline.h"
 
+#include <ranges>
+
+#include "core/descriptorSetLayout.h"
+
+#include "utils/ogl_err_handling.h"
+
 namespace gfx::ogl
 {
     GLenum toGLPolygonMode(const PolygonMode mode) {
@@ -33,48 +39,77 @@ namespace gfx::ogl
     {
         _id = glCreateProgram();
 
+        // liniarize descriptors
+        glm::u32 nextDescriptorBindingPoint = 0;
+        for (const auto& [set, layout] : _setLayouts) {
+            for (const auto& [binding, type, Count] : layout->getBindings()) {
+                _setAndBindingToBindingPoint[{ set, binding }] = nextDescriptorBindingPoint++;
+            }
+        }
+
+        std::vector<GLuint> shaderIds;
         if (_vertexShader.has_value())
         {
             const auto& vertexShader = dynamic_cast<const ogl::Shader&>(_vertexShader.value().get());
-            glAttachShader(_id, *vertexShader);
+            const GLuint shaderId = vertexShader.compile(_setAndBindingToBindingPoint);
+
+            glAttachShader(_id, shaderId);
             glCheckError();
+
+            shaderIds.push_back(shaderId);
         }
 
         if (_tessellationState.has_value())
         {
             const auto& controlShader = dynamic_cast<const ogl::Shader&>(_tessellationState->controlShader.get());
+            const GLuint controlShaderId = controlShader.compile(_setAndBindingToBindingPoint);
+
             const auto& evalShader = dynamic_cast<const ogl::Shader&>(_tessellationState->evalShader.get());
-            glAttachShader(_id, *controlShader);
-            glAttachShader(_id, *evalShader);
+            const GLuint evalShaderId = evalShader.compile(_setAndBindingToBindingPoint);
+
+            glAttachShader(_id, controlShaderId);
+            glAttachShader(_id, evalShaderId);
             glCheckError();
+
+            shaderIds.push_back(controlShaderId);
+            shaderIds.push_back(evalShaderId);
+
         }
 
         if (_geometryShader.has_value())
         {
             const auto& geometryShader = dynamic_cast<const ogl::Shader&>(_geometryShader->get());
-            glAttachShader(_id, *geometryShader);
+            const GLuint shaderId = geometryShader.compile(_setAndBindingToBindingPoint);
+            glAttachShader(_id, shaderId);
             glCheckError();
+            shaderIds.push_back(shaderId);
         }
 
         if (_taskShader.has_value())
         {
             const auto& taskShader = dynamic_cast<const ogl::Shader&>(_taskShader->get());
-            glAttachShader(_id, *taskShader);
+            const GLuint shaderId = taskShader.compile(_setAndBindingToBindingPoint);
+            glAttachShader(_id, shaderId);
             glCheckError();
+            shaderIds.push_back(shaderId);
         }
 
         if (_meshShader.has_value())
         {
             const auto& meshShader = dynamic_cast<const ogl::Shader&>(_meshShader->get());
-            glAttachShader(_id, *meshShader);
+            const GLuint shaderId = meshShader.compile(_setAndBindingToBindingPoint);
+            glAttachShader(_id, shaderId);
             glCheckError();
+            shaderIds.push_back(shaderId);
         }
 
         if (_fragmentShader.has_value())
         {
             const auto& fragmentShader = dynamic_cast<const ogl::Shader&>(_fragmentShader->get());
-            glAttachShader(_id, *fragmentShader);
+            const GLuint shaderId = fragmentShader.compile(_setAndBindingToBindingPoint);
+            glAttachShader(_id, shaderId);
             glCheckError();
+            shaderIds.push_back(shaderId);
         }
 
         glLinkProgram(_id);
@@ -88,6 +123,12 @@ namespace gfx::ogl
             char infoLog[512];
             glGetProgramInfoLog(_id, 512, nullptr, infoLog);
             throw std::runtime_error(std::string("Failed to link graphics pipeline: ") + infoLog);
+        }
+
+        for (const auto& shaderId : shaderIds) {
+            glDetachShader(_id, shaderId);
+            glDeleteShader(shaderId);
+            glCheckError();
         }
     }
 

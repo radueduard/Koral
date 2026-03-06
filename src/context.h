@@ -18,8 +18,8 @@ namespace gfx {
     std::filesystem::path shader(const std::filesystem::path& relativePath);
 
     enum class API {
-        OpenGL,
-        Vulkan,
+        eOpenGL,
+        eVulkan,
     };
 
     class Context

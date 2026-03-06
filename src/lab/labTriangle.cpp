@@ -35,13 +35,10 @@ void LabTriangle::Initialize()
         .setSize(sizeof(float))
         .setUsage(Buffer::Usage::eUniform)
         .setLayout(Buffer::Layout::eStd430)
-        .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
-        .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
         .build();
 
-    _timeDescriptor = Descriptor::Builder()
-        .setType(Descriptor::Type::eUniformBuffer)
-        .setBuffer(_timeBuffer.get())
+    _timeDescriptorSet = DescriptorSet::Builder(_graphicsPipeline->getSetLayout(0))
+        .write(0, Descriptor(_timeBuffer.get()))
         .build();
 
     _commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
@@ -62,7 +59,7 @@ void LabTriangle::Render()
         .BeginRendering(Context::DefaultFramebuffer())
         .SetViewport(0.f, 0.f, Context::Window().getExtent().x, Context::Window().getExtent().y)
         .BindPipeline(_graphicsPipeline.get())
-        .BindDescriptor(0, _timeDescriptor.get())
+        .BindDescriptorSet(0, _timeDescriptorSet.get())
         .Draw(3, 1, 0, 0)
         .EndRendering()
         .End();

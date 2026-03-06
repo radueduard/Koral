@@ -15,16 +15,16 @@
 
 namespace gfx::ogl
 {
-    GLenum GetTargetFromImageType(const gfx::Image::Type type, const gfx::Image::MSAA msaa, const glm::u32 arrayLayers)
+    GLenum GetTargetFromImageType(const gfx::Image::Type type, const gfx::MSAA msaa, const glm::u32 arrayLayers)
     {
         switch (type) {
         case gfx::Image::Type::e1D:
             return arrayLayers == 1 ? GL_TEXTURE_1D : GL_TEXTURE_1D_ARRAY;
         case gfx::Image::Type::e2D:
             if (arrayLayers == 1) {
-                return msaa == gfx::Image::MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
+                return msaa == gfx::MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
             } else {
-                return msaa == gfx::Image::MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+                return msaa == gfx::MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
             }
         case gfx::Image::Type::e3D:
             return GL_TEXTURE_3D;
@@ -84,13 +84,13 @@ namespace gfx::ogl
         } else if (createInfo.type == gfx::Image::Type::e1D && createInfo.arrayLayers > 1) {
             glTexStorage2D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.arrayLayers);
         } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers == 1) {
-            if (createInfo.msaa == gfx::Image::MSAA::eNone) {
+            if (createInfo.msaa == gfx::MSAA::eNone) {
                 glTexStorage2D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y);
             } else {
                 glTexStorage2DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, GL_TRUE);
             }
         } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers > 1) {
-            if (createInfo.msaa == gfx::Image::MSAA::eNone) {
+            if (createInfo.msaa == gfx::MSAA::eNone) {
                 glTexStorage3D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers);
             } else {
                 glTexStorage3DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers, GL_TRUE);
@@ -163,10 +163,16 @@ namespace gfx::ogl
         return data;
     }
 
-    void Image::CopyFrom(const gfx::Buffer& buffer)
+    void Image::CopyFrom(const gfx::Buffer& buffer, const uint32_t mipLevel, const uint32_t layer) const
     {
         if (!(usage & Usage::eTransferDst)) {
             throw std::runtime_error("Attempting to copy data to an image that does not have the TransferDst usage flag set!");
+        }
+        if (mipLevels <= mipLevel) {
+            throw std::runtime_error("Attempting to copy data to a mip level that does not exist!");
+        }
+        if (arrayLayers <= layer) {
+            throw std::runtime_error("Attempting to copy data to an array layer that does not exist!");
         }
 
         const auto& oglBuffer = dynamic_cast<const Buffer&>(buffer);
@@ -176,21 +182,20 @@ namespace gfx::ogl
         const GLenum target = GetTargetFromImageType(type, msaa, arrayLayers);
         const GLenum baseFormat = BaseFormatFromImageFormat(format);
         const GLenum dataType = DataTypeFromImageFormat(format);
-        const GLsizei width = static_cast<GLsizei>(extent.x);
-        const GLsizei height = static_cast<GLsizei>(extent.y);
-        const GLsizei depth = static_cast<GLsizei>(extent.z);
-        const GLsizei layerCount = arrayLayers > 1 ? static_cast<GLsizei>(arrayLayers) : 1;
+        const auto width = static_cast<GLsizei>(extent.x);
+        const auto height = static_cast<GLsizei>(extent.y);
+        const auto depth = static_cast<GLsizei>(extent.z);
 
         if (type == Type::e1D && arrayLayers == 1) {
-            glTexSubImage1D(target, 0, 0, width, baseFormat, dataType, nullptr);
+            glTexSubImage1D(target, static_cast<glm::i32>(mipLevel), 0, width, baseFormat, dataType, nullptr);
         } else if (type == Type::e1D && arrayLayers > 1) {
-            glTexSubImage2D(target, 0, 0, 0, width, layerCount, baseFormat, dataType, nullptr);
+            glTexSubImage2D(target, static_cast<glm::i32>(mipLevel), 0, static_cast<glm::i32>(layer) * width, width, 1, baseFormat, dataType, nullptr);
         } else if (type == Type::e2D && arrayLayers == 1) {
-            glTexSubImage2D(target, 0, 0, 0, width, height, baseFormat, dataType, nullptr);
+            glTexSubImage2D(target, static_cast<glm::i32>(mipLevel), 0, 0, width, height, baseFormat, dataType, nullptr);
         } else if (type == Type::e2D && arrayLayers > 1) {
-            glTexSubImage3D(target, 0, 0, 0, 0, width, height, layerCount, baseFormat, dataType, nullptr);
+            glTexSubImage3D(target, static_cast<glm::i32>(mipLevel), 0, 0, static_cast<glm::i32>(layer) * width * height, width, height, 1, baseFormat, dataType, nullptr);
         } else if (type == Type::e3D) {
-            glTexSubImage3D(target, 0, 0, 0, 0, width, height, depth, baseFormat, dataType, nullptr);
+            glTexSubImage3D(target, static_cast<glm::i32>(mipLevel), 0, 0, 0, width, height, depth, baseFormat, dataType, nullptr);
         } else {
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
             throw std::runtime_error("Unsupported image type or array layer configuration for copying data!");
@@ -409,152 +414,6 @@ namespace gfx::ogl
         case Format::eD32_SFLOAT_S8_UINT:
             return GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
         default: throw std::runtime_error("Unsupported image format for data type!");
-        }
-    }
-
-    glm::u32 Image::PixelSizeFromImageFormat(gfx::Image::Format format)
-    {
-        switch (format)
-        {
-        case Format::eR8_UNORM:
-        case Format::eR8_SNORM:
-        case Format::eR8_UINT:
-        case Format::eR8_SINT:
-            return 1;
-        case Format::eRG8_UNORM:
-        case Format::eRG8_SNORM:
-        case Format::eRG8_UINT:
-        case Format::eRG8_SINT:
-            return 1;
-        case Format::eRGB8_UNORM:
-        case Format::eRGB8_SNORM:
-        case Format::eRGB8_UINT:
-        case Format::eRGB8_SINT:
-        case Format::eRGB8_SRGB:
-            return 1;
-        case Format::eRGBA8_UNORM:
-        case Format::eRGBA8_SNORM:
-        case Format::eRGBA8_UINT:
-        case Format::eRGBA8_SINT:
-        case Format::eRGBA8_SRGB:
-            return 1;
-        case Format::eR16_UNORM:
-        case Format::eR16_SNORM:
-        case Format::eR16_UINT:
-        case Format::eR16_SINT:
-        case Format::eR16_SFLOAT:
-            return 2;
-        case Format::eRG16_UNORM:
-        case Format::eRG16_SNORM:
-        case Format::eRG16_UINT:
-        case Format::eRG16_SINT:
-        case Format::eRG16_SFLOAT:
-            return 2;
-        case Format::eRGB16_UNORM:
-        case Format::eRGB16_SNORM:
-        case Format::eRGB16_UINT:
-        case Format::eRGB16_SINT:
-        case Format::eRGB16_SFLOAT:
-            return 2;
-        case Format::eRGBA16_UNORM:
-        case Format::eRGBA16_SNORM:
-        case Format::eRGBA16_UINT:
-        case Format::eRGBA16_SINT:
-        case Format::eRGBA16_SFLOAT:
-            return 2;
-        case Format::eR32_UINT:
-        case Format::eR32_SINT:
-        case Format::eR32_SFLOAT:
-            return 4;
-        case Format::eRG32_UINT:
-        case Format::eRG32_SINT:
-        case Format::eRG32_SFLOAT:
-            return 4;
-        case Format::eRGB32_UINT:
-        case Format::eRGB32_SINT:
-        case Format::eRGB32_SFLOAT:
-            return 4;
-        case Format::eRGBA32_UINT:
-        case Format::eRGBA32_SINT:
-        case Format::eRGBA32_SFLOAT:
-            return 4;
-        case Format::eD16_UNORM:
-            return 2;
-        case Format::eD24_UNORM_S8_UINT:
-            return 4;
-        case Format::eD32_SFLOAT:
-            return 4;
-        case Format::eD32_SFLOAT_S8_UINT:
-            return 4;
-        default: throw std::runtime_error("Unsupported image format for pixel size!");
-        }
-    }
-
-    glm::u32 Image::ChannelCountFromImageFormat(gfx::Image::Format format)
-    {
-        switch (format)
-        {
-        case Format::eR8_UNORM:
-        case Format::eR8_SNORM:
-        case Format::eR8_UINT:
-        case Format::eR8_SINT:
-        case Format::eR16_UNORM:
-        case Format::eR16_SNORM:
-        case Format::eR16_UINT:
-        case Format::eR16_SINT:
-        case Format::eR16_SFLOAT:
-        case Format::eR32_UINT:
-        case Format::eR32_SINT:
-        case Format::eR32_SFLOAT:
-            return 1;
-        case Format::eRG8_UNORM:
-        case Format::eRG8_SNORM:
-        case Format::eRG8_UINT:
-        case Format::eRG8_SINT:
-        case Format::eRG16_UNORM:
-        case Format::eRG16_SNORM:
-        case Format::eRG16_UINT:
-        case Format::eRG16_SINT:
-        case Format::eRG16_SFLOAT:
-        case Format::eRG32_UINT:
-        case Format::eRG32_SINT:
-        case Format::eRG32_SFLOAT:
-            return 2;
-        case Format::eRGB8_UNORM:
-        case Format::eRGB8_SNORM:
-        case Format::eRGB8_UINT:
-        case Format::eRGB8_SINT:
-        case Format::eRGB8_SRGB:
-        case Format::eRGB16_UNORM:
-        case Format::eRGB16_SNORM:
-        case Format::eRGB16_UINT:
-        case Format::eRGB16_SINT:
-        case Format::eRGB16_SFLOAT:
-        case Format::eRGB32_UINT:
-        case Format::eRGB32_SINT:
-        case Format::eRGB32_SFLOAT:
-            return 3;
-        case Format::eRGBA8_UNORM:
-        case Format::eRGBA8_SNORM:
-        case Format::eRGBA8_UINT:
-        case Format::eRGBA8_SINT:
-        case Format::eRGBA8_SRGB:
-        case Format::eRGBA16_UNORM:
-        case Format::eRGBA16_SNORM:
-        case Format::eRGBA16_UINT:
-        case Format::eRGBA16_SINT:
-        case Format::eRGBA16_SFLOAT:
-        case Format::eRGBA32_UINT:
-        case Format::eRGBA32_SINT:
-        case Format::eRGBA32_SFLOAT:
-            return 4;
-        case Format::eD16_UNORM:
-        case Format::eD32_SFLOAT:
-            return 1;
-        case Format::eD24_UNORM_S8_UINT:
-        case Format::eD32_SFLOAT_S8_UINT:
-            return 2;
-        default: throw std::runtime_error("Unsupported image format for channel count!");
         }
     }
 }

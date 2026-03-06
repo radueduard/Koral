@@ -6,8 +6,8 @@
 
 #include <GL/glew.h>
 
-#include "../../core/buffer.h"
-#include "../../core/image.h"
+#include "core/buffer.h"
+#include "core/image.h"
 
 namespace gfx::ogl {
     class Image : public gfx::Image {
@@ -18,7 +18,7 @@ namespace gfx::ogl {
         GLuint operator*() const { return _id; }
 
         std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const override;
-        void CopyFrom(const gfx::Buffer& buffer) override;
+        void CopyFrom(const gfx::Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const override;
 
         GLenum getGLFormat() const { return InternalFormatFromImageFormat(format); }
 
@@ -27,7 +27,6 @@ namespace gfx::ogl {
         [[nodiscard]] static GLenum InternalFormatFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static GLenum BaseFormatFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static GLenum DataTypeFromImageFormat(gfx::Image::Format format);
-        [[nodiscard]] static glm::u32 PixelSizeFromImageFormat(gfx::Image::Format format);
-        [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(gfx::Image::Format format);
+
     };
 }

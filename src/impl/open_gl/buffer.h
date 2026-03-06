@@ -8,8 +8,7 @@
 #include <optional>
 #include <GL/glew.h>
 
-#include "../../core/buffer.h"
-#include "utils/ogl_err_handling.h"
+#include "core/buffer.h"
 
 namespace gfx::ogl
 {
@@ -19,10 +18,8 @@ namespace gfx::ogl
         explicit Buffer(const gfx::Buffer::Builder& createInfo);
         ~Buffer() override;
 
-        void Map() override;
-        void Unmap() override;
-        void Flush(glm::i64 offset, glm::i64 size) const override;
-        void Invalidate(glm::i64 offset, glm::i64 size) const override;
+        void Map() const override;
+        void Unmap() const override;
 
         void CopyFrom(const gfx::Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const override;
 

@@ -3,6 +3,7 @@
 //
 
 #include "graphicsPipeline.h"
+#include "descriptorSetLayout.h"
 #include "impl/open_gl/graphicsPipeline.h"
 
 #include "context.h"
@@ -79,13 +80,20 @@ namespace gfx
     std::unique_ptr<GraphicsPipeline> GraphicsPipeline::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
-        case API::OpenGL:
+        case API::eOpenGL:
             return std::make_unique<ogl::GraphicsPipeline>(*this);
-        case API::Vulkan:
+        case API::eVulkan:
             throw std::runtime_error("vulkan is not supported");
         default:
             throw std::runtime_error("Unknown API");
         }
+    }
+
+    const gfx::DescriptorSetLayout& GraphicsPipeline::getSetLayout(const glm::u32 index) const
+    {
+        if (!_setLayouts.contains(index))
+            throw std::runtime_error("This pipeline does not contain a set with that index!");
+        return *_setLayouts.at(index);
     }
 
     GraphicsPipeline::GraphicsPipeline(const Builder& createInfo) :
@@ -115,6 +123,55 @@ namespace gfx
 
         if (!_meshShader.has_value() && _taskShader.has_value()) {
             throw std::runtime_error("Task shader cannot be set if there is no mesh shader!");
+        }
+
+        std::vector<std::reference_wrapper<const Shader>> shaders;
+        if (_vertexShader.has_value()) shaders.push_back(*_vertexShader);
+        if (_tessellationState.has_value()) {
+            shaders.push_back(_tessellationState->controlShader);
+            shaders.push_back(_tessellationState->evalShader);
+        }
+        if (_geometryShader.has_value()) shaders.push_back(*_geometryShader);
+        if (_fragmentShader.has_value()) shaders.push_back(*_fragmentShader);
+        if (_taskShader.has_value()) shaders.push_back(*_taskShader);
+        if (_meshShader.has_value()) shaders.push_back(*_meshShader);
+
+        std::vector<Shader::MemoryLayout> memoryLayouts = {};
+        for (const auto& shader : shaders) {
+            memoryLayouts.push_back(shader.get().getMemoryLayout());
+        }
+
+        // check for set layout compatibility between shaders and create set layouts
+        std::unordered_map<glm::u32, std::map<glm::u32, std::tuple<DescriptorType, std::string, glm::u32>>> mergedSetLayouts;
+        for (const auto& memoryLayout : memoryLayouts)
+        {
+            for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
+            {
+                for (const auto& [binding, descriptor] : setDescription.descriptors)
+                {
+                    if (mergedSetLayouts[setIndex].contains(binding)) {
+                        const auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
+                        if (existingDescriptor != descriptor)
+                        {
+                            throw std::runtime_error("Descriptor set layout conflict between shaders in pipeline!");
+                        }
+                    } else
+                    {
+                        mergedSetLayouts[setIndex][binding] = descriptor;
+                    }
+                }
+            }
+        }
+
+        for (const auto& [setIndex, setDescription] : mergedSetLayouts)
+        {
+            auto builder = DescriptorSetLayout::Builder();
+            for (const auto& [binding, descriptor] : setDescription)
+            {
+                const auto& [type, name, count] = descriptor;
+                builder.addBinding(binding, type, count);
+            }
+            _setLayouts[setIndex] = builder.build();
         }
     }
 }

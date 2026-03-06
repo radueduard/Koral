@@ -11,6 +11,7 @@
 #include "computePipeline.h"
 #include "graphicsPipeline.h"
 #include "mesh.h"
+#include "utils/ogl_err_handling.h"
 
 namespace gfx::ogl
 {
@@ -114,12 +115,12 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptor(glm::u32 bindingPoint, const Descriptor* binding)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, const DescriptorSet* set)
     {
         CheckRecording();
-        _commands.emplace_back([bindingPoint, binding] ()
+        _commands.emplace_back([set, index, this] ()
         {
-            binding->Bind(bindingPoint);
+            set->bind(*this, index);
         });
         return *this;
     }
@@ -227,5 +228,16 @@ namespace gfx::ogl
         _filled = false;
         _submitted = false;
         _commands.clear();
+    }
+
+    const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& CommandBuffer::getRemappingTableForBoundPipeline() const
+    {
+        if (_state.boundComputePipeline.has_value()) {
+            return _state.boundComputePipeline.value()->getSetAndBindingToBindingPointMap();
+        }
+        if (_state.boundGraphicsPipeline.has_value()) {
+            return _state.boundGraphicsPipeline.value()->getSetAndBindingToBindingPointMap();
+        }
+        throw std::runtime_error("No pipeline is currently bound!");
     }
 }

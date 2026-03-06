@@ -6,8 +6,7 @@
 #include <GL/glew.h>
 
 #include "shader.h"
-#include "../../core/graphicsPipeline.h"
-#include "utils/ogl_err_handling.h"
+#include "core/graphicsPipeline.h"
 
 namespace gfx::ogl
 {
@@ -36,9 +35,15 @@ namespace gfx::ogl
 
         GLenum getMode() const;
 
+        const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& getSetAndBindingToBindingPointMap() const {
+            return _setAndBindingToBindingPoint;
+        }
+
     private:
         mutable bool _bound = false;
         GLuint _id = 0;
+
+        std::map<std::pair<glm::u32, glm::u32>, glm::u32> _setAndBindingToBindingPoint;
     };
 }
 

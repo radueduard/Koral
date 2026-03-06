@@ -22,7 +22,7 @@ namespace gfx::ogl
 
 
         std::vector<GLenum> drawAttachments {};
-        for (size_t i = 0; i < colorAttachments.size(); ++i) {
+        for (glm::uint i = 0; i < colorAttachments.size(); ++i) {
             const std::reference_wrapper imageView = dynamic_cast<const ImageView&>(colorAttachments[i].get());
             glNamedFramebufferTexture(_id, GL_COLOR_ATTACHMENT0 + i, *imageView.get(), 0);
             drawAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + i);

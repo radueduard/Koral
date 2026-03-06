@@ -4,6 +4,7 @@
 
 #include "framebuffer.h"
 #include "impl/open_gl/framebuffer.h"
+#include "impl/vulkan/framebuffer.h"
 
 #include "context.h"
 #include "io/window.h"
@@ -12,9 +13,9 @@ namespace gfx {
     std::unique_ptr<Framebuffer> Framebuffer::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
-        case API::OpenGL:
+        case API::eOpenGL:
             return std::make_unique<ogl::Framebuffer>(*this);
-        case API::Vulkan:
+        case API::eVulkan:
             throw std::runtime_error("Vulkan is not supported yet!");
         default:
             throw std::runtime_error("Unknown graphics API!");
@@ -23,10 +24,10 @@ namespace gfx {
 
     std::unique_ptr<Framebuffer> Framebuffer::CreateDefault() {
         switch (Context::Window().getAPI()) {
-        case API::OpenGL:
+        case API::eOpenGL:
             return std::make_unique<ogl::Framebuffer>();
-        case API::Vulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+        case API::eVulkan:
+            return std::make_unique<vk::Framebuffer>();
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

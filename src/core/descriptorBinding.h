@@ -5,6 +5,7 @@
 #pragma once
 
 #include "buffer.h"
+#include "descriptorSet.h"
 #include "imageView.h"
 #include "sampler.h"
 
@@ -12,100 +13,52 @@ namespace gfx
 {
     class Descriptor
     {
+        friend class DescriptorSet::Builder;
     public:
-        enum class Type {
-            eUniformBuffer,
-            eStorageBuffer,
-            eCombinedImageSampler,
-            eStorageImage,
-            eSampler,
-        };
-
-        virtual ~Descriptor() = default;
-        virtual void Bind(glm::u32 bindingPoint) const = 0;
-
-        struct Builder
+        Descriptor() = default;
+        explicit Descriptor(const Buffer* buffer, glm::i64 offset = 0, glm::i64 range = 0) : valid(true), _buffer(buffer), _offset(offset), _range(range)
         {
-            Type type;
-            union
-            {
-                struct
-                {
-                    const Buffer* buffer;
-                    glm::u32 offset;
-                    glm::u32 range;
-                };
-                struct
-                {
-                    const ImageView* imageView;
-                    const Sampler* sampler;
-                };
-            };
-
-            Builder& setType(const Type type) {
-                this->type = type;
-                return *this;
+            if (buffer == nullptr) {
+                throw std::runtime_error("Buffer must be valid!");
             }
 
-            Builder& setBuffer(const Buffer* buffer, const glm::u32 offset = 0, glm::u32 range = 0) {
-                if (range == 0)
-                {
-                    range = buffer->getSize() - offset;
-                }
-
-                this->buffer = buffer;
-                this->offset = offset;
-                this->range = range;
-                return *this;
+            if (offset < 0 || offset >= buffer->getSize()) {
+                throw std::runtime_error("Offset must be within the bounds of the buffer!");
             }
 
-            /**
-             * @brief Sets the image view and sampler for this descriptor. The imageView and sampler fields are used
-             * differently depending on the type of descriptor being created.
-             *
-             * @attention The behavior of this function is determined by the type field of the create info struct.
-             * It is the caller's responsibility to ensure that the type field is set correctly before calling this
-             * function, and that the appropriate fields are set based on the type. At least one of the imageView or
-             * sampler fields must be set to a non-nullptr value, depending on the type of descriptor being created.
-             *
-             * @param imageView is used for both combined image sampler and storage image descriptors, the difference
-             * is determined by the type field of the create info struct. If the type is set to eCombinedImageSampler,
-             * the sampler field must also be set to a valid sampler. If the type is set to eStorageImage,
-             * the sampler field is ignored and can be set to nullptr. If the type is set to eSampler, the imageView
-             * field is ignored and can be set to nullptr.
-             *
-             * @param sampler is used for combined image sampler and sampler descriptors. If the imageView field of the
-             * create info struct is set to nullptr, the sampler field is ignored and can be set to nullptr as well.
-             *
-             */
-            Builder& setImage(const ImageView* imageView, const Sampler* sampler = nullptr) {
-                this->imageView = imageView;
-                this->sampler = sampler;
-                return *this;
+            if (range < 0) {
+                throw std::runtime_error("Range must be non-negative!");
             }
 
-            [[nodiscard]] std::unique_ptr<Descriptor> build() const;
-        };
+            if (offset + range > buffer->getSize()) {
+                throw std::runtime_error("Offset + range must be within the bounds of the buffer!");
+            }
 
+            if (range == 0) {
+                _range = buffer->getSize() - offset;
+            }
+        }
+        explicit Descriptor(const ImageView* imageView, const Sampler* sampler) : valid(true), _imageView(imageView), _sampler(sampler) {}
+
+        Descriptor(const Descriptor& other) = default;
+        Descriptor& operator=(const Descriptor& other) = default;
+
+        ~Descriptor() = default;
+        [[nodiscard]] bool isValid() const { return valid; }
+
+        [[nodiscard]] const Buffer* getBuffer() const { return _buffer; }
+        [[nodiscard]] glm::i64 getOffset() const { return _offset; }
+        [[nodiscard]] glm::i64 getRange() const { return _range; }
+        [[nodiscard]] const ImageView* getImageView() const { return _imageView; }
+        [[nodiscard]] const Sampler* getSampler() const { return _sampler; }
 
     protected:
-        explicit Descriptor(const Builder& createInfo);
-
-        Type _type = Type::eUniformBuffer;
-        union
-        {
-            struct
-            {
-                const Buffer* _buffer;
-                glm::i64 _offset;
-                glm::i64 _range;
-            };
-            struct
-            {
-                const ImageView* _imageView;
-                const Sampler* _sampler;
-            };
-        };
+        bool valid = false;
+        const Buffer* _buffer = nullptr;
+        glm::i64 _offset = 0;
+        glm::i64 _range = 0;
+        const ImageView* _imageView = nullptr;
+        const Sampler* _sampler = nullptr;
     };
 }
 

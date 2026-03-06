@@ -31,9 +31,7 @@ private:
     std::unique_ptr<gfx::ImageView> _albedoImageView = nullptr;
     std::unique_ptr<gfx::Sampler> _sampler = nullptr;
 
-    std::unique_ptr<gfx::Descriptor> _descriptorBinding0 = nullptr;
-    std::unique_ptr<gfx::Descriptor> _descriptorBinding1 = nullptr;
-    std::unique_ptr<gfx::Descriptor> _descriptorBinding2 = nullptr;
+    std::unique_ptr<gfx::DescriptorSet> _descriptorSet = nullptr;
 
     std::unique_ptr<gfx::CommandBuffer> _commandBuffer = nullptr;
 

@@ -39,23 +39,13 @@ void LabRectangle::Initialize()
         .setExtent({ 512, 512 })
         .setMipLevels(1)
         .setArrayLayers(1)
-        .setMSAA(gfx::Image::MSAA::eNone)
+        .setMSAA(gfx::MSAA::eNone)
         .setUsage(gfx::Image::Usage::eStorage)
         .addUsage(gfx::Image::Usage::eTransferSrc)
         .build();
 
     const auto imageView = gfx::ImageView::Builder(*image).build();
-    const auto sampler = gfx::Sampler::CreateInfo().build();
-
-    const auto binding0 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eUniformBuffer)
-        .setBuffer(buffer.get())
-        .build();
-
-    const auto binding1 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eStorageImage)
-        .setImage(imageView.get())
-        .build();
+    const auto sampler = gfx::Sampler::Builder().build();
 
     const auto computeShader = gfx::Shader::Builder()
         .setStage(gfx::Shader::Stage::eCompute)
@@ -66,17 +56,21 @@ void LabRectangle::Initialize()
         .setComputeShader(*computeShader)
         .build();
 
+    const auto descriptorSet = gfx::DescriptorSet::Builder(computePipeline->getSetLayout(0))
+        .write(0, gfx::Descriptor(buffer.get()))
+        .write(1, gfx::Descriptor(imageView.get(), sampler.get()))
+        .build();
+
     const auto commandBuffer = gfx::CommandBuffer::Create(gfx::CommandBuffer::Usage::eCompute);
 
     commandBuffer->Begin()
         .BindPipeline(computePipeline.get())
-        .BindDescriptor(0, binding0.get())
-        .BindDescriptor(1, binding1.get())
+        .BindDescriptorSet(0, descriptorSet.get())
         .Dispatch(512 / 16, 512 / 16, 1)
         .End();
     commandBuffer->Submit();
 
-    const auto data = image->ReadData();
+    const auto data = image->ReadData(0, 0);
     stbi_write_png("output.png", static_cast<int>(image->getExtent().x), static_cast<int>(image->getExtent().y), 4, data.data(), static_cast<int>(image->getExtent().x) * 4);
 
     gfx::Context::Window().close();

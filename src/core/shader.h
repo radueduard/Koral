@@ -4,10 +4,17 @@
 
 #pragma once
 #include <filesystem>
+#include <map>
 #include <memory>
+#include <set>
+#include <glm/fwd.hpp>
+
+#include "descriptorSetLayout.h"
+#include "structs.h"
 
 namespace gfx
 {
+
     class Shader {
     public:
         enum class Stage {
@@ -42,6 +49,31 @@ namespace gfx
             eSPIRV,
         };
 
+        struct InputOutput
+        {
+            glm::u32 startingLocation;
+            glm::u32 locationSpan;
+            std::string name;
+            ChannelType channelType;
+            glm::u32 channelCount;
+
+            auto operator<=>(const InputOutput& other) const {
+                return startingLocation <=> other.startingLocation;
+            }
+        };
+
+        struct SetDescription
+        {
+            std::map<glm::u32, std::tuple<DescriptorType, std::string, glm::u32>> descriptors;
+        };
+
+        struct MemoryLayout
+        {
+            std::set<InputOutput> inputs;
+            std::set<InputOutput> outputs;
+            std::map<glm::u32, SetDescription> descriptorSets;
+        };
+
         struct Builder {
             Stage stage = Stage::eCompute;
             Lang lang = Lang::eGLSL;
@@ -70,10 +102,18 @@ namespace gfx
         [[nodiscard]] Stage getStage() const { return _stage; }
         [[nodiscard]] Lang getLang() const { return _lang; }
 
+        static std::vector<glm::u32> CompileToSPIRV(const std::filesystem::path& path, Stage stage);
+        static MemoryLayout fetchMemoryLayout(const std::vector<glm::u32>& spirvCode);
+
+        const MemoryLayout& getMemoryLayout() const { return _memoryLayout; }
+
     protected:
         explicit Shader(const Builder& createInfo);
         Stage _stage;
         Lang _lang;
         std::filesystem::path _path;
+
+        std::vector<glm::u32> _spirvCode;
+        MemoryLayout _memoryLayout;
     };
 }

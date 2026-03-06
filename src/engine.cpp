@@ -30,28 +30,28 @@ void gfx::Engine::Run()
     io::Window::Builder(labRectangle)
         .setExtent({1280, 720})
         .setFullscreen(false)
-        .setAPI(API::OpenGL)
+        .setAPI(API::eOpenGL)
         .build();
 
     auto labTriangle = LabTriangle();
     io::Window::Builder(labTriangle)
         .setTitle("Triangle")
         .setExtent({1280, 720})
-        .setAPI(API::OpenGL)
+        .setAPI(API::eOpenGL)
         .build();
 
     auto labMesh = LabMesh();
     io::Window::Builder(labMesh)
         .setTitle("Mesh")
         .setExtent({1280, 720})
-        .setAPI(API::OpenGL)
+        .setAPI(API::eOpenGL)
         .build();
 
     auto labMultiFrameBuffer = LabMultiFrameBuffer();
     io::Window::Builder(labMultiFrameBuffer)
         .setTitle("MultiFrameBuffer")
         .setExtent({1280, 720})
-        .setAPI(API::OpenGL)
+        .setAPI(API::eOpenGL)
         .build();
 
     while (!io::Manager::_windows.empty()) {

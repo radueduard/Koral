@@ -40,7 +40,7 @@ namespace gfx
             eAlways
         };
 
-        struct CreateInfo
+        struct Builder
         {
             Filter minFilter = Filter::eLinear;
             Filter magFilter = Filter::eLinear;
@@ -55,80 +55,74 @@ namespace gfx
             CompareOp compareOp = CompareOp::eAlways;
             float minLod = 0.f;
             float maxLod = 0.f;
-            glm::vec4 borderColor = glm::vec4(0.f);
             bool unnormalizedCoordinates = false;
 
-            CreateInfo& setMinFilter(Filter minFilter) {
+            Builder& setMinFilter(Filter minFilter) {
                 this->minFilter = minFilter;
                 return *this;
             }
 
-            CreateInfo& setMagFilter(Filter magFilter) {
+            Builder& setMagFilter(Filter magFilter) {
                 this->magFilter = magFilter;
                 return *this;
             }
 
-            CreateInfo& setMipmapMode(MipmapMode mipmapMode) {
+            Builder& setMipmapMode(MipmapMode mipmapMode) {
                 this->mipmapMode = mipmapMode;
                 return *this;
             }
 
-            CreateInfo& setAddressModeU(AddressMode addressModeU) {
+            Builder& setAddressModeU(AddressMode addressModeU) {
                 this->addressModeU = addressModeU;
                 return *this;
             }
 
-            CreateInfo& setAddressModeV(AddressMode addressModeV) {
+            Builder& setAddressModeV(AddressMode addressModeV) {
                 this->addressModeV = addressModeV;
                 return *this;
             }
 
-            CreateInfo& setAddressModeW(AddressMode addressModeW) {
+            Builder& setAddressModeW(AddressMode addressModeW) {
                 this->addressModeW = addressModeW;
                 return *this;
             }
 
-            CreateInfo& setMipLodBias(float mipLodBias) {
+            Builder& setMipLodBias(float mipLodBias) {
                 this->mipLodBias = mipLodBias;
                 return *this;
             }
 
-            CreateInfo& setAnisotropyEnable(bool anisotropyEnable) {
+            Builder& setAnisotropyEnable(bool anisotropyEnable) {
                 this->anisotropyEnable = anisotropyEnable;
                 return *this;
             }
 
-            CreateInfo& setMaxAnisotropy(float maxAnisotropy) {
+            Builder& setMaxAnisotropy(float maxAnisotropy) {
                 this->maxAnisotropy = maxAnisotropy;
                 return *this;
             }
 
-            CreateInfo& setCompareEnable(bool compareEnable) {
+            Builder& setCompareEnable(bool compareEnable) {
                 this->compareEnable = compareEnable;
                 return *this;
             }
 
-            CreateInfo& setCompareOp(CompareOp compareOp) {
+            Builder& setCompareOp(CompareOp compareOp) {
                 this->compareOp = compareOp;
                 return *this;
             }
 
-            CreateInfo& setMinLod(float minLod) {
+            Builder& setMinLod(float minLod) {
                 this->minLod = minLod;
                 return *this;
             }
 
-            CreateInfo& setMaxLod(float maxLod) {
+            Builder& setMaxLod(float maxLod) {
                 this->maxLod = maxLod;
                 return *this;
             }
 
-            CreateInfo& setBorderColor(const glm::vec4& borderColor) {
-                this->borderColor = borderColor;
-                return *this;
-            }
-
-            CreateInfo& setUnnormalizedCoordinates(bool unnormalizedCoordinates) {
+            Builder& setUnnormalizedCoordinates(bool unnormalizedCoordinates) {
                 this->unnormalizedCoordinates = unnormalizedCoordinates;
                 return *this;
             }
@@ -139,7 +133,23 @@ namespace gfx
         virtual ~Sampler() = default;
 
     protected:
-        explicit Sampler() = default;
+        explicit Sampler(const Builder& builder);
+
+        Filter _minFilter = Filter::eLinear;
+        Filter _magFilter = Filter::eLinear;
+        MipmapMode _mipmapMode = MipmapMode::eLinear;
+        AddressMode _addressModeU = AddressMode::eRepeat;
+        AddressMode _addressModeV = AddressMode::eRepeat;
+        AddressMode _addressModeW = AddressMode::eRepeat;
+        float _mipLodBias = 0.f;
+        bool _anisotropyEnable = false;
+        float _maxAnisotropy = 1.f;
+        bool _compareEnable = false;
+        CompareOp _compareOp = CompareOp::eAlways;
+        float _minLod = 0.f;
+        float _maxLod = 0.f;
+        bool _unnormalizedCoordinates = false;
+
     };
 }
 

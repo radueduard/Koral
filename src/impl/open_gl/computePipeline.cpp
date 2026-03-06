@@ -19,23 +19,47 @@ namespace gfx::ogl
             throw std::runtime_error("The shader provided to the compute pipeline must be a compute shader!");
         }
 
+
+        glm::u32 nextDescriptorBindingPoint = 0;
+        for (const auto& [set, layout] : _setLayouts) {
+            for (const auto& [binding, type, Count] : layout->getBindings()) {
+                _setAndBindingToBindingPoint[{ set, binding }] = nextDescriptorBindingPoint++;
+            }
+        }
+
+        const GLuint shaderId = shader.compile(_setAndBindingToBindingPoint);
+
+        // Check shader compilation status first
+        GLint compileStatus;
+        glGetShaderiv(shaderId, GL_COMPILE_STATUS, &compileStatus);
+        if (!compileStatus) {
+            char infoLog[1024];
+            glGetShaderInfoLog(shaderId, 1024, nullptr, infoLog);
+            throw std::runtime_error(std::string("Shader compilation failed: ") + infoLog);
+        }
+
         _id = glCreateProgram();
         glCheckError();
 
-        glAttachShader(_id, *shader);
+        glAttachShader(_id, shaderId);
         glCheckError();
 
         glLinkProgram(_id);
         glCheckError();
 
-        // Check for linking errors
+        glDetachShader(_id, shaderId);
+        glCheckError();
+
         GLint success;
         glGetProgramiv(_id, GL_LINK_STATUS, &success);
         if (!success) {
-            char infoLog[512];
-            glGetProgramInfoLog(_id, 512, nullptr, infoLog);
-            std::cerr << "Error linking compute pipeline: " << infoLog << std::endl;
+            char infoLog[1024];
+            glGetProgramInfoLog(_id, 1024, nullptr, infoLog);
+            glDeleteProgram(_id);
+            throw std::runtime_error(std::string("Error linking compute pipeline: ") + infoLog);
         }
+
+        glDeleteShader(shaderId);
     }
 
     ComputePipeline::~ComputePipeline()

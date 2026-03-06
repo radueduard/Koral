@@ -17,7 +17,7 @@
 #include "input.h"
 #include "context.h"
 #include "io/time.h"
-#include "../scenes/scene.h"
+#include "scenes/scene.h"
 #include "core/framebuffer.h"
 
 namespace gfx::io {
@@ -32,7 +32,7 @@ namespace gfx::io {
             glm::uvec2 extent = { 1280, 720 };
             bool resizable = true;
             bool fullscreen = false;
-            API api = API::OpenGL;
+            API api = API::eOpenGL;
             std::reference_wrapper<Scene> scene;
 
             explicit Builder(Scene& scene) : scene(scene) {}
@@ -86,14 +86,13 @@ namespace gfx::io {
         void pause() { _paused = true; }
         void unPause() { _paused = false; }
 
-        [[nodiscard]] const std::string& getTitle() const { return this->_title; }
-
         void setTitle(const std::string &title) {
             _title = title;
             glfwSetWindowTitle(_window, title.c_str());
         }
 
         [[nodiscard]] API getAPI() const { return _api; }
+        [[nodiscard]] const std::string& getTitle() const { return _title; }
         [[nodiscard]] const gfx::Framebuffer* getFramebuffer() const { return _framebuffer.get(); }
 
         void setIcon(const std::filesystem::path& iconPath);

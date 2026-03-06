@@ -23,9 +23,9 @@ namespace gfx
     {
         switch (Context::Window().getAPI())
         {
-        case API::OpenGL:
+        case API::eOpenGL:
             return std::make_unique<ogl::Mesh>(createInfo);
-        case API::Vulkan:
+        case API::eVulkan:
             throw std::runtime_error("Vulkan mesh creation not implemented yet!");
         default:
             throw std::runtime_error("Unknown graphics API!");

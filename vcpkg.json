@@ -1,7 +1,7 @@
 {
   "name" : "untitled1",
   "version-string" : "1.0.0",
-  "builtin-baseline" : "d4d51d2f2229583ed971fb53a3cbd5cd2c5219ce",
+  "builtin-baseline" : "62159a45e18f3a9ac0548628dcaf74fcb60c6ff9",
   "dependencies" : [ {
     "name" : "glfw3",
     "version>=" : "3.4#1"
@@ -23,5 +23,17 @@
   }, {
     "name" : "assimp",
     "version>=" : "6.0.2#1"
+  }, {
+    "name" : "glslang",
+    "version>=" : "16.1.0"
+  }, {
+    "name" : "spirv-cross",
+    "version>=" : "1.4.335.0"
+  }, {
+    "name" : "reflectcpp",
+    "version>=" : "0.24.0"
+  }, {
+    "name" : "spirv-reflect",
+    "version>=" : "1.4.335.0"
   } ]
 }

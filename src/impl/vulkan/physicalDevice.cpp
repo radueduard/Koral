@@ -1,0 +1,84 @@
+//
+// Created by radue on 2/27/2026.
+//
+
+#include "physicalDevice.h"
+
+#include <iostream>
+#include <unordered_set>
+#include <glm/fwd.hpp>
+
+#include "runtime.h"
+#include "vulkanContext.h"
+
+namespace gfx::vk
+{
+    PhysicalDevice::PhysicalDevice(::vk::PhysicalDevice physicalDevice)
+    {
+        _handle = physicalDevice;
+        _properties = _handle.getProperties();
+        _features = _handle.getFeatures();
+        _memoryProperties = _handle.getMemoryProperties();
+        _extensionProperties = _handle.enumerateDeviceExtensionProperties();
+        _queueFamilyProperties = _handle.getQueueFamilyProperties();
+
+        QuerySurfaceCapabilities();
+    }
+
+    void PhysicalDevice::QuerySurfaceCapabilities() const {
+        const auto surface = gfx::vk::Context::Runtime().getSurface();
+
+        _capabilities = _handle.getSurfaceCapabilitiesKHR(surface);
+        _formats = _handle.getSurfaceFormatsKHR(surface);
+        _presentModes = _handle.getSurfacePresentModesKHR(surface);
+    }
+
+
+    bool PhysicalDevice::isSuitable() const {
+        return hasRequiredQueueFamilies(gfx::vk::Context::Runtime().getRequiredQueueFamilies())
+            && hasRequiredExtensions(gfx::vk::Context::Runtime().getDeviceExtensions())
+            && hasRequiredFeatures(_features);
+    }
+
+    bool PhysicalDevice::hasRequiredQueueFamilies(const ::vk::QueueFlags& requiredQueueFamilies) const {
+        ::vk::Bool32 presentSupported = false;
+        ::vk::QueueFlags supportedQueueFamilies {};
+
+        for (const auto& queueFamily : _queueFamilyProperties) {
+            const auto queueFamilyIndex = static_cast<glm::u32>(&queueFamily - _queueFamilyProperties.data());
+            const auto supportedByThisFamily = queueFamily.queueFlags & requiredQueueFamilies;
+            supportedQueueFamilies |= supportedByThisFamily;
+
+            const auto surface = gfx::vk::Context::Runtime().getSurface();
+            presentSupported |= _handle.getSurfaceSupportKHR(queueFamilyIndex, surface);
+        }
+
+        return (requiredQueueFamilies == supportedQueueFamilies) && presentSupported;
+    }
+
+    bool PhysicalDevice::hasRequiredExtensions(const std::vector<const char*>& requiredExtensions) const {
+        auto remainingExtensions = std::unordered_set<std::string>{ requiredExtensions.begin(), requiredExtensions.end() };
+        for (const auto& availableExtension : _extensionProperties) {
+            std::string extensionName = availableExtension.extensionName;
+            remainingExtensions.erase(extensionName);
+        }
+        for (const auto& extension : remainingExtensions) {
+            std::cerr << "PhysicalDevice : Missing required extension " << extension << std::endl;
+        }
+
+        return remainingExtensions.empty();
+    }
+
+    bool PhysicalDevice::hasRequiredFeatures(const ::vk::PhysicalDeviceFeatures& requiredFeatures) const {
+        const auto requiredFeaturesPtr = reinterpret_cast<const ::vk::Bool32*>(&requiredFeatures);
+        const auto deviceFeaturesPtr = reinterpret_cast<const ::vk::Bool32*>(&_features);
+
+        for (size_t i = 0; i < sizeof(::vk::PhysicalDeviceFeatures) / sizeof(::vk::Bool32); ++i) {
+            if (requiredFeaturesPtr[i] && !deviceFeaturesPtr[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}

@@ -4,6 +4,7 @@
 
 #include "buffer.h"
 #include "impl/open_gl/buffer.h"
+#include "impl/vulkan/buffer.h"
 
 #include "io/window.h"
 
@@ -12,10 +13,10 @@ namespace gfx
     std::unique_ptr<Buffer> Buffer::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
-        case API::OpenGL:
+        case API::eOpenGL:
             return std::make_unique<ogl::Buffer>(*this);
-        case API::Vulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+        case API::eVulkan:
+            return std::make_unique<vk::Buffer>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

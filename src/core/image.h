@@ -11,6 +11,15 @@
 
 namespace gfx
 {
+    enum class MSAA
+    {
+        eNone = 0,
+        e2x = 2,
+        e4x = 4,
+        e8x = 8,
+        e16x = 16,
+    };
+
     class Image
     {
     public:
@@ -104,15 +113,6 @@ namespace gfx
             eD32_SFLOAT_S8_UINT,
         };
 
-        enum class MSAA
-        {
-            eNone = 0,
-            e2x = 2,
-            e4x = 4,
-            e8x = 8,
-            e16x = 16,
-        };
-
         enum class Usage
         {
             eTransferSrc = 1 << 0,
@@ -187,11 +187,18 @@ namespace gfx
 
         virtual ~Image() = default;
 
-        virtual std::vector<std::byte> ReadData(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const = 0;
-        virtual void CopyFrom(const gfx::Buffer& buffer) = 0;
+        virtual std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const = 0;
+        virtual void CopyFrom(const gfx::Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const = 0;
 
-        glm::uvec3 getExtent() const { return extent; }
+        [[nodiscard]] glm::uvec3 getExtent() const { return extent; }
 
+        [[nodiscard]] Type getType() const { return type; }
+        [[nodiscard]] Format getFormat() const { return format; }
+        [[nodiscard]] MSAA getMSAA() const { return msaa; }
+        [[nodiscard]] Flags<Usage> getUsage() const { return usage; }
+
+        [[nodiscard]] static glm::u32 PixelSizeFromImageFormat(gfx::Image::Format format);
+        [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(gfx::Image::Format format);
     protected:
         explicit Image(const Builder&);
 
@@ -205,5 +212,6 @@ namespace gfx
     };
 
     bool IsDepthStencilFormat(Image::Format format);
+    bool IsStencilFormat(Image::Format format);
 }
 

@@ -11,6 +11,7 @@
 #include <stb_image.h>
 
 #include "manager.h"
+#include "impl/vulkan/vulkanContext.h"
 
 namespace gfx::io {
     Window::Window(const Builder& createInfo) :
@@ -20,7 +21,7 @@ namespace gfx::io {
         _fullscreen(createInfo.fullscreen),
         _api(createInfo.api)
     {
-        glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::OpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
+        glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::eOpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
 
         const glm::u32 width = createInfo.extent.x;
@@ -74,10 +75,22 @@ namespace gfx::io {
     void Window::initContext()
     {
         Context::_currentThreadLinkedWindow = this;
-        _framebuffer = Framebuffer::CreateDefault();
-        
+
         glfwMakeContextCurrent(_window);
-        glewInit();
+
+        switch (_api)
+        {
+        case API::eOpenGL:
+            {
+                glewInit();
+                break;
+            }
+        case API::eVulkan:
+            {
+                gfx::vk::Context::Init();
+            }
+        }
+        _framebuffer = Framebuffer::CreateDefault();
     }
 
     void Window::Builder::build() const
@@ -86,6 +99,10 @@ namespace gfx::io {
     }
 
     Window::~Window() {
+        if (_api == API::eVulkan) {
+            gfx::vk::Context::Destroy();
+        }
+
         glfwDestroyWindow(_window);
     }
 

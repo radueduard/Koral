@@ -116,10 +116,8 @@ namespace gfx
             std::memcpy(static_cast<std::byte*>(_mappedPtr) + offset, &data, sizeof(T));
         }
 
-        virtual void Map() = 0;
-        virtual void Unmap() = 0;
-        virtual void Flush(glm::i64 offset, glm::i64 size) const = 0;
-        virtual void Invalidate(glm::i64 offset, glm::i64 size) const = 0;
+        virtual void Map() const = 0;
+        virtual void Unmap() const = 0;
         virtual void CopyFrom(const Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const = 0;
 
         [[nodiscard]] glm::u64 getSize() const { return size; }
@@ -135,8 +133,6 @@ namespace gfx
         Flags<MemoryProperty> memoryProperties = MemoryProperty::eHostVisible;
         Layout layout = Layout::eStd140;
 
-        void* _mappedPtr = nullptr;
-
-    private:
+        mutable void* _mappedPtr = nullptr;
     };
 }

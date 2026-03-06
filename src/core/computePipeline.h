@@ -10,6 +10,8 @@
 
 namespace gfx
 {
+    class DescriptorSetLayout;
+
     class ComputePipeline {
     public:
         struct Builder {
@@ -51,10 +53,14 @@ namespace gfx
             }
         };
 
+        const gfx::DescriptorSetLayout& getSetLayout(glm::u32 index) const;
 
     protected:
         mutable bool _bound = false;
-        explicit ComputePipeline(const Builder& createInfo) {};
+        explicit ComputePipeline(const Builder& createInfo);
+
+        std::optional<std::reference_wrapper<const Shader>> _shader;
+        std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts;
     };
 }
 

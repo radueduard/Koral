@@ -17,6 +17,7 @@ void LabMesh::Initialize()
 {
     _mesh = gfx::Importer::LoadMesh(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
     _albedoImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_albedo.jpg"));
+    _normalImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_normal.jpg"));
 
     const auto vertexShader = gfx::Shader::Builder()
         .setPath(gfx::shader("albedo.vert.glsl"))
@@ -36,15 +37,11 @@ void LabMesh::Initialize()
     _uniformBufferCamera = gfx::Buffer::Builder()
         .setSize(128)
         .setUsage(gfx::Buffer::Usage::eUniform)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostVisible)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent)
         .build();
 
     _uniformBufferModel = gfx::Buffer::Builder()
         .setSize(64)
         .setUsage(gfx::Buffer::Usage::eUniform)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostVisible)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent)
         .build();
 
     const glm::mat4 viewMatrix = glm::lookAt(
@@ -73,19 +70,19 @@ void LabMesh::Initialize()
     _uniformBufferModel->Unmap();
 
     _albedoImageView = gfx::ImageView::Builder(*_albedoImage).build();
-    _sampler = gfx::Sampler::CreateInfo().build();
+    _albedoSampler = gfx::Sampler::Builder().build();
 
-    _descriptorBinding0 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eUniformBuffer)
-        .setBuffer(_uniformBufferCamera.get(), 0, 128)
+    _normalImageView = gfx::ImageView::Builder(*_normalImage).build();
+    _normalSampler = gfx::Sampler::Builder().build();
+
+    _cameraDescriptorSet = gfx::DescriptorSet::Builder(_pipeline->getSetLayout(0))
+        .write(0, gfx::Descriptor(_uniformBufferCamera.get()))
         .build();
-    _descriptorBinding1 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eUniformBuffer)
-        .setBuffer(_uniformBufferModel.get(), 0, 64)
-        .build();
-    _descriptorBinding2 = gfx::Descriptor::Builder()
-        .setType(gfx::Descriptor::Type::eCombinedImageSampler)
-        .setImage(_albedoImageView.get(), _sampler.get())
+
+    _meshDescriptorSet = gfx::DescriptorSet::Builder(_pipeline->getSetLayout(1))
+        .write(0, gfx::Descriptor(_uniformBufferModel.get()))
+        .write(1, gfx::Descriptor(_albedoImageView.get(), _albedoSampler.get()))
+        .write(2, gfx::Descriptor(_normalImageView.get(), _normalSampler.get()))
         .build();
 
     _commandBuffer = gfx::CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics);
@@ -164,9 +161,8 @@ void LabMesh::Render()
         .BeginRendering(gfx::Context::DefaultFramebuffer())
         .SetViewport(0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y)
         .BindPipeline(_pipeline.get())
-        .BindDescriptor(0, _descriptorBinding0.get())
-        .BindDescriptor(1, _descriptorBinding1.get())
-        .BindDescriptor(2, _descriptorBinding2.get())
+        .BindDescriptorSet(0, _cameraDescriptorSet.get())
+        .BindDescriptorSet(1, _meshDescriptorSet.get())
         .DrawMesh(_mesh.get(), 1, 0)
         .EndRendering()
         .End();

@@ -30,7 +30,7 @@ namespace gfx::ogl
         glDeleteBuffers(1, &_id);
     }
 
-    void Buffer::Map()
+    void Buffer::Map() const
     {
         if (!(memoryProperties & MemoryProperty::eHostVisible)) {
             std::cerr << "Error: Attempting to map a buffer that is not host visible! Buffer ID: " << _id << std::endl;
@@ -56,7 +56,7 @@ namespace gfx::ogl
         }
     }
 
-    void Buffer::Unmap()
+    void Buffer::Unmap() const
     {
         if (!_mappedPtr) {
             std::cerr << "Warning: Buffer is not mapped! Attempting to unmap buffer with ID " << _id << " which is not currently mapped." << std::endl;
@@ -65,48 +65,6 @@ namespace gfx::ogl
 
         glUnmapNamedBuffer(_id);
         _mappedPtr = nullptr;
-        glCheckError();
-    }
-
-    void Buffer::Flush(const glm::i64 offset, const glm::i64 size) const
-    {
-        if (memoryProperties & MemoryProperty::eHostCached) {
-            std::cerr << "Info: Buffer is host cached, flushing is not necessary! Attempting to flush buffer with ID " << _id << " which is host cached." << std::endl;
-            return;
-        }
-
-        if ((memoryProperties & MemoryProperty::eHostCoherent)) {
-            std::cerr << "Error: Attempting to flush a buffer that is host coherent! This is redundant! Buffer ID: " << _id << std::endl;
-            return;
-        }
-
-        if (!_mappedPtr) {
-            std::cerr << "Warning: Buffer is not mapped! Attempting to flush buffer with ID " << _id << " which is not currently mapped." << std::endl;
-            return;
-        }
-
-        glFlushMappedNamedBufferRange(_id, offset, size);
-        glCheckError();
-    }
-
-    void Buffer::Invalidate(const glm::i64 offset, const glm::i64 size) const
-    {
-        if (memoryProperties & MemoryProperty::eHostCached) {
-            std::cerr << "Info: Buffer is host cached, invalidating is not necessary! Attempting to invalidate buffer with ID " << _id << " which is host cached." << std::endl;
-            return;
-        }
-
-        if (!(memoryProperties & MemoryProperty::eHostCoherent)) {
-            std::cerr << "Error: Attempting to invalidate a buffer that is not host coherent! Buffer ID: " << _id << std::endl;
-            return;
-        }
-
-        if (!_mappedPtr) {
-            std::cerr << "Warning: Buffer is not mapped! Attempting to invalidate buffer with ID " << _id << " which is not currently mapped." << std::endl;
-            return;
-        }
-
-        glInvalidateBufferSubData(_id, offset, size);
         glCheckError();
     }
 

@@ -23,12 +23,16 @@ private:
     std::unique_ptr<gfx::Buffer> _uniformBufferModel = nullptr;
 
     std::unique_ptr<gfx::Image> _albedoImage = nullptr;
-    std::unique_ptr<gfx::ImageView> _albedoImageView = nullptr;
-    std::unique_ptr<gfx::Sampler> _sampler = nullptr;
+    std::unique_ptr<gfx::Image> _normalImage = nullptr;
 
-    std::unique_ptr<gfx::Descriptor> _descriptorBinding0 = nullptr;
-    std::unique_ptr<gfx::Descriptor> _descriptorBinding1 = nullptr;
-    std::unique_ptr<gfx::Descriptor> _descriptorBinding2 = nullptr;
+    std::unique_ptr<gfx::ImageView> _albedoImageView = nullptr;
+    std::unique_ptr<gfx::ImageView> _normalImageView = nullptr;
+
+    std::unique_ptr<gfx::Sampler> _albedoSampler = nullptr;
+    std::unique_ptr<gfx::Sampler> _normalSampler = nullptr;
+
+    std::unique_ptr<gfx::DescriptorSet> _cameraDescriptorSet = nullptr;
+    std::unique_ptr<gfx::DescriptorSet> _meshDescriptorSet = nullptr;
 
     std::unique_ptr<gfx::CommandBuffer> _commandBuffer = nullptr;
 

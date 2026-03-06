@@ -18,7 +18,12 @@ namespace gfx::ogl
         void Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) const override;
         void DispatchIndirect(const gfx::Buffer& indirectBuffer, glm::i64 offset) const override;
 
+        const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& getSetAndBindingToBindingPointMap() const {
+            return _setAndBindingToBindingPoint;
+        }
+
     private:
         GLuint _id = 0;
+        std::map<std::pair<glm::u32, glm::u32>, glm::u32> _setAndBindingToBindingPoint;
     };
 }

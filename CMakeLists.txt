@@ -13,7 +13,11 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(assimp REQUIRED)
-find_package(Vulkan COMPONENTS glslc REQUIRED)
+find_package(Vulkan REQUIRED)
+find_package(glslang CONFIG REQUIRED)
+find_package(spirv_cross_core CONFIG REQUIRED)
+find_package(spirv_cross_glsl CONFIG REQUIRED)
+find_package(reflectcpp CONFIG REQUIRED)
 
 file (GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.c")
 file (GLOB_RECURSE HEADER_FILES "src/*.h" "src/*.hpp")
@@ -32,6 +36,18 @@ target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW OpenGL::GL)
 target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+        glslang::glslang
+        glslang::MachineIndependent
+        glslang::OSDependent
+        glslang::SPIRV
+        glslang::glslang-default-resource-limits
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-core)
+target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-glsl)
+target_link_libraries(${PROJECT_NAME} PRIVATE reflectcpp::reflectcpp)
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GLX)

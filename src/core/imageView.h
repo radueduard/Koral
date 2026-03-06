@@ -11,9 +11,19 @@ namespace gfx
 {
     class ImageView {
     public:
+        enum class Type {
+            e1D,
+            e2D,
+            e3D,
+            eCube,
+            e1DArray,
+            e2DArray,
+            eCubeArray
+        };
+
         struct Builder {
             const Image& image;
-            Image::Type viewType = Image::Type::e2D;
+            Type type = Type::e2D;
             glm::u32 baseMipLevel = 0;
             glm::u32 mipLevelCount = 1;
             glm::u32 baseArrayLayer = 0;
@@ -21,8 +31,8 @@ namespace gfx
 
             explicit Builder(const Image& image);
 
-            Builder& setViewType(Image::Type viewType) {
-                this->viewType = viewType;
+            Builder& setViewType(Type viewType) {
+                this->type = viewType;
                 return *this;
             }
 
@@ -51,9 +61,7 @@ namespace gfx
 
         virtual ~ImageView() = default;
 
-        static std::unique_ptr<ImageView> Create(const Image& image, const Builder& createInfo);
-
-        [[nodiscard]] Image::Type GetViewType() const { return _viewType; }
+        [[nodiscard]] Type GetViewType() const { return _viewType; }
         [[nodiscard]] glm::u32 GetBaseMipLevel() const { return _baseMipLevel; }
         [[nodiscard]] glm::u32 GetMipLevelCount() const { return _mipLevelCount; }
         [[nodiscard]] glm::u32 GetBaseArrayLayer() const { return _baseArrayLayer; }
@@ -61,7 +69,8 @@ namespace gfx
 
     protected:
         explicit ImageView(const Builder& createInfo);
-        Image::Type _viewType;
+        const Image& _image;
+        Type _viewType;
         glm::u32 _baseMipLevel;
         glm::u32 _mipLevelCount;
         glm::u32 _baseArrayLayer;

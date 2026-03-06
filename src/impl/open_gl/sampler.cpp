@@ -11,7 +11,7 @@
 
 namespace gfx::ogl
 {
-    Sampler::Sampler(const gfx::Sampler::CreateInfo& createInfo)
+    Sampler::Sampler(const gfx::Sampler::Builder& createInfo) : gfx::Sampler(createInfo)
     {
         glCreateSamplers(1, &_id);
         glCheckError();
@@ -27,7 +27,6 @@ namespace gfx::ogl
         }
         glSamplerParameterf(_id, GL_TEXTURE_MIN_LOD, createInfo.minLod);
         glSamplerParameterf(_id, GL_TEXTURE_MAX_LOD, createInfo.maxLod);
-        glSamplerParameterfv(_id, GL_TEXTURE_BORDER_COLOR, glm::value_ptr(createInfo.borderColor));
         if (createInfo.compareEnable) {
             glSamplerParameteri(_id, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
             glSamplerParameteri(_id, GL_TEXTURE_COMPARE_FUNC, GetCompareOpFromCompareMode(createInfo.compareOp));

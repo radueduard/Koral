@@ -4,6 +4,7 @@
 
 #include "image.h"
 #include "impl/open_gl/image.h"
+#include "impl/vulkan/image.h"
 
 #include "context.h"
 #include "io/window.h"
@@ -13,12 +14,158 @@ namespace gfx
     std::unique_ptr<Image> Image::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
-        case API::OpenGL:
+        case API::eOpenGL:
             return std::make_unique<ogl::Image>(*this);
-        case API::Vulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+        case API::eVulkan:
+            return std::make_unique<vk::Image>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
+        }
+    }
+
+glm::u32 Image::PixelSizeFromImageFormat(gfx::Image::Format format)
+    {
+        switch (format)
+        {
+        case Format::eR8_UNORM:
+        case Format::eR8_SNORM:
+        case Format::eR8_UINT:
+        case Format::eR8_SINT:
+            return 1;
+        case Format::eRG8_UNORM:
+        case Format::eRG8_SNORM:
+        case Format::eRG8_UINT:
+        case Format::eRG8_SINT:
+            return 1;
+        case Format::eRGB8_UNORM:
+        case Format::eRGB8_SNORM:
+        case Format::eRGB8_UINT:
+        case Format::eRGB8_SINT:
+        case Format::eRGB8_SRGB:
+            return 1;
+        case Format::eRGBA8_UNORM:
+        case Format::eRGBA8_SNORM:
+        case Format::eRGBA8_UINT:
+        case Format::eRGBA8_SINT:
+        case Format::eRGBA8_SRGB:
+            return 1;
+        case Format::eR16_UNORM:
+        case Format::eR16_SNORM:
+        case Format::eR16_UINT:
+        case Format::eR16_SINT:
+        case Format::eR16_SFLOAT:
+            return 2;
+        case Format::eRG16_UNORM:
+        case Format::eRG16_SNORM:
+        case Format::eRG16_UINT:
+        case Format::eRG16_SINT:
+        case Format::eRG16_SFLOAT:
+            return 2;
+        case Format::eRGB16_UNORM:
+        case Format::eRGB16_SNORM:
+        case Format::eRGB16_UINT:
+        case Format::eRGB16_SINT:
+        case Format::eRGB16_SFLOAT:
+            return 2;
+        case Format::eRGBA16_UNORM:
+        case Format::eRGBA16_SNORM:
+        case Format::eRGBA16_UINT:
+        case Format::eRGBA16_SINT:
+        case Format::eRGBA16_SFLOAT:
+            return 2;
+        case Format::eR32_UINT:
+        case Format::eR32_SINT:
+        case Format::eR32_SFLOAT:
+            return 4;
+        case Format::eRG32_UINT:
+        case Format::eRG32_SINT:
+        case Format::eRG32_SFLOAT:
+            return 4;
+        case Format::eRGB32_UINT:
+        case Format::eRGB32_SINT:
+        case Format::eRGB32_SFLOAT:
+            return 4;
+        case Format::eRGBA32_UINT:
+        case Format::eRGBA32_SINT:
+        case Format::eRGBA32_SFLOAT:
+            return 4;
+        case Format::eD16_UNORM:
+            return 2;
+        case Format::eD24_UNORM_S8_UINT:
+            return 4;
+        case Format::eD32_SFLOAT:
+            return 4;
+        case Format::eD32_SFLOAT_S8_UINT:
+            return 4;
+        default: throw std::runtime_error("Unsupported image format for pixel size!");
+        }
+    }
+
+    glm::u32 Image::ChannelCountFromImageFormat(gfx::Image::Format format)
+    {
+        switch (format)
+        {
+        case Format::eR8_UNORM:
+        case Format::eR8_SNORM:
+        case Format::eR8_UINT:
+        case Format::eR8_SINT:
+        case Format::eR16_UNORM:
+        case Format::eR16_SNORM:
+        case Format::eR16_UINT:
+        case Format::eR16_SINT:
+        case Format::eR16_SFLOAT:
+        case Format::eR32_UINT:
+        case Format::eR32_SINT:
+        case Format::eR32_SFLOAT:
+            return 1;
+        case Format::eRG8_UNORM:
+        case Format::eRG8_SNORM:
+        case Format::eRG8_UINT:
+        case Format::eRG8_SINT:
+        case Format::eRG16_UNORM:
+        case Format::eRG16_SNORM:
+        case Format::eRG16_UINT:
+        case Format::eRG16_SINT:
+        case Format::eRG16_SFLOAT:
+        case Format::eRG32_UINT:
+        case Format::eRG32_SINT:
+        case Format::eRG32_SFLOAT:
+            return 2;
+        case Format::eRGB8_UNORM:
+        case Format::eRGB8_SNORM:
+        case Format::eRGB8_UINT:
+        case Format::eRGB8_SINT:
+        case Format::eRGB8_SRGB:
+        case Format::eRGB16_UNORM:
+        case Format::eRGB16_SNORM:
+        case Format::eRGB16_UINT:
+        case Format::eRGB16_SINT:
+        case Format::eRGB16_SFLOAT:
+        case Format::eRGB32_UINT:
+        case Format::eRGB32_SINT:
+        case Format::eRGB32_SFLOAT:
+            return 3;
+        case Format::eRGBA8_UNORM:
+        case Format::eRGBA8_SNORM:
+        case Format::eRGBA8_UINT:
+        case Format::eRGBA8_SINT:
+        case Format::eRGBA8_SRGB:
+        case Format::eRGBA16_UNORM:
+        case Format::eRGBA16_SNORM:
+        case Format::eRGBA16_UINT:
+        case Format::eRGBA16_SINT:
+        case Format::eRGBA16_SFLOAT:
+        case Format::eRGBA32_UINT:
+        case Format::eRGBA32_SINT:
+        case Format::eRGBA32_SFLOAT:
+            return 4;
+        case Format::eD16_UNORM:
+        case Format::eD32_SFLOAT:
+            return 1;
+        case Format::eD24_UNORM_S8_UINT:
+        case Format::eD32_SFLOAT_S8_UINT:
+            return 2;
+        default: throw std::runtime_error("Unsupported image format for channel count!");
         }
     }
 
@@ -38,6 +185,18 @@ namespace gfx
         case Image::Format::eD16_UNORM:
         case Image::Format::eD24_UNORM_S8_UINT:
         case Image::Format::eD32_SFLOAT:
+        case Image::Format::eD32_SFLOAT_S8_UINT:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool IsStencilFormat(Image::Format format)
+    {
+        switch (format)
+        {
+        case Image::Format::eD24_UNORM_S8_UINT:
         case Image::Format::eD32_SFLOAT_S8_UINT:
             return true;
         default:

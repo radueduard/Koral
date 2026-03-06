@@ -12,7 +12,7 @@ namespace gfx::ogl
     class Sampler final : public gfx::Sampler
     {
     public:
-        explicit Sampler(const gfx::Sampler::CreateInfo& createInfo);
+        explicit Sampler(const gfx::Sampler::Builder& createInfo);
         ~Sampler() override;
 
         GLuint operator*() const { return _id; }
