@@ -4,6 +4,8 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "runtime.h"
 
+#include <ranges>
+
 #include "vulkanContext.h"
 #include "io/window.h"
 
@@ -76,21 +78,22 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
     Runtime::Runtime()
     {
-        const auto applicationInfo = ::vk::ApplicationInfo()
-            .setPApplicationName(gfx::Context::Window().getTitle().c_str())
+        constexpr auto applicationInfo = ::vk::ApplicationInfo()
+            .setPApplicationName("GFXFramework Application")
             .setApplicationVersion(VK_MAKE_VERSION(1, 0, 0))
             .setPEngineName("GFXFramework")
             .setEngineVersion(VK_MAKE_VERSION(1, 0, 0))
             .setApiVersion(VK_API_VERSION_1_3);
 
         const auto windowExtensions = GetRequiredExtensions();
-        _instanceExtensions.append_range(windowExtensions);
+        for (const auto& extension : windowExtensions) {
+            _instanceExtensions.emplace_back(extension);
+        }
 
         const auto createInfo = ::vk::InstanceCreateInfo()
             .setPApplicationInfo(&applicationInfo)
             .setPEnabledExtensionNames(_instanceExtensions)
             .setPEnabledLayerNames(_instanceLayers);
-
 
         _instance = ::vk::createInstance(createInfo);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
@@ -109,21 +112,40 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
 
         _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
-
-        _surface = CreateSurface(_instance, gfx::Context::Window());
     }
 
     Runtime::~Runtime()
     {
+        _instance.destroyDebugUtilsMessengerEXT(_debugMessenger);
         _instance.destroy();
     }
 
     void Runtime::selectPhysicalDevice()
     {
-        for (const auto physicalDevices = _instance.enumeratePhysicalDevices();
-            const auto physicalDeviceCandidate : physicalDevices) {
-            if (auto physicalDevice = std::make_unique<PhysicalDevice>(physicalDeviceCandidate);
-                physicalDevice->isSuitable())
+        auto physicalDevices = _instance.enumeratePhysicalDevices();
+        std::ranges::sort(physicalDevices, [] (const ::vk::PhysicalDevice& a, const ::vk::PhysicalDevice& b) {
+            const auto deviceTypeScore = [] (const ::vk::PhysicalDeviceType type) {
+                switch (type) {
+                    case ::vk::PhysicalDeviceType::eDiscreteGpu: return 4;
+                    case ::vk::PhysicalDeviceType::eIntegratedGpu: return 3;
+                    case ::vk::PhysicalDeviceType::eVirtualGpu: return 2;
+                    case ::vk::PhysicalDeviceType::eCpu: return 1;
+                    default: return 0;
+                }
+            };
+            const auto propertiesA = a.getProperties();
+            const auto propertiesB = b.getProperties();
+            if (deviceTypeScore(propertiesA.deviceType) != deviceTypeScore(propertiesB.deviceType)) {
+                return deviceTypeScore(propertiesA.deviceType) > deviceTypeScore(propertiesB.deviceType);
+            }
+            if (propertiesA.limits.maxImageDimension2D != propertiesB.limits.maxImageDimension2D) {
+                return propertiesA.limits.maxImageDimension2D > propertiesB.limits.maxImageDimension2D;
+            }
+            return false;
+        });
+
+        for (const auto& physicalDeviceCandidate : physicalDevices) {
+            if (auto physicalDevice = std::make_unique<PhysicalDevice>(physicalDeviceCandidate); physicalDevice->isSuitable())
             {
                 std::cout << "Selected physical device: " << physicalDevice->getProperties().deviceName << std::endl;
                 std::cout << "Device type: " << ::vk::to_string(physicalDevice->getProperties().deviceType) << std::endl;

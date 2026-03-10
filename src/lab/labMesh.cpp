@@ -144,7 +144,7 @@ void LabMesh::Update()
         return;
     }
 
-    glm::mat4 viewMatrix = glm::lookAt(
+    const glm::mat4 viewMatrix = glm::lookAt(
         _cameraPosition,
         _cameraPosition + _cameraForward,
         glm::vec3(0.f, 1.f, 0.f)

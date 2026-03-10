@@ -28,15 +28,10 @@ namespace gfx
         glm::u32 stride;
     };
 
-    struct VertexInputState {
-        std::vector<VertexInputAttributeDescription> attributes = {};
-        std::vector<VertexInputBindingDescription> bindings = {};
-    };
-
     class Mesh
     {
     public:
-        struct CreateInfo
+        struct Builder
         {
             glm::u64 vertexCount;
             std::vector<std::unique_ptr<Buffer>> vertexBuffers;
@@ -49,37 +44,41 @@ namespace gfx
             std::vector<VertexInputBindingDescription> vertexBindingDescription = {};
             std::vector<VertexInputAttributeDescription> vertexAttributeDescription = {};
 
-            CreateInfo& AddVertexBuffer(std::unique_ptr<Buffer> vertexBuffer, const VertexInputBindingDescription& bindingDescription) {
+            Builder& AddVertexBuffer(std::unique_ptr<Buffer> vertexBuffer, const VertexInputBindingDescription& bindingDescription) {
                 vertexCount = vertexBuffer->getSize() / bindingDescription.stride;
                 vertexBuffers.emplace_back(std::move(vertexBuffer));
                 vertexBindingDescription.emplace_back(bindingDescription);
                 return *this;
             }
 
-            CreateInfo& SetIndexBuffer(std::unique_ptr<Buffer> indexBuffer, const ChannelType indexType) {
+            Builder& SetIndexBuffer(std::unique_ptr<Buffer> indexBuffer, const ChannelType indexType) {
                 this->indexCount = indexBuffer->getSize() / sizeofChannelType(indexType);
                 this->indexBuffer = std::move(indexBuffer);
                 this->indexType = indexType;
                 return *this;
             }
 
-            CreateInfo& SetIndirectBuffer(std::unique_ptr<Buffer> indirectBuffer) {
+            Builder& SetIndirectBuffer(std::unique_ptr<Buffer> indirectBuffer) {
                 this->indirectBuffer = std::move(indirectBuffer);
                 return *this;
             }
 
-            CreateInfo& AddVertexAttributeDescription(const VertexInputAttributeDescription& attributeDescription) {
+            Builder& AddVertexAttributeDescription(const VertexInputAttributeDescription& attributeDescription) {
                 vertexAttributeDescription.emplace_back(attributeDescription);
                 return *this;
+            }
+
+            std::unique_ptr<Mesh> Build() {
+                return Mesh::Create(*this);
             }
         };
 
         virtual ~Mesh() = default;
 
-        static std::unique_ptr<Mesh> Create(CreateInfo& createInfo);
-
     protected:
-        explicit Mesh(CreateInfo& createInfo);
+        static std::unique_ptr<Mesh> Create(Builder& createInfo);
+
+        explicit Mesh(Builder& createInfo);
 
         glm::u64 _vertexCount;
         std::vector<std::unique_ptr<Buffer>> _vertexBuffer = {};

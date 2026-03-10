@@ -4,29 +4,30 @@
 
 #include "mesh.h"
 #include "impl/open_gl/mesh.h"
+#include "impl/vulkan/mesh.h"
 
 #include "io/window.h"
 
 namespace gfx
 {
-    Mesh::Mesh(CreateInfo& createInfo)
-        : _vertexCount(std::move(createInfo.vertexCount)),
+    Mesh::Mesh(Builder& createInfo)
+        : _vertexCount(createInfo.vertexCount),
           _vertexBuffer(std::move(createInfo.vertexBuffers)),
-          _indexCount(std::move(createInfo.indexCount)),
+          _indexCount(createInfo.indexCount),
           _indexBuffer(std::move(createInfo.indexBuffer)),
-          _indexType(std::move(createInfo.indexType)),
+          _indexType(createInfo.indexType),
           _indirectBuffer(std::move(createInfo.indirectBuffer)),
           _vertexBindingDescription(std::move(createInfo.vertexBindingDescription)),
           _vertexAttributeDescription(std::move(createInfo.vertexAttributeDescription)) {}
 
-    std::unique_ptr<Mesh> Mesh::Create(CreateInfo& createInfo)
+    std::unique_ptr<Mesh> Mesh::Create(Builder& createInfo)
     {
         switch (Context::Window().getAPI())
         {
         case API::eOpenGL:
             return std::make_unique<ogl::Mesh>(createInfo);
         case API::eVulkan:
-            throw std::runtime_error("Vulkan mesh creation not implemented yet!");
+            return std::make_unique<vk::Mesh>(createInfo);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

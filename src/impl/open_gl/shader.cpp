@@ -15,9 +15,6 @@ namespace gfx::ogl
 {
     Shader::Shader(const gfx::Shader::Builder& createInfo) : gfx::Shader(createInfo)
     {
-        std::string shaderCode;
-        // if (createInfo.lang == Lang::eSPIRV)
-        // {
         _spirvCode = CompileToSPIRV(_path, _stage);
         _memoryLayout = fetchMemoryLayout(_spirvCode);
     }

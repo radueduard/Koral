@@ -15,13 +15,13 @@
 #include "context.h"
 #include "physicalDevice.h"
 #include "runtime.h"
+#include "surface.h"
 #include "vulkanContext.h"
 
 namespace gfx::vk {
-    Queue::Family::Family(const glm::u32 index, const ::vk::QueueFamilyProperties &properties, const bool canPresent) :
+    Queue::Family::Family(const glm::u32 index, const ::vk::QueueFamilyProperties &properties) :
         _index(index),
-        _properties(properties),
-        _canPresent(canPresent) {
+        _properties(properties) {
         _remainingQueues = properties.queueCount;
     }
 
@@ -33,8 +33,10 @@ namespace gfx::vk {
         }
     }
 
-    std::unique_ptr<Queue> Queue::Family::RequestPresentQueue() {
-        if (_canPresent) {
+    std::unique_ptr<Queue> Queue::Family::RequestPresentQueue(const gfx::vk::Surface &surface) {
+        const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
+
+        if (physicalDevice->getSurfaceSupportKHR(_index, *surface)) {
             return std::make_unique<Queue>(*this);
         }
         throw std::runtime_error("QueueFamily::RequestPresentQueue : Queue family cannot present");
@@ -56,9 +58,8 @@ namespace gfx::vk {
         const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
         for (const auto& queueFamily : physicalDevice.getQueueFamilyProperties()) {
             const auto queueFamilyIndex = static_cast<uint32_t>(&queueFamily - physicalDevice.getQueueFamilyProperties().data());
-            const bool canPresent = physicalDevice->getSurfaceSupportKHR(queueFamilyIndex, Context::Runtime().getSurface());
 
-            _queueFamilies.emplace_back(queueFamilyIndex, queueFamily, canPresent);
+            _queueFamilies.emplace_back(queueFamilyIndex, queueFamily);
         }
 
         std::vector<::vk::DeviceQueueCreateInfo> queueCreateInfos;
@@ -116,16 +117,14 @@ namespace gfx::vk {
         for (const auto& queueFamily : _queueFamilies) {
             _commandPools[queueFamily.getIndex()] = {};
         }
-        createCommandPools(0);
     }
 
     Device::~Device() {
-        freeCommandPools(0);
         _handle.waitIdle();
         _handle.destroy();
     }
 
-    void Device::createCommandPools(const uint32_t threadId) {
+    void Device::createCommandPools(const uint32_t threadId) const {
         for (const auto& queueFamily : _queueFamilies) {
             const auto commandPoolCreateInfo = ::vk::CommandPoolCreateInfo()
                 .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
@@ -134,7 +133,7 @@ namespace gfx::vk {
         }
     }
 
-    void Device::freeCommandPools(const uint32_t threadId) {
+    void Device::freeCommandPools(const uint32_t threadId) const {
         for (const auto& queueFamily : _queueFamilies) {
             _handle.destroyCommandPool(_commandPools[queueFamily.getIndex()][threadId]);
             _commandPools[queueFamily.getIndex()].erase(threadId);
@@ -142,13 +141,13 @@ namespace gfx::vk {
     }
 
     const Queue& Device::requestQueue(const ::vk::QueueFlags type) const {
-        for (const auto& queue : _queuesInUse)
-        {
-            if ((queue->getFamily().getProperties().queueFlags & type) == type)
-            {
-                return *queue;
-            }
-        }
+        // for (const auto& queue : _queuesInUse)
+        // {
+        //     if ((queue->getFamily().getProperties().queueFlags & type) == type)
+        //     {
+        //         return *queue;
+        //     }
+        // }
 
         for (auto& queueFamily : _queueFamilies) {
             if ((queueFamily.getProperties().queueFlags & type) != type) {
@@ -156,21 +155,19 @@ namespace gfx::vk {
             }
             try {
                 auto queue = queueFamily.RequestQueue();
-                const auto& queueRef = *queue;
-                _queuesInUse.emplace_back(std::move(queue));
-                return queueRef;
+                const auto& queueRef =_queuesInUse.emplace_back(std::move(queue));
+                return *queueRef;
             } catch (const std::runtime_error&) {}
         }
         throw std::runtime_error("Queue::RequestQueue : Failed to find queue with requested flags");
     }
 
-    const Queue&Device::requestPresentQueue() const {
+    const Queue& Device::requestPresentQueue(const gfx::vk::Surface& surface) const {
         for (auto& queueFamily : _queueFamilies) {
             try {
-                auto queue = queueFamily.RequestPresentQueue();
-                const auto& queueRef = *queue;
-                _queuesInUse.emplace_back(std::move(queue));
-                return queueRef;
+                auto queue = queueFamily.RequestPresentQueue(surface);
+                const auto& queueRef = _queuesInUse.emplace_back(std::move(queue));
+                return *queueRef;
             } catch (const std::runtime_error&) {
                 continue;
             }

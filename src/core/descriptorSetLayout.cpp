@@ -4,6 +4,7 @@
 
 #include "descriptorSetLayout.h"
 #include "impl/open_gl/descriptorSetLayout.h"
+#include "impl/vulkan/descriptorSetLayout.h"
 
 #include <stdexcept>
 #include <string>
@@ -29,7 +30,7 @@ namespace gfx
         case API::eOpenGL:
             return std::make_unique<ogl::DescriptorSetLayout>(*this);
         case API::eVulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+            return std::make_unique<vk::DescriptorSetLayout>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

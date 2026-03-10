@@ -68,9 +68,9 @@ namespace gfx::ogl
         glCheckError();
     }
 
-    void ComputePipeline::Bind() const
+    void ComputePipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
     {
-        gfx::ComputePipeline::Bind();
+        gfx::ComputePipeline::Bind(commandBuffer);
         glUseProgram(_id);
         glCheckError();
     }
@@ -79,25 +79,6 @@ namespace gfx::ogl
     {
         gfx::ComputePipeline::Unbind();
         glUseProgram(0);
-        glCheckError();
-    }
-
-    void ComputePipeline::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ) const
-    {
-        gfx::ComputePipeline::Dispatch(groupCountX, groupCountY, groupCountZ);
-        glDispatchCompute(groupCountX, groupCountY, groupCountZ);
-        glCheckError();
-    }
-
-    void ComputePipeline::DispatchIndirect(const gfx::Buffer& indirectBuffer, const glm::i64 offset) const
-    {
-        gfx::ComputePipeline::DispatchIndirect(indirectBuffer, offset);
-        const auto& indirectBufferGL = dynamic_cast<const Buffer&>(indirectBuffer);
-        glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, *indirectBufferGL);
-        glCheckError();
-        glDispatchComputeIndirect(offset);
-        glCheckError();
-        glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, 0);
         glCheckError();
     }
 }

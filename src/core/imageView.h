@@ -61,11 +61,12 @@ namespace gfx
 
         virtual ~ImageView() = default;
 
-        [[nodiscard]] Type GetViewType() const { return _viewType; }
-        [[nodiscard]] glm::u32 GetBaseMipLevel() const { return _baseMipLevel; }
-        [[nodiscard]] glm::u32 GetMipLevelCount() const { return _mipLevelCount; }
-        [[nodiscard]] glm::u32 GetBaseArrayLayer() const { return _baseArrayLayer; }
-        [[nodiscard]] glm::u32 GetArrayLayerCount() const { return _arrayLayerCount; }
+        [[nodiscard]] const Image& getImage() const { return _image; }
+        [[nodiscard]] Type getViewType() const { return _viewType; }
+        [[nodiscard]] glm::u32 getBaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] glm::u32 getMipLevelCount() const { return _mipLevelCount; }
+        [[nodiscard]] glm::u32 getBaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] glm::u32 getArrayLayerCount() const { return _arrayLayerCount; }
 
     protected:
         explicit ImageView(const Builder& createInfo);

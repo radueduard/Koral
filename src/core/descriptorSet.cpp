@@ -4,6 +4,7 @@
 
 #include "descriptorSet.h"
 #include "impl/open_gl/descriptorSet.h"
+#include "impl/vulkan/descriptorSet.h"
 
 #include "descriptorBinding.h"
 #include "descriptorSetLayout.h"
@@ -76,7 +77,7 @@ namespace gfx
         case API::eOpenGL:
             return std::make_unique<ogl::DescriptorSet>(*this);
         case API::eVulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+            return std::make_unique<vk::DescriptorSet>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

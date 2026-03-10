@@ -14,6 +14,7 @@ find_package(GLEW CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(assimp REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(glslang CONFIG REQUIRED)
 find_package(spirv_cross_core CONFIG REQUIRED)
 find_package(spirv_cross_glsl CONFIG REQUIRED)
@@ -36,6 +37,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW OpenGL::GL)
 target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
+target_link_libraries(${PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
         glslang::glslang

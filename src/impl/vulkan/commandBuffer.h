@@ -31,19 +31,21 @@ namespace gfx::vk
         gfx::CommandBuffer& EndRendering() override;
         gfx::CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
         gfx::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
-        gfx::CommandBuffer& BindPipeline(const ComputePipeline* pipeline) override;
-        gfx::CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline) override;
-        gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* set) override;
+        gfx::CommandBuffer& BindPipeline(const gfx::ComputePipeline* pipeline) override;
+        gfx::CommandBuffer& BindPipeline(const gfx::GraphicsPipeline* pipeline) override;
+        gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, const gfx::DescriptorSet* set) override;
         gfx::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
         gfx::CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
         gfx::CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) override;
         void Submit() override;
         void Reset() override;
 
+        void WaitForFence() const override;
+
     private:
         const gfx::vk::Queue& _queue;
         const ::vk::CommandPool& _parentPool;
-        ::vk::Semaphore _signalSemaphore;
-        ::vk::Fence _fence;
+        ::vk::Semaphore _signalSemaphore = nullptr;
+        ::vk::Fence _fence = nullptr;
     };
 }

@@ -20,21 +20,15 @@ namespace gfx::vk
         [[nodiscard]] bool isSuitable() const;
         [[nodiscard]] const std::vector<::vk::QueueFamilyProperties>& getQueueFamilyProperties() const { return _queueFamilyProperties; }
 
-        [[nodiscard]] const std::vector<::vk::SurfaceFormatKHR>& getSurfaceFormats() const { return _formats; }
-        [[nodiscard]] const std::vector<::vk::PresentModeKHR>& getSurfacePresentModes() const { return _presentModes; }
-        [[nodiscard]] const ::vk::SurfaceCapabilitiesKHR& getSurfaceCapabilities() const { return _capabilities; }
-
     	[[nodiscard]] const ::vk::PhysicalDeviceProperties& getProperties() const { return _properties; }
 		[[nodiscard]] const ::vk::PhysicalDeviceFeatures& getFeatures() const { return _features; }
     	[[nodiscard]] const ::vk::PhysicalDeviceMemoryProperties& getMemoryProperties() const { return _memoryProperties; }
-
-        void QuerySurfaceCapabilities() const;
 
     private:
         [[nodiscard]] bool hasRequiredQueueFamilies(const ::vk::QueueFlags&) const;
         [[nodiscard]] bool hasRequiredExtensions(const std::vector<const char*>& requiredExtensions) const;
         [[nodiscard]] bool hasRequiredFeatures(const ::vk::PhysicalDeviceFeatures& requiredFeatures) const;
-        [[nodiscard]] bool isSwapChainSupported() const { return !_formats.empty() && !_presentModes.empty(); }
+        // [[nodiscard]] bool isSwapChainSupported() const { return !_formats.empty() && !_presentModes.empty(); }
 
         ::vk::PhysicalDeviceProperties _properties;
         ::vk::PhysicalDeviceFeatures _features;
@@ -42,9 +36,5 @@ namespace gfx::vk
         ::std::vector<::vk::ExtensionProperties> _extensionProperties;
 
         std::vector<::vk::QueueFamilyProperties> _queueFamilyProperties;
-
-        mutable ::vk::SurfaceCapabilitiesKHR _capabilities;
-        mutable ::std::vector<::vk::SurfaceFormatKHR> _formats;
-        mutable ::std::vector<::vk::PresentModeKHR> _presentModes;
     };
 }

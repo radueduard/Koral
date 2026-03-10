@@ -24,6 +24,20 @@ namespace gfx
         return queueFlags;
     }
 
+    CommandBuffer& CommandBuffer::BindPipeline(const ComputePipeline* pipeline)
+    {
+        _state.boundComputePipeline = pipeline;
+        _state.boundGraphicsPipeline = std::nullopt;
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::BindPipeline(const GraphicsPipeline* pipeline)
+    {
+        _state.boundGraphicsPipeline = pipeline;
+        _state.boundComputePipeline = std::nullopt;
+        return *this;
+    }
+
     std::unique_ptr<CommandBuffer> CommandBuffer::Create(const Flags<Usage> usage)
     {
         switch (Context::Window().getAPI()) {

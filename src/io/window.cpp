@@ -11,6 +11,7 @@
 #include <stb_image.h>
 
 #include "manager.h"
+#include "impl/vulkan/device.h"
 #include "impl/vulkan/vulkanContext.h"
 
 namespace gfx::io {
@@ -87,7 +88,8 @@ namespace gfx::io {
             }
         case API::eVulkan:
             {
-                gfx::vk::Context::Init();
+                gfx::vk::Context::Device().createCommandPools(gfx::vk::Context::ThreadId());
+                break;
             }
         }
         _framebuffer = Framebuffer::CreateDefault();
@@ -99,15 +101,14 @@ namespace gfx::io {
     }
 
     Window::~Window() {
-        if (_api == API::eVulkan) {
-            gfx::vk::Context::Destroy();
-        }
-
         glfwDestroyWindow(_window);
     }
 
     void Window::close()
     {
+        if (_api == API::eVulkan) {
+            gfx::vk::Context::Device().freeCommandPools(gfx::vk::Context::ThreadId());
+        }
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
         _closed = true;
     }

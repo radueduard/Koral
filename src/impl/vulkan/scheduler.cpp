@@ -4,6 +4,7 @@
 
 #include "scheduler.h"
 
+#include "surface.h"
 #include "swapChain.h"
 #include "vulkanContext.h"
 
@@ -29,16 +30,15 @@ namespace gfx::vk
     Scheduler::Scheduler(const Builder& createInfo)
         : _imageCount(createInfo.imageCount), _msaa(createInfo.msaa)
     {
-
-        const auto& queue = Context::Device().requestPresentQueue();
+        _surface = std::make_unique<Surface>(gfx::Context::Window());
+        const auto& queue = Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
         createFrames(queue);
 
-        _swapChain = gfx::vk::SwapChain::Builder()
+        _swapChain = gfx::vk::SwapChain::Builder(*_surface)
             .setMinImageCount(createInfo.minImageCount)
             .setImageCount(_imageCount)
             .setMSAA(_msaa)
             .build();
-        createDescriptorPool();
     }
 
     Scheduler::~Scheduler() {
@@ -86,18 +86,5 @@ namespace gfx::vk
         for (uint32_t i = 0; i < _imageCount; i++) {
             _frames.emplace_back(std::make_unique<Frame>(i, queue));
         }
-    }
-
-
-    void Scheduler::createDescriptorPool() {
-        _descriptorPool = gfx::vk::DescriptorPool::Builder()
-            .addPoolSize(::vk::DescriptorType::eUniformBuffer, 1000)
-            .addPoolSize(::vk::DescriptorType::eStorageBuffer, 1000)
-            .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
-            .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)
-            .addPoolSize(::vk::DescriptorType::eSampler, 1000)
-            .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-            .setMaxSets(1000)
-            .build();
     }
 }

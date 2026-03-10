@@ -62,7 +62,7 @@ namespace gfx::io {
                 return *this;
             }
 
-            [[nodiscard]] void build() const;
+            void build() const;
         };
 
         ~Window();

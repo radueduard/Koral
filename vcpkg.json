@@ -35,5 +35,11 @@
   }, {
     "name" : "spirv-reflect",
     "version>=" : "1.4.335.0"
+  }, {
+    "name" : "vulkan",
+    "version>=" : "2023-12-17"
+  }, {
+    "name" : "vulkan-memory-allocator",
+    "version>=" : "3.3.0"
   } ]
 }

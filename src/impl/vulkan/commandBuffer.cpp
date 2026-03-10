@@ -4,11 +4,15 @@
 
 #include "commandBuffer.h"
 
+#include "computePipeline.h"
+#include "descriptorSet.h"
 #include "device.h"
 #include "vulkanContext.h"
 
 namespace gfx::vk
 {
+    class ComputePipeline;
+
     gfx::Flags<CommandBuffer::Usage> getCommandBufferUsage(const gfx::vk::Queue& queue)
     {
         gfx::Flags<CommandBuffer::Usage> usage;
@@ -25,7 +29,7 @@ namespace gfx::vk
         : gfx::CommandBuffer(getCommandBufferUsage(queue)), _queue(queue), _parentPool(parentCommandPool) {
         _handle = commandBuffer;
         _signalSemaphore = Context::Device()->createSemaphore({});
-        _fence = gfx::vk::Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
+        _fence = gfx::vk::Context::Device()->createFence({});
     }
 
     CommandBuffer::~CommandBuffer() {
@@ -93,23 +97,43 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(const ComputePipeline* pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(const gfx::ComputePipeline* pipeline)
     {
+        gfx::CommandBuffer::BindPipeline(pipeline);
+        pipeline->Bind(*this);
         return *this;
     }
 
     gfx::CommandBuffer& CommandBuffer::BindPipeline(const GraphicsPipeline* pipeline)
     {
+        gfx::CommandBuffer::BindPipeline(pipeline);
+        // pipeline->Bind(*this);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, const DescriptorSet* set)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, const gfx::DescriptorSet* set)
     {
+        if (_state.boundComputePipeline.has_value()) {
+            const auto& vkPipeline = dynamic_cast<const ComputePipeline*>(_state.boundComputePipeline.value());
+            const auto pipelineLayout = vkPipeline->getPipelineLayout();
+            const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet*>(set);
+            _handle.bindDescriptorSets(
+                ::vk::PipelineBindPoint::eCompute,
+                pipelineLayout,
+                index,
+                **vkSet,
+                nullptr);
+        } else if (_state.boundGraphicsPipeline.has_value()) {
+            // _state.boundGraphicsPipeline.value()->BindDescriptorSet(index, *this, *set);
+        } else {
+            std::cerr << "No pipeline bound when trying to bind descriptor set" << std::endl;
+        }
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ)
+    gfx::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ)
     {
+        _handle.dispatch(groupCountX, groupCountY, groupCountZ);
         return *this;
     }
 
@@ -125,11 +149,34 @@ namespace gfx::vk
 
     void CommandBuffer::Submit()
     {
+        const auto commandBuffers = std::array { _handle };
+        auto submitInfo = ::vk::SubmitInfo()
+            .setCommandBuffers(commandBuffers);
 
+        if (_signalSemaphore != nullptr)
+            submitInfo.setSignalSemaphores(_signalSemaphore);
+
+        try {
+            _queue->submit(submitInfo, _fence);
+        } catch (const std::runtime_error& e) {
+            std::cerr << e.what() << std::endl;
+        }
     }
 
     void CommandBuffer::Reset()
     {
         _handle.reset();
+    }
+
+    void CommandBuffer::WaitForFence() const
+    {
+        try {
+            auto result = Context::Device()->waitForFences(_fence, true, UINT64_MAX);
+            if (result != ::vk::Result::eSuccess) {
+                std::cerr << "Failed to wait for fence: " << ::vk::to_string(result) << std::endl;
+            }
+        } catch (const std::runtime_error& e) {
+            std::cerr << e.what() << std::endl;
+        }
     }
 }

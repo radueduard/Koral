@@ -4,6 +4,7 @@
 #include "computePipeline.h"
 #include "descriptorSetLayout.h"
 #include "impl/open_gl/computePipeline.h"
+#include "impl/vulkan/computePipeline.h"
 
 #include "io/window.h"
 
@@ -15,7 +16,7 @@ namespace gfx
         case API::eOpenGL:
             return std::make_unique<ogl::ComputePipeline>(*this);
         case API::eVulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+            return std::make_unique<vk::ComputePipeline>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

@@ -4,6 +4,7 @@
 
 #include "shader.h"
 #include "impl/open_gl/shader.h"
+#include "impl/vulkan/shader.h"
 
 #include <spirv_cross.hpp>
 
@@ -23,7 +24,7 @@ namespace gfx {
         case API::eOpenGL:
             return std::make_unique<ogl::Shader>(*this);
         case API::eVulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+            return std::make_unique<vk::Shader>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

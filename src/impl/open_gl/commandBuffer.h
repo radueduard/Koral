@@ -34,13 +34,9 @@ namespace gfx::ogl
         void Reset() override;
 
         const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& getRemappingTableForBoundPipeline() const;
+        void WaitForFence() const override {}
 
     private:
-        struct {
-            std::optional<const ogl::Framebuffer*> boundFramebuffer = std::nullopt;
-            std::optional<const ogl::ComputePipeline*> boundComputePipeline = std::nullopt;
-            std::optional<const ogl::GraphicsPipeline*> boundGraphicsPipeline = std::nullopt;
-        } _state;
 
         bool _recording = false;
         bool _filled = false;

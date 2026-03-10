@@ -17,6 +17,7 @@
 
 namespace gfx::vk
 {
+    class Surface;
     class Image;
     class Frame;
 
@@ -24,9 +25,12 @@ namespace gfx::vk
     {
     public:
         struct Builder {
-            glm::u32 minImageCount;
-            glm::u32 imageCount;
-            MSAA msaa;
+            explicit Builder(const Surface& surface) : surface(surface) {}
+
+            std::reference_wrapper<const Surface> surface;
+            glm::u32 minImageCount = 2;
+            glm::u32 imageCount = 2;
+            MSAA msaa = MSAA::eNone;
 
             Builder& setMinImageCount(const glm::u32 minImageCount) { this->minImageCount = minImageCount; return *this; }
             Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
@@ -55,6 +59,8 @@ namespace gfx::vk
         glm::u32 _minImageCount = 0;
         glm::u32 _imageCount = 0;
         glm::u32 _imageIndex = 0;
+
+        std::reference_wrapper<const Surface> _surface;
         ::vk::SurfaceFormatKHR _surfaceFormat = {};
         ::vk::PresentModeKHR _presentMode = {};
 

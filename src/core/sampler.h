@@ -4,7 +4,6 @@
 
 #pragma once
 #include <memory>
-#include <glm/vec4.hpp>
 
 namespace gfx
 {

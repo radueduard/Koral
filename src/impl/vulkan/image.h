@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include "commandBuffer.h"
 
@@ -21,8 +21,8 @@ namespace gfx::vk
         Image(const Image&) = delete;
         Image& operator=(const Image&) = delete;
 
-		void TransitionLayout(const gfx::vk::CommandBuffer& commandBuffer, ::vk::ImageLayout newLayout);
-		void TransitionLayout(::vk::ImageLayout newLayout);
+		void TransitionLayout(const gfx::vk::CommandBuffer& commandBuffer, ::vk::ImageLayout newLayout) const;
+		void TransitionLayout(::vk::ImageLayout newLayout) const;
 
     	void Barrier(
     		const gfx::vk::CommandBuffer& commandBuffer,
@@ -35,7 +35,7 @@ namespace gfx::vk
 
     	void Clear(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const;
     	void Clear(const ::vk::ClearValue& clearValue) const;
-        void GenerateMipmaps();
+        void GenerateMipmaps() const;
     	void Resize(const glm::uvec3& extent);
 
     	std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const override;
@@ -43,9 +43,11 @@ namespace gfx::vk
 
     	explicit Image(::vk::Image _surfaceImage, glm::uvec2 extent, Format format, MSAA msaa);
 
+    	[[nodiscard]] ::vk::ImageLayout getImageLayout() const;
+
     private:
 		VmaAllocation _allocation = nullptr;
-        ::vk::ImageLayout _layout = ::vk::ImageLayout::eUndefined;
+        mutable ::vk::ImageLayout _layout = ::vk::ImageLayout::eUndefined;
 
     	inline static std::unordered_map<::vk::ImageLayout, ::vk::AccessFlags> layoutAccessMap = {
 			{ ::vk::ImageLayout::eUndefined, ::vk::AccessFlagBits::eNone },

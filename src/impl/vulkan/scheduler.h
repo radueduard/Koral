@@ -65,7 +65,6 @@ namespace gfx::vk
     	void Draw();
 
     	[[nodiscard]] const gfx::vk::SwapChain &getSwapChain() const { return *_swapChain; }
-    	[[nodiscard]] gfx::vk::DescriptorPool &getDescriptorPool() const { return *_descriptorPool; }
     	[[nodiscard]] const Frame &getCurrentFrame() const { return *_frames.at(_currentFrame); }
     	[[nodiscard]] const Frame &getNextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
     	void advanceFrame() { _currentFrame = (_currentFrame + 1) % _imageCount; }
@@ -76,6 +75,8 @@ namespace gfx::vk
     	[[nodiscard]] std::vector<Frame*> getFrames() const;
 
     private:
+    	std::unique_ptr<gfx::vk::Surface> _surface;
+
 	    glm::u32 _imageCount;
     	MSAA _msaa = MSAA::e2x;
     	std::unique_ptr<gfx::vk::SwapChain> _swapChain;
@@ -83,10 +84,6 @@ namespace gfx::vk
     	void createFrames(const Queue& queue);
 	    glm::u32 _currentFrame = 0;
     	std::vector<std::unique_ptr<Frame>> _frames;
-
-
-    	void createDescriptorPool();
-    	std::unique_ptr<gfx::vk::DescriptorPool> _descriptorPool = nullptr;
 
     	bool _resized = false;
     	::vk::Extent2D _extent;

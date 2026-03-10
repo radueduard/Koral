@@ -12,17 +12,19 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <glm/fwd.hpp>
 
 #include <vulkan/vulkan.hpp>
 
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
 #include "utils/vk_wrapper.h"
 
 namespace gfx::vk {
+    class Surface;
     class PhysicalDevice;
 }
 
@@ -33,21 +35,19 @@ namespace gfx::vk {
         {
             friend class Queue;
         public:
-            explicit Family(glm::u32 index, const ::vk::QueueFamilyProperties &properties, bool canPresent);
+            explicit Family(glm::u32 index, const ::vk::QueueFamilyProperties &properties);
             ~Family() = default;
 
             [[nodiscard]] glm::u32 getIndex() const { return _index; }
             [[nodiscard]] const ::vk::QueueFamilyProperties& getProperties() const { return _properties; }
-            [[nodiscard]] bool canPresent() const { return _canPresent; }
 
             [[nodiscard]] std::unique_ptr<Queue> RequestQueue();
-            [[nodiscard]] std::unique_ptr<Queue> RequestPresentQueue();
+            [[nodiscard]] std::unique_ptr<Queue> RequestPresentQueue(const gfx::vk::Surface& surface);
 
         private:
             glm::u32 _index;
             ::vk::QueueFamilyProperties _properties;
             glm::u32 _remainingQueues = 0;
-            bool _canPresent = false;
         };
 
         explicit Queue(Family& family);
@@ -72,10 +72,10 @@ namespace gfx::vk {
         Device &operator=(const Device &) = delete;
 
         [[nodiscard]] const Queue& requestQueue(::vk::QueueFlags type) const;
-        [[nodiscard]] const Queue& requestPresentQueue() const;
+        [[nodiscard]] const Queue& requestPresentQueue(const gfx::vk::Surface& surface) const;
 
-        void createCommandPools(uint32_t threadId);
-        void freeCommandPools(uint32_t threadId);
+        void createCommandPools(uint32_t threadId) const;
+        void freeCommandPools(uint32_t threadId) const;
 
         [[nodiscard]] std::unique_ptr<gfx::vk::CommandBuffer> requestCommandBuffer(const gfx::vk::Queue& queue, uint32_t thread = 0) const;
         void freeCommandBuffer(const gfx::vk::CommandBuffer &commandBuffer) const;
@@ -87,6 +87,6 @@ namespace gfx::vk {
     	std::unique_ptr<VmaAllocator> _allocator;
         mutable std::vector<Queue::Family> _queueFamilies {};
         mutable std::vector<std::unique_ptr<Queue>> _queuesInUse {};
-        std::unordered_map<uint32_t, std::unordered_map<uint32_t, ::vk::CommandPool>> _commandPools;
+        mutable std::unordered_map<uint32_t, std::unordered_map<uint32_t, ::vk::CommandPool>> _commandPools;
     };
 }

@@ -5,6 +5,7 @@
 #include "vulkanContext.h"
 
 #include "allocator.h"
+#include "descriptorPool.h"
 #include "device.h"
 #include "runtime.h"
 
@@ -29,6 +30,13 @@ const gfx::vk::Allocator& gfx::vk::Context::Allocator()
     return *_allocator;
 }
 
+const gfx::vk::DescriptorPool& gfx::vk::Context::DescriptorPool()
+{
+    if (!_descriptorPool)
+        throw std::runtime_error("DescriptorPool is not initialized");
+    return *_descriptorPool;
+}
+
 void gfx::vk::Context::Init()
 {
     _threadId = std::this_thread::get_id();
@@ -36,10 +44,22 @@ void gfx::vk::Context::Init()
     _runtime->selectPhysicalDevice();
     _device = new gfx::vk::Device;
     _allocator = new gfx::vk::Allocator;
+    _descriptorPool = gfx::vk::DescriptorPool::Builder()
+        .setMaxSets(1000)
+        .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+        .addPoolSize(::vk::DescriptorType::eUniformBuffer, 1000)
+        .addPoolSize(::vk::DescriptorType::eStorageBuffer, 1000)
+        .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
+        .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)
+        .addPoolSize(::vk::DescriptorType::eSampler, 1000)
+        .build();
 }
 
 void gfx::vk::Context::Destroy()
 {
+    _device->operator*().waitIdle();
+    delete _descriptorPool;
+    delete _allocator;
     delete _device;
     delete _runtime;
 }

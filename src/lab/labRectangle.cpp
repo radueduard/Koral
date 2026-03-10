@@ -25,8 +25,8 @@ void LabRectangle::Initialize()
 
     constexpr struct {
         glm::vec3 position = glm::vec3(.5f, .5f, 0.0f);
-        float size = 0.75f;
-        glm::vec4 color = glm::vec4(1.0f, .5f, 1.0f, 1.0f);
+        float size = 0.5f;
+        glm::vec4 color = glm::vec4(.5f, .0f, 1.0f, 1.0f);
     } rectangleData {};
 
     buffer->Map();
@@ -37,9 +37,6 @@ void LabRectangle::Initialize()
         .setType(gfx::Image::Type::e2D)
         .setFormat(gfx::Image::Format::eRGBA8_UNORM)
         .setExtent({ 512, 512 })
-        .setMipLevels(1)
-        .setArrayLayers(1)
-        .setMSAA(gfx::MSAA::eNone)
         .setUsage(gfx::Image::Usage::eStorage)
         .addUsage(gfx::Image::Usage::eTransferSrc)
         .build();
@@ -69,9 +66,8 @@ void LabRectangle::Initialize()
         .Dispatch(512 / 16, 512 / 16, 1)
         .End();
     commandBuffer->Submit();
+    commandBuffer->WaitForFence();
 
     const auto data = image->ReadData(0, 0);
     stbi_write_png("output.png", static_cast<int>(image->getExtent().x), static_cast<int>(image->getExtent().y), 4, data.data(), static_cast<int>(image->getExtent().x) * 4);
-
-    gfx::Context::Window().close();
 }

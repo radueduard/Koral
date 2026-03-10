@@ -13,10 +13,8 @@ namespace gfx::ogl
     public:
         explicit ComputePipeline(const Builder& createInfo);
         ~ComputePipeline() override;
-        void Bind() const override;
+        void Bind(const gfx::CommandBuffer& commandBuffer) const override;
         void Unbind() const override;
-        void Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) const override;
-        void DispatchIndirect(const gfx::Buffer& indirectBuffer, glm::i64 offset) const override;
 
         const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& getSetAndBindingToBindingPointMap() const {
             return _setAndBindingToBindingPoint;

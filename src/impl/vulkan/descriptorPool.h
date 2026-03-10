@@ -12,8 +12,15 @@
 
 #include "utils/vk_wrapper.h"
 
+namespace gfx
+{
+    enum class DescriptorType;
+}
+
 namespace gfx::vk
 {
+    class DescriptorSetLayout;
+
     class DescriptorPool : public Wrapper<::vk::DescriptorPool> {
     public:
         class Builder {
@@ -22,7 +29,7 @@ namespace gfx::vk
             Builder &addPoolSize(::vk::DescriptorType type, glm::u32 count);
             Builder &setPoolFlags(::vk::DescriptorPoolCreateFlags flags);
             Builder &setMaxSets(glm::u32 count);
-            [[nodiscard]] std::unique_ptr<DescriptorPool> build() const;
+            [[nodiscard]] DescriptorPool* build() const;
 
         private:
             std::vector<::vk::DescriptorPoolSize> _poolSizes = {};
@@ -35,16 +42,15 @@ namespace gfx::vk
         DescriptorPool(const DescriptorPool &) = delete;
         DescriptorPool &operator=(const DescriptorPool &) = delete;
 
-        // [[nodiscard]] vk::DescriptorSet Allocate(const SetLayout &layout);
-        // [[nodiscard]] std::vector<vk::DescriptorSet> Allocate(const std::vector<SetLayout> &layouts);
-        // void Free(const ::vk::DescriptorSet &descriptorSet) const;
-        // void Free(const std::vector<::vk::DescriptorSet> &descriptorSets) const;
-
+        [[nodiscard]] ::vk::DescriptorSet Allocate(const gfx::vk::DescriptorSetLayout &layout) const;
+        [[nodiscard]] std::vector<::vk::DescriptorSet> Allocate(const std::vector<gfx::vk::DescriptorSetLayout> &layouts) const;
+        void Free(const ::vk::DescriptorSet &descriptorSet) const;
+        void Free(const std::vector<::vk::DescriptorSet> &descriptorSets) const;
         void Reset() const;
 
     private:
-        glm::u32 _allocatedSetCount = 0;
-        std::unordered_map<::vk::DescriptorType, glm::u32> _allocatedBindingCounts;
+        mutable glm::u32 _allocatedSetCount = 0;
+        mutable std::unordered_map<DescriptorType, glm::u32> _allocatedBindingCounts;
 
         std::vector<::vk::DescriptorPoolSize> _poolSizes;
         ::vk::DescriptorPoolCreateFlags _flags;

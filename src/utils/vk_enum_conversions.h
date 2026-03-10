@@ -5,10 +5,38 @@
 #pragma once
 #include "core/image.h"
 #include "core/imageView.h"
+#include "core/descriptorSetLayout.h"
+#include "core/sampler.h"
 #include <vulkan/vulkan.hpp>
 
 namespace gfx
 {
+    inline ::vk::DescriptorType getVkDescriptorType(const gfx::DescriptorType type)
+    {
+        switch (type)
+        {
+        case DescriptorType::eSampler: return ::vk::DescriptorType::eSampler;
+        case DescriptorType::eCombinedImageSampler: return ::vk::DescriptorType::eCombinedImageSampler;
+        case DescriptorType::eStorageImage: return ::vk::DescriptorType::eStorageImage;
+        case DescriptorType::eUniformBuffer: return ::vk::DescriptorType::eUniformBuffer;
+        case DescriptorType::eStorageBuffer: return ::vk::DescriptorType::eStorageBuffer;
+        default: throw std::runtime_error("Unknown descriptor type!");
+        }
+    }
+
+    inline DescriptorType getDescriptorType(const ::vk::DescriptorType type)
+    {
+        switch (type)
+        {
+        case ::vk::DescriptorType::eSampler: return DescriptorType::eSampler;
+        case ::vk::DescriptorType::eCombinedImageSampler: return DescriptorType::eCombinedImageSampler;
+        case ::vk::DescriptorType::eStorageImage: return DescriptorType::eStorageImage;
+        case ::vk::DescriptorType::eUniformBuffer: return DescriptorType::eUniformBuffer;
+        case ::vk::DescriptorType::eStorageBuffer: return DescriptorType::eStorageBuffer;
+        default: throw std::runtime_error("Unknown descriptor type!");
+        }
+    }
+
     inline ::vk::Format getVkFormat(const Image::Format format)
     {
         switch (format)

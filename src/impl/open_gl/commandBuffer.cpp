@@ -96,7 +96,7 @@ namespace gfx::ogl
         {
             _state.boundComputePipeline = dynamic_cast<const ogl::ComputePipeline*>(pipeline);
             _state.boundGraphicsPipeline = std::nullopt;
-            pipeline->Bind();
+            pipeline->Bind(*this);
         });
         return *this;
     }
@@ -132,6 +132,7 @@ namespace gfx::ogl
             if (!_state.boundComputePipeline.has_value())
                 throw std::runtime_error("You can't dispatch without a compute pipeline bound!");
             glDispatchCompute(groupCountX, groupCountY, groupCountZ);
+            glCheckError();
         });
         return *this;
     }
@@ -143,8 +144,8 @@ namespace gfx::ogl
         {
             if (!_state.boundGraphicsPipeline.has_value())
                 throw std::runtime_error("You can't draw without a graphics pipeline!");
-
-            const auto mode = _state.boundGraphicsPipeline.value()->getMode();
+            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            const auto mode = oglPipeline->getMode();
             glDrawArraysInstancedBaseInstance(mode, firstVertex, vertexCount, instanceCount, firstInstance);
         });
         return *this;
@@ -181,7 +182,8 @@ namespace gfx::ogl
         {
             if (!_state.boundGraphicsPipeline.has_value())
                 throw std::runtime_error("You can't draw mesh without a graphics pipeline!");
-            const auto mode = _state.boundGraphicsPipeline.value()->getMode();
+            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            const auto mode = oglPipeline->getMode();
             const auto* oglMesh = dynamic_cast<const ogl::Mesh*>(mesh);
             glBindVertexArray(**oglMesh);
             glCheckError();
@@ -233,10 +235,12 @@ namespace gfx::ogl
     const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& CommandBuffer::getRemappingTableForBoundPipeline() const
     {
         if (_state.boundComputePipeline.has_value()) {
-            return _state.boundComputePipeline.value()->getSetAndBindingToBindingPointMap();
+            const auto& oglPipeline = dynamic_cast<const gfx::ogl::ComputePipeline*>(_state.boundComputePipeline.value());
+            return oglPipeline->getSetAndBindingToBindingPointMap();
         }
         if (_state.boundGraphicsPipeline.has_value()) {
-            return _state.boundGraphicsPipeline.value()->getSetAndBindingToBindingPointMap();
+            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            return oglPipeline->getSetAndBindingToBindingPointMap();
         }
         throw std::runtime_error("No pipeline is currently bound!");
     }

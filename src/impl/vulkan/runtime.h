@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <memory>
 #include <vulkan/vulkan.hpp>
 
 #include "physicalDevice.h"
@@ -23,7 +24,6 @@ namespace gfx::vk
 
         void selectPhysicalDevice();
 
-        ::vk::SurfaceKHR getSurface() const { return _surface; }
         const ::vk::QueueFlags& getRequiredQueueFamilies() const { return _requiredQueues; }
         std::vector<const char*> getDeviceExtensions() const
         {
@@ -44,13 +44,11 @@ namespace gfx::vk
         };
         std::vector<const char*> _instanceExtensions {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+            VK_KHR_SURFACE_EXTENSION_NAME
         };
         std::vector<const char*> _deviceExtensions {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
             VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
-        };
-        std::vector<const char*> _deviceLayers {
-            "VK_LAYER_KHRONOS_validation",
         };
 
         ::vk::QueueFlags _requiredQueues = ::vk::QueueFlags()
@@ -59,7 +57,6 @@ namespace gfx::vk
             | ::vk::QueueFlagBits::eTransfer;
 
         ::vk::DebugUtilsMessengerEXT _debugMessenger;
-        ::vk::SurfaceKHR _surface;
 
         std::unique_ptr<gfx::vk::PhysicalDevice> _physicalDevice = nullptr;
     };

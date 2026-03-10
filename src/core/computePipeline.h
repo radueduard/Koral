@@ -3,13 +3,16 @@
 //
 
 #pragma once
+#include <optional>
 #include <glm/fwd.hpp>
 
 #include "buffer.h"
+#include "descriptorSet.h"
 #include "shader.h"
 
 namespace gfx
 {
+    class CommandBuffer;
     class DescriptorSetLayout;
 
     class ComputePipeline {
@@ -29,29 +32,13 @@ namespace gfx
 
         virtual ~ComputePipeline() = default;
 
-        virtual void Bind() const {
+        virtual void Bind(const gfx::CommandBuffer& commandBuffer) const {
             _bound = true;
         };
 
         virtual void Unbind() const {
             _bound = false;
         }
-
-        virtual void Dispatch(glm::u32 groupCountX, glm::u32 groupCountY = 1, glm::u32 groupCountZ = 1) const {
-            if (!_bound) {
-                throw std::runtime_error("Compute pipeline must be bound before dispatching!");
-            }
-        };
-        virtual void DispatchBase(glm::u32 baseGroupX, glm::u32 groupCountX, glm::u32 baseGroupY = 0, glm::u32 groupCountY = 1, glm::u32 baseGroupZ = 0, glm::u32 groupCountZ = 1) const {
-            if (!_bound) {
-                throw std::runtime_error("Compute pipeline must be bound before dispatching!");
-            }
-        };
-        virtual void DispatchIndirect(const Buffer& indirectBuffer, glm::i64 offset = 0) const {
-            if (!_bound) {
-                throw std::runtime_error("Compute pipeline must be bound before dispatching!");
-            }
-        };
 
         const gfx::DescriptorSetLayout& getSetLayout(glm::u32 index) const;
 

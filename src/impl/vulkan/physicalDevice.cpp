@@ -21,18 +21,7 @@ namespace gfx::vk
         _memoryProperties = _handle.getMemoryProperties();
         _extensionProperties = _handle.enumerateDeviceExtensionProperties();
         _queueFamilyProperties = _handle.getQueueFamilyProperties();
-
-        QuerySurfaceCapabilities();
     }
-
-    void PhysicalDevice::QuerySurfaceCapabilities() const {
-        const auto surface = gfx::vk::Context::Runtime().getSurface();
-
-        _capabilities = _handle.getSurfaceCapabilitiesKHR(surface);
-        _formats = _handle.getSurfaceFormatsKHR(surface);
-        _presentModes = _handle.getSurfacePresentModesKHR(surface);
-    }
-
 
     bool PhysicalDevice::isSuitable() const {
         return hasRequiredQueueFamilies(gfx::vk::Context::Runtime().getRequiredQueueFamilies())
@@ -41,19 +30,14 @@ namespace gfx::vk
     }
 
     bool PhysicalDevice::hasRequiredQueueFamilies(const ::vk::QueueFlags& requiredQueueFamilies) const {
-        ::vk::Bool32 presentSupported = false;
         ::vk::QueueFlags supportedQueueFamilies {};
 
         for (const auto& queueFamily : _queueFamilyProperties) {
-            const auto queueFamilyIndex = static_cast<glm::u32>(&queueFamily - _queueFamilyProperties.data());
             const auto supportedByThisFamily = queueFamily.queueFlags & requiredQueueFamilies;
             supportedQueueFamilies |= supportedByThisFamily;
-
-            const auto surface = gfx::vk::Context::Runtime().getSurface();
-            presentSupported |= _handle.getSurfaceSupportKHR(queueFamilyIndex, surface);
         }
 
-        return (requiredQueueFamilies == supportedQueueFamilies) && presentSupported;
+        return requiredQueueFamilies == supportedQueueFamilies;
     }
 
     bool PhysicalDevice::hasRequiredExtensions(const std::vector<const char*>& requiredExtensions) const {

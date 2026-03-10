@@ -33,6 +33,8 @@ namespace gfx::vk
             .setFlags(imageCreateFlags);
 
         std::tie(_handle, _allocation) = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
+
+        TransitionLayout(::vk::ImageLayout::eGeneral);
     }
 
     Image::~Image() {
@@ -46,16 +48,18 @@ namespace gfx::vk
         if (!(usage & Usage::eTransferDst)) {
             throw std::runtime_error("Attempting to copy data to an image that does not have the TransferDst usage flag set!");
         }
-        if (mipLevels >= mipLevel) {
+        if (mipLevels <= mipLevel) {
             throw std::runtime_error("Attempting to copy data to a mip level that does not exist!");
         }
-        if (arrayLayers >= layer) {
+        if (arrayLayers <= layer) {
             throw std::runtime_error("Attempting to copy data to an array layer that does not exist!");
         }
 
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(buffer);
 
         Context::Device().runSingleTimeCommand([this, &buffer, layer, mipLevel, &vkBuffer] (const gfx::vk::CommandBuffer& commandBuffer) {
+            TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferDstOptimal);
+
             auto extent = this->extent;
             for (uint32_t i = 0; i < mipLevel; i++) {
                 extent.x = std::max<uint32_t>(1u, extent.x / 2);
@@ -75,6 +79,8 @@ namespace gfx::vk
                 .setImageOffset({ 0, 0, 0 })
                 .setImageExtent(::vk::Extent3D(extent.x, extent.y, extent.z));
             commandBuffer->copyBufferToImage(*vkBuffer, _handle, ::vk::ImageLayout::eTransferDstOptimal, region);
+
+            TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
         }, ::vk::QueueFlagBits::eTransfer);
     }
 
@@ -91,7 +97,12 @@ namespace gfx::vk
         _handle = _surfaceImage;
     }
 
-    void Image::TransitionLayout(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ImageLayout newLayout) {
+    ::vk::ImageLayout Image::getImageLayout() const
+    {
+        return _layout;
+    }
+
+    void Image::TransitionLayout(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ImageLayout newLayout) const {
         if (_layout == newLayout) {
             return;
         }
@@ -106,7 +117,7 @@ namespace gfx::vk
         _layout = newLayout;
     }
 
-    void Image::TransitionLayout(const ::vk::ImageLayout newLayout) {
+    void Image::TransitionLayout(const ::vk::ImageLayout newLayout) const {
         if (_layout == newLayout) {
             return;
         }
@@ -225,24 +236,27 @@ namespace gfx::vk
         if (!(usage & Usage::eTransferSrc)) {
             throw std::runtime_error("Attempting to read data from an image that does not have the TransferSrc usage flag set!");
         }
-        if (mipLevels >= mipLevel) {
+        if (mipLevels <= mipLevel) {
             throw std::runtime_error("Attempting to read data from a mip level that does not exist!");
         }
-        if (arrayLayers >= arrayLayer) {
+        if (arrayLayers <= arrayLayer) {
             throw std::runtime_error("Attempting to read data from an array layer that does not exist!");
         }
 
-        const auto bufferSize = extent.x * extent.y * extent.z * Image::PixelSizeFromImageFormat(format);
+        const auto bufferSize = extent.x * extent.y * extent.z * Image::PixelSizeFromImageFormat(format) * Image::ChannelCountFromImageFormat(format);
 
         const auto stagingBuffer = Buffer::Builder()
             .setSize(bufferSize)
             .addUsage(Buffer::Usage::eTexel)
+            .addUsage(Buffer::Usage::eTransferDst)
             .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
             .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
             .build();
         const auto& vkStagingBuffer = dynamic_cast<const gfx::vk::Buffer&>(*stagingBuffer);
 
         Context::Device().runSingleTimeCommand([this, &stagingBuffer, mipLevel, arrayLayer, &vkStagingBuffer] (const gfx::vk::CommandBuffer& commandBuffer) {
+            TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferSrcOptimal);
+
             const auto region = ::vk::BufferImageCopy()
                 .setBufferOffset(0)
                 .setBufferRowLength(0)
@@ -255,6 +269,8 @@ namespace gfx::vk
                 .setImageOffset({ 0, 0, 0 })
                 .setImageExtent(::vk::Extent3D(extent.x, extent.y, extent.z));
             commandBuffer->copyImageToBuffer(_handle, ::vk::ImageLayout::eTransferSrcOptimal, *vkStagingBuffer, region);
+
+            TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
         }, ::vk::QueueFlagBits::eTransfer);
 
         stagingBuffer->Map();
@@ -263,7 +279,8 @@ namespace gfx::vk
         return std::vector<std::byte>(data.begin(), data.end());
     }
 
-    void Image::GenerateMipmaps() {
+    void Image::GenerateMipmaps() const
+    {
         if (mipLevels == 1) {
             return;
         }

@@ -35,9 +35,8 @@ namespace gfx
         virtual CommandBuffer& EndRendering() = 0;
         virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
-        virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline) = 0;
-        virtual CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline) = 0;
-        // virtual CommandBuffer& BindDescriptor(glm::u32 bindingPoint, const Descriptor* binding) = 0;
+        virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline);
+        virtual CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline);
         virtual CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* descriptorSet) = 0;
         virtual CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) = 0;
         virtual CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) = 0;
@@ -48,7 +47,15 @@ namespace gfx
 
         static std::unique_ptr<CommandBuffer> Create(Flags<Usage> usage);
 
+        virtual void WaitForFence() const = 0;
+
     protected:
+        struct {
+            std::optional<const Framebuffer*> boundFramebuffer = std::nullopt;
+            std::optional<const ComputePipeline*> boundComputePipeline = std::nullopt;
+            std::optional<const GraphicsPipeline*> boundGraphicsPipeline = std::nullopt;
+        } _state;
+
         explicit CommandBuffer(const Flags<Usage> usage) : _usage(usage) {}
         Flags<Usage> _usage;
     };

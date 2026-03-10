@@ -13,7 +13,7 @@ namespace gfx::ogl
     class Mesh : public gfx::Mesh
     {
     public:
-        explicit Mesh(CreateInfo& createInfo);
+        explicit Mesh(Builder& createInfo);
         ~Mesh() override;
 
         GLuint operator*() const;

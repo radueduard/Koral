@@ -35,7 +35,7 @@ namespace gfx
     protected:
         explicit DescriptorSet(const Builder &builder);
 
-        const DescriptorSetLayout& _layout;
+        const gfx::DescriptorSetLayout& _layout;
         std::map<glm::u32, std::vector<Descriptor>> _writes;
     };
 }

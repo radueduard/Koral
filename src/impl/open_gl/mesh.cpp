@@ -10,7 +10,7 @@
 
 namespace gfx::ogl
 {
-    Mesh::Mesh(CreateInfo& createInfo) : gfx::Mesh(createInfo)
+    Mesh::Mesh(Builder& createInfo) : gfx::Mesh(createInfo)
     {
         glGenVertexArrays(1, &_vao);
         glBindVertexArray(_vao);

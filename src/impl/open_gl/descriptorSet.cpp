@@ -69,9 +69,9 @@ namespace gfx
 
                             glBindImageTexture(bindingPoint->second,
                                 **imageView,
-                                imageView->GetBaseMipLevel(),
-                                imageView->GetArrayLayerCount() > 1,
-                                imageView->GetBaseArrayLayer(),
+                                imageView->getBaseMipLevel(),
+                                imageView->getArrayLayerCount() > 1,
+                                imageView->getBaseArrayLayer(),
                                 GL_READ_WRITE,
                                 imageView->getFormat());
                             glCheckError();

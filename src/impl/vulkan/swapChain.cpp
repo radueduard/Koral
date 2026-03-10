@@ -9,6 +9,7 @@
 #include "image.h"
 #include "runtime.h"
 #include "scheduler.h"
+#include "surface.h"
 #include "vulkanContext.h"
 #include "utils/vk_enum_conversions.h"
 
@@ -47,10 +48,11 @@ namespace gfx::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
-        _presentQueue(Context::Device().requestPresentQueue()),
         _msaa(createInfo.msaa),
         _minImageCount(createInfo.minImageCount),
-        _imageCount(createInfo.imageCount)
+        _imageCount(createInfo.imageCount),
+        _surface(createInfo.surface),
+        _presentQueue(Context::Device().requestPresentQueue(_surface))
     {
         _extent = glm::uvec2(1, 1);
 
@@ -61,17 +63,17 @@ namespace gfx::vk
 
     void SwapChain::CreateSwapChain() {
         const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
-        auto surfaceCapabilities = physicalDevice.getSurfaceCapabilities();
+        auto surfaceCapabilities = _surface.get().getCapabilities();
 
-        _surfaceFormat = ChooseSurfaceFormat(physicalDevice.getSurfaceFormats());
-        _presentMode = ChoosePresentMode(physicalDevice.getSurfacePresentModes());
+        _surfaceFormat = ChooseSurfaceFormat(_surface.get().getFormats());
+        _presentMode = ChoosePresentMode(_surface.get().getPresentModes());
         _extent = ChooseExtent(surfaceCapabilities, _extent);
 
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
 
         const auto createInfo = ::vk::SwapchainCreateInfoKHR()
-            .setSurface(Context::Runtime().getSurface())
+            .setSurface(*_surface.get())
             .setMinImageCount(_imageCount)
             .setImageFormat(_surfaceFormat.format)
             .setImageColorSpace(_surfaceFormat.colorSpace)
