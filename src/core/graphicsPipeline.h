@@ -7,12 +7,15 @@
 #include <unordered_map>
 #include <glm/fwd.hpp>
 
+#include "mesh.h"
 #include "shader.h"
 #include "utils/flags.h"
+#include "utils/meshType.h"
 
 
 namespace gfx
 {
+    class CommandBuffer;
     class DescriptorSetLayout;
 
     enum class Topology : uint8_t
@@ -76,9 +79,22 @@ namespace gfx
         float lineWidth = 1.f;
     };
 
+    enum class SampleCount : uint8_t
+    {
+        e1 = 1,
+        e2 = 2,
+        e4 = 4,
+        e8 = 8,
+        e16 = 16,
+        e32 = 32,
+        e64 = 64
+    };
+
     struct MultisampleState
     {
-        // TODO
+        SampleCount sampleCount = SampleCount::e1;
+        bool sampleShadingEnable = false;
+        float minSampleShading = 1.f;
     };
 
     enum class CompareOp : uint8_t
@@ -227,13 +243,25 @@ namespace gfx
             std::optional<std::reference_wrapper<const Shader>> taskShader = std::nullopt;
             std::optional<std::reference_wrapper<const Shader>> meshShader = std::nullopt;
 
+            std::optional<std::reference_wrapper<const Framebuffer>> framebuffer = std::nullopt;
+
+            std::vector<VertexInputAttributeDescription> vertexAttributeDescriptions = {};
+            std::vector<VertexInputBindingDescription> vertexBindingDescriptions = {};
+
             InputAssemblyState inputAssemblyState = {};
             RasterizationState rasterizationState = {};
             MultisampleState multisampleState = {};
             DepthStencilState depthStencilState = {};
             ColorBlendState colorBlendState = {};
 
-            Builder& setVertexShader(const Shader& vertexShader);
+            template <gfx::MeshType T = NullMesh>
+            Builder& setVertexShader(const Shader& vertexShader)
+            {
+                this->vertexShader = vertexShader;
+                this->vertexAttributeDescriptions = T::VertexAttributeDescription();
+                this->vertexBindingDescriptions = T::VertexBindingDescription();
+                return *this;
+            }
             Builder& setTessellationState(const TessellationState& tessellationState);
             Builder& setGeometryShader(const Shader& geometryShader);
             Builder& setFragmentShader(const Shader& fragmentShader);
@@ -246,16 +274,20 @@ namespace gfx
             Builder& setMultisampleState(const MultisampleState& multisampleState);
             Builder& setDepthStencilState(const DepthStencilState& depthStencilState);
             Builder& setColorBlendState(const ColorBlendState& colorBlendState);
+            Builder& setFramebuffer(const Framebuffer& framebuffer);
 
             [[nodiscard]] std::unique_ptr<GraphicsPipeline> build() const;
         };
 
         virtual ~GraphicsPipeline() = default;
 
-        virtual void Bind() const = 0;
+        virtual void Bind(const gfx::CommandBuffer& commandBuffer) const = 0;
         virtual void Unbind() const = 0;
 
         [[nodiscard]] const gfx::DescriptorSetLayout& getSetLayout(glm::u32 index) const;
+
+        [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& getVertexBindingDescriptions() const { return _vertexBindingDescriptions; }
+        [[nodiscard]] const std::optional<std::vector<VertexInputAttributeDescription>>& getVertexAttributeDescriptions() const { return _vertexAttributeDescriptions; }
 
     protected:
         explicit GraphicsPipeline(const Builder& createInfo);
@@ -268,11 +300,16 @@ namespace gfx
         std::optional<std::reference_wrapper<const Shader>> _taskShader;
         std::optional<std::reference_wrapper<const Shader>> _meshShader;
 
+        std::reference_wrapper<const Framebuffer> _framebuffer;
+
         InputAssemblyState _inputAssemblyState;
         RasterizationState _rasterizationState;
         MultisampleState _multisampleState;
         DepthStencilState _depthStencilState;
         ColorBlendState _colorBlendState;
+
+        std::optional<std::vector<VertexInputAttributeDescription>> _vertexAttributeDescriptions;
+        std::optional<std::vector<VertexInputBindingDescription>> _vertexBindingDescriptions;
 
         std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts;
     };

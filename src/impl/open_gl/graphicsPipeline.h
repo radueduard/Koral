@@ -30,7 +30,7 @@ namespace gfx::ogl
         explicit GraphicsPipeline(const Builder& createInfo);
         ~GraphicsPipeline() override;
 
-        void Bind() const override;
+        void Bind(const gfx::CommandBuffer& commandBuffer) const override;
         void Unbind() const override;
 
         GLenum getMode() const;

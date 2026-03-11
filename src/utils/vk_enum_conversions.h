@@ -9,8 +9,72 @@
 #include "core/sampler.h"
 #include <vulkan/vulkan.hpp>
 
+#include "core/graphicsPipeline.h"
+
 namespace gfx
 {
+    inline ::vk::PolygonMode getVkPolygonMode(const PolygonMode polygonMode)
+    {
+        switch (polygonMode)
+        {
+        case PolygonMode::eFill: return ::vk::PolygonMode::eFill;
+        case PolygonMode::eLine: return ::vk::PolygonMode::eLine;
+        case PolygonMode::ePoint: return ::vk::PolygonMode::ePoint;
+        default: throw std::runtime_error("Unknown polygon mode!");
+        }
+    }
+
+    inline ::vk::CullModeFlags getVkCullMode(const Flags<CullMode> cullMode)
+    {
+        ::vk::CullModeFlags flags = {};
+        if (cullMode & CullMode::eFront) flags |= ::vk::CullModeFlagBits::eFront;
+        if (cullMode & CullMode::eBack) flags |= ::vk::CullModeFlagBits::eBack;
+        return flags;
+    }
+
+    inline ::vk::FrontFace getVkFrontFace(const FrontFace frontFace) {
+        switch (frontFace)
+        {
+        case FrontFace::eClockwise: return ::vk::FrontFace::eClockwise;
+        case FrontFace::eCounterClockwise: return ::vk::FrontFace::eCounterClockwise;
+        default: throw std::runtime_error("Unknown front face!");
+        }
+    }
+
+    inline ::vk::PrimitiveTopology getVkPrimitiveTopology(const Topology topology)
+    {
+        switch (topology)
+        {
+        case Topology::ePointList: return ::vk::PrimitiveTopology::ePointList;
+        case Topology::eLineList: return ::vk::PrimitiveTopology::eLineList;
+        case Topology::eLineStrip: return ::vk::PrimitiveTopology::eLineStrip;
+        case Topology::eTriangleList: return ::vk::PrimitiveTopology::eTriangleList;
+        case Topology::eTriangleStrip: return ::vk::PrimitiveTopology::eTriangleStrip;
+        case Topology::eTriangleFan: return ::vk::PrimitiveTopology::eTriangleFan;
+        case Topology::eLineListAdjacency: return ::vk::PrimitiveTopology::eLineListWithAdjacency;
+        case Topology::eLineStripAdjacency: return ::vk::PrimitiveTopology::eLineStripWithAdjacency;
+        case Topology::eTriangleListAdjacency: return ::vk::PrimitiveTopology::eTriangleListWithAdjacency;
+        case Topology::eTriangleStripAdjacency: return ::vk::PrimitiveTopology::eTriangleStripWithAdjacency;
+        case Topology::ePatchList: return ::vk::PrimitiveTopology::ePatchList;
+        default: throw std::runtime_error("Unknown topology!");
+        }
+    }
+
+    inline ::vk::SampleCountFlagBits getVkSampleCount(const SampleCount sampleCount)
+    {
+        switch (sampleCount)
+        {
+        case SampleCount::e1: return ::vk::SampleCountFlagBits::e1;
+        case SampleCount::e2: return ::vk::SampleCountFlagBits::e2;
+        case SampleCount::e4: return ::vk::SampleCountFlagBits::e4;
+        case SampleCount::e8: return ::vk::SampleCountFlagBits::e8;
+        case SampleCount::e16: return ::vk::SampleCountFlagBits::e16;
+        case SampleCount::e32: return ::vk::SampleCountFlagBits::e32;
+        case SampleCount::e64: return ::vk::SampleCountFlagBits::e64;
+        default: throw std::runtime_error("Unknown sample count!");
+        }
+    }
+
     inline ::vk::DescriptorType getVkDescriptorType(const gfx::DescriptorType type)
     {
         switch (type)
@@ -34,6 +98,42 @@ namespace gfx
         case ::vk::DescriptorType::eUniformBuffer: return DescriptorType::eUniformBuffer;
         case ::vk::DescriptorType::eStorageBuffer: return DescriptorType::eStorageBuffer;
         default: throw std::runtime_error("Unknown descriptor type!");
+        }
+    }
+
+    inline ::vk::Format getVkFormat(ChannelType channelType, glm::u32 channelCount)
+    {
+        switch (channelType)
+        {
+        case ChannelType::eFloat:
+            switch (channelCount)
+            {
+            case 1: return ::vk::Format::eR32Sfloat;
+            case 2: return ::vk::Format::eR32G32Sfloat;
+            case 3: return ::vk::Format::eR32G32B32Sfloat;
+            case 4: return ::vk::Format::eR32G32B32A32Sfloat;
+            default: throw std::runtime_error("Unsupported channel count for float type!");
+            }
+        case ChannelType::eInt:
+            switch (channelCount)
+            {
+            case 1: return ::vk::Format::eR32Sint;
+            case 2: return ::vk::Format::eR32G32Sint;
+            case 3: return ::vk::Format::eR32G32B32Sint;
+            case 4: return ::vk::Format::eR32G32B32A32Sint;
+            default: throw std::runtime_error("Unsupported channel count for int type!");
+            }
+        case ChannelType::eUInt:
+            switch (channelCount)
+            {
+            case 1: return ::vk::Format::eR32Uint;
+            case 2: return ::vk::Format::eR32G32Uint;
+            case 3: return ::vk::Format::eR32G32B32Uint;
+            case 4: return ::vk::Format::eR32G32B32A32Uint;
+            default: throw std::runtime_error("Unsupported channel count for uint type!");
+            }
+        default:
+            throw std::runtime_error("Unsupported channel type for vertex input attribute!");
         }
     }
 
@@ -95,6 +195,9 @@ namespace gfx
         case Image::Format::eD24_UNORM_S8_UINT: return ::vk::Format::eD24UnormS8Uint;
         case Image::Format::eD32_SFLOAT: return ::vk::Format::eD32Sfloat;
         case Image::Format::eD32_SFLOAT_S8_UINT: return ::vk::Format::eD32SfloatS8Uint;
+
+        case Image::Format::eBGRA8_UNORM : return ::vk::Format::eB8G8R8A8Unorm;
+        case Image::Format::eBGRA8_SRGB : return ::vk::Format::eB8G8R8A8Srgb;
         default: throw std::runtime_error("Unsupported image format!");
         }
     }
@@ -157,6 +260,9 @@ namespace gfx
         case ::vk::Format::eD24UnormS8Uint: return Image::Format::eD24_UNORM_S8_UINT;
         case ::vk::Format::eD32Sfloat: return Image::Format::eD32_SFLOAT;
         case ::vk::Format::eD32SfloatS8Uint: return Image::Format::eD32_SFLOAT_S8_UINT;
+
+        case ::vk::Format::eB8G8R8A8Unorm: return Image::Format::eBGRA8_UNORM;
+        case ::vk::Format::eB8G8R8A8Srgb: return Image::Format::eBGRA8_SRGB;
         default: throw std::runtime_error("Unsupported image format!");
         }
     }
@@ -238,17 +344,17 @@ namespace gfx
         }
     }
 
-    inline ::vk::CompareOp getVkCompareOp(const gfx::Sampler::CompareOp op)
+    inline ::vk::CompareOp getVkCompareOp(const gfx::CompareOp op)
     {
         switch (op) {
-        case gfx::Sampler::CompareOp::eNever: return ::vk::CompareOp::eNever;
-        case gfx::Sampler::CompareOp::eLess: return ::vk::CompareOp::eLess;
-        case gfx::Sampler::CompareOp::eEqual: return ::vk::CompareOp::eEqual;
-        case gfx::Sampler::CompareOp::eLessOrEqual: return ::vk::CompareOp::eLessOrEqual;
-        case gfx::Sampler::CompareOp::eGreater: return ::vk::CompareOp::eGreater;
-        case gfx::Sampler::CompareOp::eNotEqual: return ::vk::CompareOp::eNotEqual;
-        case gfx::Sampler::CompareOp::eGreaterOrEqual: return ::vk::CompareOp::eGreaterOrEqual;
-        case gfx::Sampler::CompareOp::eAlways: return ::vk::CompareOp::eAlways;
+        case gfx::CompareOp::eNever: return ::vk::CompareOp::eNever;
+        case gfx::CompareOp::eLess: return ::vk::CompareOp::eLess;
+        case gfx::CompareOp::eEqual: return ::vk::CompareOp::eEqual;
+        case gfx::CompareOp::eLessOrEqual: return ::vk::CompareOp::eLessOrEqual;
+        case gfx::CompareOp::eGreater: return ::vk::CompareOp::eGreater;
+        case gfx::CompareOp::eNotEqual: return ::vk::CompareOp::eNotEqual;
+        case gfx::CompareOp::eGreaterOrEqual: return ::vk::CompareOp::eGreaterOrEqual;
+        case gfx::CompareOp::eAlways: return ::vk::CompareOp::eAlways;
         default: throw std::runtime_error("Unknown compare operation");
         }
     }
@@ -259,6 +365,29 @@ namespace gfx
         case gfx::Sampler::MipmapMode::eNearest: return ::vk::SamplerMipmapMode::eNearest;
         case gfx::Sampler::MipmapMode::eLinear: return ::vk::SamplerMipmapMode::eLinear;
         default: throw std::runtime_error("Unknown mipmap mode");
+        }
+    }
+
+    inline ::vk::LogicOp getVkLogicOp(const gfx::LogicOp op)
+    {
+        switch (op) {
+        case gfx::LogicOp::eClear: return ::vk::LogicOp::eClear;
+        case gfx::LogicOp::eAnd: return ::vk::LogicOp::eAnd;
+        case gfx::LogicOp::eAndReverse: return ::vk::LogicOp::eAndReverse;
+        case gfx::LogicOp::eCopy: return ::vk::LogicOp::eCopy;
+        case gfx::LogicOp::eAndInverted: return ::vk::LogicOp::eAndInverted;
+        case gfx::LogicOp::eNoOp: return ::vk::LogicOp::eNoOp;
+        case gfx::LogicOp::eXor: return ::vk::LogicOp::eXor;
+        case gfx::LogicOp::eOr: return ::vk::LogicOp::eOr;
+        case gfx::LogicOp::eNor: return ::vk::LogicOp::eNor;
+        case gfx::LogicOp::eEquivalent: return ::vk::LogicOp::eEquivalent;
+        case gfx::LogicOp::eInvert: return ::vk::LogicOp::eInvert;
+        case gfx::LogicOp::eOrReverse: return ::vk::LogicOp::eOrReverse;
+        case gfx::LogicOp::eCopyInverted: return ::vk::LogicOp::eCopyInverted;
+        case gfx::LogicOp::eOrInverted: return ::vk::LogicOp::eOrInverted;
+        case gfx::LogicOp::eNand: return ::vk::LogicOp::eNand;
+        case gfx::LogicOp::eSet: return ::vk::LogicOp::eSet;
+        default: throw std::runtime_error("Unknown logic operation");
         }
     }
 

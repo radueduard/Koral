@@ -27,7 +27,7 @@ namespace gfx::vk
 
         gfx::CommandBuffer& Begin() override;
         void End() override;
-        gfx::CommandBuffer& BeginRendering(const Framebuffer* framebuffer) override;
+        gfx::CommandBuffer& BeginRendering(const gfx::Framebuffer* framebuffer) override;
         gfx::CommandBuffer& EndRendering() override;
         gfx::CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
         gfx::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;

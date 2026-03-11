@@ -8,6 +8,7 @@
 #include "descriptorPool.h"
 #include "device.h"
 #include "runtime.h"
+#include "scheduler.h"
 
 const gfx::vk::Runtime& gfx::vk::Context::Runtime()
 {

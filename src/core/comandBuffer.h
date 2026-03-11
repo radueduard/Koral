@@ -31,7 +31,7 @@ namespace gfx
         virtual CommandBuffer& Begin() = 0;
         virtual void End() = 0;
 
-        virtual CommandBuffer& BeginRendering(const Framebuffer* framebuffer) = 0;
+        virtual CommandBuffer& BeginRendering(const Framebuffer* framebuffer = nullptr) = 0;
         virtual CommandBuffer& EndRendering() = 0;
         virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;

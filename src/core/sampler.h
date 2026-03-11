@@ -5,6 +5,8 @@
 #pragma once
 #include <memory>
 
+#include "graphicsPipeline.h"
+
 namespace gfx
 {
     class Sampler
@@ -26,17 +28,6 @@ namespace gfx
             eMirroredRepeat,
             eClampToEdge,
             eClampToBorder
-        };
-
-        enum class CompareOp {
-            eNever,
-            eLess,
-            eEqual,
-            eLessOrEqual,
-            eGreater,
-            eNotEqual,
-            eGreaterOrEqual,
-            eAlways
         };
 
         struct Builder

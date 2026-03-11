@@ -11,6 +11,8 @@
 
 namespace gfx
 {
+    class FramebufferImage;
+
     enum class MSAA
     {
         eNone = 0,
@@ -111,6 +113,10 @@ namespace gfx
             eD24_UNORM_S8_UINT,
             eD32_SFLOAT,
             eD32_SFLOAT_S8_UINT,
+
+            // </hint> Surface formats
+            eBGRA8_UNORM,
+            eBGRA8_SRGB,
         };
 
         enum class Usage
@@ -183,6 +189,7 @@ namespace gfx
             }
 
             [[nodiscard]] std::unique_ptr<Image> build() const;
+            [[nodiscard]] std::unique_ptr<FramebufferImage> buildFramebufferImage() const;
         };
 
         virtual ~Image() = default;

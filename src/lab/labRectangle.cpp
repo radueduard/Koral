@@ -16,11 +16,9 @@
 void LabRectangle::Initialize()
 {
     const auto buffer = gfx::Buffer::Builder()
-        .setSize(64)
+        .setSize(32)
         .setUsage(gfx::Buffer::Usage::eUniform)
         .setLayout(gfx::Buffer::Layout::eStd430)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostVisible)
-        .addMemoryProperty(gfx::Buffer::MemoryProperty::eHostCoherent)
         .build();
 
     constexpr struct {
@@ -42,7 +40,6 @@ void LabRectangle::Initialize()
         .build();
 
     const auto imageView = gfx::ImageView::Builder(*image).build();
-    const auto sampler = gfx::Sampler::Builder().build();
 
     const auto computeShader = gfx::Shader::Builder()
         .setStage(gfx::Shader::Stage::eCompute)
@@ -55,7 +52,7 @@ void LabRectangle::Initialize()
 
     const auto descriptorSet = gfx::DescriptorSet::Builder(computePipeline->getSetLayout(0))
         .write(0, gfx::Descriptor(buffer.get()))
-        .write(1, gfx::Descriptor(imageView.get(), sampler.get()))
+        .write(1, gfx::Descriptor(imageView.get(), nullptr))
         .build();
 
     const auto commandBuffer = gfx::CommandBuffer::Create(gfx::CommandBuffer::Usage::eCompute);

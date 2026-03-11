@@ -16,7 +16,7 @@ namespace gfx
         friend class DescriptorSet::Builder;
     public:
         Descriptor() = default;
-        explicit Descriptor(const Buffer* buffer, glm::i64 offset = 0, glm::i64 range = 0) : valid(true), _buffer(buffer), _offset(offset), _range(range)
+        explicit Descriptor(const Buffer* buffer, const glm::i64 offset = 0, const glm::i64 range = 0) : valid(true), _buffer(buffer), _offset(offset), _range(range)
         {
             if (buffer == nullptr) {
                 throw std::runtime_error("Buffer must be valid!");
@@ -54,7 +54,7 @@ namespace gfx
 
     protected:
         bool valid = false;
-        const Buffer* _buffer = nullptr;
+        const gfx::Buffer* _buffer = nullptr;
         glm::i64 _offset = 0;
         glm::i64 _range = 0;
         const ImageView* _imageView = nullptr;

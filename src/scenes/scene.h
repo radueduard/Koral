@@ -6,6 +6,8 @@
 
 namespace gfx
 {
+    class CommandBuffer;
+
     class Scene {
     public:
         virtual ~Scene() = default;
@@ -13,7 +15,7 @@ namespace gfx
         virtual void Initialize() = 0;
         virtual void Update() = 0;
         virtual void FixedUpdate() {};
-        virtual void Render() = 0;
+        virtual void Render(gfx::CommandBuffer& commandBuffer) = 0;
     };
 }
 

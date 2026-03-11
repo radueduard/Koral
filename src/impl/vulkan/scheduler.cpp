@@ -13,9 +13,9 @@
 
 namespace gfx::vk
 {
-    Frame::Frame(const glm::u32 imageIndex, const gfx::vk::Queue& queue)
-        : _imageIndex(imageIndex), _queue(queue)
+    Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : gfx::Frame(imageIndex), _queue(queue)
     {
+        _commandBuffer = Context::Device().requestCommandBuffer(_queue, Context::ThreadId());
         _imageAvailable = vk::Context::Device()->createSemaphore({});
         _readyToPresent = vk::Context::Device()->createSemaphore({});
         _inFlightFence = Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
@@ -27,17 +27,15 @@ namespace gfx::vk
         Context::Device()->destroyFence(_inFlightFence);
     }
 
-    Scheduler::Scheduler(const Builder& createInfo)
-        : _imageCount(createInfo.imageCount), _msaa(createInfo.msaa)
+    Scheduler::Scheduler(const Builder& createInfo) : gfx::Scheduler(createInfo)
     {
         _surface = std::make_unique<Surface>(gfx::Context::Window());
-        const auto& queue = Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
-        createFrames(queue);
+        createFrames();
 
         _swapChain = gfx::vk::SwapChain::Builder(*_surface)
             .setMinImageCount(createInfo.minImageCount)
             .setImageCount(_imageCount)
-            .setMSAA(_msaa)
+            .setMSAA(MSAA::eNone)
             .build();
     }
 
@@ -45,8 +43,8 @@ namespace gfx::vk
         Context::Device()->waitIdle();
     }
 
-    void Scheduler::Draw() {
-        const auto& frame = getCurrentFrame();
+    void Scheduler::Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const {
+        const auto& frame = dynamic_cast<const gfx::vk::Frame&>(getCurrentFrame());
 
         const auto& fence = frame.getInFlightFence();
         if (const auto result = Context::Device()->waitForFences(1, &fence, ::vk::True, UINT64_MAX); result != ::vk::Result::eSuccess) {
@@ -62,9 +60,24 @@ namespace gfx::vk
             _swapChain->Resize(gfx::Context::Window().getExtent());
         }
 
+        auto& commandBuffer = frame.getCommandBuffer();
+        commandBuffer.Reset();
+        renderFunc(commandBuffer.Begin());
+        commandBuffer.End();
+
+        const SubmitInfo submitInfo {
+            .commandBuffer = dynamic_cast<const gfx::vk::CommandBuffer&>(commandBuffer),
+            .waitSemaphores = { frame.getImageAvailableSemaphore() },
+            .waitStages = { ::vk::PipelineStageFlagBits::eColorAttachmentOutput },
+            .signalSemaphores = { frame.getReadyToPresentSemaphore() },
+            .fence = frame.getInFlightFence()
+        };
+
+        const auto& vkFrame = dynamic_cast<const gfx::vk::Frame&>(frame);
+        vkFrame.getQueue().Submit(submitInfo);
+
         if (const auto result = _swapChain->Present(frame);
             result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
-
             _swapChain->Resize(gfx::Context::Window().getExtent());
             return;
         }
@@ -72,17 +85,9 @@ namespace gfx::vk
         advanceFrame();
     }
 
-    std::vector<Frame*> Scheduler::getFrames() const
-    {
-        std::vector<Frame*> frames;
-        for (const auto& frame : _frames) {
-            frames.emplace_back(frame.get());
-        }
-        return frames;
-    }
-
-    void Scheduler::createFrames(const Queue& queue) {
+    void Scheduler::createFrames() {
         _frames.reserve(_imageCount);
+        const auto& queue = Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
         for (uint32_t i = 0; i < _imageCount; i++) {
             _frames.emplace_back(std::make_unique<Frame>(i, queue));
         }

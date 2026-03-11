@@ -7,6 +7,7 @@
 #include "impl/vulkan/image.h"
 
 #include "context.h"
+#include "framebufferImage.h"
 #include "io/window.h"
 
 namespace gfx
@@ -23,7 +24,12 @@ namespace gfx
         }
     }
 
-glm::u32 Image::PixelSizeFromImageFormat(gfx::Image::Format format)
+    std::unique_ptr<FramebufferImage> Image::Builder::buildFramebufferImage() const
+    {
+        return std::unique_ptr<FramebufferImage>(new FramebufferImage(*this));
+    }
+
+    glm::u32 Image::PixelSizeFromImageFormat(const gfx::Image::Format format)
     {
         switch (format)
         {

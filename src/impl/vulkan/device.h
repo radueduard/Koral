@@ -24,6 +24,7 @@
 #include "utils/vk_wrapper.h"
 
 namespace gfx::vk {
+    struct SubmitInfo;
     class Surface;
     class PhysicalDevice;
 }
@@ -56,6 +57,8 @@ namespace gfx::vk {
         [[nodiscard]] glm::u32 getIndex() const { return _index; }
         [[nodiscard]] const Family& getFamily() const { return _family; }
 
+        void Submit(const SubmitInfo& submitInfo) const;
+
     private:
         glm::u32 _index;
         Family& _family;
@@ -74,10 +77,10 @@ namespace gfx::vk {
         [[nodiscard]] const Queue& requestQueue(::vk::QueueFlags type) const;
         [[nodiscard]] const Queue& requestPresentQueue(const gfx::vk::Surface& surface) const;
 
-        void createCommandPools(uint32_t threadId) const;
-        void freeCommandPools(uint32_t threadId) const;
+        void createCommandPools() const;
+        void freeCommandPools() const;
 
-        [[nodiscard]] std::unique_ptr<gfx::vk::CommandBuffer> requestCommandBuffer(const gfx::vk::Queue& queue, uint32_t thread = 0) const;
+        [[nodiscard]] std::unique_ptr<gfx::vk::CommandBuffer> requestCommandBuffer(const gfx::vk::Queue& queue, uint32_t thread) const;
         void freeCommandBuffer(const gfx::vk::CommandBuffer &commandBuffer) const;
 
         void runSingleTimeCommand(const std::function<void(const gfx::vk::CommandBuffer&)> &command, ::vk::QueueFlags requiredFlags,

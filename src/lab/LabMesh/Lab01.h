@@ -5,16 +5,17 @@
 #pragma once
 #include <memory>
 
-#include "../core/descriptorBinding.h"
-#include "../core/mesh.h"
+#include "core/descriptorBinding.h"
+#include "core/graphicsPipeline.h"
+#include "core/mesh.h"
 #include "scenes/scene.h"
 
-class LabMesh : public gfx::Scene
+class Lab01 : public gfx::Scene
 {
 public:
     void Initialize() override;
     void Update() override;
-    void Render() override;
+    void Render(gfx::CommandBuffer& commandBuffer) override;
 private:
     std::unique_ptr<gfx::Mesh> _mesh = nullptr;
     std::unique_ptr<gfx::GraphicsPipeline> _pipeline = nullptr;
@@ -34,7 +35,6 @@ private:
     std::unique_ptr<gfx::DescriptorSet> _cameraDescriptorSet = nullptr;
     std::unique_ptr<gfx::DescriptorSet> _meshDescriptorSet = nullptr;
 
-    std::unique_ptr<gfx::CommandBuffer> _commandBuffer = nullptr;
 
     glm::vec3 _cameraPosition = glm::vec3(0.f, 0.f, -5.f);
     glm::vec3 _cameraForward = glm::vec3(0.f, 0.f, 1.f);

@@ -17,12 +17,10 @@ struct LabTriangle : gfx::Scene
 {
     void Initialize() override;
     void Update() override;
-    void Render() override;
+    void Render(gfx::CommandBuffer& commandBuffer) override;
 
 private:
     std::unique_ptr<gfx::Buffer> _timeBuffer = nullptr;
     std::unique_ptr<gfx::DescriptorSet> _timeDescriptorSet = nullptr;
     std::unique_ptr<gfx::GraphicsPipeline> _graphicsPipeline = nullptr;
-
-    std::unique_ptr<gfx::CommandBuffer> _commandBuffer = nullptr;
 };

@@ -19,6 +19,7 @@ namespace gfx::io
 
 namespace gfx::vk
 {
+    class Scheduler;
     class DescriptorPool;
     class Allocator;
     class Runtime;

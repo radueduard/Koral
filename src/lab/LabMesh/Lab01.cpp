@@ -2,20 +2,24 @@
 // Created by radue on 2/23/2026.
 //
 
-#include "labMesh.h"
+#include "Lab01.h"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_RADIANS
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.inl>
 
-#include "../core/comandBuffer.h"
-#include "../core/importer.h"
+#include "mesh.h"
+#include "core/comandBuffer.h"
+#include "core/importer.h"
 #include "io/time.h"
 #include "io/window.h"
 
-void LabMesh::Initialize()
+void Lab01::Initialize()
 {
-    _mesh = gfx::Importer::LoadMesh(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
+    _mesh = gfx::LabMesh::ImportFromFile(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
     _albedoImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_albedo.jpg"));
     _normalImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_normal.jpg"));
 
@@ -30,7 +34,7 @@ void LabMesh::Initialize()
         .build();
 
     _pipeline = gfx::GraphicsPipeline::Builder()
-        .setVertexShader(*vertexShader)
+        .setVertexShader<gfx::LabMesh>(*vertexShader)
         .setFragmentShader(*fragmentShader)
         .build();
 
@@ -84,14 +88,10 @@ void LabMesh::Initialize()
         .write(1, gfx::Descriptor(_albedoImageView.get(), _albedoSampler.get()))
         .write(2, gfx::Descriptor(_normalImageView.get(), _normalSampler.get()))
         .build();
-
-    _commandBuffer = gfx::CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics);
 }
 
-void LabMesh::Update()
+void Lab01::Update()
 {
-    _commandBuffer->Reset();
-
     if (!gfx::io::Input::isMouseButtonHeld(gfx::io::MouseButton::eRight)) {
         return;
     }
@@ -155,16 +155,15 @@ void LabMesh::Update()
     _uniformBufferCamera->Unmap();
 }
 
-void LabMesh::Render()
+void Lab01::Render(gfx::CommandBuffer& commandBuffer)
 {
-    _commandBuffer->Begin()
-        .BeginRendering(gfx::Context::DefaultFramebuffer())
+    commandBuffer
+        .BeginRendering()
         .SetViewport(0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y)
+        .SetScissor(0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y)
         .BindPipeline(_pipeline.get())
         .BindDescriptorSet(0, _cameraDescriptorSet.get())
         .BindDescriptorSet(1, _meshDescriptorSet.get())
         .DrawMesh(_mesh.get(), 1, 0)
-        .EndRendering()
-        .End();
-    _commandBuffer->Submit();
+        .EndRendering();
 }

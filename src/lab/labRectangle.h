@@ -10,5 +10,5 @@ class LabRectangle : public gfx::Scene
 public:
     void Initialize() override;
     void Update() override {};
-    void Render() override {};
+    void Render(gfx::CommandBuffer& commandBuffer) override {};
 };

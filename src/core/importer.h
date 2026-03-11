@@ -12,17 +12,20 @@
 
 namespace gfx
 {
+    class Image;
+
     class Importer
     {
     public:
-        static std::unique_ptr<Mesh> LoadMesh(const std::filesystem::path& path);
         static std::unique_ptr<Image> LoadImage(const std::filesystem::path& path);
 
+        explicit Importer(std::filesystem::path path);
         ~Importer();
+
+        [[nodiscard]] const aiScene* GetScene() const { return _scene; }
+
     protected:
         Assimp::Importer _importer = {};
-        explicit Importer(std::filesystem::path path);
-
         const aiScene* _scene;
     };
 }

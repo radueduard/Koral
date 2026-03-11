@@ -10,7 +10,7 @@
 #include "buffer.h"
 #include "computePipeline.h"
 #include "graphicsPipeline.h"
-#include "mesh.h"
+#include "core/mesh.h"
 #include "utils/ogl_err_handling.h"
 
 namespace gfx::ogl
@@ -44,6 +44,10 @@ namespace gfx::ogl
 
     gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* framebuffer)
     {
+        if (framebuffer == nullptr) {
+            framebuffer = &Context::DefaultFramebuffer();
+        }
+
         CheckRecording();
         _commands.emplace_back([this, framebuffer] ()
         {
@@ -110,7 +114,7 @@ namespace gfx::ogl
                 throw std::runtime_error("You can't use a graphics pipeline without a framebuffer!");
             _state.boundGraphicsPipeline = dynamic_cast<const ogl::GraphicsPipeline*>(pipeline);
             _state.boundComputePipeline = std::nullopt;
-            pipeline->Bind();
+            pipeline->Bind(*this);
         });
         return *this;
     }
@@ -184,15 +188,46 @@ namespace gfx::ogl
                 throw std::runtime_error("You can't draw mesh without a graphics pipeline!");
             const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
             const auto mode = oglPipeline->getMode();
-            const auto* oglMesh = dynamic_cast<const ogl::Mesh*>(mesh);
-            glBindVertexArray(**oglMesh);
-            glCheckError();
 
-            if (oglMesh->hasIndexBuffer()) {
-                const auto indexType = oglMesh->getIndexType().value();
+            auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
+            auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
+
+            const auto vertexBuffers = mesh->getVertexBuffers();
+            for (size_t i = 0; i < vertexBuffers.size(); ++i)
+            {
+                const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(vertexBuffers[i].get());
+                glBindBuffer(GL_ARRAY_BUFFER, *vertexBuffer);
+                glCheckError();
+
+                const auto& [binding, stride] = meshVertexBindingDescription[i];
+                for (const auto& attributeDescription : meshVertexAttributeDescription)
+                {
+                    if (attributeDescription.binding == binding)
+                    {
+                        glEnableVertexAttribArray(attributeDescription.location);
+                        glCheckError();
+                        glVertexAttribPointer(
+                            attributeDescription.location,
+                            attributeDescription.channelCount,
+                            toGLChannelType(attributeDescription.channelType),
+                            GL_FALSE,
+                            stride,
+                            nullptr);
+                    }
+                }
+            }
+            auto indexBuffer = mesh->getIndexBuffer();
+            if (indexBuffer.has_value()) {
+                const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(indexBuffer.value().get());
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *oglIndexBuffer);
+                glCheckError();
+            }
+
+            if (mesh->hasIndexBuffer()) {
+                const auto indexType = mesh->getIndexType().value();
                 glDrawElementsInstancedBaseInstance(
                     GL_TRIANGLES,
-                    oglMesh->getIndexCount().value(),
+                    mesh->getIndexCount().value(),
                     toGLChannelType(indexType),
                     nullptr,
                     instanceCount,
@@ -201,7 +236,7 @@ namespace gfx::ogl
                 glDrawArraysInstancedBaseInstance(
                     mode,
                     0,
-                    oglMesh->getVertexCount(),
+                    mesh->getVertexCount(),
                     instanceCount,
                     baseInstance);
             }

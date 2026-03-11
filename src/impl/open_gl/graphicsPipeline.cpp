@@ -137,7 +137,7 @@ namespace gfx::ogl
         glDeleteProgram(_id);
     }
 
-    void GraphicsPipeline::Bind() const
+    void GraphicsPipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
     {
         glUseProgram(_id);
         glCheckError();

@@ -5,34 +5,32 @@
 #pragma once
 #include <glm/fwd.hpp>
 
-#include "descriptorPool.h"
 #include "device.h"
 #include "swapChain.h"
+#include "core/scheduler.h"
 
 namespace gfx::vk
 {
-	class Frame {
+	class Frame final : public gfx::Frame
+	{
 	public:
-		explicit Frame(glm::u32 imageIndex, const gfx::vk::Queue& queue);
-		~Frame();
+		explicit Frame(glm::u32 imageIndex, const Queue& queue);
+		~Frame() override;
 
 		Frame(const Frame&) = delete;
 		Frame& operator=(const Frame&) = delete;
 
-		[[nodiscard]] glm::u32 getImageIndex() const { return _imageIndex; }
 		[[nodiscard]] ::vk::Semaphore getImageAvailableSemaphore() const { return _imageAvailable; }
 		[[nodiscard]] ::vk::Semaphore getReadyToPresentSemaphore() const { return _readyToPresent; }
 		[[nodiscard]] ::vk::Fence getInFlightFence() const { return _inFlightFence; }
 
-		[[nodiscard]] const gfx::vk::Queue& getQueue() const { return _queue; }
-
+		[[nodiscard]] const Queue& getQueue() const { return _queue; }
 
 	private:
-		glm::u32 _imageIndex;
+		const Queue& _queue;
 		::vk::Semaphore _imageAvailable;
 		::vk::Semaphore _readyToPresent;
     	::vk::Fence _inFlightFence;
-		const gfx::vk::Queue& _queue;
 	};
 
     struct SubmitInfo {
@@ -43,49 +41,24 @@ namespace gfx::vk
         ::vk::Fence fence = nullptr;
     };
 
-    class Scheduler {
+    class Scheduler final : public gfx::Scheduler {
     public:
-    	struct Builder {
-    		glm::u32 minImageCount;
-    		glm::u32 imageCount;
-    		gfx::MSAA msaa;
-
-    		Builder& setMinImageCount(const glm::u32 minImageCount) { this->minImageCount = minImageCount; return *this; }
-    		Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
-    		Builder& setMSAA(const gfx::MSAA msaa) { this->msaa = msaa; return *this; }
-    		std::unique_ptr<Scheduler> build() { return std::make_unique<Scheduler>(*this); }
-
-    	};
-
     	explicit Scheduler(const Builder &createInfo);
-    	~Scheduler();
+    	~Scheduler() override;
     	Scheduler(const Scheduler &) = delete;
     	Scheduler &operator=(const Scheduler &) = delete;
 
-    	void Draw();
+    	void Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const override;
 
     	[[nodiscard]] const gfx::vk::SwapChain &getSwapChain() const { return *_swapChain; }
-    	[[nodiscard]] const Frame &getCurrentFrame() const { return *_frames.at(_currentFrame); }
-    	[[nodiscard]] const Frame &getNextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
-    	void advanceFrame() { _currentFrame = (_currentFrame + 1) % _imageCount; }
-    	[[nodiscard]] const ::vk::Extent2D &getExtent() const { return _extent; }
     	[[nodiscard]] bool isResized() const { return _resized; }
-    	[[nodiscard]] uint32_t getImageCount() const { return _imageCount; }
 
-    	[[nodiscard]] std::vector<Frame*> getFrames() const;
 
     private:
     	std::unique_ptr<gfx::vk::Surface> _surface;
-
-	    glm::u32 _imageCount;
-    	MSAA _msaa = MSAA::e2x;
     	std::unique_ptr<gfx::vk::SwapChain> _swapChain;
 
-    	void createFrames(const Queue& queue);
-	    glm::u32 _currentFrame = 0;
-    	std::vector<std::unique_ptr<Frame>> _frames;
-
+    	void createFrames() override;
     	bool _resized = false;
-    	::vk::Extent2D _extent;
     };
 }

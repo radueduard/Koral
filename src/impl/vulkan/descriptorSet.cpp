@@ -4,6 +4,8 @@
 
 #include "descriptorSet.h"
 
+#include <ranges>
+
 #include "buffer.h"
 #include "descriptorPool.h"
 #include "descriptorSetLayout.h"
@@ -19,6 +21,19 @@ namespace gfx::vk
     {
         _handle = Context::DescriptorPool().Allocate(dynamic_cast<const DescriptorSetLayout&>(_layout));
         std::vector<::vk::WriteDescriptorSet> writes;
+        std::vector<::vk::DescriptorBufferInfo> bufferInfos;
+        std::vector<::vk::DescriptorImageInfo> imageInfos;
+
+        // Pre-calculate total descriptor count to reserve space and prevent reallocation
+        // which would invalidate references stored in WriteDescriptorSet
+        size_t totalDescriptors = 0;
+        for (const auto& descriptors : _writes | std::views::values) {
+            totalDescriptors += descriptors.size();
+        }
+        writes.reserve(totalDescriptors);
+        bufferInfos.reserve(totalDescriptors);
+        imageInfos.reserve(totalDescriptors);
+
         for (const auto& [binding, descriptors] : _writes)
         {
             const auto type = _layout.getBindingType(binding);
@@ -29,7 +44,7 @@ namespace gfx::vk
                 case DescriptorType::eUniformBuffer:
                     {
                         auto* buffer = dynamic_cast<const gfx::vk::Buffer*>(descriptor.getBuffer());
-                        auto bufferInfo = ::vk::DescriptorBufferInfo()
+                        const auto& bufferInfo = bufferInfos.emplace_back()
                             .setBuffer(**buffer)
                             .setOffset(descriptor.getOffset())
                             .setRange(descriptor.getRange());
@@ -44,21 +59,21 @@ namespace gfx::vk
                 case DescriptorType::eSampler:
                     {
                         auto* sampler = dynamic_cast<const Sampler*>(descriptor.getSampler());
-                        auto samplerInfo = ::vk::DescriptorImageInfo()
+                        const auto& imageInfo = imageInfos.emplace_back()
                             .setSampler(**sampler);
                         writes.emplace_back()
                             .setDstSet(_handle)
                             .setDstBinding(binding)
                             .setDstArrayElement(i)
                             .setDescriptorType(::vk::DescriptorType::eSampler)
-                            .setImageInfo(samplerInfo);
+                            .setImageInfo(imageInfo);
                         break;
                     }
                 case DescriptorType::eCombinedImageSampler:
                     {
                         auto* sampler = dynamic_cast<const vk::Sampler*>(descriptor.getSampler());
                         auto* imageView = dynamic_cast<const vk::ImageView*>(descriptor.getImageView());
-                        auto imageInfo = ::vk::DescriptorImageInfo()
+                        const auto& imageInfo = imageInfos.emplace_back()
                             .setImageView(**imageView)
                             .setSampler(**sampler)
                             .setImageLayout(dynamic_cast<const Image&>(imageView->getImage()).getImageLayout());
@@ -74,7 +89,7 @@ namespace gfx::vk
                 case DescriptorType::eStorageBuffer:
                     {
                         auto* buffer = dynamic_cast<const Buffer*>(descriptor.getBuffer());
-                        auto bufferInfo = ::vk::DescriptorBufferInfo()
+                        const auto& bufferInfo = bufferInfos.emplace_back()
                             .setBuffer(**buffer)
                             .setOffset(descriptor.getOffset())
                             .setRange(descriptor.getRange());
@@ -89,7 +104,7 @@ namespace gfx::vk
                 case DescriptorType::eStorageImage:
                     {
                         auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
-                        auto imageInfo = ::vk::DescriptorImageInfo()
+                        const auto& imageInfo = imageInfos.emplace_back()
                             .setImageView(**imageView)
                             .setImageLayout(dynamic_cast<const Image&>(imageView->getImage()).getImageLayout());
                         writes.emplace_back()

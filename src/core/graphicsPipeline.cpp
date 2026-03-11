@@ -5,18 +5,13 @@
 #include "graphicsPipeline.h"
 #include "descriptorSetLayout.h"
 #include "impl/open_gl/graphicsPipeline.h"
+#include "impl/vulkan/graphicsPipeline.h"
 
 #include "context.h"
 #include "io/window.h"
 
 namespace gfx
 {
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setVertexShader(const Shader& vertexShader)
-    {
-        this->vertexShader = vertexShader;
-        return *this;
-    }
-
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTessellationState(const TessellationState& tessellationState)
     {
         this->tessellationState = tessellationState;
@@ -77,13 +72,19 @@ namespace gfx
         return *this;
     }
 
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(const Framebuffer& framebuffer)
+    {
+        this->framebuffer = framebuffer;
+        return *this;
+    }
+
     std::unique_ptr<GraphicsPipeline> GraphicsPipeline::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
             return std::make_unique<ogl::GraphicsPipeline>(*this);
         case API::eVulkan:
-            throw std::runtime_error("vulkan is not supported");
+            return std::make_unique<vk::GraphicsPipeline>(*this);
         default:
             throw std::runtime_error("Unknown API");
         }
@@ -103,11 +104,14 @@ namespace gfx
         _fragmentShader(createInfo.fragmentShader),
         _taskShader(createInfo.taskShader),
         _meshShader(createInfo.meshShader),
+        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value().get() : Context::DefaultFramebuffer()),
         _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),
         _depthStencilState(createInfo.depthStencilState),
-        _colorBlendState(createInfo.colorBlendState)
+        _colorBlendState(createInfo.colorBlendState),
+        _vertexAttributeDescriptions(createInfo.vertexAttributeDescriptions),
+        _vertexBindingDescriptions(createInfo.vertexBindingDescriptions)
     {
         if (!_vertexShader.has_value() && !_meshShader.has_value()) {
             throw std::runtime_error("Graphics pipeline must have either a vertex shader or a mesh shader!");
@@ -150,8 +154,8 @@ namespace gfx
                 for (const auto& [binding, descriptor] : setDescription.descriptors)
                 {
                     if (mergedSetLayouts[setIndex].contains(binding)) {
-                        const auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
-                        if (existingDescriptor != descriptor)
+                        if (const auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
+                            existingDescriptor != descriptor)
                         {
                             throw std::runtime_error("Descriptor set layout conflict between shaders in pipeline!");
                         }

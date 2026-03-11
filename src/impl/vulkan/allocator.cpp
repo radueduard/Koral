@@ -62,7 +62,7 @@ namespace gfx::vk
         }
 
 
-        return { ::vk::Buffer(buffer), allocation };
+        return { buffer, allocation };
     }
 
     void Allocator::FreeBuffer(const ::vk::Buffer buffer, const VmaAllocation allocation) const
@@ -91,7 +91,7 @@ namespace gfx::vk
             throw std::runtime_error("Failed to allocate image");
         }
 
-        return { ::vk::Image(image), allocation };
+        return { image, allocation };
     }
 
     void Allocator::FreeImage(const ::vk::Image image, const VmaAllocation allocation) const
