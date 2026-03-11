@@ -6,6 +6,7 @@
 #include <filesystem>
 
 namespace gfx {
+    class Scheduler;
     class Framebuffer;
 
     namespace io
@@ -29,13 +30,18 @@ namespace gfx {
         static io::Window& FocusedWindow();
 
         static io::Window& Window();
+        static gfx::Scheduler& Scheduler();
 
-        static const gfx::Framebuffer* DefaultFramebuffer();
+        static const gfx::Framebuffer& DefaultFramebuffer();
+
+        static void InitScheduler();
+        static void DestroyScheduler();
 
     private:
         static void setFocusedWindow(io::Window* window);
 
         inline static io::Window* _focusedWindow = nullptr;
         inline static thread_local io::Window* _currentThreadLinkedWindow = nullptr;
+        inline static thread_local gfx::Scheduler* _scheduler = nullptr;
     };
 }

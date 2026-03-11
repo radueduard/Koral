@@ -14,13 +14,13 @@ namespace gfx::ogl {
         explicit Framebuffer(const gfx::Framebuffer::Builder& createInfo);
         ~Framebuffer() override;
 
-        GLuint operator*() const { return _id; }
+        GLuint operator*() const;
         void Bind() const override;
         void Unbind() const override;
         bool hasDepthStencilAttachment() const override;
 
     private:
-        GLuint _id = 0;
+        std::vector<GLuint> _ids;
     };
 }
 

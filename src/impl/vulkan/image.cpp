@@ -85,7 +85,7 @@ namespace gfx::vk
     }
 
     Image::Image(const ::vk::Image _surfaceImage, glm::uvec2 extent, Format format, MSAA msaa)
-        : Image(Builder()
+        : gfx::Image(Builder()
             .setType(Type::e2D)
             .setExtent(extent)
             .addUsage(Usage::eTransferDst)
@@ -95,6 +95,7 @@ namespace gfx::vk
             .setFormat(format)
             .setMSAA(msaa)) {
         _handle = _surfaceImage;
+        TransitionLayout(::vk::ImageLayout::ePresentSrcKHR);
     }
 
     ::vk::ImageLayout Image::getImageLayout() const

@@ -8,7 +8,7 @@
 #include "io/manager.h"
 #include "io/window.h"
 
-#include "lab/labMesh.h"
+#include "lab/LabMesh/Lab01.h"
 #include "lab/labMultiFrameBuffer.h"
 #include "lab/labRectangle.h"
 #include "lab/labTriangle.h"
@@ -32,23 +32,37 @@ void gfx::Engine::Run()
         // io::Window::Builder(labRectangle)
         //     .setExtent({1280, 720})
         //     .setFullscreen(false)
-        //     .setAPI(API::eOpenGL)
+        //     .setAPI(API::eVulkan)
         //     .build();
 
         // auto labTriangle = LabTriangle();
         // io::Window::Builder(labTriangle)
         //     .setTitle("Triangle")
         //     .setExtent({1280, 720})
+        //     .setAPI(API::eVulkan)
+        //     .build();
+        //
+        // auto labTriangleOgl = LabTriangle();
+        // io::Window::Builder(labTriangleOgl)
+        //     .setTitle("Triangle")
+        //     .setExtent({1280, 720})
         //     .setAPI(API::eOpenGL)
         //     .build();
 
-        auto labMesh = LabMesh();
-        io::Window::Builder(labMesh)
+        auto labMeshVk = Lab01();
+        io::Window::Builder(labMeshVk)
             .setTitle("Mesh")
             .setExtent({1280, 720})
             .setAPI(API::eVulkan)
             .build();
-        //
+
+        auto labMeshOgl = Lab01();
+        io::Window::Builder(labMeshOgl)
+            .setTitle("Mesh")
+            .setExtent({1280, 720})
+            .setAPI(API::eOpenGL)
+            .build();
+
         // auto labMultiFrameBuffer = LabMultiFrameBuffer();
         // io::Window::Builder(labMultiFrameBuffer)
         //     .setTitle("MultiFrameBuffer")

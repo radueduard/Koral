@@ -9,10 +9,12 @@
 #include <fstream>
 #include <iostream>
 #include <ranges>
-#include <stb_image_write.h>
 #include <magic_enum/magic_enum.hpp>
 
 #include "input.h"
+#include "core/comandBuffer.h"
+#include "impl/open_gl/buffer.h"
+#include "core/scheduler.h"
 
 namespace gfx::io
 {
@@ -32,12 +34,14 @@ namespace gfx::io
 
                 scene.Initialize();
 
-                while (!w.shouldClose()) {
+                while (!w.shouldClose())
+                {
                     w._inputState.update();
                     w._timeState.update();
                     scene.Update();
-                    scene.Render();
-                    glfwSwapBuffers(*w);
+                    Context::Scheduler().Draw([&](gfx::CommandBuffer& commandBuffer) {
+                        scene.Render(commandBuffer);
+                    });
                 }
                 std::cout << Context::Window().getTitle() << " is closing." << std::endl;
                 w.close();

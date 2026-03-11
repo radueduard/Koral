@@ -17,9 +17,10 @@ namespace gfx::vk
 {
     ::vk::SurfaceFormatKHR SwapChain::ChooseSurfaceFormat(const std::vector<::vk::SurfaceFormatKHR> &availableFormats) {
         for (const auto &availableFormat : availableFormats) {
+            // std::cout << "Available surface format: " << ::vk::to_string(availableFormat.format) << ", color space: " << ::vk::to_string(availableFormat.colorSpace) << std::endl;
             // if (availableFormat.format == ::vk::Format::eA2B10G10R10UnormPack32 && availableFormat.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear) {
             if (availableFormat.format == ::vk::Format::eB8G8R8A8Unorm && availableFormat.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear) {
-            // if (availableFormat.format == ::vk::Format::eR8G8B8A8Srgb && availableFormat.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear) {
+            // if (availableFormat.format == ::vk::Format::eR8G8B8A8Unorm && availableFormat.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear) {
                 return availableFormat;
             }
         }
@@ -100,10 +101,18 @@ namespace gfx::vk
             const auto& img = _swapChainImages.emplace_back(std::make_unique<gfx::vk::Image>(image, _extent, getFormat(_surfaceFormat.format), _msaa));
             _swapChainImageViews.emplace_back(ImageView::Builder(*img)
                 .setViewType(ImageView::Type::e2D)
-                .setBaseMipLevel(0)
-                .setBaseArrayLayer(0)
-                .setMipLevelCount(1)
-                .setArrayLayerCount(1)
+                .build());
+
+            const auto& depthImage = _depthImages.emplace_back(Image::Builder()
+                .setExtent(_extent)
+                .setFormat(gfx::Image::Format::eD24_UNORM_S8_UINT)
+                .setType(gfx::Image::Type::e2D)
+                .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
+                .setMSAA(_msaa)
+                .build());
+
+            _depthImageViews.emplace_back(ImageView::Builder(*depthImage)
+                .setViewType(ImageView::Type::e2D)
                 .build());
         }
     }
@@ -115,10 +124,19 @@ namespace gfx::vk
         }
     }
 
-    std::vector<std::reference_wrapper<gfx::ImageView>> SwapChain::getSwapChainImageViews() const
+    std::vector<std::reference_wrapper<const gfx::ImageView>> SwapChain::getSwapChainImageViews() const
     {
-        std::vector<std::reference_wrapper<gfx::ImageView>> imageViews;
+        std::vector<std::reference_wrapper<const gfx::ImageView>> imageViews;
         for (const auto& imageView : _swapChainImageViews) {
+            imageViews.emplace_back(*imageView);
+        }
+        return imageViews;
+    }
+
+    std::vector<std::reference_wrapper<const gfx::ImageView>> SwapChain::getDepthImageViews() const
+    {
+        std::vector<std::reference_wrapper<const gfx::ImageView>> imageViews;
+        for (const auto& imageView : _depthImageViews) {
             imageViews.emplace_back(*imageView);
         }
         return imageViews;
@@ -159,7 +177,7 @@ namespace gfx::vk
             .setImageIndices(_imageIndex);
 
         try {
-        	return frame.getQueue()->presentKHR(presentInfo);
+        	return _presentQueue->presentKHR(presentInfo);
         } catch (const ::vk::OutOfDateKHRError &) {
             return ::vk::Result::eErrorOutOfDateKHR;
         }

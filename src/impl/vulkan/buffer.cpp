@@ -59,7 +59,9 @@ namespace gfx::vk
 			.setUsage(getVkBufferUsageFlags(usage))
 			.setSharingMode(::vk::SharingMode::eExclusive);
 
-		std::tie(_handle, _allocation) = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
+		auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
+		_handle = buffer;
+		_allocation = allocation;
 	}
 
 	Buffer::~Buffer() {

@@ -14,7 +14,7 @@
 
 void LabMultiFrameBuffer::Initialize()
 {
-    _mesh = gfx::Importer::LoadMesh(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
+    // _mesh = gfx::Importer::LoadMesh(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
     _albedoImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_albedo.jpg"));
 
     const auto geometryPassVertexShader = gfx::Shader::Builder()
@@ -100,66 +100,53 @@ void LabMultiFrameBuffer::Initialize()
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eColorAttachment)
         .setFormat(gfx::Image::Format::eRGB32_SFLOAT)
-        .build();
+        .buildFramebufferImage();
 
-    _positionsImageView = gfx::ImageView::Builder(*_positionsImage).build();
 
     _colorsImage = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eColorAttachment)
         .setFormat(gfx::Image::Format::eRGBA8_UNORM)
-        .build();
+        .buildFramebufferImage();
 
-    _colorsImageView = gfx::ImageView::Builder(*_colorsImage).build();
 
     _normalsImage = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eColorAttachment)
         .setFormat(gfx::Image::Format::eRGB32_SFLOAT)
-        .build();
+        .buildFramebufferImage();
 
-    _normalsImageView = gfx::ImageView::Builder(*_normalsImage).build();
 
     _depthImage = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
         .setFormat(gfx::Image::Format::eD24_UNORM_S8_UINT)
-        .build();
+        .buildFramebufferImage();
 
-    _depthImageView = gfx::ImageView::Builder(*_depthImage).build();
+
 
     _framebuffer = gfx::Framebuffer::Builder()
-        .addColorAttachment(*_positionsImageView, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
-        .addColorAttachment(*_colorsImageView, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
-        .addColorAttachment(*_normalsImageView, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
-        .setDepthStencilAttachment(*_depthImageView, 1.f, 0)
+        .addColorAttachment(*_positionsImage, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
+        .addColorAttachment(*_colorsImage, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
+        .addColorAttachment(*_normalsImage, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f))
+        .setDepthStencilAttachment(*_depthImage, 1.f, 0)
         .build();
-
-    _commandBuffer = gfx::CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics);
 }
 
-void LabMultiFrameBuffer::Update()
+void LabMultiFrameBuffer::Render(gfx::CommandBuffer& commandBuffer)
 {
-    _commandBuffer->Reset();
-}
-
-void LabMultiFrameBuffer::Render()
-{
-    _commandBuffer->Begin()
+    commandBuffer
         .BeginRendering(_framebuffer.get())
         .SetViewport(0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y)
         .BindPipeline(_pipeline1.get())
         .BindDescriptorSet(0, _descriptorSet.get())
         .DrawMesh(_mesh.get(), 1, 0)
         .EndRendering()
-        .BeginRendering(gfx::Context::DefaultFramebuffer())
+        .BeginRendering()
         .BindPipeline(_pipeline2.get())
         .DrawMesh(_mesh.get(), 1, 0)
-        .EndRendering()
-        .End();
-
-    _commandBuffer->Submit();
+        .EndRendering();
 }

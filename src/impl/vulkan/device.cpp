@@ -15,6 +15,7 @@
 #include "context.h"
 #include "physicalDevice.h"
 #include "runtime.h"
+#include "scheduler.h"
 #include "surface.h"
 #include "vulkanContext.h"
 
@@ -52,6 +53,29 @@ namespace gfx::vk {
 
     Queue::~Queue() {
         _family._remainingQueues++;
+    }
+
+    void Queue::Submit(const SubmitInfo& submitInfo) const
+    {
+        const auto commandBufferHandle = *submitInfo.commandBuffer;
+        const auto commandBuffers = std::array { commandBufferHandle };
+        auto submitInfoVulkan = ::vk::SubmitInfo()
+            .setCommandBuffers(commandBuffers);
+
+        if (!submitInfo.waitSemaphores.empty()) {
+            submitInfoVulkan
+                .setWaitSemaphores(submitInfo.waitSemaphores)
+                .setWaitDstStageMask(submitInfo.waitStages);
+        }
+
+        if (!submitInfo.signalSemaphores.empty())
+            submitInfoVulkan.setSignalSemaphores(submitInfo.signalSemaphores);
+
+        try {
+            _handle.submit(submitInfoVulkan, submitInfo.fence);
+        } catch (const std::runtime_error& e) {
+            std::cerr << e.what() << std::endl;
+        }
     }
 
     Device::Device() {
@@ -124,7 +148,8 @@ namespace gfx::vk {
         _handle.destroy();
     }
 
-    void Device::createCommandPools(const uint32_t threadId) const {
+    void Device::createCommandPools() const {
+        auto threadId = Context::ThreadId();
         for (const auto& queueFamily : _queueFamilies) {
             const auto commandPoolCreateInfo = ::vk::CommandPoolCreateInfo()
                 .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
@@ -133,7 +158,9 @@ namespace gfx::vk {
         }
     }
 
-    void Device::freeCommandPools(const uint32_t threadId) const {
+    void Device::freeCommandPools() const {
+        auto threadId = Context::ThreadId();
+        _handle.waitIdle();
         for (const auto& queueFamily : _queueFamilies) {
             _handle.destroyCommandPool(_commandPools[queueFamily.getIndex()][threadId]);
             _commandPools[queueFamily.getIndex()].erase(threadId);

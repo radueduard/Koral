@@ -9,6 +9,7 @@
 #include "core/mesh.h"
 #include "core/descriptorBinding.h"
 #include "core/comandBuffer.h"
+#include "core/framebufferImage.h"
 
 #include "scenes/scene.h"
 
@@ -16,8 +17,8 @@ class LabMultiFrameBuffer : public gfx::Scene
 {
 public:
     void Initialize() override;
-    void Update() override;
-    void Render() override;
+    void Update() override {};
+    void Render(gfx::CommandBuffer& commandBuffer) override;
 
 private:
     std::unique_ptr<gfx::Mesh> _mesh = nullptr;
@@ -33,19 +34,10 @@ private:
 
     std::unique_ptr<gfx::DescriptorSet> _descriptorSet = nullptr;
 
-    std::unique_ptr<gfx::CommandBuffer> _commandBuffer = nullptr;
-
-    std::unique_ptr<gfx::Image> _positionsImage = nullptr;
-    std::unique_ptr<gfx::ImageView> _positionsImageView = nullptr;
-
-    std::unique_ptr<gfx::Image> _colorsImage = nullptr;
-    std::unique_ptr<gfx::ImageView> _colorsImageView = nullptr;
-
-    std::unique_ptr<gfx::Image> _normalsImage = nullptr;
-    std::unique_ptr<gfx::ImageView> _normalsImageView = nullptr;
-
-    std::unique_ptr<gfx::Image> _depthImage = nullptr;
-    std::unique_ptr<gfx::ImageView> _depthImageView = nullptr;
+    std::unique_ptr<gfx::FramebufferImage> _positionsImage = nullptr;
+    std::unique_ptr<gfx::FramebufferImage> _colorsImage = nullptr;
+    std::unique_ptr<gfx::FramebufferImage> _normalsImage = nullptr;
+    std::unique_ptr<gfx::FramebufferImage> _depthImage = nullptr;
 
     std::unique_ptr<gfx::Framebuffer> _framebuffer = nullptr;
 };

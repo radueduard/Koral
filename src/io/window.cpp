@@ -84,14 +84,18 @@ namespace gfx::io {
         case API::eOpenGL:
             {
                 glewInit();
+                auto globalVAO = 0u;
+                glGenVertexArrays(1, &globalVAO);
+                glBindVertexArray(globalVAO);
                 break;
             }
         case API::eVulkan:
             {
-                gfx::vk::Context::Device().createCommandPools(gfx::vk::Context::ThreadId());
+                gfx::vk::Context::Device().createCommandPools();
                 break;
             }
         }
+        Context::InitScheduler();
         _framebuffer = Framebuffer::CreateDefault();
     }
 
@@ -106,28 +110,13 @@ namespace gfx::io {
 
     void Window::close()
     {
+        Context::DestroyScheduler();
         if (_api == API::eVulkan) {
-            gfx::vk::Context::Device().freeCommandPools(gfx::vk::Context::ThreadId());
+            gfx::vk::Context::Device().freeCommandPools();
         }
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
         _closed = true;
     }
-
-    // std::vector <const char*> window::GetRequiredExtensions() const {
-    //     uint32_t glfwExtensionCount = 0;
-    //     const auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-    //     std::vector extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-    //     return extensions;
-    // }
-
-    // vk::SurfaceKHR window::CreateSurface(const vk::Instance& instance) const {
-	   //  VkSurfaceKHR surface;
-    // 	if (const auto result = glfwCreateWindowSurface(instance, m_window, nullptr, &surface); result != VK_SUCCESS) {
-    // 		std::cerr << "Failed to create window surface: " << vk::to_string(static_cast<vk::Result>(result)) << std::endl;
-    // 	}
-    //
-    // 	return { surface };
-    // }
 
     void Window::setIcon(const std::filesystem::path& iconPath)
     {

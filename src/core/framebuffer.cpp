@@ -6,10 +6,39 @@
 #include "impl/open_gl/framebuffer.h"
 #include "impl/vulkan/framebuffer.h"
 
+#include <algorithm>
+#include <ranges>
+
 #include "context.h"
+#include "framebufferImage.h"
+#include "scheduler.h"
 #include "io/window.h"
 
 namespace gfx {
+    Framebuffer::Builder::Builder()
+    {
+        attachments.resize(Context::Scheduler().getImageCount());
+    }
+
+    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const FramebufferImage& framebufferImage, glm::vec4 clearColor)
+    {
+        for (const auto& [i, imageView] : framebufferImage.getImageViews() | std::views::enumerate) {
+            attachments[i].colorAttachments.emplace_back(imageView);
+        }
+        clearValues.clearColor.emplace_back(clearColor);
+        return *this;
+    }
+
+    Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(const FramebufferImage& framebufferImage, float depth, glm::i32 stencil)
+    {
+        for (const auto& [i, imageView] : framebufferImage.getImageViews() | std::views::enumerate) {
+            attachments[i].depthStencilAttachment = imageView;
+        }
+        clearValues.clearDepth = depth;
+        clearValues.clearStencil = stencil;
+        return *this;
+    }
+
     std::unique_ptr<Framebuffer> Framebuffer::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
@@ -35,17 +64,19 @@ namespace gfx {
 
     bool Framebuffer::hasDepthStencilAttachment() const
     {
-        return depthStencilAttachment.has_value();
+        return std::ranges::all_of(attachments, [](const auto& attachmentInfo) {
+            return attachmentInfo.depthStencilAttachment.has_value();
+        });
     }
 
     const std::vector<std::reference_wrapper<const ImageView>>& Framebuffer::getColorAttachments() const
     {
-        return colorAttachments;
+        return attachments[Context::Scheduler().getCurrentImageIndex()].colorAttachments;
     }
 
     const ImageView& Framebuffer::getDepthStencilAttachment() const
     {
-        return depthStencilAttachment.value();
+        return attachments[Context::Scheduler().getCurrentImageIndex()].depthStencilAttachment->get();
     }
 
     const glm::vec4& Framebuffer::getClearColor(const glm::u32 index) const
@@ -64,7 +95,10 @@ namespace gfx {
     }
 
     Framebuffer::Framebuffer(const Builder& createInfo) :
-        colorAttachments(createInfo.colorAttachments),
-        depthStencilAttachment(createInfo.depthStencilAttachment),
-        clearValues(createInfo.clearValues) {}
+        _frameCount(createInfo.attachments.size()),
+        attachments(createInfo.attachments),
+        clearValues(createInfo.clearValues)
+    {
+        _extent = attachments[0].colorAttachments[0].get().getImage().getExtent();
+    }
 }

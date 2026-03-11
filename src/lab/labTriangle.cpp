@@ -40,8 +40,6 @@ void LabTriangle::Initialize()
     _timeDescriptorSet = DescriptorSet::Builder(_graphicsPipeline->getSetLayout(0))
         .write(0, Descriptor(_timeBuffer.get()))
         .build();
-
-    _commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
 }
 
 void LabTriangle::Update() {
@@ -49,19 +47,16 @@ void LabTriangle::Update() {
     _timeBuffer->Map();
     _timeBuffer->Write(time);
     _timeBuffer->Unmap();
-
-    _commandBuffer->Reset();
 }
 
-void LabTriangle::Render()
+void LabTriangle::Render(gfx::CommandBuffer& commandBuffer)
 {
-    _commandBuffer->Begin()
-        .BeginRendering(Context::DefaultFramebuffer())
+    commandBuffer
+        .BeginRendering()
         .SetViewport(0.f, 0.f, Context::Window().getExtent().x, Context::Window().getExtent().y)
+        .SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y)
         .BindPipeline(_graphicsPipeline.get())
         .BindDescriptorSet(0, _timeDescriptorSet.get())
         .Draw(3, 1, 0, 0)
-        .EndRendering()
-        .End();
-    _commandBuffer->Submit();
+        .EndRendering();
 }
