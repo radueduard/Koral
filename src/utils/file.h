@@ -5,6 +5,7 @@
 #pragma once
 
 #include <fstream>
+#include <vector>
 #include <filesystem>
 #include <glm/fwd.hpp>
 
@@ -17,17 +18,16 @@ namespace gfx::utils
             throw std::runtime_error("Failed to open file: " + filePath.string());
         }
 
-        std::stringbuf buffer;
+        std::string buffer;
         while (!file.eof())
         {
             std::string line;
             std::getline(file, line);
-            buffer.sputn(line.c_str(), line.size());
-            buffer.sputc('\n');
+            buffer += line + "\n";
         }
 
         file.close();
-        return buffer.str();
+        return buffer;
     }
 
     inline void WriteToFile(const std::filesystem::path& filePath, const std::string& data)

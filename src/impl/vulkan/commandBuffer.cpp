@@ -91,7 +91,8 @@ namespace gfx::vk
         }
 
         std::vector<::vk::RenderingAttachmentInfoKHR> colorAttachmentInfos;
-        for (auto [i, colorAttachment] : framebuffer->getColorAttachments() | std::views::enumerate) {
+        int i = 0;
+        for (auto colorAttachment : framebuffer->getColorAttachments()) {
             colorAttachmentInfos.push_back(::vk::RenderingAttachmentInfoKHR()
                 .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&colorAttachment.get()))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
@@ -99,6 +100,7 @@ namespace gfx::vk
                     .setFloat32({ framebuffer->getClearValues().clearColor[i].r, framebuffer->getClearValues().clearColor[i].g, framebuffer->getClearValues().clearColor[i].b, framebuffer->getClearValues().clearColor[i].a })))
                 .setLoadOp(::vk::AttachmentLoadOp::eClear)
                 .setStoreOp(::vk::AttachmentStoreOp::eStore));
+            i++;
         }
 
         const auto depthAttachment = framebuffer->hasDepthStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
@@ -118,7 +120,8 @@ namespace gfx::vk
             .setLayerCount(1)
             .setViewMask(0)
             .setColorAttachments(colorAttachmentInfos)
-            .setPDepthAttachment(depthAttachment.has_value() ? &depthAttachment.value() : nullptr);
+            .setPDepthAttachment(depthAttachment.has_value() ? &depthAttachment.value() : nullptr)
+            .setPStencilAttachment(depthAttachment.has_value()? &depthAttachment.value() : nullptr);
 
         _handle.beginRenderingKHR(beginRenderingInfo);
         return *this;

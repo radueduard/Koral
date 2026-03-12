@@ -61,10 +61,12 @@ namespace gfx::ogl
             if (**oglFramebuffer == 0) {
                 glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer->getClearColor(0)));
             } else {
-                for (const auto& [i, attachment] : _state.boundFramebuffer.value()->getColorAttachments() | std::views::enumerate)
+                int i = 0;
+                for (const auto& attachment : _state.boundFramebuffer.value()->getColorAttachments())
                 {
                     glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer->getClearColor(i)));
                     glCheckError();
+                    i++;
                 }
             }
             if (framebuffer->hasDepthStencilAttachment())

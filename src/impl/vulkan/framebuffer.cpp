@@ -34,7 +34,7 @@ namespace gfx::vk
             attachments[i].colorAttachments.emplace_back(colorAttachments[i]);
             attachments[i].depthStencilAttachment = depthStencilAttachments[i];
         }
-        clearValues.clearColor.emplace_back(glm::vec4 { 0.0, 0.0, 0.0, 1.0 });
+        clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 1.0 );
         clearValues.clearDepth = 1.0f;
         clearValues.clearStencil = 0;
     }

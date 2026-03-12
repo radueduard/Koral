@@ -12,6 +12,7 @@ namespace gfx
     std::vector<std::reference_wrapper<const ImageView>> FramebufferImage::getImageViews() const
     {
         std::vector<std::reference_wrapper<const ImageView>> imageViews;
+        imageViews.reserve(_imageViews.size());
         for (const auto& imageView : _imageViews) {
             imageViews.emplace_back(*imageView);
         }

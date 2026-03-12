@@ -15,7 +15,7 @@ namespace gfx
     public:
         ~FramebufferImage() = default;
 
-        std::vector<std::reference_wrapper<const ImageView>> getImageViews() const;
+        [[nodiscard]] std::vector<std::reference_wrapper<const ImageView>> getImageViews() const;
     private:
         explicit FramebufferImage(const Image::Builder& createInfo);
 

@@ -22,8 +22,9 @@ namespace gfx {
 
     Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const FramebufferImage& framebufferImage, glm::vec4 clearColor)
     {
-        for (const auto& [i, imageView] : framebufferImage.getImageViews() | std::views::enumerate) {
-            attachments[i].colorAttachments.emplace_back(imageView);
+        int i = 0;
+        for (const auto& imageView : framebufferImage.getImageViews()) {
+            attachments[i++].colorAttachments.emplace_back(imageView);
         }
         clearValues.clearColor.emplace_back(clearColor);
         return *this;
@@ -31,8 +32,9 @@ namespace gfx {
 
     Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(const FramebufferImage& framebufferImage, float depth, glm::i32 stencil)
     {
-        for (const auto& [i, imageView] : framebufferImage.getImageViews() | std::views::enumerate) {
-            attachments[i].depthStencilAttachment = imageView;
+        int i = 0;
+        for (const auto& imageView : framebufferImage.getImageViews()) {
+            attachments[i++].depthStencilAttachment = imageView;
         }
         clearValues.clearDepth = depth;
         clearValues.clearStencil = stencil;

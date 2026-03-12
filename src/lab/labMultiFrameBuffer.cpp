@@ -2,14 +2,14 @@
 // Created by radue on 2/26/2026.
 //
 
+#include "core/framebuffer.h"
 #include "labMultiFrameBuffer.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.inl>
 
-#include "../core/importer.h"
-#include "../impl/open_gl/image.h"
+#include "core/importer.h"
 #include "io/window.h"
 
 void LabMultiFrameBuffer::Initialize()

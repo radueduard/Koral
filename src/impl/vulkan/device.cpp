@@ -168,14 +168,6 @@ namespace gfx::vk {
     }
 
     const Queue& Device::requestQueue(const ::vk::QueueFlags type) const {
-        // for (const auto& queue : _queuesInUse)
-        // {
-        //     if ((queue->getFamily().getProperties().queueFlags & type) == type)
-        //     {
-        //         return *queue;
-        //     }
-        // }
-
         for (auto& queueFamily : _queueFamilies) {
             if ((queueFamily.getProperties().queueFlags & type) != type) {
                 continue;
@@ -186,7 +178,14 @@ namespace gfx::vk {
                 return *queueRef;
             } catch (const std::runtime_error&) {}
         }
-        throw std::runtime_error("Queue::RequestQueue : Failed to find queue with requested flags");
+        for (const auto& queue : _queuesInUse)
+        {
+            if ((queue->getFamily().getProperties().queueFlags & type) == type)
+            {
+                return *queue;
+            }
+        }
+        throw std::runtime_error("Device::RequestQueue: Failed to find a queue with this type!");
     }
 
     const Queue& Device::requestPresentQueue(const gfx::vk::Surface& surface) const {
@@ -195,8 +194,8 @@ namespace gfx::vk {
                 auto queue = queueFamily.RequestPresentQueue(surface);
                 const auto& queueRef = _queuesInUse.emplace_back(std::move(queue));
                 return *queueRef;
-            } catch (const std::runtime_error&) {
-                continue;
+            } catch (const std::runtime_error& err) {
+                std::cerr << err.what() << std::endl;
             }
         }
         throw std::runtime_error("Device::RequestPresentQueue: Failed to find suitable present queue!");

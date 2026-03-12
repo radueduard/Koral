@@ -46,11 +46,13 @@ namespace gfx::vk
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
         [[nodiscard]] MSAA getMSAA() const { return _msaa; }
 
+        [[nodiscard]] const gfx::vk::Image& getImage(glm::u32 index) const { return *_swapChainImages[index]; }
+
         [[nodiscard]] std::vector<std::reference_wrapper<const gfx::ImageView>> getSwapChainImageViews() const;
         [[nodiscard]] std::vector<std::reference_wrapper<const gfx::ImageView>> getDepthImageViews() const;
 
-        std::reference_wrapper<const gfx::ImageView> getSwapChainImageView(const glm::u32 index) const { return *_swapChainImageViews[index]; }
-        std::reference_wrapper<const gfx::ImageView> getDepthImageView(const glm::u32 index) const { return *_depthImageViews[index]; }
+        [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getSwapChainImageView(const glm::u32 index) const { return *_swapChainImageViews[index]; }
+        [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getDepthImageView(const glm::u32 index) const { return *_depthImageViews[index]; }
 
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
         [[nodiscard]] glm::u32 getCurrentImageIndex() const { return _imageIndex; }

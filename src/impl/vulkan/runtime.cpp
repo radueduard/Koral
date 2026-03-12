@@ -91,6 +91,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         }
 
         const auto createInfo = ::vk::InstanceCreateInfo()
+        #ifdef __APPLE__
+            .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
+        #endif
             .setPApplicationInfo(&applicationInfo)
             .setPEnabledExtensionNames(_instanceExtensions)
             .setPEnabledLayerNames(_instanceLayers);

@@ -53,7 +53,6 @@ namespace gfx::vk
     	[[nodiscard]] const gfx::vk::SwapChain &getSwapChain() const { return *_swapChain; }
     	[[nodiscard]] bool isResized() const { return _resized; }
 
-
     private:
     	std::unique_ptr<gfx::vk::Surface> _surface;
     	std::unique_ptr<gfx::vk::SwapChain> _swapChain;

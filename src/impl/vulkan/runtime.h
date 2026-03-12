@@ -44,11 +44,17 @@ namespace gfx::vk
         };
         std::vector<const char*> _instanceExtensions {
             VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-            VK_KHR_SURFACE_EXTENSION_NAME
+            VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef __APPLE__
+            VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+#endif
         };
         std::vector<const char*> _deviceExtensions {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
             VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+#ifdef __APPLE__
+            "VK_KHR_portability_subset"
+#endif
         };
 
         ::vk::QueueFlags _requiredQueues = ::vk::QueueFlags()

@@ -30,13 +30,12 @@ namespace gfx::vk
     Scheduler::Scheduler(const Builder& createInfo) : gfx::Scheduler(createInfo)
     {
         _surface = std::make_unique<Surface>(gfx::Context::Window());
-        createFrames();
-
         _swapChain = gfx::vk::SwapChain::Builder(*_surface)
             .setMinImageCount(createInfo.minImageCount)
             .setImageCount(_imageCount)
             .setMSAA(MSAA::eNone)
             .build();
+        createFrames();
     }
 
     Scheduler::~Scheduler() {
@@ -61,8 +60,12 @@ namespace gfx::vk
         }
 
         auto& commandBuffer = frame.getCommandBuffer();
+        auto& vkCommandBuffer = dynamic_cast<gfx::vk::CommandBuffer&>(commandBuffer);
         commandBuffer.Reset();
-        renderFunc(commandBuffer.Begin());
+        commandBuffer.Begin();
+        _swapChain->getImage(_currentFrame).TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::eColorAttachmentOptimal);
+        renderFunc(commandBuffer);
+        _swapChain->getImage(_currentFrame).TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::ePresentSrcKHR);
         commandBuffer.End();
 
         const SubmitInfo submitInfo {

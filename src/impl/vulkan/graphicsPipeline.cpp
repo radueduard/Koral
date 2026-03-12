@@ -29,8 +29,7 @@ namespace gfx::vk
             .setColorAttachmentFormats(colorAttachmentFormats);
         if (_framebuffer.get().hasDepthStencilAttachment()) {
             pipelineRenderingCreateInfo.setDepthAttachmentFormat(getVkFormat(_framebuffer.get().getDepthStencilAttachment().getImage().getFormat()));
-            if (createInfo.depthStencilState.stencilEnable)
-                pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer.get().getDepthStencilAttachment().getImage().getFormat()));
+            pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer.get().getDepthStencilAttachment().getImage().getFormat()));
         }
 
         std::vector<::vk::DescriptorSetLayout> setLayouts(std::ranges::max(_setLayouts | std::views::keys) + 1, nullptr);
@@ -110,6 +109,7 @@ namespace gfx::vk
             .setCullMode(getVkCullMode(createInfo.rasterizationState.cullMode))
             .setFrontFace(getVkFrontFace(createInfo.rasterizationState.frontFace))
             .setDepthClampEnable(createInfo.rasterizationState.depthClampEnable)
+            .setLineWidth(createInfo.rasterizationState.lineWidth)
             .setRasterizerDiscardEnable(createInfo.rasterizationState.rasterizerDiscardEnable);
         pipelineCreateInfo.setPRasterizationState(&rasterizationStateCreateInfo);
 

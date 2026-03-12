@@ -56,12 +56,12 @@ void gfx::Engine::Run()
             .setAPI(API::eVulkan)
             .build();
 
-        auto labMeshOgl = Lab01();
-        io::Window::Builder(labMeshOgl)
-            .setTitle("Mesh")
-            .setExtent({1280, 720})
-            .setAPI(API::eOpenGL)
-            .build();
+        // auto labMeshOgl = Lab01();
+        // io::Window::Builder(labMeshOgl)
+        //     .setTitle("Mesh")
+        //     .setExtent({1280, 720})
+        //     .setAPI(API::eOpenGL)
+        //     .build();
 
         // auto labMultiFrameBuffer = LabMultiFrameBuffer();
         // io::Window::Builder(labMultiFrameBuffer)

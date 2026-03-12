@@ -105,11 +105,14 @@ namespace gfx::vk
 
             const auto& depthImage = _depthImages.emplace_back(Image::Builder()
                 .setExtent(_extent)
-                .setFormat(gfx::Image::Format::eD24_UNORM_S8_UINT)
+                .setFormat(gfx::Image::Format::eD32_SFLOAT_S8_UINT)
                 .setType(gfx::Image::Type::e2D)
                 .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
                 .setMSAA(_msaa)
                 .build());
+
+            const auto& vkDepthImage = dynamic_cast<gfx::vk::Image&>(*depthImage);
+            vkDepthImage.TransitionLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
             _depthImageViews.emplace_back(ImageView::Builder(*depthImage)
                 .setViewType(ImageView::Type::e2D)
@@ -127,6 +130,7 @@ namespace gfx::vk
     std::vector<std::reference_wrapper<const gfx::ImageView>> SwapChain::getSwapChainImageViews() const
     {
         std::vector<std::reference_wrapper<const gfx::ImageView>> imageViews;
+        imageViews.reserve(_swapChainImageViews.size());
         for (const auto& imageView : _swapChainImageViews) {
             imageViews.emplace_back(*imageView);
         }
@@ -136,6 +140,7 @@ namespace gfx::vk
     std::vector<std::reference_wrapper<const gfx::ImageView>> SwapChain::getDepthImageViews() const
     {
         std::vector<std::reference_wrapper<const gfx::ImageView>> imageViews;
+        imageViews.reserve(_depthImageViews.size());
         for (const auto& imageView : _depthImageViews) {
             imageViews.emplace_back(*imageView);
         }

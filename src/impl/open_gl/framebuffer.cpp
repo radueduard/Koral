@@ -23,15 +23,16 @@ namespace gfx::ogl
         glCreateFramebuffers(_frameCount, _ids.data());
         glCheckError();
 
-        for (const auto& [i, perAttachmentInfo] : attachments | std::views::enumerate) {
+        int i = 0;
+        for (const auto& perAttachmentInfo : attachments) {
             const auto& colorAttachments = perAttachmentInfo.colorAttachments;
             const auto& depthStencilAttachment = perAttachmentInfo.depthStencilAttachment;
 
             std::vector<GLenum> drawAttachments {};
-            for (glm::uint i = 0; i < colorAttachments.size(); ++i) {
+            for (glm::uint j = 0; j < colorAttachments.size(); ++j) {
                 const std::reference_wrapper imageView = dynamic_cast<const ImageView&>(colorAttachments[i].get());
-                glNamedFramebufferTexture(_ids[i], GL_COLOR_ATTACHMENT0 + i, *imageView.get(), 0);
-                drawAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + i);
+                glNamedFramebufferTexture(_ids[i], GL_COLOR_ATTACHMENT0 + j, *imageView.get(), 0);
+                drawAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + j);
                 glCheckError();
             }
             if (depthStencilAttachment) {
@@ -41,6 +42,7 @@ namespace gfx::ogl
             }
             glNamedFramebufferDrawBuffers(_ids[i], drawAttachments.size(), drawAttachments.data());
             glCheckError();
+            i++;
         }
     }
 
