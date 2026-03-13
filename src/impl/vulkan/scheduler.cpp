@@ -62,8 +62,6 @@ namespace gfx::vk
             _started = true;
         }
 
-        std::cout << "Current image index: " << _swapChain->getCurrentImageIndex() << "\tScheduler frame index: " << _currentFrame << std::endl;
-
         auto& commandBuffer = frame.getCommandBuffer();
         const auto& vkCommandBuffer = dynamic_cast<gfx::vk::CommandBuffer&>(commandBuffer);
         commandBuffer.Reset();

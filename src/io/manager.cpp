@@ -42,7 +42,6 @@ namespace gfx::io
                         scene.Render(commandBuffer);
                     });
                 }
-                scene.~Scene();
                 std::cout << Context::Window().getTitle() << " is closing." << std::endl;
                 w.close();
             }, window);

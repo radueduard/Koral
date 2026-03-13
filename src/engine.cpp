@@ -67,7 +67,7 @@ void gfx::Engine::Run()
         io::Window::Builder(labMultiFrameBuffer)
             .setTitle("MultiFrameBuffer")
             .setExtent({1280, 720})
-            .setAPI(API::eOpenGL)
+            .setAPI(API::eVulkan)
             .build();
 
 
