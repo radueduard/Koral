@@ -26,7 +26,7 @@ class LabMultiFrameBuffer : public gfx::Scene
 {
 public:
     void Initialize() override;
-    void Update() override {};
+    void Update() override;
     void Render(gfx::CommandBuffer& commandBuffer) override;
 
 private:
@@ -71,4 +71,9 @@ private:
 
     std::unique_ptr<gfx::Buffer> _lightsBuffer = nullptr;
     std::unique_ptr<gfx::DescriptorSet> _compositeDescriptorSet = nullptr;
+
+    glm::vec3 _cameraPosition = glm::vec3(0.f, 0.f, -5.f);
+    glm::vec3 _cameraForward = glm::vec3(0.f, 0.f, 1.f);
+    glm::vec3 _cameraUp = glm::vec3(0.f, 1.f, 0.f);
+    glm::vec3 _cameraRight = glm::vec3(1.f, 0.f, 0.f);
 };

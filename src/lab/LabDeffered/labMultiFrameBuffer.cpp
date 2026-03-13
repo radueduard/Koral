@@ -218,6 +218,71 @@ void LabMultiFrameBuffer::Initialize()
         .build();
 }
 
+void LabMultiFrameBuffer::Update()
+{
+    if (!gfx::io::Input::isMouseButtonHeld(gfx::io::MouseButton::eRight)) {
+        return;
+    }
+
+    bool changed = false;
+    // move
+    {
+        glm::vec3 delta = { 0.0f, 0.0f, 0.0f };
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eW)) {
+            delta.z += 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eS)) {
+            delta.z -= 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eA)) {
+            delta.x -= 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eD)) {
+            delta.x += 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eQ)) {
+            delta.y -= 1.f;
+        }
+        if (gfx::io::Input::isKeyHeld(gfx::io::Key::eE)) {
+            delta.y += 1.f;
+        }
+
+        if (delta != glm::vec3(0.f)) {
+            delta = glm::normalize(delta) * 5.f * gfx::io::Time::FrameTime();
+            _cameraPosition += delta.x * _cameraRight + delta.y * glm::vec3(0.f, 1.f, 0.f) + delta.z * _cameraForward;
+            changed = true;
+        }
+    }
+
+    // rotate
+    {
+        if (const glm::vec2 mouseDelta = gfx::io::Input::getMousePositionDelta(); mouseDelta != glm::vec2(0.f))
+        {
+            constexpr float sensitivity = 0.2f;
+            _cameraForward = glm::rotate(glm::mat4(1.f), glm::radians(-mouseDelta.x * sensitivity), glm::vec3(0.f, 1.f, 0.f)) *
+                             glm::rotate(glm::mat4(1.f), glm::radians(-mouseDelta.y * sensitivity), _cameraRight) *
+                             glm::vec4(_cameraForward, 0.f);
+
+            _cameraRight = glm::normalize(glm::cross(_cameraForward, glm::vec3(0.f, 1.f, 0.f)));
+            changed = true;
+        }
+    }
+
+    if (!changed) {
+        return;
+    }
+
+    const glm::mat4 viewMatrix = glm::lookAt(
+        _cameraPosition,
+        _cameraPosition + _cameraForward,
+        glm::vec3(0.f, 1.f, 0.f)
+    );
+
+    _uniformBufferCamera->Map();
+    _uniformBufferCamera->Write(viewMatrix);
+    _uniformBufferCamera->Unmap();
+}
+
 void LabMultiFrameBuffer::Render(gfx::CommandBuffer& commandBuffer)
 {
     commandBuffer

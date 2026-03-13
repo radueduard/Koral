@@ -184,8 +184,8 @@ namespace gfx::ogl
             const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
             const auto mode = oglPipeline->getMode();
 
-            auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
-            auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
+            const auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
+            const auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
 
             const auto vertexBuffers = mesh->getVertexBuffers();
             for (size_t i = 0; i < vertexBuffers.size(); ++i)
@@ -208,6 +208,7 @@ namespace gfx::ogl
                             GL_FALSE,
                             stride,
                             nullptr);
+                        glCheckError();
                     }
                 }
             }

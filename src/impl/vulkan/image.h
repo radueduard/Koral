@@ -65,10 +65,21 @@ namespace gfx::vk
 			{ ::vk::ImageLayout::eShaderReadOnlyOptimal, ::vk::AccessFlagBits::eShaderRead },
 			{ ::vk::ImageLayout::eTransferSrcOptimal, ::vk::AccessFlagBits::eTransferRead },
 			{ ::vk::ImageLayout::eTransferDstOptimal, ::vk::AccessFlagBits::eTransferWrite },
-			{ ::vk::ImageLayout::ePresentSrcKHR, ::vk::AccessFlagBits::eMemoryRead },
+			{ ::vk::ImageLayout::ePresentSrcKHR, ::vk::AccessFlagBits::eNone },
 		};
 
-    	inline static std::unordered_map<::vk::ImageLayout, ::vk::PipelineStageFlags> layoutPipelineStageMap = {
+    	inline static std::unordered_map<::vk::ImageLayout, ::vk::PipelineStageFlags> srcLayoutPipelineStageMap = {
+			{ ::vk::ImageLayout::eUndefined, ::vk::PipelineStageFlagBits::eTopOfPipe },
+			{ ::vk::ImageLayout::eGeneral, ::vk::PipelineStageFlagBits::eAllCommands },
+			{ ::vk::ImageLayout::eColorAttachmentOptimal, ::vk::PipelineStageFlagBits::eColorAttachmentOutput },
+			{ ::vk::ImageLayout::eDepthStencilAttachmentOptimal, ::vk::PipelineStageFlagBits::eLateFragmentTests },
+			{ ::vk::ImageLayout::eShaderReadOnlyOptimal, ::vk::PipelineStageFlagBits::eFragmentShader },
+			{ ::vk::ImageLayout::eTransferSrcOptimal, ::vk::PipelineStageFlagBits::eTransfer },
+			{ ::vk::ImageLayout::eTransferDstOptimal, ::vk::PipelineStageFlagBits::eTransfer },
+			{ ::vk::ImageLayout::ePresentSrcKHR, ::vk::PipelineStageFlagBits::eBottomOfPipe },
+		};
+
+		inline static std::unordered_map<::vk::ImageLayout, ::vk::PipelineStageFlags> dstLayoutPipelineStageMap = {
 			{ ::vk::ImageLayout::eUndefined, ::vk::PipelineStageFlagBits::eTopOfPipe },
 			{ ::vk::ImageLayout::eGeneral, ::vk::PipelineStageFlagBits::eAllCommands },
 			{ ::vk::ImageLayout::eColorAttachmentOptimal, ::vk::PipelineStageFlagBits::eColorAttachmentOutput },

@@ -20,7 +20,6 @@ namespace gfx::vk
         auto imageCreateFlags = ::vk::ImageCreateFlags();
         if (_arrayLayers > 1 && _type == Type::e2D) imageCreateFlags |= ::vk::ImageCreateFlagBits::e2DArrayCompatibleKHR;
         if (_arrayLayers == 6 && _type == Type::e2D) imageCreateFlags |= ::vk::ImageCreateFlagBits::eCubeCompatible;
-        imageCreateFlags |= ::vk::ImageCreateFlagBits::eExtendedUsage;
 
 
         const auto type = getVkImageType(this->_type);
@@ -29,11 +28,11 @@ namespace gfx::vk
 
         auto tiling = ::vk::ImageTiling::eOptimal;
         try {
-             Context::Runtime().getPhysicalDevice()->getImageFormatProperties(format, type, ::vk::ImageTiling::eOptimal, usage, imageCreateFlags);
+             (void)Context::Runtime().getPhysicalDevice()->getImageFormatProperties(format, type, ::vk::ImageTiling::eOptimal, usage, imageCreateFlags);
         } catch (const std::runtime_error& err) {
             try {
                 tiling = ::vk::ImageTiling::eLinear;
-                Context::Runtime().getPhysicalDevice()->getImageFormatProperties(format, type, ::vk::ImageTiling::eLinear, usage, imageCreateFlags);
+                (void)Context::Runtime().getPhysicalDevice()->getImageFormatProperties(format, type, ::vk::ImageTiling::eLinear, usage, imageCreateFlags);
             } catch (const std::runtime_error& err) {
                 throw std::runtime_error("The specified image format is not supported by the physical device!");
             }
@@ -154,8 +153,8 @@ namespace gfx::vk
         {
             for (size_t i = 0; i < _layouts.size(); i++) {
                 if (_layouts[i] != newLayout) {
-                    const ::vk::PipelineStageFlags sourceStage = layoutPipelineStageMap.at(_layouts[i]);
-                    const ::vk::PipelineStageFlags destinationStage = layoutPipelineStageMap.at(newLayout);
+                    const ::vk::PipelineStageFlags sourceStage = srcLayoutPipelineStageMap.at(_layouts[i]);
+                    const ::vk::PipelineStageFlags destinationStage = dstLayoutPipelineStageMap.at(newLayout);
                     const ::vk::AccessFlags srcAccessMask = layoutAccessMap.at(_layouts[i]);
                     const ::vk::AccessFlags dstAccessMask = layoutAccessMap.at(newLayout);
 
@@ -170,8 +169,8 @@ namespace gfx::vk
                 return;
             }
 
-            const ::vk::PipelineStageFlags sourceStage = layoutPipelineStageMap.at(_layouts[frameIndex]);
-            const ::vk::PipelineStageFlags destinationStage = layoutPipelineStageMap.at(newLayout);
+            const ::vk::PipelineStageFlags sourceStage = srcLayoutPipelineStageMap.at(_layouts[frameIndex]);
+            const ::vk::PipelineStageFlags destinationStage = dstLayoutPipelineStageMap.at(newLayout);
             const ::vk::AccessFlags srcAccessMask = layoutAccessMap.at(_layouts[frameIndex]);
             const ::vk::AccessFlags dstAccessMask = layoutAccessMap.at(newLayout);
 

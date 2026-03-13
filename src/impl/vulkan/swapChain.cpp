@@ -95,6 +95,7 @@ namespace gfx::vk
 
         const auto swapChainImageHandles = Context::Device()->getSwapchainImagesKHR(_handle);
         _swapChainImages = std::make_unique<gfx::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa);
+
         _depthImages = Image::Builder()
             .setIsPerFrame(true)
             .setExtent(_extent)
@@ -124,6 +125,7 @@ namespace gfx::vk
         _extent = newSize;
         Context::Device()->waitIdle();
         CreateSwapChain();
+        _swapChainImages->TransitionLayout(::vk::ImageLayout::ePresentSrcKHR);
     }
 
     ::vk::Result SwapChain::Acquire(const gfx::vk::Frame &frame) {

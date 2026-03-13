@@ -24,8 +24,8 @@ namespace gfx::vk
 
         void selectPhysicalDevice();
 
-        const ::vk::QueueFlags& getRequiredQueueFamilies() const { return _requiredQueues; }
-        std::vector<const char*> getDeviceExtensions() const
+        [[nodiscard]] const ::vk::QueueFlags& getRequiredQueueFamilies() const { return _requiredQueues; }
+        [[nodiscard]] std::vector<const char*> getDeviceExtensions() const
         {
             std::vector<const char*> extensions {};
             for (const auto& extension : _deviceExtensions) {

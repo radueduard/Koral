@@ -84,7 +84,7 @@ namespace gfx
                     .build();
 
                 stagingBuffer->Map();
-                stagingBuffer->Write(std::span { vertices });
+                stagingBuffer->Write(std::span<Vertex> { vertices });
                 stagingBuffer->Unmap();
 
                 vertexBuffer->CopyFrom(*stagingBuffer, 0, 0, vertices.size() * sizeof(Vertex));

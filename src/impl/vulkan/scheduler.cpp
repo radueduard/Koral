@@ -59,8 +59,12 @@ namespace gfx::vk
 
         if (const auto result = _swapChain->Acquire(frame);
             result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
+            _started = false;
             _swapChain->Resize(gfx::Context::Window().getExtent());
+            _started = true;
         }
+
+        std::cout << "Current image index: " << _swapChain->getCurrentImageIndex() << "\tScheduler frame index: " << _currentFrame << std::endl;
 
         auto& commandBuffer = frame.getCommandBuffer();
         const auto& vkCommandBuffer = dynamic_cast<gfx::vk::CommandBuffer&>(commandBuffer);
@@ -79,12 +83,13 @@ namespace gfx::vk
             .fence = frame.getInFlightFence()
         };
 
-        const auto& vkFrame = dynamic_cast<const gfx::vk::Frame&>(frame);
-        vkFrame.getQueue().Submit(submitInfo);
+        vkCommandBuffer.getQueue().Submit(submitInfo);
 
         if (const auto result = _swapChain->Present(frame);
             result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
+            _started = false;
             _swapChain->Resize(gfx::Context::Window().getExtent());
+            _started = true;
             return;
         }
 
