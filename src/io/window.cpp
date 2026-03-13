@@ -111,6 +111,7 @@ namespace gfx::io {
     void Window::close()
     {
         Context::DestroyScheduler();
+        _framebuffer.reset();
         if (_api == API::eVulkan) {
             gfx::vk::Context::Device().freeCommandPools();
         }

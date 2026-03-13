@@ -17,7 +17,7 @@ namespace gfx::ogl {
         GLuint operator*() const;
         void Bind() const override;
         void Unbind() const override;
-        bool hasDepthStencilAttachment() const override;
+        [[nodiscard]] bool hasDepthStencilAttachment() const override;
 
     private:
         GLuint _id;

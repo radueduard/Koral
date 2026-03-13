@@ -38,6 +38,7 @@ namespace gfx::ogl
     Sampler::~Sampler()
     {
         glDeleteSamplers(1, &_id);
+        glCheckError();
     }
 
     constexpr GLenum Sampler::GetMinFilterFromFilterMode(const Filter filterMode, const MipmapMode mipmapMode)

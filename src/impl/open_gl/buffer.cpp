@@ -28,6 +28,7 @@ namespace gfx::ogl
     Buffer::~Buffer()
     {
         glDeleteBuffers(1, &_id);
+        glCheckError();
     }
 
     void Buffer::Map() const

@@ -108,6 +108,7 @@ namespace gfx::ogl
     Image::~Image()
     {
         glDeleteTextures(1, &_id);
+        glCheckError();
     }
 
     std::vector<std::byte> Image::ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const

@@ -207,7 +207,7 @@ namespace gfx::ogl
                             toGLChannelType(attributeDescription.channelType),
                             GL_FALSE,
                             stride,
-                            nullptr);
+                            reinterpret_cast<void*>(attributeDescription.offset));
                         glCheckError();
                     }
                 }
@@ -265,6 +265,9 @@ namespace gfx::ogl
                     GL_COLOR_BUFFER_BIT,
                     GL_NEAREST);
                 glCheckError();
+
+                glDeleteFramebuffers(1, &framebuffer);
+                glCheckError();
             });
         } else
         {
@@ -293,6 +296,10 @@ namespace gfx::ogl
                     0, 0, glDstImage->getExtent().x, glDstImage->getExtent().y,
                     GL_COLOR_BUFFER_BIT,
                     GL_NEAREST);
+                glCheckError();
+
+                glDeleteFramebuffers(1, &srcFramebuffer);
+                glDeleteFramebuffers(1, &dstFramebuffer);
                 glCheckError();
             });
         }

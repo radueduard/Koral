@@ -42,6 +42,7 @@ namespace gfx::ogl
     Framebuffer::~Framebuffer()
     {
         glDeleteFramebuffers(1, &_id);
+        glCheckError();
     }
 
     GLuint Framebuffer::operator*() const
