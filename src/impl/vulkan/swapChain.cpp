@@ -49,13 +49,17 @@ namespace gfx::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
+        _extent(1, 1),
         _msaa(createInfo.msaa),
         _minImageCount(createInfo.minImageCount),
         _imageCount(createInfo.imageCount),
         _surface(createInfo.surface),
         _presentQueue(Context::Device().requestPresentQueue(_surface))
     {
-        _extent = glm::uvec2(1, 1);
+        for (glm::u32 i = 0; i < _imageCount; i++)
+        {
+            _renderFinishedSemaphores.push_back(Context::Device()->createSemaphore({}));
+        }
 
         vk::Context::Device()->waitIdle();
 
@@ -116,6 +120,9 @@ namespace gfx::vk
 
     SwapChain::~SwapChain() {
         Context::Device()->waitIdle();
+        for (const auto& semaphore : _renderFinishedSemaphores) {
+            Context::Device()->destroySemaphore(semaphore);
+        }
         if (_handle) {
             Context::Device()->destroySwapchainKHR(_handle);
         }
@@ -144,7 +151,7 @@ namespace gfx::vk
 
     ::vk::Result SwapChain::Present(const gfx::vk::Frame &frame) {
         std::array waitSemaphores = {
-        	frame.getReadyToPresentSemaphore()
+        	_renderFinishedSemaphores[_imageIndex]
         };
 
         std::array swapChains = {

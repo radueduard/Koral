@@ -21,7 +21,6 @@ namespace gfx::vk
 		Frame& operator=(const Frame&) = delete;
 
 		[[nodiscard]] ::vk::Semaphore getImageAvailableSemaphore() const { return _imageAvailable; }
-		[[nodiscard]] ::vk::Semaphore getReadyToPresentSemaphore() const { return _readyToPresent; }
 		[[nodiscard]] ::vk::Fence getInFlightFence() const { return _inFlightFence; }
 
 		[[nodiscard]] const Queue& getQueue() const { return _queue; }
@@ -29,7 +28,6 @@ namespace gfx::vk
 	private:
 		const Queue& _queue;
 		::vk::Semaphore _imageAvailable;
-		::vk::Semaphore _readyToPresent;
     	::vk::Fence _inFlightFence;
 	};
 
@@ -54,6 +52,7 @@ namespace gfx::vk
 
     	[[nodiscard]] const gfx::vk::SwapChain &getSwapChain() const { return *_swapChain; }
     	[[nodiscard]] bool isResized() const { return _resized; }
+
 
     private:
     	std::unique_ptr<gfx::vk::Surface> _surface;

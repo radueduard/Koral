@@ -17,13 +17,11 @@ namespace gfx::vk
     {
         _commandBuffer = Context::Device().requestCommandBuffer(_queue, Context::ThreadId());
         _imageAvailable = vk::Context::Device()->createSemaphore({});
-        _readyToPresent = vk::Context::Device()->createSemaphore({});
         _inFlightFence = Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
     }
 
 	Frame::~Frame() {
         Context::Device()->destroySemaphore(_imageAvailable);
-        Context::Device()->destroySemaphore(_readyToPresent);
         Context::Device()->destroyFence(_inFlightFence);
     }
 
@@ -79,7 +77,7 @@ namespace gfx::vk
             .commandBuffer = dynamic_cast<const gfx::vk::CommandBuffer&>(commandBuffer),
             .waitSemaphores = { frame.getImageAvailableSemaphore() },
             .waitStages = { ::vk::PipelineStageFlagBits::eColorAttachmentOutput },
-            .signalSemaphores = { frame.getReadyToPresentSemaphore() },
+            .signalSemaphores = { _swapChain->getCurrentRenderFinishedSemaphore() },
             .fence = frame.getInFlightFence()
         };
 

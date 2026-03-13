@@ -55,6 +55,8 @@ namespace gfx::vk
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
         [[nodiscard]] glm::u32 getCurrentImageIndex() const { return _imageIndex; }
 
+    	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinishedSemaphores[_imageIndex]; }
+
         void Resize(const glm::uvec2& newSize);
         ::vk::Result Acquire(const gfx::vk::Frame &frame);
         ::vk::Result Present(const gfx::vk::Frame &frame);
@@ -73,6 +75,7 @@ namespace gfx::vk
         const gfx::vk::Queue& _presentQueue;
         std::unique_ptr<gfx::vk::Image> _swapChainImages;
         std::unique_ptr<gfx::Image> _depthImages;
+        std::vector<::vk::Semaphore> _renderFinishedSemaphores;
 
         std::unique_ptr<gfx::ImageView> _swapChainImageViews;
         std::unique_ptr<gfx::ImageView> _depthImageViews;
