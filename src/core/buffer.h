@@ -44,10 +44,16 @@ namespace gfx
         };
 
         struct Builder {
+            bool isPerFrame = false;
             glm::i64 size = 64;
             Flags<Usage> usage = Usage::eUniform;
             Flags<MemoryProperty> memoryProperties = MemoryProperty::eHostVisible;
             Layout layout = Layout::eStd140;
+
+            Builder& setIsPerFrame(const bool isPerFrame) {
+                this->isPerFrame = isPerFrame;
+                return *this;
+            }
 
             Builder& setSize(const glm::u64 size) {
                 this->size = size;
@@ -120,18 +126,21 @@ namespace gfx
         virtual void Unmap() const = 0;
         virtual void CopyFrom(const Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const = 0;
 
-        [[nodiscard]] glm::u64 getSize() const { return size; }
-        [[nodiscard]] Flags<Usage> getUsage() const { return usage; }
-        [[nodiscard]] Flags<MemoryProperty> getMemoryProperties() const { return memoryProperties; }
-        [[nodiscard]] Layout getLayout() const { return layout; }
+        [[nodiscard]] glm::u64 getSize() const { return _size; }
+        [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
+        [[nodiscard]] Flags<MemoryProperty> getMemoryProperties() const { return _memoryProperties; }
+        [[nodiscard]] Layout getLayout() const { return _layout; }
+
+        [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
 
     protected:
         explicit Buffer(const Builder& createInfo);
 
-        glm::u64 size = 64;
-        Flags<Usage> usage = Usage::eUniform;
-        Flags<MemoryProperty> memoryProperties = MemoryProperty::eHostVisible;
-        Layout layout = Layout::eStd140;
+        bool _isPerFrame = false;
+        glm::u64 _size = 64;
+        Flags<Usage> _usage = Usage::eUniform;
+        Flags<MemoryProperty> _memoryProperties = MemoryProperty::eHostVisible;
+        Layout _layout = Layout::eStd140;
 
         mutable void* _mappedPtr = nullptr;
     };

@@ -24,6 +24,23 @@ namespace gfx
         return queueFlags;
     }
 
+    CommandBuffer& CommandBuffer::BeginRendering(const Framebuffer* framebuffer)
+    {
+        if (framebuffer == nullptr) framebuffer = &Context::DefaultFramebuffer();
+        _state.boundFramebuffer = framebuffer;
+        _state.boundComputePipeline = std::nullopt;
+        _state.boundGraphicsPipeline = std::nullopt;
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::EndRendering()
+    {
+        _state.boundFramebuffer = std::nullopt;
+        _state.boundComputePipeline = std::nullopt;
+        _state.boundGraphicsPipeline = std::nullopt;
+        return *this;
+    }
+
     CommandBuffer& CommandBuffer::BindPipeline(const ComputePipeline* pipeline)
     {
         _state.boundComputePipeline = pipeline;

@@ -10,13 +10,15 @@
 
 namespace gfx::ogl
 {
-    Scheduler::Scheduler(const Builder& createInfo): gfx::Scheduler(createInfo)
+    Scheduler::Scheduler(const Builder& createInfo): gfx::Scheduler(createInfo) {}
+    void Scheduler::Initialize()
     {
         createFrames();
     }
 
     void Scheduler::Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const
     {
+        gfx::Scheduler::Draw(renderFunc);
         const auto& currentFrame = getCurrentFrame();
         auto& commandBuffer = currentFrame.getCommandBuffer();
         commandBuffer.Reset();

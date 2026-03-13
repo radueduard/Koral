@@ -32,7 +32,7 @@ namespace gfx::ogl
 
     void Buffer::Map() const
     {
-        if (!(memoryProperties & MemoryProperty::eHostVisible)) {
+        if (!(_memoryProperties & MemoryProperty::eHostVisible)) {
             std::cerr << "Error: Attempting to map a buffer that is not host visible! Buffer ID: " << _id << std::endl;
             return;
         }
@@ -43,13 +43,13 @@ namespace gfx::ogl
         }
 
         auto accessFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT;
-        if (memoryProperties & MemoryProperty::eHostCoherent) {
+        if (_memoryProperties & MemoryProperty::eHostCoherent) {
             accessFlags |= GL_MAP_COHERENT_BIT;
-        } else if (memoryProperties & MemoryProperty::eHostVisible) {
+        } else if (_memoryProperties & MemoryProperty::eHostVisible) {
             accessFlags |= GL_MAP_FLUSH_EXPLICIT_BIT;
         }
 
-        _mappedPtr = glMapNamedBufferRange(_id, 0, size, accessFlags);
+        _mappedPtr = glMapNamedBufferRange(_id, 0, _size, accessFlags);
         glCheckError();
         if (!_mappedPtr) {
             std::cerr << "Failed to map buffer with ID " << _id << "!" << std::endl;
@@ -76,12 +76,12 @@ namespace gfx::ogl
             std::cerr << "Error: Source buffer is not a transfer source! Buffer ID: " << srcBufferGL._id << std::endl;
             return;
         }
-        if (!(usage & Usage::eTransferDst)) {
+        if (!(_usage & Usage::eTransferDst)) {
             std::cerr << "Error: Destination buffer is not a transfer destination! Buffer ID: " << _id << std::endl;
             return;
         }
         if (srcOffset + getSize() > srcBufferGL.getSize()) {
-            std::cerr << "Error: Source buffer copy range exceeds buffer size! Buffer ID: " << srcBufferGL._id << ", Source Offset: " << srcOffset << ", Size: " << size << ", Buffer Size: " << srcBufferGL.size << std::endl;
+            std::cerr << "Error: Source buffer copy range exceeds buffer size! Buffer ID: " << srcBufferGL._id << ", Source Offset: " << srcOffset << ", Size: " << size << ", Buffer Size: " << srcBufferGL._size << std::endl;
             return;
         }
         if (dstOffset + size > size) {

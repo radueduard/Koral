@@ -10,12 +10,14 @@
 
 namespace gfx::vk
 {
-    class DescriptorSet final : public gfx::DescriptorSet, public Wrapper<::vk::DescriptorSet>
+    class DescriptorSet final : public gfx::DescriptorSet
     {
     public:
         explicit DescriptorSet(const Builder& builder);
         ~DescriptorSet() override;
+        ::vk::DescriptorSet operator*() const;
 
-        void bind(const gfx::CommandBuffer& commandBuffer, glm::u32 index) const override;
+    private:
+        std::vector<::vk::DescriptorSet> _descriptorSets;
     };
 }

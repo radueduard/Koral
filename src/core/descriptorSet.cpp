@@ -6,6 +6,8 @@
 #include "impl/open_gl/descriptorSet.h"
 #include "impl/vulkan/descriptorSet.h"
 
+#include <ranges>
+
 #include "descriptorBinding.h"
 #include "descriptorSetLayout.h"
 #include "io/window.h"
@@ -85,6 +87,20 @@ namespace gfx
 
     DescriptorSet::DescriptorSet(const Builder& builder) : _layout(builder.layout), _writes(builder.writes)
     {
-
+        for (const auto& write : _writes | std::views::values) {
+            for (const auto& descriptor : write)
+            {
+                auto buffer = descriptor.getBuffer();
+                auto imageView = descriptor.getImageView();
+                if (buffer != nullptr && buffer->isPerFrame()) {
+                    _isPerFrame = true;
+                    break;
+                }
+                if (imageView != nullptr && imageView->isPerFrame()) {
+                    _isPerFrame = true;
+                    break;
+                }
+            }
+        }
     }
 }

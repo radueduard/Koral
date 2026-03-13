@@ -7,7 +7,6 @@
 #include "impl/vulkan/image.h"
 
 #include "context.h"
-#include "framebufferImage.h"
 #include "io/window.h"
 
 namespace gfx
@@ -22,11 +21,6 @@ namespace gfx
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
-    }
-
-    std::unique_ptr<FramebufferImage> Image::Builder::buildFramebufferImage() const
-    {
-        return std::unique_ptr<FramebufferImage>(new FramebufferImage(*this));
     }
 
     glm::u32 Image::PixelSizeFromImageFormat(const gfx::Image::Format format)
@@ -176,13 +170,14 @@ namespace gfx
     }
 
     Image::Image(const Builder& createInfo) :
-        type(createInfo.type),
-        format(createInfo.format),
-        extent(createInfo.extent),
-        mipLevels(createInfo.mipLevels),
-        arrayLayers(createInfo.arrayLayers),
-        msaa(createInfo.msaa),
-        usage(createInfo.usage) {}
+        _isPerFrame(createInfo.isPerFrame),
+        _type(createInfo.type),
+        _format(createInfo.format),
+        _extent(createInfo.extent),
+        _mipLevels(createInfo.mipLevels),
+        _arrayLayers(createInfo.arrayLayers),
+        _msaa(createInfo.msaa),
+        _usage(createInfo.usage) {}
 
     bool IsDepthStencilFormat(const Image::Format format)
     {

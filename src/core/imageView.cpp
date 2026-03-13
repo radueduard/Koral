@@ -28,6 +28,7 @@ namespace gfx
 
     ImageView::ImageView(const Builder& createInfo) :
         _image(createInfo.image),
+        _isPerFrame(_image.isPerFrame()),
         _viewType(createInfo.type),
         _baseMipLevel(createInfo.baseMipLevel),
         _mipLevelCount(createInfo.mipLevelCount),

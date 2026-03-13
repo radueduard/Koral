@@ -293,7 +293,7 @@ namespace gfx
 
     inline ::vk::ImageUsageFlags getVkUsage(const Flags<gfx::Image::Usage> usage)
     {
-        ::vk::ImageUsageFlags usageFlags;
+        ::vk::ImageUsageFlags usageFlags = ::vk::ImageUsageFlags();
         if (usage & gfx::Image::Usage::eTransferSrc) usageFlags |= ::vk::ImageUsageFlagBits::eTransferSrc;
         if (usage & gfx::Image::Usage::eTransferDst) usageFlags |= ::vk::ImageUsageFlagBits::eTransferDst;
         if (usage & gfx::Image::Usage::eSampled) usageFlags |= ::vk::ImageUsageFlagBits::eSampled;
@@ -301,6 +301,28 @@ namespace gfx
         if (usage & gfx::Image::Usage::eColorAttachment) usageFlags |= ::vk::ImageUsageFlagBits::eColorAttachment;
         if (usage & gfx::Image::Usage::eDepthStencilAttachment) usageFlags |= ::vk::ImageUsageFlagBits::eDepthStencilAttachment;
         return usageFlags;
+    }
+
+    inline ::vk::BufferUsageFlags getVkBufferUsageFlags(const gfx::Flags<Buffer::Usage> usage)
+    {
+        auto vkUsage = ::vk::BufferUsageFlags();
+        if (usage & Buffer::Usage::eVertex)
+            vkUsage |= ::vk::BufferUsageFlagBits::eVertexBuffer;
+        if (usage & Buffer::Usage::eIndex)
+            vkUsage |= ::vk::BufferUsageFlagBits::eIndexBuffer;
+        if (usage & Buffer::Usage::eIndirect)
+            vkUsage |= ::vk::BufferUsageFlagBits::eIndirectBuffer;
+        if (usage & Buffer::Usage::eStorage)
+            vkUsage |= ::vk::BufferUsageFlagBits::eStorageBuffer;
+        if (usage & Buffer::Usage::eTransferSrc)
+            vkUsage |= ::vk::BufferUsageFlagBits::eTransferSrc;
+        if (usage & Buffer::Usage::eTransferDst)
+            vkUsage |= ::vk::BufferUsageFlagBits::eTransferDst;
+        if (usage & Buffer::Usage::eUniform)
+            vkUsage |= ::vk::BufferUsageFlagBits::eUniformBuffer;
+        if (usage & Buffer::Usage::eTexel)
+            vkUsage |= ::vk::BufferUsageFlagBits::eUniformTexelBuffer | ::vk::BufferUsageFlagBits::eStorageTexelBuffer;
+        return vkUsage;
     }
 
     inline ::vk::SampleCountFlagBits getVkSampleCount(MSAA msaa)

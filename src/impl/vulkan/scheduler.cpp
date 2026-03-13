@@ -27,11 +27,13 @@ namespace gfx::vk
         Context::Device()->destroyFence(_inFlightFence);
     }
 
-    Scheduler::Scheduler(const Builder& createInfo) : gfx::Scheduler(createInfo)
+    Scheduler::Scheduler(const Builder& createInfo) : gfx::Scheduler(createInfo) {}
+
+    void Scheduler::Initialize()
     {
         _surface = std::make_unique<Surface>(gfx::Context::Window());
         _swapChain = gfx::vk::SwapChain::Builder(*_surface)
-            .setMinImageCount(createInfo.minImageCount)
+            .setMinImageCount(_minImageCount)
             .setImageCount(_imageCount)
             .setMSAA(MSAA::eNone)
             .build();
@@ -43,6 +45,7 @@ namespace gfx::vk
     }
 
     void Scheduler::Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const {
+        gfx::Scheduler::Draw(renderFunc);
         const auto& frame = dynamic_cast<const gfx::vk::Frame&>(getCurrentFrame());
 
         const auto& fence = frame.getInFlightFence();
@@ -60,12 +63,12 @@ namespace gfx::vk
         }
 
         auto& commandBuffer = frame.getCommandBuffer();
-        auto& vkCommandBuffer = dynamic_cast<gfx::vk::CommandBuffer&>(commandBuffer);
+        const auto& vkCommandBuffer = dynamic_cast<gfx::vk::CommandBuffer&>(commandBuffer);
         commandBuffer.Reset();
         commandBuffer.Begin();
-        _swapChain->getImage(_currentFrame).TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::eColorAttachmentOptimal);
+        _swapChain->getImage().TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::eColorAttachmentOptimal);
         renderFunc(commandBuffer);
-        _swapChain->getImage(_currentFrame).TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::ePresentSrcKHR);
+        _swapChain->getImage().TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::ePresentSrcKHR);
         commandBuffer.End();
 
         const SubmitInfo submitInfo {

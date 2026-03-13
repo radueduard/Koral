@@ -20,7 +20,7 @@ namespace gfx::ogl {
         bool hasDepthStencilAttachment() const override;
 
     private:
-        std::vector<GLuint> _ids;
+        GLuint _id;
     };
 }
 

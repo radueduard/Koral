@@ -14,7 +14,10 @@
 
 namespace gfx::vk
 {
-	class Buffer final : public gfx::Buffer, public Wrapper<::vk::Buffer> {
+	class DescriptorSet;
+
+	class Buffer final : public gfx::Buffer {
+		friend class gfx::vk::DescriptorSet;
     public:
         explicit Buffer(const Builder& builder);
 		~Buffer() override;
@@ -26,11 +29,15 @@ namespace gfx::vk
     	void Map() const override;
         void Unmap() const override;
 
-
+		::vk::Buffer operator*() const;
         [[nodiscard]] VmaAllocation getAllocation() const;
+
         void CopyFrom(const gfx::Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const override;
 
     private:
-    	VmaAllocation _allocation = VK_NULL_HANDLE;
+		::vk::Buffer operator[](const int i) const { return _buffers[i]; }
+
+		std::vector<::vk::Buffer> _buffers {};
+		std::vector<VmaAllocation> _allocations {};
     };
 }

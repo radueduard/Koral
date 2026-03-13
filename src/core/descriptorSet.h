@@ -30,11 +30,11 @@ namespace gfx
 
         virtual ~DescriptorSet() = default;
 
-        virtual void bind(const CommandBuffer& commandBuffer, glm::u32 index) const = 0;
+        virtual void bind(const CommandBuffer& commandBuffer, glm::u32 index) const {};
 
     protected:
         explicit DescriptorSet(const Builder &builder);
-
+        bool _isPerFrame = false;
         const gfx::DescriptorSetLayout& _layout;
         std::map<glm::u32, std::vector<Descriptor>> _writes;
     };

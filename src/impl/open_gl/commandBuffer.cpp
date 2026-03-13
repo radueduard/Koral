@@ -9,7 +9,9 @@
 
 #include "buffer.h"
 #include "computePipeline.h"
+#include "framebuffer.h"
 #include "graphicsPipeline.h"
+#include "image.h"
 #include "core/mesh.h"
 #include "utils/ogl_err_handling.h"
 
@@ -36,22 +38,19 @@ namespace gfx::ogl
     void CommandBuffer::End()
     {
         if (!_recording) throw std::runtime_error("CommandBuffer is not currently recording!");
-        if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Rendering operation is still in progress!");
 
         _recording = false;
         _filled = true;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* framebuffer)
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* _framebuffer)
     {
-        if (framebuffer == nullptr) {
-            framebuffer = &Context::DefaultFramebuffer();
-        }
-
         CheckRecording();
-        _commands.emplace_back([this, framebuffer] ()
+        _commands.emplace_back([_framebuffer, this] ()
         {
             if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Another rendering operation is still in progress!");
+            gfx::CommandBuffer::BeginRendering(_framebuffer);
+            const auto framebuffer = _state.boundFramebuffer.value();
             auto oglFramebuffer = dynamic_cast<const ogl::Framebuffer*>(framebuffer);
             _state.boundFramebuffer = oglFramebuffer;
             _state.boundComputePipeline = std::nullopt;
@@ -84,13 +83,7 @@ namespace gfx::ogl
         CheckRecording();
         _commands.emplace_back([this] ()
         {
-            if (!_state.boundFramebuffer.has_value()) throw std::runtime_error("There is no rendering operation in progress!");
-            _state.boundFramebuffer.value()->Unbind();
-            if (_state.boundGraphicsPipeline.has_value()) {
-                _state.boundGraphicsPipeline.value()->Unbind();
-                _state.boundComputePipeline = std::nullopt;
-            }
-            _state.boundFramebuffer = std::nullopt;
+            gfx::CommandBuffer::EndRendering();
         });
         return *this;
     }
@@ -245,6 +238,63 @@ namespace gfx::ogl
 
             glBindVertexArray(0);
         });
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage)
+    {
+        if (dstImage == nullptr)
+        {
+            _commands.emplace_back([srcImage] ()
+            {
+                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
+                GLuint framebuffer = 0;
+                glGenFramebuffers(1, &framebuffer);
+                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+                glCheckError();
+
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
+                glCheckError();
+
+                glBlitNamedFramebuffer(
+                    framebuffer,
+                    0,
+                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
+                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
+                    GL_COLOR_BUFFER_BIT,
+                    GL_NEAREST);
+                glCheckError();
+            });
+        } else
+        {
+            _commands.emplace_back([srcImage, dstImage] ()
+            {
+                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
+                const auto* glDstImage = dynamic_cast<const ogl::Image*>(dstImage);
+                GLuint srcFramebuffer = 0;
+                glGenFramebuffers(1, &srcFramebuffer);
+                glBindFramebuffer(GL_FRAMEBUFFER, srcFramebuffer);
+                glCheckError();
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
+                glCheckError();
+
+                GLuint dstFramebuffer = 0;
+                glGenFramebuffers(1, &dstFramebuffer);
+                glBindFramebuffer(GL_FRAMEBUFFER, dstFramebuffer);
+                glCheckError();
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glDstImage, 0);
+                glCheckError();
+
+                glBlitNamedFramebuffer(
+                    srcFramebuffer,
+                    dstFramebuffer,
+                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
+                    0, 0, glDstImage->getExtent().x, glDstImage->getExtent().y,
+                    GL_COLOR_BUFFER_BIT,
+                    GL_NEAREST);
+                glCheckError();
+            });
+        }
         return *this;
     }
 

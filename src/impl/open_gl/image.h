@@ -20,7 +20,7 @@ namespace gfx::ogl {
         std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const override;
         void CopyFrom(const gfx::Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const override;
 
-        GLenum getGLFormat() const { return InternalFormatFromImageFormat(format); }
+        GLenum getGLFormat() const { return InternalFormatFromImageFormat(_format); }
 
     private:
         GLuint _id = 0;
