@@ -68,9 +68,12 @@ namespace gfx
         [[nodiscard]] glm::u32 getBaseArrayLayer() const { return _baseArrayLayer; }
         [[nodiscard]] glm::u32 getArrayLayerCount() const { return _arrayLayerCount; }
 
+        [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
+
     protected:
         explicit ImageView(const Builder& createInfo);
         const Image& _image;
+        bool _isPerFrame = false;
         Type _viewType;
         glm::u32 _baseMipLevel;
         glm::u32 _mipLevelCount;

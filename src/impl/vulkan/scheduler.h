@@ -44,6 +44,8 @@ namespace gfx::vk
     class Scheduler final : public gfx::Scheduler {
     public:
     	explicit Scheduler(const Builder &createInfo);
+    	void Initialize() override;
+
     	~Scheduler() override;
     	Scheduler(const Scheduler &) = delete;
     	Scheduler &operator=(const Scheduler &) = delete;

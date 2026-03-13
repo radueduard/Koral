@@ -33,7 +33,6 @@ namespace gfx::io
                 auto& scene = createInfo.scene.get();
 
                 scene.Initialize();
-
                 while (!w.shouldClose())
                 {
                     w._inputState.update();

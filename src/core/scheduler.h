@@ -43,8 +43,9 @@ namespace gfx
         };
 
         virtual ~Scheduler() = default;
+    	virtual void Initialize() = 0;
 
-    	[[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
+        [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
     	[[nodiscard]] glm::u32 getCurrentImageIndex() const { return _currentFrame; }
         [[nodiscard]] const gfx::Frame &getCurrentFrame() const { return *_frames.at(_currentFrame); }
         [[nodiscard]] const gfx::Frame &getNextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
@@ -60,12 +61,14 @@ namespace gfx
 			return frames;
         }
 
-        virtual void Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const = 0;
+        virtual void Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const { _started = true; }
+
+    	[[nodiscard]] bool hasStarted() const { return _started; }
 
     protected:
     	virtual void createFrames() = 0;
-
         explicit Scheduler(const Builder& createInfo);
+    	mutable bool _started = false;
 
         glm::u32 _minImageCount;
         glm::u32 _imageCount;

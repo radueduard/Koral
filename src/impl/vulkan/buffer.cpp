@@ -6,6 +6,8 @@
 
 #include "commandBuffer.h"
 #include "device.h"
+#include "core/scheduler.h"
+#include "utils/vk_enum_conversions.h"
 
 namespace gfx::vk
 {
@@ -15,28 +17,6 @@ namespace gfx::vk
 	// 	}
 	// 	return size;
 	// }
-
-	::vk::BufferUsageFlags getVkBufferUsageFlags(const gfx::Flags<Buffer::Usage> usage)
-	{
-		auto vkUsage = ::vk::BufferUsageFlags();
-		if (usage & Buffer::Usage::eVertex)
-			vkUsage |= ::vk::BufferUsageFlagBits::eVertexBuffer;
-		if (usage & Buffer::Usage::eIndex)
-			vkUsage |= ::vk::BufferUsageFlagBits::eIndexBuffer;
-		if (usage & Buffer::Usage::eIndirect)
-			vkUsage |= ::vk::BufferUsageFlagBits::eIndirectBuffer;
-		if (usage & Buffer::Usage::eStorage)
-			vkUsage |= ::vk::BufferUsageFlagBits::eStorageBuffer;
-		if (usage & Buffer::Usage::eTransferSrc)
-			vkUsage |= ::vk::BufferUsageFlagBits::eTransferSrc;
-		if (usage & Buffer::Usage::eTransferDst)
-			vkUsage |= ::vk::BufferUsageFlagBits::eTransferDst;
-		if (usage & Buffer::Usage::eUniform)
-			vkUsage |= ::vk::BufferUsageFlagBits::eUniformBuffer;
-		if (usage & Buffer::Usage::eTexel)
-			vkUsage |= ::vk::BufferUsageFlagBits::eUniformTexelBuffer | ::vk::BufferUsageFlagBits::eStorageTexelBuffer;
-		return vkUsage;
-	}
 
 	Buffer::Buffer(const Builder& builder) : gfx::Buffer(builder) {
 		VmaMemoryUsage memoryUsage = VMA_MEMORY_USAGE_UNKNOWN;
@@ -55,46 +35,65 @@ namespace gfx::vk
 
 
 		const auto bufferInfo = ::vk::BufferCreateInfo()
-			.setSize(size)
-			.setUsage(getVkBufferUsageFlags(usage))
+			.setSize(_size)
+			.setUsage(getVkBufferUsageFlags(_usage))
 			.setSharingMode(::vk::SharingMode::eExclusive);
 
-		auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
-		_handle = buffer;
-		_allocation = allocation;
+
+		const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+		for (int i = 0; i < frameCount; ++i)
+		{
+			auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
+			_buffers.push_back(buffer);
+			_allocations.push_back(allocation);
+		}
 	}
 
 	Buffer::~Buffer() {
 		Unmap();
-		Context::Allocator().FreeBuffer(_handle, _allocation);
+		for (int i = 0; i < _buffers.size(); ++i)
+		{
+			Context::Allocator().FreeBuffer(_buffers[i], _allocations[i]);
+		}
 	}
 
 	void Buffer::Map() const
 	{
+		const auto _allocation = getAllocation();
 		_mappedPtr = vk::Context::Allocator().MapMemory(_allocation);
 	}
 
 	void Buffer::Unmap() const
 	{
+		const auto _allocation = getAllocation();
 		if (_mappedPtr) {
 			Context::Allocator().UnmapMemory(_allocation);
 			_mappedPtr = nullptr;
 		}
 	}
 
-	void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const {
+	::vk::Buffer Buffer::operator*() const
+	{
+		return _buffers[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
+	}
+
+	void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const
+	{
 		Context::Device().runSingleTimeCommand([this, srcOffset, dstOffset, &srcBuffer, size](const gfx::vk::CommandBuffer& commandBuffer) {
+			const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
 			const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(srcBuffer);
-			const auto copyRegion = ::vk::BufferCopy()
-				.setSrcOffset(srcOffset)
-				.setDstOffset(dstOffset)
-				.setSize(size);
-			commandBuffer->copyBuffer(*vkBuffer, _handle, 1, &copyRegion);
+			for (int i = 0; i < frameCount; ++i) {
+				const auto copyRegion = ::vk::BufferCopy()
+					.setSrcOffset(srcOffset)
+					.setDstOffset(dstOffset)
+					.setSize(size);
+				commandBuffer->copyBuffer(*vkBuffer, _buffers[i], 1, &copyRegion);
+			}
 		}, ::vk::QueueFlagBits::eTransfer);
 	}
 
 	VmaAllocation Buffer::getAllocation() const {
-		return _allocation;
+		return  _allocations[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
 
 

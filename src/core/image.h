@@ -130,6 +130,7 @@ namespace gfx
         };
 
         struct Builder {
+            bool isPerFrame = false;
             Type type = Type::e2D;
             Format format = Format::eRGBA8_UNORM;
             glm::uvec3 extent = { 1, 1, 1 };
@@ -137,6 +138,11 @@ namespace gfx
             glm::u32 arrayLayers = 1;
             MSAA msaa = MSAA::eNone;
             Flags<Usage> usage = Usage::eSampled;
+
+            Builder& setIsPerFrame(const bool isPerFrame) {
+                this->isPerFrame = isPerFrame;
+                return *this;
+            }
 
             Builder& setType(const Type type) {
                 this->type = type;
@@ -189,7 +195,6 @@ namespace gfx
             }
 
             [[nodiscard]] std::unique_ptr<Image> build() const;
-            [[nodiscard]] std::unique_ptr<FramebufferImage> buildFramebufferImage() const;
         };
 
         virtual ~Image() = default;
@@ -197,25 +202,27 @@ namespace gfx
         virtual std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const = 0;
         virtual void CopyFrom(const gfx::Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const = 0;
 
-        [[nodiscard]] glm::uvec3 getExtent() const { return extent; }
+        [[nodiscard]] glm::uvec3 getExtent() const { return _extent; }
 
-        [[nodiscard]] Type getType() const { return type; }
-        [[nodiscard]] Format getFormat() const { return format; }
-        [[nodiscard]] MSAA getMSAA() const { return msaa; }
-        [[nodiscard]] Flags<Usage> getUsage() const { return usage; }
+        [[nodiscard]] Type getType() const { return _type; }
+        [[nodiscard]] Format getFormat() const { return _format; }
+        [[nodiscard]] MSAA getMSAA() const { return _msaa; }
+        [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
 
         [[nodiscard]] static glm::u32 PixelSizeFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(gfx::Image::Format format);
+
+        [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
     protected:
         explicit Image(const Builder&);
-
-        Type type;
-        Format format;
-        glm::uvec3 extent;
-        glm::u32 mipLevels;
-        glm::u32 arrayLayers;
-        MSAA msaa;
-        Flags<Usage> usage;
+        bool _isPerFrame = false;
+        Type _type;
+        Format _format;
+        glm::uvec3 _extent;
+        glm::u32 _mipLevels;
+        glm::u32 _arrayLayers;
+        MSAA _msaa;
+        Flags<Usage> _usage;
     };
 
     bool IsDepthStencilFormat(Image::Format format);

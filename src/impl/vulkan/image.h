@@ -4,17 +4,21 @@
 
 #pragma once
 #include <vk_mem_alloc.h>
+#include <vector>
 
 #include "commandBuffer.h"
 
 #include "core/image.h"
 
-#include "utils/vk_wrapper.h"
 
 namespace gfx::vk
 {
-    class Image final : public gfx::Image, public Wrapper<::vk::Image> {
+	class ImageView;
+
+	class Image final : public gfx::Image {
+    	friend class gfx::vk::ImageView;
     public:
+
         explicit Image(const gfx::Image::Builder& builder);
         ~Image() override;
 
@@ -30,7 +34,8 @@ namespace gfx::vk
     		::vk::AccessFlags dstAccessMask,
     		::vk::PipelineStageFlags srcStage,
     		::vk::PipelineStageFlags dstStage,
-    		::vk::ImageLayout newLayout
+    		::vk::ImageLayout newLayout,
+    		glm::i32 frame = -1
     	) const;
 
     	void Clear(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const;
@@ -41,13 +46,16 @@ namespace gfx::vk
     	std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const override;
         void CopyFrom(const gfx::Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const override;
 
-    	explicit Image(::vk::Image _surfaceImage, glm::uvec2 extent, Format format, MSAA msaa);
+    	explicit Image(const std::vector<::vk::Image>& surfaceImages, glm::uvec2 extent, Format format, MSAA msaa);
 
+    	::vk::Image operator*() const;
+    	VmaAllocation getAllocation() const;
     	[[nodiscard]] ::vk::ImageLayout getImageLayout() const;
 
     private:
-		VmaAllocation _allocation = nullptr;
-        mutable ::vk::ImageLayout _layout = ::vk::ImageLayout::eUndefined;
+    	std::vector<::vk::Image> _images;
+    	std::vector<VmaAllocation> _allocations;
+    	mutable std::vector<::vk::ImageLayout> _layouts {};
 
     	inline static std::unordered_map<::vk::ImageLayout, ::vk::AccessFlags> layoutAccessMap = {
 			{ ::vk::ImageLayout::eUndefined, ::vk::AccessFlagBits::eNone },

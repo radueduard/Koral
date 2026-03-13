@@ -17,7 +17,10 @@ namespace gfx
     Importer::Importer(std::filesystem::path path)
     {
         constexpr auto flags = aiProcess_Triangulate
-            | aiProcess_FlipUVs;
+            | aiProcess_FlipUVs
+            | aiProcess_CalcTangentSpace
+            | aiProcess_JoinIdenticalVertices
+            | aiProcess_OptimizeMeshes;
         _scene = _importer.ReadFile(path.string(), flags);
     }
 

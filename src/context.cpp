@@ -5,6 +5,7 @@
 #include "context.h"
 
 #include "core/scheduler.h"
+#include "impl/vulkan/scheduler.h"
 #include "io/window.h"
 
 std::filesystem::path gfx::asset(const std::filesystem::path& relativePath)
@@ -33,7 +34,7 @@ gfx::io::Window& gfx::Context::Window()
     return *_currentThreadLinkedWindow;
 }
 
-gfx::Scheduler& gfx::Context::Scheduler()
+const gfx::Scheduler& gfx::Context::Scheduler()
 {
     if (_scheduler == nullptr) {
         throw std::runtime_error("No scheduler is linked to the current thread!");
@@ -56,9 +57,10 @@ void gfx::Context::InitScheduler()
         throw std::runtime_error("Scheduler is already initialized for this thread");
     }
     _scheduler = Scheduler::Builder()
-                 .setMinImageCount(2)
-                 .setImageCount(3)
-                 .build();
+         .setMinImageCount(2)
+         .setImageCount(3)
+         .build();
+    _scheduler->Initialize();
 }
 
 void gfx::Context::DestroyScheduler()

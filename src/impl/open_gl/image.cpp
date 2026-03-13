@@ -112,12 +112,12 @@ namespace gfx::ogl
 
     std::vector<std::byte> Image::ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const
     {
-        if (!(usage & Usage::eTransferSrc)) {
+        if (!(_usage & Usage::eTransferSrc)) {
             throw std::runtime_error("Attempting to read data from an image that does not have the TransferSrc usage flag set!");
         }
 
         // Determine the appropriate OpenGL texture target based on the image type and MSAA settings
-        const GLenum target = GetTargetFromImageType(type, msaa, arrayLayers);
+        const GLenum target = GetTargetFromImageType(_type, _msaa, _arrayLayers);
         glBindTexture(target, _id);
 
         // Create a PBO
@@ -125,14 +125,14 @@ namespace gfx::ogl
         glGenBuffers(1, &pbo);
         glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
 
-        const GLenum baseFormat = BaseFormatFromImageFormat(format);
-        const GLenum dataType = DataTypeFromImageFormat(format);
-        const GLsizei width = static_cast<GLsizei>(extent.x >> mipLevel);
-        const GLsizei height = static_cast<GLsizei>(extent.y >> mipLevel);
-        const GLsizei depth = static_cast<GLsizei>(extent.z >> mipLevel);
-        const GLsizei layerCount = arrayLayers > 1 ? static_cast<GLsizei>(arrayLayers) : 1;
-        const GLsizei pixelSize = PixelSizeFromImageFormat(format);
-        const GLsizei channelCount = ChannelCountFromImageFormat(format);
+        const GLenum baseFormat = BaseFormatFromImageFormat(_format);
+        const GLenum dataType = DataTypeFromImageFormat(_format);
+        const GLsizei width = static_cast<GLsizei>(_extent.x >> mipLevel);
+        const GLsizei height = static_cast<GLsizei>(_extent.y >> mipLevel);
+        const GLsizei depth = static_cast<GLsizei>(_extent.z >> mipLevel);
+        const GLsizei layerCount = _arrayLayers > 1 ? static_cast<GLsizei>(_arrayLayers) : 1;
+        const GLsizei pixelSize = PixelSizeFromImageFormat(_format);
+        const GLsizei channelCount = ChannelCountFromImageFormat(_format);
         const GLsizei imageSize = width * height * depth * layerCount * pixelSize * channelCount;
 
         glBufferStorage(GL_PIXEL_PACK_BUFFER, imageSize, nullptr, GL_MAP_READ_BIT);
@@ -165,13 +165,13 @@ namespace gfx::ogl
 
     void Image::CopyFrom(const gfx::Buffer& buffer, const uint32_t mipLevel, const uint32_t layer) const
     {
-        if (!(usage & Usage::eTransferDst)) {
+        if (!(_usage & Usage::eTransferDst)) {
             throw std::runtime_error("Attempting to copy data to an image that does not have the TransferDst usage flag set!");
         }
-        if (mipLevels <= mipLevel) {
+        if (_mipLevels <= mipLevel) {
             throw std::runtime_error("Attempting to copy data to a mip level that does not exist!");
         }
-        if (arrayLayers <= layer) {
+        if (_arrayLayers <= layer) {
             throw std::runtime_error("Attempting to copy data to an array layer that does not exist!");
         }
 
@@ -179,22 +179,22 @@ namespace gfx::ogl
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *oglBuffer);
         glCheckError();
 
-        const GLenum target = GetTargetFromImageType(type, msaa, arrayLayers);
-        const GLenum baseFormat = BaseFormatFromImageFormat(format);
-        const GLenum dataType = DataTypeFromImageFormat(format);
-        const auto width = static_cast<GLsizei>(extent.x);
-        const auto height = static_cast<GLsizei>(extent.y);
-        const auto depth = static_cast<GLsizei>(extent.z);
+        const GLenum target = GetTargetFromImageType(_type, _msaa, _arrayLayers);
+        const GLenum baseFormat = BaseFormatFromImageFormat(_format);
+        const GLenum dataType = DataTypeFromImageFormat(_format);
+        const auto width = static_cast<GLsizei>(_extent.x);
+        const auto height = static_cast<GLsizei>(_extent.y);
+        const auto depth = static_cast<GLsizei>(_extent.z);
 
-        if (type == Type::e1D && arrayLayers == 1) {
+        if (_type == Type::e1D && _arrayLayers == 1) {
             glTexSubImage1D(target, static_cast<glm::i32>(mipLevel), 0, width, baseFormat, dataType, nullptr);
-        } else if (type == Type::e1D && arrayLayers > 1) {
+        } else if (_type == Type::e1D && _arrayLayers > 1) {
             glTexSubImage2D(target, static_cast<glm::i32>(mipLevel), 0, static_cast<glm::i32>(layer) * width, width, 1, baseFormat, dataType, nullptr);
-        } else if (type == Type::e2D && arrayLayers == 1) {
+        } else if (_type == Type::e2D && _arrayLayers == 1) {
             glTexSubImage2D(target, static_cast<glm::i32>(mipLevel), 0, 0, width, height, baseFormat, dataType, nullptr);
-        } else if (type == Type::e2D && arrayLayers > 1) {
+        } else if (_type == Type::e2D && _arrayLayers > 1) {
             glTexSubImage3D(target, static_cast<glm::i32>(mipLevel), 0, 0, static_cast<glm::i32>(layer) * width * height, width, height, 1, baseFormat, dataType, nullptr);
-        } else if (type == Type::e3D) {
+        } else if (_type == Type::e3D) {
             glTexSubImage3D(target, static_cast<glm::i32>(mipLevel), 0, 0, 0, width, height, depth, baseFormat, dataType, nullptr);
         } else {
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);

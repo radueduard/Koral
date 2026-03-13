@@ -17,6 +17,7 @@ namespace gfx::ogl
     {
     public:
         explicit Scheduler(const Builder& createInfo);
+        void Initialize() override;
         void Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const override;
 
     protected:

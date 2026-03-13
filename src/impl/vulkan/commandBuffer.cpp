@@ -10,8 +10,10 @@
 #include "computePipeline.h"
 #include "descriptorSet.h"
 #include "device.h"
+#include "framebuffer.h"
 #include "graphicsPipeline.h"
 #include "imageView.h"
+#include "scheduler.h"
 #include "vulkanContext.h"
 #include "core/framebuffer.h"
 #include "core/scheduler.h"
@@ -84,10 +86,22 @@ namespace gfx::vk
         _handle.end();
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(const Framebuffer* framebuffer)
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* framebuffer)
     {
-        if (framebuffer == nullptr) {
-            framebuffer = &gfx::Context::DefaultFramebuffer();
+        gfx::CommandBuffer::BeginRendering(framebuffer);
+        framebuffer = _state.boundFramebuffer.value();
+        if (!framebuffer->IsDefault())
+        {
+            for (const auto& attachment : framebuffer->getColorAttachments())
+            {
+                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(attachment.get().getImage());
+                vkImage.TransitionLayout(*this, ::vk::ImageLayout::eColorAttachmentOptimal);
+            }
+            if (framebuffer->hasDepthStencilAttachment())
+            {
+                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(framebuffer->getDepthStencilAttachment().getImage());
+                vkImage.TransitionLayout(*this, ::vk::ImageLayout::eDepthStencilAttachmentOptimal);
+            }
         }
 
         std::vector<::vk::RenderingAttachmentInfoKHR> colorAttachmentInfos;
@@ -111,7 +125,7 @@ namespace gfx::vk
             .setStoreOp(::vk::AttachmentStoreOp::eStore)) : std::nullopt;
 
         auto extent = framebuffer->getExtent();
-        auto renderArea = ::vk::Rect2D()
+        const auto renderArea = ::vk::Rect2D()
             .setOffset({0, 0})
             .setExtent({ extent.x, extent.y });
 
@@ -130,7 +144,20 @@ namespace gfx::vk
     gfx::CommandBuffer& CommandBuffer::EndRendering()
     {
         _handle.endRenderingKHR();
-        return *this;
+        if (const auto* framebuffer = dynamic_cast<const gfx::vk::Framebuffer*>(_state.boundFramebuffer.value()); !framebuffer->IsDefault())
+        {
+            for (const auto& attachment : framebuffer->getColorAttachments())
+            {
+                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(attachment.get().getImage());
+                vkImage.TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+            }
+            if (framebuffer->hasDepthStencilAttachment())
+            {
+                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(framebuffer->getDepthStencilAttachment().getImage());
+                vkImage.TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+            }
+        }
+        return gfx::CommandBuffer::EndRendering();
     }
 
     gfx::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
@@ -227,6 +254,37 @@ namespace gfx::vk
         const auto indexCount = mesh->hasIndexBuffer() ? mesh->getIndexCount().value() : mesh->getVertexCount();
         _handle.drawIndexed(indexCount, instanceCount, 0, 0, 0);
         return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage)
+    {
+        const auto vkSrcImage = dynamic_cast<const gfx::vk::Image*>(srcImage);
+        const gfx::vk::Image* vkDstImage = dstImage != nullptr ? dynamic_cast<const gfx::vk::Image*>(dstImage) : nullptr;
+        if (dstImage == nullptr)
+            vkDstImage = &dynamic_cast<const gfx::vk::Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
+
+        vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferSrcOptimal);
+        vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferDstOptimal);
+        _handle.blitImage(
+            **vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+            **vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
+            ::vk::ImageBlit()
+                .setSrcSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                    .setMipLevel(0)
+                    .setBaseArrayLayer(0)
+                    .setLayerCount(1))
+                .setSrcOffsets({ ::vk::Offset3D{ 0, 0, 0 }, ::vk::Offset3D{ static_cast<glm::i32>(vkSrcImage->getExtent().x), static_cast<glm::i32>(vkSrcImage->getExtent().y), 1 } })
+                .setDstSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                    .setMipLevel(0)
+                    .setBaseArrayLayer(0)
+                    .setLayerCount(1))
+                .setDstOffsets({ ::vk::Offset3D{ 0, 0, 0 }, ::vk::Offset3D{ static_cast<glm::i32>(vkDstImage->getExtent().x), static_cast<glm::i32>(vkDstImage->getExtent().y), 1 } }),
+            ::vk::Filter::eNearest);
+         vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+         vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+         return *this;
     }
 
     void CommandBuffer::Submit()

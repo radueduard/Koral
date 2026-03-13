@@ -23,8 +23,9 @@ namespace gfx
     }
 
     Buffer::Buffer(const Builder& createInfo) :
-        size(createInfo.size),
-        usage(createInfo.usage),
-        memoryProperties(createInfo.memoryProperties),
-        layout(createInfo.layout) {}
+        _isPerFrame(createInfo.isPerFrame),
+        _size(createInfo.size),
+        _usage(createInfo.usage),
+        _memoryProperties(createInfo.memoryProperties),
+        _layout(createInfo.layout) {}
 }

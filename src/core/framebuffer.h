@@ -16,6 +16,7 @@ namespace gfx
     public:
         virtual void Bind() const = 0;
         virtual void Unbind() const = 0;
+        [[nodiscard]] bool IsDefault() const { return _isDefault; }
 
         struct ClearValues
         {
@@ -24,19 +25,13 @@ namespace gfx
             glm::i32 clearStencil = 0;
         };
 
-        struct PerFrameAttachmentInfo
-        {
-            std::vector<std::reference_wrapper<const ImageView>> colorAttachments;
-            std::optional<std::reference_wrapper<const ImageView>> depthStencilAttachment;
-        };
-
         struct Builder {
-            std::vector<PerFrameAttachmentInfo> attachments;
+            std::vector<std::reference_wrapper<const ImageView>> colorAttachments {};
+            std::optional<std::reference_wrapper<const ImageView>> depthStencilAttachment = std::nullopt;
             ClearValues clearValues;
 
-            Builder();
-            Builder& addColorAttachment(const FramebufferImage& framebufferImage, glm::vec4 clearColor);
-            Builder& setDepthStencilAttachment(const FramebufferImage& framebufferImage, float depth, glm::i32 stencil);
+            Builder& addColorAttachment(const ImageView& imageView, glm::vec4 clearColor);
+            Builder& setDepthStencilAttachment(const ImageView& imageView, float depth, glm::i32 stencil);
             [[nodiscard]] std::unique_ptr<Framebuffer> build() const;
         };
 
@@ -53,19 +48,18 @@ namespace gfx
         [[nodiscard]] glm::i32 getClearStencil() const;
 
         [[nodiscard]] const glm::uvec2& getExtent() const { return _extent; }
-        [[nodiscard]] glm::u32 getFrameCount() const { return _frameCount; }
 
-        [[nodiscard]] virtual const ClearValues& getClearValues() const { return clearValues; }
+        [[nodiscard]] virtual const ClearValues& getClearValues() const { return _clearValues; }
 
     protected:
-        bool isDefault = false;
+        bool _isDefault = false;
         Framebuffer() = default;
         explicit Framebuffer(const Builder& createInfo);
 
         glm::uvec2 _extent = { 0, 0 };
-        glm::u32 _frameCount = 0;
-        std::vector<PerFrameAttachmentInfo> attachments;
-        ClearValues clearValues;
+        std::vector<std::reference_wrapper<const ImageView>> _colorAttachments;
+        std::optional<std::reference_wrapper<const ImageView>> _depthStencilAttachment;
+        ClearValues _clearValues;
     };
 }
 

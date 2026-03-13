@@ -63,8 +63,7 @@ namespace gfx::vk
     }
 
     void SwapChain::CreateSwapChain() {
-        const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
-        auto surfaceCapabilities = _surface.get().getCapabilities();
+        const auto surfaceCapabilities = _surface.get().getCapabilities();
 
         _surfaceFormat = ChooseSurfaceFormat(_surface.get().getFormats());
         _presentMode = ChoosePresentMode(_surface.get().getPresentModes());
@@ -95,29 +94,23 @@ namespace gfx::vk
         }
 
         const auto swapChainImageHandles = Context::Device()->getSwapchainImagesKHR(_handle);
-        _swapChainImages.clear();
-        _swapChainImages.reserve(swapChainImageHandles.size());
-        for (const auto &image : swapChainImageHandles) {
-            const auto& img = _swapChainImages.emplace_back(std::make_unique<gfx::vk::Image>(image, _extent, getFormat(_surfaceFormat.format), _msaa));
-            _swapChainImageViews.emplace_back(ImageView::Builder(*img)
-                .setViewType(ImageView::Type::e2D)
-                .build());
+        _swapChainImages = std::make_unique<gfx::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa);
+        _depthImages = Image::Builder()
+            .setIsPerFrame(true)
+            .setExtent(_extent)
+            .setFormat(gfx::Image::Format::eD32_SFLOAT_S8_UINT)
+            .setType(gfx::Image::Type::e2D)
+            .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
+            .setMSAA(_msaa)
+            .build();
+        dynamic_cast<const gfx::vk::Image*>(_depthImages.get())->TransitionLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
-            const auto& depthImage = _depthImages.emplace_back(Image::Builder()
-                .setExtent(_extent)
-                .setFormat(gfx::Image::Format::eD32_SFLOAT_S8_UINT)
-                .setType(gfx::Image::Type::e2D)
-                .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
-                .setMSAA(_msaa)
-                .build());
-
-            const auto& vkDepthImage = dynamic_cast<gfx::vk::Image&>(*depthImage);
-            vkDepthImage.TransitionLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-            _depthImageViews.emplace_back(ImageView::Builder(*depthImage)
-                .setViewType(ImageView::Type::e2D)
-                .build());
-        }
+        _swapChainImageViews = gfx::ImageView::Builder(*_swapChainImages)
+            .setViewType(gfx::ImageView::Type::e2D)
+            .build();
+        _depthImageViews = ImageView::Builder(*_depthImages)
+            .setViewType(gfx::ImageView::Type::e2D)
+            .build();
     }
 
     SwapChain::~SwapChain() {
@@ -125,26 +118,6 @@ namespace gfx::vk
         if (_handle) {
             Context::Device()->destroySwapchainKHR(_handle);
         }
-    }
-
-    std::vector<std::reference_wrapper<const gfx::ImageView>> SwapChain::getSwapChainImageViews() const
-    {
-        std::vector<std::reference_wrapper<const gfx::ImageView>> imageViews;
-        imageViews.reserve(_swapChainImageViews.size());
-        for (const auto& imageView : _swapChainImageViews) {
-            imageViews.emplace_back(*imageView);
-        }
-        return imageViews;
-    }
-
-    std::vector<std::reference_wrapper<const gfx::ImageView>> SwapChain::getDepthImageViews() const
-    {
-        std::vector<std::reference_wrapper<const gfx::ImageView>> imageViews;
-        imageViews.reserve(_depthImageViews.size());
-        for (const auto& imageView : _depthImageViews) {
-            imageViews.emplace_back(*imageView);
-        }
-        return imageViews;
     }
 
     void SwapChain::Resize(const glm::uvec2& newSize) {

@@ -6,36 +6,23 @@
 #include "impl/open_gl/framebuffer.h"
 #include "impl/vulkan/framebuffer.h"
 
-#include <algorithm>
 #include <ranges>
 
 #include "context.h"
-#include "framebufferImage.h"
 #include "scheduler.h"
 #include "io/window.h"
 
 namespace gfx {
-    Framebuffer::Builder::Builder()
+    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const ImageView& imageView, glm::vec4 clearColor)
     {
-        attachments.resize(Context::Scheduler().getImageCount());
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const FramebufferImage& framebufferImage, glm::vec4 clearColor)
-    {
-        int i = 0;
-        for (const auto& imageView : framebufferImage.getImageViews()) {
-            attachments[i++].colorAttachments.emplace_back(imageView);
-        }
+        colorAttachments.emplace_back(imageView);
         clearValues.clearColor.emplace_back(clearColor);
         return *this;
     }
 
-    Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(const FramebufferImage& framebufferImage, float depth, glm::i32 stencil)
+    Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(const ImageView& imageView, float depth, glm::i32 stencil)
     {
-        int i = 0;
-        for (const auto& imageView : framebufferImage.getImageViews()) {
-            attachments[i++].depthStencilAttachment = imageView;
-        }
+        depthStencilAttachment = imageView;
         clearValues.clearDepth = depth;
         clearValues.clearStencil = stencil;
         return *this;
@@ -47,7 +34,7 @@ namespace gfx {
         case API::eOpenGL:
             return std::make_unique<ogl::Framebuffer>(*this);
         case API::eVulkan:
-            throw std::runtime_error("Vulkan is not supported yet!");
+            return std::make_unique<vk::Framebuffer>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
@@ -66,41 +53,39 @@ namespace gfx {
 
     bool Framebuffer::hasDepthStencilAttachment() const
     {
-        return std::ranges::all_of(attachments, [](const auto& attachmentInfo) {
-            return attachmentInfo.depthStencilAttachment.has_value();
-        });
+        return _depthStencilAttachment.has_value();
     }
 
     const std::vector<std::reference_wrapper<const ImageView>>& Framebuffer::getColorAttachments() const
     {
-        return attachments[Context::Scheduler().getCurrentImageIndex()].colorAttachments;
+        return _colorAttachments;
     }
 
     const ImageView& Framebuffer::getDepthStencilAttachment() const
     {
-        return attachments[Context::Scheduler().getCurrentImageIndex()].depthStencilAttachment->get();
+        return _depthStencilAttachment.has_value() ? _depthStencilAttachment.value().get() : throw std::runtime_error("This framebuffer does not have a depth stencil attachment!");
     }
 
     const glm::vec4& Framebuffer::getClearColor(const glm::u32 index) const
     {
-        return clearValues.clearColor[index];
+        return _clearValues.clearColor[index];
     }
 
     float Framebuffer::getClearDepth() const
     {
-        return clearValues.clearDepth;
+        return _clearValues.clearDepth;
     }
 
     glm::i32 Framebuffer::getClearStencil() const
     {
-        return clearValues.clearStencil;
+        return _clearValues.clearStencil;
     }
 
     Framebuffer::Framebuffer(const Builder& createInfo) :
-        _frameCount(createInfo.attachments.size()),
-        attachments(createInfo.attachments),
-        clearValues(createInfo.clearValues)
+        _colorAttachments(createInfo.colorAttachments),
+        _depthStencilAttachment(createInfo.depthStencilAttachment),
+        _clearValues(createInfo.clearValues)
     {
-        _extent = attachments[0].colorAttachments[0].get().getImage().getExtent();
+        _extent = _colorAttachments.empty() ? _depthStencilAttachment.has_value() ? _depthStencilAttachment.value().get().getImage().getExtent() : glm::uvec2{ 0, 0 } : _colorAttachments[0].get().getImage().getExtent();
     }
 }

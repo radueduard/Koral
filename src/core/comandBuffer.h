@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include <glm/fwd.hpp>
 
 #include "computePipeline.h"
@@ -31,8 +32,8 @@ namespace gfx
         virtual CommandBuffer& Begin() = 0;
         virtual void End() = 0;
 
-        virtual CommandBuffer& BeginRendering(const Framebuffer* framebuffer = nullptr) = 0;
-        virtual CommandBuffer& EndRendering() = 0;
+        virtual CommandBuffer& BeginRendering(const Framebuffer* framebuffer = nullptr);
+        virtual CommandBuffer& EndRendering();
         virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
         virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline);
@@ -41,6 +42,7 @@ namespace gfx
         virtual CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) = 0;
         virtual CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) = 0;
         virtual CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) = 0;
+        virtual CommandBuffer& Blit(const Image* srcImage, const Image* dstImage = nullptr) = 0;
 
         virtual void Submit() = 0;
         virtual void Reset() = 0;

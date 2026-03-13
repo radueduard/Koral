@@ -5,6 +5,7 @@
 #pragma once
 #include <filesystem>
 
+
 namespace gfx {
     class Scheduler;
     class Framebuffer;
@@ -26,11 +27,12 @@ namespace gfx {
     class Context
     {
         friend class io::Window;
+        friend class Scheduler;
     public:
         static io::Window& FocusedWindow();
 
         static io::Window& Window();
-        static gfx::Scheduler& Scheduler();
+        static const Scheduler& Scheduler();
 
         static const gfx::Framebuffer& DefaultFramebuffer();
 
