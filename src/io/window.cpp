@@ -78,25 +78,7 @@ namespace gfx::io {
     void Window::initContext()
     {
         Context::_currentThreadLinkedWindow = this;
-
         glfwMakeContextCurrent(_window);
-
-        switch (_api)
-        {
-        case API::eOpenGL:
-            {
-                glewInit();
-                auto globalVAO = 0u;
-                glGenVertexArrays(1, &globalVAO);
-                glBindVertexArray(globalVAO);
-                break;
-            }
-        case API::eVulkan:
-            {
-                gfx::vk::Context::Device().createCommandPools();
-                break;
-            }
-        }
         Context::InitScheduler();
         _framebuffer = Framebuffer::CreateDefault();
     }
@@ -112,10 +94,10 @@ namespace gfx::io {
 
     void Window::close()
     {
-        Context::DestroyScheduler();
         _framebuffer.reset();
+        Context::DestroyScheduler();
         if (_api == API::eVulkan) {
-            gfx::vk::Context::Device().freeCommandPools();
+            gfx::vk::Context::Device().freeQueues();
         }
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
         _closed = true;

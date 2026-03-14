@@ -53,6 +53,7 @@ const gfx::Framebuffer& gfx::Context::DefaultFramebuffer()
 
 void gfx::Context::InitScheduler()
 {
+    _threadId = std::this_thread::get_id();
     if (_scheduler != nullptr) {
         throw std::runtime_error("Scheduler is already initialized for this thread");
     }

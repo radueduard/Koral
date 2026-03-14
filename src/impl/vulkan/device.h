@@ -12,6 +12,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <unordered_map>
@@ -54,8 +55,12 @@ namespace gfx::vk {
         explicit Queue(Family& family);
         ~Queue() override;
 
+        Queue(const Queue &) = delete;
+        Queue &operator=(const Queue &) = delete;
+
         [[nodiscard]] glm::u32 getIndex() const { return _index; }
         [[nodiscard]] const Family& getFamily() const { return _family; }
+        [[nodiscard]] bool canPresent(const gfx::vk::Surface& surface) const;
 
         void Submit(const SubmitInfo& submitInfo) const;
 
@@ -71,14 +76,14 @@ namespace gfx::vk {
         explicit Device();
         ~Device() override;
 
+        void queuesWaitIdle() const;
+
         Device(const Device &) = delete;
         Device &operator=(const Device &) = delete;
 
         [[nodiscard]] const Queue& requestQueue(::vk::QueueFlags type) const;
         [[nodiscard]] const Queue& requestPresentQueue(const gfx::vk::Surface& surface) const;
-
-        void createCommandPools() const;
-        void freeCommandPools() const;
+        void freeQueues() const;
 
         [[nodiscard]] std::unique_ptr<gfx::vk::CommandBuffer> requestCommandBuffer(const gfx::vk::Queue& queue, uint32_t thread) const;
         void freeCommandBuffer(const gfx::vk::CommandBuffer &commandBuffer) const;
@@ -87,9 +92,8 @@ namespace gfx::vk {
             ::vk::Fence fence = nullptr, ::vk::Semaphore waitSemaphore = nullptr, ::vk::Semaphore signalSemaphore = nullptr, bool wait = true) const;
 
     private:
-    	std::unique_ptr<VmaAllocator> _allocator;
         mutable std::vector<Queue::Family> _queueFamilies {};
-        mutable std::vector<std::unique_ptr<Queue>> _queuesInUse {};
-        mutable std::unordered_map<uint32_t, std::unordered_map<uint32_t, ::vk::CommandPool>> _commandPools;
+        mutable std::map<glm::u32, std::unique_ptr<Queue>> _queuesInUse {};
+        mutable std::map<glm::u32, ::vk::CommandPool> _commandPools {};
     };
 }

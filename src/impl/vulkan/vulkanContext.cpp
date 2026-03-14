@@ -40,7 +40,6 @@ const gfx::vk::DescriptorPool& gfx::vk::Context::DescriptorPool()
 
 void gfx::vk::Context::Init()
 {
-    _threadId = std::this_thread::get_id();
     _runtime = new gfx::vk::Runtime;
     _runtime->selectPhysicalDevice();
     _device = new gfx::vk::Device;

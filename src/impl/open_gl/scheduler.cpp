@@ -4,6 +4,7 @@
 
 #include "scheduler.h"
 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include "io/window.h"
@@ -13,6 +14,10 @@ namespace gfx::ogl
     Scheduler::Scheduler(const Builder& createInfo): gfx::Scheduler(createInfo) {}
     void Scheduler::Initialize()
     {
+        glewInit();
+        auto globalVAO = 0u;
+        glGenVertexArrays(1, &globalVAO);
+        glBindVertexArray(globalVAO);
         createFrames();
     }
 

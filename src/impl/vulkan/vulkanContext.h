@@ -36,9 +36,6 @@ namespace gfx::vk
         static const gfx::vk::Allocator& Allocator();
         static const gfx::vk::DescriptorPool& DescriptorPool();
 
-        static glm::u32 ThreadId() { return std::hash<std::thread::id>()(_threadId); }
-        static glm::u32 MainThreadId() { return std::hash<std::thread::id>()(_mainThreadId); }
-
     private:
         static void Init();
         static void Destroy();
@@ -48,7 +45,5 @@ namespace gfx::vk
         inline static gfx::vk::Allocator* _allocator = nullptr;
         inline static gfx::vk::DescriptorPool* _descriptorPool = nullptr;
 
-        inline thread_local static auto _threadId = std::thread::id();
-        inline static std::thread::id _mainThreadId = std::this_thread::get_id();
     };
 }

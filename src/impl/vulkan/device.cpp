@@ -55,6 +55,11 @@ namespace gfx::vk {
         _family._remainingQueues++;
     }
 
+    bool Queue::canPresent(const gfx::vk::Surface &surface) const {
+        const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
+        return physicalDevice->getSurfaceSupportKHR(_family.getIndex(), *surface);
+    }
+
     void Queue::Submit(const SubmitInfo& submitInfo) const
     {
         const auto commandBufferHandle = *submitInfo.commandBuffer;
@@ -137,10 +142,6 @@ namespace gfx::vk {
 
         _handle = physicalDevice->createDevice(deviceCreateInfo);
     	VULKAN_HPP_DEFAULT_DISPATCHER.init(_handle);
-
-        for (const auto& queueFamily : _queueFamilies) {
-            _commandPools[queueFamily.getIndex()] = {};
-        }
     }
 
     Device::~Device() {
@@ -148,51 +149,56 @@ namespace gfx::vk {
         _handle.destroy();
     }
 
-    void Device::createCommandPools() const {
-        auto threadId = Context::ThreadId();
-        for (const auto& queueFamily : _queueFamilies) {
-            const auto commandPoolCreateInfo = ::vk::CommandPoolCreateInfo()
-                .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
-                .setQueueFamilyIndex(queueFamily.getIndex());
-            _commandPools[queueFamily.getIndex()].emplace(threadId, _handle.createCommandPool(commandPoolCreateInfo));
-        }
-    }
-
-    void Device::freeCommandPools() const {
-        auto threadId = Context::ThreadId();
-        _handle.waitIdle();
-        for (const auto& queueFamily : _queueFamilies) {
-            _handle.destroyCommandPool(_commandPools[queueFamily.getIndex()][threadId]);
-            _commandPools[queueFamily.getIndex()].erase(threadId);
+    void Device::queuesWaitIdle() const {
+        for (const auto& [thread_id, queue] : _queuesInUse)
+        {
+            if (thread_id != gfx::Context::ThreadId()) continue;
+            queue->operator*().waitIdle();
         }
     }
 
     const Queue& Device::requestQueue(const ::vk::QueueFlags type) const {
+        for (const auto& [thread_id, queue] : _queuesInUse)
+        {
+            if (thread_id != gfx::Context::ThreadId()) continue;
+            if ((queue->getFamily().getProperties().queueFlags & type) == type)
+            {
+                return *queue;
+            }
+        }
         for (auto& queueFamily : _queueFamilies) {
             if ((queueFamily.getProperties().queueFlags & type) != type) {
                 continue;
             }
             try {
                 auto queue = queueFamily.RequestQueue();
-                const auto& queueRef =_queuesInUse.emplace_back(std::move(queue));
+                auto* queueRef = queue.get();
+                _queuesInUse.emplace(gfx::Context::ThreadId(), std::move(queue));
+                _commandPools[queueRef->getFamily().getIndex()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
+                    .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
+                    .setQueueFamilyIndex(queueFamily.getIndex()));
                 return *queueRef;
             } catch (const std::runtime_error&) {}
-        }
-        for (const auto& queue : _queuesInUse)
-        {
-            if ((queue->getFamily().getProperties().queueFlags & type) == type)
-            {
-                return *queue;
-            }
         }
         throw std::runtime_error("Device::RequestQueue: Failed to find a queue with this type!");
     }
 
     const Queue& Device::requestPresentQueue(const gfx::vk::Surface& surface) const {
+        for (const auto& [thread_id, queue] : _queuesInUse)
+        {
+            if (thread_id != gfx::Context::ThreadId()) continue;
+            if ((queue->canPresent(surface))) {
+                return *queue;
+            }
+        }
         for (auto& queueFamily : _queueFamilies) {
             try {
                 auto queue = queueFamily.RequestPresentQueue(surface);
-                const auto& queueRef = _queuesInUse.emplace_back(std::move(queue));
+                auto* queueRef = queue.get();
+                _queuesInUse.emplace(gfx::Context::ThreadId(), std::move(queue));
+                _commandPools[queueRef->getFamily().getIndex()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
+                    .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
+                    .setQueueFamilyIndex(queueFamily.getIndex()));
                 return *queueRef;
             } catch (const std::runtime_error& err) {
                 std::cerr << err.what() << std::endl;
@@ -201,8 +207,21 @@ namespace gfx::vk {
         throw std::runtime_error("Device::RequestPresentQueue: Failed to find suitable present queue!");
     }
 
+    void Device::freeQueues() const {
+        const auto threadId = gfx::Context::ThreadId();
+        for (auto it = _queuesInUse.begin(); it != _queuesInUse.end();) {
+            if (it->first == threadId) {
+                it->second->operator*().waitIdle();
+                _handle.destroyCommandPool(_commandPools.at(it->second->getFamily().getIndex()));
+                it = _queuesInUse.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
     std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const gfx::vk::Queue& queue, const glm::u32 thread) const {
-        const auto& commandPool = _commandPools.at(queue.getFamily().getIndex()).at(thread);
+        const auto& commandPool = _commandPools.at(queue.getFamily().getIndex());
         const auto commandBufferAllocInfo = ::vk::CommandBufferAllocateInfo()
             .setCommandPool(commandPool)
             .setLevel(::vk::CommandBufferLevel::ePrimary)
@@ -219,11 +238,11 @@ namespace gfx::vk {
         const ::vk::Fence fence, ::vk::Semaphore waitSemaphore, ::vk::Semaphore signalSemaphore, const bool wait) const
     {
         glm::u32 thread = 0;
-        if (Context::ThreadId() != Context::MainThreadId()) {
-            thread = Context::ThreadId();
+        if (gfx::Context::ThreadId() != gfx::Context::MainThreadId()) {
+            thread = gfx::Context::ThreadId();
         }
 
-        const auto queue = requestQueue(requiredFlags);
+        const auto& queue = requestQueue(requiredFlags);
         const auto commandBufferHolder = requestCommandBuffer(queue, thread);
         const auto& commandBuffer = *commandBufferHolder.get();
 

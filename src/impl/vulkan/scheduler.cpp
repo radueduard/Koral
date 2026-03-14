@@ -15,7 +15,7 @@ namespace gfx::vk
 {
     Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : gfx::Frame(imageIndex), _queue(queue)
     {
-        _commandBuffer = Context::Device().requestCommandBuffer(_queue, Context::ThreadId());
+        _commandBuffer = Context::Device().requestCommandBuffer(_queue, gfx::Context::ThreadId());
         _imageAvailable = vk::Context::Device()->createSemaphore({});
         _inFlightFence = Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
     }
@@ -38,7 +38,7 @@ namespace gfx::vk
     }
 
     Scheduler::~Scheduler() {
-        Context::Device()->waitIdle();
+        Context::Device().queuesWaitIdle();
     }
 
     void Scheduler::Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const {

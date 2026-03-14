@@ -119,7 +119,6 @@ namespace gfx::vk
     }
 
     SwapChain::~SwapChain() {
-        Context::Device()->waitIdle();
         for (const auto& semaphore : _renderFinishedSemaphores) {
             Context::Device()->destroySemaphore(semaphore);
         }
