@@ -181,9 +181,9 @@ namespace gfx::vk
     }
 
     void Image::TransitionLayout(const ::vk::ImageLayout newLayout) const {
-        if (const auto _layout = getImageLayout(); _layout == newLayout) {
-            return;
-        }
+        // if (const auto _layout = getImageLayout(); _layout == newLayout) {
+        //     return;
+        // }
 
         Context::Device().runSingleTimeCommand([this, newLayout] (const gfx::vk::CommandBuffer &commandBuffer) {
             TransitionLayout(commandBuffer, newLayout);

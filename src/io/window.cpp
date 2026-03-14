@@ -12,6 +12,7 @@
 
 #include "manager.h"
 #include "impl/vulkan/device.h"
+#include "impl/vulkan/surface.h"
 #include "impl/vulkan/vulkanContext.h"
 
 namespace gfx::io {
@@ -71,6 +72,7 @@ namespace gfx::io {
     	glfwGetFramebufferSize(_window, reinterpret_cast<int*>(&extent.x), reinterpret_cast<int*>(&extent.y));
 		_extent = extent;
 
+        _surface = gfx::Surface::Create(*this);
     }
 
     void Window::initContext()

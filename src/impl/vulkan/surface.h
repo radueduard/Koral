@@ -9,6 +9,7 @@
 
 #include "runtime.h"
 #include "vulkanContext.h"
+#include "core/surface.h"
 
 namespace gfx::io
 {
@@ -17,7 +18,7 @@ namespace gfx::io
 
 namespace gfx::vk
 {
-    class Surface final : public Wrapper<::vk::SurfaceKHR>
+    class Surface final : public gfx::Surface, public Wrapper<::vk::SurfaceKHR>
     {
     public:
         explicit Surface(const gfx::io::Window& window);

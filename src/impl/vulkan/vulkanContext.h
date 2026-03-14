@@ -19,6 +19,7 @@ namespace gfx::io
 
 namespace gfx::vk
 {
+    class Surface;
     class Scheduler;
     class DescriptorPool;
     class Allocator;
@@ -46,6 +47,7 @@ namespace gfx::vk
         inline static gfx::vk::Device* _device = nullptr;
         inline static gfx::vk::Allocator* _allocator = nullptr;
         inline static gfx::vk::DescriptorPool* _descriptorPool = nullptr;
+
         inline thread_local static auto _threadId = std::thread::id();
         inline static std::thread::id _mainThreadId = std::this_thread::get_id();
     };

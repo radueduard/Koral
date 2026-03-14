@@ -21,7 +21,7 @@ namespace gfx
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
             return new ogl::Scheduler(*this);
-        case API::eVulkan:
+            case API::eVulkan:
             return new vk::Scheduler(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");

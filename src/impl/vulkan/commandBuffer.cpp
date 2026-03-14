@@ -162,7 +162,7 @@ namespace gfx::vk
 
     gfx::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
-        ::vk::Viewport viewport = ::vk::Viewport()
+        const ::vk::Viewport viewport = ::vk::Viewport()
             .setX(static_cast<float>(x))
             .setY(static_cast<float>(y) + static_cast<float>(height)) // Vulkan's viewport y-axis is inverted compared to OpenGL, so we need to add the height to the y coordinate and set the height to negative value to flip it back.
             .setWidth(static_cast<float>(width))
@@ -274,14 +274,20 @@ namespace gfx::vk
                     .setMipLevel(0)
                     .setBaseArrayLayer(0)
                     .setLayerCount(1))
-                .setSrcOffsets({ ::vk::Offset3D{ 0, 0, 0 }, ::vk::Offset3D{ static_cast<glm::i32>(vkSrcImage->getExtent().x), static_cast<glm::i32>(vkSrcImage->getExtent().y), 1 } })
+                .setSrcOffsets({
+                    ::vk::Offset3D{ 0, 0, 0 },
+                    ::vk::Offset3D{ static_cast<glm::i32>(vkSrcImage->getExtent().x), static_cast<glm::i32>(vkSrcImage->getExtent().y), 1 }
+                })
                 .setDstSubresource(::vk::ImageSubresourceLayers()
                     .setAspectMask(::vk::ImageAspectFlagBits::eColor)
                     .setMipLevel(0)
                     .setBaseArrayLayer(0)
                     .setLayerCount(1))
-                .setDstOffsets({ ::vk::Offset3D{ 0, 0, 0 }, ::vk::Offset3D{ static_cast<glm::i32>(vkDstImage->getExtent().x), static_cast<glm::i32>(vkDstImage->getExtent().y), 1 } }),
-            ::vk::Filter::eNearest);
+                .setDstOffsets({
+                    ::vk::Offset3D{ 0, 0, 0 },
+                    ::vk::Offset3D{ static_cast<glm::i32>(vkDstImage->getExtent().x), static_cast<glm::i32>(vkDstImage->getExtent().y), 1 }
+                }),
+            ::vk::Filter::eLinear);
          vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
          vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
          return *this;

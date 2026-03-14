@@ -6,10 +6,7 @@
 
 #include <string>
 
-// #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-
-// #include <vulkan/vulkan.hpp>
 
 #include <filesystem>
 #include <glm/glm.hpp>
@@ -19,6 +16,7 @@
 #include "io/time.h"
 #include "scenes/scene.h"
 #include "core/framebuffer.h"
+#include "core/surface.h"
 
 namespace gfx::io {
     class Window {
@@ -78,8 +76,6 @@ namespace gfx::io {
 
         [[nodiscard]] GLFWwindow* operator*() const { return _window; }
         [[nodiscard]] glm::uvec2 getExtent() const { return _extent; }
-        // [[nodiscard]] std::vector<const char*> getRequiredExtensions() const;
-        // [[nodiscard]] vk::SurfaceKHR createSurface(const vk::Instance&) const;
 
         [[nodiscard]] bool isPaused() const { return _paused; }
 
@@ -94,6 +90,7 @@ namespace gfx::io {
         [[nodiscard]] API getAPI() const { return _api; }
         [[nodiscard]] const std::string& getTitle() const { return _title; }
         [[nodiscard]] const gfx::Framebuffer* getFramebuffer() const { return _framebuffer.get(); }
+        [[nodiscard]] const gfx::Surface& getSurface() const { return *_surface; }
 
         void setIcon(const std::filesystem::path& iconPath);
 
@@ -112,6 +109,7 @@ namespace gfx::io {
         GLFWmonitor* _monitor = nullptr;
         GLFWimage* _icon = nullptr;
         const GLFWvidmode *_videoMode = nullptr;
+        std::unique_ptr<gfx::Surface> _surface = nullptr;
 
         std::string _title;
         glm::uvec2 _extent;

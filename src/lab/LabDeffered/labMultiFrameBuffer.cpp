@@ -76,7 +76,7 @@ void LabMultiFrameBuffer::Initialize()
         .setType(gfx::Image::Type::e2D)
         .setExtent(glm::uvec2 { gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y })
         .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
-        .setFormat(gfx::Image::Format::eD24_UNORM_S8_UINT)
+        .setFormat(gfx::Image::Format::eD32_SFLOAT_S8_UINT)
         .build();
 
     for (const auto& [name, image] : framebufferImages)

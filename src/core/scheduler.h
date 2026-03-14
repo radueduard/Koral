@@ -46,7 +46,7 @@ namespace gfx
     	virtual void Initialize() = 0;
 
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
-    	[[nodiscard]] glm::u32 getCurrentImageIndex() const { return _currentFrame; }
+    	[[nodiscard]] virtual glm::u32 getCurrentImageIndex() const { return _currentFrame; }
         [[nodiscard]] const gfx::Frame &getCurrentFrame() const { return *_frames.at(_currentFrame); }
         [[nodiscard]] const gfx::Frame &getNextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
 

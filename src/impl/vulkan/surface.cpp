@@ -16,7 +16,7 @@
 
 namespace gfx::vk
 {
-    Surface::Surface(const gfx::io::Window& window)
+    Surface::Surface(const gfx::io::Window& window) : gfx::Surface(window)
     {
         const auto instance = Context::Runtime().getInstance();
         const auto& physicalDevice = Context::Runtime().getPhysicalDevice();

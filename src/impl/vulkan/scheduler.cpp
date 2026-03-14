@@ -29,8 +29,7 @@ namespace gfx::vk
 
     void Scheduler::Initialize()
     {
-        _surface = std::make_unique<Surface>(gfx::Context::Window());
-        _swapChain = gfx::vk::SwapChain::Builder(*_surface)
+        _swapChain = gfx::vk::SwapChain::Builder(dynamic_cast<const gfx::vk::Surface&>(gfx::Context::Window().getSurface()))
             .setMinImageCount(_minImageCount)
             .setImageCount(_imageCount)
             .setMSAA(MSAA::eNone)
@@ -60,6 +59,8 @@ namespace gfx::vk
             _started = false;
             _swapChain->Resize(gfx::Context::Window().getExtent());
             _started = true;
+            std::cout << "SwapChain Resized" << std::endl;
+            return;
         }
 
         auto& commandBuffer = frame.getCommandBuffer();
@@ -86,6 +87,7 @@ namespace gfx::vk
             _started = false;
             _swapChain->Resize(gfx::Context::Window().getExtent());
             _started = true;
+            std::cout << "SwapChain Resized" << std::endl;
             return;
         }
 

@@ -9,11 +9,9 @@
 #include <fstream>
 #include <iostream>
 #include <ranges>
-#include <magic_enum/magic_enum.hpp>
 
 #include "input.h"
 #include "core/comandBuffer.h"
-#include "impl/open_gl/buffer.h"
 #include "core/scheduler.h"
 
 namespace gfx::io

@@ -24,7 +24,8 @@ layout (set = 0, binding = 7, std430) buffer Lights {
 };
 
 void main() {
-    vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(imageSize(outputImage));
+    vec2 pixelPercentage = 1.f / vec2(imageSize(outputImage));
+    vec2 uv = vec2(gl_GlobalInvocationID.xy) / vec2(imageSize(outputImage)) + pixelPercentage / 2.f;
 
     vec3 position = texture(gPosition, uv).rgb;
     vec3 albedo = texture(gAlbedo, uv).rgb;

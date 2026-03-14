@@ -30,7 +30,7 @@ namespace gfx::vk
 
     ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes) {
         for (const auto &availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == ::vk::PresentModeKHR::eMailbox) {
+            if (availablePresentMode == ::vk::PresentModeKHR::eImmediate) {
                 return availablePresentMode;
             }
         }
@@ -162,7 +162,6 @@ namespace gfx::vk
             .setWaitSemaphores(waitSemaphores)
             .setSwapchains(swapChains)
             .setImageIndices(_imageIndex);
-
         try {
         	return _presentQueue->presentKHR(presentInfo);
         } catch (const ::vk::OutOfDateKHRError &) {

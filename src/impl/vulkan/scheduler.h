@@ -52,10 +52,10 @@ namespace gfx::vk
 
     	[[nodiscard]] const gfx::vk::SwapChain &getSwapChain() const { return *_swapChain; }
     	[[nodiscard]] bool isResized() const { return _resized; }
+		glm::u32 getCurrentImageIndex() const override { return _swapChain->getCurrentImageIndex(); }
 
 
     private:
-    	std::unique_ptr<gfx::vk::Surface> _surface;
     	std::unique_ptr<gfx::vk::SwapChain> _swapChain;
 
     	void createFrames() override;
