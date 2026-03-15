@@ -2,20 +2,26 @@
 // Created by radue on 2/21/2026.
 //
 
-#include "shader.h"
-#include "impl/open_gl/shader.h"
-#include "impl/vulkan/shader.h"
+#include "../backends/open_gl/shader.h"
+#include "../backends/vulkan/shader.h"
+
+#include <shader.h>
+#include <window.h>
+#include <context.h>
+#include <file.h>
+#include <framebuffer.h>
+#include <surface.h>
+
+#include <iostream>
 
 #include <spirv_cross.hpp>
-
-#include "context.h"
-#include "io/window.h"
 
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
-#include "utils/file.h"
+#include "structs.h"
+
 
 namespace gfx {
     std::unique_ptr<Shader> Shader::Builder::build() const
@@ -95,8 +101,8 @@ namespace gfx {
 	std::pair<ChannelType, glm::u32> SPIRTypeConverter(const spirv_cross::SPIRType& type)
     {
     	auto rows = type.vecsize;
-    	auto columns = type.columns;
-    	auto base = type.basetype;
+    	const auto columns = type.columns;
+    	const auto base = type.basetype;
 
     	if (columns > 1) {
     		throw std::runtime_error("Matrices are not supported as shader inputs/outputs!");

@@ -2,26 +2,27 @@
 // Created by radue on 10/13/2024.
 //
 #include <GL/glew.h>
-#include "../core/framebuffer.h"
 
-#include "window.h"
+#include <window.h>
+#include <framebuffer.h>
+
 #include "input.h"
 
 #include <iostream>
 #include <stb_image.h>
+#include <GLFW/glfw3.h>
 
 #include "manager.h"
-#include "impl/vulkan/device.h"
-#include "impl/vulkan/surface.h"
-#include "impl/vulkan/vulkanContext.h"
+#include "surface.h"
 
 namespace gfx::io {
-    Window::Window(const Builder& createInfo) :
+    Window::Window(Builder& createInfo) :
         _title(createInfo.title),
         _extent(createInfo.extent),
         _resizable(createInfo.resizable),
         _fullscreen(createInfo.fullscreen),
-        _api(createInfo.api)
+        _api(createInfo.api),
+        _scene(std::move(createInfo.scene))
     {
         glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::eOpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
@@ -83,7 +84,7 @@ namespace gfx::io {
         _framebuffer = Framebuffer::CreateDefault();
     }
 
-    void Window::Builder::build() const
+    void Window::Builder::build()
     {
         Manager::createWindow(*this);
     }
@@ -92,15 +93,22 @@ namespace gfx::io {
         glfwDestroyWindow(_window);
     }
 
+    bool Window::shouldClose() const
+    { return glfwWindowShouldClose(_window); }
+
     void Window::close()
     {
         _framebuffer.reset();
+        _scene.reset();
         Context::DestroyScheduler();
-        if (_api == API::eVulkan) {
-            gfx::vk::Context::Device().freeQueues();
-        }
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
         _closed = true;
+    }
+
+    void Window::setTitle(const std::string& title)
+    {
+        _title = title;
+        glfwSetWindowTitle(_window, title.c_str());
     }
 
     void Window::setIcon(const std::filesystem::path& iconPath)

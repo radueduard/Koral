@@ -2,15 +2,15 @@
 // Created by radue on 2/23/2026.
 //
 
-#include "importer.h"
+#include "../../include/importer.h"
 
 #include <stb_image.h>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include "image.h"
-#include "mesh.h"
+#include "../../include/image.h"
+#include "../../include/mesh.h"
 
 namespace gfx
 {

@@ -1,15 +1,25 @@
 //
 // Created by radue on 2/21/2026.
 //
-#include "computePipeline.h"
-#include "descriptorSetLayout.h"
-#include "impl/open_gl/computePipeline.h"
-#include "impl/vulkan/computePipeline.h"
+#include <computePipeline.h>
+#include <descriptorSetLayout.h>
+#include <framebuffer.h>
+#include <surface.h>
 
-#include "io/window.h"
+#include "../backends/open_gl/computePipeline.h"
+#include "../backends/vulkan/computePipeline.h"
+
+#include "shader.h"
+#include "../../include/window.h"
 
 namespace gfx
 {
+    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(const Shader& computeShader)
+    {
+        this->computeShader = computeShader;
+        return *this;
+    }
+
     std::unique_ptr<ComputePipeline> ComputePipeline::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
@@ -20,6 +30,18 @@ namespace gfx
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
+    }
+
+    ComputePipeline::~ComputePipeline() = default;
+
+    void ComputePipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    {
+        _bound = true;
+    }
+
+    void ComputePipeline::Unbind() const
+    {
+        _bound = false;
     }
 
     const gfx::DescriptorSetLayout& ComputePipeline::getSetLayout(const glm::u32 index) const

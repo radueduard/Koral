@@ -4,15 +4,16 @@
 
 #include "input.h"
 
-#include <iostream>
-
-
+#include <GLFW/glfw3.h>
 #include <glm/fwd.hpp>
 #include <glm/vec2.hpp>
 #include <magic_enum/magic_enum.hpp>
 
+#include "context.h"
 #include "window.h"
-#include "../context.h"
+#include "framebuffer.h"
+#include "surface.h"
+
 
 namespace gfx::io {
 	void Input::State::setup()

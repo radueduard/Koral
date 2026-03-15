@@ -18,12 +18,12 @@ namespace gfx
 
 namespace gfx::io
 {
-    class Manager
+    class GFX_API Manager
     {
         friend int ::main();
         friend class gfx::Engine;
     public:
-        static Window& createWindow(const Window::Builder& createInfo);
+        static Window& createWindow(Window::Builder& createInfo);
         static void removeWindow(Window* window);
 
         ~Manager();

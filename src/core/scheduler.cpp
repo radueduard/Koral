@@ -2,12 +2,14 @@
 // Created by eduard on 11.03.2026.
 //
 
-#include "scheduler.h"
-#include "impl/open_gl/scheduler.h"
-#include "impl/vulkan/scheduler.h"
+#include <scheduler.h>
+#include <comandBuffer.h>
+#include <window.h>
+#include <framebuffer.h>
+#include <surface.h>
 
-#include "comandBuffer.h"
-#include "io/window.h"
+#include "../backends/open_gl/scheduler.h"
+#include "../backends/vulkan/scheduler.h"
 
 namespace gfx
 {

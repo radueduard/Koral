@@ -2,8 +2,9 @@
 // Created by radue on 2/24/2026.
 //
 
-#include "time.h"
-
+#include <framebuffer.h>
+#include <surface.h>
+#include <time.h>
 #include "context.h"
 #include "window.h"
 

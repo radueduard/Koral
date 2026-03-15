@@ -2,15 +2,17 @@
 // Created by radue on 3/4/2026.
 //
 
-#include "descriptorSetLayout.h"
-#include "impl/open_gl/descriptorSetLayout.h"
-#include "impl/vulkan/descriptorSetLayout.h"
+#include <descriptorSetLayout.h>
+#include <framebuffer.h>
+#include <surface.h>
+
+#include "../backends/vulkan/descriptorSetLayout.h"
 
 #include <stdexcept>
 #include <string>
 
 #include "context.h"
-#include "io/window.h"
+#include "../../include/window.h"
 
 namespace gfx
 {
@@ -28,7 +30,7 @@ namespace gfx
     {
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
-            return std::make_unique<ogl::DescriptorSetLayout>(*this);
+            return std::make_unique<DescriptorSetLayout>(*this);
         case API::eVulkan:
             return std::make_unique<vk::DescriptorSetLayout>(*this);
         default:

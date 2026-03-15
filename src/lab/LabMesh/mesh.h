@@ -5,9 +5,6 @@
 #pragma once
 #include <assimp/scene.h>
 
-#include "core/importer.h"
-#include "core/mesh.h"
-
 namespace gfx
 {
     class LabMesh final : public CustomMesh<LabMesh>

@@ -4,11 +4,15 @@
 
 #pragma once
 #include <memory>
+#include <mesh.h>
 
-#include "core/descriptorBinding.h"
-#include "core/graphicsPipeline.h"
-#include "core/mesh.h"
-#include "scenes/scene.h"
+#include "descriptorSet.h"
+#include "graphicsPipeline.h"
+#include "image.h"
+#include "imageView.h"
+#include "sampler.h"
+#include "scene.h"
+
 
 class Lab01 : public gfx::Scene
 {

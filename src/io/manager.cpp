@@ -9,26 +9,28 @@
 #include <fstream>
 #include <iostream>
 #include <ranges>
+#include <GLFW/glfw3.h>
 
-#include "input.h"
-#include "core/comandBuffer.h"
-#include "core/scheduler.h"
+#include "scene.h"
+#include "scheduler.h"
+#include <framebuffer.h>
+#include <surface.h>
 
 namespace gfx::io
 {
-    Window& Manager::createWindow(const Window::Builder& createInfo)
+    Window& Manager::createWindow(Window::Builder& createInfo)
     {
         auto window = new Window(createInfo);
         auto windowRef = std::ref(*window);
 
         _windows.emplace_back(
-            [windowRef, createInfo] ()
+            [windowRef] ()
             {
                 auto& w = windowRef.get();
                 w.initContext();
                 w._inputState.setup();
                 w._timeState.setup();
-                auto& scene = createInfo.scene.get();
+                auto& scene = *w._scene;
 
                 scene.Initialize();
                 while (!w.shouldClose())
@@ -41,6 +43,7 @@ namespace gfx::io
                     });
                 }
                 std::cout << Context::Window().getTitle() << " is closing." << std::endl;
+                Context::Scheduler().WaitIdle();
                 w.close();
             }, window);
         return *window;
