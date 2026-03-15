@@ -2,11 +2,13 @@
 // Created by radue on 2/18/2026.
 //
 
-#include "buffer.h"
-#include "impl/open_gl/buffer.h"
-#include "impl/vulkan/buffer.h"
+#include "../backends/open_gl/buffer.h"
+#include "../backends/vulkan/buffer.h"
 
-#include "io/window.h"
+#include <buffer.h>
+#include <window.h>
+#include <framebuffer.h>
+#include <surface.h>
 
 namespace gfx
 {

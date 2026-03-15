@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include "scenes/scene.h"
+#include <scene.h>
 
 class LabRectangle : public gfx::Scene
 {

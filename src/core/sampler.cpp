@@ -2,12 +2,14 @@
 // Created by radue on 2/20/2026.
 //
 
-#include "sampler.h"
-#include "impl/open_gl/sampler.h"
-#include "impl/vulkan/sampler.h"
+#include "../backends/open_gl/sampler.h"
+#include "../backends/vulkan/sampler.h"
 
-#include "context.h"
-#include "io/window.h"
+#include <sampler.h>
+#include <context.h>
+#include <window.h>
+#include <framebuffer.h>
+#include <surface.h>
 
 namespace gfx
 {

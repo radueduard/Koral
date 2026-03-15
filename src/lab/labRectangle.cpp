@@ -6,12 +6,16 @@
 
 #include <stb_image_write.h>
 
-#include "core/comandBuffer.h"
-#include "core/computePipeline.h"
-#include "core/descriptorBinding.h"
-#include "core/image.h"
-#include "core/shader.h"
-#include "io/window.h"
+#include <comandBuffer.h>
+#include <computePipeline.h>
+#include <descriptorBinding.h>
+#include <image.h>
+#include <shader.h>
+#include <window.h>
+
+#include "buffer.h"
+#include "descriptorSet.h"
+#include "imageView.h"
 
 void LabRectangle::Initialize()
 {

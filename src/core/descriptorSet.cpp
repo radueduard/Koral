@@ -2,18 +2,49 @@
 // Created by radue on 3/4/2026.
 //
 
-#include "descriptorSet.h"
-#include "impl/open_gl/descriptorSet.h"
-#include "impl/vulkan/descriptorSet.h"
+#include <descriptorSet.h>
+#include <descriptorBinding.h>
+#include <descriptorSetLayout.h>
+#include <window.h>
+#include <framebuffer.h>
+#include <surface.h>
+
+#include "../backends/open_gl/descriptorSet.h"
+#include "../backends/vulkan/descriptorSet.h"
 
 #include <ranges>
 
-#include "descriptorBinding.h"
-#include "descriptorSetLayout.h"
-#include "io/window.h"
+#include "buffer.h"
+#include "imageView.h"
+
 
 namespace gfx
 {
+    Descriptor::Descriptor(const Buffer* buffer, const glm::i64 offset, const glm::i64 range): valid(true), _buffer(buffer), _offset(offset), _range(range)
+    {
+        if (buffer == nullptr) {
+            throw std::runtime_error("Buffer must be valid!");
+        }
+
+        if (offset < 0 || offset >= buffer->getSize()) {
+            throw std::runtime_error("Offset must be within the bounds of the buffer!");
+        }
+
+        if (range < 0) {
+            throw std::runtime_error("Range must be non-negative!");
+        }
+
+        if (offset + range > buffer->getSize()) {
+            throw std::runtime_error("Offset + range must be within the bounds of the buffer!");
+        }
+
+        if (range == 0) {
+            _range = buffer->getSize() - offset;
+        }
+    }
+
+    Descriptor::Descriptor(const ImageView* imageView, const Sampler* sampler): valid(true), _imageView(imageView), _sampler(sampler) {}
+
     DescriptorSet::Builder::Builder(const DescriptorSetLayout& layout) : layout(layout)
     {
         for (const auto& [binding, type, count] : layout.getBindings()) {
@@ -40,27 +71,27 @@ namespace gfx
         {
         case DescriptorType::eUniformBuffer:
         case DescriptorType::eStorageBuffer:
-            if (descriptor._buffer == nullptr)
+            if (descriptor.getBuffer() == nullptr)
             {
                 throw std::runtime_error("Descriptor for buffer binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid buffer!");
             }
             break;
         case DescriptorType::eCombinedImageSampler:
-            if (descriptor._imageView == nullptr) {
+            if (descriptor.getImageView() == nullptr) {
                 throw std::runtime_error("Descriptor for image binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid image view!");
             }
-            if (descriptor._sampler == nullptr)
+            if (descriptor.getSampler() == nullptr)
             {
                 throw std::runtime_error("Descriptor for image binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid sampler!");
             }
             break;
         case DescriptorType::eStorageImage:
-            if (descriptor._imageView == nullptr) {
+            if (descriptor.getImageView() == nullptr) {
                 throw std::runtime_error("Descriptor for image binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid image view!");
             }
             break;
         case DescriptorType::eSampler:
-            if (descriptor._sampler == nullptr)            {
+            if (descriptor.getSampler() == nullptr)            {
                 throw std::runtime_error("Descriptor for sampler binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid sampler!");
             }
             break;

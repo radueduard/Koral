@@ -2,15 +2,17 @@
 // Created by radue on 2/21/2026.
 //
 
-#include "framebuffer.h"
-#include "impl/open_gl/framebuffer.h"
-#include "impl/vulkan/framebuffer.h"
+#include <framebuffer.h>
+#include <scheduler.h>
+#include <context.h>
+#include <window.h>
+#include <surface.h>
 
-#include <ranges>
+#include "../backends/open_gl/framebuffer.h"
+#include "../backends/vulkan/framebuffer.h"
 
-#include "context.h"
-#include "scheduler.h"
-#include "io/window.h"
+#include "image.h"
+#include "imageView.h"
 
 namespace gfx {
     Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const ImageView& imageView, glm::vec4 clearColor)

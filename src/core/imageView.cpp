@@ -2,13 +2,15 @@
 // Created by radue on 2/20/2026.
 //
 
-#include "imageView.h"
-#include "impl/open_gl/imageView.h"
-#include "impl/vulkan/imageView.h"
 
+#include "../backends/open_gl/imageView.h"
+#include "../backends/vulkan/imageView.h"
 
-#include "context.h"
-#include "io/window.h"
+#include <imageView.h>
+#include <context.h>
+#include <window.h>
+#include <framebuffer.h>
+#include <surface.h>
 
 namespace gfx
 {

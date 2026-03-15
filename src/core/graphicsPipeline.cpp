@@ -2,13 +2,17 @@
 // Created by radue on 2/22/2026.
 //
 
-#include "graphicsPipeline.h"
-#include "descriptorSetLayout.h"
-#include "impl/open_gl/graphicsPipeline.h"
-#include "impl/vulkan/graphicsPipeline.h"
+#include <graphicsPipeline.h>
+#include <descriptorSetLayout.h>
+#include <framebuffer.h>
+#include <surface.h>
+#include <window.h>
+
+#include "../backends/open_gl/graphicsPipeline.h"
+#include "../backends/vulkan/graphicsPipeline.h"
 
 #include "context.h"
-#include "io/window.h"
+#include "shader.h"
 
 namespace gfx
 {
@@ -20,25 +24,25 @@ namespace gfx
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(const Shader& geometryShader)
     {
-        this->geometryShader = geometryShader;
+        this->geometryShader = std::cref(geometryShader);
         return *this;
     }
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(const Shader& fragmentShader)
     {
-        this->fragmentShader = fragmentShader;
+        this->fragmentShader = std::cref(fragmentShader);
         return *this;
     }
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(const Shader& taskShader)
     {
-        this->taskShader = taskShader;
+        this->taskShader = std::cref(taskShader);
         return *this;
     }
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(const Shader& meshShader)
     {
-        this->meshShader = meshShader;
+        this->meshShader = std::cref(meshShader);
         return *this;
     }
 
@@ -74,7 +78,7 @@ namespace gfx
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(const Framebuffer& framebuffer)
     {
-        this->framebuffer = framebuffer;
+        this->framebuffer = std::cref(framebuffer);
         return *this;
     }
 
@@ -89,6 +93,8 @@ namespace gfx
             throw std::runtime_error("Unknown API");
         }
     }
+
+    GraphicsPipeline::~GraphicsPipeline() = default;
 
     const gfx::DescriptorSetLayout& GraphicsPipeline::getSetLayout(const glm::u32 index) const
     {
