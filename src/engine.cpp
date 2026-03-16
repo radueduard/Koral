@@ -24,13 +24,8 @@ namespace gfx
         glewExperimental = GL_TRUE;
         vk::Context::Init();
 
-        {
-            // SceneManager::LoadScene("F:/GFX_PROJECTS/SimpleTriangle/cmake-build-debug/SimpleTriangle.dll");
-            SceneManager::LoadScene("F:/GFX_PROJECTS/MultiFramebuffer/cmake-build-debug/MultiFramebuffer.dll");
-
-            while (!io::Manager::_windows.empty()) {
-                io::Manager::update();
-            }
+        while (!io::Manager::_windows.empty()) {
+            io::Manager::update();
         }
         vk::Context::Destroy();
     }

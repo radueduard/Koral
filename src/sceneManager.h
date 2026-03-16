@@ -8,7 +8,13 @@
 #include "io/manager.h"
 
 #include <scene.h>
+
+#ifdef _WIN32
 #include <windows.h>
+#elif defined(__linux__) || defined(__APPLE__)
+#include <dlfcn.h>
+#endif
+
 
 using CreateSceneFn = gfx::Scene*(*)();
 
@@ -23,6 +29,7 @@ namespace gfx
                 throw std::runtime_error("Scene file does not exist: " + path.string());
             }
 
+#ifdef _WIN32
             const HMODULE module = LoadLibraryW(path.wstring().c_str());
             if (!module) {
                 throw std::runtime_error("Failed to load DLL");
@@ -32,6 +39,19 @@ namespace gfx
             const auto createScene = reinterpret_cast<CreateSceneFn>(
                 GetProcAddress(module, "CreateScene")
             );
+#elif defined(__linux__) || defined(__APPLE__)
+            const void* module = dlopen(path.string().c_str(), RTLD_LAZY);
+            if (!module) {
+                throw std::runtime_error("Failed to load shared library: " + std::string(dlerror()));
+            }
+
+            const auto createScene = reinterpret_cast<CreateSceneFn>(
+                dlsym(const_cast<void*>(module), "CreateScene")
+            );
+#else
+#error "Unsupported platform"
+#endif
+
 
             auto scene = std::unique_ptr<gfx::Scene>(createScene());
             io::Window::Builder(std::move(scene))
@@ -39,7 +59,7 @@ namespace gfx
                 .setExtent({ 1280, 720 })
                 .setResizable(true)
                 .setFullscreen(false)
-                .setAPI(API::eOpenGL)
+                .setAPI(API::eVulkan)
                 .build();
         }
     };

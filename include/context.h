@@ -28,12 +28,12 @@ namespace gfx {
     class Context
     {
         friend class io::Window;
-        friend class Scheduler;
+        friend class gfx::Scheduler;
     public:
         static GFX_API io::Window& FocusedWindow();
 
         static GFX_API io::Window& Window();
-        static GFX_API const Scheduler& Scheduler();
+        static GFX_API const gfx::Scheduler& Scheduler();
 
         static GFX_API const gfx::Framebuffer& DefaultFramebuffer();
 
