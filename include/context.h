@@ -53,7 +53,7 @@ namespace gfx {
         inline static thread_local io::Window* _currentThreadLinkedWindow = nullptr;
         inline static thread_local gfx::Scheduler* _scheduler = nullptr;
 
-        inline thread_local static auto _threadId = std::thread::id();
+        static thread_local std::thread::id _threadId;
         inline static std::thread::id _mainThreadId = std::this_thread::get_id();
 
     };
