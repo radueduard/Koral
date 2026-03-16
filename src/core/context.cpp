@@ -11,6 +11,8 @@
 #include "scheduler.h"
 #include "window.h"
 
+thread_local std::thread::id gfx::Context::_threadId;
+
 std::filesystem::path gfx::asset(const std::filesystem::path& relativePath)
 {
     return std::filesystem::path(ASSETS_PATH) / relativePath;
