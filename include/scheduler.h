@@ -8,7 +8,7 @@
 #include <functional>
 #include <memory>
 
-#include "comandBuffer.h"
+#include "commandBuffer.h"
 
 namespace gfx
 {

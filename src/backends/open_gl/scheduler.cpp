@@ -10,7 +10,7 @@
 #include "scheduler.h"
 #include <window.h>
 
-#include "comandBuffer.h"
+#include "commandBuffer.h"
 
 namespace gfx::ogl
 {

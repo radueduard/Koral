@@ -11,7 +11,7 @@
 #include "device.h"
 #include "shader.h"
 #include "vulkanContext.h"
-#include "comandBuffer.h"
+#include "commandBuffer.h"
 #include "framebuffer.h"
 #include "vk_enum_conversions.h"
 

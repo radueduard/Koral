@@ -137,6 +137,9 @@ target_link_libraries(${PROJECT_NAME} glad::glad)
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
     SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/"
+    SCENES_PATH="${CMAKE_SOURCE_DIR}/scenes/"
+    TEMPLATES_PATH="${CMAKE_SOURCE_DIR}/templates/"
+    PROJECT_ROOT="${CMAKE_SOURCE_DIR}/"
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -154,3 +157,6 @@ target_include_directories(Gfx_Runtime PRIVATE
         ${CMAKE_BINARY_DIR}/include)
 # link the GFX_RELOADED dll
 target_link_libraries(Gfx_Runtime PRIVATE ${PROJECT_NAME})
+
+target_compile_definitions(Gfx_Runtime PRIVATE
+    PROJECT_ROOT="${CMAKE_SOURCE_DIR}")

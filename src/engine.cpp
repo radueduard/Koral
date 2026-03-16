@@ -9,7 +9,7 @@
 #include "backends/vulkan/vulkanContext.h"
 #include "io/manager.h"
 
-#include "lab/LabMesh/Lab01.h"
+#include "project/generate.h"
 
 namespace gfx
 {

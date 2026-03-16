@@ -17,8 +17,10 @@ namespace gfx {
         class Window;
     }
 
-    GFX_API std::filesystem::path asset(const std::filesystem::path& relativePath);
-    GFX_API std::filesystem::path shader(const std::filesystem::path& relativePath);
+    GFX_API std::filesystem::path assetPath(const std::filesystem::path& relativePath);
+    GFX_API std::filesystem::path shaderPath(const std::filesystem::path& relativePath);
+    GFX_API std::filesystem::path scenePath(const std::filesystem::path& relativePath);
+    GFX_API std::filesystem::path templatePath(const std::filesystem::path& relativePath);
 
     enum class API {
         eOpenGL,

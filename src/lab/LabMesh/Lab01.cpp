@@ -11,7 +11,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.inl>
 
-#include <comandBuffer.h>
+#include <commandBuffer.h>
 #include <importer.h>
 #include <window.h>
 
@@ -25,17 +25,17 @@
 
 void Lab01::Initialize()
 {
-    _mesh = gfx::LabMesh::ImportFromFile(gfx::asset("DamagedHelmet/DamagedHelmet.gltf"));
-    _albedoImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_albedo.jpg"));
-    _normalImage = gfx::Importer::LoadImage(gfx::asset("DamagedHelmet/Default_normal.jpg"));
+    _mesh = gfx::LabMesh::ImportFromFile(gfx::assetPath("DamagedHelmet/DamagedHelmet.gltf"));
+    _albedoImage = gfx::Importer::LoadImage(gfx::assetPath("DamagedHelmet/Default_albedo.jpg"));
+    _normalImage = gfx::Importer::LoadImage(gfx::assetPath("DamagedHelmet/Default_normal.jpg"));
 
     const auto vertexShader = gfx::Shader::Builder()
-        .setPath(gfx::shader("albedo.vert.glsl"))
+        .setPath(gfx::shaderPath("albedo.vert.glsl"))
         .setStage(gfx::Shader::Stage::eVertex)
         .build();
 
     const auto fragmentShader = gfx::Shader::Builder()
-        .setPath(gfx::shader("albedo.frag.glsl"))
+        .setPath(gfx::shaderPath("albedo.frag.glsl"))
         .setStage(gfx::Shader::Stage::eFragment)
         .build();
 

@@ -1,0 +1,13 @@
+{
+  "version": 4,
+  "configurePresets": [
+    {
+      "name": "debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/cmake-build-debug",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "C:/Users/radue/.vcpkg-clion/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      }
+    }
+  ]
+}

@@ -11,14 +11,24 @@
 #include "scheduler.h"
 #include "window.h"
 
-std::filesystem::path gfx::asset(const std::filesystem::path& relativePath)
+std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
 {
     return std::filesystem::path(ASSETS_PATH) / relativePath;
 }
 
-std::filesystem::path gfx::shader(const std::filesystem::path& relativePath)
+std::filesystem::path gfx::shaderPath(const std::filesystem::path& relativePath)
 {
     return std::filesystem::path(SHADERS_PATH) / relativePath;
+}
+
+std::filesystem::path gfx::scenePath(const std::filesystem::path& relativePath)
+{
+    return std::filesystem::path(SCENES_PATH) / relativePath;
+}
+
+std::filesystem::path gfx::templatePath(const std::filesystem::path& relativePath)
+{
+    return std::filesystem::path(TEMPLATES_PATH) / relativePath;
 }
 
 gfx::io::Window& gfx::Context::FocusedWindow()
