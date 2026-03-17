@@ -25,6 +25,9 @@ namespace gfx
         glewExperimental = GL_TRUE;
         vk::Context::Init();
 
+        // ProjectManager::generate("/Users/radue", "lSystems");
+        SceneManager::LoadScene(scenePath("liblSystems.dylib"));
+
         while (!io::Manager::_windows.empty()) {
             io::Manager::update();
         }

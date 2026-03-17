@@ -14,8 +14,10 @@ void @NAME@::Update()
 
 void @NAME@::Render(gfx::CommandBuffer& commandBuffer)
 {
-    (void)commandBuffer;
     // TODO: record render commands
+    commandBuffer
+        .BeginRendering()
+        .EndRendering();
 }
 
 void @NAME@::RenderUI(ImGuiContext* context) const

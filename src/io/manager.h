@@ -5,6 +5,7 @@
 #pragma once
 #include <vector>
 #include <memory>
+#include <queue>
 #include <thread>
 
 #include "window.h"
@@ -28,10 +29,12 @@ namespace gfx::io
 
         ~Manager();
 
+        [[nodiscard]] static std::queue<std::function<void()>>& MainThreadTasks() { return _mainThreadTasks; }
+
     private:
         Manager();
         static void update();
-
+        inline static std::queue<std::function<void()>> _mainThreadTasks = {};
         inline static std::vector<std::pair<std::jthread, std::unique_ptr<Window>>> _windows;
     };
 }

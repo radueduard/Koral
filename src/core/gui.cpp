@@ -14,8 +14,10 @@
 
 #include <imgui.h>
 #include <iostream>
+#include <semaphore>
 
 #include "commandBuffer.h"
+#include "../io/manager.h"
 
 void gfx::GUI::Init()
 {
@@ -34,19 +36,25 @@ void gfx::GUI::Init()
 
 void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, const Scene& scene)
 {
-    switch (Context::Window().getAPI())
-    {
-    case API::eOpenGL:
-        ogl::GUI::NewFrame();
-        break;
-    case API::eVulkan:
-        vk::GUI::NewFrame();
-        break;
-    default:
-        throw std::runtime_error("Unsupported graphics API");
-    }
+    auto semaphore = std::binary_semaphore(0);
+    auto api = Context::Window().getAPI();
+    io::Manager::MainThreadTasks().emplace([&semaphore, api] {
+        switch (api)
+        {
+        case API::eOpenGL:
+                ogl::GUI::NewFrame();
+                break;
+            case API::eVulkan:
+                vk::GUI::NewFrame();
+                break;
+            default:
+                throw std::runtime_error("Unsupported graphics API");
+            }
 
-    ImGui::NewFrame();
+        ImGui::NewFrame();
+        semaphore.release();
+    });
+    semaphore.acquire();
 
     constexpr ImGuiDockNodeFlags dockSpaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
 

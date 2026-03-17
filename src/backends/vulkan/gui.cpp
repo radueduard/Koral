@@ -40,7 +40,9 @@ namespace gfx::vk
             .build();
 
         ImGui::CreateContext();
-        ImGui_ImplGlfw_InitForVulkan(*gfx::Context::Window(), true);
+        if (!ImGui_ImplGlfw_InitForVulkan(*gfx::Context::Window(), true)) {
+            throw std::runtime_error("Failed to initialize ImGui for GLFW");
+        }
         ImGui::StyleColorsDark();
 
         const auto& queue = vk::Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
@@ -92,8 +94,8 @@ namespace gfx::vk
 
     void GUI::NewFrame()
     {
-        ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
+        ImGui_ImplVulkan_NewFrame();
     }
 
     void GUI::Render(gfx::CommandBuffer& commandBuffer)

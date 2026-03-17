@@ -82,6 +82,12 @@ namespace gfx::io
     {
         glfwPollEvents();
 
+        while (!_mainThreadTasks.empty()) {
+            auto& task = _mainThreadTasks.front();
+            task();
+            _mainThreadTasks.pop();
+        }
+
         _windows.erase(std::ranges::remove_if(_windows, [](const auto& window) {
             return window.second->_closed;
         }).begin(), _windows.end());
