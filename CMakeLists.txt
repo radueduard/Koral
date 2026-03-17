@@ -33,61 +33,12 @@ find_package(spirv_cross_core CONFIG REQUIRED)
 find_package(spirv_cross_glsl CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
 
-set (SOURCE_FILES
-        src/core/buffer.cpp
-        src/core/commandBuffer.cpp
-        src/core/computePipeline.cpp
-        src/core/context.cpp
-        src/core/descriptorSet.cpp
-        src/core/descriptorSetLayout.cpp
-        src/core/framebuffer.cpp
-        src/core/graphicsPipeline.cpp
-        src/core/image.cpp
-        src/core/imageView.cpp
-        src/core/importer.cpp
-        src/core/initLibs.cpp
-        src/core/sampler.cpp
-        src/core/scheduler.cpp
-        src/core/shader.cpp
-        src/core/surface.cpp
+find_package(imgui CONFIG REQUIRED)
 
-        src/io/input.cpp
-        src/io/manager.cpp
-        src/io/time.cpp
-        src/io/window.cpp
-
-        src/backends/open_gl/buffer.cpp
-        src/backends/open_gl/commandBuffer.cpp
-        src/backends/open_gl/computePipeline.cpp
-        src/backends/open_gl/descriptorSet.cpp
-        src/backends/open_gl/framebuffer.cpp
-        src/backends/open_gl/graphicsPipeline.cpp
-        src/backends/open_gl/image.cpp
-        src/backends/open_gl/imageView.cpp
-        src/backends/open_gl/sampler.cpp
-        src/backends/open_gl/scheduler.cpp
-        src/backends/open_gl/shader.cpp
-
-        src/backends/vulkan/allocator.cpp
-        src/backends/vulkan/buffer.cpp
-        src/backends/vulkan/commandBuffer.cpp
-        src/backends/vulkan/computePipeline.cpp
-        src/backends/vulkan/descriptorPool.cpp
-        src/backends/vulkan/descriptorSet.cpp
-        src/backends/vulkan/descriptorSetLayout.cpp
-        src/backends/vulkan/device.cpp
-        src/backends/vulkan/framebuffer.cpp
-        src/backends/vulkan/graphicsPipeline.cpp
-        src/backends/vulkan/image.cpp
-        src/backends/vulkan/imageView.cpp
-        src/backends/vulkan/physicalDevice.cpp
-        src/backends/vulkan/runtime.cpp
-        src/backends/vulkan/sampler.cpp
-        src/backends/vulkan/scheduler.cpp
-        src/backends/vulkan/shader.cpp
-        src/backends/vulkan/surface.cpp
-        src/backends/vulkan/swapChain.cpp
-        src/backends/vulkan/vulkanContext.cpp
+file (GLOB_RECURSE SOURCE_FILES
+        src/core/*.cpp
+        src/io/*.cpp
+        src/backends/*.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
@@ -127,6 +78,7 @@ target_link_libraries(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} spirv-cross-core)
 target_link_libraries(${PROJECT_NAME} spirv-cross-glsl)
 target_link_libraries(${PROJECT_NAME} reflectcpp::reflectcpp)
+target_link_libraries(${PROJECT_NAME} imgui::imgui)
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} OpenGL::GLX)
@@ -146,11 +98,13 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_BINARY_DIR}/include
         ${CMAKE_SOURCE_DIR}/include)
 
-
-add_executable(Gfx_Runtime
+file (GLOB_RECURSE RUNTIME_SOURCE_FILES
         src/main.cpp
         src/engine.cpp
-        src/lab/LabMesh/Lab01.cpp)
+        src/lab/*.cpp
+)
+
+add_executable(Gfx_Runtime ${RUNTIME_SOURCE_FILES})
 
 target_include_directories(Gfx_Runtime PRIVATE
         ${CMAKE_SOURCE_DIR}/include
@@ -158,5 +112,7 @@ target_include_directories(Gfx_Runtime PRIVATE
 # link the GFX_RELOADED dll
 target_link_libraries(Gfx_Runtime PRIVATE ${PROJECT_NAME})
 
+string(REPLACE "\\" "/" VCPKG_TOOLCHAIN_FWD "${CMAKE_TOOLCHAIN_FILE}")
 target_compile_definitions(Gfx_Runtime PRIVATE
-    PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
+    PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
+    VCPKG_ROOT="${VCPKG_TOOLCHAIN_FWD}")

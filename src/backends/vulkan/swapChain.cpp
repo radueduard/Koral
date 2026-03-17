@@ -4,8 +4,10 @@
 
 #include "swapChain.h"
 
+#include <framebuffer.h>
 #include <ranges>
 
+#include "context.h"
 #include "image.h"
 #include "runtime.h"
 #include "scheduler.h"
@@ -132,6 +134,8 @@ namespace gfx::vk
         Context::Device()->waitIdle();
         CreateSwapChain();
         _swapChainImages->TransitionLayout(::vk::ImageLayout::ePresentSrcKHR);
+        gfx::Context::DefaultFramebuffer().Resize(_swapChainImages->getExtent());
+
     }
 
     ::vk::Result SwapChain::Acquire(const gfx::vk::Frame &frame) {

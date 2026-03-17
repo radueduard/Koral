@@ -53,14 +53,16 @@ namespace gfx
 
         [[nodiscard]] virtual const ClearValues& getClearValues() const { return _clearValues; }
 
+        virtual void Resize(const glm::uvec2& newExtent) const {};
+
     protected:
         bool _isDefault = false;
         Framebuffer() = default;
         explicit Framebuffer(const Builder& createInfo);
 
-        glm::uvec2 _extent = { 0, 0 };
-        std::vector<std::reference_wrapper<const ImageView>> _colorAttachments;
-        std::optional<std::reference_wrapper<const ImageView>> _depthStencilAttachment;
+        mutable glm::uvec2 _extent = { 0, 0 };
+        mutable std::vector<std::reference_wrapper<const ImageView>> _colorAttachments;
+        mutable std::optional<std::reference_wrapper<const ImageView>> _depthStencilAttachment;
         ClearValues _clearValues;
     };
 }

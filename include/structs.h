@@ -29,6 +29,9 @@ namespace gfx
         eCombinedImageSampler,
         eStorageImage,
         eSampler,
+        eSampledImage,
+        eUniformTexelBuffer,
+        eStorageTexelBuffer,
     };
 
     struct GFX_API VertexInputAttributeDescription

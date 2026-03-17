@@ -39,7 +39,7 @@ namespace gfx::io {
             bool resizable = true;
             bool fullscreen = false;
             API api = API::eOpenGL;
-            std::unique_ptr<Scene> scene;
+            std::unique_ptr<Scene> scene = nullptr;
 
             explicit Builder(std::unique_ptr<Scene> scene) : scene(std::move(scene)) {}
 

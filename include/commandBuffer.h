@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <glm/fwd.hpp>
@@ -47,6 +48,7 @@ namespace gfx
         virtual CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) = 0;
         virtual CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) = 0;
         virtual CommandBuffer& Blit(const Image* srcImage, const Image* dstImage = nullptr) = 0;
+        virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 
         virtual void Submit() = 0;
         virtual void Reset() = 0;

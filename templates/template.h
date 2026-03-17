@@ -8,4 +8,5 @@ public:
     void Initialize() override;
     void Update() override;
     void Render(gfx::CommandBuffer& commandBuffer) override;
+    void RenderUI(ImGuiContext* context) const override;
 };

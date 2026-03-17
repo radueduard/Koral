@@ -8,6 +8,7 @@
 #include "sceneManager.h"
 #include "backends/vulkan/vulkanContext.h"
 #include "io/manager.h"
+#include "lab/labRectangle.h"
 
 #include "project/generate.h"
 

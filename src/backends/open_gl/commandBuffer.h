@@ -33,6 +33,7 @@ namespace gfx::ogl
         gfx::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
         gfx::CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) override;
         gfx::CommandBuffer& Blit(const Image* srcImage, const Image* dstImage) override;
+        gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
 
         void Submit() override;
         void Reset() override;

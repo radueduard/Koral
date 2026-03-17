@@ -292,6 +292,12 @@ namespace gfx::vk
          return *this;
     }
 
+    gfx::CommandBuffer& CommandBuffer::Run(const std::function<void(gfx::CommandBuffer&)>& command)
+    {
+        command(*this);
+        return *this;
+    }
+
     void CommandBuffer::Submit()
     {
         const auto commandBuffers = std::array { _handle };

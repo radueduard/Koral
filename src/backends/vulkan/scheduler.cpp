@@ -66,7 +66,6 @@ namespace gfx::vk
             _started = false;
             _swapChain->Resize(gfx::Context::Window().getExtent());
             _started = true;
-            std::cout << "SwapChain Resized" << std::endl;
             return;
         }
 
@@ -94,7 +93,6 @@ namespace gfx::vk
             _started = false;
             _swapChain->Resize(gfx::Context::Window().getExtent());
             _started = true;
-            std::cout << "SwapChain Resized" << std::endl;
             return;
         }
 

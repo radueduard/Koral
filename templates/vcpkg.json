@@ -8,5 +8,9 @@
   }, {
     "name" : "assimp",
     "version>=" : "6.0.4"
-  } ]
+  }, {
+    "name" : "imgui",
+    "version>=" : "1.91.9",
+    "features": ["glfw-binding", "opengl3-binding", "vulkan-binding", "docking-experimental"]
+  }  ]
 }

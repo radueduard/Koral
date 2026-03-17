@@ -17,6 +17,8 @@ layout (set = 0, binding = 6) uniform Camera {
 struct Light {
     vec4 position;
     vec4 color;
+    float intensity;
+    float radius;
 };
 
 layout (set = 0, binding = 7, std430) buffer Lights {

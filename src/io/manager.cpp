@@ -15,6 +15,7 @@
 #include "scheduler.h"
 #include <framebuffer.h>
 #include <surface.h>
+#include "../core/gui.h"
 
 namespace gfx::io
 {
@@ -32,6 +33,7 @@ namespace gfx::io
                 w._timeState.setup();
                 auto& scene = *w._scene;
 
+                gfx::GUI::Init();
                 scene.Initialize();
                 while (!w.shouldClose())
                 {
@@ -40,10 +42,12 @@ namespace gfx::io
                     scene.Update();
                     Context::Scheduler().Draw([&](gfx::CommandBuffer& commandBuffer) {
                         scene.Render(commandBuffer);
+                        gfx::GUI::Render(commandBuffer, scene);
                     });
                 }
                 std::cout << Context::Window().getTitle() << " is closing." << std::endl;
                 Context::Scheduler().WaitIdle();
+                GUI::Shutdown();
                 w.close();
             }, window);
         return *window;

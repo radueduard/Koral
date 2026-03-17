@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(glm CONFIG REQUIRED)
 find_package(assimp REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 file (GLOB_RECURSE SOURCE_FILES "src/*.cpp" "src/*.c")
 file (GLOB_RECURSE HEADER_FILES "src/*.h" "src/*.hpp")
@@ -35,6 +36,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 target_link_libraries(${PROJECT_NAME} PUBLIC ${GFX_RELOADED_LIBRARY})
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm assimp::assimp)
+target_link_libraries(${PROJECT_NAME} PRIVATE imgui::imgui)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
         ASSETS_PATH="@PATH@/assets/"

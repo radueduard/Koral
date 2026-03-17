@@ -104,8 +104,10 @@ namespace gfx
             {
                 throw std::runtime_error("Failed to open cmake presets file");
             }
+            std::string cmakePresetsContent((std::istreambuf_iterator<char>(cmakePresets)), std::istreambuf_iterator<char>());
+            replaceAll(cmakePresetsContent, "@VCPKG@", VCPKG_ROOT);
             std::ofstream cmakePresetsFile(projectDir / "CMakePresets.json");
-            cmakePresetsFile << cmakePresets.rdbuf();
+            cmakePresetsFile << cmakePresetsContent;
             cmakePresetsFile.close();
 
             _projects.insert(projectDir);

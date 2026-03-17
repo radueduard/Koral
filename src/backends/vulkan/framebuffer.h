@@ -16,5 +16,6 @@ namespace gfx::vk
         explicit Framebuffer(const Framebuffer::Builder& builder);
 
         ~Framebuffer() override;
+        void Resize(const glm::uvec2& newExtent) const override;
     };
 }
