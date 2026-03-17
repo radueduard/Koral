@@ -6,6 +6,8 @@
 
 #include "api.h"
 
+struct ImGuiContext;
+
 namespace gfx
 {
     class CommandBuffer;
@@ -15,9 +17,9 @@ namespace gfx
         virtual ~Scene() = default;
 
         virtual void Initialize() = 0;
-        virtual void Update() = 0;
-        virtual void FixedUpdate() {};
+        virtual void Update() {};
         virtual void Render(gfx::CommandBuffer& commandBuffer) = 0;
+        virtual void RenderUI(ImGuiContext* context) const {};
     };
 }
 

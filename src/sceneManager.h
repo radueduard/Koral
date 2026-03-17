@@ -52,10 +52,8 @@ namespace gfx
 #error "Unsupported platform"
 #endif
 
-
-            auto scene = std::unique_ptr<gfx::Scene>(createScene());
-            io::Window::Builder(std::move(scene))
-                .setTitle("Simple Triangle")
+            io::Window::Builder(std::unique_ptr<Scene>(createScene()))
+                .setTitle(path.stem().string())
                 .setExtent({ 1280, 720 })
                 .setResizable(true)
                 .setFullscreen(false)

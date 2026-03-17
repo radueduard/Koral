@@ -39,4 +39,21 @@ namespace gfx::vk
 
     Framebuffer::Framebuffer(const Framebuffer::Builder& builder) : gfx::Framebuffer(builder) {}
     Framebuffer::~Framebuffer() = default;
+
+    void Framebuffer::Resize(const glm::uvec2& newExtent) const
+    {
+        gfx::Framebuffer::Resize(newExtent);
+
+        if (_isDefault)
+        {
+            const auto& scheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
+            auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
+            auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
+
+            _extent = newExtent;
+            _colorAttachments.clear();
+            _colorAttachments.emplace_back(colorAttachment);
+            _depthStencilAttachment = depthStencilAttachment;
+        }
+    }
 }

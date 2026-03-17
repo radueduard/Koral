@@ -13,6 +13,7 @@
 
 #include <image.h>
 
+#include "vk_enum_conversions.h"
 #include "vk_wrapper.h"
 
 namespace gfx::vk
@@ -44,7 +45,7 @@ namespace gfx::vk
         [[nodiscard]] const glm::uvec2 &getExtent() const { return _extent; }
         [[nodiscard]] glm::u32 getMinImageCount() const { return _minImageCount; }
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
-        [[nodiscard]] MSAA getMSAA() const { return _msaa; }
+        [[nodiscard]] ::vk::SampleCountFlagBits getMSAA() const { return getVkSampleCount(_msaa); }
 
         [[nodiscard]] const gfx::vk::Image& getImage() const { return *_swapChainImages; }
         [[nodiscard]] const gfx::Image& getDepthImage() const { return *_depthImages; }

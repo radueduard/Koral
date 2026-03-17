@@ -12,10 +12,13 @@
 
 #include "buffer.h"
 #include "computePipeline.h"
+#include "context.h"
 #include "framebuffer.h"
 #include "graphicsPipeline.h"
 #include "image.h"
 #include "ogl_err_handling.h"
+#include "window.h"
+#include "surface.h"
 
 namespace gfx::ogl
 {
@@ -262,7 +265,7 @@ namespace gfx::ogl
                     framebuffer,
                     0,
                     0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
-                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
+                    0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y,
                     GL_COLOR_BUFFER_BIT,
                     GL_NEAREST);
                 glCheckError();
@@ -304,6 +307,16 @@ namespace gfx::ogl
                 glCheckError();
             });
         }
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::Run(const std::function<void(gfx::CommandBuffer&)>& command)
+    {
+        CheckRecording();
+        _commands.emplace_back([command, this] ()
+        {
+            command(*this);
+        });
         return *this;
     }
 

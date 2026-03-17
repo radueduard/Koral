@@ -4,9 +4,7 @@
 
 #include "labRectangle.h"
 
-#include <stb_image_write.h>
-
-#include <comandBuffer.h>
+#include <commandBuffer.h>
 #include <computePipeline.h>
 #include <descriptorBinding.h>
 #include <image.h>
@@ -35,7 +33,7 @@ void LabRectangle::Initialize()
     buffer->Write(rectangleData);
     buffer->Unmap();
 
-    const auto image = gfx::Image::Builder()
+    _image = gfx::Image::Builder()
         .setType(gfx::Image::Type::e2D)
         .setFormat(gfx::Image::Format::eRGBA8_UNORM)
         .setExtent({ 512, 512 })
@@ -43,11 +41,11 @@ void LabRectangle::Initialize()
         .addUsage(gfx::Image::Usage::eTransferSrc)
         .build();
 
-    const auto imageView = gfx::ImageView::Builder(*image).build();
+    const auto imageView = gfx::ImageView::Builder(*_image).build();
 
     const auto computeShader = gfx::Shader::Builder()
         .setStage(gfx::Shader::Stage::eCompute)
-        .setPath(gfx::shader("test.comp.glsl"))
+        .setPath(gfx::shaderPath("test.comp.glsl"))
         .build();
 
     const auto computePipeline = gfx::ComputePipeline::Builder()
@@ -68,7 +66,11 @@ void LabRectangle::Initialize()
         .End();
     commandBuffer->Submit();
     commandBuffer->WaitForFence();
-
-    const auto data = image->ReadData(0, 0);
-    stbi_write_png("output.png", static_cast<int>(image->getExtent().x), static_cast<int>(image->getExtent().y), 4, data.data(), static_cast<int>(image->getExtent().x) * 4);
 }
+
+void LabRectangle::Render(gfx::CommandBuffer& commandBuffer)
+{
+    commandBuffer.Blit(_image.get());
+}
+
+

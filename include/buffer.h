@@ -121,6 +121,17 @@ namespace gfx
             std::memcpy(static_cast<std::byte*>(_mappedPtr) + offset, &data, sizeof(T));
         }
 
+        template <typename T> requires std::is_trivially_copyable_v<T>
+        void WriteAt(const glm::i64 index, const T& data)
+        {
+            if (!_mappedPtr) {
+                std::cerr << "Warning: Buffer is not mapped! Attempting to write to buffer which is not currently mapped." << std::endl;
+                return;
+            }
+
+            std::memcpy(static_cast<std::byte*>(_mappedPtr) + index * sizeof(T), &data, sizeof(T));
+        }
+
         virtual void Map() const = 0;
         virtual void Unmap() const = 0;
         virtual void CopyFrom(const Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const = 0;

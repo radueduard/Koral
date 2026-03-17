@@ -94,9 +94,13 @@ namespace gfx
         {
         case ::vk::DescriptorType::eSampler: return DescriptorType::eSampler;
         case ::vk::DescriptorType::eCombinedImageSampler: return DescriptorType::eCombinedImageSampler;
+        case ::vk::DescriptorType::eSampledImage: return DescriptorType::eSampledImage;
         case ::vk::DescriptorType::eStorageImage: return DescriptorType::eStorageImage;
+        case ::vk::DescriptorType::eUniformTexelBuffer: return DescriptorType::eUniformTexelBuffer;
+        case ::vk::DescriptorType::eStorageTexelBuffer: return DescriptorType::eStorageTexelBuffer;
         case ::vk::DescriptorType::eUniformBuffer: return DescriptorType::eUniformBuffer;
         case ::vk::DescriptorType::eStorageBuffer: return DescriptorType::eStorageBuffer;
+
         default: throw std::runtime_error("Unknown descriptor type!");
         }
     }
@@ -325,7 +329,7 @@ namespace gfx
         return vkUsage;
     }
 
-    inline ::vk::SampleCountFlagBits getVkSampleCount(MSAA msaa)
+    inline ::vk::SampleCountFlagBits getVkSampleCount(const MSAA msaa)
     {
         switch (msaa) {
         case MSAA::eNone: return ::vk::SampleCountFlagBits::e1;

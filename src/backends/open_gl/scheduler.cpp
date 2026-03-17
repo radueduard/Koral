@@ -11,6 +11,7 @@
 #include <window.h>
 
 #include "commandBuffer.h"
+#include "gui.h"
 
 namespace gfx::ogl
 {

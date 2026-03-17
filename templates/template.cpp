@@ -1,5 +1,6 @@
 #include "@NAME@.h"
 #include <commandBuffer.h>
+#include <imgui.h>
 
 void @NAME@::Initialize()
 {
@@ -15,4 +16,10 @@ void @NAME@::Render(gfx::CommandBuffer& commandBuffer)
 {
     (void)commandBuffer;
     // TODO: record render commands
+}
+
+void @NAME@::RenderUI(ImGuiContext* context) const
+{
+    ImGui::SetCurrentContext(context);
+    // TODO: define ui for the scene
 }
