@@ -58,3 +58,12 @@ if(WIN32)
         COMMENT "Copying ${PROJECT_NAME} and runtime DLL dependencies to ${OUTPUT_DLL_DIR}"
     )
 endif()
+if (UNIX)
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DLL_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:${PROJECT_NAME}>"
+        "${OUTPUT_DLL_DIR}/$<TARGET_FILE_NAME:${PROJECT_NAME}>"
+        COMMENT "Copying ${PROJECT_NAME} to ${OUTPUT_DLL_DIR}"
+    )
+endif()

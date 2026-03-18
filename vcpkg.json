@@ -28,13 +28,13 @@
     "version>=" : "16.1.0"
   }, {
     "name" : "spirv-cross",
-    "version>=" : "1.4.335.0"
+    "version>=" : "1.4.341.0"
   }, {
     "name" : "reflectcpp",
     "version>=" : "0.24.0"
   }, {
     "name" : "spirv-reflect",
-    "version>=" : "1.4.335.0"
+    "version>=" : "1.4.341.0"
   }, {
     "name" : "vulkan",
     "version>=" : "2023-12-17"

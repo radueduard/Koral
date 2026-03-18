@@ -4,11 +4,11 @@
 
 #include <GL/glew.h>
 
-#include "mesh.h"
 #include "sceneManager.h"
 #include "backends/vulkan/vulkanContext.h"
 #include "io/manager.h"
 #include "lab/labRectangle.h"
+#include "lab/LabMesh/Lab01.h"
 
 #include "project/generate.h"
 
@@ -25,8 +25,17 @@ namespace gfx
         glewExperimental = GL_TRUE;
         vk::Context::Init();
 
-        // ProjectManager::generate("/Users/radue", "lSystems");
-        SceneManager::LoadScene(scenePath("liblSystems.dylib"));
+        // ProjectManager::generate("/Users/radue", "conway");
+        // SceneManager::LoadScene(scenePath("liblSystems.dylib"));
+        SceneManager::LoadScene(scenePath("libconway.dylib"));
+
+        // io::Window::Builder(std::unique_ptr<Scene>(new Lab01))
+                // .setTitle("Lab 01")
+                // .setExtent({ 1280, 720 })
+                // .setResizable(true)
+                // .setFullscreen(false)
+                // .setAPI(API::eVulkan)
+                // .build();
 
         while (!io::Manager::_windows.empty()) {
             io::Manager::update();

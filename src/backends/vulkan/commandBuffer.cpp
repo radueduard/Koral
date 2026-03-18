@@ -286,7 +286,7 @@ namespace gfx::vk
                     ::vk::Offset3D{ 0, 0, 0 },
                     ::vk::Offset3D{ static_cast<glm::i32>(vkDstImage->getExtent().x), static_cast<glm::i32>(vkDstImage->getExtent().y), 1 }
                 }),
-            ::vk::Filter::eLinear);
+            ::vk::Filter::eNearest);
          vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
          vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
          return *this;

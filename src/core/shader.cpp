@@ -71,7 +71,7 @@ namespace gfx {
         shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
         shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
 
-        constexpr auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDefault);
+        constexpr auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDefault | EShMsgDebugInfo);
 
         if (!shader->parse(GetDefaultResources(), 100, false, messages)) {
             std::cerr << shader->getInfoLog() << std::endl;
@@ -131,7 +131,8 @@ namespace gfx {
 
     Shader::MemoryLayout Shader::fetchMemoryLayout(const std::vector<glm::u32>& spirvCode)
     {
-        const auto module = spirv_cross::Compiler(spirvCode);
+    	std::vector words(spirvCode.begin(), spirvCode.end());
+        const auto module = spirv_cross::Compiler(words);
         const auto resources = module.get_shader_resources();
 
     	MemoryLayout memoryLayout;
