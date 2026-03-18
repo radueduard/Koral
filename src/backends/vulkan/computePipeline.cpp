@@ -49,7 +49,7 @@ namespace gfx::vk
     ComputePipeline::~ComputePipeline()
     {
         const Device& device = Context::Device();
-        device->waitIdle();
+        device.queuesWaitIdle();
         if (_pipelineLayout)
             device->destroyPipelineLayout(_pipelineLayout);
         if (_handle)

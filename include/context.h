@@ -8,7 +8,10 @@
 #include <thread>
 #include <glm/fwd.hpp>
 
+struct ImGuiContext;
+
 namespace gfx {
+    class GUI;
     class Scheduler;
     class Framebuffer;
 
@@ -31,6 +34,7 @@ namespace gfx {
     {
         friend class io::Window;
         friend class gfx::Scheduler;
+        friend class gfx::GUI;
     public:
         static GFX_API io::Window& FocusedWindow();
 
@@ -44,6 +48,7 @@ namespace gfx {
 
         static GFX_API glm::u32 ThreadId() { return std::hash<std::thread::id>()(_threadId); }
         static GFX_API glm::u32 MainThreadId() { return std::hash<std::thread::id>()(_mainThreadId); }
+        static GFX_API ImGuiContext* GetCurrentImGuiContext();
 
 
     private:
@@ -52,6 +57,7 @@ namespace gfx {
         inline static io::Window* _focusedWindow = nullptr;
         inline static thread_local io::Window* _currentThreadLinkedWindow = nullptr;
         inline static thread_local gfx::Scheduler* _scheduler = nullptr;
+        inline static thread_local ImGuiContext* _imguiContext = nullptr;
 
         static thread_local std::thread::id _threadId;
         inline static std::thread::id _mainThreadId = std::this_thread::get_id();

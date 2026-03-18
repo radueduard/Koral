@@ -89,6 +89,14 @@ void gfx::Context::DestroyScheduler()
     _scheduler = nullptr;
 }
 
+ImGuiContext* gfx::Context::GetCurrentImGuiContext()
+{
+    if (_imguiContext == nullptr) {
+        throw std::runtime_error("ImGui context is not initialized for this thread");
+    }
+    return _imguiContext;
+}
+
 void gfx::Context::setFocusedWindow(io::Window* window)
 {
     _focusedWindow = window;

@@ -29,7 +29,7 @@ namespace gfx::io
 
         ~Manager();
 
-        [[nodiscard]] static std::queue<std::function<void()>>& MainThreadTasks() { return _mainThreadTasks; }
+        static void AddMainThreadTask(std::function<void()> task);
 
     private:
         Manager();

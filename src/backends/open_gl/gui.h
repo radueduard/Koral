@@ -5,6 +5,8 @@
 #pragma once
 #include <commandBuffer.h>
 
+#include <imgui.h>
+
 namespace gfx::ogl
 {
     class GUI
@@ -12,7 +14,7 @@ namespace gfx::ogl
     public:
         static void Init();
         static void NewFrame();
-        static void Render(CommandBuffer& commandBuffer);
+        static void Render(CommandBuffer& commandBuffer, ImDrawData* drawData);
         static void Shutdown();
     };
 }

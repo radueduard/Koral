@@ -16,17 +16,10 @@
 #include <imgui_impl_opengl3.h>
 #include <GLFW/glfw3.h>
 
-#include "commandBuffer.h"
-
 namespace gfx
 {
     void ogl::GUI::Init()
     {
-        ImGui::CreateContext();
-
-        ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
         ImGui_ImplGlfw_InitForOpenGL(*Context::Window(), true);
         ImGui_ImplOpenGL3_Init("#version 450");
 
@@ -39,22 +32,12 @@ namespace gfx
         ImGui_ImplGlfw_NewFrame();
     }
 
-    void ogl::GUI::Render(gfx::CommandBuffer& commandBuffer)
+    void ogl::GUI::Render(gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
-        commandBuffer.Run([](gfx::CommandBuffer&)
+        commandBuffer.Run([draw_data](gfx::CommandBuffer&)
         {
-            ImGui::Render();
-
-            ImDrawData* draw_data = ImGui::GetDrawData();
             if (const bool main_is_minimized = draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f; !main_is_minimized) {
                 ImGui_ImplOpenGL3_RenderDrawData(draw_data);
-            }
-            if (const ImGuiIO& io = ImGui::GetIO(); io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-            {
-                GLFWwindow* backup_current_context = glfwGetCurrentContext();
-                ImGui::UpdatePlatformWindows();
-                ImGui::RenderPlatformWindowsDefault();
-                glfwMakeContextCurrent(backup_current_context);
             }
         });
     }
@@ -63,6 +46,5 @@ namespace gfx
     {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
     }
 }

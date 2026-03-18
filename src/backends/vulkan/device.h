@@ -57,10 +57,12 @@ namespace gfx::vk {
         [[nodiscard]] glm::u32 getIndex() const { return _index; }
         [[nodiscard]] const Family& getFamily() const { return _family; }
         [[nodiscard]] bool canPresent(const gfx::vk::Surface& surface) const;
+        [[nodiscard]] glm::u32 getIdentifier() const { return _identifier; }
 
         void Submit(const SubmitInfo& submitInfo) const;
 
     private:
+        glm::u32 _identifier;
         glm::u32 _index;
         Family& _family;
     };

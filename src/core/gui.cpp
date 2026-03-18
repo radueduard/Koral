@@ -21,10 +21,15 @@
 
 void gfx::GUI::Init()
 {
+    Context::_imguiContext = ImGui::CreateContext();
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
     switch (Context::Window().getAPI())
     {
     case API::eOpenGL:
-        ogl::GUI::Init();
+         ogl::GUI::Init();
         break;
     case API::eVulkan:
         vk::GUI::Init();
@@ -37,25 +42,27 @@ void gfx::GUI::Init()
 void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, const Scene& scene)
 {
     auto semaphore = std::binary_semaphore(0);
-    auto api = Context::Window().getAPI();
-    io::Manager::MainThreadTasks().emplace([&semaphore, api] {
+    const auto api = Context::Window().getAPI();
+    auto* context = Context::GetCurrentImGuiContext();
+
+    io::Manager::AddMainThreadTask([&semaphore, api, context, &scene] {
         switch (api)
         {
         case API::eOpenGL:
-                ogl::GUI::NewFrame();
-                break;
-            case API::eVulkan:
-                vk::GUI::NewFrame();
-                break;
-            default:
-                throw std::runtime_error("Unsupported graphics API");
-            }
-
-        ImGui::NewFrame();
+            ogl::GUI::NewFrame();
+            break;
+        case API::eVulkan:
+            vk::GUI::NewFrame();
+            break;
+        default:
+            throw std::runtime_error("Unsupported graphics API");
+        }
         semaphore.release();
     });
     semaphore.acquire();
 
+    ImGui::SetCurrentContext(context);
+    ImGui::NewFrame();
     constexpr ImGuiDockNodeFlags dockSpaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 5.0f);
@@ -76,19 +83,22 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, const Scene& scene)
     const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
     ImGui::DockSpace(dockSpaceId, ImVec2(0.0f, 0.0f), dockSpaceFlags);
 
-    scene.RenderUI(ImGui::GetCurrentContext());
+    scene.RenderUI(context);
 
     ImGui::End();
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(3);
 
+    ImGui::Render();
+
+    ImDrawData* draw_data = ImGui::GetDrawData();
     switch (Context::Window().getAPI())
     {
     case API::eOpenGL:
-        ogl::GUI::Render(commandBuffer);
+        ogl::GUI::Render(commandBuffer, draw_data);
         break;
     case API::eVulkan:
-        vk::GUI::Render(commandBuffer);
+        vk::GUI::Render(commandBuffer, draw_data);
         break;
     default:
         throw std::runtime_error("Unsupported graphics API");
@@ -108,4 +118,5 @@ void gfx::GUI::Shutdown()
     default:
         throw std::runtime_error("Unsupported graphics API");
     }
+    ImGui::DestroyContext();
 }

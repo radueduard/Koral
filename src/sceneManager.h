@@ -54,7 +54,7 @@ namespace gfx
 
             io::Window::Builder(std::unique_ptr<Scene>(createScene()))
                 .setTitle(path.stem().string())
-                .setExtent({ 512, 512 })
+                .setExtent({ 1280, 720 })
                 .setResizable(true)
                 .setFullscreen(false)
                 .setAPI(API::eVulkan)

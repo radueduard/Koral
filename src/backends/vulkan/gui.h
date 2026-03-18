@@ -3,7 +3,9 @@
 //
 
 #pragma once
-#include <memory>
+
+struct ImGuiContext;
+struct ImDrawData;
 
 namespace gfx
 {
@@ -19,7 +21,7 @@ namespace gfx::vk
     public:
         static void Init();
         static void NewFrame();
-        static void Render(gfx::CommandBuffer& commandBuffer);
+        static void Render(const gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data);
         static void Shutdown();
 
     private:

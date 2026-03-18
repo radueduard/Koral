@@ -14,8 +14,9 @@
 #include "scene.h"
 #include "scheduler.h"
 #include <framebuffer.h>
+#include <mutex>
 #include <surface.h>
-#include "../core/gui.h"
+#include "../../include/gui.h"
 
 namespace gfx::io
 {
@@ -32,8 +33,8 @@ namespace gfx::io
                 w._inputState.setup();
                 w._timeState.setup();
                 auto& scene = *w._scene;
-
                 gfx::GUI::Init();
+
                 scene.Initialize();
                 while (!w.shouldClose())
                 {
@@ -47,7 +48,7 @@ namespace gfx::io
                 }
                 std::cout << Context::Window().getTitle() << " is closing." << std::endl;
                 Context::Scheduler().WaitIdle();
-                GUI::Shutdown();
+                gfx::GUI::Shutdown();
                 w.close();
             }, window);
         return *window;
@@ -78,10 +79,16 @@ namespace gfx::io
         glfwTerminate();
     }
 
+    void Manager::AddMainThreadTask(std::function<void()> task)
+    {
+        static std::mutex mutex;
+        std::lock_guard lock(mutex);
+        _mainThreadTasks.push(std::move(task));
+    }
+
     void Manager::update()
     {
         glfwPollEvents();
-
         while (!_mainThreadTasks.empty()) {
             auto& task = _mainThreadTasks.front();
             task();

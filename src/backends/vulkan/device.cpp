@@ -48,6 +48,7 @@ namespace gfx::vk {
             throw std::runtime_error("Queue::Queue : No more queues available in this family");
         }
         _index = _family._properties.queueCount - _family._remainingQueues--;
+        _identifier = _family.getIndex() << 16 | _index;
         _handle = gfx::vk::Context::Device()->getQueue(_family.getIndex(), _index);
     }
 
@@ -174,7 +175,7 @@ namespace gfx::vk {
                 auto queue = queueFamily.RequestQueue();
                 auto* queueRef = queue.get();
                 _queuesInUse.emplace(gfx::Context::ThreadId(), std::move(queue));
-                _commandPools[queueRef->getFamily().getIndex()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
+                _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
                     .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
                     .setQueueFamilyIndex(queueFamily.getIndex()));
                 return *queueRef;
@@ -196,7 +197,7 @@ namespace gfx::vk {
                 auto queue = queueFamily.RequestPresentQueue(surface);
                 auto* queueRef = queue.get();
                 _queuesInUse.emplace(gfx::Context::ThreadId(), std::move(queue));
-                _commandPools[queueRef->getFamily().getIndex()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
+                _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
                     .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
                     .setQueueFamilyIndex(queueFamily.getIndex()));
                 return *queueRef;
@@ -212,7 +213,7 @@ namespace gfx::vk {
         for (auto it = _queuesInUse.begin(); it != _queuesInUse.end();) {
             if (it->first == threadId) {
                 it->second->operator*().waitIdle();
-                _handle.destroyCommandPool(_commandPools.at(it->second->getFamily().getIndex()));
+                _handle.destroyCommandPool(_commandPools.at(it->second->getIdentifier()));
                 it = _queuesInUse.erase(it);
             } else {
                 ++it;
@@ -221,7 +222,7 @@ namespace gfx::vk {
     }
 
     std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const gfx::vk::Queue& queue, const glm::u32 thread) const {
-        const auto& commandPool = _commandPools.at(queue.getFamily().getIndex());
+        const auto& commandPool = _commandPools.at(queue.getIdentifier());
         const auto commandBufferAllocInfo = ::vk::CommandBufferAllocateInfo()
             .setCommandPool(commandPool)
             .setLevel(::vk::CommandBufferLevel::ePrimary)

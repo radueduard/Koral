@@ -39,11 +39,9 @@ namespace gfx::vk
             .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
             .build();
 
-        ImGui::CreateContext();
         if (!ImGui_ImplGlfw_InitForVulkan(*gfx::Context::Window(), true)) {
             throw std::runtime_error("Failed to initialize ImGui for GLFW");
         }
-        ImGui::StyleColorsDark();
 
         const auto& queue = vk::Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
 
@@ -84,12 +82,10 @@ namespace gfx::vk
                 }
             },
         };
-        ImGui_ImplVulkan_Init(&initInfo);
 
-        ImGuiIO& io = ImGui::GetIO();
-        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-        ImGui::StyleColorsDark();
+        if (const bool success = ImGui_ImplVulkan_Init(&initInfo); !success) {
+            throw std::runtime_error("Failed to initialize ImGui for Vulkan");
+        }
     }
 
     void GUI::NewFrame()
@@ -98,7 +94,7 @@ namespace gfx::vk
         ImGui_ImplVulkan_NewFrame();
     }
 
-    void GUI::Render(gfx::CommandBuffer& commandBuffer)
+    void GUI::Render(const gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
         const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
         const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(gfx::Context::DefaultFramebuffer());
@@ -122,8 +118,6 @@ namespace gfx::vk
 
         vkCommandBuffer->beginRendering(renderingInfo);
 
-        ImGui::Render();
-        ImDrawData* draw_data = ImGui::GetDrawData();
         if (const bool main_is_minimized = draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f; !main_is_minimized) {
             ImGui_ImplVulkan_RenderDrawData(draw_data, *vkCommandBuffer);
         }
@@ -135,7 +129,6 @@ namespace gfx::vk
     {
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
 
         delete _descriptorPool;
         _descriptorPool = nullptr;
