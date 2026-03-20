@@ -1,16 +1,16 @@
 
 
 #include <iostream>
-#include "io/manager.h"
 
-using gfx::io::Window;
+#include "context.h"
+#include "project/generate.h"
 
 namespace gfx
 {
     class Engine
     {
-        friend int ::main(int argc, char **argv);
-        static void Run(std::filesystem::path scenePath);
+    public:
+        static void Run(const std::filesystem::path& scenePath);
     };
 }
 
@@ -33,8 +33,12 @@ void enableANSI() {
 }
 #endif
 
-int main(int argc, char **argv)
+int main(const int argc, char **argv)
 {
+
+    gfx::ProjectManager::generate("F:/GFX_PROJECTS", "GfxHub");
+    return EXIT_SUCCESS;
+
     if (argc < 2)
     {
         std::cerr << "Usage: " << argv[0] << " <scene_library_name>" << std::endl;
@@ -43,7 +47,6 @@ int main(int argc, char **argv)
     enableANSI();
 #endif
     try {
-        gfx::io::Manager manager;
         gfx::Engine::Run(gfx::scenePath(argv[1]));
     } catch (const std::exception& e) {
         std::cerr << "An error occurred: " << e.what() << std::endl;

@@ -65,7 +65,7 @@ namespace gfx
         case API::eVulkan:
             {
                 const auto& queue = vk::Context::Device().requestQueue(getQueueFlagsFromUsage(usage));
-                return vk::Context::Device().requestCommandBuffer(queue, Context::ThreadId());
+                return vk::Context::Device().requestCommandBuffer(queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
             }
         default:
             throw std::runtime_error("Unknown API");

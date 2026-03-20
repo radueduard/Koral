@@ -151,17 +151,15 @@ namespace gfx::vk {
     }
 
     void Device::queuesWaitIdle() const {
-        for (const auto& [thread_id, queue] : _queuesInUse)
+        for (const auto& queue : _queuesInUse)
         {
-            if (thread_id != gfx::Context::ThreadId()) continue;
             queue->operator*().waitIdle();
         }
     }
 
     const Queue& Device::requestQueue(const ::vk::QueueFlags type) const {
-        for (const auto& [thread_id, queue] : _queuesInUse)
+        for (const auto& queue : _queuesInUse)
         {
-            if (thread_id != gfx::Context::ThreadId()) continue;
             if ((queue->getFamily().getProperties().queueFlags & type) == type)
             {
                 return *queue;
@@ -174,7 +172,6 @@ namespace gfx::vk {
             try {
                 auto queue = queueFamily.RequestQueue();
                 auto* queueRef = queue.get();
-                _queuesInUse.emplace(gfx::Context::ThreadId(), std::move(queue));
                 _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
                     .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
                     .setQueueFamilyIndex(queueFamily.getIndex()));
@@ -185,9 +182,8 @@ namespace gfx::vk {
     }
 
     const Queue& Device::requestPresentQueue(const gfx::vk::Surface& surface) const {
-        for (const auto& [thread_id, queue] : _queuesInUse)
+        for (const auto& queue : _queuesInUse)
         {
-            if (thread_id != gfx::Context::ThreadId()) continue;
             if ((queue->canPresent(surface))) {
                 return *queue;
             }
@@ -196,7 +192,7 @@ namespace gfx::vk {
             try {
                 auto queue = queueFamily.RequestPresentQueue(surface);
                 auto* queueRef = queue.get();
-                _queuesInUse.emplace(gfx::Context::ThreadId(), std::move(queue));
+                _queuesInUse.emplace_back(std::move(queue));
                 _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
                     .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
                     .setQueueFamilyIndex(queueFamily.getIndex()));
@@ -209,16 +205,11 @@ namespace gfx::vk {
     }
 
     void Device::freeQueues() const {
-        const auto threadId = gfx::Context::ThreadId();
-        for (auto it = _queuesInUse.begin(); it != _queuesInUse.end();) {
-            if (it->first == threadId) {
-                it->second->operator*().waitIdle();
-                _handle.destroyCommandPool(_commandPools.at(it->second->getIdentifier()));
-                it = _queuesInUse.erase(it);
-            } else {
-                ++it;
-            }
+        for (const auto& queue : _queuesInUse)
+        {
+            _handle.destroyCommandPool(_commandPools.at(queue->getIdentifier()));
         }
+         _queuesInUse.clear();
     }
 
     std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const gfx::vk::Queue& queue, const glm::u32 thread) const {
@@ -238,13 +229,8 @@ namespace gfx::vk {
     void Device::runSingleTimeCommand(const std::function<void(const gfx::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags,
         const ::vk::Fence fence, ::vk::Semaphore waitSemaphore, ::vk::Semaphore signalSemaphore, const bool wait) const
     {
-        glm::u32 thread = 0;
-        if (gfx::Context::ThreadId() != gfx::Context::MainThreadId()) {
-            thread = gfx::Context::ThreadId();
-        }
-
         const auto& queue = requestQueue(requiredFlags);
-        const auto commandBufferHolder = requestCommandBuffer(queue, thread);
+        const auto commandBufferHolder = requestCommandBuffer(queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
         const auto& commandBuffer = *commandBufferHolder.get();
 
         commandBuffer->begin(::vk::CommandBufferBeginInfo().setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit));

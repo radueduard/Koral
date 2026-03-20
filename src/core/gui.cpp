@@ -14,10 +14,9 @@
 
 #include <imgui.h>
 #include <iostream>
-#include <semaphore>
 
 #include "commandBuffer.h"
-#include "../io/manager.h"
+#include "../backends/open_gl/ogl_err_handling.h"
 
 void gfx::GUI::Init()
 {
@@ -41,25 +40,20 @@ void gfx::GUI::Init()
 
 void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 {
-    auto semaphore = std::binary_semaphore(0);
-    const auto api = Context::Window().getAPI();
     auto* context = Context::GetCurrentImGuiContext();
 
-    io::Manager::AddMainThreadTask([&semaphore, api, context, &scene] {
-        switch (api)
-        {
-        case API::eOpenGL:
-            ogl::GUI::NewFrame();
-            break;
-        case API::eVulkan:
-            vk::GUI::NewFrame();
-            break;
-        default:
-            throw std::runtime_error("Unsupported graphics API");
-        }
-        semaphore.release();
-    });
-    semaphore.acquire();
+    switch (Context::Window().getAPI())
+    {
+    case API::eOpenGL:
+        ogl::GUI::NewFrame();
+        glCheckError();
+        break;
+    case API::eVulkan:
+        vk::GUI::NewFrame();
+        break;
+    default:
+        throw std::runtime_error("Unsupported graphics API");
+    }
 
     ImGui::SetCurrentContext(context);
     ImGui::NewFrame();

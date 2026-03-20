@@ -12,8 +12,10 @@
 #include <stb_image.h>
 #include <GLFW/glfw3.h>
 
-#include "manager.h"
+#include "gui.h"
+#include "scheduler.h"
 #include "surface.h"
+#include "../backends/vulkan/vulkanContext.h"
 
 namespace gfx::io {
     Window::Window(Builder& createInfo) :
@@ -24,6 +26,12 @@ namespace gfx::io {
         _api(createInfo.api),
         _scene(std::move(createInfo.scene))
     {
+        Context::_window = this;
+
+        if (const auto result = glfwInit(); result != GLFW_TRUE) {
+            std::cerr << "Failed to initialize GLFW: " << result << std::endl;
+        }
+
         glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::eOpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
 
@@ -53,8 +61,6 @@ namespace gfx::io {
             _monitor,
             nullptr);
 
-
-
         if (_window == nullptr) {
             std::cerr << "Failed to create window" << std::endl;
         }
@@ -72,25 +78,50 @@ namespace gfx::io {
     	glm::uvec2 extent;
     	glfwGetFramebufferSize(_window, reinterpret_cast<int*>(&extent.x), reinterpret_cast<int*>(&extent.y));
 		_extent = extent;
+        glfwMakeContextCurrent(_window);
+
+        if (_api == API::eOpenGL) {
+            glewExperimental = GL_TRUE;
+            if (const auto result = glewInit(); result != GLEW_OK) {
+                std::cerr << "Failed to initialize GLEW: " << glewGetErrorString(result) << std::endl;
+            }
+        } else if (_api == API::eVulkan) {
+            gfx::vk::Context::Init();
+        }
 
         _surface = gfx::Surface::Create(*this);
-    }
-
-    void Window::initContext()
-    {
-        Context::_currentThreadLinkedWindow = this;
-        glfwMakeContextCurrent(_window);
-        Context::InitScheduler();
+        Context::_scheduler = Scheduler::Builder()
+            .setMinImageCount(2)
+            .setImageCount(3)
+            .build();
+        Context::_scheduler->Initialize();
         _framebuffer = Framebuffer::CreateDefault();
+
+        _timeState.setup();
+        _inputState.setup();
+        gfx::GUI::Init();
+
+        _scene->Initialize();
     }
 
-    void Window::Builder::build()
+    std::unique_ptr<Window> Window::Builder::build()
     {
-        Manager::createWindow(*this);
+        return std::make_unique<Window>(*this);
     }
 
     Window::~Window() {
+        Context::Scheduler().WaitIdle();
+        _scene.reset();
+        GUI::Shutdown();
+        if (_api == API::eVulkan) {
+            _framebuffer.reset();
+            delete Context::_scheduler;
+            _surface.reset();
+            vk::Context::Destroy();
+        }
+
         glfwDestroyWindow(_window);
+        glfwTerminate();
     }
 
     bool Window::shouldClose() const
@@ -100,7 +131,8 @@ namespace gfx::io {
     {
         _framebuffer.reset();
         _scene.reset();
-        Context::DestroyScheduler();
+        Context::_scheduler->WaitIdle();
+        delete Context::_scheduler;
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
         _closed = true;
     }

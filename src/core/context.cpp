@@ -11,7 +11,6 @@
 #include "scheduler.h"
 #include "window.h"
 
-thread_local std::thread::id gfx::Context::_threadId;
 
 std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
 {
@@ -43,10 +42,10 @@ gfx::io::Window& gfx::Context::FocusedWindow()
 
 gfx::io::Window& gfx::Context::Window()
 {
-    if (_currentThreadLinkedWindow == nullptr) {
+    if (_window == nullptr) {
         throw std::runtime_error("No window is linked to the current thread!");
     }
-    return *_currentThreadLinkedWindow;
+    return *_window;
 }
 
 const gfx::Scheduler& gfx::Context::Scheduler()
@@ -59,34 +58,11 @@ const gfx::Scheduler& gfx::Context::Scheduler()
 
 const gfx::Framebuffer& gfx::Context::DefaultFramebuffer()
 {
-    if (_currentThreadLinkedWindow == nullptr)
+    if (_window == nullptr)
     {
         throw std::runtime_error("There is no default framebuffer!");
     }
-    return *_currentThreadLinkedWindow->getFramebuffer();
-}
-
-void gfx::Context::InitScheduler()
-{
-    _threadId = std::this_thread::get_id();
-    if (_scheduler != nullptr) {
-        throw std::runtime_error("Scheduler is already initialized for this thread");
-    }
-    _scheduler = Scheduler::Builder()
-         .setMinImageCount(2)
-         .setImageCount(3)
-         .build();
-    _scheduler->Initialize();
-}
-
-void gfx::Context::DestroyScheduler()
-{
-    if (_scheduler == nullptr) {
-        throw std::runtime_error("Scheduler is not initialized for this thread");
-    }
-
-    delete _scheduler;
-    _scheduler = nullptr;
+    return *_window->getFramebuffer();
 }
 
 ImGuiContext* gfx::Context::GetCurrentImGuiContext()

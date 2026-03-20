@@ -19,6 +19,7 @@ namespace gfx
 {
     class Surface;
     class Framebuffer;
+    class Engine;
 }
 
 struct GLFWmonitor;
@@ -30,7 +31,7 @@ namespace gfx::io {
     class GFX_API Window {
         friend class Input;
         friend class Input::Callbacks;
-        friend class Manager;
+        friend class gfx::Engine;
         friend class Time;
     public:
         struct GFX_API Builder {
@@ -68,9 +69,10 @@ namespace gfx::io {
                 return *this;
             }
 
-            void build();
+            std::unique_ptr<Window> build();
         };
 
+        explicit Window(Builder&);
         ~Window();
 
         Window(const Window &) = delete;
@@ -102,10 +104,6 @@ namespace gfx::io {
         [[nodiscard]] bool isFocused() const { return _focused; }
 
     private:
-        explicit Window(Builder&);
-
-        void initContext();
-
         void focus();
     	static void framebufferResize(GLFWwindow* handle, int width, int height);
 

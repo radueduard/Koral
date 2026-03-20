@@ -5,9 +5,11 @@
 #pragma once
 #include <filesystem>
 
-#include "io/manager.h"
 
 #include <scene.h>
+
+#include "context.h"
+#include "window.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -23,7 +25,7 @@ namespace gfx
     class SceneManager
     {
     public:
-        static void LoadScene(const std::filesystem::path& path)
+        static std::unique_ptr<io::Window> LoadScene(const std::filesystem::path& path)
         {
             if (!std::filesystem::exists(path)) {
                 throw std::runtime_error("Scene file does not exist: " + path.string());
@@ -52,7 +54,7 @@ namespace gfx
 #error "Unsupported platform"
 #endif
 
-            io::Window::Builder(std::unique_ptr<Scene>(createScene()))
+            return io::Window::Builder(std::unique_ptr<Scene>(createScene()))
                 .setTitle(path.stem().string())
                 .setExtent({ 1280, 720 })
                 .setResizable(true)

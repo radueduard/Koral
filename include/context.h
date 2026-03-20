@@ -42,12 +42,6 @@ namespace gfx {
         static GFX_API const gfx::Scheduler& Scheduler();
 
         static GFX_API const gfx::Framebuffer& DefaultFramebuffer();
-
-        static GFX_API void InitScheduler();
-        static GFX_API void DestroyScheduler();
-
-        static GFX_API glm::u32 ThreadId() { return std::hash<std::thread::id>()(_threadId); }
-        static GFX_API glm::u32 MainThreadId() { return std::hash<std::thread::id>()(_mainThreadId); }
         static GFX_API ImGuiContext* GetCurrentImGuiContext();
 
 
@@ -55,12 +49,10 @@ namespace gfx {
         static GFX_API void setFocusedWindow(io::Window* window);
 
         inline static io::Window* _focusedWindow = nullptr;
-        inline static thread_local io::Window* _currentThreadLinkedWindow = nullptr;
-        inline static thread_local gfx::Scheduler* _scheduler = nullptr;
-        inline static thread_local ImGuiContext* _imguiContext = nullptr;
+        inline static io::Window* _window = nullptr;
+        inline static gfx::Scheduler* _scheduler = nullptr;
+        inline static ImGuiContext* _imguiContext = nullptr;
 
-        static thread_local std::thread::id _threadId;
-        inline static std::thread::id _mainThreadId = std::this_thread::get_id();
 
     };
 }

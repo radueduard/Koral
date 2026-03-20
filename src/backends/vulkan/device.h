@@ -91,7 +91,7 @@ namespace gfx::vk {
 
     private:
         mutable std::vector<Queue::Family> _queueFamilies {};
-        mutable std::map<glm::u32, std::unique_ptr<Queue>> _queuesInUse {};
+        mutable std::vector<std::unique_ptr<Queue>> _queuesInUse {};
         mutable std::map<glm::u32, ::vk::CommandPool> _commandPools {};
     };
 }

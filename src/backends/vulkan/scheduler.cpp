@@ -19,7 +19,7 @@ namespace gfx::vk
 {
     Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : gfx::Frame(imageIndex), _queue(queue)
     {
-        _commandBuffer = Context::Device().requestCommandBuffer(_queue, gfx::Context::ThreadId());
+        _commandBuffer = Context::Device().requestCommandBuffer(_queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
         _imageAvailable = vk::Context::Device()->createSemaphore({});
         _inFlightFence = Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
     }
