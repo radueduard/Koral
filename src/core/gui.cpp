@@ -39,7 +39,7 @@ void gfx::GUI::Init()
     }
 }
 
-void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, const Scene& scene)
+void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 {
     auto semaphore = std::binary_semaphore(0);
     const auto api = Context::Window().getAPI();

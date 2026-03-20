@@ -14,11 +14,11 @@ namespace gfx
 {
     class Engine
     {
-        friend int ::main();
-        static void Run();
+        friend int ::main(int argc, char **argv);
+        static void Run(std::filesystem::path scenePath);
     };
 
-    void Engine::Run()
+    void Engine::Run(std::filesystem::path scenePath)
     {
         glewExperimental = GL_TRUE;
         vk::Context::Init();
@@ -35,8 +35,9 @@ namespace gfx
         //         .setAPI(API::eVulkan)
         //         .build();
 
-        SceneManager::LoadScene(scenePath("CameraAndSimpleMesh.dll"));
+        // SceneManager::LoadScene(scenePath("CameraAndSimpleMesh.dll"));
         // SceneManager::LoadScene(scenePath("MultiFramebuffer.dll"));
+        SceneManager::LoadScene(scenePath);
 
         while (!io::Manager::_windows.empty()) {
             io::Manager::update();

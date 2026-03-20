@@ -19,7 +19,7 @@ namespace gfx
         virtual void Initialize() = 0;
         virtual void Update() {}
         virtual void Render(gfx::CommandBuffer& commandBuffer) = 0;
-        virtual void RenderUI(ImGuiContext* context) const {}
+        virtual void RenderUI(ImGuiContext* context) {}
     };
 }
 

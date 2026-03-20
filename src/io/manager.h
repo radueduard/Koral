@@ -10,7 +10,7 @@
 
 #include "window.h"
 
-int main();
+int main(int argc, char **argv);
 
 namespace gfx
 {
@@ -21,7 +21,7 @@ namespace gfx::io
 {
     class GFX_API Manager
     {
-        friend int ::main();
+        friend int ::main(int argc, char **argv);
         friend class gfx::Engine;
     public:
         static Window& createWindow(Window::Builder& createInfo);

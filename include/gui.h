@@ -20,7 +20,7 @@ namespace gfx
     {
     public:
         GFX_API static void Init();
-        GFX_API static void Render(CommandBuffer& commandBuffer, const Scene& scene);
+        GFX_API static void Render(CommandBuffer& commandBuffer, Scene& scene);
         GFX_API static void Shutdown();
 
         struct GFX_API Bridge

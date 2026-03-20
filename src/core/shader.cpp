@@ -67,9 +67,9 @@ namespace gfx {
         const auto shaderStringsPointer = shaderStrings->c_str();
         shader->setStrings(&shaderStringsPointer, 1);
 
-        shader->setEnvInput(glslang::EShSourceGlsl, eShStage, glslang::EShClientVulkan, 130);
+        shader->setEnvInput(glslang::EShSourceGlsl, eShStage, glslang::EShClientVulkan, 100);
         shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
-        shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
+        shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_5);
 
         constexpr auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDefault | EShMsgDebugInfo);
 

@@ -9,8 +9,8 @@ namespace gfx
 {
     class Engine
     {
-        friend int ::main();
-        static void Run();
+        friend int ::main(int argc, char **argv);
+        static void Run(std::filesystem::path scenePath);
     };
 }
 
@@ -33,13 +33,18 @@ void enableANSI() {
 }
 #endif
 
-int main() {
+int main(int argc, char **argv)
+{
+    if (argc < 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <scene_library_name>" << std::endl;
+    }
 #ifdef _WIN32
     enableANSI();
 #endif
     try {
         gfx::io::Manager manager;
-        gfx::Engine::Run();
+        gfx::Engine::Run(gfx::scenePath(argv[1]));
     } catch (const std::exception& e) {
         std::cerr << "An error occurred: " << e.what() << std::endl;
         return EXIT_FAILURE;
