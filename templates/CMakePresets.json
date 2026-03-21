@@ -2,12 +2,14 @@
   "version": 4,
   "configurePresets": [
     {
-      "name": "debug",
+      "name": "Debug",
+      "displayName": "Debug",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/cmake-build-debug",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "@VCPKG@"
-      }
+      },
+      "hidden": false
     }
   ]
 }

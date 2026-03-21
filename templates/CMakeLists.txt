@@ -67,3 +67,25 @@ if (UNIX)
         COMMENT "Copying ${PROJECT_NAME} to ${OUTPUT_DLL_DIR}"
     )
 endif()
+
+if (WIN32)
+    set(GFX_RUNTIME_EXECUTABLE "@GFX_PATH@/cmake-build-debug/Gfx_Runtime.exe" CACHE FILEPATH "Path to GFX Runtime executable")
+elseif (UNIX)
+    set(GFX_RUNTIME_EXECUTABLE "@GFX_PATH@/cmake-build-debug/Gfx_Runtime" CACHE FILEPATH "Path to GFX Runtime executable")
+endif()
+
+set(RUN_CONFIG_CONTENT
+"<component name=\"ProjectRunConfigurationManager\">
+  <configuration default=\"false\" name=\"${PROJECT_NAME}\" type=\"CMakeRunConfiguration\" factoryName=\"Application\"
+    PROGRAM_PARAMS=\"$<TARGET_FILE:${PROJECT_NAME}>\"
+    PROJECT_NAME=\"${PROJECT_NAME}\"
+    TARGET_NAME=\"${PROJECT_NAME}\"
+    CONFIG_NAME=\"debug\"
+    RUN_PATH=\"${GFX_RUNTIME_EXECUTABLE}\">
+    <method v=\"2\">
+      <option name=\"com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask\" enabled=\"true\" />
+    </method>
+  </configuration>
+</component>")
+
+file(GENERATE OUTPUT "${CMAKE_SOURCE_DIR}/.idea/runConfigurations/${PROJECT_NAME}.xml" CONTENT "${RUN_CONFIG_CONTENT}")

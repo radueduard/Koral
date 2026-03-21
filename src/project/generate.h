@@ -110,6 +110,19 @@ namespace gfx
             cmakePresetsFile << cmakePresetsContent;
             cmakePresetsFile.close();
 
+            // // create .idea folder
+            // std::filesystem::create_directory(projectDir / ".idea");
+            // // create a cmake.xml file in the .idea folder
+            // std::ifstream cmakeXmlTemplate(gfx::templatePath("cmake.xml"));
+            // if (!cmakeXmlTemplate.is_open())
+            // {
+            //     throw std::runtime_error("Failed to open cmake xml template file");
+            // }
+            // std::string cmakeXmlContent((std::istreambuf_iterator<char>(cmakeXmlTemplate)), std::istreambuf_iterator<char>());
+            // std::ofstream cmakeXmlFile(projectDir / ".idea" / "cmake.xml");
+            // cmakeXmlFile << cmakeXmlContent;
+            // cmakeXmlFile.close();
+
             _projects.insert(projectDir);
 
             // open clion at the project directory

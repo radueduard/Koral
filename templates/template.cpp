@@ -20,7 +20,7 @@ void @NAME@::Render(gfx::CommandBuffer& commandBuffer)
         .EndRendering();
 }
 
-void @NAME@::RenderUI(ImGuiContext* context) const
+void @NAME@::RenderUI(ImGuiContext* context)
 {
     ImGui::SetCurrentContext(context);
     // TODO: define ui for the scene

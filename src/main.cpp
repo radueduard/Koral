@@ -35,9 +35,8 @@ void enableANSI() {
 
 int main(const int argc, char **argv)
 {
-
-    gfx::ProjectManager::generate("F:/GFX_PROJECTS", "GfxHub");
-    return EXIT_SUCCESS;
+    // gfx::ProjectManager::generate("F:/GFX_PROJECTS", "Hub");
+    // return EXIT_SUCCESS;
 
     if (argc < 2)
     {
@@ -47,7 +46,7 @@ int main(const int argc, char **argv)
     enableANSI();
 #endif
     try {
-        gfx::Engine::Run(gfx::scenePath(argv[1]));
+        gfx::Engine::Run(argv[1]);
     } catch (const std::exception& e) {
         std::cerr << "An error occurred: " << e.what() << std::endl;
         return EXIT_FAILURE;
