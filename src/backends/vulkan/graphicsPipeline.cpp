@@ -151,7 +151,7 @@ namespace gfx::vk
         pipelineCreateInfo.setPDepthStencilState(&depthStencilStateCreateInfo);
 
         std::vector<::vk::PipelineColorBlendAttachmentState> vkColorBlendAttachmentStates;
-        for (const auto& attachment : _framebuffer.get().getColorAttachments()) {
+        for (const auto& _ : _framebuffer.get().getColorAttachments()) {
             vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
                 .setBlendEnable(false)
                 .setColorWriteMask(::vk::ColorComponentFlagBits::eR | ::vk::ColorComponentFlagBits::eG | ::vk::ColorComponentFlagBits::eB | ::vk::ColorComponentFlagBits::eA));

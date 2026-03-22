@@ -109,6 +109,12 @@ namespace gfx
         [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& getVertexBindingDescriptions() const { return _vertexBindingDescriptions; }
         [[nodiscard]] const std::optional<std::vector<VertexInputAttributeDescription>>& getVertexAttributeDescriptions() const { return _vertexAttributeDescriptions; }
 
+        [[nodiscard]] const InputAssemblyState& getInputAssemblyState() const { return _inputAssemblyState; }
+        [[nodiscard]] const RasterizationState& getRasterizationState() const { return _rasterizationState; }
+        [[nodiscard]] const MultisampleState& getMultisampleState() const { return _multisampleState; }
+        [[nodiscard]] const DepthStencilState& getDepthStencilState() const { return _depthStencilState; }
+        [[nodiscard]] const ColorBlendState& getColorBlendState() const { return _colorBlendState; }
+
     protected:
         explicit GraphicsPipeline(const Builder& createInfo);
 

@@ -161,11 +161,12 @@ namespace gfx::vk
 
     gfx::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
+        const bool isDefaultFramebuffer = _state.boundFramebuffer.value()->IsDefault();
         const ::vk::Viewport viewport = ::vk::Viewport()
             .setX(static_cast<float>(x))
-            .setY(static_cast<float>(y) + static_cast<float>(height)) // Vulkan's viewport y-axis is inverted compared to OpenGL, so we need to add the height to the y coordinate and set the height to negative value to flip it back.
+            .setY(static_cast<float>(y) + (isDefaultFramebuffer ? static_cast<float>(height) : 0.f)) // Vulkan's viewport y-axis is inverted compared to OpenGL, so we need to add the height to the y coordinate and set the height to negative value to flip it back.
             .setWidth(static_cast<float>(width))
-            .setHeight(-static_cast<float>(height))
+            .setHeight(static_cast<float>(height) * (isDefaultFramebuffer ? -1.f : 1.f)) // If it's the default framebuffer, we need to flip the height to account for the inverted y-axis. For offscreen framebuffers, we can keep it as is.
             .setMinDepth(0.f)
             .setMaxDepth(1.f);
         _handle.setViewport(0, viewport);
@@ -192,6 +193,12 @@ namespace gfx::vk
     {
         gfx::CommandBuffer::BindPipeline(pipeline);
         pipeline->Bind(*this);
+        const bool isDefaultFramebuffer = _state.boundFramebuffer.has_value() && _state.boundFramebuffer.value()->IsDefault();
+        const auto frontFace = pipeline->getRasterizationState().frontFace;
+        _handle.setFrontFace(isDefaultFramebuffer ? frontFace == gfx::FrontFace::eClockwise ? ::vk::FrontFace::eClockwise
+                                                                                            : ::vk::FrontFace::eCounterClockwise
+                                                  : frontFace == gfx::FrontFace::eClockwise ? ::vk::FrontFace::eCounterClockwise
+                                                                                            : ::vk::FrontFace::eClockwise);
         return *this;
     }
 

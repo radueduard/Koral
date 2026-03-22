@@ -27,9 +27,10 @@ namespace gfx::vk
         [[nodiscard]] const ::vk::PipelineLayout& getPipelineLayout() const { return _pipelineLayout; }
     private:
         ::vk::PipelineLayout _pipelineLayout;
-        inline static std::array<::vk::DynamicState, 2> _dynamicStates = {
+        inline static std::array<::vk::DynamicState, 3> _dynamicStates = {
             ::vk::DynamicState::eViewport,
-            ::vk::DynamicState::eScissor
+            ::vk::DynamicState::eScissor,
+            ::vk::DynamicState::eFrontFace
         };
     };
 }

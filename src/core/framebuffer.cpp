@@ -88,6 +88,7 @@ namespace gfx {
         _depthStencilAttachment(createInfo.depthStencilAttachment),
         _clearValues(createInfo.clearValues)
     {
+        _isDefault = false;
         _extent = _colorAttachments.empty() ? _depthStencilAttachment.has_value() ? _depthStencilAttachment.value().get().getImage().getExtent() : glm::uvec2{ 0, 0 } : _colorAttachments[0].get().getImage().getExtent();
     }
 }
