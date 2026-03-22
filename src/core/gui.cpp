@@ -25,12 +25,14 @@ void gfx::GUI::Init()
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+
     switch (Context::Window().getAPI())
     {
     case API::eOpenGL:
          ogl::GUI::Init();
         break;
     case API::eVulkan:
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         vk::GUI::Init();
         break;
     default:
@@ -96,6 +98,12 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
         break;
     default:
         throw std::runtime_error("Unsupported graphics API");
+    }
+
+    if (const ImGuiIO& io = ImGui::GetIO(); io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
     }
 }
 

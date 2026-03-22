@@ -60,7 +60,32 @@ namespace gfx::ogl
                         glBindSampler(bindingPoint->second, **sampler);
                         glCheckError();
                         glActiveTexture(GL_TEXTURE0 + bindingPoint->second);
-                        glBindTexture(GL_TEXTURE_2D, **imageView);
+                        GLenum target = GL_TEXTURE_2D;
+                        switch (imageView->getViewType())
+                        {
+                        case ImageView::Type::e1D:
+                            target = GL_TEXTURE_1D;
+                            break;
+                        case ImageView::Type::e2D:
+                            target = GL_TEXTURE_2D;
+                            break;
+                        case ImageView::Type::e3D:
+                            target = GL_TEXTURE_3D;
+                            break;
+                        case ImageView::Type::eCube:
+                            target = GL_TEXTURE_CUBE_MAP;
+                            break;
+                        case ImageView::Type::e1DArray:
+                            target = GL_TEXTURE_1D_ARRAY;
+                            break;
+                        case ImageView::Type::e2DArray:
+                            target = GL_TEXTURE_2D_ARRAY;
+                            break;
+                        case ImageView::Type::eCubeArray:
+                            target = GL_TEXTURE_CUBE_MAP_ARRAY;
+                            break;
+                        }
+                        glBindTexture(target, **imageView);
                         glCheckError();
                         break;
                     }

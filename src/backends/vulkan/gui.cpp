@@ -46,7 +46,7 @@ namespace gfx::vk
         const auto& queue = vk::Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
 
         const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
-        const std::array colorAttachmentFormats = {
+        static std::vector colorAttachmentFormats = {
             static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().getImage().getFormat()))
         };
 

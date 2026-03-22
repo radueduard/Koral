@@ -113,13 +113,12 @@ namespace gfx::io {
         Context::Scheduler().WaitIdle();
         _scene.reset();
         GUI::Shutdown();
+        _framebuffer.reset();
+        delete Context::_scheduler;
+        _surface.reset();
         if (_api == API::eVulkan) {
-            _framebuffer.reset();
-            delete Context::_scheduler;
-            _surface.reset();
             vk::Context::Destroy();
         }
-
         glfwDestroyWindow(_window);
         glfwTerminate();
     }
