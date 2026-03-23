@@ -96,10 +96,10 @@ namespace gfx::io {
             .build();
         Context::_scheduler->Initialize();
         _framebuffer = Framebuffer::CreateDefault();
+        gfx::GUI::Init();
 
         _timeState.setup();
         _inputState.setup();
-        gfx::GUI::Init();
 
         _scene->Initialize();
     }

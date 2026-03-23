@@ -4,11 +4,13 @@
 
 #pragma once
 #include "commandBuffer.h"
-#include "../src/backends/vulkan/commandBuffer.h"
+#include "imageView.h"
+#include "sampler.h"
+
+#include <imgui.h>
+#include <map>
 
 struct ImGui_ImplVulkan_InitInfo;
-struct ImDrawData;
-struct ImGuiContext;
 
 struct GLFWwindow;
 
@@ -16,30 +18,44 @@ namespace gfx
 {
     class Scene;
 
+    class GFX_API GUI_Image
+    {
+    public:
+        virtual ~GUI_Image() = default;
+
+        virtual void setLayerAndLevel(glm::u32 layer, glm::u32 level) = 0;
+        virtual void setImage(const Image& image) = 0;
+
+        ImTextureID operator*() const { return _id; }
+
+        static std::unique_ptr<GUI_Image> Create(const gfx::Image& image, glm::u32 layer = 0, glm::u32 level = 0);
+
+    protected:
+        ImTextureID _id = 0;
+    };
+
+    enum class Font
+    {
+        Light,
+        Regular,
+        Bold,
+        Italic,
+        Black
+    };
+
     class GUI
     {
     public:
-        GFX_API static void Init();
-        GFX_API static void Render(CommandBuffer& commandBuffer, Scene& scene);
-        GFX_API static void Shutdown();
+        static void Init();
+        GFX_API static void Render(gfx::CommandBuffer& commandBuffer, Scene& scene);
+        static void Shutdown();
 
-        struct GFX_API Bridge
-        {
-            bool(*ImplGlfw_InitForOpenGL)(GLFWwindow* window, bool install_callbacks);
-            bool(*ImplOpenGL3_Init)(const char* glsl_version);
-            void(*ImplOpenGL3_NewFrame)();
-            void(*ImplOpenGL3_RenderDrawData)(ImDrawData* draw_data);
-            void(*ImplOpenGL3_Shutdown)();
-            bool(*ImplGlfw_InitForVulkan)(GLFWwindow* window, bool install_callbacks);
+        GFX_API static ImFont* GetFont(Font font);
 
-            bool(*ImplVulkan_Init)(ImGui_ImplVulkan_InitInfo* initInfo);
-            void(*ImplVulkan_NewFrame)();
-            void(*ImplVulkan_RenderDrawData)(ImDrawData* draw_data, VkCommandBuffer commandBuffer, VkPipeline pipeline);
-            void(*ImplVulkan_Shutdown)();
-
-            void(*ImplGlfw_NewFrame)();
-            void(*ImplGlfw_Shutdown)();
-        };
-        GFX_API static Bridge bridge;
+    private:
+        static void DefineStyle();
+        inline static std::map<Font, ImFont*> _fonts {};
     };
+
+
 }

@@ -8,6 +8,8 @@
 #include <surface.h>
 
 #include "scheduler.h"
+
+#include <iostream>
 #include <window.h>
 
 #include "commandBuffer.h"

@@ -2,6 +2,7 @@
 // Created by radue on 2/17/2026.
 //
 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include "gui.h"
@@ -20,6 +21,7 @@ namespace gfx
     void Engine::Run(const std::filesystem::path& scenePath)
     {
         auto window = SceneManager::LoadScene(scenePath);
+
         while (!window->shouldClose()) {
             glfwPollEvents();
             auto& scene = *window->_scene;

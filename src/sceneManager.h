@@ -54,7 +54,9 @@ namespace gfx
 #error "Unsupported platform"
 #endif
 
-            return io::Window::Builder(std::unique_ptr<Scene>(createScene()))
+
+            const auto scene = createScene();
+            return io::Window::Builder(std::unique_ptr<Scene>(scene))
                 .setTitle(path.stem().string())
                 .setExtent({ 1280, 720 })
                 .setResizable(true)

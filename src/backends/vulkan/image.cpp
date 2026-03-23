@@ -19,7 +19,7 @@ namespace gfx::vk
 {
     Image::Image(const Builder &builder) : gfx::Image(builder) {
         auto imageCreateFlags = ::vk::ImageCreateFlags();
-        if (_arrayLayers > 1 && _type == Type::e2D) imageCreateFlags |= ::vk::ImageCreateFlagBits::e2DArrayCompatibleKHR;
+        // if (_type == Type::e3D) imageCreateFlags |= ::vk::ImageCreateFlagBits::e2DArrayCompatibleKHR;
         if (_arrayLayers == 6 && _type == Type::e2D) imageCreateFlags |= ::vk::ImageCreateFlagBits::eCubeCompatible;
 
 

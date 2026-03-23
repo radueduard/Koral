@@ -24,6 +24,93 @@ gfx::vk::DescriptorPool* gfx::vk::GUI::_descriptorPool = nullptr;
 
 namespace gfx::vk
 {
+    GUI_Image::GUI_Image(const gfx::Image& image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    {
+        _helperSampler = Sampler::Builder().build();
+        setImage(image);
+        setLayerAndLevel(layer, level);
+    }
+
+    GUI_Image::~GUI_Image()
+    {
+        ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
+        if (_id != 0)
+        {
+            ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(_id));
+            _id = 0;
+        }
+    }
+
+    void GUI_Image::setLayerAndLevel(const glm::u32 layer, const glm::u32 level)
+    {
+        Context::Device().runSingleTimeCommand([&](const CommandBuffer& commandBuffer)
+            {
+                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(_image.get());
+                const auto& vkHelperImage = *dynamic_cast<const gfx::vk::Image*>(_helperImage.get());
+
+                vkImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferSrcOptimal);
+                vkHelperImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferDstOptimal);
+                commandBuffer->blitImage(
+                    *vkImage, ::vk::ImageLayout::eTransferSrcOptimal,
+                    *vkHelperImage, ::vk::ImageLayout::eTransferDstOptimal,
+                    ::vk::ImageBlit()
+                        .setSrcSubresource(::vk::ImageSubresourceLayers()
+                            .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                            .setMipLevel(level)
+                            .setBaseArrayLayer(0)
+                            .setLayerCount(1))
+                        .setSrcOffsets({
+                            ::vk::Offset3D{ 0, 0, static_cast<int32_t>(layer) },
+                            ::vk::Offset3D{ static_cast<glm::i32>(vkImage.getExtent().x), static_cast<glm::i32>(vkImage.getExtent().y), static_cast<int32_t>(layer + 1) }
+                        })
+                        .setDstSubresource(::vk::ImageSubresourceLayers()
+                            .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                            .setMipLevel(0)
+                            .setBaseArrayLayer(0)
+                            .setLayerCount(1))
+                        .setDstOffsets({
+                            ::vk::Offset3D{ 0, 0, 0 },
+                            ::vk::Offset3D{ static_cast<glm::i32>(vkHelperImage.getExtent().x), static_cast<glm::i32>(vkHelperImage.getExtent().y), 1 }
+                        }),
+                    ::vk::Filter::eNearest);
+                vkImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
+                vkHelperImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
+            }, ::vk::QueueFlagBits::eGraphics);
+    }
+
+    void GUI_Image::setImage(const gfx::Image& image)
+    {
+        Context::Device()->waitIdle();
+        ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
+        if (_id != 0)
+        {
+            ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(_id));
+            _id = 0;
+        }
+
+        _image = image;
+        _helperImage = gfx::Image::Builder()
+            .setType(Image::Type::e2D)
+            .setFormat(image.getFormat())
+            .setExtent({ image.getExtent().x, image.getExtent().y })
+            .setMSAA(image.getMSAA())
+            .setUsage(Image::Usage::eTransferDst)
+            .addUsage(Image::Usage::eSampled)
+            .build();
+
+        _helperImageView = gfx::ImageView::Builder(*_helperImage)
+            .setViewType(ImageView::Type::e2D)
+            .build();
+
+        _descriptorSet = ImGui_ImplVulkan_AddTexture(
+            **dynamic_cast<const gfx::vk::Sampler*>(_helperSampler.get()),
+            **dynamic_cast<const gfx::vk::ImageView*>(_helperImageView.get()),
+            VK_IMAGE_LAYOUT_GENERAL);
+
+        _id = reinterpret_cast<ImTextureID>(_descriptorSet);
+        setLayerAndLevel(0, 0);
+    }
+
     void GUI::Init()
     {
         _descriptorPool = gfx::vk::DescriptorPool::Builder()
@@ -78,7 +165,7 @@ namespace gfx::vk
             {
                 if (err != VK_SUCCESS)
                 {
-                    throw std::runtime_error("Vulkan error: " + std::to_string(err));
+                    std::cerr << "Vulkan error: " << ::vk::to_string(static_cast<::vk::Result>(err)) << std::endl;
                 }
             },
         };

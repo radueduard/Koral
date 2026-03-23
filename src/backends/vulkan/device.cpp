@@ -106,13 +106,18 @@ namespace gfx::vk {
             .setTaskShader(true)
             .setMeshShader(true);
 
+        auto sampler2DViewOf3D = ::vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT()
+            .setImage2DViewOf3D(true)
+            .setSampler2DViewOf3D(true)
+            .setPNext(&deviceMeshShaderFeatures);
+
      //    auto maintenance4Features = vk::PhysicalDeviceMaintenance4Features()
      //        .setMaintenance4(true)
      //        .setPNext(&deviceMeshShaderFeatures);
 
     	auto dynamicRenderingFeatures = ::vk::PhysicalDeviceDynamicRenderingFeatures()
 			.setDynamicRendering(true)
-			.setPNext(&deviceMeshShaderFeatures);
+			.setPNext(&sampler2DViewOf3D);
 
         auto vk11Features = ::vk::PhysicalDeviceVulkan11Features()
             .setShaderDrawParameters(true)
@@ -125,6 +130,10 @@ namespace gfx::vk {
             .setBufferDeviceAddress(true)
 			.setPNext(&vk11Features);
 
+        auto maintenance9 = ::vk::PhysicalDeviceMaintenance9FeaturesKHR()
+            .setMaintenance9(true)
+            .setPNext(&vk12Features);
+
     	// auto maintenance4Features = vk::PhysicalDeviceMaintenance4Features()
     	// 	.setMaintenance4(true)
 			// .setPNext(&vk12Features);
@@ -135,10 +144,12 @@ namespace gfx::vk {
 
         auto deviceExtensions = Context::Runtime().getDeviceExtensions();
 
+        auto features = Context::Runtime().getPhysicalDevice().getFeatures();
+
         const auto deviceCreateInfo = ::vk::DeviceCreateInfo()
             .setQueueCreateInfos(queueCreateInfos)
-            .setPEnabledFeatures(&Context::Runtime().getPhysicalDevice().getFeatures())
-            .setPNext(&vk12Features)
+            .setPEnabledFeatures(&features)
+            .setPNext(&maintenance9)
             .setPEnabledExtensionNames(deviceExtensions);
 
         _handle = physicalDevice->createDevice(deviceCreateInfo);

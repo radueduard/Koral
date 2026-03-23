@@ -3,10 +3,10 @@
 //
 
 #pragma once
+#include <GL/glew.h>
 
 #include <image.h>
 
-#include <GL/glew.h>
 
 namespace gfx::ogl {
     class Image : public gfx::Image {
@@ -26,6 +26,5 @@ namespace gfx::ogl {
         [[nodiscard]] static GLenum InternalFormatFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static GLenum BaseFormatFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static GLenum DataTypeFromImageFormat(gfx::Image::Format format);
-
     };
 }

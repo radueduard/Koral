@@ -209,11 +209,14 @@ namespace gfx
         [[nodiscard]] Format getFormat() const { return _format; }
         [[nodiscard]] MSAA getMSAA() const { return _msaa; }
         [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
+        [[nodiscard]] glm::u32 getMipLevels() const { return _mipLevels; }
+        [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }
 
         [[nodiscard]] static glm::u32 PixelSizeFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(gfx::Image::Format format);
 
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
+
     protected:
         explicit Image(const Builder&);
         bool _isPerFrame = false;

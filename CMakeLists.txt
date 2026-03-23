@@ -102,6 +102,7 @@ file (GLOB_RECURSE RUNTIME_SOURCE_FILES
         src/main.cpp
         src/engine.cpp
         src/lab/*.cpp
+        src/project/*.cpp
 )
 
 add_executable(Gfx_Runtime ${RUNTIME_SOURCE_FILES})
@@ -115,4 +116,6 @@ target_link_libraries(Gfx_Runtime PRIVATE ${PROJECT_NAME})
 string(REPLACE "\\" "/" VCPKG_TOOLCHAIN_FWD "${CMAKE_TOOLCHAIN_FILE}")
 target_compile_definitions(Gfx_Runtime PRIVATE
     PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
-    VCPKG_ROOT="${VCPKG_TOOLCHAIN_FWD}")
+    VCPKG_ROOT="${VCPKG_TOOLCHAIN_FWD}"
+    ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
+    SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/")
