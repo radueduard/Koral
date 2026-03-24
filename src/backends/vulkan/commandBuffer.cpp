@@ -266,7 +266,9 @@ namespace gfx::vk
     {
         const auto vkSrcImage = dynamic_cast<const gfx::vk::Image*>(srcImage);
         const gfx::vk::Image* vkDstImage = dstImage != nullptr ? dynamic_cast<const gfx::vk::Image*>(dstImage) : nullptr;
-        if (dstImage == nullptr)
+
+        bool blitToScreen = dstImage == nullptr;
+        if (blitToScreen)
             vkDstImage = &dynamic_cast<const gfx::vk::Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
 
         vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferSrcOptimal);
@@ -290,8 +292,8 @@ namespace gfx::vk
                     .setBaseArrayLayer(0)
                     .setLayerCount(1))
                 .setDstOffsets({
-                    ::vk::Offset3D{ 0, 0, 0 },
-                    ::vk::Offset3D{ static_cast<glm::i32>(vkDstImage->getExtent().x), static_cast<glm::i32>(vkDstImage->getExtent().y), 1 }
+                    ::vk::Offset3D{ 0, blitToScreen ? static_cast<glm::i32>(vkDstImage->getExtent().y) : 0, 0 },
+                    ::vk::Offset3D{ static_cast<glm::i32>(vkDstImage->getExtent().x), blitToScreen ? 0 : static_cast<glm::i32>(vkDstImage->getExtent().y), 1 }
                 }),
             ::vk::Filter::eNearest);
          vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);

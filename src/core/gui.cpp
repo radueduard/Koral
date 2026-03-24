@@ -30,9 +30,9 @@ void gfx::GUI::DefineStyle()
     style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
     style.WindowBorderSize = 0.0f;
     style.FrameBorderSize = 0.0f;
-    style.PopupBorderSize = 1.0f;
+    style.PopupBorderSize = 2.0f;
     style.TabBarOverlineSize = 5.0f;
-    style.TabBorderSize = 0.0f;
+    style.TabBorderSize = 2.0f;
     style.WindowMenuButtonPosition = ImGuiDir_None;
     style.DisplaySafeAreaPadding = ImVec2(11.0f, 5.0f);
     style.CellPadding = ImVec2(11.0f, 5.0f);
@@ -93,6 +93,7 @@ void gfx::GUI::DefineStyle()
     style.Colors[ImGuiCol_PlotLinesHovered] = highlightHover;
     style.Colors[ImGuiCol_PlotHistogram] = text;
     style.Colors[ImGuiCol_PlotHistogramHovered] = highlightHover;
+    style.Colors[ImGuiCol_BorderShadow] = text;
 
     const auto regularFontPath = gfx::assetPath("fonts/Inter_28pt-Regular.ttf");
     const auto boldFontPath = gfx::assetPath("fonts/Inter_28pt-Bold.ttf");

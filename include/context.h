@@ -22,8 +22,6 @@ namespace gfx {
 
     GFX_API std::filesystem::path assetPath(const std::filesystem::path& relativePath);
     GFX_API std::filesystem::path shaderPath(const std::filesystem::path& relativePath);
-    GFX_API std::filesystem::path scenePath(const std::filesystem::path& relativePath);
-    GFX_API std::filesystem::path templatePath(const std::filesystem::path& relativePath);
 
     enum class API {
         eOpenGL,

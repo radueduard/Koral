@@ -8,7 +8,6 @@
 #include "gui.h"
 #include "sceneManager.h"
 #include "scheduler.h"
-#include "project/generate.h"
 
 namespace gfx
 {
@@ -24,6 +23,9 @@ namespace gfx
 
         while (!window->shouldClose()) {
             glfwPollEvents();
+            if (window->isPaused()) {
+                continue;
+            }
             auto& scene = *window->_scene;
             window->_inputState.update();
             window->_timeState.update();

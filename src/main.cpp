@@ -3,7 +3,6 @@
 #include <iostream>
 
 #include "context.h"
-#include "project/generate.h"
 
 namespace gfx
 {
@@ -35,9 +34,6 @@ void enableANSI() {
 
 int main(const int argc, char **argv)
 {
-    // gfx::ProjectManager::generate("F:/GFX_PROJECTS", "Hub");
-    // return EXIT_SUCCESS;
-
     if (argc < 2)
     {
         std::cerr << "Usage: " << argv[0] << " <scene_library_name>" << std::endl;

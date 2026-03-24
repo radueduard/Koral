@@ -828,7 +828,7 @@ inline void ImGui::FileBrowser::Display()
     }
     else
     {
-        if(Button(" ok ") || isEnterPressed)
+        if(Button(" OK ") || isEnterPressed)
         {
             isOk_ = true;
             CloseCurrentPopup();
@@ -838,7 +838,7 @@ inline void ImGui::FileBrowser::Display()
     SameLine();
 
     const bool shouldClose =
-        Button("cancel") || shouldClose_ ||
+        Button("Cancel") || shouldClose_ ||
         ((flags_ & ImGuiFileBrowserFlags_CloseOnEsc) &&
         IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
         IsKeyPressed(ImGuiKey_Escape));

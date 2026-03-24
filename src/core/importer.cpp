@@ -38,6 +38,7 @@ namespace gfx
             .setExtent({ static_cast<glm::u32>(width), static_cast<glm::u32>(height) })
             .setFormat(Image::Format::eRGBA8_UNORM)
             .setUsage(Image::Usage::eSampled)
+            .addUsage(Image::Usage::eTransferSrc)
             .addUsage(Image::Usage::eTransferDst)
             .build();
 
