@@ -25,9 +25,11 @@ namespace gfx::vk
 
 		[[nodiscard]] const Queue& getQueue() const { return _queue; }
 
+		void ResetSemaphore() const;
+
 	private:
 		const Queue& _queue;
-		::vk::Semaphore _imageAvailable;
+		mutable ::vk::Semaphore _imageAvailable;
     	::vk::Fence _inFlightFence;
 	};
 

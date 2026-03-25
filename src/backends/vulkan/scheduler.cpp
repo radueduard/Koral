@@ -29,6 +29,11 @@ namespace gfx::vk
         Context::Device()->destroyFence(_inFlightFence);
     }
 
+    void Frame::ResetSemaphore() const {
+        vk::Context::Device()->destroySemaphore(_imageAvailable);
+        _imageAvailable = vk::Context::Device()->createSemaphore({});
+    }
+
     Scheduler::Scheduler(const Builder& createInfo) : gfx::Scheduler(createInfo) {}
 
     void Scheduler::Initialize()
@@ -57,16 +62,21 @@ namespace gfx::vk
             throw std::runtime_error("Failed to wait fence: " + ::vk::to_string(result));
         }
 
-        if (const auto result = Context::Device()->resetFences(1, &fence); result != ::vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to reset fence: " + ::vk::to_string(result));
+        while (true) {
+            auto result = _swapChain->Acquire(frame);
+            if (result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
+                _started = false;
+                _swapChain->Resize(gfx::Context::Window().getExtent());
+                _started = true;
+                // recreate the semaphore
+                frame.ResetSemaphore();
+                continue;
+            }
+            break;
         }
 
-        if (const auto result = _swapChain->Acquire(frame);
-            result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
-            _started = false;
-            _swapChain->Resize(gfx::Context::Window().getExtent());
-            _started = true;
-            return;
+        if (const auto result = Context::Device()->resetFences(1, &fence); result != ::vk::Result::eSuccess) {
+            throw std::runtime_error("Failed to reset fence: " + ::vk::to_string(result));
         }
 
         auto& commandBuffer = frame.getCommandBuffer();

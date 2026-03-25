@@ -202,6 +202,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 
     ImGui::Begin(Context::Window().getTitle().c_str(), nullptr, window_flags);
 
+    if (!Context::Window().isDecorated())
     {
         ImVec2 windowPos = ImGui::GetWindowPos();
         float titleBarHeight = ImGui::GetFrameHeight();
