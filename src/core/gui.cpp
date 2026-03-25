@@ -44,6 +44,7 @@ void gfx::GUI::DefineStyle()
     style.ChildRounding = 5.0f;
     style.ScrollbarRounding = 5.0f;
     style.TabRounding = 0.0f;
+    style.WindowPadding = ImVec2(11.0f, 5.0f);
     // do not show tab dropdown
     style.DockingSeparatorSize = 1.0f;
     style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
@@ -147,8 +148,11 @@ void gfx::GUI::Init()
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
+    if (!Context::Window().isFullscreen())
+    {
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    }
 
     switch (Context::Window().getAPI())
     {

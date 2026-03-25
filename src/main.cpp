@@ -9,12 +9,12 @@ namespace gfx
     class Engine
     {
     public:
-        static void Run(const std::filesystem::path& scenePath);
+        static void Run(int argc, char** argv);
     };
 }
 
 #ifdef _WIN32
-#include <windows.h>
+#include <Windows.h>
 void enableANSI() {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
@@ -42,7 +42,7 @@ int main(const int argc, char **argv)
     enableANSI();
 #endif
     try {
-        gfx::Engine::Run(argv[1]);
+        gfx::Engine::Run(argc, argv);
     } catch (const std::exception& e) {
         std::cerr << "An error occurred: " << e.what() << std::endl;
         return EXIT_FAILURE;

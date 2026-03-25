@@ -40,7 +40,8 @@ namespace gfx::io {
             bool resizable = true;
             bool fullscreen = false;
             bool decorated = true;
-            API api = API::eOpenGL;
+            bool transparentFramebuffer = false;
+            API api = API::eVulkan;
             std::unique_ptr<Scene> scene = nullptr;
 
             explicit Builder(std::unique_ptr<Scene> scene) : scene(std::move(scene)) {}
@@ -67,6 +68,11 @@ namespace gfx::io {
 
             Builder& setDecorated(bool decorated) {
                 this->decorated = decorated;
+                return *this;
+            }
+
+            Builder& setTransparentFramebuffer(bool transparent) {
+                this->transparentFramebuffer = transparent;
                 return *this;
             }
 
@@ -97,6 +103,7 @@ namespace gfx::io {
         [[nodiscard]] bool isResizable() const { return _resizable; }
         [[nodiscard]] bool isFullscreen() const { return _fullscreen; }
         [[nodiscard]] bool isDecorated() const { return _decorated; }
+        [[nodiscard]] bool isFramebufferTransparent() const { return _transparentFramebuffer; }
 
         void pause() { _paused = true; }
         void unPause() { _paused = false; }
@@ -127,6 +134,7 @@ namespace gfx::io {
         bool _resizable;
         bool _fullscreen;
         bool _decorated;
+        bool _transparentFramebuffer;
         API _api;
 
         Input::State _inputState;

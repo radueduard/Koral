@@ -14,6 +14,7 @@
 #include "surface.h"
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
+#include "window.h"
 
 namespace gfx::vk
 {
@@ -78,6 +79,16 @@ namespace gfx::vk
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
 
+        const auto compositeAlpha = gfx::Context::Window().isFramebufferTransparent() ?
+#ifdef _WIN32
+        ::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
+#elifdef __APPLE__
+        ::vk::CompositeAlphaFlagBitsKHR::ePostMultiplied
+#else
+        ::vk::CompositeAlphaFlagBitsKHR::eOpaque
+#endif
+        : ::vk::CompositeAlphaFlagBitsKHR::eOpaque;
+
         const auto createInfo = ::vk::SwapchainCreateInfoKHR()
             .setSurface(*_surface.get())
             .setMinImageCount(_imageCount)
@@ -89,7 +100,7 @@ namespace gfx::vk
             .setImageSharingMode(::vk::SharingMode::eExclusive)
             .setQueueFamilyIndices(queueFamilyIndices)
             .setPreTransform(surfaceCapabilities.currentTransform)
-            .setCompositeAlpha(::vk::CompositeAlphaFlagBitsKHR::ePostMultiplied)
+            .setCompositeAlpha(compositeAlpha)
             .setPresentMode(_presentMode)
             .setOldSwapchain(oldSwapChain)
             .setClipped(true);

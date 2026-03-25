@@ -25,7 +25,7 @@ namespace gfx
     class SceneManager
     {
     public:
-        static std::unique_ptr<io::Window> LoadScene(const std::filesystem::path& path)
+        static std::unique_ptr<Scene> LoadScene(const std::filesystem::path& path)
         {
             if (!std::filesystem::exists(path)) {
                 throw std::runtime_error("Scene file does not exist: " + path.string());
@@ -55,15 +55,7 @@ namespace gfx
 #endif
 
 
-            const auto scene = createScene();
-            return io::Window::Builder(std::unique_ptr<Scene>(scene))
-                .setTitle(path.stem().string())
-                .setExtent({ 1280, 720 })
-                .setResizable(true)
-                .setFullscreen(false)
-                .setDecorated(false)
-                .setAPI(API::eVulkan)
-                .build();
+           return std::unique_ptr<Scene>(createScene());
         }
     };
 }

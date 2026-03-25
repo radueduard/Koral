@@ -24,6 +24,7 @@ namespace gfx::io {
         _resizable(createInfo.resizable),
         _fullscreen(createInfo.fullscreen),
         _decorated(createInfo.decorated),
+        _transparentFramebuffer(createInfo.transparentFramebuffer),
         _api(createInfo.api),
         _scene(std::move(createInfo.scene))
     {
@@ -36,7 +37,7 @@ namespace gfx::io {
         glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::eOpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
         glfwWindowHint(GLFW_DECORATED, createInfo.decorated);
-        glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
+        glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, createInfo.transparentFramebuffer);
 
         const glm::u32 width = createInfo.extent.x;
         const glm::u32 height = createInfo.extent.y;
@@ -58,8 +59,8 @@ namespace gfx::io {
         }
 
         _window = glfwCreateWindow(
-            static_cast<glm::i32>(width),
-            static_cast<glm::i32>(height),
+            static_cast<glm::i32>(_extent.x),
+            static_cast<glm::i32>(_extent.y),
             createInfo.title.c_str(),
             _monitor,
             nullptr);
