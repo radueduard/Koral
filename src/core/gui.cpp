@@ -147,6 +147,7 @@ void gfx::GUI::Init()
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
 
     switch (Context::Window().getAPI())
@@ -155,7 +156,6 @@ void gfx::GUI::Init()
          ogl::GUI::Init();
         break;
     case API::eVulkan:
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         vk::GUI::Init();
         break;
     default:
@@ -332,8 +332,10 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 
     if (const ImGuiIO& io = ImGui::GetIO(); io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
+        GLFWwindow* backup_ctx = glfwGetCurrentContext();
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(backup_ctx);
     }
 }
 

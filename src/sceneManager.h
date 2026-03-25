@@ -62,7 +62,7 @@ namespace gfx
                 .setResizable(true)
                 .setFullscreen(false)
                 .setDecorated(false)
-                .setAPI(API::eVulkan)
+                .setAPI(API::eOpenGL)
                 .build();
         }
     };

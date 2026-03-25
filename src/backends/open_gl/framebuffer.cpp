@@ -15,7 +15,7 @@ namespace gfx::ogl
     Framebuffer::Framebuffer() : _id(0)
     {
         _isDefault = true;
-        _clearValues.clearColor.emplace_back(glm::vec4 { 0.0, 0.0, 0.0, 1.0 });
+        _clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 0.0 );
     }
 
     Framebuffer::Framebuffer(const gfx::Framebuffer::Builder& createInfo) : gfx::Framebuffer(createInfo) {

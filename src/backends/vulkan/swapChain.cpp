@@ -89,7 +89,7 @@ namespace gfx::vk
             .setImageSharingMode(::vk::SharingMode::eExclusive)
             .setQueueFamilyIndices(queueFamilyIndices)
             .setPreTransform(surfaceCapabilities.currentTransform)
-            .setCompositeAlpha(::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied)
+            .setCompositeAlpha(::vk::CompositeAlphaFlagBitsKHR::ePostMultiplied)
             .setPresentMode(_presentMode)
             .setOldSwapchain(oldSwapChain)
             .setClipped(true);
