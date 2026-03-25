@@ -23,6 +23,7 @@ namespace gfx::io {
         _extent(createInfo.extent),
         _resizable(createInfo.resizable),
         _fullscreen(createInfo.fullscreen),
+        _decorated(createInfo.decorated),
         _api(createInfo.api),
         _scene(std::move(createInfo.scene))
     {
@@ -34,6 +35,8 @@ namespace gfx::io {
 
         glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::eOpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
+        glfwWindowHint(GLFW_DECORATED, createInfo.decorated);
+        glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
 
         const glm::u32 width = createInfo.extent.x;
         const glm::u32 height = createInfo.extent.y;
@@ -79,6 +82,22 @@ namespace gfx::io {
     	glfwGetFramebufferSize(_window, reinterpret_cast<int*>(&extent.x), reinterpret_cast<int*>(&extent.y));
 		_extent = extent;
         glfwMakeContextCurrent(_window);
+
+        if (!_fullscreen) {
+            if (const auto primaryMonitor = glfwGetPrimaryMonitor()) {
+                if (const auto videoMode = glfwGetVideoMode(primaryMonitor)) {
+                    int monitorX, monitorY;
+                    glfwGetMonitorPos(primaryMonitor, &monitorX, &monitorY);
+                    const int windowX = monitorX + (videoMode->width - static_cast<int>(width)) / 2;
+                    const int windowY = monitorY + (videoMode->height - static_cast<int>(height)) / 2;
+                    glfwSetWindowPos(_window, windowX, windowY);
+                } else {
+                    std::cerr << "Failed to get video mode of primary monitor" << std::endl;
+                }
+            } else {
+                std::cerr << "Failed to get primary monitor" << std::endl;
+            }
+        }
 
         if (_api == API::eOpenGL) {
             glewExperimental = GL_TRUE;
@@ -128,10 +147,6 @@ namespace gfx::io {
 
     void Window::close()
     {
-        _framebuffer.reset();
-        _scene.reset();
-        Context::_scheduler->WaitIdle();
-        delete Context::_scheduler;
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
         _closed = true;
     }

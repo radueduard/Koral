@@ -13,8 +13,27 @@
 #include "../backends/vulkan/gui.h"
 
 #include <imgui.h>
+#include <iostream>
+#include <GLFW/glfw3.h>
 
 #include "commandBuffer.h"
+#include <IconsFontAwesome6.h>
+
+ImFont* AddFont(const std::filesystem::path& path, const float size)
+{
+    const std::string iconPath = gfx::assetPath(FONT_ICON_FILE_NAME_FAS).string();
+    const float iconFontSize = size * 2.0f / 3.0f; // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
+
+    ImFontConfig config;
+    std::ranges::copy(path.filename().string(), config.Name);
+    config.MergeMode = false;
+    config.PixelSnapH = true;
+    ImGui::GetIO().Fonts->AddFontFromFileTTF(path.string().c_str(), size, &config);
+    config.MergeMode = true;
+    config.GlyphMinAdvanceX = iconFontSize;
+    static constexpr ImWchar icons_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
+    return ImGui::GetIO().Fonts->AddFontFromFileTTF(iconPath.c_str(), iconFontSize, &config, icons_ranges);
+}
 
 void gfx::GUI::DefineStyle()
 {
@@ -95,22 +114,19 @@ void gfx::GUI::DefineStyle()
     style.Colors[ImGuiCol_PlotHistogramHovered] = highlightHover;
     style.Colors[ImGuiCol_BorderShadow] = text;
 
-    const auto regularFontPath = gfx::assetPath("fonts/Inter_28pt-Regular.ttf");
-    const auto boldFontPath = gfx::assetPath("fonts/Inter_28pt-Bold.ttf");
-    const auto italicFontPath = gfx::assetPath("fonts/Inter_28pt-Italic.ttf");
-    const auto blackFontPath = gfx::assetPath("fonts/Inter_28pt-Black.ttf");
-    const auto lightFontPath = gfx::assetPath("fonts/Inter_28pt-Light.ttf");
-    ImGuiIO& io = ImGui::GetIO();
-    _fonts[Font::Regular] = io.Fonts->AddFontFromFileTTF(regularFontPath.string().c_str(), 28.0f);
-    _fonts[Font::Bold] =io.Fonts->AddFontFromFileTTF(boldFontPath.string().c_str(), 32.0f);
-    _fonts[Font::Italic] =io.Fonts->AddFontFromFileTTF(italicFontPath.string().c_str(), 28.0f);
-    _fonts[Font::Black] =io.Fonts->AddFontFromFileTTF(blackFontPath.string().c_str(), 36.0f);
-    _fonts[Font::Light] =io.Fonts->AddFontFromFileTTF(lightFontPath.string().c_str(), 26.0f);
-    io.FontDefault = _fonts[Font::Regular];
 
-    // ImGui::SetWindowFontScale(.5f);
+    auto& io = ImGui::GetIO();
+    _fonts[Font::Regular] = AddFont(gfx::assetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
+    _fonts[Font::Bold] = AddFont(gfx::assetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
+    _fonts[Font::Italic] = AddFont(gfx::assetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
+    _fonts[Font::Black] = AddFont(gfx::assetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
+    _fonts[Font::Light] = AddFont(gfx::assetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
+
+    io.FontDefault = _fonts[Font::Regular];
     io.FontGlobalScale = .55f;
 }
+
+
 
 std::unique_ptr<gfx::GUI_Image> gfx::GUI_Image::Create(const gfx::Image& image, glm::u32 layer, glm::u32 level)
 {
@@ -175,9 +191,123 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground;
+    window_flags |= ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground;
 
-    ImGui::Begin("DockSpace", nullptr, window_flags);
+    if (Context::Window().isDecorated())
+    {
+        window_flags |= ImGuiWindowFlags_NoTitleBar;
+    }
+
+    ImGui::PushFont(GetFont(Font::Bold));
+
+    ImGui::Begin(Context::Window().getTitle().c_str(), nullptr, window_flags);
+
+    {
+        ImVec2 windowPos = ImGui::GetWindowPos();
+        float titleBarHeight = ImGui::GetFrameHeight();
+        float buttonSize = titleBarHeight - 8.0f;
+        float padding = 4.0f;
+        float buttonY = windowPos.y + padding;
+
+        ImDrawList* drawList = ImGui::GetForegroundDrawList();
+
+        struct TitleButton {
+            ImVec2 min, max;
+            const char* label;
+            ImU32 hoverColor;
+        };
+
+        float closeX    = windowPos.x + ImGui::GetWindowWidth() - buttonSize - padding;
+        float maximizeX = closeX - buttonSize - padding;
+        float minimizeX = maximizeX - buttonSize - padding;
+
+        TitleButton buttons[] = {
+            { ImVec2(closeX,    buttonY), ImVec2(closeX    + buttonSize, buttonY + buttonSize), ICON_FA_X,  IM_COL32(220, 50,  50,  255) },
+            { ImVec2(maximizeX, buttonY), ImVec2(maximizeX + buttonSize, buttonY + buttonSize), ICON_FA_SQUARE,  IM_COL32(80,  80,  80,  255) },
+            { ImVec2(minimizeX, buttonY), ImVec2(minimizeX + buttonSize, buttonY + buttonSize), ICON_FA_MINUS, IM_COL32(80,  80,  80,  255) }
+        };
+
+        for (auto& btn : buttons)
+        {
+            bool isHovered = ImGui::IsMouseHoveringRect(btn.min, btn.max, false);
+            bool isClicked = isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
+
+            ImU32 bgColor = isHovered ? btn.hoverColor : IM_COL32(0, 0, 0, 0);
+            drawList->AddRectFilled(btn.min, btn.max, bgColor, buttonSize * 0.5f);
+
+            ImVec2 textSize = ImGui::CalcTextSize(btn.label);
+            ImVec2 btnCenter = ImVec2(
+                btn.min.x + buttonSize * 0.5f,
+                btn.min.y + buttonSize * 0.5f
+            );
+            auto textPos = ImVec2(
+                btnCenter.x - textSize.x * 0.5f + 0.5f,  // +0.5 for pixel alignment
+                btnCenter.y - textSize.y * 0.5f - 0.5f
+            );
+            drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), btn.label);
+
+            if (isClicked)
+            {
+                if (btn.label[0] == 'X')
+                {
+                    Context::Window().close();
+                }
+                else if (btn.label[0] == ICON_FA_SQUARE[0] && btn.label[1] == ICON_FA_SQUARE[1])
+                {
+                    GLFWwindow* win = *Context::Window();
+                    if (glfwGetWindowAttrib(win, GLFW_MAXIMIZED))
+                        glfwRestoreWindow(win);
+                    else
+                        glfwMaximizeWindow(win);
+                }
+                else if (btn.label[0] == ICON_FA_MINUS[0] && btn.label[1] == ICON_FA_MINUS[1])
+                {
+                    glfwIconifyWindow(*Context::Window());
+                }
+            }
+        }
+    }
+    ImGui::PopFont();
+
+    if (!Context::Window().isDecorated())
+    {
+        const ImVec2 windowPos = ImGui::GetWindowPos();
+        const ImVec2 titleBarMin = windowPos;
+        const auto titleBarMax = ImVec2(windowPos.x + ImGui::GetWindowWidth(),
+                                    windowPos.y + ImGui::GetFrameHeight());
+
+        static bool isDragging = false;
+        static ImVec2 dragStartMousePos;
+        static ImVec2 dragStartWindowPos;
+
+        if (bool isHoveringTitleBar = ImGui::IsMouseHoveringRect(titleBarMin, titleBarMax, false); isHoveringTitleBar && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
+            isDragging = true;
+            dragStartMousePos = ImGui::GetMousePos();
+            int wx, wy;
+            glfwGetWindowPos(*Context::Window(), &wx, &wy);
+            dragStartWindowPos = ImVec2(static_cast<float>(wx), static_cast<float>(wy));
+        }
+
+        if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+        {
+            isDragging = false;
+        }
+
+        if (isDragging && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
+        {
+            const ImVec2 currentMousePos = ImGui::GetMousePos();
+            const float dx = currentMousePos.x - dragStartMousePos.x;
+            const float dy = currentMousePos.y - dragStartMousePos.y;
+
+            glfwSetWindowPos(
+                *Context::Window(),
+                static_cast<int>(dragStartWindowPos.x + dx),
+                static_cast<int>(dragStartWindowPos.y + dy)
+            );
+        }
+    }
+
 
     const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
     ImGui::DockSpace(dockSpaceId, ImVec2(0.0f, 0.0f), dockSpaceFlags);

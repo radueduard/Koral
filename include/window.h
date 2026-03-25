@@ -39,6 +39,7 @@ namespace gfx::io {
             glm::uvec2 extent = { 1280, 720 };
             bool resizable = true;
             bool fullscreen = false;
+            bool decorated = true;
             API api = API::eOpenGL;
             std::unique_ptr<Scene> scene = nullptr;
 
@@ -61,6 +62,11 @@ namespace gfx::io {
 
             Builder& setFullscreen(bool fullscreen) {
                 this->fullscreen = fullscreen;
+                return *this;
+            }
+
+            Builder& setDecorated(bool decorated) {
+                this->decorated = decorated;
                 return *this;
             }
 
@@ -88,6 +94,9 @@ namespace gfx::io {
         [[nodiscard]] glm::uvec2 getExtent() const { return _extent; }
 
         [[nodiscard]] bool isPaused() const { return _paused; }
+        [[nodiscard]] bool isResizable() const { return _resizable; }
+        [[nodiscard]] bool isFullscreen() const { return _fullscreen; }
+        [[nodiscard]] bool isDecorated() const { return _decorated; }
 
         void pause() { _paused = true; }
         void unPause() { _paused = false; }
@@ -117,6 +126,7 @@ namespace gfx::io {
         glm::uvec2 _extent;
         bool _resizable;
         bool _fullscreen;
+        bool _decorated;
         API _api;
 
         Input::State _inputState;

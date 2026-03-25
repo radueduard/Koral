@@ -61,6 +61,7 @@ namespace gfx
                 .setExtent({ 1280, 720 })
                 .setResizable(true)
                 .setFullscreen(false)
+                .setDecorated(false)
                 .setAPI(API::eVulkan)
                 .build();
         }
