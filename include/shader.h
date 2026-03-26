@@ -61,16 +61,46 @@ namespace gfx
             }
         };
 
-        struct GFX_API SetDescription
+        struct GFX_API Descriptor {
+            DescriptorType type;
+            std::string name;
+            glm::u32 count;
+            Flags<Stage> stages;
+
+            auto operator<=>(const Descriptor& other) const {
+                return std::tie(type, name, count) <=> std::tie(other.type, other.name, other.count);
+            }
+
+            auto operator==(const Descriptor& other) const {
+                return std::tie(type, name, count) == std::tie(other.type, other.name, other.count);
+            }
+        };
+
+        struct GFX_API DescriptorSet
         {
-            std::map<glm::u32, std::tuple<DescriptorType, std::string, glm::u32>> descriptors;
+            std::map<glm::u32, Descriptor> descriptors;
+        };
+
+        struct GFX_API PushConstant {
+            std::string name;
+            glm::u32 size;
+            glm::u32 offset;
+            Flags<Stage> stages;
+
+            auto operator<=>(const PushConstant& other) const {
+                return std::tie(name, size, offset) <=> std::tie(other.name, other.size, other.offset);
+            }
+            auto operator==(const PushConstant& other) const {
+                return std::tie(name, size, offset) == std::tie(other.name, other.size, other.offset);
+            }
         };
 
         struct GFX_API MemoryLayout
         {
             std::set<InputOutput> inputs;
             std::set<InputOutput> outputs;
-            std::map<glm::u32, SetDescription> descriptorSets;
+            std::map<glm::u32, DescriptorSet> descriptorSets;
+            std::map<glm::u32, PushConstant> pushConstants;
         };
 
         struct GFX_API Builder {

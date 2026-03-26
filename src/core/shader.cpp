@@ -129,11 +129,32 @@ namespace gfx {
     	return count;
     }
 
+	Shader::Stage StageFrom(const spv::ExecutionModel executionModel) {
+	    switch (executionModel) {
+	    	case spv::ExecutionModelVertex: return Shader::Stage::eVertex;
+	    	case spv::ExecutionModelTessellationControl: return Shader::Stage::eTessellationControl;
+	    	case spv::ExecutionModelTessellationEvaluation: return Shader::Stage::eTessellationEvaluation;
+	    	case spv::ExecutionModelGeometry: return Shader::Stage::eGeometry;
+	    	case spv::ExecutionModelFragment: return Shader::Stage::eFragment;
+	    	case spv::ExecutionModelGLCompute: return Shader::Stage::eCompute;
+	    	case spv::ExecutionModelMeshNV: return Shader::Stage::eMesh;
+	    	case spv::ExecutionModelTaskNV: return Shader::Stage::eTask;
+	    	case spv::ExecutionModelRayGenerationNV: return Shader::Stage::eRaygen;
+	    	case spv::ExecutionModelIntersectionNV: return Shader::Stage::eIntersection;
+	    	case spv::ExecutionModelAnyHitNV: return Shader::Stage::eAnyHit;
+	    	case spv::ExecutionModelClosestHitNV: return Shader::Stage::eClosestHit;
+	    	case spv::ExecutionModelMissNV: return Shader::Stage::eMiss;
+	    	case spv::ExecutionModelCallableNV: return Shader::Stage::eCallable;
+	    	default: throw std::runtime_error("Unknown execution model in SPIR-V module!");
+	    }
+    }
+
     Shader::MemoryLayout Shader::fetchMemoryLayout(const std::vector<glm::u32>& spirvCode)
     {
     	std::vector words(spirvCode.begin(), spirvCode.end());
         const auto module = spirv_cross::Compiler(words);
         const auto resources = module.get_shader_resources();
+    	const auto stage = StageFrom(module.get_execution_model());
 
     	MemoryLayout memoryLayout;
 
@@ -161,7 +182,7 @@ namespace gfx {
 			const uint32_t count = GetCount(module.get_type(sampler.type_id));
 			const auto& name = module.get_name(sampler.id);
 
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eSampler, name, count));
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampler, name, count, stage });
 		} // eSampler
 		for (const auto& sampledImage : resources.separate_images) {
 			const uint32_t set = module.get_decoration(sampledImage.id, spv::DecorationDescriptorSet);
@@ -172,7 +193,7 @@ namespace gfx {
 				// memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eUniformTexelBuffer, name, count));
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eStorageImage, name, count));
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage });
 			}
 		} // eSampledImage and eUniformTexelBuffer
 		for (const auto& sampledImage : resources.sampled_images) {
@@ -180,7 +201,7 @@ namespace gfx {
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eCombinedImageSampler, name, count));
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eCombinedImageSampler, name, count, stage });
 		} // eCombinedImageSampler
 		for (const auto& image : resources.storage_images) {
 			const uint32_t set = module.get_decoration(image.id, spv::DecorationDescriptorSet);
@@ -191,7 +212,7 @@ namespace gfx {
 				// memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eStorageTexelBuffer, name, count));
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eStorageImage, name, count));
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage });
 			}
 		} // eStorageImage and eStorageTexelBuffer
 		for (const auto& buffer : resources.uniform_buffers) {
@@ -199,15 +220,23 @@ namespace gfx {
 			const uint32_t binding = module.get_decoration(buffer.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eUniformBuffer, name, count));
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformBuffer, name, count, stage });
 		} // eUniformBuffer
 		for (const auto& buffer : resources.storage_buffers) {
 			const uint32_t set = module.get_decoration(buffer.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(buffer.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eStorageBuffer, name, count));
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageBuffer, name, count, stage });
 		} // eStorageBuffer
+
+    	for (const auto& pushConstant : resources.push_constant_buffers) {
+			const auto& name = module.get_name(pushConstant.id);
+			const auto& type = module.get_type(pushConstant.type_id);
+			const glm::u32 size = module.get_declared_struct_size(type);
+    		const auto offset = module.get_decoration(pushConstant.id, spv::DecorationOffset);
+			memoryLayout.pushConstants.emplace(offset, PushConstant { name, size, offset, stage });
+		} // push constants
 
     	return memoryLayout;
     }

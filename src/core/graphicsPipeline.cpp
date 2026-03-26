@@ -103,6 +103,12 @@ namespace gfx
         return *_setLayouts.at(index);
     }
 
+    const Shader::PushConstant & GraphicsPipeline::getPushConstantRange(glm::u32 offset) const {
+        if (!_pushConstantRanges.contains(offset))
+            throw std::runtime_error("This pipeline does not contain a push constant with that offset!");
+        return _pushConstantRanges.at(offset);
+    }
+
     GraphicsPipeline::GraphicsPipeline(const Builder& createInfo) :
         _vertexShader(createInfo.vertexShader),
         _tessellationState(createInfo.tessellationState),
@@ -152,7 +158,8 @@ namespace gfx
         }
 
         // check for set layout compatibility between shaders and create set layouts
-        std::unordered_map<glm::u32, std::map<glm::u32, std::tuple<DescriptorType, std::string, glm::u32>>> mergedSetLayouts;
+        std::unordered_map<glm::u32, std::map<glm::u32, Shader::Descriptor>> mergedSetLayouts;
+        std::unordered_map<glm::u32, Shader::PushConstant> mergedPushConstants;
         for (const auto& memoryLayout : memoryLayouts)
         {
             for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
@@ -160,15 +167,47 @@ namespace gfx
                 for (const auto& [binding, descriptor] : setDescription.descriptors)
                 {
                     if (mergedSetLayouts[setIndex].contains(binding)) {
-                        if (const auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
-                            existingDescriptor != descriptor)
+                        auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
+                        if (existingDescriptor != descriptor)
                         {
                             throw std::runtime_error("Descriptor set layout conflict between shaders in pipeline!");
                         }
+                        existingDescriptor.stages |= descriptor.stages;
                     } else
                     {
                         mergedSetLayouts[setIndex][binding] = descriptor;
                     }
+                }
+            }
+            for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
+            {
+                if (mergedPushConstants.contains(offset)) {
+                    if (auto& existingPushConstant = mergedPushConstants[offset];
+                        existingPushConstant != pushConstant) {
+                        if (existingPushConstant.size < pushConstant.size) {
+                            existingPushConstant.stages |= pushConstant.stages;
+                            mergedPushConstants[offset + existingPushConstant.size] = {
+                                .name = pushConstant.name + "_part2",
+                                .size = pushConstant.size - existingPushConstant.size,
+                                .offset = offset + existingPushConstant.size,
+                                .stages = pushConstant.stages
+                            };
+                            existingPushConstant.size = pushConstant.size;
+                        } else if (existingPushConstant.size > pushConstant.size) {
+                            existingPushConstant.stages |= pushConstant.stages;
+                            mergedPushConstants[offset + pushConstant.size] = {
+                                .name = existingPushConstant.name + "_part2",
+                                .size = existingPushConstant.size - pushConstant.size,
+                                .offset = offset + pushConstant.size,
+                                .stages = existingPushConstant.stages
+                            };
+                            existingPushConstant.size = pushConstant.size;
+                        } else {
+                            throw std::runtime_error("Push constant layout conflict between shaders in pipeline!");
+                        }
+                    }
+                } else {
+                    mergedPushConstants[offset] = pushConstant;
                 }
             }
         }
@@ -178,10 +217,15 @@ namespace gfx
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription)
             {
-                const auto& [type, name, count] = descriptor;
+                const auto& [type, name, count, _] = descriptor;
                 builder.addBinding(binding, type, count);
             }
             _setLayouts[setIndex] = builder.build();
+        }
+
+        for (const auto& [offset, pushConstant] : mergedPushConstants)
+        {
+            _pushConstantRanges[offset] = pushConstant;
         }
     }
 }

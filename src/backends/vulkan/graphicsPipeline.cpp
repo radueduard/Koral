@@ -37,8 +37,17 @@ namespace gfx::vk
             setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.get());
         }
 
+        std::vector<::vk::PushConstantRange> pushConstantRanges = {};
+        for (const auto& [offset, pushConstant] : _pushConstantRanges) {
+            pushConstantRanges.push_back(::vk::PushConstantRange()
+                .setStageFlags(getVkShaderStageFlags(pushConstant.stages))
+                .setOffset(offset)
+                .setSize(pushConstant.size));
+        }
+
         const auto pipelineLayoutCreateInfo = ::vk::PipelineLayoutCreateInfo()
-            .setSetLayouts(setLayouts);
+            .setSetLayouts(setLayouts)
+            .setPushConstantRanges(pushConstantRanges);
 
         _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
 
@@ -49,6 +58,7 @@ namespace gfx::vk
                                       .setStage(::vk::ShaderStageFlagBits::eVertex)
                                       .setModule(*shader)
                                       .setPName("main"));
+            _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eVertex;
         }
         if (_tessellationState.has_value())
         {
@@ -62,6 +72,7 @@ namespace gfx::vk
                                       .setStage(::vk::ShaderStageFlagBits::eTessellationEvaluation)
                                       .setModule(*evalShader)
                                       .setPName("main"));
+            _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eTessellationControl | ::vk::ShaderStageFlagBits::eTessellationEvaluation;
         }
         if (_geometryShader.has_value()) {
             const auto& shader = dynamic_cast<const vk::Shader&>(_geometryShader.value().get());
@@ -69,6 +80,7 @@ namespace gfx::vk
                                       .setStage(::vk::ShaderStageFlagBits::eGeometry)
                                       .setModule(*shader)
                                       .setPName("main"));
+            _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eGeometry;
         }
         if (_fragmentShader.has_value())
         {
@@ -77,6 +89,7 @@ namespace gfx::vk
                                       .setStage(::vk::ShaderStageFlagBits::eFragment)
                                       .setModule(*shader)
                                       .setPName("main"));
+            _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eFragment;
         }
         if (_taskShader.has_value())
         {
@@ -85,6 +98,7 @@ namespace gfx::vk
                                       .setStage(::vk::ShaderStageFlagBits::eTaskEXT)
                                       .setModule(*shader)
                                       .setPName("main"));
+            _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eTaskEXT;
         }
         if (_meshShader.has_value())
         {
@@ -93,6 +107,7 @@ namespace gfx::vk
                                       .setStage(::vk::ShaderStageFlagBits::eMeshEXT)
                                       .setModule(*shader)
                                       .setPName("main"));
+            _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eMeshEXT;
         }
 
         auto dynamicStateCreateInfo = ::vk::PipelineDynamicStateCreateInfo()
@@ -151,10 +166,25 @@ namespace gfx::vk
         pipelineCreateInfo.setPDepthStencilState(&depthStencilStateCreateInfo);
 
         std::vector<::vk::PipelineColorBlendAttachmentState> vkColorBlendAttachmentStates;
+        int index = 0;
         for (const auto& _ : _framebuffer.get().getColorAttachments()) {
-            vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
-                .setBlendEnable(false)
-                .setColorWriteMask(::vk::ColorComponentFlagBits::eR | ::vk::ColorComponentFlagBits::eG | ::vk::ColorComponentFlagBits::eB | ::vk::ColorComponentFlagBits::eA));
+            if (createInfo.colorBlendState.attachments.empty()) {
+                vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
+                    .setBlendEnable(false)
+                    .setColorWriteMask(::vk::ColorComponentFlagBits::eR | ::vk::ColorComponentFlagBits::eG | ::vk::ColorComponentFlagBits::eB | ::vk::ColorComponentFlagBits::eA));
+            } else {
+                const auto& attachmentBlendState = createInfo.colorBlendState.attachments[index];
+                vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
+                    .setBlendEnable(attachmentBlendState.blendEnable)
+                    .setSrcColorBlendFactor(getVkBlendFactor(attachmentBlendState.srcColorBlendFactor))
+                    .setDstColorBlendFactor(getVkBlendFactor(attachmentBlendState.dstColorBlendFactor))
+                    .setColorBlendOp(getVkBlendOp(attachmentBlendState.colorBlendOp))
+                    .setSrcAlphaBlendFactor(getVkBlendFactor(attachmentBlendState.srcAlphaBlendFactor))
+                    .setDstAlphaBlendFactor(getVkBlendFactor(attachmentBlendState.dstAlphaBlendFactor))
+                    .setAlphaBlendOp(getVkBlendOp(attachmentBlendState.alphaBlendOp))
+                    .setColorWriteMask(getVkColorComponentFlags(attachmentBlendState.colorWriteMask)));
+            }
+            index++;
         }
         auto colorBlendStateCreateInfo = ::vk::PipelineColorBlendStateCreateInfo()
             .setLogicOpEnable(createInfo.colorBlendState.enableLogicOp)

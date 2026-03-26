@@ -14,6 +14,7 @@
 #include "descriptorSetLayout.h"
 #include "mesh.h"
 #include "api.h"
+#include "shader.h"
 
 namespace gfx
 {
@@ -105,6 +106,7 @@ namespace gfx
         virtual void Unbind() const = 0;
 
         [[nodiscard]] const gfx::DescriptorSetLayout& getSetLayout(glm::u32 index) const;
+        [[nodiscard]] const Shader::PushConstant& getPushConstantRange(glm::u32 offset) const;
 
         [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& getVertexBindingDescriptions() const { return _vertexBindingDescriptions; }
         [[nodiscard]] const std::optional<std::vector<VertexInputAttributeDescription>>& getVertexAttributeDescriptions() const { return _vertexAttributeDescriptions; }
@@ -138,5 +140,6 @@ namespace gfx
         std::optional<std::vector<VertexInputBindingDescription>> _vertexBindingDescriptions;
 
         std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts {};
+        std::map<glm::u32, Shader::PushConstant> _pushConstantRanges;
     };
 }

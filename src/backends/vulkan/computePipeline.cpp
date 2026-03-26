@@ -29,8 +29,17 @@ namespace gfx::vk
             setLayouts.push_back(**dynamic_cast<const DescriptorSetLayout*>(layout.get()));
         }
 
+        std::vector<::vk::PushConstantRange> pushConstantRanges = {};
+        for (const auto& [offset, pushConstant] : _pushConstantRanges) {
+            pushConstantRanges.push_back(::vk::PushConstantRange()
+                 .setStageFlags(::vk::ShaderStageFlagBits::eCompute)
+                 .setOffset(offset)
+                 .setSize(pushConstant.size));
+        }
+
         const auto pipelineLayoutCreateInfo = ::vk::PipelineLayoutCreateInfo()
-            .setSetLayouts(setLayouts);
+            .setSetLayouts(setLayouts)
+            .setPushConstantRanges(pushConstantRanges);
 
         _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
 

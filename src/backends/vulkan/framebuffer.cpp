@@ -32,7 +32,7 @@ namespace gfx::vk
 
         _colorAttachments.emplace_back(colorAttachment);
         _depthStencilAttachment = depthStencilAttachment;
-        _clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 0.0 );
+        _clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 1.0 );
         _clearValues.clearDepth = 1.0f;
         _clearValues.clearStencil = 0;
     }

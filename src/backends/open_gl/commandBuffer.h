@@ -41,6 +41,9 @@ namespace gfx::ogl
         const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& getRemappingTableForBoundPipeline() const;
         void WaitForFence() const override {}
 
+    protected:
+        gfx::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
+
     private:
 
         bool _recording = false;

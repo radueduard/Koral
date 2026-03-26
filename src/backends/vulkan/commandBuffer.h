@@ -45,6 +45,9 @@ namespace gfx::vk
 
         void WaitForFence() const override;
 
+    protected:
+        gfx::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
+
     private:
         const gfx::vk::Queue& _queue;
         const ::vk::CommandPool& _parentPool;

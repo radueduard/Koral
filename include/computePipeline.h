@@ -10,6 +10,7 @@
 
 #include "api.h"
 #include "descriptorSetLayout.h"
+#include "shader.h"
 
 namespace gfx
 {
@@ -28,11 +29,11 @@ namespace gfx
         ComputePipeline(const ComputePipeline&) = delete;
         ComputePipeline& operator=(const ComputePipeline&) = delete;
 
-        virtual void Bind(const gfx::CommandBuffer& commandBuffer) const;;
+        virtual void Bind(const CommandBuffer& commandBuffer) const;;
 
         virtual void Unbind() const;
 
-        const gfx::DescriptorSetLayout& getSetLayout(glm::u32 index) const;
+        const DescriptorSetLayout& getSetLayout(glm::u32 index) const;
 
     protected:
         mutable bool _bound = false;
@@ -40,5 +41,6 @@ namespace gfx
 
         std::optional<std::reference_wrapper<const Shader>> _shader;
         std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts;
+        std::map<glm::u32, Shader::PushConstant> _pushConstantRanges;
     };
 }

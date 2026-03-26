@@ -22,9 +22,20 @@ namespace gfx
             return *this;
         }
 
+        Flags& operator |= (const Flags& other) {
+            _flags |= other._flags;
+            return *this;
+        }
+
         Flags operator |(Enum flag) const {
             Flags result(*this);
             result |= flag;
+            return result;
+        }
+
+        Flags operator |(const Flags& other) const {
+            Flags result(*this);
+            result |= other;
             return result;
         }
 

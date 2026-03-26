@@ -49,8 +49,6 @@ namespace gfx
         glm::u32 stride;
     };
 
-
-
     inline glm::u32 sizeofChannelType(const ChannelType channelType) {
         switch (channelType) {
         case ChannelType::eFloat: return sizeof(float);

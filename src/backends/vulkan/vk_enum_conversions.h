@@ -13,6 +13,26 @@
 
 namespace gfx
 {
+    inline ::vk::ShaderStageFlags getVkShaderStageFlags(const Flags<Shader::Stage> stages)
+    {
+        ::vk::ShaderStageFlags flags = {};
+        if (stages & Shader::Stage::eVertex) flags |= ::vk::ShaderStageFlagBits::eVertex;
+        if (stages & Shader::Stage::eTessellationControl) flags |= ::vk::ShaderStageFlagBits::eTessellationControl;
+        if (stages & Shader::Stage::eTessellationEvaluation) flags |= ::vk::ShaderStageFlagBits::eTessellationEvaluation;
+        if (stages & Shader::Stage::eGeometry) flags |= ::vk::ShaderStageFlagBits::eGeometry;
+        if (stages & Shader::Stage::eFragment) flags |= ::vk::ShaderStageFlagBits::eFragment;
+        if (stages & Shader::Stage::eCompute) flags |= ::vk::ShaderStageFlagBits::eCompute;
+        if (stages & Shader::Stage::eTask) flags |= ::vk::ShaderStageFlagBits::eTaskEXT;
+        if (stages & Shader::Stage::eMesh) flags |= ::vk::ShaderStageFlagBits::eMeshEXT;
+        if (stages & Shader::Stage::eRaygen) flags |= ::vk::ShaderStageFlagBits::eRaygenKHR;
+        if (stages & Shader::Stage::eAnyHit) flags |= ::vk::ShaderStageFlagBits::eAnyHitKHR;
+        if (stages & Shader::Stage::eClosestHit) flags |= ::vk::ShaderStageFlagBits::eClosestHitKHR;
+        if (stages & Shader::Stage::eMiss) flags |= ::vk::ShaderStageFlagBits::eMissKHR;
+        if (stages & Shader::Stage::eIntersection) flags |= ::vk::ShaderStageFlagBits::eIntersectionKHR;
+        if (stages & Shader::Stage::eCallable) flags |= ::vk::ShaderStageFlagBits::eCallableKHR;
+        return flags;
+    }
+
     inline ::vk::PolygonMode getVkPolygonMode(const PolygonMode polygonMode)
     {
         switch (polygonMode)
@@ -417,5 +437,46 @@ namespace gfx
         }
     }
 
+    inline ::vk::BlendFactor getVkBlendFactor(const gfx::BlendFactor factor)
+    {
+        switch (factor) {
+        case gfx::BlendFactor::eZero: return ::vk::BlendFactor::eZero;
+        case gfx::BlendFactor::eOne: return ::vk::BlendFactor::eOne;
+        case gfx::BlendFactor::eSrcColor: return ::vk::BlendFactor::eSrcColor;
+        case gfx::BlendFactor::eOneMinusSrcColor: return ::vk::BlendFactor::eOneMinusSrcColor;
+        case gfx::BlendFactor::eDstColor: return ::vk::BlendFactor::eDstColor;
+        case gfx::BlendFactor::eOneMinusDstColor: return ::vk::BlendFactor::eOneMinusDstColor;
+        case gfx::BlendFactor::eSrcAlpha: return ::vk::BlendFactor::eSrcAlpha;
+        case gfx::BlendFactor::eOneMinusSrcAlpha: return ::vk::BlendFactor::eOneMinusSrcAlpha;
+        case gfx::BlendFactor::eDstAlpha: return ::vk::BlendFactor::eDstAlpha;
+        case gfx::BlendFactor::eOneMinusDstAlpha: return ::vk::BlendFactor::eOneMinusDstAlpha;
+        case gfx::BlendFactor::eConstantColor: return ::vk::BlendFactor::eConstantColor;
+        case gfx::BlendFactor::eOneMinusConstantColor: return ::vk::BlendFactor::eOneMinusConstantColor;
+        case gfx::BlendFactor::eSrcAlphaSaturate: return ::vk::BlendFactor::eSrcAlphaSaturate;
+        default: throw std::runtime_error("Unknown blend factor");
+        }
+    }
+
+    inline ::vk::BlendOp getVkBlendOp(const gfx::BlendOp op)
+    {
+        switch (op) {
+        case gfx::BlendOp::eAdd: return ::vk::BlendOp::eAdd;
+        case gfx::BlendOp::eSubtract: return ::vk::BlendOp::eSubtract;
+        case gfx::BlendOp::eReverseSubtract: return ::vk::BlendOp::eReverseSubtract;
+        case gfx::BlendOp::eMin: return ::vk::BlendOp::eMin;
+        case gfx::BlendOp::eMax: return ::vk::BlendOp::eMax;
+        default: throw std::runtime_error("Unknown blend operation");
+        }
+    }
+
+    inline ::vk::ColorComponentFlags getVkColorComponentFlags(const Flags<gfx::ColorComponent> flags)
+    {
+        auto vkFlags = ::vk::ColorComponentFlags();
+        if (flags & gfx::ColorComponent::eR) vkFlags |= ::vk::ColorComponentFlagBits::eR;
+        if (flags & gfx::ColorComponent::eG) vkFlags |= ::vk::ColorComponentFlagBits::eG;
+        if (flags & gfx::ColorComponent::eB) vkFlags |= ::vk::ColorComponentFlagBits::eB;
+        if (flags & gfx::ColorComponent::eA) vkFlags |= ::vk::ColorComponentFlagBits::eA;
+        return vkFlags;
+    }
 
 }

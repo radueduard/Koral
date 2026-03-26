@@ -64,7 +64,7 @@ void gfx::GUI::DefineStyle()
     ImVec4 secondary = ImVec4(static_cast<float>(0xA5) / 255.f, static_cast<float>(0xA6) / 255.f, static_cast<float>(0x1E) / 255.f, 1.0f);
     ImVec4 secondaryHover = ImVec4(static_cast<float>(0xA5) / 255.f, static_cast<float>(0xA6) / 255.f, static_cast<float>(0x1E) / 255.f, 0.5f);
 
-    ImVec4 background = ImVec4(0.048f, 0.048f, 0.048f, 1.0f);
+    ImVec4 background = ImVec4(0.08f, 0.08f, 0.08f, 1.0f);
     ImVec4 unfocused = ImVec4(0.12f, 0.12f, 0.12f, 1.0f);
     ImVec4 text = ImVec4(0.9f, 0.9f, 0.9f, 1.0f);
 

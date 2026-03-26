@@ -53,16 +53,20 @@ namespace gfx
 
     ComputePipeline::ComputePipeline(const Builder& createInfo) : _shader(createInfo.computeShader)
     {
-        for (auto memoryLayout = _shader->get().getMemoryLayout();
-            const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
+        auto memoryLayout = _shader->get().getMemoryLayout();
+        for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
         {
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription.descriptors)
             {
-                const auto& [type, name, count] = descriptor;
+                const auto& [type, name, count, stages] = descriptor;
                 builder.addBinding(binding, type, count);
             }
             _setLayouts[setIndex] = builder.build();
+        }
+        for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
+        {
+            _pushConstantRanges[offset] = pushConstant;
         }
     }
 }

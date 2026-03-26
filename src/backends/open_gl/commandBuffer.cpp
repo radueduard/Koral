@@ -353,4 +353,9 @@ namespace gfx::ogl
         }
         throw std::runtime_error("No pipeline is currently bound!");
     }
+
+    gfx::CommandBuffer & CommandBuffer::PushConstants(const void *data, glm::u32 size, glm::u32 offset) {
+        std::cerr << "CommandBuffer::PushConstants NOT YET IMPLEMENTED!" << std::endl;
+        return *this;
+    }
 }

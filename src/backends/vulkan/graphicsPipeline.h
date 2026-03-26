@@ -25,8 +25,10 @@ namespace gfx::vk
         void Unbind() const override {}
 
         [[nodiscard]] const ::vk::PipelineLayout& getPipelineLayout() const { return _pipelineLayout; }
+        [[nodiscard]] ::vk::ShaderStageFlags getPipelineStageFlags() const { return _pipelineStageFlags; }
     private:
         ::vk::PipelineLayout _pipelineLayout;
+        ::vk::ShaderStageFlags _pipelineStageFlags = ::vk::ShaderStageFlags();
         inline static std::array<::vk::DynamicState, 3> _dynamicStates = {
             ::vk::DynamicState::eViewport,
             ::vk::DynamicState::eScissor,

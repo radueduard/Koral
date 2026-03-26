@@ -341,4 +341,27 @@ namespace gfx::vk
             std::cerr << e.what() << std::endl;
         }
     }
+
+    gfx::CommandBuffer& CommandBuffer::PushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {
+        if (_state.boundComputePipeline.has_value()) {
+            const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline*>(_state.boundComputePipeline.value());
+            _handle.pushConstants(
+                vkPipeline->getPipelineLayout(),
+                ::vk::ShaderStageFlagBits::eCompute,
+                offset,
+                size,
+                data);
+        } else if (_state.boundGraphicsPipeline.has_value()) {
+            const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            _handle.pushConstants(
+                vkPipeline->getPipelineLayout(),
+                getVkShaderStageFlags(vkPipeline->getPushConstantRange(offset).stages),
+                offset,
+                size,
+                data);
+        } else {
+            std::cerr << "No pipeline bound when trying to push constants" << std::endl;
+        }
+        return *this;
+    }
 }

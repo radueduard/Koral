@@ -48,21 +48,25 @@ namespace gfx::vk
                 const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(_image.get());
                 const auto& vkHelperImage = *dynamic_cast<const gfx::vk::Image*>(_helperImage.get());
 
+                const auto imageType = vkImage.getType();
+                const auto srcSubresourceLayer  = ::vk::ImageSubresourceLayers()
+                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                    .setMipLevel(level)
+                    .setBaseArrayLayer(imageType == Image::Type::e3D ? 0 : layer)
+                    .setLayerCount(1);
+                const auto srcOffsets = std::array {
+                    ::vk::Offset3D{ 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
+                    ::vk::Offset3D{ static_cast<glm::i32>(vkImage.getExtent().x), static_cast<glm::i32>(vkImage.getExtent().y), imageType == Image::Type::e3D ? static_cast<int32_t>(layer + 1) : 1 }
+                };
+
                 vkImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferSrcOptimal);
                 vkHelperImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferDstOptimal);
                 commandBuffer->blitImage(
                     *vkImage, ::vk::ImageLayout::eTransferSrcOptimal,
                     *vkHelperImage, ::vk::ImageLayout::eTransferDstOptimal,
                     ::vk::ImageBlit()
-                        .setSrcSubresource(::vk::ImageSubresourceLayers()
-                            .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                            .setMipLevel(level)
-                            .setBaseArrayLayer(0)
-                            .setLayerCount(1))
-                        .setSrcOffsets({
-                            ::vk::Offset3D{ 0, 0, static_cast<int32_t>(layer) },
-                            ::vk::Offset3D{ static_cast<glm::i32>(vkImage.getExtent().x), static_cast<glm::i32>(vkImage.getExtent().y), static_cast<int32_t>(layer + 1) }
-                        })
+                        .setSrcSubresource(srcSubresourceLayer)
+                        .setSrcOffsets(srcOffsets)
                         .setDstSubresource(::vk::ImageSubresourceLayers()
                             .setAspectMask(::vk::ImageAspectFlagBits::eColor)
                             .setMipLevel(0)

@@ -44,9 +44,15 @@ namespace gfx
         virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline);
         virtual CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline);
         virtual CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* descriptorSet) = 0;
+
+        template<typename T> requires std::is_trivially_copyable_v<T>
+        CommandBuffer& PushConstants(const T& data, const glm::u32 offset = 0) {
+            return PushConstants(&data, sizeof(T), offset);
+        }
+
         virtual CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) = 0;
         virtual CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) = 0;
-        virtual CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) = 0;
+        virtual CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount , glm::u32 baseInstance) = 0;
         virtual CommandBuffer& Blit(const Image* srcImage, const Image* dstImage = nullptr) = 0;
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 
@@ -66,6 +72,8 @@ namespace gfx
 
         explicit CommandBuffer(const Flags<Usage> usage) : _usage(usage) {}
         Flags<Usage> _usage;
+
+        virtual CommandBuffer& PushConstants(const void* data, glm::u32 size, glm::u32 offset) = 0;
     };
 }
 
