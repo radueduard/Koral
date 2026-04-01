@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <commandBuffer.h>
+
 #include "api.h"
 
 struct ImGuiContext;

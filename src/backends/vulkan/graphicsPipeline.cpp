@@ -32,9 +32,12 @@ namespace gfx::vk
             pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer.get().getDepthStencilAttachment().getImage().getFormat()));
         }
 
-        std::vector<::vk::DescriptorSetLayout> setLayouts(std::ranges::max(_setLayouts | std::views::keys) + 1, nullptr);
-        for (const auto& [set, layout] : _setLayouts) {
-            setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.get());
+        std::vector<::vk::DescriptorSetLayout> setLayouts;
+        if (!_setLayouts.empty()) {
+            setLayouts = { std::ranges::max(_setLayouts | std::views::keys) + 1, nullptr };
+            for (const auto& [set, layout] : _setLayouts) {
+                setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.get());
+            }
         }
 
         std::vector<::vk::PushConstantRange> pushConstantRanges = {};

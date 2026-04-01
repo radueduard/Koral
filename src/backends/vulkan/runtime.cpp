@@ -93,31 +93,55 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             _instanceExtensions.emplace_back(extension);
         }
 
-        const auto createInfo = ::vk::InstanceCreateInfo()
-        #ifdef __APPLE__
-            .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
-        #endif
-            .setPApplicationInfo(&applicationInfo)
-            .setPEnabledExtensionNames(_instanceExtensions)
-            .setPEnabledLayerNames(_instanceLayers);
+        constexpr std::array<uint32_t, 1> bufferSize = { 1024 * 1024 };
+            const auto validationLayerSetting = ::vk::LayerSettingEXT()
+                .setPLayerName("VK_LAYER_KHRONOS_validation")
+                .setPSettingName("printf_buffer_size")
+                .setType(::vk::LayerSettingTypeEXT::eUint32)
+                .setValues(bufferSize);
 
-        _instance = ::vk::createInstance(createInfo);
-        VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
+            const auto layerSettingsInfo = ::vk::LayerSettingsCreateInfoEXT()
+                .setSettings(validationLayerSetting);
+                // pNext = nullptr (tail)
 
-        const auto debugCreateInfo = ::vk::DebugUtilsMessengerCreateInfoEXT()
-            // .setPNext(&validationCreateInfo)
-            .setMessageSeverity(
-                ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
-                | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-                | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-                // | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
-            )
-            .setMessageType(
-                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation)
-            .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
+            // 2. Middle — validation features, points to layer settings
+            const ::vk::ValidationFeatureEnableEXT enabledFeatures[] = {
+                ::vk::ValidationFeatureEnableEXT::eDebugPrintf
+            };
 
-        _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
+            const auto validationCreateInfo = ::vk::ValidationFeaturesEXT()
+                .setPNext(&layerSettingsInfo)        // ← points to tail
+                .setEnabledValidationFeatures(enabledFeatures);
+
+            // 3. Debug messenger, points to validation features
+            const auto debugCreateInfo = ::vk::DebugUtilsMessengerCreateInfoEXT()
+                .setPNext(&validationCreateInfo)     // ← points to middle
+                .setMessageSeverity(
+                    ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
+                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
+                )
+                .setMessageType(
+                    ::vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                    ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+                )
+                .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
+
+            // 4. Head — instance create info, points to debug messenger
+            const auto createInfo = ::vk::InstanceCreateInfo()
+            #ifdef __APPLE__
+                .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
+            #endif
+                .setPNext(&debugCreateInfo)
+                .setPApplicationInfo(&applicationInfo)
+                .setPEnabledExtensionNames(_instanceExtensions)
+                .setPEnabledLayerNames(_instanceLayers);
+
+            _instance = ::vk::createInstance(createInfo);
+            VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
+
+            _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
     }
 
     Runtime::~Runtime()

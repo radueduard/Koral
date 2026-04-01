@@ -12,10 +12,18 @@
 #include "../backends/vulkan/graphicsPipeline.h"
 
 #include "context.h"
+#include "meshLayout.h"
 #include "shader.h"
 
 namespace gfx
 {
+    GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(const Shader &shader) {
+        this->vertexShader = std::cref(shader);
+        this->vertexAttributeDescriptions = DefaultMeshRegistry::Attributes();
+        this->vertexBindingDescriptions = DefaultMeshRegistry::Bindings();
+        return *this;
+    }
+
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTessellationState(const TessellationState& tessellationState)
     {
         this->tessellationState = tessellationState;
@@ -182,30 +190,7 @@ namespace gfx
             for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
             {
                 if (mergedPushConstants.contains(offset)) {
-                    if (auto& existingPushConstant = mergedPushConstants[offset];
-                        existingPushConstant != pushConstant) {
-                        if (existingPushConstant.size < pushConstant.size) {
-                            existingPushConstant.stages |= pushConstant.stages;
-                            mergedPushConstants[offset + existingPushConstant.size] = {
-                                .name = pushConstant.name + "_part2",
-                                .size = pushConstant.size - existingPushConstant.size,
-                                .offset = offset + existingPushConstant.size,
-                                .stages = pushConstant.stages
-                            };
-                            existingPushConstant.size = pushConstant.size;
-                        } else if (existingPushConstant.size > pushConstant.size) {
-                            existingPushConstant.stages |= pushConstant.stages;
-                            mergedPushConstants[offset + pushConstant.size] = {
-                                .name = existingPushConstant.name + "_part2",
-                                .size = existingPushConstant.size - pushConstant.size,
-                                .offset = offset + pushConstant.size,
-                                .stages = existingPushConstant.stages
-                            };
-                            existingPushConstant.size = pushConstant.size;
-                        } else {
-                            throw std::runtime_error("Push constant layout conflict between shaders in pipeline!");
-                        }
-                    }
+                    continue;
                 } else {
                     mergedPushConstants[offset] = pushConstant;
                 }

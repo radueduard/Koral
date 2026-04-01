@@ -67,13 +67,13 @@ namespace gfx {
         const auto shaderStringsPointer = shaderStrings->c_str();
         shader->setStrings(&shaderStringsPointer, 1);
 
-        shader->setEnvInput(glslang::EShSourceGlsl, eShStage, glslang::EShClientVulkan, 100);
+        shader->setEnvInput(glslang::EShSourceGlsl, eShStage, glslang::EShClientVulkan, 450);
         shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
-        shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_5);
+        shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
 
-        constexpr auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDefault | EShMsgDebugInfo);
+        constexpr auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDefault | EShMsgDebugInfo | EShMsgEnhanced);
 
-        if (!shader->parse(GetDefaultResources(), 100, false, messages)) {
+        if (!shader->parse(GetDefaultResources(), 450, false, messages)) {
             std::cerr << shader->getInfoLog() << std::endl;
             throw std::runtime_error("GLSL parsing failed for stage: " + std::to_string(eShStage));
         }
@@ -233,8 +233,19 @@ namespace gfx {
     	for (const auto& pushConstant : resources.push_constant_buffers) {
 			const auto& name = module.get_name(pushConstant.id);
 			const auto& type = module.get_type(pushConstant.type_id);
-			const glm::u32 size = module.get_declared_struct_size(type);
-    		const auto offset = module.get_decoration(pushConstant.id, spv::DecorationOffset);
+    		// const auto offset = module.get_decoration(pushConstant.id, spv::DecorationOffset);
+    		glm::u32 start = 0xFFFFFFFF;
+    		glm::u32 end = 0;
+    		auto memberCount = type.member_types.size();
+			for (uint32_t i = 0; i < memberCount; i++) {
+				const auto memberOffset = module.get_member_decoration(type.self, i, spv::DecorationOffset);
+				const auto memberSize = module.get_declared_struct_member_size(type, i);
+				if (memberOffset < start) start = memberOffset;
+				if (memberOffset + memberSize > end) end = memberOffset + memberSize;
+			}
+    		const auto offset = start;
+    		const auto size = end - start;
+
 			memoryLayout.pushConstants.emplace(offset, PushConstant { name, size, offset, stage });
 		} // push constants
 

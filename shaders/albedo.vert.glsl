@@ -18,6 +18,5 @@ layout(location = 0) out vec2 outUV;
 
 void main() {
     outUV = inUV;
-
     gl_Position = camera.proj * camera.view * model * vec4(position, 1.0);
 }

@@ -161,6 +161,7 @@ namespace gfx::vk
 
     gfx::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
+        gfx::CommandBuffer::SetViewport(x, y, width, height);
         const bool isDefaultFramebuffer = _state.boundFramebuffer.value()->IsDefault();
         const ::vk::Viewport viewport = ::vk::Viewport()
             .setX(static_cast<float>(x))
@@ -175,6 +176,7 @@ namespace gfx::vk
 
     gfx::CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
+        gfx::CommandBuffer::SetScissor(x, y, width, height);
         const ::vk::Rect2D scissor = ::vk::Rect2D()
             .setOffset({ static_cast<glm::i32>(x), static_cast<glm::i32>(y) })
             .setExtent({ width, height });
@@ -233,17 +235,26 @@ namespace gfx::vk
     gfx::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ)
     {
         _handle.dispatch(groupCountX, groupCountY, groupCountZ);
+        _handle.pipelineBarrier(
+            ::vk::PipelineStageFlagBits::eComputeShader,
+            ::vk::PipelineStageFlagBits::eAllGraphics,
+            {},
+            nullptr,
+            nullptr,
+            nullptr);
         return *this;
     }
 
     gfx::CommandBuffer& CommandBuffer::Draw(const glm::u32 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance)
     {
+        gfx::CommandBuffer::Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         _handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
         return *this;
     }
 
     gfx::CommandBuffer& CommandBuffer::DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance)
     {
+        gfx::CommandBuffer::DrawMesh(mesh, instanceCount, baseInstance);
         std::vector<::vk::Buffer> vertexBuffers;
         std::vector<::vk::DeviceSize> offsets;
         for (const auto& buffer : mesh->getVertexBuffers()) {
@@ -258,7 +269,7 @@ namespace gfx::vk
             _handle.bindIndexBuffer(*vkBuffer, 0, ::vk::IndexType::eUint32);
         }
         const auto indexCount = mesh->hasIndexBuffer() ? mesh->getIndexCount().value() : mesh->getVertexCount();
-        _handle.drawIndexed(indexCount, instanceCount, 0, 0, 0);
+        _handle.drawIndexed(indexCount, instanceCount, 0, 0, baseInstance);
         return *this;
     }
 
@@ -325,6 +336,7 @@ namespace gfx::vk
 
     void CommandBuffer::Reset()
     {
+        _state = {};
         _handle.reset();
     }
 

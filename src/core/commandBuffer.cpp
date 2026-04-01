@@ -43,6 +43,22 @@ namespace gfx
         return *this;
     }
 
+    CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    {
+        if (!_state.boundGraphicsPipeline.has_value())
+            throw std::runtime_error("You can't set the viewport without a graphics pipeline bound!");
+        _state.viewportSet = true;
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    {
+        if (!_state.boundGraphicsPipeline.has_value())
+            throw std::runtime_error("You can't set the scissor without a graphics pipeline bound!");
+        _state.scissorSet = true;
+        return *this;
+    }
+
     CommandBuffer& CommandBuffer::BindPipeline(const ComputePipeline* pipeline)
     {
         _state.boundComputePipeline = pipeline;
@@ -54,6 +70,33 @@ namespace gfx
     {
         _state.boundGraphicsPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex,
+        glm::u32 firstInstance)
+    {
+        if (!_state.boundGraphicsPipeline.has_value())
+            throw std::runtime_error("You can't draw without a graphics pipeline bound!");
+        if (!_state.viewportSet) {
+            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        if (!_state.scissorSet) {
+            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance)
+    {
+        if (!_state.boundGraphicsPipeline.has_value())
+            throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
+        if (!_state.viewportSet) {
+            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        if (!_state.scissorSet) {
+            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
         return *this;
     }
 

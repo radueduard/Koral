@@ -56,6 +56,7 @@ namespace gfx::vk
 #ifdef __APPLE__
             "VK_KHR_portability_subset",
 #endif
+            VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
             // VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME
         };
 

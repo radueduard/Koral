@@ -72,14 +72,19 @@ namespace gfx
             DepthStencilState depthStencilState = {};
             ColorBlendState colorBlendState = {};
 
-            template <gfx::MeshType T = NullMesh>
+            // implicit default (registry -> NullMesh fallback)
+            Builder& setVertexShader(const Shader& shader);
+
+            // explicit mesh override
+            template <gfx::MeshType T>
             Builder& setVertexShader(const Shader& shader)
-             {
+            {
                 this->vertexShader = std::cref(shader);
                 this->vertexAttributeDescriptions = T::VertexAttributeDescription();
                 this->vertexBindingDescriptions = T::VertexBindingDescription();
                 return *this;
             }
+
             Builder& setTessellationState(const TessellationState& tessellationState);
             Builder& setGeometryShader(const Shader& geometryShader);
             Builder& setFragmentShader(const Shader& fragmentShader);
