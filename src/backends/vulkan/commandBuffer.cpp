@@ -266,7 +266,7 @@ namespace gfx::vk
         if (mesh->hasIndexBuffer())
         {
             const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&mesh->getIndexBuffer().value().get());
-            _handle.bindIndexBuffer(*vkBuffer, 0, ::vk::IndexType::eUint32);
+            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
         }
         const auto indexCount = mesh->hasIndexBuffer() ? mesh->getIndexCount().value() : mesh->getVertexCount();
         _handle.drawIndexed(indexCount, instanceCount, 0, 0, baseInstance);

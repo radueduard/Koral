@@ -32,6 +32,7 @@ find_package(glslang CONFIG REQUIRED)
 find_package(spirv_cross_core CONFIG REQUIRED)
 find_package(spirv_cross_glsl CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
+find_package(DevIL REQUIRED)
 
 find_package(imgui CONFIG REQUIRED)
 
@@ -78,6 +79,7 @@ target_link_libraries(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} spirv-cross-core)
 target_link_libraries(${PROJECT_NAME} spirv-cross-glsl)
 target_link_libraries(${PROJECT_NAME} reflectcpp::reflectcpp)
+target_link_libraries(${PROJECT_NAME} DevIL::IL)
 target_link_libraries(${PROJECT_NAME} imgui::imgui)
 
 if (UNIX AND NOT APPLE)

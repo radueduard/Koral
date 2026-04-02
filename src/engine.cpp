@@ -79,9 +79,9 @@ namespace gfx
             window->_inputState.update();
             window->_timeState.update();
             scene.Update();
-            Context::Scheduler().Draw([&](gfx::CommandBuffer& commandBuffer) {
+            Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
                 scene.Render(commandBuffer);
-                gfx::GUI::Render(commandBuffer, scene);
+                GUI::Render(commandBuffer, scene);
             });
         }
         window.reset();

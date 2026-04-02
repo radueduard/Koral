@@ -119,11 +119,9 @@ namespace gfx {
         inline static AttributeGetter _attributeGetter = nullptr;
     };
 
-    template<typename... Attrs>
+    template<typename... Attrs> requires (is_vertex_attribute_v<Attrs> && ...)
     struct ParamVertex
     {
-        static_assert((is_vertex_attribute_v<Attrs> && ...), "ParamVertex only accepts VertexAttribute<T> entries");
-
         using Attributes = std::tuple<Attrs...>;
         using Storage = VertexStorage<typename Attrs::ValueType...>;
 
@@ -185,11 +183,9 @@ namespace gfx {
         return builder.Build();
     }
 
-    template<typename IndexT>
+    template<typename IndexT> requires std::is_integral_v<IndexT>
     static std::unique_ptr<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
     {
-        static_assert(std::is_integral_v<IndexT>, "Index type must be an integral type.");
-
         Builder builder;
         setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
 
@@ -318,33 +314,23 @@ private:
     // Common named vertex attributes.
     // These are aliases over VertexAttribute<T>, so they work directly in ParamVertex<...>.
     using Position2  = VertexAttribute<glm::vec2>;
-    using Position3  = VertexAttribute<glm::vec3>;
+    using Position   = VertexAttribute<glm::vec3>;
     using Position4  = VertexAttribute<glm::vec4>;
 
-    using Normal3    = VertexAttribute<glm::vec3>;
-    using Normal4    = VertexAttribute<glm::vec4>;
+    using Normal  = VertexAttribute<glm::vec3>;
+    using Normal4 = VertexAttribute<glm::vec4>;
 
     using Color3     = VertexAttribute<glm::vec3>;
-    using Color4     = VertexAttribute<glm::vec4>;
+    using Color      = VertexAttribute<glm::vec4>;
 
-    using UV1        = VertexAttribute<glm::vec2>;
-    using UV2        = VertexAttribute<glm::vec2>; // second UV set
-    using UV3        = VertexAttribute<glm::vec3>; // less common, but sometimes used
+    using UV        = VertexAttribute<glm::vec2>;
+    using UV3       = VertexAttribute<glm::vec3>;
 
-    using Tangent3   = VertexAttribute<glm::vec3>;
-    using Tangent4   = VertexAttribute<glm::vec4>; // xyz + handedness in w
-    using Bitangent3 = VertexAttribute<glm::vec3>;
-    using Bitangent4 = VertexAttribute<glm::vec4>;
+    using Tangent         = VertexAttribute<glm::vec3>;
+    using PackedTangent   = VertexAttribute<glm::vec4>; // xyz + handedness in w
+    using Bitangent       = VertexAttribute<glm::vec3>;
 
-    using BoneIds4   = VertexAttribute<glm::ivec4>;
-    using BoneWeights4 = VertexAttribute<glm::vec4>;
-
-    using InstanceRow0 = VertexAttribute<glm::vec4>;
-    using InstanceRow1 = VertexAttribute<glm::vec4>;
-    using InstanceRow2 = VertexAttribute<glm::vec4>;
-    using InstanceRow3 = VertexAttribute<glm::vec4>;
-
-    using Velocity3  = VertexAttribute<glm::vec3>;
-    using PackedNormal = VertexAttribute<glm::vec4>; // optional generic packed form
+    using BoneIds     = VertexAttribute<glm::ivec4>;
+    using BoneWeights = VertexAttribute<glm::vec4>;
 }
 

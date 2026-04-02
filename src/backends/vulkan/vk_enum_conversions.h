@@ -13,6 +13,16 @@
 
 namespace gfx
 {
+    inline ::vk::IndexType getVkIndexType(const ChannelType indexType) {
+        switch (indexType)
+        {
+        case ChannelType::eUByte: return ::vk::IndexType::eUint8;
+        case ChannelType::eUShort: return ::vk::IndexType::eUint16;
+        case ChannelType::eUInt: return ::vk::IndexType::eUint32;
+        default: throw std::runtime_error("Unknown index type!");
+        }
+    }
+
     inline ::vk::ShaderStageFlags getVkShaderStageFlags(const Flags<Shader::Stage> stages)
     {
         ::vk::ShaderStageFlags flags = {};

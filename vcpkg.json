@@ -44,6 +44,9 @@
   }, {
     "name" : "imgui",
     "version>=" : "1.91.9",
-    "features": ["glfw-binding", "opengl3-binding", "vulkan-binding", "docking-experimental"]
+    "features" : [ "glfw-binding", "opengl3-binding", "vulkan-binding", "docking-experimental" ]
+  }, {
+    "name" : "devil",
+    "version>=" : "1.8.0#13"
   } ]
 }

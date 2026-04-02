@@ -106,16 +106,9 @@ namespace gfx::vk {
             .setTaskShader(true)
             .setMeshShader(true);
 
-     //    auto maintenance4Features = vk::PhysicalDeviceMaintenance4Features()
-     //        .setMaintenance4(true)
-     //        .setPNext(&deviceMeshShaderFeatures);
-
-   //  	auto dynamicRenderingFeatures = ::vk::PhysicalDeviceDynamicRenderingFeatures()
-			// .setDynamicRendering(true)
-			// .setPNext(&sampler2DViewOf3D);
-
         auto vk11Features = ::vk::PhysicalDeviceVulkan11Features()
             .setShaderDrawParameters(true)
+            .setStorageBuffer16BitAccess(true)
             .setPNext(&deviceMeshShaderFeatures);
 
     	auto vk12Features = ::vk::PhysicalDeviceVulkan12Features()
@@ -123,6 +116,10 @@ namespace gfx::vk {
     		.setRuntimeDescriptorArray(true)
     		.setTimelineSemaphore(true)
             .setBufferDeviceAddress(true)
+            .setVulkanMemoryModel(true)
+            .setVulkanMemoryModelDeviceScope(true)
+            .setScalarBlockLayout(true)
+            .setStorageBuffer8BitAccess(true)
 			.setPNext(&vk11Features);
 
         auto vk13Features = ::vk::PhysicalDeviceVulkan13Features()
@@ -130,17 +127,13 @@ namespace gfx::vk {
             .setDynamicRendering(true)
             .setPNext(&vk12Features);
 
+        auto vk14Features = ::vk::PhysicalDeviceVulkan14Features()
+            .setPNext(&vk13Features)
+            .setIndexTypeUint8(true);
+
         auto maintenance9 = ::vk::PhysicalDeviceMaintenance9FeaturesKHR()
-            .setMaintenance9(true)
-            .setPNext(&vk13Features);
-
-    	// auto maintenance4Features = vk::PhysicalDeviceMaintenance4Features()
-    	// 	.setMaintenance4(true)
-			// .setPNext(&vk12Features);
-
-   //  	auto vk13Features = vk::PhysicalDeviceVulkan13Features()
-			// .setShaderDemoteToHelperInvocation(true)
-			// .setPNext(&maintenance4Features);
+            .setPNext(&vk14Features)
+            .setMaintenance9(true);
 
         auto deviceExtensions = Context::Runtime().getDeviceExtensions();
 

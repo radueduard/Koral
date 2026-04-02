@@ -5,6 +5,7 @@
 
 #include <window.h>
 #include <framebuffer.h>
+#include <il.h>
 
 #include "input.h"
 
@@ -109,6 +110,7 @@ namespace gfx::io {
             gfx::vk::Context::Init();
         }
 
+        ilInit();
         _surface = gfx::Surface::Create(*this);
         Context::_scheduler = Scheduler::Builder()
             .setMinImageCount(2)
@@ -136,6 +138,7 @@ namespace gfx::io {
         _framebuffer.reset();
         delete Context::_scheduler;
         _surface.reset();
+        ilShutDown();
         if (_api == API::eVulkan) {
             vk::Context::Destroy();
         }

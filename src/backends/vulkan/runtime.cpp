@@ -64,6 +64,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         std::string typeLabel;
         bool first = true;
         if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
+            if (severityLabel == "INFO")
+                return VK_FALSE;
             typeLabel += "GENERAL"; first = false;
         }
         if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
@@ -86,7 +88,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             .setApplicationVersion(VK_MAKE_VERSION(1, 0, 0))
             .setPEngineName("GFXFramework")
             .setEngineVersion(VK_MAKE_VERSION(1, 0, 0))
-            .setApiVersion(VK_API_VERSION_1_3);
+            .setApiVersion(VK_API_VERSION_1_4);
 
         const auto windowExtensions = GetRequiredExtensions();
         for (const auto& extension : windowExtensions) {
@@ -119,7 +121,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 .setMessageSeverity(
                     ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
                     | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+                    // | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
                     | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
                 )
                 .setMessageType(
