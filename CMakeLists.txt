@@ -18,6 +18,12 @@ if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_OSX_SYSROOT ${CMAKE_OSX_SYSROOT} CACHE PATH "macOS SDK path")
 endif()
 
+find_package(TIFF REQUIRED)
+find_package(JPEG REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(PNG REQUIRED)
+find_package(Jasper REQUIRED)
+
 find_package(glfw3 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
@@ -79,6 +85,9 @@ target_link_libraries(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} spirv-cross-core)
 target_link_libraries(${PROJECT_NAME} spirv-cross-glsl)
 target_link_libraries(${PROJECT_NAME} reflectcpp::reflectcpp)
+
+target_link_libraries(${PROJECT_NAME} ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${JASPER_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} DevIL::IL)
 target_link_libraries(${PROJECT_NAME} imgui::imgui)
 
