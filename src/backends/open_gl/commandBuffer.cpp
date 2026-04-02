@@ -226,7 +226,7 @@ namespace gfx::ogl
             if (mesh->hasIndexBuffer()) {
                 const auto indexType = mesh->getIndexType().value();
                 glDrawElementsInstancedBaseInstance(
-                    GL_TRIANGLES,
+                    mode,
                     mesh->getIndexCount().value(),
                     toGLChannelType(indexType),
                     nullptr,
@@ -242,6 +242,65 @@ namespace gfx::ogl
             }
 
             glBindVertexArray(0);
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) {
+        CheckRecording();
+        _commands.emplace_back([this, mesh, baseIndex, indexCount] {
+            gfx::CommandBuffer::DrawSubMesh(mesh, baseIndex, indexCount);
+            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            const auto mode = oglPipeline->getMode();
+            const auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
+            const auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
+
+            if (!mesh->hasIndexBuffer()) {
+                throw std::runtime_error("You can't draw sub mesh without an index buffer!");
+            }
+
+            const auto vertexBuffers = mesh->getVertexBuffers();
+            for (size_t i = 0; i < vertexBuffers.size(); ++i)
+            {
+                const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(vertexBuffers[i].get());
+                glBindBuffer(GL_ARRAY_BUFFER, *vertexBuffer);
+                glCheckError();
+
+                const auto& [binding, stride] = meshVertexBindingDescription[i];
+                for (const auto& [location, attributeBinding, channelCount, channelType, offset] : meshVertexAttributeDescription)
+                {
+                    if (binding == attributeBinding)
+                    {
+                        glEnableVertexAttribArray(location);
+                        glCheckError();
+                        glVertexAttribPointer(
+                            location,
+                            static_cast<GLint>(channelCount),
+                            toGLChannelType(channelType),
+                            GL_FALSE,
+                            static_cast<GLsizei>(stride),
+                            reinterpret_cast<void*>(static_cast<ptrdiff_t>(offset)));
+                        glCheckError();
+                    }
+                }
+            }
+            if (const auto indexBuffer = mesh->getIndexBuffer(); indexBuffer.has_value()) {
+                const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(indexBuffer.value().get());
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *oglIndexBuffer);
+                glCheckError();
+            }
+
+            const auto indexType = mesh->getIndexType().value();
+            glDrawElementsInstancedBaseInstance(
+                mode,
+                mesh->getIndexCount().value(),
+                toGLChannelType(indexType),
+                nullptr,
+                1,
+                0);
+
+            glBindVertexArray(0);
+
         });
         return *this;
     }

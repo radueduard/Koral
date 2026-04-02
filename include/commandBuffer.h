@@ -54,6 +54,8 @@ namespace gfx
 
         virtual CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance);
         virtual CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount , glm::u32 baseInstance);
+        virtual CommandBuffer& DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount);
+
         virtual CommandBuffer& Blit(const Image* srcImage, const Image* dstImage = nullptr) = 0;
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 

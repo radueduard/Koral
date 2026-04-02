@@ -273,6 +273,26 @@ namespace gfx::vk
         return *this;
     }
 
+    gfx::CommandBuffer & CommandBuffer::DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) {
+        gfx::CommandBuffer::DrawSubMesh(mesh, baseIndex, indexCount);
+        std::vector<::vk::Buffer> vertexBuffers;
+        std::vector<::vk::DeviceSize> offsets;
+        for (const auto& buffer : mesh->getVertexBuffers()) {
+            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&buffer.get());
+            vertexBuffers.push_back(*vkBuffer);
+            offsets.push_back(0);
+        }
+        _handle.bindVertexBuffers(0, vertexBuffers, offsets);
+        if (mesh->hasIndexBuffer())
+        {
+            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&mesh->getIndexBuffer().value().get());
+            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
+        }
+        _handle.drawIndexed(indexCount, 1, baseIndex, 0, 0);
+        return *this;
+    }
+
+
     gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage)
     {
         const auto vkSrcImage = dynamic_cast<const gfx::vk::Image*>(srcImage);

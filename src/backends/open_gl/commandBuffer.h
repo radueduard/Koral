@@ -29,9 +29,10 @@ namespace gfx::ogl
         gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, const gfx::DescriptorSet* set) override;
         gfx::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
         gfx::CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
+        gfx::CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) override;
+        gfx::CommandBuffer& DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) override;
         gfx::CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
         gfx::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
-        gfx::CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) override;
         gfx::CommandBuffer& Blit(const Image* srcImage, const Image* dstImage) override;
         gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
 

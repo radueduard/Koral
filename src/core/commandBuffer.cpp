@@ -32,6 +32,8 @@ namespace gfx
         _state.boundFramebuffer = framebuffer;
         _state.boundComputePipeline = std::nullopt;
         _state.boundGraphicsPipeline = std::nullopt;
+        _state.viewportSet = false;
+        _state.scissorSet = false;
         return *this;
     }
 
@@ -89,6 +91,18 @@ namespace gfx
 
     CommandBuffer& CommandBuffer::DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance)
     {
+        if (!_state.boundGraphicsPipeline.has_value())
+            throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
+        if (!_state.viewportSet) {
+            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        if (!_state.scissorSet) {
+            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        return *this;
+    }
+
+    CommandBuffer & CommandBuffer::DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) {
         if (!_state.boundGraphicsPipeline.has_value())
             throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
         if (!_state.viewportSet) {

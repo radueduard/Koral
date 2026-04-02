@@ -37,6 +37,7 @@ namespace gfx::vk
         gfx::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
         gfx::CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
         gfx::CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) override;
+        gfx::CommandBuffer& DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) override;
         gfx::CommandBuffer& Blit(const gfx::Image* srcImage, const gfx::Image* dstImage) override;
         gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
 

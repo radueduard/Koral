@@ -50,6 +50,23 @@ namespace gfx {
         static constexpr ChannelType channelType = ScalarChannelTraits<std::remove_cv_t<T>>::channelType;
     };
 
+    template<typename T>
+    struct Std430AlignTraits
+    {
+        // scalar base alignment = sizeof(scalar)
+        static constexpr std::size_t alignment = sizeof(std::remove_cv_t<T>);
+    };
+
+    template<glm::length_t L, typename T, glm::qualifier Q>
+    struct Std430AlignTraits<glm::vec<L, T, Q>>
+    {
+        static constexpr std::size_t N = sizeof(std::remove_cv_t<T>);
+        // std430 vector base alignment:
+        // vec1 -> N, vec2 -> 2N, vec3/vec4 -> 4N
+        static constexpr std::size_t alignment =
+            (L == 1 ? N : (L == 2 ? 2 * N : 4 * N));
+    };
+
     // --- helpers for actual vertex storage with flat constructor ---
     template<typename... Ts>
     struct VertexStorage;
@@ -63,7 +80,7 @@ namespace gfx {
     template<typename T, typename... Rest>
     struct VertexStorage<T, Rest...>
     {
-        T value{};
+        alignas(Std430AlignTraits<T>::alignment) T value{};
         VertexStorage<Rest...> tail{};
 
         constexpr VertexStorage() = default;
@@ -127,7 +144,6 @@ namespace gfx {
 
         Storage storage{};
 
-        // This enables: VertexSimple{ {..}, {..}, {..} }
         constexpr ParamVertex() = default;
         constexpr ParamVertex(const typename Attrs::ValueType&... values) : storage(values...) {}
 
@@ -230,7 +246,10 @@ private:
             const auto byteSize = static_cast<glm::u64>(data.size_bytes());
 
             // Keep final buffers transfer-capable as requested.
-            const auto finalUsage = usage | Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc;
+            const auto finalUsage = usage
+                | Buffer::Usage::eTransferDst
+                | Buffer::Usage::eTransferSrc
+                | Buffer::Usage::eStorage;
 
             auto finalBuffer = Buffer::Builder()
                 .setSize(byteSize)
