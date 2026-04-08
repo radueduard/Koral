@@ -9,6 +9,7 @@
 #include "importer.h"
 
 #include <assimp/Importer.hpp>
+#include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
@@ -33,18 +34,37 @@ namespace gfx {
 
     private:
         Assimp::Importer _importer = {};
+        Assimp::Exporter _exporter = {};
         const aiScene* _scene;
         std::unordered_map<std::string, glm::u32> _meshNameToIndex;
         std::unordered_map<glm::u32, std::string> _indexToMeshName;
     };
 
     inline AssimpImporter::AssimpImporter(const std::filesystem::path &path) {
-        constexpr auto flags = aiProcess_Triangulate
-                               | aiProcess_FlipUVs
-                               // | aiProcess_CalcTangentSpace
-                               | aiProcess_LimitBoneWeights
-                               | aiProcess_JoinIdenticalVertices;
-        _scene = _importer.ReadFile(path.string(), flags);
+        _scene = _importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
+        std::string format = path.extension().string();
+
+        bool shouldSave = false;
+        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTangentsAndBitangents()) {
+            _importer.ApplyPostProcessing(aiProcess_CalcTangentSpace);
+            shouldSave = true;
+        }
+        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTextureCoords(0)) {
+            _importer.ApplyPostProcessing(aiProcess_GenUVCoords);
+            shouldSave = true;
+        }
+        if (shouldSave) {
+            _importer.ApplyPostProcessing(aiProcess_OptimizeGraph);
+            _importer.ApplyPostProcessing(aiProcess_OptimizeMeshes);
+
+            // const std::filesystem::path outputPath = path.parent_path() / (path.stem().string() + "_processed" + path.extension().string());
+            // Assimp::ExportProperties exportProps;
+            // if (_exporter.Export(_scene, format.substr(1), outputPath.string()) != AI_SUCCESS) {
+            //     std::cerr << "Failed to export processed scene: " << _exporter.GetErrorString() << std::endl;
+            // }
+        }
+
+        _importer.ApplyPostProcessing(aiProcess_FlipUVs);
 
         if (_scene == nullptr) {
             std::cerr << "Could not read file: " << path.string() << std::endl;

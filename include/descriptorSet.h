@@ -34,6 +34,7 @@ namespace gfx
         virtual ~DescriptorSet() = default;
 
         virtual void bind(const CommandBuffer& commandBuffer, glm::u32 index) const {};
+        virtual void Write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index) = 0;
 
     protected:
         explicit DescriptorSet(const Builder &builder);

@@ -75,7 +75,7 @@ glm::u32 getPixelSize(ILint format, ILint type) {
 
 namespace gfx
 {
-    std::unique_ptr<Image> Importer::LoadImage(const std::filesystem::path& path)
+    std::unique_ptr<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
     {
         ILuint imageId;
         ilGenImages(1, &imageId);
@@ -100,6 +100,11 @@ namespace gfx
         const ILint layerCount = ilGetInteger(IL_NUM_LAYERS);
         const ILint mipmapCount = ilGetInteger(IL_NUM_MIPMAPS);
 
+        if (generateMipmaps && mipmapCount > 0) {
+            generateMipmaps = false;
+        }
+        const auto maxMipMapLevels = static_cast<ILint>(std::floor(std::log2(std::max({ width, height, depth }))) + 1);
+
         const auto imageType = depth > 1 ? Image::Type::e3D : height > 1 ? Image::Type::e2D : Image::Type::e1D;
         auto image = Image::Builder()
             .setType(imageType)
@@ -109,7 +114,7 @@ namespace gfx
             .addUsage(Image::Usage::eTransferSrc)
             .addUsage(Image::Usage::eTransferDst)
             .setArrayLayers(layerCount > 0 ? static_cast<glm::u32>(layerCount) : 1)
-            .setMipLevels(mipmapCount > 0 ? static_cast<glm::u32>(mipmapCount) : 1)
+            .setMipLevels(generateMipmaps && mipmapCount == 0 ? maxMipMapLevels : mipmapCount == 0 ? 1 : static_cast<glm::u32>(mipmapCount))
             .build();
 
         const glm::uint pixelSize = getPixelSize(format, type);
@@ -139,6 +144,10 @@ namespace gfx
                 image->CopyFrom(*stagingBuffer, mipmap, layer);
             }
         }
+        if (generateMipmaps) {
+            image->GenerateMipmaps();
+        }
+
         ilDeleteImages(1, &imageId);
         return image;
     }

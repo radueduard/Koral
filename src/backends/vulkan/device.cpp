@@ -120,6 +120,10 @@ namespace gfx::vk {
             .setVulkanMemoryModelDeviceScope(true)
             .setScalarBlockLayout(true)
             .setStorageBuffer8BitAccess(true)
+            .setShaderSampledImageArrayNonUniformIndexing(true)
+            .setDescriptorBindingSampledImageUpdateAfterBind(true)
+            .setDescriptorBindingPartiallyBound(true)
+            .setDescriptorBindingVariableDescriptorCount(true)
 			.setPNext(&vk11Features);
 
         auto vk13Features = ::vk::PhysicalDeviceVulkan13Features()

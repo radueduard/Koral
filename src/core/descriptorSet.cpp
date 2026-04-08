@@ -118,6 +118,7 @@ namespace gfx
 
     DescriptorSet::DescriptorSet(const Builder& builder) : _layout(builder.layout), _writes(builder.writes)
     {
+        _isPerFrame = false;
         for (const auto& write : _writes | std::views::values) {
             for (const auto& descriptor : write)
             {

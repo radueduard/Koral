@@ -14,8 +14,10 @@ namespace gfx::vk
     public:
         explicit DescriptorSet(const Builder& builder);
         ~DescriptorSet() override;
-        ::vk::DescriptorSet operator*() const;
 
+        void Write(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) override;
+
+        ::vk::DescriptorSet operator*() const;
     private:
         std::vector<::vk::DescriptorSet> _descriptorSets;
     };

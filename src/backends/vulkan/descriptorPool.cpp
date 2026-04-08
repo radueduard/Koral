@@ -59,7 +59,20 @@ namespace gfx::vk
     ::vk::DescriptorSet DescriptorPool::Allocate(const gfx::vk::DescriptorSetLayout& layout) const
     {
         const auto layoutHandle = *layout;
+
+        std::vector<glm::u32> counts;
+        for (const auto& [_a, _b, count] : layout.getBindings()) {
+            if (count == 0) {
+                counts.emplace_back(64);
+                break;
+            }
+            counts.emplace_back(count);
+        }
+        const auto variableCountInfo = ::vk::DescriptorSetVariableDescriptorCountAllocateInfo()
+            .setDescriptorCounts(counts);
+
         const auto allocateInfo = ::vk::DescriptorSetAllocateInfo()
+            .setPNext(&variableCountInfo)
             .setDescriptorPool(_handle)
             .setSetLayouts({layoutHandle});
 

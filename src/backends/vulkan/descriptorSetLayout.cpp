@@ -36,7 +36,7 @@ namespace gfx::vk
             bindings[binding] = ::vk::DescriptorSetLayoutBinding()
                 .setBinding(binding)
                 .setDescriptorType(getVkDescriptorType(type))
-                .setDescriptorCount(count == 0 ? 1 : count) // if count is 0, we set it to 1 in the layout and use the variable descriptor count feature to allow for an unbounded array of descriptors
+                .setDescriptorCount(count == 0 ? 1000 : count)
                 .setStageFlags(::vk::ShaderStageFlagBits::eAll);
         }
 

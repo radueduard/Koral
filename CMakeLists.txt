@@ -27,7 +27,6 @@ find_package(Jasper REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(Stb REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
@@ -41,6 +40,7 @@ find_package(reflectcpp CONFIG REQUIRED)
 find_package(DevIL REQUIRED)
 
 find_package(imgui CONFIG REQUIRED)
+find_package(imguizmo CONFIG REQUIRED)
 
 file (GLOB_RECURSE SOURCE_FILES
         src/core/*.cpp
@@ -67,7 +67,6 @@ endif()
 target_link_libraries(${PROJECT_NAME} glfw)
 target_link_libraries(${PROJECT_NAME} magic_enum::magic_enum)
 target_link_libraries(${PROJECT_NAME} glm::glm)
-target_include_directories(${PROJECT_NAME} PRIVATE ${Stb_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME} GLEW::GLEW OpenGL::GL)
 target_link_libraries(${PROJECT_NAME} assimp::assimp)
 
@@ -90,6 +89,7 @@ target_link_libraries(${PROJECT_NAME} ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB
 target_link_libraries(${PROJECT_NAME} ${JASPER_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} DevIL::IL)
 target_link_libraries(${PROJECT_NAME} imgui::imgui)
+target_link_libraries(${PROJECT_NAME} imguizmo::imguizmo)
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} OpenGL::GLX)

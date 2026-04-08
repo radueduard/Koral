@@ -15,8 +15,8 @@
 #include "imageView.h"
 #include "sampler.h"
 #include "vulkanContext.h"
-#include "../../../include/descriptorSetLayout.h"
-#include "../../../include/scheduler.h"
+#include <descriptorSetLayout.h>
+#include <scheduler.h>
 
 namespace gfx::vk
 {
@@ -30,8 +30,6 @@ namespace gfx::vk
         std::vector<::vk::DescriptorBufferInfo> bufferInfos;
         std::vector<::vk::DescriptorImageInfo> imageInfos;
 
-        // Pre-calculate total descriptor count to reserve space and prevent reallocation
-        // which would invalidate references stored in WriteDescriptorSet
         size_t totalDescriptors = 0;
         for (const auto& descriptors : _writes | std::views::values) {
             totalDescriptors += descriptors.size();
@@ -154,6 +152,107 @@ namespace gfx::vk
     {
         for (const auto& descriptorSet : _descriptorSets) {
             Context::DescriptorPool().Free(descriptorSet);
+        }
+    }
+
+    void DescriptorSet::Write(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index)
+    {
+        const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+        for (int frame = 0; frame < frameCount; ++frame) {
+            const auto type = _layout.getBindingType(binding);
+            std::vector<::vk::WriteDescriptorSet> writes;
+            std::vector<::vk::DescriptorBufferInfo> bufferInfos;
+            std::vector<::vk::DescriptorImageInfo> imageInfos;
+            switch (type) {
+                case DescriptorType::eUniformBuffer:
+                {
+                    auto* buffer = dynamic_cast<const gfx::vk::Buffer*>(descriptor.getBuffer());
+                    const auto& bufferHandle = buffer->isPerFrame() ? (*buffer)[frame] : (*buffer)[0];
+                    const auto& bufferInfo = bufferInfos.emplace_back()
+                        .setBuffer(bufferHandle)
+                        .setOffset(descriptor.getOffset())
+                        .setRange(descriptor.getRange());
+                    writes.emplace_back()
+                        .setDstSet(_descriptorSets[frame])
+                        .setDstBinding(binding)
+                        .setDstArrayElement(index)
+                        .setDescriptorType(::vk::DescriptorType::eUniformBuffer)
+                        .setBufferInfo(bufferInfo);
+                    break;
+                }
+                case DescriptorType::eStorageBuffer:
+                {
+                    auto* buffer = dynamic_cast<const Buffer*>(descriptor.getBuffer());
+                    const auto& bufferHandle = buffer->isPerFrame() ? (*buffer)[frame] : (*buffer)[0];
+                    const auto& bufferInfo = bufferInfos.emplace_back()
+                        .setBuffer(bufferHandle)
+                        .setOffset(descriptor.getOffset())
+                        .setRange(descriptor.getRange());
+                    writes.emplace_back()
+                        .setDstSet(_descriptorSets[frame])
+                        .setDstBinding(binding)
+                        .setDstArrayElement(index)
+                        .setDescriptorType(::vk::DescriptorType::eStorageBuffer)
+                        .setBufferInfo(bufferInfo);
+                    break;
+                }
+                case DescriptorType::eSampler:
+                {
+                    auto* sampler = dynamic_cast<const Sampler*>(descriptor.getSampler());
+                    const auto& imageInfo = imageInfos.emplace_back()
+                        .setSampler(**sampler);
+                    writes.emplace_back()
+                        .setDstSet(_descriptorSets[frame])
+                        .setDstBinding(binding)
+                        .setDstArrayElement(index)
+                        .setDescriptorType(::vk::DescriptorType::eSampler)
+                        .setImageInfo(imageInfo);
+                    break;
+                }
+                case DescriptorType::eCombinedImageSampler:
+                {
+                    auto* sampler = dynamic_cast<const vk::Sampler*>(descriptor.getSampler());
+                    auto* imageView = dynamic_cast<const vk::ImageView*>(descriptor.getImageView());
+                    const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                    const auto imageLayout = dynamic_cast<const Image&>(imageView->getImage()).getImageLayout();
+                    if (imageLayout == ::vk::ImageLayout::eUndefined) {
+                        throw std::runtime_error("Storage image for binding " + std::to_string(binding) + " index " + std::to_string(index) + " has undefined layout! You must transition the image to a defined layout before using it in a descriptor set.");
+                    }
+                    const auto& imageInfo = imageInfos.emplace_back()
+                        .setImageView(imageViewHandle)
+                        .setSampler(**sampler)
+                        .setImageLayout(imageLayout);
+
+                    writes.emplace_back()
+                        .setDstSet(_descriptorSets[frame])
+                        .setDstBinding(binding)
+                        .setDstArrayElement(index)
+                        .setDescriptorType(::vk::DescriptorType::eCombinedImageSampler)
+                        .setImageInfo(imageInfo);
+                    break;
+                }
+                case DescriptorType::eStorageImage:
+                {
+                    auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
+                    const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                    const auto imageLayout = dynamic_cast<const Image&>(imageView->getImage()).getImageLayout();
+                    if (imageLayout == ::vk::ImageLayout::eUndefined) {
+                        throw std::runtime_error("Storage image for binding " + std::to_string(binding) + " index " + std::to_string(index) + " has undefined layout! You must transition the image to a defined layout before using it in a descriptor set.");
+                    }
+                    const auto& imageInfo = imageInfos.emplace_back()
+                        .setImageView(imageViewHandle)
+                        .setImageLayout(imageLayout);
+                    writes.emplace_back()
+                        .setDstSet(_descriptorSets[frame])
+                        .setDstBinding(binding)
+                        .setDstArrayElement(index)
+                        .setDescriptorType(::vk::DescriptorType::eStorageImage)
+                        .setImageInfo(imageInfo);
+                    break;
+                }
+                default: throw std::runtime_error("Unknown descriptor type for binding " + std::to_string(binding) + " index " + std::to_string(index) + "!");
+            }
+            Context::Device()->updateDescriptorSets(writes, {});
         }
     }
 

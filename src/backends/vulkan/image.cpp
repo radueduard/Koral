@@ -358,7 +358,7 @@ namespace gfx::vk
         return std::vector(data.begin(), data.end());
     }
 
-    void Image::GenerateMipmaps() const
+    void Image::GenerateMipmaps()
     {
         if (_mipLevels == 1) {
             return;
@@ -369,6 +369,7 @@ namespace gfx::vk
             auto mipHeight = static_cast<glm::i32>(_extent.y);
 
             const auto _handle = **this;
+            TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferDstOptimal);
 
             auto barrier = ::vk::ImageMemoryBarrier();
             for (uint32_t i = 1; i < _mipLevels; i++) {

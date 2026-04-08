@@ -19,7 +19,7 @@ namespace gfx
     public:
         virtual ~Importer() = default;
 
-        static std::unique_ptr<Image> LoadImage(const std::filesystem::path& path);
+        static std::unique_ptr<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
         static std::unique_ptr<Importer> LoadMeshes(const std::filesystem::path& path);
 
         virtual std::vector<std::string> GetMeshNames() = 0;

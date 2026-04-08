@@ -13,6 +13,8 @@
 #include "../backends/vulkan/gui.h"
 
 #include <imgui.h>
+// #include <imguizmo.h>
+
 #include <iostream>
 #include <GLFW/glfw3.h>
 
@@ -145,6 +147,7 @@ std::unique_ptr<gfx::GUI_Image> gfx::GUI_Image::Create(const gfx::Image& image, 
 void gfx::GUI::Init()
 {
     Context::_imguiContext = ImGui::CreateContext();
+    // ImGuizmo::SetImGuiContext(Context::_imguiContext);
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -187,6 +190,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 
     ImGui::SetCurrentContext(context);
     ImGui::NewFrame();
+    // ImGuizmo::BeginFrame();
     constexpr ImGuiDockNodeFlags dockSpaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
 
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking;

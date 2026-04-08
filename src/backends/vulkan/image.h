@@ -40,9 +40,9 @@ namespace gfx::vk
 
     	void Clear(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const;
     	void Clear(const ::vk::ClearValue& clearValue) const;
-        void GenerateMipmaps() const;
     	void Resize(const glm::uvec3& extent);
 
+        void GenerateMipmaps() override;
     	std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const override;
         void CopyFrom(const gfx::Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const override;
 

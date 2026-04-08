@@ -20,6 +20,10 @@ namespace gfx::ogl
 {
     DescriptorSet::DescriptorSet(const Builder& builder): gfx::DescriptorSet(builder) {}
 
+    void DescriptorSet::Write(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) {
+        throw std::runtime_error("NOT YET IMPLEMENTED ON OPENGL BACKEND");
+    }
+
     void DescriptorSet::bind(const gfx::CommandBuffer& commandBuffer, glm::u32 index) const
     {
         const auto& oglCommandBuffer = dynamic_cast<const CommandBuffer&>(commandBuffer);

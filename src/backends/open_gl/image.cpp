@@ -110,6 +110,12 @@ namespace gfx::ogl
         glCheckError();
     }
 
+    void Image::GenerateMipmaps() {
+        glBindTexture(GetTargetFromImageType(_type, _msaa, _arrayLayers), _id);
+        glGenerateMipmap(GetTargetFromImageType(_type, _msaa, _arrayLayers));
+        glCheckError();
+    }
+
     std::vector<std::byte> Image::ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const
     {
         if (!(_usage & Usage::eTransferSrc)) {

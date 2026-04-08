@@ -190,7 +190,12 @@ namespace gfx
             for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
             {
                 if (mergedPushConstants.contains(offset)) {
-                    continue;
+                    auto& existingPushConstant = mergedPushConstants[offset];
+                    if (existingPushConstant.size != pushConstant.size)
+                    {
+                        throw std::runtime_error("Push constant layout conflict between shaders in pipeline!");
+                    }
+                    existingPushConstant.stages |= pushConstant.stages;
                 } else {
                     mergedPushConstants[offset] = pushConstant;
                 }

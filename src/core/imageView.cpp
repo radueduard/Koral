@@ -14,7 +14,10 @@
 
 namespace gfx
 {
-    ImageView::Builder::Builder(const Image& image) : image(image){}
+    ImageView::Builder::Builder(const Image& image) : image(image) {
+        arrayLayerCount = image.getArrayLayers();
+        mipLevelCount = image.getMipLevels();
+    }
 
     std::unique_ptr<ImageView> ImageView::Builder::build() const
     {

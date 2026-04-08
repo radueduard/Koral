@@ -148,7 +148,7 @@ namespace gfx::ogl
         {
             if (!_state.boundGraphicsPipeline.has_value())
                 throw std::runtime_error("You can't draw without a graphics pipeline!");
-            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            const auto& oglPipeline = dynamic_cast<const GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
             const auto mode = oglPipeline->getMode();
             glDrawArraysInstancedBaseInstance(mode, firstVertex, vertexCount, instanceCount, firstInstance);
         });
