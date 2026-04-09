@@ -60,16 +60,16 @@ namespace gfx::vk
     {
         const auto layoutHandle = *layout;
 
-        std::vector<glm::u32> counts;
+        glm::u32 descriptorCount = 0;
         for (const auto& [_a, _b, count] : layout.getBindings()) {
             if (count == 0) {
-                counts.emplace_back(64);
+                descriptorCount += 64;
                 break;
             }
-            counts.emplace_back(count);
+            descriptorCount += count;
         }
         const auto variableCountInfo = ::vk::DescriptorSetVariableDescriptorCountAllocateInfo()
-            .setDescriptorCounts(counts);
+            .setDescriptorCounts(descriptorCount);
 
         const auto allocateInfo = ::vk::DescriptorSetAllocateInfo()
             .setPNext(&variableCountInfo)

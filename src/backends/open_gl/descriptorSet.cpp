@@ -107,6 +107,19 @@ namespace gfx::ogl
                         glCheckError();
                         break;
                     }
+                case DescriptorType::eSampledImage:
+                    {
+                        auto* imageView = dynamic_cast<const ogl::ImageView*>(descriptor.getImageView());
+                        glBindImageTexture(bindingPoint->second,
+                                             **imageView,
+                                             imageView->getBaseMipLevel(),
+                                             imageView->getArrayLayerCount() > 1,
+                                             imageView->getBaseArrayLayer(),
+                                             GL_READ_ONLY,
+                                             imageView->getFormat());
+                        glCheckError();
+                        break;
+                    }
                 case DescriptorType::eSampler:
                     {
                         auto* sampler = dynamic_cast<const ogl::Sampler*>(descriptor.getSampler());

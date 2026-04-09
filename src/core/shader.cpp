@@ -193,7 +193,7 @@ namespace gfx {
 				// memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eUniformTexelBuffer, name, count));
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage });
 			}
 		} // eSampledImage and eUniformTexelBuffer
 		for (const auto& sampledImage : resources.sampled_images) {

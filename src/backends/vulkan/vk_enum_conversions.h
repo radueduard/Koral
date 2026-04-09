@@ -113,6 +113,9 @@ namespace gfx
         case DescriptorType::eCombinedImageSampler: return ::vk::DescriptorType::eCombinedImageSampler;
         case DescriptorType::eStorageImage: return ::vk::DescriptorType::eStorageImage;
         case DescriptorType::eUniformBuffer: return ::vk::DescriptorType::eUniformBuffer;
+        case DescriptorType::eUniformTexelBuffer: return ::vk::DescriptorType::eUniformTexelBuffer;
+        case DescriptorType::eSampledImage: return ::vk::DescriptorType::eSampledImage;
+        case DescriptorType::eStorageTexelBuffer: return ::vk::DescriptorType::eStorageTexelBuffer;
         case DescriptorType::eStorageBuffer: return ::vk::DescriptorType::eStorageBuffer;
         default: throw std::runtime_error("Unknown descriptor type!");
         }

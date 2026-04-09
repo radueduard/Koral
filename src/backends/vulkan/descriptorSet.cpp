@@ -134,7 +134,25 @@ namespace gfx::vk
                                 .setImageInfo(imageInfo);
                             break;
                         }
-
+                    case DescriptorType::eSampledImage:
+                        {
+                            auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
+                            const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                            const auto imageLayout = dynamic_cast<const Image&>(imageView->getImage()).getImageLayout();
+                            if (imageLayout == ::vk::ImageLayout::eUndefined) {
+                                throw std::runtime_error("Sampled image for binding " + std::to_string(binding) + " index " + std::to_string(i) + " has undefined layout! You must transition the image to a defined layout before using it in a descriptor set.");
+                            }
+                            const auto& imageInfo = imageInfos.emplace_back()
+                                .setImageView(imageViewHandle)
+                                .setImageLayout(imageLayout);
+                            writes.emplace_back()
+                                .setDstSet(_descriptorSets[frame])
+                                .setDstBinding(binding)
+                                .setDstArrayElement(i)
+                                .setDescriptorType(::vk::DescriptorType::eSampledImage)
+                                .setImageInfo(imageInfo);
+                            break;
+                        }
                     default:
                         throw std::runtime_error("Unknown descriptor type for binding " + std::to_string(binding) + " index " + std::to_string(i) + "!");
                     }
@@ -247,6 +265,25 @@ namespace gfx::vk
                         .setDstBinding(binding)
                         .setDstArrayElement(index)
                         .setDescriptorType(::vk::DescriptorType::eStorageImage)
+                        .setImageInfo(imageInfo);
+                    break;
+                }
+                case DescriptorType::eSampledImage:
+                {
+                    auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
+                    const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                    const auto imageLayout = dynamic_cast<const Image&>(imageView->getImage()).getImageLayout();
+                    if (imageLayout == ::vk::ImageLayout::eUndefined) {
+                        throw std::runtime_error("Sampled image for binding " + std::to_string(binding) + " index " + std::to_string(index) + " has undefined layout! You must transition the image to a defined layout before using it in a descriptor set.");
+                    }
+                    const auto& imageInfo = imageInfos.emplace_back()
+                        .setImageView(imageViewHandle)
+                        .setImageLayout(imageLayout);
+                    writes.emplace_back()
+                        .setDstSet(_descriptorSets[frame])
+                        .setDstBinding(binding)
+                        .setDstArrayElement(index)
+                        .setDescriptorType(::vk::DescriptorType::eSampledImage)
                         .setImageInfo(imageInfo);
                     break;
                 }

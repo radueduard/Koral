@@ -85,6 +85,7 @@ namespace gfx
                 throw std::runtime_error("Descriptor for image binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid sampler!");
             }
             break;
+        case DescriptorType::eSampledImage:
         case DescriptorType::eStorageImage:
             if (descriptor.getImageView() == nullptr) {
                 throw std::runtime_error("Descriptor for image binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid image view!");
