@@ -129,6 +129,116 @@ namespace gfx::ogl
         return *this;
     }
 
+    gfx::CommandBuffer & CommandBuffer::BindMesh(const Mesh *mesh) {
+        CheckRecording();
+        _commands.emplace_back([mesh, this] () {
+            gfx::CommandBuffer::BindMesh(mesh);
+            const auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
+            const auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
+
+            const auto vertexBuffers = mesh->getVertexBuffers();
+            for (size_t i = 0; i < vertexBuffers.size(); ++i)
+            {
+                const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(vertexBuffers[i].get());
+                glBindBuffer(GL_ARRAY_BUFFER, *vertexBuffer);
+                glCheckError();
+
+                const auto& [binding, stride] = meshVertexBindingDescription[i];
+                for (const auto& [location, attributeBinding, channelCount, channelType, offset] : meshVertexAttributeDescription)
+                {
+                    if (binding == attributeBinding)
+                    {
+                        glEnableVertexAttribArray(location);
+                        glCheckError();
+                        glVertexAttribPointer(
+                            location,
+                            static_cast<GLint>(channelCount),
+                            toGLChannelType(channelType),
+                            GL_FALSE,
+                            static_cast<GLsizei>(stride),
+                            reinterpret_cast<void*>(static_cast<ptrdiff_t>(offset)));
+                        glCheckError();
+                    }
+                }
+            }
+            if (const auto indexBuffer = mesh->getIndexBuffer(); indexBuffer.has_value()) {
+                const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(indexBuffer.value().get());
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *oglIndexBuffer);
+                glCheckError();
+            }
+        });
+        return *this;
+    }
+
+    std::optional<GLbitfield> GetBarrierBits(ResourceAccess src, ResourceAccess dst) {
+        // Only incoherent writes need a barrier in OpenGL
+        bool srcIsIncoherentWrite =
+            src == ResourceAccess::ComputeWrite        ||
+            src == ResourceAccess::ComputeReadWrite     ||
+            src == ResourceAccess::VertexShaderWrite    ||
+            src == ResourceAccess::VertexShaderReadWrite||
+            src == ResourceAccess::FragmentShaderWrite  ||
+            src == ResourceAccess::FragmentShaderReadWrite;
+
+        if (!srcIsIncoherentWrite)
+            return std::nullopt;
+
+        switch (dst) {
+            case ResourceAccess::VertexBuffer:
+                return GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT;
+
+            case ResourceAccess::IndexBuffer:
+                return GL_ELEMENT_ARRAY_BARRIER_BIT;
+
+            case ResourceAccess::IndirectBuffer:
+                return GL_COMMAND_BARRIER_BIT;
+
+            case ResourceAccess::ComputeRead:
+            case ResourceAccess::VertexShaderRead:
+            case ResourceAccess::FragmentShaderRead:
+                return GL_SHADER_STORAGE_BARRIER_BIT;
+
+            case ResourceAccess::ComputeReadWrite:
+            case ResourceAccess::VertexShaderReadWrite:
+            case ResourceAccess::FragmentShaderReadWrite:
+                return GL_SHADER_STORAGE_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
+
+            case ResourceAccess::TransferSrc:
+            case ResourceAccess::TransferDst:
+                return GL_TEXTURE_UPDATE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT;
+
+            case ResourceAccess::ColorAttachment:
+            case ResourceAccess::DepthAttachment:
+            case ResourceAccess::DepthRead:
+                return GL_FRAMEBUFFER_BARRIER_BIT;
+
+            default:
+                return std::nullopt;
+        }
+    }
+
+    gfx::CommandBuffer & CommandBuffer::Barrier(std::vector<gfx::BufferBarrier> bufferBarriers,
+        std::vector<gfx::ImageBarrier> imageBarriers) {
+        CheckRecording();
+        _commands.emplace_back([bufferBarriers = std::move(bufferBarriers), imageBarriers = std::move(imageBarriers)] () {
+            for (const auto& barrier : bufferBarriers) {
+                GetBarrierBits(barrier.getSrcAccess(), barrier.getDstAccess()).and_then([&](GLbitfield bits) {
+                    glMemoryBarrier(bits);
+                    glCheckError();
+                    return std::optional(bits);
+                });
+            }
+            for (const auto& barrier : imageBarriers) {
+                GetBarrierBits(barrier.getSrcAccess(), barrier.getDstAccess()).and_then([&](GLbitfield bits) {
+                    glMemoryBarrier(bits);
+                    glCheckError();
+                    return std::optional(bits);
+                });
+            }
+        });
+        return *this;
+    }
+
     gfx::CommandBuffer& CommandBuffer::Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ)
     {
         CheckRecording();
@@ -141,7 +251,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance)
+    gfx::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance)
     {
         CheckRecording();
         _commands.emplace_back([this, vertexCount, instanceCount, firstVertex, firstInstance] ()
@@ -151,6 +261,25 @@ namespace gfx::ogl
             const auto& oglPipeline = dynamic_cast<const GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
             const auto mode = oglPipeline->getMode();
             glDrawArraysInstancedBaseInstance(mode, firstVertex, vertexCount, instanceCount, firstInstance);
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) {
+        CheckRecording();
+        _commands.emplace_back([this, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance] () {
+            gfx::CommandBuffer::DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+            const auto& oglPipeline = dynamic_cast<const GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            const auto mode = oglPipeline->getMode();
+            const auto mesh = _state.boundMesh.value();
+            const auto indexType = mesh->getIndexType().value();
+            glDrawElementsInstancedBaseInstance(
+                mode,
+                mesh->getIndexCount().value(),
+                toGLChannelType(indexType),
+                nullptr,
+                instanceCount,
+                firstInstance);
         });
         return *this;
     }
@@ -179,134 +308,20 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::DrawMesh(const gfx::Mesh* mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
+    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage, gfx::Blit blitInfo)
     {
+        if (srcImage->getMSAA() != MSAA::eNone)
+            throw std::runtime_error("Source image must not be multisampled for blit operation!");
+        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+            throw std::runtime_error("Destination image must not be multisampled for blit operation!");
+
+        if (blitInfo.srcExtent == glm::ivec3(-1))
+            blitInfo.srcExtent = srcImage->getExtent();
+        if (blitInfo.dstExtent == glm::ivec3(-1))
+            blitInfo.dstExtent = dstImage ? dstImage->getExtent() : glm::uvec3 { Context::Window().getExtent(), 1 };
+
         CheckRecording();
-        _commands.emplace_back([this, mesh, instanceCount, baseInstance] ()
-        {
-            if (!_state.boundGraphicsPipeline.has_value())
-                throw std::runtime_error("You can't draw mesh without a graphics pipeline!");
-            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
-            const auto mode = oglPipeline->getMode();
 
-            const auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
-            const auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
-
-            const auto vertexBuffers = mesh->getVertexBuffers();
-            for (size_t i = 0; i < vertexBuffers.size(); ++i)
-            {
-                const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(vertexBuffers[i].get());
-                glBindBuffer(GL_ARRAY_BUFFER, *vertexBuffer);
-                glCheckError();
-
-                const auto& [binding, stride] = meshVertexBindingDescription[i];
-                for (const auto& [location, attributeBinding, channelCount, channelType, offset] : meshVertexAttributeDescription)
-                {
-                    if (binding == attributeBinding)
-                    {
-                        glEnableVertexAttribArray(location);
-                        glCheckError();
-                        glVertexAttribPointer(
-                            location,
-                            static_cast<GLint>(channelCount),
-                            toGLChannelType(channelType),
-                            GL_FALSE,
-                            static_cast<GLsizei>(stride),
-                            reinterpret_cast<void*>(static_cast<ptrdiff_t>(offset)));
-                        glCheckError();
-                    }
-                }
-            }
-            if (const auto indexBuffer = mesh->getIndexBuffer(); indexBuffer.has_value()) {
-                const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(indexBuffer.value().get());
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *oglIndexBuffer);
-                glCheckError();
-            }
-
-            if (mesh->hasIndexBuffer()) {
-                const auto indexType = mesh->getIndexType().value();
-                glDrawElementsInstancedBaseInstance(
-                    mode,
-                    mesh->getIndexCount().value(),
-                    toGLChannelType(indexType),
-                    nullptr,
-                    instanceCount,
-                    baseInstance);
-            } else {
-                glDrawArraysInstancedBaseInstance(
-                    mode,
-                    0,
-                    mesh->getVertexCount(),
-                    instanceCount,
-                    baseInstance);
-            }
-
-            glBindVertexArray(0);
-        });
-        return *this;
-    }
-
-    gfx::CommandBuffer & CommandBuffer::DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) {
-        CheckRecording();
-        _commands.emplace_back([this, mesh, baseIndex, indexCount] {
-            gfx::CommandBuffer::DrawSubMesh(mesh, baseIndex, indexCount);
-            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
-            const auto mode = oglPipeline->getMode();
-            const auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
-            const auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
-
-            if (!mesh->hasIndexBuffer()) {
-                throw std::runtime_error("You can't draw sub mesh without an index buffer!");
-            }
-
-            const auto vertexBuffers = mesh->getVertexBuffers();
-            for (size_t i = 0; i < vertexBuffers.size(); ++i)
-            {
-                const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(vertexBuffers[i].get());
-                glBindBuffer(GL_ARRAY_BUFFER, *vertexBuffer);
-                glCheckError();
-
-                const auto& [binding, stride] = meshVertexBindingDescription[i];
-                for (const auto& [location, attributeBinding, channelCount, channelType, offset] : meshVertexAttributeDescription)
-                {
-                    if (binding == attributeBinding)
-                    {
-                        glEnableVertexAttribArray(location);
-                        glCheckError();
-                        glVertexAttribPointer(
-                            location,
-                            static_cast<GLint>(channelCount),
-                            toGLChannelType(channelType),
-                            GL_FALSE,
-                            static_cast<GLsizei>(stride),
-                            reinterpret_cast<void*>(static_cast<ptrdiff_t>(offset)));
-                        glCheckError();
-                    }
-                }
-            }
-            if (const auto indexBuffer = mesh->getIndexBuffer(); indexBuffer.has_value()) {
-                const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(indexBuffer.value().get());
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *oglIndexBuffer);
-                glCheckError();
-            }
-
-            const auto indexType = mesh->getIndexType().value();
-            glDrawElementsInstancedBaseInstance(
-                mode,
-                mesh->getIndexCount().value(),
-                toGLChannelType(indexType),
-                nullptr,
-                1,
-                0);
-
-            glBindVertexArray(0);
-
-        });
-        return *this;
-    }
-
-    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage)
-    {
         if (dstImage == nullptr)
         {
             _commands.emplace_back([srcImage] ()
@@ -363,6 +378,66 @@ namespace gfx::ogl
 
                 glDeleteFramebuffers(1, &srcFramebuffer);
                 glDeleteFramebuffers(1, &dstFramebuffer);
+                glCheckError();
+            });
+        }
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::Resolve(const gfx::Image *srcImage, const gfx::Image *dstImage) {
+        if (srcImage->getMSAA() == MSAA::eNone)
+            throw std::runtime_error("Source image must be multisampled for resolve operation!");
+        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+            throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
+
+        CheckRecording();
+        if (dstImage == nullptr)
+        {
+            _commands.emplace_back([srcImage] ()
+            {
+                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
+                GLuint framebuffer = 0;
+                glGenFramebuffers(1, &framebuffer);
+                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+                glCheckError();
+
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
+                glCheckError();
+
+                glBlitNamedFramebuffer(
+                    framebuffer,
+                    0,
+                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
+                    0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y,
+                    GL_COLOR_BUFFER_BIT,
+                    GL_NEAREST);
+                glCheckError();
+
+                glDeleteFramebuffers(1, &framebuffer);
+                glCheckError();
+            });
+        } else
+        {
+            _commands.emplace_back([srcImage, dstImage] ()
+            {
+                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
+                const auto* glDstImage = dynamic_cast<const ogl::Image*>(dstImage);
+
+                glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+                glCheckError();
+                glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
+                glCheckError();
+
+                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+                glCheckError();
+                glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glDstImage, 0);
+                glCheckError();
+
+                glBlitFramebuffer(
+                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
+                    0, 0, glDstImage->getExtent().x, glDstImage->getExtent().y,
+                    GL_COLOR_BUFFER_BIT,
+                    GL_NEAREST);
                 glCheckError();
             });
         }

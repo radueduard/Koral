@@ -137,7 +137,7 @@ namespace gfx::ogl
         const GLsizei height = static_cast<GLsizei>(_extent.y >> mipLevel);
         const GLsizei depth = static_cast<GLsizei>(_extent.z >> mipLevel);
         const GLsizei layerCount = _arrayLayers > 1 ? static_cast<GLsizei>(_arrayLayers) : 1;
-        const GLsizei pixelSize = PixelSizeFromImageFormat(_format);
+        const GLsizei pixelSize = ChannelSizeFromImageFormat(_format);
         const GLsizei channelCount = ChannelCountFromImageFormat(_format);
         const GLsizei imageSize = width * height * depth * layerCount * pixelSize * channelCount;
 

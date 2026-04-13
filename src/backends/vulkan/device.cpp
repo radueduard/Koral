@@ -4,6 +4,7 @@
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #define VMA_IMPLEMENTATION
+#define VK_ENABLE_BETA_EXTENSIONS
 #include "device.h"
 
 #include <iostream>
@@ -102,7 +103,17 @@ namespace gfx::vk {
             queueCreateInfos.emplace_back(queueCreateInfo);
         }
 
+#ifdef __APPLE__
+        auto portabilityFeatures = ::vk::PhysicalDevicePortabilitySubsetFeaturesKHR()
+            .setPNext(nullptr)
+            .setTriangleFans(true)
+            .setImageViewFormatSwizzle(true);
+#endif
+
         auto deviceMeshShaderFeatures = ::vk::PhysicalDeviceMeshShaderFeaturesEXT()
+#ifdef __APPLE__
+            .setPNext(&portabilityFeatures)
+#endif
             .setTaskShader(true)
             .setMeshShader(true);
 
@@ -124,6 +135,7 @@ namespace gfx::vk {
             .setDescriptorBindingSampledImageUpdateAfterBind(true)
             .setDescriptorBindingPartiallyBound(true)
             .setDescriptorBindingVariableDescriptorCount(true)
+            .setDescriptorIndexing(true)
 			.setPNext(&vk11Features);
 
         auto vk13Features = ::vk::PhysicalDeviceVulkan13Features()
@@ -234,12 +246,12 @@ namespace gfx::vk {
         _handle.freeCommandBuffers(commandBuffer.getParentPool(), *commandBuffer);
     }
 
-    void Device::runSingleTimeCommand(const std::function<void(const gfx::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags,
+    void Device::runSingleTimeCommand(const std::function<void(gfx::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags,
         const ::vk::Fence fence, ::vk::Semaphore waitSemaphore, ::vk::Semaphore signalSemaphore, const bool wait) const
     {
         const auto& queue = requestQueue(requiredFlags);
         const auto commandBufferHolder = requestCommandBuffer(queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
-        const auto& commandBuffer = *commandBufferHolder.get();
+        auto& commandBuffer = *commandBufferHolder.get();
 
         commandBuffer->begin(::vk::CommandBufferBeginInfo().setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
         command(commandBuffer);

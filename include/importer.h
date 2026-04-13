@@ -14,12 +14,25 @@ namespace gfx
 {
     class Image;
 
+    enum class FileFormat
+    {
+        ePNG,
+        eJPG,
+        eBMP,
+        eTGA,
+        eHDR,
+        eDDS,
+        ePPM,
+        eTIF,
+    };
+
     class GFX_API Importer
     {
     public:
         virtual ~Importer() = default;
 
         static std::unique_ptr<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
+        static void SaveImage(const std::filesystem::path& path, const std::string& name, FileFormat fileFormat, const Image& image);
         static std::unique_ptr<Importer> LoadMeshes(const std::filesystem::path& path);
 
         virtual std::vector<std::string> GetMeshNames() = 0;

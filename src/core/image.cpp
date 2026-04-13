@@ -26,7 +26,7 @@ namespace gfx
         }
     }
 
-    glm::u32 Image::PixelSizeFromImageFormat(const gfx::Image::Format format)
+    glm::u32 Image::ChannelSizeFromImageFormat(const gfx::Image::Format format)
     {
         switch (format)
         {

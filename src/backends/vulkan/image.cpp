@@ -58,9 +58,13 @@ namespace gfx::vk
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
             _images.push_back(image);
             _allocations.push_back(allocation);
-            _layouts.push_back(::vk::ImageLayout::eUndefined);
+            for (uint32_t mipLevel = 0; mipLevel < _mipLevels; mipLevel++) {
+                for (uint32_t arrayLayer = 0; arrayLayer < _arrayLayers; arrayLayer++) {
+                    glm::u32 key = (i << 24) | (mipLevel << 12) | arrayLayer;
+                    _layouts[key] = ::vk::ImageLayout::eUndefined;
+                }
+            }
         }
-        TransitionLayout(::vk::ImageLayout::eGeneral);
     }
 
     Image::~Image() {
@@ -125,8 +129,12 @@ namespace gfx::vk
             .setFormat(format)
             .setMSAA(msaa)) {
         _images = surfaceImages;
+
+        int frameIndex = 0;
         for (const auto& _ : surfaceImages) {
-            _layouts.push_back(::vk::ImageLayout::eUndefined);
+            glm::u32 key = (frameIndex << 24) | (0 << 12) | 0;
+            _layouts[key] = ::vk::ImageLayout::eUndefined;
+            frameIndex++;
         }
         TransitionLayout(::vk::ImageLayout::ePresentSrcKHR);
     }
@@ -135,6 +143,26 @@ namespace gfx::vk
     {
         const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
         return _layouts[currentFrame];
+    }
+
+    void Image::SetImageLayout(::vk::ImageLayout newLayout, glm::u32 mipLevel, glm::u32 arrayLayer) const {
+        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
+            _layouts[key] = newLayout;
+        }
+    }
+
+    ::vk::ImageAspectFlags Image::getAspectFlags() const {
+        ::vk::ImageAspectFlags aspectMask = {};
+        if (_usage & Usage::eDepthStencilAttachment) {
+            aspectMask = ::vk::ImageAspectFlagBits::eDepth;
+            if (IsStencilFormat(_format)) {
+                aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
+            }
+        } else {
+            aspectMask = ::vk::ImageAspectFlagBits::eColor;
+        }
+        return aspectMask;
     }
 
     ::vk::Image Image::operator*() const
@@ -147,91 +175,6 @@ namespace gfx::vk
     {
         const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
         return _allocations[currentFrame];
-    }
-
-    void Image::TransitionLayout(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ImageLayout newLayout) const {
-        if (const auto schedulerStarted = gfx::Context::Scheduler().hasStarted(); !schedulerStarted && _isPerFrame)
-        {
-            for (size_t i = 0; i < _layouts.size(); i++) {
-                if (_layouts[i] != newLayout) {
-                    const ::vk::PipelineStageFlags sourceStage = srcLayoutPipelineStageMap.at(_layouts[i]);
-                    const ::vk::PipelineStageFlags destinationStage = dstLayoutPipelineStageMap.at(newLayout);
-                    const ::vk::AccessFlags srcAccessMask = layoutAccessMap.at(_layouts[i]);
-                    const ::vk::AccessFlags dstAccessMask = layoutAccessMap.at(newLayout);
-
-                    Barrier(commandBuffer, srcAccessMask, dstAccessMask, sourceStage, destinationStage, newLayout, i);
-
-                    _layouts[i] = newLayout;
-                }
-            }
-        } else {
-            const auto frameIndex = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
-            if (_layouts[frameIndex] == newLayout) {
-                return;
-            }
-
-            const ::vk::PipelineStageFlags sourceStage = srcLayoutPipelineStageMap.at(_layouts[frameIndex]);
-            const ::vk::PipelineStageFlags destinationStage = dstLayoutPipelineStageMap.at(newLayout);
-            const ::vk::AccessFlags srcAccessMask = layoutAccessMap.at(_layouts[frameIndex]);
-            const ::vk::AccessFlags dstAccessMask = layoutAccessMap.at(newLayout);
-
-            Barrier(commandBuffer, srcAccessMask, dstAccessMask, sourceStage, destinationStage, newLayout, frameIndex);
-
-            _layouts[frameIndex] = newLayout;
-        }
-    }
-
-    void Image::TransitionLayout(const ::vk::ImageLayout newLayout) const {
-        // if (const auto _layout = getImageLayout(); _layout == newLayout) {
-        //     return;
-        // }
-
-        Context::Device().runSingleTimeCommand([this, newLayout] (const gfx::vk::CommandBuffer &commandBuffer) {
-            TransitionLayout(commandBuffer, newLayout);
-        }, ::vk::QueueFlagBits::eGraphics);
-    }
-
-    void Image::Barrier(const gfx::vk::CommandBuffer& commandBuffer,
-        const ::vk::AccessFlags srcAccessMask, const ::vk::AccessFlags dstAccessMask,
-        const ::vk::PipelineStageFlags srcStage, const ::vk::PipelineStageFlags dstStage,
-        const ::vk::ImageLayout newLayout, glm::i32 frame
-    ) const {
-        if (frame == -1) {
-            frame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
-        }
-        const auto _layout = _layouts[frame];
-        const auto _handle = _images[frame];
-
-        ::vk::ImageAspectFlags aspectMask = {};
-        if (_usage & Usage::eDepthStencilAttachment) {
-            aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (IsStencilFormat(_format)) {
-                aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
-            }
-        } else {
-            aspectMask = ::vk::ImageAspectFlagBits::eColor;
-        }
-
-        const auto imageBarrier = ::vk::ImageMemoryBarrier()
-            .setOldLayout(_layout)
-            .setNewLayout(newLayout)
-            .setImage(_handle)
-            .setSubresourceRange(::vk::ImageSubresourceRange()
-                .setAspectMask(aspectMask)
-                .setBaseMipLevel(0)
-                .setLevelCount(_mipLevels)
-                .setBaseArrayLayer(0)
-                .setLayerCount(_arrayLayers))
-            .setSrcAccessMask(srcAccessMask)
-            .setDstAccessMask(dstAccessMask);
-
-        commandBuffer->pipelineBarrier(
-            srcStage,
-            dstStage,
-            ::vk::DependencyFlags(),
-            nullptr,
-            nullptr,
-            imageBarrier);
     }
 
     void Image::Clear(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const {
@@ -277,7 +220,6 @@ namespace gfx::vk
     void Image::Resize(const glm::uvec3 &extent) {
         const auto _handle = **this;
         const auto _allocation = getAllocation();
-        const auto _layout = getImageLayout();
 
         if (this->_extent == extent || (extent.x == 0 || extent.y == 0 || extent.z == 0))
             return;
@@ -303,10 +245,20 @@ namespace gfx::vk
         _images[frameIndex] = image;
         _allocations[frameIndex] = allocation;
 
-        if (_layout != ::vk::ImageLayout::eUndefined) {
-            _layouts[frameIndex] = ::vk::ImageLayout::eUndefined;
-            TransitionLayout(_layout);
+        // if (_layout != ::vk::ImageLayout::eUndefined) {
+        //     glm::u32 key = (frameIndex << 24) | (0 << 12) | 0;
+        //     _layouts[key] = ::vk::ImageLayout::eUndefined;
+        //     TransitionLayout(_layout);
+        // }
+
+
+        for (uint32_t mipLevel = 0; mipLevel < _mipLevels; mipLevel++) {
+            for (uint32_t arrayLayer = 0; arrayLayer < _arrayLayers; arrayLayer++) {
+                glm::u32 key = (frameIndex << 24) | (mipLevel << 12) | arrayLayer;
+                _layouts[key] = ::vk::ImageLayout::eUndefined;
+            }
         }
+
     }
 
     std::vector<std::byte> Image::ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const
@@ -321,7 +273,10 @@ namespace gfx::vk
             throw std::runtime_error("Attempting to read data from an array layer that does not exist!");
         }
 
-        const auto bufferSize = _extent.x * _extent.y * _extent.z * Image::PixelSizeFromImageFormat(_format) * Image::ChannelCountFromImageFormat(_format);
+        const auto mipReductionFactor = 1u << mipLevel;
+        const auto extent = glm::max(_extent / mipReductionFactor, glm::uvec3(1));
+
+        const auto bufferSize = extent.x * extent.y * extent.z * Image::ChannelSizeFromImageFormat(_format) * Image::ChannelCountFromImageFormat(_format);
 
         const auto stagingBuffer = Buffer::Builder()
             .setSize(bufferSize)
@@ -355,7 +310,7 @@ namespace gfx::vk
         stagingBuffer->Map();
         auto data = stagingBuffer->Read(0, bufferSize);
         stagingBuffer->Unmap();
-        return std::vector(data.begin(), data.end());
+        return { data.begin(), data.end() };
     }
 
     void Image::GenerateMipmaps()
@@ -364,91 +319,26 @@ namespace gfx::vk
             return;
         }
 
-        gfx::vk::Context::Device().runSingleTimeCommand([this] (const gfx::vk::CommandBuffer &commandBuffer) {
+        gfx::vk::Context::Device().runSingleTimeCommand([this] (gfx::vk::CommandBuffer &commandBuffer) {
             auto mipWidth = static_cast<glm::i32>(_extent.x);
             auto mipHeight = static_cast<glm::i32>(_extent.y);
+            auto mipDepth = static_cast<glm::i32>(_extent.z);
 
-            const auto _handle = **this;
-            TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferDstOptimal);
-
-            auto barrier = ::vk::ImageMemoryBarrier();
             for (uint32_t i = 1; i < _mipLevels; i++) {
-                barrier = ::vk::ImageMemoryBarrier()
-                    .setOldLayout(::vk::ImageLayout::eTransferDstOptimal)
-                    .setNewLayout(::vk::ImageLayout::eTransferSrcOptimal)
-                    .setSrcQueueFamilyIndex(::vk::QueueFamilyIgnored)
-                    .setDstQueueFamilyIndex(::vk::QueueFamilyIgnored)
-                    .setImage(_handle)
-                    .setSrcAccessMask(::vk::AccessFlagBits::eTransferWrite)
-                    .setDstAccessMask(::vk::AccessFlagBits::eTransferRead)
-                    .setSubresourceRange(::vk::ImageSubresourceRange()
-                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                        .setBaseMipLevel(i - 1)
-                        .setLevelCount(1)
-                        .setBaseArrayLayer(0)
-                        .setLayerCount(_arrayLayers));
-
-                commandBuffer->pipelineBarrier(
-                    ::vk::PipelineStageFlagBits::eTransfer,
-                    ::vk::PipelineStageFlagBits::eTransfer,
-                    ::vk::DependencyFlags(),
-                    nullptr,
-                    nullptr,
-                    barrier);
-
-                const auto imageBlit = ::vk::ImageBlit()
-                    .setSrcSubresource(::vk::ImageSubresourceLayers()
-                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                        .setMipLevel(i - 1)
-                        .setBaseArrayLayer(0)
-                        .setLayerCount(_arrayLayers))
-                    .setSrcOffsets({
-                        ::vk::Offset3D(0, 0, 0),
-                        ::vk::Offset3D(mipWidth, mipHeight, 1)
-                    })
-                    .setDstSubresource(::vk::ImageSubresourceLayers()
-                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                        .setMipLevel(i)
-                        .setBaseArrayLayer(0)
-                        .setLayerCount(_arrayLayers))
-                    .setDstOffsets({
-                        ::vk::Offset3D(0, 0, 0),
-                        ::vk::Offset3D(
-                            std::max<uint32_t>(1u, mipWidth / 2),
-                            std::max<uint32_t>(1u, mipHeight / 2),
-                            1)
+                commandBuffer.Blit(
+                    this, this,
+                    gfx::Blit {
+                        .srcOffset = { 0, 0, 0 },
+                        .srcExtent = { mipWidth, mipHeight, mipDepth },
+                        .dstOffset = { 0, 0, 0 },
+                        .dstExtent = { std::max(mipWidth / 2, 1), std::max(mipHeight / 2, 1), std::max(mipDepth / 2, 1) },
+                        .srcBaseArrayLayer = 0,
+                        .dstBaseArrayLayer = 0,
+                        .layerCount = _arrayLayers,
+                        .srcMipLevel = i - 1,
+                        .dstMipLevel = i,
+                        .filtering = gfx::Filter::eLinear
                     });
-
-                commandBuffer->blitImage(
-                    _handle,
-                    ::vk::ImageLayout::eTransferSrcOptimal,
-                    _handle,
-                    ::vk::ImageLayout::eTransferDstOptimal,
-                    imageBlit,
-                    ::vk::Filter::eLinear);
-
-                barrier = ::vk::ImageMemoryBarrier()
-                    .setOldLayout(::vk::ImageLayout::eTransferSrcOptimal)
-                    .setNewLayout(::vk::ImageLayout::eGeneral)
-                    .setSrcQueueFamilyIndex(::vk::QueueFamilyIgnored)
-                    .setDstQueueFamilyIndex(::vk::QueueFamilyIgnored)
-                    .setImage(_handle)
-                    .setSrcAccessMask(::vk::AccessFlagBits::eTransferRead)
-                    .setDstAccessMask(::vk::AccessFlagBits::eShaderRead)
-                    .setSubresourceRange(::vk::ImageSubresourceRange()
-                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                        .setBaseMipLevel(i - 1)
-                        .setLevelCount(1)
-                        .setBaseArrayLayer(0)
-                        .setLayerCount(_arrayLayers));
-
-                commandBuffer->pipelineBarrier(
-                    ::vk::PipelineStageFlagBits::eTransfer,
-                    ::vk::PipelineStageFlagBits::eAllGraphics,
-                    ::vk::DependencyFlags(),
-                    nullptr,
-                    nullptr,
-                    barrier);
 
                 if (mipWidth > 1) {
                     mipWidth /= 2;
@@ -457,29 +347,6 @@ namespace gfx::vk
                     mipHeight /= 2;
                 }
             }
-
-            barrier = ::vk::ImageMemoryBarrier()
-                .setOldLayout(::vk::ImageLayout::eTransferDstOptimal)
-                .setNewLayout(::vk::ImageLayout::eGeneral)
-                .setSrcQueueFamilyIndex(::vk::QueueFamilyIgnored)
-                .setDstQueueFamilyIndex(::vk::QueueFamilyIgnored)
-                .setImage(_handle)
-                .setSrcAccessMask(::vk::AccessFlagBits::eTransferRead)
-                .setDstAccessMask(::vk::AccessFlagBits::eShaderRead)
-                .setSubresourceRange(::vk::ImageSubresourceRange()
-                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                    .setBaseMipLevel(_mipLevels - 1)
-                    .setLevelCount(1)
-                    .setBaseArrayLayer(0)
-                    .setLayerCount(_arrayLayers));
-
-            commandBuffer->pipelineBarrier(
-                ::vk::PipelineStageFlagBits::eTransfer,
-                ::vk::PipelineStageFlagBits::eFragmentShader,
-                ::vk::DependencyFlags(),
-                nullptr,
-                nullptr,
-                barrier);
         }, ::vk::QueueFlagBits::eGraphics);
 
         const auto frameIndex = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;

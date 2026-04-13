@@ -33,7 +33,7 @@ namespace gfx::vk
 
     ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes) {
         for (const auto &availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == ::vk::PresentModeKHR::eImmediate) {
+            if (availablePresentMode == ::vk::PresentModeKHR::eMailbox) {
                 return availablePresentMode;
             }
         }

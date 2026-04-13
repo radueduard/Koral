@@ -7,18 +7,143 @@
 #include <functional>
 #include <memory>
 #include <optional>
-#include <glm/fwd.hpp>
 #include "flags.h"
 #include "api.h"
 
+#include <glm/glm.hpp>
+
+#include "sampler.h"
+
 namespace gfx
 {
+    enum class Filter;
+    class Buffer;
     class Image;
     class DescriptorSet;
     class GraphicsPipeline;
     class ComputePipeline;
     class Framebuffer;
     class Mesh;
+
+    enum class PipelineStage {
+        // Compute
+        Compute = 1 << 0,
+
+        // Vertex pipeline
+        VertexInput = 1 << 1,
+        VertexShader = 1 << 2,
+        FragmentShader = 1 << 3,
+        EarlyFragmentTests = 1 << 4,
+        LateFragmentTests = 1 << 5,
+        ColorAttachmentOutput = 1 << 6,
+
+        // Transfer
+        Transfer = 1 << 7,
+
+        // Bottom and top of pipe
+        TopOfPipe = 1 << 8,
+        BottomOfPipe = 1 << 9
+    };
+
+    enum class ResourceAccess {
+        // Compute
+        ComputeRead,         // COMPUTE_SHADER + SHADER_READ
+        ComputeWrite,        // COMPUTE_SHADER + SHADER_WRITE
+        ComputeReadWrite,    // COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
+
+        // Vertex pipeline
+        VertexBuffer,        // VERTEX_INPUT + VERTEX_ATTRIBUTE_READ
+        IndexBuffer,         // VERTEX_INPUT + INDEX_READ
+        IndirectBuffer,      // DRAW_INDIRECT + INDIRECT_COMMAND_READ
+
+        // Vertex shader
+        VertexShaderRead,    // VERTEX_SHADER + SHADER_READ
+        VertexShaderWrite,   // VERTEX_SHADER + SHADER_WRITE
+        VertexShaderReadWrite, // VERTEX_SHADER + SHADER_READ | SHADER_WRITE
+
+        // Fragment shader
+        FragmentShaderRead,  // FRAGMENT_SHADER + SHADER_READ
+        FragmentShaderWrite, // FRAGMENT_SHADER + SHADER_WRITE
+        FragmentShaderReadWrite, // FRAGMENT_SHADER + SHADER_READ | SHADER_WRITE
+
+        // Attachments
+        ColorAttachment,     // COLOR_ATTACHMENT_OUTPUT + COLOR_ATTACHMENT_WRITE
+        DepthAttachment,     // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
+        DepthRead,           // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
+
+        // Transfer
+        TransferSrc,         // TRANSFER + TRANSFER_READ
+        TransferDst,         // TRANSFER + TRANSFER_WRITE
+
+        // Present
+        Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
+    };
+
+    class GFX_API BufferBarrier {
+    public:
+        BufferBarrier(
+            const gfx::Buffer& buffer,
+            ResourceAccess srcAccess,
+            ResourceAccess dstAccess,
+            glm::u64 offset = 0,
+            glm::u64 size = UINT64_MAX);
+
+        const gfx::Buffer& getBuffer() const { return _buffer; }
+        ResourceAccess getSrcAccess() const { return _srcAccess; }
+        ResourceAccess getDstAccess() const { return _dstAccess; }
+        glm::u64 getOffset() const { return _offset; }
+        glm::u64 getSize() const { return _size; }
+
+    private:
+        const gfx::Buffer& _buffer;
+        ResourceAccess _srcAccess;
+        ResourceAccess _dstAccess;
+        glm::u64 _offset;
+        glm::u64 _size;
+    };
+
+    class GFX_API ImageBarrier {
+    public:
+        ImageBarrier(
+            const gfx::Image& image,
+            ResourceAccess srcAccess,
+            ResourceAccess dstAccess,
+            std::optional<glm::u32> baseMipLevel = std::nullopt,
+            std::optional<glm::u32> levelCount = std::nullopt,
+            std::optional<glm::u32> baseArrayLayer = std::nullopt,
+            std::optional<glm::u32> layerCount = std::nullopt);
+
+        const gfx::Image& getImage() const { return _image; }
+        ResourceAccess getSrcAccess() const { return _srcAccess; }
+        ResourceAccess getDstAccess() const { return _dstAccess; }
+        std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
+        std::optional<glm::u32> getLevelCount() const { return _levelCount; }
+        std::optional<glm::u32> getBaseArrayLayer() const { return _baseArrayLayer; }
+        std::optional<glm::u32> getLayerCount() const { return _layerCount; }
+
+    private:
+        const gfx::Image& _image;
+        ResourceAccess _srcAccess;
+        ResourceAccess _dstAccess;
+        std::optional<glm::u32> _baseMipLevel;
+        std::optional<glm::u32> _levelCount;
+        std::optional<glm::u32> _baseArrayLayer;
+        std::optional<glm::u32> _layerCount;
+    };
+
+    class GFX_API Blit {
+    public:
+        glm::ivec3 srcOffset = { 0, 0, 0 };
+        glm::ivec3 srcExtent = { -1, -1, -1 };
+        glm::ivec3 dstOffset = { 0, 0, 0 };
+        glm::ivec3 dstExtent = { -1, -1, -1 };
+        glm::u32 srcBaseArrayLayer = 0;
+        glm::u32 dstBaseArrayLayer = 0;
+        glm::u32 layerCount = 1;
+        glm::u32 srcMipLevel = 0;
+        glm::u32 dstMipLevel = 0;
+        gfx::Filter filtering = gfx::Filter::eNearest;
+    };
 
     class GFX_API CommandBuffer
     {
@@ -44,23 +169,37 @@ namespace gfx
         virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline);
         virtual CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline);
         virtual CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* descriptorSet) = 0;
+        virtual CommandBuffer& BindMesh(const Mesh* mesh);
 
         template<typename T> requires std::is_trivially_copyable_v<T>
         CommandBuffer& PushConstants(const T& data, const glm::u32 offset = 0) {
             return PushConstants(&data, sizeof(T), offset);
         }
 
+        virtual CommandBuffer& Barrier(std::vector<BufferBarrier> bufferBarriers = {}, std::vector<ImageBarrier> imageBarriers = {}) = 0;
+
         virtual CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) = 0;
 
-        virtual CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance);
-        virtual CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount , glm::u32 baseInstance);
-        virtual CommandBuffer& DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount);
+        virtual CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0);
+        virtual CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0);
 
-        virtual CommandBuffer& Blit(const Image* srcImage, const Image* dstImage = nullptr) = 0;
+        virtual CommandBuffer& Blit(
+            const Image* srcImage,
+            const Image* dstImage = nullptr,
+            Blit blitInfo = {}) = 0;
+
+        virtual CommandBuffer& Resolve(const Image* srcImage, const Image* dstImage = nullptr) = 0;
+
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 
         virtual void Submit() = 0;
         virtual void Reset() = 0;
+
+        CommandBuffer& BufferBarrier(const BufferBarrier& barrier) { return Barrier({ barrier }, {}); }
+        CommandBuffer& ImageBarrier(const ImageBarrier& barrier) { return Barrier({}, { barrier }); }
+
+        CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount , glm::u32 baseInstance);
+        CommandBuffer& DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount);
 
         static std::unique_ptr<CommandBuffer> Create(Flags<Usage> usage);
 
@@ -71,6 +210,7 @@ namespace gfx
             std::optional<const Framebuffer*> boundFramebuffer = std::nullopt;
             std::optional<const ComputePipeline*> boundComputePipeline = std::nullopt;
             std::optional<const GraphicsPipeline*> boundGraphicsPipeline = std::nullopt;
+            std::optional<const Mesh*> boundMesh = std::nullopt;
 
             bool viewportSet = false;
             bool scissorSet = false;

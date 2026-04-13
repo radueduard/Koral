@@ -24,6 +24,40 @@ namespace gfx
             eCubeArray
         };
 
+        enum class Swizzle {
+            eIdentity,
+            eZero,
+            eOne,
+            eR,
+            eG,
+            eB,
+            eA
+        };
+
+        struct GFX_API ComponentMapping {
+            Swizzle r = Swizzle::eIdentity;
+            Swizzle g = Swizzle::eIdentity;
+            Swizzle b = Swizzle::eIdentity;
+            Swizzle a = Swizzle::eIdentity;
+
+            ComponentMapping& setR(const Swizzle swizzle) {
+                r = swizzle;
+                return *this;
+            }
+            ComponentMapping& setG(const Swizzle swizzle) {
+                g = swizzle;
+                return *this;
+            }
+            ComponentMapping& setB(const Swizzle swizzle) {
+                b = swizzle;
+                return *this;
+            }
+            ComponentMapping& setA(const Swizzle swizzle) {
+                a = swizzle;
+                return *this;
+            }
+        };
+
         struct GFX_API Builder {
             const Image& image;
             Type type = Type::e2D;
@@ -31,6 +65,7 @@ namespace gfx
             glm::u32 mipLevelCount = 1;
             glm::u32 baseArrayLayer = 0;
             glm::u32 arrayLayerCount = 1;
+            ComponentMapping componentMapping = {};
 
             explicit Builder(const Image& image);
 
@@ -59,6 +94,11 @@ namespace gfx
                 return *this;
             }
 
+            Builder& setComponentMapping(const ComponentMapping& componentMapping) {
+                this->componentMapping = componentMapping;
+                return *this;
+            }
+
             [[nodiscard]] std::unique_ptr<ImageView> build() const;
         };
 
@@ -70,6 +110,7 @@ namespace gfx
         [[nodiscard]] glm::u32 getMipLevelCount() const { return _mipLevelCount; }
         [[nodiscard]] glm::u32 getBaseArrayLayer() const { return _baseArrayLayer; }
         [[nodiscard]] glm::u32 getArrayLayerCount() const { return _arrayLayerCount; }
+        [[nodiscard]] ComponentMapping getComponentMapping() const { return _componentMapping; }
 
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
 
@@ -82,6 +123,7 @@ namespace gfx
         glm::u32 _mipLevelCount;
         glm::u32 _baseArrayLayer;
         glm::u32 _arrayLayerCount;
+        ComponentMapping _componentMapping;
     };
 }
 

@@ -43,6 +43,25 @@ gfx::Image::Format getImageFormat(ILint format, ILint type) {
     }
 }
 
+std::pair<ILint, ILint> getImageFormatAndType(gfx::Image::Format format) {
+    switch (format) {
+        case gfx::Image::Format::eRGBA8_UNORM:
+            return { IL_RGBA, IL_UNSIGNED_BYTE };
+        case gfx::Image::Format::eRGBA16_UNORM:
+            return { IL_RGBA, IL_UNSIGNED_SHORT };
+        case gfx::Image::Format::eRGBA32_SFLOAT:
+            return { IL_RGBA, IL_FLOAT };
+        case gfx::Image::Format::eR8_UNORM:
+            return { IL_LUMINANCE, IL_UNSIGNED_BYTE };
+        case gfx::Image::Format::eR16_UNORM:
+            return { IL_LUMINANCE, IL_UNSIGNED_SHORT };
+        case gfx::Image::Format::eR32_SFLOAT:
+            return { IL_LUMINANCE, IL_FLOAT };
+        default:
+            throw std::runtime_error("Unsupported image format: " + std::to_string(static_cast<int>(format)));
+    }
+}
+
 glm::u32 getPixelSize(ILint format, ILint type) {
     switch (format) {
         case IL_RGBA:
@@ -86,7 +105,7 @@ namespace gfx
         }
         ILint format = ilGetInteger(IL_IMAGE_FORMAT);
         const ILint type = ilGetInteger(IL_IMAGE_TYPE);
-        if (format == IL_RGB) {
+        if (format == IL_RGB || format == IL_BGR || format == IL_BGRA) {
             if (!ilConvertImage(IL_RGBA, type)) {
                 ilDeleteImages(1, &imageId);
                 throw std::runtime_error("Failed to convert image to RGBA format: " + path.string());
@@ -117,14 +136,11 @@ namespace gfx
             .setMipLevels(generateMipmaps && mipmapCount == 0 ? maxMipMapLevels : mipmapCount == 0 ? 1 : static_cast<glm::u32>(mipmapCount))
             .build();
 
-        const glm::uint pixelSize = getPixelSize(format, type);
         for (int layer = 0; layer < std::max(layerCount, 1); layer++) {
             if (layer != 0) ilActiveLayer(layer);
             for (int mipmap = 0; mipmap < std::max(mipmapCount,1); mipmap++) {
                 if (mipmap != 0) ilActiveMipmap(mipmap);
-                const ILint subWidth = ilGetInteger(IL_IMAGE_WIDTH);
-                const ILint subHeight = ilGetInteger(IL_IMAGE_HEIGHT);
-                const ILint subDepth = ilGetInteger(IL_IMAGE_DEPTH);
+                const ILuint dataSize = ilGetInteger(IL_IMAGE_SIZE_OF_DATA);
 
                 const auto data = ilGetData();
                 if (data == nullptr) {
@@ -132,14 +148,14 @@ namespace gfx
                     throw std::runtime_error("Failed to get image data: " + path.string());
                 }
                 const auto stagingBuffer = Buffer::Builder()
-                    .setSize(static_cast<glm::u64>(subWidth) * subHeight * subDepth * pixelSize)
+                    .setSize(dataSize)
                     .setUsage(Buffer::Usage::eTransferSrc)
                     .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
                     .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
                     .build();
 
                 stagingBuffer->Map();
-                stagingBuffer->Write(std::span { data, static_cast<unsigned long long>(width * height * 4) });
+                stagingBuffer->Write(std::span { data, dataSize });
                 stagingBuffer->Unmap();
                 image->CopyFrom(*stagingBuffer, mipmap, layer);
             }
@@ -150,6 +166,77 @@ namespace gfx
 
         ilDeleteImages(1, &imageId);
         return image;
+    }
+
+    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, const Image &image) {
+        const auto filePath = path / (name + "." + [fileFormat] {
+            switch (fileFormat) {
+                case FileFormat::ePNG: return "png";
+                case FileFormat::eJPG: return "jpg";
+                case FileFormat::eBMP: return "bmp";
+                case FileFormat::eTGA: return "tga";
+                case FileFormat::eHDR: return "hdr";
+                case FileFormat::eDDS: return "dds";
+                case FileFormat::ePPM: return "ppm";
+                case FileFormat::eTIF: return "tif";
+                default:
+                    throw std::runtime_error("Unsupported file format: " + std::to_string(static_cast<int>(fileFormat)));
+            }
+        }());
+
+        ILuint imageId;
+        ilGenImages(1, &imageId);
+        ilBindImage(imageId);
+
+        const auto& extent = image.getExtent();
+        const auto [format, type] = getImageFormatAndType(image.getFormat());
+        const auto numChannels = format == IL_RGBA ? 4 : 1;
+
+        bool hasLayersOrMipmaps = image.getArrayLayers() > 1 || image.getMipLevels() > 1;
+        void* data = nullptr;
+
+        if (hasLayersOrMipmaps) {
+            // If the image has multiple layers or mip levels, we need to create an empty image and then fill in the data for each layer/mip level
+            if (!ilTexImage(extent.x, extent.y, extent.z, numChannels, format, type, nullptr)) {
+                ilDeleteImages(1, &imageId);
+                throw std::runtime_error("Failed to create image for saving: " + filePath.string());
+            }
+
+            for (int layer = 0; layer < image.getArrayLayers(); layer++) {
+                for (int mipLevel = 0; mipLevel < image.getMipLevels(); mipLevel++) {
+                    auto bytes = image.ReadData(mipLevel, layer);
+                    if (bytes.empty()) {
+                        ilDeleteImages(1, &imageId);
+                        throw std::runtime_error("Failed to read image data for saving: " + filePath.string());
+                    }
+                    data = bytes.data();
+                    ilActiveLayer(layer);
+                    ilActiveMipmap(mipLevel);
+                    if (!ilSetData(data)) {
+                        ilDeleteImages(1, &imageId);
+                        throw std::runtime_error("Failed to set image data for saving: " + filePath.string());
+                    }
+                }
+            }
+
+        } else {
+            // If the image has only one layer and one mip level, we can directly provide the data pointer to ilTexImage
+            auto imageData = image.ReadData(0, 0);
+            if (imageData.empty()) {
+                ilDeleteImages(1, &imageId);
+                throw std::runtime_error("Failed to read image data for saving: " + filePath.string());
+            }
+            data = imageData.data();
+            if (!ilTexImage(extent.x, extent.y, extent.z, numChannels, format, type, data)) {
+                ilDeleteImages(1, &imageId);
+                throw std::runtime_error("Failed to create image for saving: " + filePath.string());
+            }
+        }
+
+        if (!ilSaveImage(filePath.string().c_str())) {
+            ilDeleteImages(1, &imageId);
+            throw std::runtime_error("Failed to save image: " + filePath.string());
+        }
     }
 
     std::unique_ptr<Importer> Importer::LoadMeshes(const std::filesystem::path &path) {

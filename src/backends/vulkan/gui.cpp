@@ -102,8 +102,17 @@ namespace gfx::vk
             .addUsage(Image::Usage::eSampled)
             .build();
 
+        auto components = gfx::ImageView::ComponentMapping();
+        if (image.getFormat() == Image::Format::eR8_UNORM) {
+            components.r = gfx::ImageView::Swizzle::eR;
+            components.g = gfx::ImageView::Swizzle::eR;
+            components.b = gfx::ImageView::Swizzle::eR;
+            components.a = gfx::ImageView::Swizzle::eR;
+        }
+
         _helperImageView = gfx::ImageView::Builder(*_helperImage)
             .setViewType(ImageView::Type::e2D)
+            .setComponentMapping(components)
             .build();
 
         _descriptorSet = ImGui_ImplVulkan_AddTexture(

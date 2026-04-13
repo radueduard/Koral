@@ -22,10 +22,10 @@ namespace gfx::ogl {
 
         GLenum getGLFormat() const { return InternalFormatFromImageFormat(_format); }
 
-    private:
-        GLuint _id = 0;
         [[nodiscard]] static GLenum InternalFormatFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static GLenum BaseFormatFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static GLenum DataTypeFromImageFormat(gfx::Image::Format format);
+    private:
+        GLuint _id = 0;
     };
 }

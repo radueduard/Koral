@@ -34,11 +34,13 @@ namespace gfx::vk
         gfx::CommandBuffer& BindPipeline(const gfx::ComputePipeline* pipeline) override;
         gfx::CommandBuffer& BindPipeline(const gfx::GraphicsPipeline* pipeline) override;
         gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, const gfx::DescriptorSet* set) override;
+        gfx::CommandBuffer& BindMesh(const Mesh *mesh) override;
+        gfx::CommandBuffer& Barrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers) override;
         gfx::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
-        gfx::CommandBuffer& Draw(glm::u32 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
-        gfx::CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance) override;
-        gfx::CommandBuffer& DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) override;
-        gfx::CommandBuffer& Blit(const gfx::Image* srcImage, const gfx::Image* dstImage) override;
+        gfx::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
+        gfx::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) override;
+        gfx::CommandBuffer& Blit(const gfx::Image* srcImage, const gfx::Image* dstImage, gfx::Blit blitInfo) override;
+        gfx::CommandBuffer& Resolve(const Image *srcImage, const Image *dstImage) override;
         gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
 
         void Submit() override;

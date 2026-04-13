@@ -213,7 +213,7 @@ namespace gfx
         [[nodiscard]] glm::u32 getMipLevels() const { return _mipLevels; }
         [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }
 
-        [[nodiscard]] static glm::u32 PixelSizeFromImageFormat(gfx::Image::Format format);
+        [[nodiscard]] static glm::u32 ChannelSizeFromImageFormat(gfx::Image::Format format);
         [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(gfx::Image::Format format);
 
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }

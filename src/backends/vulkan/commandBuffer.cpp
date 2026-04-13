@@ -93,8 +93,12 @@ namespace gfx::vk
         {
             for (const auto& attachment : framebuffer->getColorAttachments())
             {
-                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(attachment.get().getImage());
+                const auto vkImage = dynamic_cast<const gfx::vk::Image&>(attachment.get().getImage());
                 vkImage.TransitionLayout(*this, ::vk::ImageLayout::eColorAttachmentOptimal);
+                ImageBarrier({
+                    vkImage,
+                    ResourceAccess::
+                })
             }
             if (framebuffer->hasDepthStencilAttachment())
             {
@@ -232,6 +236,86 @@ namespace gfx::vk
         return *this;
     }
 
+    gfx::CommandBuffer& CommandBuffer::BindMesh(const gfx::Mesh* mesh)
+    {
+        gfx::CommandBuffer::BindMesh(mesh);
+        std::vector<::vk::Buffer> vertexBuffers;
+        std::vector<::vk::DeviceSize> offsets;
+        for (const auto& buffer : mesh->getVertexBuffers()) {
+            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&buffer.get());
+            vertexBuffers.push_back(*vkBuffer);
+            offsets.push_back(0);
+        }
+        _handle.bindVertexBuffers(0, vertexBuffers, offsets);
+        if (mesh->hasIndexBuffer())
+        {
+            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&mesh->getIndexBuffer().value().get());
+            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
+        }
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::Barrier(
+        const std::vector<gfx::BufferBarrier> bufferBarriers,
+        const std::vector<gfx::ImageBarrier> imageBarriers) {
+
+        ::vk::PipelineStageFlags srcStageMask = ::vk::PipelineStageFlagBits::eNone;
+        ::vk::PipelineStageFlags dstStageMask = ::vk::PipelineStageFlagBits::eNone;
+
+        std::vector<::vk::BufferMemoryBarrier> vkBufferBarriers;
+        std::vector<::vk::ImageMemoryBarrier> vkImageBarriers;
+        for (const auto& barrier : bufferBarriers) {
+            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(barrier.getBuffer());
+            vkBufferBarriers.push_back(::vk::BufferMemoryBarrier()
+                .setSrcAccessMask(getVkAccessFlags(barrier.getSrcAccess()))
+                .setDstAccessMask(getVkAccessFlags(barrier.getDstAccess()))
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setBuffer(*vkBuffer)
+                .setOffset(barrier.getOffset())
+                .setSize(barrier.getSize()));
+
+            srcStageMask |= getVkPipelineStageFlags(barrier.getSrcAccess());
+            dstStageMask |= getVkPipelineStageFlags(barrier.getDstAccess());
+        }
+        for (const auto& barrier : imageBarriers) {
+            const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(barrier.getImage());
+            vkImageBarriers.push_back(::vk::ImageMemoryBarrier()
+                .setSrcAccessMask(getVkAccessFlags(barrier.getSrcAccess()))
+                .setDstAccessMask(getVkAccessFlags(barrier.getDstAccess()))
+                .setOldLayout(vkImage.getImageLayout())
+                .setNewLayout(getVkImageLayout(barrier.getDstAccess()))
+                .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
+                .setImage(*vkImage)
+                .setSubresourceRange(::vk::ImageSubresourceRange()
+                    .setAspectMask(getVkImageAspectFlags(vkImage.getFormat()))
+                    .setBaseMipLevel(barrier.getBaseMipLevel().value_or(0))
+                    .setLevelCount(barrier.getLevelCount().value_or(vkImage.getMipLevels()))
+                    .setBaseArrayLayer(barrier.getBaseArrayLayer().value_or(0))
+                    .setLayerCount(barrier.getLayerCount().value_or(vkImage.getArrayLayers()))));
+
+            srcStageMask |= getVkPipelineStageFlags(barrier.getSrcAccess());
+            dstStageMask |= getVkPipelineStageFlags(barrier.getDstAccess());
+
+            for (auto mip = barrier.getBaseMipLevel().value_or(0); mip < (barrier.getBaseMipLevel().value_or(0) + barrier.getLevelCount().value_or(vkImage.getMipLevels())); ++mip) {
+                for (auto layer = barrier.getBaseArrayLayer().value_or(0); layer < (barrier.getBaseArrayLayer().value_or(0) + barrier.getLayerCount().value_or(vkImage.getArrayLayers())); ++layer) {
+                    vkImage.SetImageLayout(getVkImageLayout(barrier.getDstAccess()), mip, layer);
+                }
+            }
+        }
+
+        _handle.pipelineBarrier(
+            srcStageMask,
+            dstStageMask,
+            {},
+            {},
+            vkBufferBarriers,
+            vkImageBarriers);
+
+        return *this;
+    }
+
     gfx::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ)
     {
         _handle.dispatch(groupCountX, groupCountY, groupCountZ);
@@ -245,91 +329,143 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Draw(const glm::u32 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance)
+    gfx::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance)
     {
+        if (vertexCount == UINT64_MAX) {
+            vertexCount = _state.boundMesh.value()->getVertexCount();
+        }
         gfx::CommandBuffer::Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         _handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::DrawMesh(const Mesh* mesh, glm::u32 instanceCount, glm::u32 baseInstance)
-    {
-        gfx::CommandBuffer::DrawMesh(mesh, instanceCount, baseInstance);
-        std::vector<::vk::Buffer> vertexBuffers;
-        std::vector<::vk::DeviceSize> offsets;
-        for (const auto& buffer : mesh->getVertexBuffers()) {
-            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&buffer.get());
-            vertexBuffers.push_back(*vkBuffer);
-            offsets.push_back(0);
+    gfx::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) {
+        gfx::CommandBuffer::DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+        const auto mesh = _state.boundMesh.value();
+        if (indexCount == UINT64_MAX) {
+            indexCount = mesh->getIndexCount().value();
         }
-        _handle.bindVertexBuffers(0, vertexBuffers, offsets);
-        if (mesh->hasIndexBuffer())
-        {
-            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&mesh->getIndexBuffer().value().get());
-            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
-        }
-        const auto indexCount = mesh->hasIndexBuffer() ? mesh->getIndexCount().value() : mesh->getVertexCount();
-        _handle.drawIndexed(indexCount, instanceCount, 0, 0, baseInstance);
+        _handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) {
-        gfx::CommandBuffer::DrawSubMesh(mesh, baseIndex, indexCount);
-        std::vector<::vk::Buffer> vertexBuffers;
-        std::vector<::vk::DeviceSize> offsets;
-        for (const auto& buffer : mesh->getVertexBuffers()) {
-            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&buffer.get());
-            vertexBuffers.push_back(*vkBuffer);
-            offsets.push_back(0);
-        }
-        _handle.bindVertexBuffers(0, vertexBuffers, offsets);
-        if (mesh->hasIndexBuffer())
-        {
-            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&mesh->getIndexBuffer().value().get());
-            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
-        }
-        _handle.drawIndexed(indexCount, 1, baseIndex, 0, 0);
-        return *this;
-    }
-
-
-    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage)
+    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage, gfx::Blit blitInfo)
     {
-        const auto vkSrcImage = dynamic_cast<const gfx::vk::Image*>(srcImage);
-        const gfx::vk::Image* vkDstImage = dstImage != nullptr ? dynamic_cast<const gfx::vk::Image*>(dstImage) : nullptr;
+        const auto vkSrcImage = dynamic_cast<const Image*>(srcImage);
+        const Image* vkDstImage = dstImage != nullptr ? dynamic_cast<const Image*>(dstImage) : nullptr;
 
         bool blitToScreen = dstImage == nullptr;
         if (blitToScreen)
-            vkDstImage = &dynamic_cast<const gfx::vk::Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
+            vkDstImage = &dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
 
-        vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferSrcOptimal);
-        vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferDstOptimal);
+        if (blitInfo.srcExtent == glm::ivec3(-1))
+            blitInfo.srcExtent = vkSrcImage->getExtent();
+        if (blitInfo.dstExtent == glm::ivec3(-1))
+            blitInfo.dstExtent = vkDstImage->getExtent();
+
+        Barrier({}, {
+            {
+                *vkSrcImage,
+                ResourceAccess::TransferDst,
+                ResourceAccess::TransferSrc,
+                blitInfo.srcMipLevel,
+                1,
+                blitInfo.srcBaseArrayLayer,
+                blitInfo.layerCount
+            }, {
+                *vkDstImage,
+                ResourceAccess::TransferSrc,
+                ResourceAccess::TransferDst,
+                blitInfo.dstMipLevel,
+                1,
+                blitInfo.dstBaseArrayLayer,
+                blitInfo.layerCount
+            }
+        });
+
         _handle.blitImage(
             **vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
             **vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
             ::vk::ImageBlit()
                 .setSrcSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                    .setMipLevel(0)
-                    .setBaseArrayLayer(0)
-                    .setLayerCount(1))
+                    .setAspectMask(vkSrcImage->getAspectFlags())
+                    .setMipLevel(blitInfo.srcMipLevel)
+                    .setBaseArrayLayer(blitInfo.srcBaseArrayLayer)
+                    .setLayerCount(blitInfo.layerCount))
                 .setSrcOffsets({
-                    ::vk::Offset3D{ 0, 0, 0 },
-                    ::vk::Offset3D{ static_cast<glm::i32>(vkSrcImage->getExtent().x), static_cast<glm::i32>(vkSrcImage->getExtent().y), 1 }
+                    ::vk::Offset3D{ blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.z },
+                    ::vk::Offset3D{ blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y, blitInfo.srcOffset.z + blitInfo.srcExtent.z }
                 })
                 .setDstSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                    .setMipLevel(0)
-                    .setBaseArrayLayer(0)
-                    .setLayerCount(1))
+                    .setAspectMask(vkDstImage->getAspectFlags())
+                    .setMipLevel(blitInfo.dstMipLevel)
+                    .setBaseArrayLayer(blitInfo.dstBaseArrayLayer)
+                    .setLayerCount(blitInfo.layerCount))
                 .setDstOffsets({
-                    ::vk::Offset3D{ 0, blitToScreen ? static_cast<glm::i32>(vkDstImage->getExtent().y) : 0, 0 },
-                    ::vk::Offset3D{ static_cast<glm::i32>(vkDstImage->getExtent().x), blitToScreen ? 0 : static_cast<glm::i32>(vkDstImage->getExtent().y), 1 }
+                    ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y + (blitToScreen ?  blitInfo.dstExtent.y : 0), blitInfo.dstOffset.z },
+                    ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + (blitToScreen ? 0 : blitInfo.dstExtent.y), blitInfo.dstOffset.z + blitInfo.dstExtent.z }
                 }),
             ::vk::Filter::eNearest);
-         vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
-         vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
          return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::Resolve(const gfx::Image *srcImage, const gfx::Image *dstImage) {
+        if (srcImage->getMSAA() == MSAA::eNone)
+            throw std::runtime_error("Source image must be multisampled for resolve operation!");
+        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+            throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
+
+        const auto vkSrcImage = dynamic_cast<const gfx::vk::Image*>(srcImage);
+        if (dstImage != nullptr) {
+            const auto vkDstImage = dynamic_cast<const gfx::vk::Image*>(dstImage);
+            vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferSrcOptimal);
+            vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferDstOptimal);
+            _handle.resolveImage(
+                **vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+                **vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
+                ::vk::ImageResolve()
+                    .setSrcSubresource(::vk::ImageSubresourceLayers()
+                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                        .setMipLevel(0)
+                        .setBaseArrayLayer(0)
+                        .setLayerCount(1))
+                    .setSrcOffset({ 0, 0, 0 })
+                    .setExtent({ vkSrcImage->getExtent().x, vkSrcImage->getExtent().y, 1 })
+                    .setDstSubresource(::vk::ImageSubresourceLayers()
+                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                        .setMipLevel(0)
+                        .setBaseArrayLayer(0)
+                        .setLayerCount(1))
+                    .setDstOffset({ 0, 0, 0 }));
+             vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+             vkDstImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+        } else {
+            // If dstImage is null, we resolve to the swapchain image directly
+            const auto& swapChain = dynamic_cast<const gfx::vk::Scheduler&>(gfx::Context::Scheduler()).getSwapChain();
+            const auto& vkDstImage = swapChain.getImage();
+            vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eTransferSrcOptimal);
+            vkDstImage.TransitionLayout(*this, ::vk::ImageLayout::eTransferDstOptimal);
+            _handle.resolveImage(
+                **vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+                *vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
+                ::vk::ImageResolve()
+                    .setSrcSubresource(::vk::ImageSubresourceLayers()
+                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                        .setMipLevel(0)
+                        .setBaseArrayLayer(0)
+                        .setLayerCount(1))
+                    .setDstSubresource(::vk::ImageSubresourceLayers()
+                        .setAspectMask(::vk::ImageAspectFlagBits::eColor)
+                        .setMipLevel(0)
+                        .setBaseArrayLayer(0)
+                        .setLayerCount(1))
+                    .setSrcOffset({ 0, 0, 0 })
+                    .setDstOffset({ 0, 0, 0 })
+                    .setExtent({ vkSrcImage->getExtent().x, vkSrcImage->getExtent().y, 1 }));
+            vkSrcImage->TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+            vkDstImage.TransitionLayout(*this, ::vk::ImageLayout::eGeneral);
+        }
+        return *this;
     }
 
     gfx::CommandBuffer& CommandBuffer::Run(const std::function<void(gfx::CommandBuffer&)>& command)

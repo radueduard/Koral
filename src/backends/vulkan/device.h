@@ -1,11 +1,4 @@
 //
-// Created by radue on 2/27/2026.
-//
-
-#pragma once
-
-
-//
 // Created by radue on 10/14/2024.
 //
 
@@ -86,7 +79,7 @@ namespace gfx::vk {
         [[nodiscard]] std::unique_ptr<gfx::vk::CommandBuffer> requestCommandBuffer(const gfx::vk::Queue& queue, uint32_t thread) const;
         void freeCommandBuffer(const gfx::vk::CommandBuffer &commandBuffer) const;
 
-        void runSingleTimeCommand(const std::function<void(const gfx::vk::CommandBuffer&)> &command, ::vk::QueueFlags requiredFlags,
+        void runSingleTimeCommand(const std::function<void(gfx::vk::CommandBuffer&)> &command, ::vk::QueueFlags requiredFlags,
             ::vk::Fence fence = nullptr, ::vk::Semaphore waitSemaphore = nullptr, ::vk::Semaphore signalSemaphore = nullptr, bool wait = true) const;
 
     private:

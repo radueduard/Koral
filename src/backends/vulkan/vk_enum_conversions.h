@@ -3,6 +3,8 @@
 //
 
 #pragma once
+#include <image.h>
+
 #include "image.h"
 #include "imageView.h"
 #include "graphicsPipeline.h"
@@ -13,6 +15,103 @@
 
 namespace gfx
 {
+    inline ::vk::AccessFlags getVkAccessFlags(const ResourceAccess access) {
+        switch (access)
+        {
+        case ResourceAccess::ComputeRead: return ::vk::AccessFlagBits::eShaderRead;
+        case ResourceAccess::ComputeWrite: return ::vk::AccessFlagBits::eShaderWrite;
+        case ResourceAccess::ComputeReadWrite: return ::vk::AccessFlagBits::eShaderRead | ::vk::AccessFlagBits::eShaderWrite;
+        case ResourceAccess::VertexBuffer: return ::vk::AccessFlagBits::eVertexAttributeRead;
+        case ResourceAccess::IndexBuffer: return ::vk::AccessFlagBits::eIndexRead;
+        case ResourceAccess::IndirectBuffer: return ::vk::AccessFlagBits::eIndirectCommandRead;
+        case ResourceAccess::VertexShaderRead: return ::vk::AccessFlagBits::eShaderRead;
+        case ResourceAccess::FragmentShaderRead: return ::vk::AccessFlagBits::eShaderRead;
+        case ResourceAccess::ColorAttachment: return ::vk::AccessFlagBits::eColorAttachmentWrite;
+        case ResourceAccess::DepthAttachment: return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case ResourceAccess::DepthRead: return ::vk::AccessFlagBits::eDepthStencilAttachmentRead;
+        case ResourceAccess::TransferSrc: return ::vk::AccessFlagBits::eTransferRead;
+        case ResourceAccess::TransferDst: return ::vk::AccessFlagBits::eTransferWrite;
+        case ResourceAccess::Present: return {}; // no access mask needed for present
+        default: throw std::runtime_error("Unknown resource access type!");
+        }
+    }
+
+    inline ::vk::PipelineStageFlags getVkPipelineStageFlags(const ResourceAccess access) {
+        switch (access)
+        {
+        case ResourceAccess::ComputeRead:
+        case ResourceAccess::ComputeWrite:
+        case ResourceAccess::ComputeReadWrite:
+            return ::vk::PipelineStageFlagBits::eComputeShader;
+        case ResourceAccess::VertexBuffer:
+        case ResourceAccess::IndexBuffer:
+            return ::vk::PipelineStageFlagBits::eVertexInput;
+        case ResourceAccess::IndirectBuffer:
+            return ::vk::PipelineStageFlagBits::eDrawIndirect;
+        case ResourceAccess::VertexShaderRead:
+        case ResourceAccess::VertexShaderWrite:
+        case ResourceAccess::VertexShaderReadWrite:
+            return ::vk::PipelineStageFlagBits::eVertexShader;
+        case ResourceAccess::FragmentShaderRead:
+        case ResourceAccess::FragmentShaderWrite:
+        case ResourceAccess::FragmentShaderReadWrite:
+            return ::vk::PipelineStageFlagBits::eFragmentShader;
+        case ResourceAccess::ColorAttachment:
+            return ::vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        case ResourceAccess::DepthAttachment:
+        case ResourceAccess::DepthRead:
+            return ::vk::PipelineStageFlagBits::eEarlyFragmentTests | ::vk::PipelineStageFlagBits::eLateFragmentTests;
+        case ResourceAccess::TransferSrc:
+        case ResourceAccess::TransferDst:
+            return ::vk::PipelineStageFlagBits::eTransfer;
+        case ResourceAccess::Present:
+            return ::vk::PipelineStageFlagBits::eBottomOfPipe; // must wait for all previous stages to complete before presenting
+        default: throw std::runtime_error("Unknown resource access type!");
+        }
+    }
+
+    inline ::vk::ImageAspectFlags getVkImageAspectFlags(const Image::Format format) {
+        switch (format)
+        {
+        case Image::Format::eD16_UNORM:
+        case Image::Format::eD32_SFLOAT:
+            return ::vk::ImageAspectFlagBits::eDepth;
+        case Image::Format::eD24_UNORM_S8_UINT:
+        case Image::Format::eD32_SFLOAT_S8_UINT:
+            return ::vk::ImageAspectFlagBits::eDepth | ::vk::ImageAspectFlagBits::eStencil;
+        default: return ::vk::ImageAspectFlagBits::eColor;
+        }
+    }
+
+    inline ::vk::ImageLayout getVkImageLayout(const ResourceAccess access) {
+        switch (access)
+        {
+        case ResourceAccess::ComputeWrite:
+        case ResourceAccess::ComputeReadWrite:
+        case ResourceAccess::VertexShaderWrite:
+        case ResourceAccess::VertexShaderReadWrite:
+        case ResourceAccess::FragmentShaderWrite:
+        case ResourceAccess::FragmentShaderReadWrite:
+            return ::vk::ImageLayout::eGeneral;
+        case ResourceAccess::ComputeRead:
+        case ResourceAccess::VertexShaderRead:
+        case ResourceAccess::FragmentShaderRead:
+            return ::vk::ImageLayout::eShaderReadOnlyOptimal;
+        case ResourceAccess::ColorAttachment:
+            return ::vk::ImageLayout::eColorAttachmentOptimal;
+        case ResourceAccess::DepthAttachment:
+        case ResourceAccess::DepthRead:
+            return ::vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        case ResourceAccess::TransferSrc:
+            return ::vk::ImageLayout::eTransferSrcOptimal;
+        case ResourceAccess::TransferDst:
+            return ::vk::ImageLayout::eTransferDstOptimal;
+        case ResourceAccess::Present:
+            return ::vk::ImageLayout::ePresentSrcKHR;
+        default: throw std::runtime_error("Unknown resource access type!");
+        }
+    }
+
     inline ::vk::IndexType getVkIndexType(const ChannelType indexType) {
         switch (indexType)
         {
@@ -328,6 +427,21 @@ namespace gfx
         }
     }
 
+    inline ::vk::ComponentSwizzle getVkComponentSwizzle(const gfx::ImageView::Swizzle swizzle)
+    {
+        switch (swizzle)
+        {
+        case gfx::ImageView::Swizzle::eIdentity: return ::vk::ComponentSwizzle::eIdentity;
+        case gfx::ImageView::Swizzle::eZero: return ::vk::ComponentSwizzle::eZero;
+        case gfx::ImageView::Swizzle::eOne: return ::vk::ComponentSwizzle::eOne;
+        case gfx::ImageView::Swizzle::eR: return ::vk::ComponentSwizzle::eR;
+        case gfx::ImageView::Swizzle::eG: return ::vk::ComponentSwizzle::eG;
+        case gfx::ImageView::Swizzle::eB: return ::vk::ComponentSwizzle::eB;
+        case gfx::ImageView::Swizzle::eA: return ::vk::ComponentSwizzle::eA;
+        default: throw std::runtime_error("Unknown component swizzle!");
+        }
+    }
+
     inline ::vk::ImageUsageFlags getVkUsage(const Flags<gfx::Image::Usage> usage)
     {
         ::vk::ImageUsageFlags usageFlags = ::vk::ImageUsageFlags();
@@ -374,11 +488,11 @@ namespace gfx
         }
     }
 
-    inline ::vk::Filter getVkFilter(const gfx::Sampler::Filter filter)
+    inline ::vk::Filter getVkFilter(const gfx::Filter filter)
     {
         switch (filter) {
-        case gfx::Sampler::Filter::eNearest: return ::vk::Filter::eNearest;
-        case gfx::Sampler::Filter::eLinear: return ::vk::Filter::eLinear;
+        case gfx::Filter::eNearest: return ::vk::Filter::eNearest;
+        case gfx::Filter::eLinear: return ::vk::Filter::eLinear;
         default: throw std::runtime_error("Unknown filter type");
         }
     }

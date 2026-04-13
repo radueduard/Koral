@@ -18,6 +18,9 @@ namespace gfx::ogl
         GLuint operator*() const;
 
         [[nodiscard]] GLenum getFormat() const;
+
+    private:
+        GLuint _textureViewID;
     };
 }
 

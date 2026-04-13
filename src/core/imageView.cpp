@@ -38,5 +38,6 @@ namespace gfx
         _baseMipLevel(createInfo.baseMipLevel),
         _mipLevelCount(createInfo.mipLevelCount),
         _baseArrayLayer(createInfo.baseArrayLayer),
-        _arrayLayerCount(createInfo.arrayLayerCount) {}
+        _arrayLayerCount(createInfo.arrayLayerCount),
+        _componentMapping(createInfo.componentMapping) {}
 }

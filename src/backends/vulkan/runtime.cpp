@@ -12,6 +12,8 @@
 #include <window.h>
 #include <GLFW/glfw3.h>
 
+#include "../../log.h"
+
 namespace gfx::vk
 {
     std::vector <const char*> GetRequiredExtensions() {
@@ -38,47 +40,24 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
     void* pUserData) {
 
-        // Choose color
-        auto color = "\x1b[37m";
-        if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
-            color = "\x1b[34m";
-        } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-            color = "\x1b[31m";
-        } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            color = "\x1b[33m";
+        switch (messageSeverity) {
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+                gfx::log::info("[vulkan] {}", pCallbackData->pMessage);
+                break;
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+                gfx::log::info("[vulkan] {}", pCallbackData->pMessage);
+                break;
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+                gfx::log::warn("[vulkan] {}", pCallbackData->pMessage);
+                break;
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+                gfx::log::error("[vulkan] {}", pCallbackData->pMessage);
+                GFX_BREAK(); // drop into debugger on Vulkan errors too
+                break;
+            case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
+                break;
         }
-
-        // Build severity label
-        std::string severityLabel;
-        if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-            severityLabel = "ERROR";
-        } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            severityLabel = "WARNING";
-        } else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-            severityLabel = "INFO";
-        } else {
-            severityLabel = "VERBOSE";
-        }
-
-        // Build type label(s)
-        std::string typeLabel;
-        bool first = true;
-        if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
-            if (severityLabel == "INFO")
-                return VK_FALSE;
-            typeLabel += "GENERAL"; first = false;
-        }
-        if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
-            if (!first) typeLabel += "|"; typeLabel += "VALIDATION"; first = false;
-        }
-        if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
-            if (!first) typeLabel += "|"; typeLabel += "PERFORMANCE"; first = false;
-        }
-        // Print colored message with source location
-        std::cout << color << "[" << severityLabel << "][" << typeLabel << "] "
-                  << pCallbackData->pMessage << "\x1b[0m" << std::endl;
-
-        return messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT ? VK_TRUE : VK_FALSE;
+        return VK_FALSE; // never abort the Vulkan call
     }
 
     Runtime::Runtime()

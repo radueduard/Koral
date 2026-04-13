@@ -40,7 +40,7 @@ find_package(reflectcpp CONFIG REQUIRED)
 find_package(DevIL REQUIRED)
 
 find_package(imgui CONFIG REQUIRED)
-find_package(imguizmo CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
 file (GLOB_RECURSE SOURCE_FILES
         src/core/*.cpp
@@ -89,7 +89,7 @@ target_link_libraries(${PROJECT_NAME} ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB
 target_link_libraries(${PROJECT_NAME} ${JASPER_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} DevIL::IL)
 target_link_libraries(${PROJECT_NAME} imgui::imgui)
-target_link_libraries(${PROJECT_NAME} imguizmo::imguizmo)
+target_link_libraries(${PROJECT_NAME} spdlog::spdlog)
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} OpenGL::GLX)

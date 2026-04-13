@@ -10,15 +10,15 @@
 
 namespace gfx
 {
+    enum class Filter
+    {
+        eNearest,
+        eLinear,
+    };
+
     class GFX_API Sampler
     {
     public:
-        enum class Filter
-        {
-            eNearest,
-            eLinear,
-        };
-
         enum class MipmapMode {
             eNearest,
             eLinear
