@@ -7,9 +7,12 @@
 #include <framebuffer.h>
 #include "context.h"
 #include <filesystem>
+#include <mutex>
 
 #include "scheduler.h"
 #include "window.h"
+#include "../executor/BackgroundExecutor.h"
+#include "../executor/MainThreadExecutor.h"
 
 
 std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
@@ -61,6 +64,27 @@ ImGuiContext* gfx::Context::GetCurrentImGuiContext()
         throw std::runtime_error("ImGui context is not initialized for this thread");
     }
     return _imguiContext;
+}
+
+gfx::SwitchAwaiter gfx::Context::SwitchToMainThread() {
+    if (!_mainThreadExecutor) {
+        throw std::runtime_error("Main thread executor is not initialized for this thread!");
+    }
+    return _mainThreadExecutor->SwitchToMainThread();
+}
+
+gfx::SwitchAwaiter gfx::Context::SwitchToBackgroundThread() {
+    if (!_backgroundExecutor) {
+        throw std::runtime_error("Background thread executor is not initialized for this thread!");
+    }
+    return _backgroundExecutor->SwitchToBackground();
+}
+
+void gfx::Context::DrainMainThread() {
+    if (!_mainThreadExecutor) {
+        throw std::runtime_error("Main thread executor is not initialized for this thread!");
+    }
+    _mainThreadExecutor->Drain();
 }
 
 void gfx::Context::setFocusedWindow(io::Window* window)

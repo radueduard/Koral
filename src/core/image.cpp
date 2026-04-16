@@ -104,7 +104,7 @@ namespace gfx
         }
     }
 
-    glm::u32 Image::ChannelCountFromImageFormat(gfx::Image::Format format)
+    glm::u32 Image::ChannelCountFromImageFormat(const gfx::Image::Format format)
     {
         switch (format)
         {
@@ -180,7 +180,11 @@ namespace gfx
         _mipLevels(createInfo.mipLevels),
         _arrayLayers(createInfo.arrayLayers),
         _msaa(createInfo.msaa),
-        _usage(createInfo.usage) {}
+        _usage(createInfo.usage) {
+        if (_mipLevels == 0) {
+            _mipLevels = 1 + static_cast<glm::u32>(std::floor(std::log2(std::max(_extent.x, std::max(_extent.y, _extent.z)))));
+        }
+    }
 
     bool IsDepthStencilFormat(const Image::Format format)
     {

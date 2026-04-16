@@ -5,10 +5,12 @@
 #pragma once
 #include "api.h"
 #include <filesystem>
-#include <thread>
-#include <glm/fwd.hpp>
+
+#include "Task.h"
 
 struct ImGuiContext;
+class MainThreadExecutor;
+class BackgroundExecutor;
 
 namespace gfx {
     class GUI;
@@ -42,6 +44,9 @@ namespace gfx {
         static GFX_API const gfx::Framebuffer& DefaultFramebuffer();
         static GFX_API ImGuiContext* GetCurrentImGuiContext();
 
+        static GFX_API gfx::SwitchAwaiter SwitchToMainThread();
+        static GFX_API gfx::SwitchAwaiter SwitchToBackgroundThread();
+        static GFX_API void DrainMainThread();
 
     private:
         static GFX_API void setFocusedWindow(io::Window* window);
@@ -51,6 +56,7 @@ namespace gfx {
         inline static gfx::Scheduler* _scheduler = nullptr;
         inline static ImGuiContext* _imguiContext = nullptr;
 
-
+        inline static MainThreadExecutor* _mainThreadExecutor = nullptr;
+        inline static BackgroundExecutor* _backgroundExecutor   = nullptr;
     };
 }

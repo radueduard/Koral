@@ -41,11 +41,6 @@ int main(const int argc, char **argv)
 #ifdef _WIN32
     enableANSI();
 #endif
-    try {
-        gfx::Engine::Run(argc, argv);
-    } catch (const std::exception& e) {
-        std::cerr << "An error occurred: " << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
+    gfx::Engine::Run(argc, argv);
     return EXIT_SUCCESS;
 }

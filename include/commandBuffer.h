@@ -75,6 +75,11 @@ namespace gfx
         TransferSrc,         // TRANSFER + TRANSFER_READ
         TransferDst,         // TRANSFER + TRANSFER_WRITE
 
+        // General
+        AllShaderRead,          // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ
+        AllShaderWrite,         // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_WRITE
+        AllShaderReadWrite,     // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
+
         // Present
         Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
     };
@@ -83,20 +88,17 @@ namespace gfx
     public:
         BufferBarrier(
             const gfx::Buffer& buffer,
-            ResourceAccess srcAccess,
             ResourceAccess dstAccess,
             glm::u64 offset = 0,
             glm::u64 size = UINT64_MAX);
 
-        const gfx::Buffer& getBuffer() const { return _buffer; }
-        ResourceAccess getSrcAccess() const { return _srcAccess; }
-        ResourceAccess getDstAccess() const { return _dstAccess; }
-        glm::u64 getOffset() const { return _offset; }
-        glm::u64 getSize() const { return _size; }
+        [[nodiscard]] const gfx::Buffer& getBuffer() const { return _buffer; }
+        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
+        [[nodiscard]] glm::u64 getOffset() const { return _offset; }
+        [[nodiscard]] glm::u64 getSize() const { return _size; }
 
     private:
         const gfx::Buffer& _buffer;
-        ResourceAccess _srcAccess;
         ResourceAccess _dstAccess;
         glm::u64 _offset;
         glm::u64 _size;
@@ -106,24 +108,21 @@ namespace gfx
     public:
         ImageBarrier(
             const gfx::Image& image,
-            ResourceAccess srcAccess,
             ResourceAccess dstAccess,
             std::optional<glm::u32> baseMipLevel = std::nullopt,
             std::optional<glm::u32> levelCount = std::nullopt,
             std::optional<glm::u32> baseArrayLayer = std::nullopt,
             std::optional<glm::u32> layerCount = std::nullopt);
 
-        const gfx::Image& getImage() const { return _image; }
-        ResourceAccess getSrcAccess() const { return _srcAccess; }
-        ResourceAccess getDstAccess() const { return _dstAccess; }
-        std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
-        std::optional<glm::u32> getLevelCount() const { return _levelCount; }
-        std::optional<glm::u32> getBaseArrayLayer() const { return _baseArrayLayer; }
-        std::optional<glm::u32> getLayerCount() const { return _layerCount; }
+        [[nodiscard]] const gfx::Image& getImage() const { return _image; }
+        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
+        [[nodiscard]] std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] std::optional<glm::u32> getLevelCount() const { return _levelCount; }
+        [[nodiscard]] std::optional<glm::u32> getBaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] std::optional<glm::u32> getLayerCount() const { return _layerCount; }
 
     private:
         const gfx::Image& _image;
-        ResourceAccess _srcAccess;
         ResourceAccess _dstAccess;
         std::optional<glm::u32> _baseMipLevel;
         std::optional<glm::u32> _levelCount;
@@ -143,6 +142,19 @@ namespace gfx
         glm::u32 srcMipLevel = 0;
         glm::u32 dstMipLevel = 0;
         gfx::Filter filtering = gfx::Filter::eNearest;
+    };
+
+    class GFX_API Resolve {
+    public:
+        glm::ivec3 srcOffset = { 0, 0, 0 };
+        glm::ivec3 srcExtent = { -1, -1, -1 };
+        glm::ivec3 dstOffset = { 0, 0, 0 };
+        glm::ivec3 dstExtent = { -1, -1, -1 };
+        glm::u32 srcBaseArrayLayer = 0;
+        glm::u32 dstBaseArrayLayer = 0;
+        glm::u32 layerCount = 1;
+        glm::u32 srcMipLevel = 0;
+        glm::u32 dstMipLevel = 0;
     };
 
     class GFX_API CommandBuffer
@@ -188,7 +200,10 @@ namespace gfx
             const Image* dstImage = nullptr,
             Blit blitInfo = {}) = 0;
 
-        virtual CommandBuffer& Resolve(const Image* srcImage, const Image* dstImage = nullptr) = 0;
+        virtual CommandBuffer& Resolve(
+            const Image* srcImage,
+            const Image* dstImage = nullptr,
+            Resolve resolveInfo = {}) = 0;
 
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 

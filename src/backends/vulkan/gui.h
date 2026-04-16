@@ -36,7 +36,7 @@ namespace gfx::vk
     public:
         static void Init();
         static void NewFrame();
-        static void Render(const gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data);
+        static void Render(gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data);
         static void Shutdown();
 
     private:

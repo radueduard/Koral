@@ -5,7 +5,6 @@
 
 #include <window.h>
 #include <framebuffer.h>
-#include <il.h>
 
 #include "input.h"
 
@@ -17,6 +16,9 @@
 #include "scheduler.h"
 #include "surface.h"
 #include "../backends/vulkan/vulkanContext.h"
+
+#include "../executor/MainThreadExecutor.h"
+#include "../executor/BackgroundExecutor.h"
 
 namespace gfx::io {
     Window::Window(Builder& createInfo) :
@@ -110,7 +112,6 @@ namespace gfx::io {
             gfx::vk::Context::Init();
         }
 
-        ilInit();
         _surface = gfx::Surface::Create(*this);
         Context::_scheduler = Scheduler::Builder()
             .setMinImageCount(2)
@@ -122,6 +123,9 @@ namespace gfx::io {
 
         _timeState.setup();
         _inputState.setup();
+
+        Context::_mainThreadExecutor = new MainThreadExecutor();
+        Context::_backgroundExecutor = new BackgroundExecutor();
 
         _scene->Initialize();
     }
@@ -137,8 +141,9 @@ namespace gfx::io {
         GUI::Shutdown();
         _framebuffer.reset();
         delete Context::_scheduler;
+        delete Context::_mainThreadExecutor;
+        delete Context::_backgroundExecutor;
         _surface.reset();
-        ilShutDown();
         if (_api == API::eVulkan) {
             vk::Context::Destroy();
         }

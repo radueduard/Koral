@@ -37,7 +37,7 @@ namespace gfx::ogl
         gfx::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
 
         gfx::CommandBuffer& Blit(const Image* srcImage, const Image* dstImage, gfx::Blit blitInfo) override;
-        gfx::CommandBuffer& Resolve(const Image *srcImage, const Image *dstImage) override;
+        gfx::CommandBuffer& Resolve(const Image *srcImage, const Image *dstImage, gfx::Resolve resolveInfo) override;
 
         gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
 

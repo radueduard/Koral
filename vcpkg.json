@@ -60,5 +60,14 @@
   }, {
     "name" : "spdlog",
     "version>=" : "1.17.0"
+  }, {
+    "name" : "ktx",
+    "version>=" : "4.4.2"
+  }, {
+    "name" : "directxtex",
+    "version>=" : "2025-10-27"
+  }, {
+    "name" : "openimageio",
+    "version>=" : "3.0.9.1#3"
   } ]
 }

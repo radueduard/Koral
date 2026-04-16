@@ -30,19 +30,17 @@ namespace gfx
     }
 
     BufferBarrier::BufferBarrier(
-        const gfx::Buffer &buffer,
-        const ResourceAccess srcAccess, const ResourceAccess dstAccess,
+        const gfx::Buffer &buffer, const ResourceAccess dstAccess,
         const glm::u64 offset, const glm::u64 size)
-      : _buffer(buffer),
-        _srcAccess(srcAccess), _dstAccess(dstAccess),
+      : _buffer(buffer), _dstAccess(dstAccess),
         _offset(offset), _size(size) {}
 
     ImageBarrier::ImageBarrier(
         const gfx::Image &image,
-        const ResourceAccess srcAccess, ResourceAccess dstAccess,
+        const ResourceAccess dstAccess,
         const std::optional<glm::u32> baseMipLevel, const std::optional<glm::u32> levelCount,
         const std::optional<glm::u32> baseArrayLayer, const std::optional<glm::u32> layerCount)
-        : _image(image), _srcAccess(srcAccess), _dstAccess(dstAccess),
+        : _image(image), _dstAccess(dstAccess),
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 

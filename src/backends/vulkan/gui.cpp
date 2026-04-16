@@ -43,7 +43,7 @@ namespace gfx::vk
 
     void GUI_Image::setLayerAndLevel(const glm::u32 layer, const glm::u32 level)
     {
-        Context::Device().runSingleTimeCommand([&](const CommandBuffer& commandBuffer)
+        Context::Device().runSingleTimeCommand([&](CommandBuffer& commandBuffer)
             {
                 const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(_image.get());
                 const auto& vkHelperImage = *dynamic_cast<const gfx::vk::Image*>(_helperImage.get());
@@ -56,29 +56,25 @@ namespace gfx::vk
                     .setLayerCount(1);
                 const auto srcOffsets = std::array {
                     ::vk::Offset3D{ 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
-                    ::vk::Offset3D{ static_cast<glm::i32>(vkImage.getExtent().x), static_cast<glm::i32>(vkImage.getExtent().y), imageType == Image::Type::e3D ? static_cast<int32_t>(layer + 1) : 1 }
+                    ::vk::Offset3D{  }
                 };
 
-                vkImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferSrcOptimal);
-                vkHelperImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferDstOptimal);
-                commandBuffer->blitImage(
-                    *vkImage, ::vk::ImageLayout::eTransferSrcOptimal,
-                    *vkHelperImage, ::vk::ImageLayout::eTransferDstOptimal,
-                    ::vk::ImageBlit()
-                        .setSrcSubresource(srcSubresourceLayer)
-                        .setSrcOffsets(srcOffsets)
-                        .setDstSubresource(::vk::ImageSubresourceLayers()
-                            .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                            .setMipLevel(0)
-                            .setBaseArrayLayer(0)
-                            .setLayerCount(1))
-                        .setDstOffsets({
-                            ::vk::Offset3D{ 0, 0, 0 },
-                            ::vk::Offset3D{ static_cast<glm::i32>(vkHelperImage.getExtent().x), static_cast<glm::i32>(vkHelperImage.getExtent().y), 1 }
-                        }),
-                    ::vk::Filter::eNearest);
-                vkImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
-                vkHelperImage.TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
+                commandBuffer.Blit(
+                    &_image.get(), _helperImage.get(),
+                    gfx::Blit {
+                        .srcOffset = { 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
+                        .srcExtent = { static_cast<glm::i32>(vkImage.getExtent().x), static_cast<glm::i32>(vkImage.getExtent().y), imageType == Image::Type::e3D ? static_cast<int32_t>(layer + 1) : 1 },
+                        .dstOffset = { 0, 0, 0 },
+                        .dstExtent = { static_cast<glm::u32>(vkHelperImage.getExtent().x), static_cast<glm::u32>(vkHelperImage.getExtent().y), 1 },
+                        .srcBaseArrayLayer = imageType == Image::Type::e3D ? 0 : layer,
+                        .dstBaseArrayLayer = 0,
+                        .layerCount = 1,
+                        .srcMipLevel = level,
+                        .dstMipLevel = 0,
+                        .filtering = gfx::Filter::eNearest
+                    });
+
+                commandBuffer.ImageBarrier({ *_helperImage, ResourceAccess::FragmentShaderRead });
             }, ::vk::QueueFlagBits::eGraphics);
     }
 
@@ -118,7 +114,7 @@ namespace gfx::vk
         _descriptorSet = ImGui_ImplVulkan_AddTexture(
             **dynamic_cast<const gfx::vk::Sampler*>(_helperSampler.get()),
             **dynamic_cast<const gfx::vk::ImageView*>(_helperImageView.get()),
-            VK_IMAGE_LAYOUT_GENERAL);
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
         _id = reinterpret_cast<ImTextureID>(_descriptorSet);
         setLayerAndLevel(0, 0);
@@ -194,17 +190,16 @@ namespace gfx::vk
         ImGui_ImplVulkan_NewFrame();
     }
 
-    void GUI::Render(const gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data)
+    void GUI::Render(gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
         const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
         const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(gfx::Context::DefaultFramebuffer());
         const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(vkFramebuffer.getColorAttachments()[0].get());
         const auto& vkImage = dynamic_cast<const vk::Image&>(vkColorImageView.getImage());
-        vkImage.TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::eGeneral);
 
         auto colorAttachment = ::vk::RenderingAttachmentInfo()
             .setImageView(*vkColorImageView)
-            .setImageLayout(::vk::ImageLayout::eGeneral)
+            .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
             .setLoadOp(::vk::AttachmentLoadOp::eLoad)
             .setStoreOp(::vk::AttachmentStoreOp::eStore);
 
@@ -216,6 +211,11 @@ namespace gfx::vk
             .setViewMask(0)
             .setLayerCount(1);
 
+        commandBuffer.ImageBarrier({
+            vkImage,
+            ResourceAccess::ColorAttachment
+        });
+
         vkCommandBuffer->beginRendering(renderingInfo);
 
         if (const bool main_is_minimized = draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f; !main_is_minimized) {
@@ -223,6 +223,11 @@ namespace gfx::vk
         }
 
         vkCommandBuffer->endRendering();
+
+        commandBuffer.ImageBarrier({
+            vkImage,
+            ResourceAccess::Present
+        });
     }
 
     void GUI::Shutdown()

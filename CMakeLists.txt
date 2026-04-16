@@ -37,10 +37,15 @@ find_package(glslang CONFIG REQUIRED)
 find_package(spirv_cross_core CONFIG REQUIRED)
 find_package(spirv_cross_glsl CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
-find_package(DevIL REQUIRED)
+
+find_package(Ktx CONFIG REQUIRED)
+find_package(directxtex CONFIG REQUIRED)
+find_package(OpenImageIO CONFIG REQUIRED)
 
 find_package(imgui CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+
+
 
 file (GLOB_RECURSE SOURCE_FILES
         src/core/*.cpp
@@ -87,9 +92,12 @@ target_link_libraries(${PROJECT_NAME} reflectcpp::reflectcpp)
 
 target_link_libraries(${PROJECT_NAME} ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} ${JASPER_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} DevIL::IL)
 target_link_libraries(${PROJECT_NAME} imgui::imgui)
 target_link_libraries(${PROJECT_NAME} spdlog::spdlog)
+
+target_link_libraries(${PROJECT_NAME} KTX::ktx)
+target_link_libraries(${PROJECT_NAME} Microsoft::DirectXTex)
+target_link_libraries(${PROJECT_NAME} OpenImageIO::OpenImageIO)
 
 if (UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} OpenGL::GLX)

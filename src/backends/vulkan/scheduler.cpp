@@ -83,9 +83,7 @@ namespace gfx::vk
         const auto& vkCommandBuffer = dynamic_cast<gfx::vk::CommandBuffer&>(commandBuffer);
         commandBuffer.Reset();
         commandBuffer.Begin();
-        _swapChain->getImage().TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::eColorAttachmentOptimal);
         renderFunc(commandBuffer);
-        _swapChain->getImage().TransitionLayout(vkCommandBuffer, ::vk::ImageLayout::ePresentSrcKHR);
         commandBuffer.End();
 
         const SubmitInfo submitInfo {

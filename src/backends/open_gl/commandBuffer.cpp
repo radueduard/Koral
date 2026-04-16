@@ -170,19 +170,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    std::optional<GLbitfield> GetBarrierBits(ResourceAccess src, ResourceAccess dst) {
-        // Only incoherent writes need a barrier in OpenGL
-        bool srcIsIncoherentWrite =
-            src == ResourceAccess::ComputeWrite        ||
-            src == ResourceAccess::ComputeReadWrite     ||
-            src == ResourceAccess::VertexShaderWrite    ||
-            src == ResourceAccess::VertexShaderReadWrite||
-            src == ResourceAccess::FragmentShaderWrite  ||
-            src == ResourceAccess::FragmentShaderReadWrite;
-
-        if (!srcIsIncoherentWrite)
-            return std::nullopt;
-
+    std::optional<GLbitfield> GetBarrierBits(ResourceAccess dst) {
         switch (dst) {
             case ResourceAccess::VertexBuffer:
                 return GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT;
@@ -222,14 +210,14 @@ namespace gfx::ogl
         CheckRecording();
         _commands.emplace_back([bufferBarriers = std::move(bufferBarriers), imageBarriers = std::move(imageBarriers)] () {
             for (const auto& barrier : bufferBarriers) {
-                GetBarrierBits(barrier.getSrcAccess(), barrier.getDstAccess()).and_then([&](GLbitfield bits) {
+                GetBarrierBits(barrier.getDstAccess()).and_then([&](GLbitfield bits) {
                     glMemoryBarrier(bits);
                     glCheckError();
                     return std::optional(bits);
                 });
             }
             for (const auto& barrier : imageBarriers) {
-                GetBarrierBits(barrier.getSrcAccess(), barrier.getDstAccess()).and_then([&](GLbitfield bits) {
+                GetBarrierBits(barrier.getDstAccess()).and_then([&](GLbitfield bits) {
                     glMemoryBarrier(bits);
                     glCheckError();
                     return std::optional(bits);
@@ -324,7 +312,7 @@ namespace gfx::ogl
 
         if (dstImage == nullptr)
         {
-            _commands.emplace_back([srcImage] ()
+            _commands.emplace_back([srcImage, blitInfo] ()
             {
                 const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
                 GLuint framebuffer = 0;
@@ -338,10 +326,10 @@ namespace gfx::ogl
                 glBlitNamedFramebuffer(
                     framebuffer,
                     0,
-                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
-                    0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y,
+                    blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y,
+                    blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y,
                     GL_COLOR_BUFFER_BIT,
-                    GL_NEAREST);
+                    blitInfo.filtering == gfx::Filter::eNearest ? GL_NEAREST : GL_LINEAR);
                 glCheckError();
 
                 glDeleteFramebuffers(1, &framebuffer);
@@ -349,7 +337,7 @@ namespace gfx::ogl
             });
         } else
         {
-            _commands.emplace_back([srcImage, dstImage] ()
+            _commands.emplace_back([srcImage, dstImage, blitInfo] ()
             {
                 const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
                 const auto* glDstImage = dynamic_cast<const ogl::Image*>(dstImage);
@@ -370,10 +358,10 @@ namespace gfx::ogl
                 glBlitNamedFramebuffer(
                     srcFramebuffer,
                     dstFramebuffer,
-                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
-                    0, 0, glDstImage->getExtent().x, glDstImage->getExtent().y,
+                    blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y,
+                    blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y,
                     GL_COLOR_BUFFER_BIT,
-                    GL_NEAREST);
+                    blitInfo.filtering == gfx::Filter::eNearest ? GL_NEAREST : GL_LINEAR);
                 glCheckError();
 
                 glDeleteFramebuffers(1, &srcFramebuffer);
@@ -384,16 +372,21 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::Resolve(const gfx::Image *srcImage, const gfx::Image *dstImage) {
+    gfx::CommandBuffer & CommandBuffer::Resolve(const gfx::Image *srcImage, const gfx::Image *dstImage, gfx::Resolve resolveInfo) {
         if (srcImage->getMSAA() == MSAA::eNone)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
         if (dstImage && dstImage->getMSAA() != MSAA::eNone)
             throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
 
+        if (resolveInfo.srcExtent == glm::ivec3(-1))
+            resolveInfo.srcExtent = srcImage->getExtent();
+        if (resolveInfo.dstExtent == glm::ivec3(-1))
+            resolveInfo.dstExtent = dstImage ? dstImage->getExtent() : glm::uvec3 { Context::Window().getExtent(), 1 };
+
         CheckRecording();
         if (dstImage == nullptr)
         {
-            _commands.emplace_back([srcImage] ()
+            _commands.emplace_back([srcImage, resolveInfo] ()
             {
                 const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
                 GLuint framebuffer = 0;
@@ -407,8 +400,8 @@ namespace gfx::ogl
                 glBlitNamedFramebuffer(
                     framebuffer,
                     0,
-                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
-                    0, 0, gfx::Context::Window().getExtent().x, gfx::Context::Window().getExtent().y,
+                    resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.x + resolveInfo.srcExtent.x, resolveInfo.srcOffset.y + resolveInfo.srcExtent.y,
+                    resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.x + resolveInfo.dstExtent.x, resolveInfo.dstOffset.y + resolveInfo.dstExtent.y,
                     GL_COLOR_BUFFER_BIT,
                     GL_NEAREST);
                 glCheckError();
@@ -418,7 +411,7 @@ namespace gfx::ogl
             });
         } else
         {
-            _commands.emplace_back([srcImage, dstImage] ()
+            _commands.emplace_back([srcImage, dstImage, resolveInfo] ()
             {
                 const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
                 const auto* glDstImage = dynamic_cast<const ogl::Image*>(dstImage);
@@ -434,8 +427,8 @@ namespace gfx::ogl
                 glCheckError();
 
                 glBlitFramebuffer(
-                    0, 0, glSrcImage->getExtent().x, glSrcImage->getExtent().y,
-                    0, 0, glDstImage->getExtent().x, glDstImage->getExtent().y,
+                    resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.x + resolveInfo.srcExtent.x, resolveInfo.srcOffset.y + resolveInfo.srcExtent.y,
+                    resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.x + resolveInfo.dstExtent.x, resolveInfo.dstOffset.y + resolveInfo.dstExtent.y,
                     GL_COLOR_BUFFER_BIT,
                     GL_NEAREST);
                 glCheckError();

@@ -121,7 +121,6 @@ namespace gfx::vk
             .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
             .setMSAA(_msaa)
             .build();
-        dynamic_cast<const gfx::vk::Image*>(_depthImages.get())->TransitionLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
         _swapChainImageViews = gfx::ImageView::Builder(*_swapChainImages)
             .setViewType(gfx::ImageView::Type::e2D)
@@ -144,7 +143,6 @@ namespace gfx::vk
         _extent = newSize;
         Context::Device()->waitIdle();
         CreateSwapChain();
-        _swapChainImages->TransitionLayout(::vk::ImageLayout::ePresentSrcKHR);
         gfx::Context::DefaultFramebuffer().Resize(_swapChainImages->getExtent());
 
     }

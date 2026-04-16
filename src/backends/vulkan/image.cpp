@@ -62,6 +62,7 @@ namespace gfx::vk
                 for (uint32_t arrayLayer = 0; arrayLayer < _arrayLayers; arrayLayer++) {
                     glm::u32 key = (i << 24) | (mipLevel << 12) | arrayLayer;
                     _layouts[key] = ::vk::ImageLayout::eUndefined;
+                    _accessMasks[key] = ::vk::AccessFlagBits::eNone;
                 }
             }
         }
@@ -89,7 +90,7 @@ namespace gfx::vk
 
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(buffer);
 
-        Context::Device().runSingleTimeCommand([this, &buffer, layer, mipLevel, &vkBuffer] (const gfx::vk::CommandBuffer& commandBuffer) {
+        Context::Device().runSingleTimeCommand([this, &buffer, layer, mipLevel, &vkBuffer] (gfx::vk::CommandBuffer& commandBuffer) {
 
             auto extent = this->_extent;
             for (uint32_t i = 0; i < mipLevel; i++) {
@@ -111,9 +112,16 @@ namespace gfx::vk
                 .setImageExtent(::vk::Extent3D(extent.x, extent.y, extent.z));
 
             const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
-            TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferDstOptimal);
+            commandBuffer.ImageBarrier({
+                *this,
+                ResourceAccess::TransferDst,
+                mipLevel,
+                1,
+                layer,
+                1
+            });
+
             commandBuffer->copyBufferToImage(*vkBuffer, _images[currentFrame], ::vk::ImageLayout::eTransferDstOptimal, region);
-            TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
         }, ::vk::QueueFlagBits::eTransfer);
     }
 
@@ -134,21 +142,35 @@ namespace gfx::vk
         for (const auto& _ : surfaceImages) {
             glm::u32 key = (frameIndex << 24) | (0 << 12) | 0;
             _layouts[key] = ::vk::ImageLayout::eUndefined;
+            _accessMasks[key] = ::vk::AccessFlagBits::eNone;
             frameIndex++;
         }
-        TransitionLayout(::vk::ImageLayout::ePresentSrcKHR);
     }
 
-    ::vk::ImageLayout Image::getImageLayout() const
+    ::vk::ImageLayout Image::getImageLayout(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
         const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
-        return _layouts[currentFrame];
+        const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
+        return _layouts[key];
     }
 
-    void Image::SetImageLayout(::vk::ImageLayout newLayout, glm::u32 mipLevel, glm::u32 arrayLayer) const {
+    ::vk::AccessFlags Image::getAccessMask(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
+        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
+        return _accessMasks[key];
+    }
+
+    void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
         const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
         if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
             _layouts[key] = newLayout;
+        }
+    }
+
+    void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
+        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        if (const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _accessMasks[key] != newAccessMask) {
+            _accessMasks[key] = newAccessMask;
         }
     }
 
@@ -167,7 +189,7 @@ namespace gfx::vk
 
     ::vk::Image Image::operator*() const
     {
-        auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
         return _images[currentFrame];
     }
 
@@ -245,20 +267,13 @@ namespace gfx::vk
         _images[frameIndex] = image;
         _allocations[frameIndex] = allocation;
 
-        // if (_layout != ::vk::ImageLayout::eUndefined) {
-        //     glm::u32 key = (frameIndex << 24) | (0 << 12) | 0;
-        //     _layouts[key] = ::vk::ImageLayout::eUndefined;
-        //     TransitionLayout(_layout);
-        // }
-
-
         for (uint32_t mipLevel = 0; mipLevel < _mipLevels; mipLevel++) {
             for (uint32_t arrayLayer = 0; arrayLayer < _arrayLayers; arrayLayer++) {
                 glm::u32 key = (frameIndex << 24) | (mipLevel << 12) | arrayLayer;
                 _layouts[key] = ::vk::ImageLayout::eUndefined;
+                _accessMasks[key] = ::vk::AccessFlagBits::eNone;
             }
         }
-
     }
 
     std::vector<std::byte> Image::ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const
@@ -287,7 +302,7 @@ namespace gfx::vk
             .build();
         const auto& vkStagingBuffer = dynamic_cast<const gfx::vk::Buffer&>(*stagingBuffer);
 
-        Context::Device().runSingleTimeCommand([this, mipLevel, arrayLayer, &vkStagingBuffer] (const gfx::vk::CommandBuffer& commandBuffer) {
+        Context::Device().runSingleTimeCommand([this, mipLevel, arrayLayer, &vkStagingBuffer] (gfx::vk::CommandBuffer& commandBuffer) {
 
             const auto region = ::vk::BufferImageCopy()
                 .setBufferOffset(0)
@@ -302,9 +317,16 @@ namespace gfx::vk
                 .setImageExtent(::vk::Extent3D(_extent.x, _extent.y, _extent.z));
 
             const auto _handle = **this;
-            TransitionLayout(commandBuffer, ::vk::ImageLayout::eTransferSrcOptimal);
+            commandBuffer.ImageBarrier({
+                *this,
+                ResourceAccess::TransferSrc,
+                mipLevel,
+                1,
+                arrayLayer,
+                1
+            });
+
             commandBuffer->copyImageToBuffer(_handle, ::vk::ImageLayout::eTransferSrcOptimal, *vkStagingBuffer, region);
-            TransitionLayout(commandBuffer, ::vk::ImageLayout::eGeneral);
         }, ::vk::QueueFlagBits::eTransfer);
 
         stagingBuffer->Map();
@@ -348,8 +370,5 @@ namespace gfx::vk
                 }
             }
         }, ::vk::QueueFlagBits::eGraphics);
-
-        const auto frameIndex = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
-        _layouts[frameIndex] = ::vk::ImageLayout::eGeneral;
     }
 }

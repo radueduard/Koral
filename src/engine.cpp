@@ -72,6 +72,8 @@ namespace gfx
 
         while (!window->shouldClose()) {
             glfwPollEvents();
+            Context::DrainMainThread();
+
             if (window->isPaused()) {
                 continue;
             }

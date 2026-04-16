@@ -24,13 +24,25 @@ namespace gfx
         case ResourceAccess::VertexBuffer: return ::vk::AccessFlagBits::eVertexAttributeRead;
         case ResourceAccess::IndexBuffer: return ::vk::AccessFlagBits::eIndexRead;
         case ResourceAccess::IndirectBuffer: return ::vk::AccessFlagBits::eIndirectCommandRead;
-        case ResourceAccess::VertexShaderRead: return ::vk::AccessFlagBits::eShaderRead;
-        case ResourceAccess::FragmentShaderRead: return ::vk::AccessFlagBits::eShaderRead;
         case ResourceAccess::ColorAttachment: return ::vk::AccessFlagBits::eColorAttachmentWrite;
         case ResourceAccess::DepthAttachment: return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
         case ResourceAccess::DepthRead: return ::vk::AccessFlagBits::eDepthStencilAttachmentRead;
         case ResourceAccess::TransferSrc: return ::vk::AccessFlagBits::eTransferRead;
         case ResourceAccess::TransferDst: return ::vk::AccessFlagBits::eTransferWrite;
+
+        case ResourceAccess::VertexShaderRead:
+        case ResourceAccess::FragmentShaderRead:
+        case ResourceAccess::AllShaderRead:
+            return ::vk::AccessFlagBits::eShaderRead;
+        case ResourceAccess::VertexShaderWrite:
+        case ResourceAccess::FragmentShaderWrite:
+        case ResourceAccess::AllShaderWrite:
+            return ::vk::AccessFlagBits::eShaderWrite;
+        case ResourceAccess::VertexShaderReadWrite:
+        case ResourceAccess::FragmentShaderReadWrite:
+        case ResourceAccess::AllShaderReadWrite:
+            return ::vk::AccessFlagBits::eShaderRead | ::vk::AccessFlagBits::eShaderWrite;
+
         case ResourceAccess::Present: return {}; // no access mask needed for present
         default: throw std::runtime_error("Unknown resource access type!");
         }
@@ -64,8 +76,12 @@ namespace gfx
         case ResourceAccess::TransferSrc:
         case ResourceAccess::TransferDst:
             return ::vk::PipelineStageFlagBits::eTransfer;
+        case ResourceAccess::AllShaderRead:
+        case ResourceAccess::AllShaderWrite:
+            case ResourceAccess::AllShaderReadWrite:
+            return ::vk::PipelineStageFlagBits::eAllCommands;
         case ResourceAccess::Present:
-            return ::vk::PipelineStageFlagBits::eBottomOfPipe; // must wait for all previous stages to complete before presenting
+            return ::vk::PipelineStageFlagBits::eBottomOfPipe;
         default: throw std::runtime_error("Unknown resource access type!");
         }
     }
@@ -92,10 +108,13 @@ namespace gfx
         case ResourceAccess::VertexShaderReadWrite:
         case ResourceAccess::FragmentShaderWrite:
         case ResourceAccess::FragmentShaderReadWrite:
+        case ResourceAccess::AllShaderWrite:
+        case ResourceAccess::AllShaderReadWrite:
             return ::vk::ImageLayout::eGeneral;
         case ResourceAccess::ComputeRead:
         case ResourceAccess::VertexShaderRead:
         case ResourceAccess::FragmentShaderRead:
+        case ResourceAccess::AllShaderRead:
             return ::vk::ImageLayout::eShaderReadOnlyOptimal;
         case ResourceAccess::ColorAttachment:
             return ::vk::ImageLayout::eColorAttachmentOptimal;

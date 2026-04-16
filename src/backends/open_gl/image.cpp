@@ -209,6 +209,38 @@ namespace gfx::ogl
         glCheckError();
     }
 
+    void Image::Resize(const glm::uvec3 &extent) {
+        const GLenum target = GetTargetFromImageType(_type, _msaa, _arrayLayers);
+        glBindTexture(target, _id);
+
+        const GLenum internalFormat = InternalFormatFromImageFormat(_format);
+
+        if (_type == Type::e1D && _arrayLayers == 1) {
+            glTexStorage1D(target, _mipLevels, internalFormat, extent.x);
+        } else if (_type == Type::e1D && _arrayLayers > 1) {
+            glTexStorage2D(target, _mipLevels, internalFormat, extent.x, _arrayLayers);
+        } else if (_type == Type::e2D && _arrayLayers == 1) {
+            if (_msaa == MSAA::eNone) {
+                glTexStorage2D(target, _mipLevels, internalFormat, extent.x, extent.y);
+            } else {
+                glTexStorage2DMultisample(target, static_cast<GLsizei>(_msaa), internalFormat, extent.x, extent.y, GL_TRUE);
+            }
+        } else if (_type == Type::e2D && _arrayLayers > 1) {
+            if (_msaa == MSAA::eNone) {
+                glTexStorage3D(target, _mipLevels, internalFormat, extent.x, extent.y, _arrayLayers);
+            } else {
+                glTexStorage3DMultisample(target, static_cast<GLsizei>(_msaa), internalFormat, extent.x, extent.y, _arrayLayers, GL_TRUE);
+            }
+        } else if (_type == Type::e3D) {
+            glTexStorage3D(target, _mipLevels, internalFormat, extent.x, extent.y, extent.z);
+        }
+
+        // check for errors
+        if (glCheckError()) {
+            throw std::runtime_error("Failed to resize image!");
+        }
+    }
+
     GLenum Image::InternalFormatFromImageFormat(const gfx::Image::Format format)
     {
         switch (format)

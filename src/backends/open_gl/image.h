@@ -19,6 +19,7 @@ namespace gfx::ogl {
         void GenerateMipmaps() override;
         std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const override;
         void CopyFrom(const gfx::Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const override;
+        void Resize(const glm::uvec3 &extent) override;
 
         GLenum getGLFormat() const { return InternalFormatFromImageFormat(_format); }
 

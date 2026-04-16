@@ -40,7 +40,7 @@ namespace gfx::vk
         gfx::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
         gfx::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) override;
         gfx::CommandBuffer& Blit(const gfx::Image* srcImage, const gfx::Image* dstImage, gfx::Blit blitInfo) override;
-        gfx::CommandBuffer& Resolve(const Image *srcImage, const Image *dstImage) override;
+        gfx::CommandBuffer& Resolve(const Image *srcImage, const Image *dstImage, gfx::Resolve resolveInfo) override;
         gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
 
         void Submit() override;
@@ -50,6 +50,8 @@ namespace gfx::vk
 
     protected:
         gfx::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
+
+        std::unique_ptr<gfx::Image> _resolveHelperImage;
 
     private:
         const gfx::vk::Queue& _queue;

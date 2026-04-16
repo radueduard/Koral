@@ -203,6 +203,7 @@ namespace gfx
         virtual void GenerateMipmaps() = 0;
         virtual std::vector<std::byte> ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const = 0;
         virtual void CopyFrom(const Buffer& buffer, glm::u32 mipLevel, glm::u32 layer) const = 0;
+        virtual void Resize(const glm::uvec3& extent) = 0;
 
         [[nodiscard]] glm::uvec3 getExtent() const { return _extent; }
 

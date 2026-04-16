@@ -34,6 +34,7 @@ namespace gfx
 #ifdef _WIN32
             const HMODULE module = LoadLibraryW(path.wstring().c_str());
             if (!module) {
+                DWORD error = GetLastError();
                 throw std::runtime_error("Failed to load DLL");
             }
 

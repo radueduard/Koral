@@ -3,6 +3,9 @@
 //
 
 #include "imageView.h"
+
+#include <stdexcept>
+
 #include "image.h"
 
 namespace gfx::ogl

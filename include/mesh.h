@@ -55,6 +55,11 @@ namespace gfx
     class CustomMesh : public Mesh
     {
     public:
+        static void Initialize() {
+            if (DefineMeshParent())
+                Derived::DefineMesh();
+        }
+
         struct Builder
         {
             glm::u64 vertexCount = 0;
