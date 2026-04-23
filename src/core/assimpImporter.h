@@ -6,6 +6,7 @@
 
 #include <queue>
 #include <unordered_map>
+#include <iostream>
 
 #include "importer.h"
 
@@ -44,17 +45,21 @@ namespace gfx {
 
     inline AssimpImporter::AssimpImporter(const std::filesystem::path &path) {
         _path = path;
-        _scene = _importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType);
+        _scene = _importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_GenBoundingBoxes);
         std::string format = path.extension().string();
+
+        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTextureCoords(0)) {
+            _importer.ApplyPostProcessing(aiProcess_GenUVCoords);
+        }
+        _importer.ApplyPostProcessing(aiProcess_FlipUVs);
+
+        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasNormals()) {
+            _importer.ApplyPostProcessing(aiProcess_GenSmoothNormals);
+        }
 
         if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTangentsAndBitangents()) {
             _importer.ApplyPostProcessing(aiProcess_CalcTangentSpace);
         }
-        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTextureCoords(0)) {
-            _importer.ApplyPostProcessing(aiProcess_GenUVCoords);
-        }
-
-        _importer.ApplyPostProcessing(aiProcess_FlipUVs);
 
         if (_scene == nullptr) {
             std::cerr << "Could not read file: " << path.string() << std::endl;
@@ -227,6 +232,11 @@ namespace gfx {
             result.doubleSided = doubleSided != 0;
         }
 
+        float alphaCutoff;
+        if (material->Get(AI_MATKEY_OPACITY, alphaCutoff) == AI_SUCCESS) {
+            result.alphaCutoff = alphaCutoff;
+        }
+
         aiString texName;
         if (material->GetTextureCount(aiTextureType_BASE_COLOR) > 0) {
             if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texName) == AI_SUCCESS) {
@@ -339,7 +349,24 @@ namespace gfx {
         result.position = glm::vec3(position.x, position.y, position.z);
         result.rotation = glm::degrees(glm::vec3(rotation.x, rotation.y, rotation.z));
         result.scale = glm::vec3(scale.x, scale.y, scale.z);
+
+        result.aabb = {
+            .min = glm::vec3(std::numeric_limits<float>::max()),
+            .max = glm::vec3(std::numeric_limits<float>::min())
+        };
+        for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
+            const auto& mesh = _scene->mMeshes[node->mMeshes[i]];
+            auto meshAABB = mesh->mAABB;
+            result.aabb.min = glm::min(result.aabb.min, glm::vec3(meshAABB.mMin.x, meshAABB.mMin.y, meshAABB.mMin.z));
+            result.aabb.max = glm::max(result.aabb.max, glm::vec3(meshAABB.mMax.x, meshAABB.mMax.y, meshAABB.mMax.z));
+        }
+        if (node->mNumMeshes == 0) {
+            result.aabb.min = glm::vec3(0.f);
+            result.aabb.max = glm::vec3(0.f);
+        }
+
         result.name = node->mName.C_Str();
+
 
         return result;
     }

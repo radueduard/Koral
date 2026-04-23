@@ -56,4 +56,11 @@ namespace gfx::vk
         const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
         return _imageViews[currentFrame];
     }
+
+    ::vk::ImageView ImageView::operator[](size_t i) const {
+        if (i >= _imageViews.size()) {
+            throw std::out_of_range("ImageView index out of range!");
+        }
+        return _imageViews[i];
+    }
 }

@@ -184,6 +184,10 @@ namespace gfx::io {
         _icon = image;
     }
 
+    void Window::LateUpdate() {
+        _hasResized = false;
+    }
+
     void Window::focus()
     {
         Context::setFocusedWindow(this);
@@ -191,6 +195,8 @@ namespace gfx::io {
 
     void Window::framebufferResize(GLFWwindow* handle, const int width, const int height) {
     	const auto app = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+
+        app->_hasResized = true;
 
     	app->_extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
     	if (width == 0 || height == 0) {

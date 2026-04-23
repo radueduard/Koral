@@ -98,14 +98,10 @@ namespace gfx::vk
                             auto* sampler = dynamic_cast<const vk::Sampler*>(descriptor.getSampler());
                             auto* imageView = dynamic_cast<const vk::ImageView*>(descriptor.getImageView());
                             const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
-                            const auto imageLayout = dynamic_cast<const Image&>(imageView->getImage()).getImageLayout();
-                            if (imageLayout == ::vk::ImageLayout::eUndefined) {
-                                throw std::runtime_error("Storage image for binding " + std::to_string(binding) + " index " + std::to_string(i) + " has undefined layout! You must transition the image to a defined layout before using it in a descriptor set.");
-                            }
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setImageView(imageViewHandle)
                                 .setSampler(**sampler)
-                                .setImageLayout(imageLayout);
+                                .setImageLayout(::vk::ImageLayout::eShaderReadOnlyOptimal);
 
                             writes.emplace_back()
                                 .setDstSet(_descriptorSets[frame])
@@ -119,13 +115,9 @@ namespace gfx::vk
                         {
                             auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
                             const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
-                            const auto imageLayout = dynamic_cast<const Image&>(imageView->getImage()).getImageLayout();
-                            if (imageLayout == ::vk::ImageLayout::eUndefined) {
-                                throw std::runtime_error("Storage image for binding " + std::to_string(binding) + " index " + std::to_string(i) + " has undefined layout! You must transition the image to a defined layout before using it in a descriptor set.");
-                            }
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setImageView(imageViewHandle)
-                                .setImageLayout(imageLayout);
+                                .setImageLayout(::vk::ImageLayout::eGeneral);
                             writes.emplace_back()
                                 .setDstSet(_descriptorSets[frame])
                                 .setDstBinding(binding)
@@ -138,13 +130,9 @@ namespace gfx::vk
                         {
                             auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
                             const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
-                            const auto imageLayout = dynamic_cast<const Image&>(imageView->getImage()).getImageLayout();
-                            if (imageLayout == ::vk::ImageLayout::eUndefined) {
-                                throw std::runtime_error("Sampled image for binding " + std::to_string(binding) + " index " + std::to_string(i) + " has undefined layout! You must transition the image to a defined layout before using it in a descriptor set.");
-                            }
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setImageView(imageViewHandle)
-                                .setImageLayout(imageLayout);
+                                .setImageLayout(::vk::ImageLayout::eShaderReadOnlyOptimal);
                             writes.emplace_back()
                                 .setDstSet(_descriptorSets[frame])
                                 .setDstBinding(binding)
@@ -278,6 +266,12 @@ namespace gfx::vk
             }
             Context::Device()->updateDescriptorSets(writes, {});
         }
+    }
+
+    void DescriptorSet::DebugPrint() const {
+        gfx::DescriptorSet::DebugPrint();
+        const auto frame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        std::cout << "Current Vulkan descriptor set handle: " << _descriptorSets[frame] << std::endl;
     }
 
     ::vk::DescriptorSet DescriptorSet::operator*() const

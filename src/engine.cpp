@@ -80,11 +80,12 @@ namespace gfx
             auto& scene = *window->_scene;
             window->_inputState.update();
             window->_timeState.update();
-            scene.Update();
             Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
+                scene.Update();
                 scene.Render(commandBuffer);
                 GUI::Render(commandBuffer, scene);
             });
+            window->LateUpdate();
         }
         window.reset();
     }

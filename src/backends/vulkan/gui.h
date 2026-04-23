@@ -22,13 +22,15 @@ namespace gfx::vk
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
         void setImage(const gfx::Image& image) override;
 
+        ImTextureID operator*() const override;
+
     private:
         std::reference_wrapper<const gfx::Image> _image;
         std::unique_ptr<gfx::Image> _helperImage;
         std::unique_ptr<gfx::ImageView> _helperImageView;
         std::unique_ptr<gfx::Sampler> _helperSampler;
 
-        VkDescriptorSet _descriptorSet;
+        std::vector<VkDescriptorSet> _descriptorSets;
     };
 
     class GUI

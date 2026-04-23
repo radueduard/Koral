@@ -22,11 +22,11 @@ namespace gfx::ogl
         gfx::CommandBuffer& Begin() override;
         void End() override;
 
-        gfx::CommandBuffer& BeginRendering(const gfx::Framebuffer* framebuffer) override;
+        gfx::CommandBuffer& BeginRendering(const gfx::Framebuffer* framebuffer, RenderParameters renderParameters) override;
         gfx::CommandBuffer& EndRendering() override;
         gfx::CommandBuffer& BindPipeline(const gfx::ComputePipeline* pipeline) override;
         gfx::CommandBuffer& BindPipeline(const gfx::GraphicsPipeline* pipeline) override;
-        gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, const gfx::DescriptorSet* set) override;
+        gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, const gfx::DescriptorSet* set, bool debug) override;
         gfx::CommandBuffer& BindMesh(const Mesh *mesh) override;
         gfx::CommandBuffer& Barrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers) override;
         gfx::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
@@ -38,6 +38,9 @@ namespace gfx::ogl
 
         gfx::CommandBuffer& Blit(const Image* srcImage, const Image* dstImage, gfx::Blit blitInfo) override;
         gfx::CommandBuffer& Resolve(const Image *srcImage, const Image *dstImage, gfx::Resolve resolveInfo) override;
+
+        gfx::CommandBuffer& ClearBuffer(const gfx::Buffer *buffer, glm::u64 offset, glm::u64 size) override;
+        gfx::CommandBuffer& FillBuffer(const gfx::Buffer *buffer, void *data, glm::u64 offset, glm::u64 size) override;
 
         gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
 

@@ -11,6 +11,8 @@
 #include "assimpImporter.h"
 
 #include <OpenImageIO/imageio.h>
+#include <vulkan/vulkan.h>
+#include <ktx.h>
 
 #include "context.h"
 
@@ -124,8 +126,149 @@ namespace gfx
         return image;
     }
 
-    Task<void> Importer::LoadImageAsync(const std::filesystem::path path, const bool generateMipmaps, std::shared_ptr<Image>& returnImage)
-    {
+    struct KtxTextureDeleter {
+        void operator()(ktxTexture* t) const noexcept {
+            if (t) {
+                ktxTexture_Destroy(t); // macro is fine when invoked
+            }
+        }
+    };
+
+
+    gfx::Image::Format GetFormatFromKtxVkFormat(const ktx_uint32_t vkFormat) {
+        switch (vkFormat) {
+            case VK_FORMAT_R8_UNORM: return gfx::Image::Format::eR8_UNORM;
+            case VK_FORMAT_R8G8_UNORM: return gfx::Image::Format::eRG8_UNORM;
+            case VK_FORMAT_R8G8B8A8_UNORM: return gfx::Image::Format::eRGBA8_UNORM;
+            case VK_FORMAT_R8G8B8A8_SRGB: return gfx::Image::Format::eRGBA8_SRGB;
+
+            case VK_FORMAT_R16_UNORM: return gfx::Image::Format::eR16_UNORM;
+            case VK_FORMAT_R16G16_UNORM: return gfx::Image::Format::eRG16_UNORM;
+            case VK_FORMAT_R16G16B16A16_UNORM: return gfx::Image::Format::eRGBA16_UNORM;
+            case VK_FORMAT_R16G16B16A16_SFLOAT: return gfx::Image::Format::eRGBA16_SFLOAT;
+
+            case VK_FORMAT_R32_SFLOAT: return gfx::Image::Format::eR32_SFLOAT;
+            case VK_FORMAT_R32G32_SFLOAT: return gfx::Image::Format::eRG32_SFLOAT;
+            case VK_FORMAT_R32G32B32A32_SFLOAT: return gfx::Image::Format::eRGBA32_SFLOAT;
+
+            case VK_FORMAT_BC7_UNORM_BLOCK: return gfx::Image::Format::eBC7_UNORM;
+            case VK_FORMAT_BC7_SRGB_BLOCK: return gfx::Image::Format::eBC7_SRGB;
+
+            default: {
+                std::cerr << "Unknown format: " << vkFormat << std::endl;
+                throw std::runtime_error("Unsupported KTX VkFormat: " + std::to_string(vkFormat));
+            }
+        }
+    }
+
+    gfx::Image::Type GetImageTypeFromKtx(const ktxTexture* tex) {
+        if (tex->baseDepth > 1) return gfx::Image::Type::e3D;
+        if (tex->baseHeight > 1) return gfx::Image::Type::e2D;
+        return gfx::Image::Type::e1D;
+    }
+
+    Task<void> LoadKTXAsync(const std::filesystem::path& path, const bool generateMipmaps, std::shared_ptr<Image>& returnImage) {
+        ktxTexture2* rawTexture = nullptr;
+        const KTX_error_code createResult = ktxTexture2_CreateFromNamedFile(
+            path.string().c_str(),
+            KTX_TEXTURE_CREATE_NO_FLAGS, // metadata only (phase 1)
+            &rawTexture
+        );
+
+        if (createResult != KTX_SUCCESS || !rawTexture) {
+            std::cerr << "Could not open KTX file: " << path.string()
+                      << " error=" << ktxErrorString(createResult) << std::endl;
+            co_return;
+        }
+
+        const std::unique_ptr<ktxTexture, KtxTextureDeleter> texture(ktxTexture(rawTexture));
+
+        const glm::u32 layers = std::max<glm::u32>(1u, texture->numLayers);
+        const glm::u32 faces  = std::max<glm::u32>(1u, texture->numFaces);
+        const glm::u32 arrayLayers = layers * faces;
+        const glm::u32 fileMipLevels = std::max<glm::u32>(1u, texture->numLevels);
+
+        // If KTX already contains mips, use them. Otherwise optionally auto-generate.
+        const glm::u32 mipLevels = (fileMipLevels > 1) ? fileMipLevels : (generateMipmaps ? 0u : 1u);
+
+        // Phase 1: publish image handle before any suspend (matches your async contract)
+        returnImage = Image::Builder()
+            .setType(GetImageTypeFromKtx(texture.get()))
+            .setExtent({ texture->baseWidth, texture->baseHeight, texture->baseDepth })
+            .setArrayLayers(arrayLayers)
+            .setMipLevels(mipLevels)
+            .setFormat(GetFormatFromKtxVkFormat(rawTexture->vkFormat))
+            .addUsage(Image::Usage::eTransferSrc)
+            .addUsage(Image::Usage::eTransferDst)
+            .build();
+
+        const auto image = returnImage;
+
+        // Phase 2a: disk/data load off main thread
+        co_await Context::SwitchToBackgroundThread();
+
+        const KTX_error_code loadResult = ktxTexture_LoadImageData(texture.get(), nullptr, 0);
+        if (loadResult != KTX_SUCCESS || texture->pData == nullptr) {
+            std::cerr << "Could not load KTX image data: " << path.string()
+                      << " error=" << ktxErrorString(loadResult) << std::endl;
+            co_return;
+        }
+
+        struct UploadSlice {
+            glm::u32 mip;
+            glm::u32 layer;
+            ktx_size_t offset;
+            size_t size;
+        };
+        std::vector<UploadSlice> uploads;
+        uploads.reserve(fileMipLevels * arrayLayers);
+
+        for (glm::u32 mip = 0; mip < fileMipLevels; ++mip) {
+            const size_t perImageSize = ktxTexture_GetImageSize(texture.get(), mip);
+
+            for (glm::u32 layer = 0; layer < layers; ++layer) {
+                for (glm::u32 face = 0; face < faces; ++face) {
+                    ktx_size_t offset = 0;
+                    const KTX_error_code offResult = ktxTexture_GetImageOffset(texture.get(), mip, layer, face, &offset);
+                    if (offResult != KTX_SUCCESS) {
+                        std::cerr << "KTX offset query failed: " << ktxErrorString(offResult) << std::endl;
+                        co_return;
+                    }
+
+                    uploads.push_back(UploadSlice{
+                        mip,
+                        layer * faces + face, // flatten layer+face into array layer
+                        offset,
+                        perImageSize
+                    });
+                }
+            }
+        }
+
+        // Phase 2b: GPU upload on main/render thread
+        co_await Context::SwitchToMainThread();
+
+        for (const auto& u : uploads) {
+            const auto stagingBuffer = Buffer::Builder()
+                .setSize(u.size)
+                .setUsage(Buffer::Usage::eTransferSrc)
+                .build();
+
+            stagingBuffer->Map();
+            stagingBuffer->Write(std::span{texture->pData + u.offset, u.size});
+            stagingBuffer->Unmap();
+
+            image->CopyFrom(*stagingBuffer, u.mip, u.layer);
+        }
+
+        if (generateMipmaps && fileMipLevels == 1) {
+            image->GenerateMipmaps();
+        }
+
+        co_return;
+    }
+
+    Task<void> LoadRegularImageAsync(const std::filesystem::path path, const bool generateMipmaps, std::shared_ptr<Image>& returnImage) {
         const auto image_input = OIIO::ImageInput::open(path.string());
         if (!image_input) {
             std::cerr << "Could not open image file: " << OIIO::geterror() << std::endl;
@@ -179,6 +322,13 @@ namespace gfx
         }
 
         co_return;
+    }
+
+    Task<void> Importer::LoadImageAsync(const std::filesystem::path& path, const bool generateMipmaps, std::shared_ptr<Image>& returnImage) {
+        if (path.extension() == ".ktx" || path.extension() == ".ktx2") {
+            return LoadKTXAsync(path, generateMipmaps, returnImage);
+        }
+        return LoadRegularImageAsync(path, generateMipmaps, returnImage);
     }
 
     void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, const Image &image) {

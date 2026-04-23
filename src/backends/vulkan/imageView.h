@@ -17,10 +17,8 @@ namespace gfx::vk
         ~ImageView() override;
 
         ::vk::ImageView operator*() const;
-
+        ::vk::ImageView operator[](size_t i) const;
     private:
-        ::vk::ImageView operator[](const int i) const { return _imageViews[i]; }
-
         std::vector<::vk::ImageView> _imageViews {};
     };
 }

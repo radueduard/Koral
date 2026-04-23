@@ -26,7 +26,10 @@ namespace gfx::vk
 {
     GUI_Image::GUI_Image(const gfx::Image& image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
-        _helperSampler = Sampler::Builder().build();
+        _helperSampler = Sampler::Builder()
+            .setMagFilter(Filter::eNearest)
+            .setMinFilter(Filter::eNearest)
+            .build();
         setImage(image);
         setLayerAndLevel(layer, level);
     }
@@ -34,10 +37,8 @@ namespace gfx::vk
     GUI_Image::~GUI_Image()
     {
         ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
-        if (_id != 0)
-        {
-            ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(_id));
-            _id = 0;
+        for (const auto& descriptorSet : _descriptorSets) {
+            ImGui_ImplVulkan_RemoveTexture(descriptorSet);
         }
     }
 
@@ -49,23 +50,18 @@ namespace gfx::vk
                 const auto& vkHelperImage = *dynamic_cast<const gfx::vk::Image*>(_helperImage.get());
 
                 const auto imageType = vkImage.getType();
-                const auto srcSubresourceLayer  = ::vk::ImageSubresourceLayers()
-                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                    .setMipLevel(level)
-                    .setBaseArrayLayer(imageType == Image::Type::e3D ? 0 : layer)
-                    .setLayerCount(1);
-                const auto srcOffsets = std::array {
-                    ::vk::Offset3D{ 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
-                    ::vk::Offset3D{  }
-                };
 
                 commandBuffer.Blit(
                     &_image.get(), _helperImage.get(),
                     gfx::Blit {
                         .srcOffset = { 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
-                        .srcExtent = { static_cast<glm::i32>(vkImage.getExtent().x), static_cast<glm::i32>(vkImage.getExtent().y), imageType == Image::Type::e3D ? static_cast<int32_t>(layer + 1) : 1 },
+                        .srcExtent = {
+                            static_cast<glm::i32>(vkImage.getExtent().x),
+                            static_cast<glm::i32>(vkImage.getExtent().y),
+                            1
+                        },
                         .dstOffset = { 0, 0, 0 },
-                        .dstExtent = { static_cast<glm::u32>(vkHelperImage.getExtent().x), static_cast<glm::u32>(vkHelperImage.getExtent().y), 1 },
+                        .dstExtent = { (vkHelperImage.getExtent().x), (vkHelperImage.getExtent().y), 1 },
                         .srcBaseArrayLayer = imageType == Image::Type::e3D ? 0 : layer,
                         .dstBaseArrayLayer = 0,
                         .layerCount = 1,
@@ -82,14 +78,14 @@ namespace gfx::vk
     {
         Context::Device()->waitIdle();
         ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
-        if (_id != 0)
-        {
-            ImGui_ImplVulkan_RemoveTexture(reinterpret_cast<VkDescriptorSet>(_id));
-            _id = 0;
+        for (const auto& descriptorSet : _descriptorSets) {
+            ImGui_ImplVulkan_RemoveTexture(descriptorSet);
         }
+        _descriptorSets.clear();
 
         _image = image;
         _helperImage = gfx::Image::Builder()
+            .setIsPerFrame(_image.get().isPerFrame())
             .setType(Image::Type::e2D)
             .setFormat(image.getFormat())
             .setExtent({ image.getExtent().x, image.getExtent().y })
@@ -111,13 +107,19 @@ namespace gfx::vk
             .setComponentMapping(components)
             .build();
 
-        _descriptorSet = ImGui_ImplVulkan_AddTexture(
-            **dynamic_cast<const gfx::vk::Sampler*>(_helperSampler.get()),
-            **dynamic_cast<const gfx::vk::ImageView*>(_helperImageView.get()),
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        for (int frame = 0; frame < gfx::Context::Scheduler().getImageCount(); ++frame) {
+            _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
+                **dynamic_cast<const gfx::vk::Sampler*>(_helperSampler.get()),
+                (*dynamic_cast<const gfx::vk::ImageView*>(_helperImageView.get()))[frame],
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+        }
 
-        _id = reinterpret_cast<ImTextureID>(_descriptorSet);
         setLayerAndLevel(0, 0);
+    }
+
+    ImTextureID GUI_Image::operator*() const {
+        const auto frameIndex = gfx::Context::Scheduler().getCurrentImageIndex();
+        return reinterpret_cast<ImTextureID>(_descriptorSets[frameIndex]);
     }
 
     void GUI::Init()

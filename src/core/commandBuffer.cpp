@@ -44,7 +44,7 @@ namespace gfx
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
-    CommandBuffer& CommandBuffer::BeginRendering(const Framebuffer* framebuffer)
+    CommandBuffer& CommandBuffer::BeginRendering(const Framebuffer* framebuffer, RenderParameters renderParameters)
     {
         if (framebuffer == nullptr) framebuffer = &Context::DefaultFramebuffer();
         _state.boundFramebuffer = framebuffer;

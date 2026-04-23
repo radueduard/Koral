@@ -27,12 +27,18 @@ namespace gfx
         eTIF,
     };
 
+    struct GFX_API AABB {
+        glm::vec3 min;
+        glm::vec3 max;
+    };
+
     class GFX_API Importer
     {
     public:
         struct GFX_API Material {
             std::string name;
 
+            float alphaCutoff = 1.f;
             glm::vec4 baseColorFactor = glm::vec4(1.0f);
             glm::vec4 emissiveFactor = glm::vec4(1.0f);
             float roughness = 1.0f;
@@ -80,6 +86,7 @@ namespace gfx
             glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);
             glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);
             glm::vec3 scale = glm::vec3(1.f, 1.f, 1.f);
+            AABB aabb;
         };
 
         struct GFX_API Scene {
@@ -91,7 +98,7 @@ namespace gfx
         virtual ~Importer() = default;
 
         static std::unique_ptr<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
-        static Task<void> LoadImageAsync(std::filesystem::path path, bool generateMipmaps, std::shared_ptr<Image> &returnImage);
+        static Task<void> LoadImageAsync(const std::filesystem::path& path, bool generateMipmaps, std::shared_ptr<Image> &returnImage);
 
         static void SaveImage(const std::filesystem::path& path, const std::string& name, FileFormat fileFormat, const Image& image);
         static std::unique_ptr<Importer> Load(const std::filesystem::path& path);

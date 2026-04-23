@@ -36,6 +36,8 @@ namespace gfx
         virtual void bind(const CommandBuffer& commandBuffer, glm::u32 index) const {};
         virtual void Write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index) = 0;
 
+        virtual void DebugPrint() const {};
+
     protected:
         explicit DescriptorSet(const Builder &builder);
         bool _isPerFrame = false;

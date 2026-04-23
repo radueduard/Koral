@@ -16,6 +16,7 @@
 #include "imageView.h"
 #include "scheduler.h"
 #include "vulkanContext.h"
+#include "vk_enum_conversions.h"
 
 namespace gfx::vk
 {
@@ -85,7 +86,7 @@ namespace gfx::vk
         _handle.end();
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* framebuffer)
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* framebuffer, RenderParameters renderParameters)
     {
         gfx::CommandBuffer::BeginRendering(framebuffer);
         framebuffer = _state.boundFramebuffer.value();
@@ -139,8 +140,8 @@ namespace gfx::vk
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
                 .setClearValue(::vk::ClearValue().setColor(::vk::ClearColorValue()
                     .setFloat32({ framebuffer->getClearValues().clearColor[i].r, framebuffer->getClearValues().clearColor[i].g, framebuffer->getClearValues().clearColor[i].b, framebuffer->getClearValues().clearColor[i].a })))
-                .setLoadOp(::vk::AttachmentLoadOp::eClear)
-                .setStoreOp(::vk::AttachmentStoreOp::eStore));
+                .setLoadOp(getVkLoadOp(renderParameters.colorLoadOperation))
+                .setStoreOp(getVkStoreOp(renderParameters.colorStoreOperation)));
             i++;
         }
 
@@ -148,8 +149,15 @@ namespace gfx::vk
             .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthStencilAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearValues().clearDepth, static_cast<glm::u32>(framebuffer->getClearValues().clearStencil) }))
-            .setLoadOp(::vk::AttachmentLoadOp::eClear)
-            .setStoreOp(::vk::AttachmentStoreOp::eStore)) : std::nullopt;
+            .setLoadOp(getVkLoadOp(renderParameters.depthLoadOperation))
+            .setStoreOp(getVkStoreOp(renderParameters.depthStoreOperation))) : std::nullopt;
+
+        const auto stencilAttachment = framebuffer->hasDepthStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
+            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthStencilAttachment()))
+            .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
+            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearValues().clearDepth, static_cast<glm::u32>(framebuffer->getClearValues().clearStencil) }))
+            .setLoadOp(getVkLoadOp(renderParameters.stencilLoadOperation))
+            .setStoreOp(getVkStoreOp(renderParameters.stencilStoreOperation))) : std::nullopt;
 
         auto extent = framebuffer->getExtent();
         const auto renderArea = ::vk::Rect2D()
@@ -162,7 +170,7 @@ namespace gfx::vk
             .setViewMask(0)
             .setColorAttachments(colorAttachmentInfos)
             .setPDepthAttachment(depthAttachment.has_value() ? &depthAttachment.value() : nullptr)
-            .setPStencilAttachment(depthAttachment.has_value()? &depthAttachment.value() : nullptr);
+            .setPStencilAttachment(stencilAttachment.has_value() ? &stencilAttachment.value() : nullptr);
 
         _handle.beginRenderingKHR(beginRenderingInfo);
         return *this;
@@ -220,8 +228,10 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, const gfx::DescriptorSet* set)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, const gfx::DescriptorSet* set, const bool debug)
     {
+        if (debug) set->DebugPrint();
+
         if (_state.boundComputePipeline.has_value()) {
             const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline*>(_state.boundComputePipeline.value());
             const auto pipelineLayout = vkPipeline->getPipelineLayout();
@@ -358,6 +368,21 @@ namespace gfx::vk
             indexCount = mesh->getIndexCount().value();
         }
         _handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::ClearBuffer(const gfx::Buffer *buffer, glm::u64 offset, glm::u64 size) {
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
+        _handle.fillBuffer(*vkBuffer, offset, size, 0);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::FillBuffer(const gfx::Buffer *buffer, void *data, const glm::u64 offset, glm::u64 size) {
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
+        if (size == UINT64_MAX) {
+            size = vkBuffer.getSize() - offset;
+        }
+        _handle.updateBuffer(*vkBuffer, offset, size, data);
         return *this;
     }
 

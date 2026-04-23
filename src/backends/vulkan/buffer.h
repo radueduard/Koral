@@ -34,8 +34,8 @@ namespace gfx::vk
 		[[nodiscard]] ::vk::AccessFlags getAccessMask() const;
 		void setAccessMask(::vk::AccessFlags access) const;
 
+		::vk::Buffer operator[](size_t i) const;
     private:
-		::vk::Buffer operator[](const int i) const { return _buffers[i]; }
 
 		std::vector<::vk::Buffer> _buffers {};
 		std::vector<VmaAllocation> _allocations {};

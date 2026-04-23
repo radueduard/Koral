@@ -118,6 +118,18 @@ namespace gfx
             // </hint> Surface formats
             eBGRA8_UNORM,
             eBGRA8_SRGB,
+
+            // </hint> Compressed formats
+            eBC1_RGB_UNORM,
+            eBC1_RGB_SRGB,
+            eBC1_RGBA_UNORM,
+            eBC1_RGBA_SRGB,
+            eBC2_UNORM,
+            eBC2_SRGB,
+            eBC3_UNORM,
+            eBC3_SRGB,
+            eBC7_UNORM,
+            eBC7_SRGB,
         };
 
         enum class Usage

@@ -15,6 +15,25 @@
 
 namespace gfx
 {
+    inline ::vk::AttachmentLoadOp getVkLoadOp(const LoadOperation loadOperation) {
+        switch (loadOperation)
+        {
+        case LoadOperation::eLoad: return ::vk::AttachmentLoadOp::eLoad;
+        case LoadOperation::eClear: return ::vk::AttachmentLoadOp::eClear;
+        case LoadOperation::eDontCare: return ::vk::AttachmentLoadOp::eDontCare;
+        default: throw std::runtime_error("Unknown load operation type!");
+        }
+    }
+
+    inline ::vk::AttachmentStoreOp getVkStoreOp(const StoreOperation storeOperation) {
+        switch (storeOperation)
+        {
+        case StoreOperation::eStore: return ::vk::AttachmentStoreOp::eStore;
+        case StoreOperation::eDontCare: return ::vk::AttachmentStoreOp::eDontCare;
+        default: throw std::runtime_error("Unknown store operation type!");
+        }
+    }
+
     inline ::vk::AccessFlags getVkAccessFlags(const ResourceAccess access) {
         switch (access)
         {
@@ -353,6 +372,16 @@ namespace gfx
 
         case Image::Format::eBGRA8_UNORM : return ::vk::Format::eB8G8R8A8Unorm;
         case Image::Format::eBGRA8_SRGB : return ::vk::Format::eB8G8R8A8Srgb;
+        case Image::Format::eBC1_RGB_UNORM: return ::vk::Format::eBc1RgbUnormBlock;
+        case Image::Format::eBC1_RGB_SRGB: return ::vk::Format::eBc1RgbSrgbBlock;
+        case Image::Format::eBC1_RGBA_UNORM: return ::vk::Format::eBc1RgbaUnormBlock;
+        case Image::Format::eBC1_RGBA_SRGB: return ::vk::Format::eBc1RgbaSrgbBlock;
+        case Image::Format::eBC2_UNORM: return ::vk::Format::eBc2UnormBlock;
+        case Image::Format::eBC2_SRGB: return ::vk::Format::eBc2SrgbBlock;
+        case Image::Format::eBC3_UNORM: return ::vk::Format::eBc3UnormBlock;
+        case Image::Format::eBC3_SRGB: return ::vk::Format::eBc3SrgbBlock;
+        case Image::Format::eBC7_UNORM: return ::vk::Format::eBc7UnormBlock;
+        case Image::Format::eBC7_SRGB: return ::vk::Format::eBc7SrgbBlock;
         default: throw std::runtime_error("Unsupported image format!");
         }
     }

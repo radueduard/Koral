@@ -127,4 +127,8 @@ namespace gfx
 
         setLayerAndLevel(0, 0);
     }
+
+    ImTextureID ogl::GUI_Image::operator*() const {
+        return _id;
+    }
 }

@@ -30,7 +30,10 @@ namespace gfx::ogl
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
         void setImage(const gfx::Image& image) override;
 
+        ImTextureID operator*() const override;
+
     private:
+        GLint _id;
         std::reference_wrapper<const gfx::Image> _image;
     };
 }

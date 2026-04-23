@@ -113,11 +113,14 @@ namespace gfx::io {
         [[nodiscard]] API getAPI() const { return _api; }
         [[nodiscard]] const std::string& getTitle() const { return _title; }
         [[nodiscard]] const gfx::Framebuffer* getFramebuffer() const { return _framebuffer.get(); }
+        [[nodiscard]] bool hasResized() const { return _hasResized; }
         [[nodiscard]] const gfx::Surface& getSurface() const { return *_surface; }
 
         void setIcon(const std::filesystem::path& iconPath);
 
         [[nodiscard]] bool isFocused() const { return _focused; }
+
+        void LateUpdate();
 
     private:
         void focus();
@@ -146,5 +149,6 @@ namespace gfx::io {
         bool _paused = false;
         bool _closed = false;
         bool _focused = true;
+        bool _hasResized = false;
     };
 }

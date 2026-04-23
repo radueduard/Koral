@@ -157,6 +157,29 @@ namespace gfx
         glm::u32 dstMipLevel = 0;
     };
 
+
+    enum class LoadOperation {
+        eLoad,
+        eClear,
+        eDontCare
+    };
+
+    enum class StoreOperation {
+        eStore,
+        eDontCare
+    };
+
+    class GFX_API RenderParameters {
+    public:
+        gfx::LoadOperation colorLoadOperation = gfx::LoadOperation::eClear;
+        gfx::LoadOperation depthLoadOperation = gfx::LoadOperation::eClear;
+        gfx::LoadOperation stencilLoadOperation = gfx::LoadOperation::eClear;
+
+        gfx::StoreOperation colorStoreOperation = gfx::StoreOperation::eStore;
+        gfx::StoreOperation depthStoreOperation = gfx::StoreOperation::eStore;
+        gfx::StoreOperation stencilStoreOperation = gfx::StoreOperation::eStore;
+    };
+
     class GFX_API CommandBuffer
     {
     public:
@@ -174,13 +197,13 @@ namespace gfx
         virtual CommandBuffer& Begin() = 0;
         virtual void End() = 0;
 
-        virtual CommandBuffer& BeginRendering(const Framebuffer* framebuffer = nullptr);
+        virtual CommandBuffer& BeginRendering(const Framebuffer* framebuffer = nullptr, RenderParameters renderParameters = {}) = 0;
         virtual CommandBuffer& EndRendering();
         virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
         virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline);
         virtual CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline);
-        virtual CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* descriptorSet) = 0;
+        virtual CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* descriptorSet, bool debug = false) = 0;
         virtual CommandBuffer& BindMesh(const Mesh* mesh);
 
         template<typename T> requires std::is_trivially_copyable_v<T>
@@ -194,6 +217,10 @@ namespace gfx
 
         virtual CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0);
         virtual CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0);
+
+
+        virtual CommandBuffer& ClearBuffer(const Buffer* buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
+        virtual CommandBuffer& FillBuffer(const Buffer* buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
 
         virtual CommandBuffer& Blit(
             const Image* srcImage,

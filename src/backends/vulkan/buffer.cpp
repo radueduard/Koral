@@ -48,8 +48,8 @@ namespace gfx::vk
 		{
 			auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
 			_buffers.push_back(buffer);
-			_allocations.push_back(allocation);
-			_accessFlags.push_back(::vk::AccessFlagBits::eNone);
+			_allocations.emplace_back(allocation);
+			_accessFlags.emplace_back(::vk::AccessFlagBits::eNone);
 		}
 	}
 
@@ -104,6 +104,14 @@ namespace gfx::vk
 	void Buffer::setAccessMask(const ::vk::AccessFlags access) const {
 		const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
 		_accessFlags[currentFrame] = access;
+	}
+
+	::vk::Buffer Buffer::operator[](const size_t i) const {
+		if (_isPerFrame) {
+			const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
+			return _buffers[currentFrame];
+		}
+		return _buffers[0];
 	}
 
 	VmaAllocation Buffer::getAllocation() const {

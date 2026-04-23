@@ -48,10 +48,10 @@ namespace gfx::ogl
         _filled = true;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* _framebuffer)
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* _framebuffer, RenderParameters renderParameters)
     {
         CheckRecording();
-        _commands.emplace_back([_framebuffer, this] ()
+        _commands.emplace_back([_framebuffer, this, renderParameters] ()
         {
             if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Another rendering operation is still in progress!");
             gfx::CommandBuffer::BeginRendering(_framebuffer);
@@ -63,22 +63,28 @@ namespace gfx::ogl
             framebuffer->Bind();
 
             if (**oglFramebuffer == 0) {
-                glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer->getClearColor(0)));
+                if (renderParameters.colorLoadOperation == LoadOperation::eClear)
+                    glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer->getClearColor(0)));
+                    glCheckError();
+                if (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear)
+                    glClearNamedFramebufferfi(**oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer->getClearDepth(), oglFramebuffer->getClearStencil());
+                    glCheckError();
             } else {
                 int i = 0;
                 for (const auto& attachment : _state.boundFramebuffer.value()->getColorAttachments())
                 {
-                    glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer->getClearColor(i)));
-                    glCheckError();
+                    if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
+                        glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer->getClearColor(i)));
+                        glCheckError();
+                    }
                     i++;
                 }
+                if (framebuffer->hasDepthStencilAttachment() && (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear))
+                {
+                    glClearNamedFramebufferfi(**oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer->getClearDepth(), oglFramebuffer->getClearStencil());
+                    glCheckError();
+                }
             }
-            if (framebuffer->hasDepthStencilAttachment())
-            {
-                glClearNamedFramebufferfi(**oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer->getClearDepth(), oglFramebuffer->getClearStencil());
-                glCheckError();
-            }
-
         });
         return *this;
     }
@@ -119,8 +125,10 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, const DescriptorSet* set)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, const DescriptorSet* set, bool debug)
     {
+        if (debug) set->DebugPrint();
+
         CheckRecording();
         _commands.emplace_back([set, index, this] ()
         {
@@ -434,6 +442,30 @@ namespace gfx::ogl
                 glCheckError();
             });
         }
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::ClearBuffer(const gfx::Buffer *buffer, glm::u64 offset, glm::u64 size) {
+        CheckRecording();
+        _commands.emplace_back([buffer, offset, size] () {
+            const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
+            glClearNamedBufferData(*oglBuffer, GL_R8, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+            glCheckError();
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::FillBuffer(const gfx::Buffer *buffer, void *data, glm::u64 offset, glm::u64 size) {
+        CheckRecording();
+        _commands.emplace_back([buffer, data, offset, size] () {
+            const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
+            auto actualSize = size;
+            if (size == UINT64_MAX) {
+                actualSize = oglBuffer.getSize() - offset;
+            }
+            glNamedBufferSubData(*oglBuffer, offset, actualSize, data);
+            glCheckError();
+        });
         return *this;
     }
 
