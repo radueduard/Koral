@@ -243,35 +243,18 @@ private:
     template<typename T>
     static std::unique_ptr<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
         {
-            const auto byteSize = static_cast<glm::u64>(data.size_bytes());
-
             // Keep final buffers transfer-capable as requested.
             const auto finalUsage = usage
                 | Buffer::Usage::eTransferDst
                 | Buffer::Usage::eTransferSrc
                 | Buffer::Usage::eStorage;
 
-            auto finalBuffer = Buffer::Builder()
-                .setSize(byteSize)
+            auto finalBuffer = Buffer::Builder<T>()
+                .setDataView(data)
                 .setUsage(finalUsage)
-                .setMemoryProperties(Buffer::MemoryProperty::eDeviceLocal)
+                .setType(Buffer::Type::eDeviceLocal)
                 .build();
 
-            if (byteSize == 0 || data.empty())
-                return finalBuffer;
-
-            auto stagingBuffer = Buffer::Builder()
-                .setSize(byteSize)
-                .setUsage(Buffer::Usage::eTransferSrc)
-                .setMemoryProperties(Buffer::MemoryProperty::eHostVisible)
-                .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
-                .build();
-
-            stagingBuffer->Map();
-            stagingBuffer->Write(data);
-            stagingBuffer->Unmap();
-
-            finalBuffer->CopyFrom(*stagingBuffer, 0, 0, static_cast<glm::i64>(byteSize));
             return finalBuffer;
         }
 

@@ -12,7 +12,7 @@
 
 namespace gfx
 {
-    std::unique_ptr<Buffer> Buffer::Builder::build() const
+    std::unique_ptr<Buffer> Buffer::RawBuilder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
@@ -24,10 +24,9 @@ namespace gfx
         }
     }
 
-    Buffer::Buffer(const Builder& createInfo) :
+    Buffer::Buffer(const RawBuilder& createInfo) :
         _isPerFrame(createInfo.isPerFrame),
         _size(createInfo.size),
         _usage(createInfo.usage),
-        _memoryProperties(createInfo.memoryProperties),
-        _layout(createInfo.layout) {}
+        _type(createInfo.type) {}
 }

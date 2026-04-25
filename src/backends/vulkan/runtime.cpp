@@ -52,7 +52,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
                 gfx::log::error("[vulkan] {}", pCallbackData->pMessage);
-                // GFX_BREAK(); // drop into debugger on Vulkan errors too
+                GFX_BREAK(); // drop into debugger on Vulkan errors too
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
                 break;

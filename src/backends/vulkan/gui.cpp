@@ -4,6 +4,8 @@
 
 #include "gui.h"
 
+#include <iostream>
+
 #include "context.h"
 #include "descriptorPool.h"
 #include "device.h"

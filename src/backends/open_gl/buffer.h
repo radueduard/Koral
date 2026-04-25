@@ -13,24 +13,25 @@ namespace gfx::ogl
     class Buffer : public gfx::Buffer
     {
     public:
-        explicit Buffer(const gfx::Buffer::Builder& createInfo);
+        explicit Buffer(const gfx::Buffer::RawBuilder& createInfo);
         ~Buffer() override;
 
-        void Map() const override;
-        void Unmap() const override;
-
-        void CopyFrom(const gfx::Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const override;
+        void CopyFrom(const gfx::Buffer& srcBuffer, glm::u64 srcOffset, glm::u64 dstOffset, glm::u64 size) const override;
 
         void Bind(GLenum target);
         void Unbind();
 
         GLuint operator*() const { return _id; }
 
+        void Map() const override;
+        void Unmap() const override;
+        void Flush(glm::i64 size, glm::u64 offset) const override;
+        void Invalidate(glm::i64 size, glm::u64 offset) const override;
+
     private:
         GLuint _id = 0;
         static GLenum GetTargetFromUsage(Flags<gfx::Buffer::Usage> usage);
-        static GLenum GetFlagsFromMemoryProperties(Flags<gfx::Buffer::MemoryProperty> memoryProperties);
-
+        static GLenum GetFlagsFromType(Type type);
 
         std::optional<GLenum> _boundTarget = std::nullopt;
 

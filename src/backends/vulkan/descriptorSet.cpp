@@ -5,6 +5,7 @@
 #include "descriptorSet.h"
 
 #include <ranges>
+#include <iostream>
 
 #include "buffer.h"
 #include "context.h"

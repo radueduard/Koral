@@ -16,7 +16,7 @@ namespace gfx::vk
 	class Buffer final : public gfx::Buffer {
 		friend class gfx::vk::DescriptorSet;
     public:
-        explicit Buffer(const Builder& builder);
+        explicit Buffer(const RawBuilder& builder);
 		~Buffer() override;
 
 		Buffer(const Buffer &) = delete;
@@ -25,11 +25,13 @@ namespace gfx::vk
 
     	void Map() const override;
         void Unmap() const override;
+		void Flush(glm::i64 size, glm::u64 offset) const override;
+		void Invalidate(glm::i64 size, glm::u64 offset) const override;
 
 		::vk::Buffer operator*() const;
         [[nodiscard]] VmaAllocation getAllocation() const;
 
-        void CopyFrom(const gfx::Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const override;
+        void CopyFrom(const gfx::Buffer& srcBuffer, glm::u64 srcOffset, glm::u64 dstOffset, glm::u64 size) const override;
 
 		[[nodiscard]] ::vk::AccessFlags getAccessMask() const;
 		void setAccessMask(::vk::AccessFlags access) const;

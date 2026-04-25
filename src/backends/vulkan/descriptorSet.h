@@ -12,6 +12,7 @@ namespace gfx::vk
     class DescriptorSet final : public gfx::DescriptorSet
     {
     public:
+
         explicit DescriptorSet(const Builder& builder);
         ~DescriptorSet() override;
 

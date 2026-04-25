@@ -8,7 +8,7 @@
 
 namespace gfx::ogl
 {
-    Buffer::Buffer(const gfx::Buffer::Builder& createInfo) : gfx::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo.usage))
+    Buffer::Buffer(const gfx::Buffer::RawBuilder& createInfo) : gfx::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo.usage))
     {
         if (createInfo.usage & Usage::eUniform) {
             if (createInfo.size > 0xFFFF) {
@@ -19,7 +19,7 @@ namespace gfx::ogl
         glCreateBuffers(1, &_id);
         glCheckError();
 
-        glNamedBufferStorage(_id, createInfo.size, nullptr, GetFlagsFromMemoryProperties(createInfo.memoryProperties));
+        glNamedBufferStorage(_id, createInfo.size, nullptr, GetFlagsFromType(createInfo.type));
         glCheckError();
     }
 
@@ -31,24 +31,18 @@ namespace gfx::ogl
 
     void Buffer::Map() const
     {
-        if (!(_memoryProperties & MemoryProperty::eHostVisible)) {
-            std::cerr << "Error: Attempting to map a buffer that is not host visible! Buffer ID: " << _id << std::endl;
+        if (_type == Type::eDeviceLocal) {
+            gfx::log::error("Attempted to map a device-local buffer! Buffer ID: {}. Device-local buffers are not mappable, as they reside in GPU-only memory. Please use a staging buffer for data transfer to or from device-local buffers.", _id);
             return;
         }
 
-        if (_mappedPtr) {
-            std::cerr << "Warning: Buffer is already mapped! Attempting to map buffer with ID " << _id << " again." << std::endl;
-            return;
-        }
-
-        auto accessFlags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT;
-        if (_memoryProperties & MemoryProperty::eHostCoherent) {
-            accessFlags |= GL_MAP_COHERENT_BIT;
-        } else if (_memoryProperties & MemoryProperty::eHostVisible) {
-            accessFlags |= GL_MAP_FLUSH_EXPLICIT_BIT;
-        }
-
-        _mappedPtr = glMapNamedBufferRange(_id, 0, _size, accessFlags);
+        const auto accessFlags = GetFlagsFromType(_type);
+        _mappedPtr = glMapNamedBufferRange(
+            _id,
+            0,
+            static_cast<GLsizeiptr>(_size),
+            accessFlags
+        );
         glCheckError();
         if (!_mappedPtr) {
             std::cerr << "Failed to map buffer with ID " << _id << "!" << std::endl;
@@ -67,7 +61,25 @@ namespace gfx::ogl
         glCheckError();
     }
 
-    void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, const glm::i64 srcOffset, const glm::i64 dstOffset, const glm::i64 size) const
+    void Buffer::Flush(const glm::i64 size, const glm::u64 offset) const {
+        glFlushMappedNamedBufferRange(
+            _id,
+            static_cast<GLintptr>(offset),
+            static_cast<GLsizeiptr>(size)
+        );
+        glCheckError();
+    }
+
+    void Buffer::Invalidate(const glm::i64 size, const glm::u64 offset) const {
+        glInvalidateBufferSubData(
+            _id,
+            static_cast<GLintptr>(offset),
+            static_cast<GLsizeiptr>(size)
+        );
+        glCheckError();
+    }
+
+    void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, const glm::u64 srcOffset, const glm::u64 dstOffset, const glm::u64 size) const
     {
         const auto& srcBufferGL = dynamic_cast<Buffer&>(const_cast<gfx::Buffer&>(srcBuffer));
 
@@ -79,16 +91,22 @@ namespace gfx::ogl
             std::cerr << "Error: Destination buffer is not a transfer destination! Buffer ID: " << _id << std::endl;
             return;
         }
-        if (srcOffset + getSize() > srcBufferGL.getSize()) {
+        if (srcOffset > srcBufferGL.getSize() || size > (srcBufferGL.getSize() - srcOffset)) {
             std::cerr << "Error: Source buffer copy range exceeds buffer size! Buffer ID: " << srcBufferGL._id << ", Source Offset: " << srcOffset << ", Size: " << size << ", Buffer Size: " << srcBufferGL._size << std::endl;
             return;
         }
-        if (dstOffset + size > size) {
-            std::cerr << "Error: Destination buffer copy range exceeds buffer size! Buffer ID: " << _id << ", Destination Offset: " << dstOffset << ", Size: " << size << ", Buffer Size: " << size << std::endl;
+        if (dstOffset > getSize() || size > (getSize() - dstOffset)) {
+            std::cerr << "Error: Destination buffer copy range exceeds buffer size! Buffer ID: " << _id << ", Destination Offset: " << dstOffset << ", Size: " << size << ", Buffer Size: " << getSize() << std::endl;
             return;
         }
 
-        glCopyNamedBufferSubData(srcBufferGL._id, _id, srcOffset, dstOffset, size);
+        glCopyNamedBufferSubData(
+            srcBufferGL._id,
+            _id,
+            static_cast<GLintptr>(srcOffset),
+            static_cast<GLintptr>(dstOffset),
+            static_cast<GLsizeiptr>(size)
+        );
         glCheckError();
     }
 
@@ -139,23 +157,24 @@ namespace gfx::ogl
         if (usage & Usage::eTexel) {
             return GL_TEXTURE_BUFFER;
         }
-        std::cerr << "Warning: Buffer usage does not specify a valid target! Defaulting to GL_ARRAY_BUFFER." << std::endl;
+        gfx::log::error("Unknown buffer usage flags specified! Defaulting to GL_ARRAY_BUFFER. Usage value: {}", static_cast<int>(usage));
         return GL_ARRAY_BUFFER;
     }
 
-    GLenum Buffer::GetFlagsFromMemoryProperties(Flags<gfx::Buffer::MemoryProperty> memoryProperties)
-    {
-        GLenum flags = 0;
-        if (memoryProperties & MemoryProperty::eHostVisible) {
-            flags |= GL_MAP_READ_BIT | GL_MAP_WRITE_BIT;
+    GLenum Buffer::GetFlagsFromType(const Type type) {
+        switch (type) {
+            case Type::eDeviceLocal:
+                return GL_DYNAMIC_STORAGE_BIT;
+            case Type::eStaging:
+                return GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+            case Type::eReadback:
+                return GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+            case Type::eDynamic:
+                return GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
+            default:
+                gfx::log::error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
+                return GL_DYNAMIC_STORAGE_BIT;
         }
-        if (memoryProperties & MemoryProperty::eHostCoherent) {
-            flags |= GL_MAP_COHERENT_BIT | GL_MAP_PERSISTENT_BIT;
-        }
-        if (memoryProperties & MemoryProperty::eHostCached) {
-            flags |= GL_MAP_PERSISTENT_BIT;
-        }
-        return flags;
     }
 
 

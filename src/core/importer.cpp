@@ -107,14 +107,11 @@ namespace gfx
 
         }
 
-        const auto stagingBuffer = gfx::Buffer::Builder()
-            .setSize(data.size())
+        const auto stagingBuffer = gfx::Buffer::Builder<unsigned char>()
+            .setDataView(data)
             .setUsage(gfx::Buffer::Usage::eTransferSrc)
+            .setType(gfx::Buffer::Type::eStaging)
             .build();
-
-        stagingBuffer->Map();
-        stagingBuffer->Write(std::span { data });
-        stagingBuffer->Unmap();
 
         image->CopyFrom(*stagingBuffer, 0, 0);
         imageInput->close();
@@ -248,17 +245,14 @@ namespace gfx
         // Phase 2b: GPU upload on main/render thread
         co_await Context::SwitchToMainThread();
 
-        for (const auto& u : uploads) {
-            const auto stagingBuffer = Buffer::Builder()
-                .setSize(u.size)
+        for (const auto&[mip, layer, offset, size] : uploads) {
+            const auto stagingBuffer = Buffer::Builder<unsigned char>()
+                .setDataView(std::span{texture->pData + offset, size})
                 .setUsage(Buffer::Usage::eTransferSrc)
+                .setType(Buffer::Type::eStaging)
                 .build();
 
-            stagingBuffer->Map();
-            stagingBuffer->Write(std::span{texture->pData + u.offset, u.size});
-            stagingBuffer->Unmap();
-
-            image->CopyFrom(*stagingBuffer, u.mip, u.layer);
+            image->CopyFrom(*stagingBuffer, mip, layer);
         }
 
         if (generateMipmaps && fileMipLevels == 1) {
@@ -307,14 +301,11 @@ namespace gfx
 
         co_await Context::SwitchToMainThread();
 
-        const auto stagingBuffer = Buffer::Builder()
-            .setSize(data.size())
+        const auto stagingBuffer = Buffer::Builder<unsigned char>()
+            .setDataView(data)
             .setUsage(Buffer::Usage::eTransferSrc)
+            .setType(Buffer::Type::eStaging)
             .build();
-
-        stagingBuffer->Map();
-        stagingBuffer->Write(std::span{data});
-        stagingBuffer->Unmap();
 
         image->CopyFrom(*stagingBuffer, 0, 0);
         if (generateMipmaps) {

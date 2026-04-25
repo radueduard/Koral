@@ -36,8 +36,9 @@ namespace gfx::vk
 		void FreeImage(const ::vk::Image image, const VmaAllocation allocation) const;
 
 		void* MapMemory(const VmaAllocation allocation) const;
-
 		void UnmapMemory(const VmaAllocation allocation) const;
+    	void FlushAllocation(const VmaAllocation allocation, size_t offset = 0, size_t size = VK_WHOLE_SIZE) const;
+		void InvalidateAllocation(const VmaAllocation allocation, size_t offset = 0, size_t size = VK_WHOLE_SIZE) const;
 
 		[[nodiscard]] VmaAllocationInfo GetAllocationInfo(const VmaAllocation allocation) const;
 

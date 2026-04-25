@@ -293,12 +293,11 @@ namespace gfx::vk
 
         const auto bufferSize = extent.x * extent.y * extent.z * Image::ChannelSizeFromImageFormat(_format) * Image::ChannelCountFromImageFormat(_format);
 
-        const auto stagingBuffer = Buffer::Builder()
-            .setSize(bufferSize)
+        const auto stagingBuffer = Buffer::Builder<std::byte>()
+            .setInstanceCount(bufferSize)
             .addUsage(Buffer::Usage::eTexel)
             .addUsage(Buffer::Usage::eTransferDst)
-            .addMemoryProperty(Buffer::MemoryProperty::eHostCoherent)
-            .addMemoryProperty(Buffer::MemoryProperty::eHostVisible)
+            .setType(Buffer::Type::eStaging)
             .build();
         const auto& vkStagingBuffer = dynamic_cast<const gfx::vk::Buffer&>(*stagingBuffer);
 
@@ -329,9 +328,7 @@ namespace gfx::vk
             commandBuffer->copyImageToBuffer(_handle, ::vk::ImageLayout::eTransferSrcOptimal, *vkStagingBuffer, region);
         }, ::vk::QueueFlagBits::eTransfer);
 
-        stagingBuffer->Map();
-        auto data = stagingBuffer->Read(0, bufferSize);
-        stagingBuffer->Unmap();
+        auto data = stagingBuffer->Read<std::byte>();
         return { data.begin(), data.end() };
     }
 

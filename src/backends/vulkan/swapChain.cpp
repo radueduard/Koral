@@ -6,6 +6,7 @@
 
 #include <framebuffer.h>
 #include <ranges>
+#include <iostream>
 
 #include "context.h"
 #include "image.h"

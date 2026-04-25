@@ -114,6 +114,21 @@ namespace gfx::vk
         vmaUnmapMemory(_allocator, allocation);
     }
 
+    void Allocator::FlushAllocation(const VmaAllocation allocation, size_t offset, size_t size) const {
+        if (const auto result = vmaFlushAllocation(_allocator, allocation, offset, size); result != VK_SUCCESS) {
+            std::cerr << "Failed to flush allocation: " << ::vk::to_string(static_cast<::vk::Result>(result)) << std::endl;
+            throw std::runtime_error("Failed to flush allocation");
+        }
+    }
+
+    void Allocator::InvalidateAllocation(const VmaAllocation allocation, size_t offset, size_t size) const {
+        if (const auto result = vmaInvalidateAllocation(_allocator, allocation, offset, size); result != VK_SUCCESS) {
+            std::cerr << "Failed to invalidate allocation: " << ::vk::to_string(static_cast<::vk::Result>(result)) << std::endl;
+            throw std::runtime_error("Failed to invalidate allocation");
+        }
+    }
+
+
     VmaAllocationInfo Allocator::GetAllocationInfo(const VmaAllocation allocation) const
     {
         VmaAllocationInfo allocInfo;

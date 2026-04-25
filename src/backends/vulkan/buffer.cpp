@@ -21,21 +21,26 @@ namespace gfx::vk
 	// 	return size;
 	// }
 
-	Buffer::Buffer(const Builder& builder) : gfx::Buffer(builder) {
+	Buffer::Buffer(const RawBuilder& builder) : gfx::Buffer(builder) {
 		VmaMemoryUsage memoryUsage = VMA_MEMORY_USAGE_UNKNOWN;
-		if (builder.memoryProperties & MemoryProperty::eDeviceLocal)
-			memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
-		if (builder.memoryProperties & MemoryProperty::eHostVisible
-			|| builder.memoryProperties & MemoryProperty::eHostCoherent
-			|| builder.memoryProperties & MemoryProperty::eHostCached)
-			memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
-
 		VmaAllocationCreateFlags flags = 0;
-		if (builder.memoryProperties & MemoryProperty::eHostVisible)
+		switch (_type) {
+		case Type::eDeviceLocal:
+			memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+			break;
+		case Type::eStaging:
+			memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+			flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+			break;
+		case Type::eReadback:
+			memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 			flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
-		if (builder.memoryProperties & MemoryProperty::eHostCached)
-			flags |= VMA_ALLOCATION_CREATE_MAPPED_BIT;
-
+			break;
+		case Type::eDynamic:
+			memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
+			flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+			break;
+		}
 
 		const auto bufferInfo = ::vk::BufferCreateInfo()
 			.setSize(_size)
@@ -76,12 +81,22 @@ namespace gfx::vk
 		}
 	}
 
+	void Buffer::Flush(glm::i64 size, glm::u64 offset) const {
+		const auto _allocation = getAllocation();
+		Context::Allocator().FlushAllocation(_allocation, offset, size);
+	}
+
+	void Buffer::Invalidate(glm::i64 size, glm::u64 offset) const {
+		const auto _allocation = getAllocation();
+		Context::Allocator().InvalidateAllocation(_allocation, offset, size);
+	}
+
 	::vk::Buffer Buffer::operator*() const
 	{
 		return _buffers[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
 
-	void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, glm::i64 srcOffset, glm::i64 dstOffset, glm::i64 size) const
+	void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, glm::u64 srcOffset, glm::u64 dstOffset, glm::u64 size) const
 	{
 		Context::Device().runSingleTimeCommand([this, srcOffset, dstOffset, &srcBuffer, size](const gfx::vk::CommandBuffer& commandBuffer) {
 			const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
