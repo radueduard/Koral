@@ -112,7 +112,7 @@ namespace gfx::io {
 
         [[nodiscard]] API getAPI() const { return _api; }
         [[nodiscard]] const std::string& getTitle() const { return _title; }
-        [[nodiscard]] const gfx::Framebuffer* getFramebuffer() const { return _framebuffer.get(); }
+        [[nodiscard]] gfx::ResourceRef<gfx::Framebuffer> getFramebuffer() const { return _framebuffer; }
         [[nodiscard]] bool hasResized() const { return _hasResized; }
         [[nodiscard]] const gfx::Surface& getSurface() const { return *_surface; }
 
@@ -142,7 +142,7 @@ namespace gfx::io {
 
         Input::State _inputState;
         Time::State _timeState;
-        std::unique_ptr<gfx::Framebuffer> _framebuffer;
+        gfx::Resource<gfx::Framebuffer> _framebuffer;
 
         std::unique_ptr<Scene> _scene;
 

@@ -9,6 +9,7 @@
 #include "../backends/open_gl/commandBuffer.h"
 #include "../backends/vulkan/commandBuffer.h"
 
+#include "image.h"
 #include "mesh.h"
 #include "../log.h"
 #include "../backends/vulkan/device.h"
@@ -30,13 +31,13 @@ namespace gfx
     }
 
     BufferBarrier::BufferBarrier(
-        const gfx::Buffer &buffer, const ResourceAccess dstAccess,
+        const gfx::ResourceRef<gfx::Buffer> &buffer, const ResourceAccess dstAccess,
         const glm::u64 offset, const glm::u64 size)
       : _buffer(buffer), _dstAccess(dstAccess),
         _offset(offset), _size(size) {}
 
     ImageBarrier::ImageBarrier(
-        const gfx::Image &image,
+        const gfx::ResourceRef<gfx::Image> &image,
         const ResourceAccess dstAccess,
         const std::optional<glm::u32> baseMipLevel, const std::optional<glm::u32> levelCount,
         const std::optional<glm::u32> baseArrayLayer, const std::optional<glm::u32> layerCount)
@@ -44,9 +45,18 @@ namespace gfx
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
-    CommandBuffer& CommandBuffer::BeginRendering(const Framebuffer* framebuffer, RenderParameters renderParameters)
+
+    CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
+        _state.boundFramebuffer = Context::Window().getFramebuffer();
+        _state.boundComputePipeline = std::nullopt;
+        _state.boundGraphicsPipeline = std::nullopt;
+        _state.viewportSet = false;
+        _state.scissorSet = false;
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<Framebuffer> framebuffer, RenderParameters renderParameters)
     {
-        if (framebuffer == nullptr) framebuffer = &Context::DefaultFramebuffer();
         _state.boundFramebuffer = framebuffer;
         _state.boundComputePipeline = std::nullopt;
         _state.boundGraphicsPipeline = std::nullopt;
@@ -79,21 +89,21 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BindPipeline(const ComputePipeline* pipeline)
+    CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<ComputePipeline> pipeline)
     {
         _state.boundComputePipeline = pipeline;
         _state.boundGraphicsPipeline = std::nullopt;
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BindPipeline(const GraphicsPipeline* pipeline)
+    CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<GraphicsPipeline> pipeline)
     {
         _state.boundGraphicsPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BindMesh(const Mesh *mesh) {
+    CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<Mesh> mesh) {
         if (!_state.boundGraphicsPipeline.has_value())
             log::error("You can't bind a mesh without a graphics pipeline bound!");
         _state.boundMesh = mesh;
@@ -130,7 +140,51 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::DrawMesh(const Mesh* mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
+    CommandBuffer & CommandBuffer::GenerateMipmaps(ResourceRef<Image> image) {
+        const auto& extent = image->getExtent();
+        const auto mipLevels = image->getMipLevels();
+        const auto arrayLayers = image->getArrayLayers();
+
+        auto mipWidth = static_cast<glm::i32>(extent.x);
+        auto mipHeight = static_cast<glm::i32>(extent.y);
+        auto mipDepth = static_cast<glm::i32>(extent.z);
+
+        for (uint32_t i = 1; i < mipLevels; i++) {
+            Blit(
+                image, image,
+                gfx::Blit {
+                    .srcOffset = { 0, 0, 0 },
+                    .srcExtent = { mipWidth, mipHeight, mipDepth },
+                    .dstOffset = { 0, 0, 0 },
+                    .dstExtent = { std::max(mipWidth / 2, 1), std::max(mipHeight / 2, 1), std::max(mipDepth / 2, 1) },
+                    .srcBaseArrayLayer = 0,
+                    .dstBaseArrayLayer = 0,
+                    .layerCount = arrayLayers,
+                    .srcMipLevel = i - 1,
+                    .dstMipLevel = i,
+                    .filtering = Filter::eLinear
+                });
+
+            if (mipWidth > 1) {
+                mipWidth /= 2;
+            }
+            if (mipHeight > 1) {
+                mipHeight /= 2;
+            }
+        }
+        return *this;
+    }
+
+    void CommandBuffer::SingleTimeCommand(const std::function<void(gfx::CommandBuffer &)> &command, const Usage usage) {
+        const auto commandBuffer = Create(usage);
+        commandBuffer->Begin();
+        command(*commandBuffer);
+        commandBuffer->End();
+        commandBuffer->Submit();
+        commandBuffer->WaitForFence();
+    }
+
+    CommandBuffer& CommandBuffer::DrawMesh(gfx::ResourceRef<Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
     {
         if (!_state.boundGraphicsPipeline.has_value())
             throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
@@ -145,7 +199,7 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount) {
+    CommandBuffer & CommandBuffer::DrawSubMesh(gfx::ResourceRef<Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
         if (!_state.boundGraphicsPipeline.has_value())
             throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
         if (!_state.viewportSet) {

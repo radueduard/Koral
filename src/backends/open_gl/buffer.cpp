@@ -79,37 +79,6 @@ namespace gfx::ogl
         glCheckError();
     }
 
-    void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, const glm::u64 srcOffset, const glm::u64 dstOffset, const glm::u64 size) const
-    {
-        const auto& srcBufferGL = dynamic_cast<Buffer&>(const_cast<gfx::Buffer&>(srcBuffer));
-
-        if (!(srcBufferGL.getUsage() & Usage::eTransferSrc)) {
-            std::cerr << "Error: Source buffer is not a transfer source! Buffer ID: " << srcBufferGL._id << std::endl;
-            return;
-        }
-        if (!(_usage & Usage::eTransferDst)) {
-            std::cerr << "Error: Destination buffer is not a transfer destination! Buffer ID: " << _id << std::endl;
-            return;
-        }
-        if (srcOffset > srcBufferGL.getSize() || size > (srcBufferGL.getSize() - srcOffset)) {
-            std::cerr << "Error: Source buffer copy range exceeds buffer size! Buffer ID: " << srcBufferGL._id << ", Source Offset: " << srcOffset << ", Size: " << size << ", Buffer Size: " << srcBufferGL._size << std::endl;
-            return;
-        }
-        if (dstOffset > getSize() || size > (getSize() - dstOffset)) {
-            std::cerr << "Error: Destination buffer copy range exceeds buffer size! Buffer ID: " << _id << ", Destination Offset: " << dstOffset << ", Size: " << size << ", Buffer Size: " << getSize() << std::endl;
-            return;
-        }
-
-        glCopyNamedBufferSubData(
-            srcBufferGL._id,
-            _id,
-            static_cast<GLintptr>(srcOffset),
-            static_cast<GLintptr>(dstOffset),
-            static_cast<GLsizeiptr>(size)
-        );
-        glCheckError();
-    }
-
     void Buffer::Bind(GLenum target)
     {
         glBindBuffer(target, _id);

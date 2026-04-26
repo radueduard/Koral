@@ -57,7 +57,7 @@ namespace gfx::vk
         {
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
             _images.push_back(image);
-            _allocations.push_back(allocation);
+            _allocations.emplace_back(allocation);
             for (uint32_t mipLevel = 0; mipLevel < _mipLevels; mipLevel++) {
                 for (uint32_t arrayLayer = 0; arrayLayer < _arrayLayers; arrayLayer++) {
                     glm::u32 key = (i << 24) | (mipLevel << 12) | arrayLayer;
@@ -74,55 +74,6 @@ namespace gfx::vk
                 Context::Allocator().FreeImage(_images[i], _allocations[i]);
             }
         }
-    }
-
-    void Image::CopyFrom(const gfx::Buffer &buffer, const glm::u32 mipLevel, const glm::u32 layer) const {
-
-        if (!(_usage & Usage::eTransferDst)) {
-            throw std::runtime_error("Attempting to copy data to an image that does not have the TransferDst usage flag set!");
-        }
-        if (_mipLevels <= mipLevel) {
-            throw std::runtime_error("Attempting to copy data to a mip level that does not exist!");
-        }
-        if (_arrayLayers <= layer) {
-            throw std::runtime_error("Attempting to copy data to an array layer that does not exist!");
-        }
-
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(buffer);
-
-        Context::Device().runSingleTimeCommand([this, &buffer, layer, mipLevel, &vkBuffer] (gfx::vk::CommandBuffer& commandBuffer) {
-
-            auto extent = this->_extent;
-            for (uint32_t i = 0; i < mipLevel; i++) {
-                extent.x = std::max<uint32_t>(1u, extent.x / 2);
-                extent.y = std::max<uint32_t>(1u, extent.y / 2);
-                extent.z = std::max<uint32_t>(1u, extent.z / 2);
-            }
-
-            const auto region = ::vk::BufferImageCopy()
-                .setBufferOffset(0)
-                .setBufferRowLength(0)
-                .setBufferImageHeight(0)
-                .setImageSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                    .setMipLevel(mipLevel)
-                    .setBaseArrayLayer(layer)
-                    .setLayerCount(1))
-                .setImageOffset({ 0, 0, 0 })
-                .setImageExtent(::vk::Extent3D(extent.x, extent.y, extent.z));
-
-            const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
-            commandBuffer.ImageBarrier({
-                *this,
-                ResourceAccess::TransferDst,
-                mipLevel,
-                1,
-                layer,
-                1
-            });
-
-            commandBuffer->copyBufferToImage(*vkBuffer, _images[currentFrame], ::vk::ImageLayout::eTransferDstOptimal, region);
-        }, ::vk::QueueFlagBits::eTransfer);
     }
 
     Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const MSAA msaa)
@@ -274,98 +225,5 @@ namespace gfx::vk
                 _accessMasks[key] = ::vk::AccessFlagBits::eNone;
             }
         }
-    }
-
-    std::vector<std::byte> Image::ReadData(glm::u32 mipLevel, glm::u32 arrayLayer) const
-    {
-        if (!(_usage & Usage::eTransferSrc)) {
-            throw std::runtime_error("Attempting to read data from an image that does not have the TransferSrc usage flag set!");
-        }
-        if (_mipLevels <= mipLevel) {
-            throw std::runtime_error("Attempting to read data from a mip level that does not exist!");
-        }
-        if (_arrayLayers <= arrayLayer) {
-            throw std::runtime_error("Attempting to read data from an array layer that does not exist!");
-        }
-
-        const auto mipReductionFactor = 1u << mipLevel;
-        const auto extent = glm::max(_extent / mipReductionFactor, glm::uvec3(1));
-
-        const auto bufferSize = extent.x * extent.y * extent.z * Image::ChannelSizeFromImageFormat(_format) * Image::ChannelCountFromImageFormat(_format);
-
-        const auto stagingBuffer = Buffer::Builder<std::byte>()
-            .setInstanceCount(bufferSize)
-            .addUsage(Buffer::Usage::eTexel)
-            .addUsage(Buffer::Usage::eTransferDst)
-            .setType(Buffer::Type::eStaging)
-            .build();
-        const auto& vkStagingBuffer = dynamic_cast<const gfx::vk::Buffer&>(*stagingBuffer);
-
-        Context::Device().runSingleTimeCommand([this, mipLevel, arrayLayer, &vkStagingBuffer] (gfx::vk::CommandBuffer& commandBuffer) {
-
-            const auto region = ::vk::BufferImageCopy()
-                .setBufferOffset(0)
-                .setBufferRowLength(0)
-                .setBufferImageHeight(0)
-                .setImageSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(::vk::ImageAspectFlagBits::eColor)
-                    .setMipLevel(mipLevel)
-                    .setBaseArrayLayer(arrayLayer)
-                    .setLayerCount(1))
-                .setImageOffset({ 0, 0, 0 })
-                .setImageExtent(::vk::Extent3D(_extent.x, _extent.y, _extent.z));
-
-            const auto _handle = **this;
-            commandBuffer.ImageBarrier({
-                *this,
-                ResourceAccess::TransferSrc,
-                mipLevel,
-                1,
-                arrayLayer,
-                1
-            });
-
-            commandBuffer->copyImageToBuffer(_handle, ::vk::ImageLayout::eTransferSrcOptimal, *vkStagingBuffer, region);
-        }, ::vk::QueueFlagBits::eTransfer);
-
-        auto data = stagingBuffer->Read<std::byte>();
-        return { data.begin(), data.end() };
-    }
-
-    void Image::GenerateMipmaps()
-    {
-        if (_mipLevels == 1) {
-            return;
-        }
-
-        gfx::vk::Context::Device().runSingleTimeCommand([this] (gfx::vk::CommandBuffer &commandBuffer) {
-            auto mipWidth = static_cast<glm::i32>(_extent.x);
-            auto mipHeight = static_cast<glm::i32>(_extent.y);
-            auto mipDepth = static_cast<glm::i32>(_extent.z);
-
-            for (uint32_t i = 1; i < _mipLevels; i++) {
-                commandBuffer.Blit(
-                    this, this,
-                    gfx::Blit {
-                        .srcOffset = { 0, 0, 0 },
-                        .srcExtent = { mipWidth, mipHeight, mipDepth },
-                        .dstOffset = { 0, 0, 0 },
-                        .dstExtent = { std::max(mipWidth / 2, 1), std::max(mipHeight / 2, 1), std::max(mipDepth / 2, 1) },
-                        .srcBaseArrayLayer = 0,
-                        .dstBaseArrayLayer = 0,
-                        .layerCount = _arrayLayers,
-                        .srcMipLevel = i - 1,
-                        .dstMipLevel = i,
-                        .filtering = gfx::Filter::eLinear
-                    });
-
-                if (mipWidth > 1) {
-                    mipWidth /= 2;
-                }
-                if (mipHeight > 1) {
-                    mipHeight /= 2;
-                }
-            }
-        }, ::vk::QueueFlagBits::eGraphics);
     }
 }

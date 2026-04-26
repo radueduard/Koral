@@ -13,13 +13,13 @@
 
 namespace gfx
 {
-    std::unique_ptr<Sampler> Sampler::Builder::build() const
+    gfx::Resource<Sampler> Sampler::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return std::make_unique<ogl::Sampler>(*this);
-        case API::eVulkan:
-            return std::make_unique<vk::Sampler>(*this);
+            case API::eOpenGL:
+            return gfx::MakeResource<ogl::Sampler>(*this);
+            case API::eVulkan:
+            return gfx::MakeResource<vk::Sampler>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

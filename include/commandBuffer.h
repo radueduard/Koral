@@ -87,18 +87,18 @@ namespace gfx
     class GFX_API BufferBarrier {
     public:
         BufferBarrier(
-            const gfx::Buffer& buffer,
+            const gfx::ResourceRef<gfx::Buffer> &buffer,
             ResourceAccess dstAccess,
             glm::u64 offset = 0,
             glm::u64 size = UINT64_MAX);
 
-        [[nodiscard]] const gfx::Buffer& getBuffer() const { return _buffer; }
+        [[nodiscard]] gfx::ResourceRef<gfx::Buffer> getBuffer() const { return _buffer; }
         [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
         [[nodiscard]] glm::u64 getOffset() const { return _offset; }
         [[nodiscard]] glm::u64 getSize() const { return _size; }
 
     private:
-        const gfx::Buffer& _buffer;
+        gfx::ResourceRef<gfx::Buffer> _buffer;
         ResourceAccess _dstAccess;
         glm::u64 _offset;
         glm::u64 _size;
@@ -107,14 +107,14 @@ namespace gfx
     class GFX_API ImageBarrier {
     public:
         ImageBarrier(
-            const gfx::Image& image,
+            const gfx::ResourceRef<gfx::Image> &image,
             ResourceAccess dstAccess,
             std::optional<glm::u32> baseMipLevel = std::nullopt,
             std::optional<glm::u32> levelCount = std::nullopt,
             std::optional<glm::u32> baseArrayLayer = std::nullopt,
             std::optional<glm::u32> layerCount = std::nullopt);
 
-        [[nodiscard]] const gfx::Image& getImage() const { return _image; }
+        [[nodiscard]] gfx::ResourceRef<gfx::Image> getImage() const { return _image; }
         [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
         [[nodiscard]] std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
         [[nodiscard]] std::optional<glm::u32> getLevelCount() const { return _levelCount; }
@@ -122,7 +122,7 @@ namespace gfx
         [[nodiscard]] std::optional<glm::u32> getLayerCount() const { return _layerCount; }
 
     private:
-        const gfx::Image& _image;
+        gfx::ResourceRef<gfx::Image> _image;
         ResourceAccess _dstAccess;
         std::optional<glm::u32> _baseMipLevel;
         std::optional<glm::u32> _levelCount;
@@ -157,6 +157,17 @@ namespace gfx
         glm::u32 dstMipLevel = 0;
     };
 
+    class GFX_API Copy {
+    public:
+        glm::u64 bufferOffset = 0;
+        glm::u64 bufferRowLength = 0;
+        glm::u64 bufferImageHeight = 0;
+        glm::ivec3 imageOffset = { 0, 0, 0 };
+        glm::ivec3 imageExtent = { -1, -1, -1 };
+        glm::u32 imageBaseArrayLayer = 0;
+        glm::u32 imageLayerCount = 1;
+        glm::u32 imageMipLevel = 0;
+    };
 
     enum class LoadOperation {
         eLoad,
@@ -197,14 +208,15 @@ namespace gfx
         virtual CommandBuffer& Begin() = 0;
         virtual void End() = 0;
 
-        virtual CommandBuffer& BeginRendering(const Framebuffer* framebuffer = nullptr, RenderParameters renderParameters = {}) = 0;
+        virtual CommandBuffer& BeginRendering(RenderParameters renderParameters = {});
+        virtual CommandBuffer& BeginRendering(ResourceRef<Framebuffer> framebuffer, RenderParameters renderParameters = {});
         virtual CommandBuffer& EndRendering();
         virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
-        virtual CommandBuffer& BindPipeline(const ComputePipeline* pipeline);
-        virtual CommandBuffer& BindPipeline(const GraphicsPipeline* pipeline);
-        virtual CommandBuffer& BindDescriptorSet(glm::u32 index, const DescriptorSet* descriptorSet, bool debug = false) = 0;
-        virtual CommandBuffer& BindMesh(const Mesh* mesh);
+        virtual CommandBuffer& BindPipeline(ResourceRef<ComputePipeline> pipeline);
+        virtual CommandBuffer& BindPipeline(ResourceRef<GraphicsPipeline> pipeline);
+        virtual CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<DescriptorSet> descriptorSet, bool debug = false) = 0;
+        virtual CommandBuffer& BindMesh(ResourceRef<Mesh> mesh);
 
         template<typename T> requires std::is_trivially_copyable_v<T>
         CommandBuffer& PushConstants(const T& data, const glm::u32 offset = 0) {
@@ -219,20 +231,35 @@ namespace gfx
         virtual CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0);
 
 
-        virtual CommandBuffer& ClearBuffer(const Buffer* buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
-        virtual CommandBuffer& FillBuffer(const Buffer* buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
+        virtual CommandBuffer& ClearBuffer(ResourceRef<Buffer> buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
+        virtual CommandBuffer& FillBuffer(ResourceRef<Buffer> buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
+        virtual CommandBuffer& CopyBuffer(ResourceRef<Buffer> srcBuffer, ResourceRef<Buffer> dstBuffer, glm::u64 size = UINT64_MAX, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0) = 0;
 
         virtual CommandBuffer& Blit(
-            const Image* srcImage,
-            const Image* dstImage = nullptr,
-            Blit blitInfo = {}) = 0;
+            ResourceRef<Image> srcImage,
+            gfx::Blit blitInfo = {}) = 0;
+
+        virtual CommandBuffer& Blit(
+            ResourceRef<Image> srcImage,
+            ResourceRef<Image> dstImage,
+            gfx::Blit blitInfo = {}) = 0;
 
         virtual CommandBuffer& Resolve(
-            const Image* srcImage,
-            const Image* dstImage = nullptr,
-            Resolve resolveInfo = {}) = 0;
+            ResourceRef<Image> srcImage,
+            gfx::Resolve resolveInfo = {}) = 0;
+
+        virtual CommandBuffer& Resolve(
+            ResourceRef<Image> srcImage,
+            ResourceRef<Image> dstImage,
+            gfx::Resolve resolveInfo = {}) = 0;
+
+        CommandBuffer& GenerateMipmaps(ResourceRef<Image> image);
+
+        virtual CommandBuffer& CopyBufferToImage(ResourceRef<Buffer> buffer, ResourceRef<Image> image, gfx::Copy copyInfo = {}) = 0;
+        virtual CommandBuffer& CopyImageToBuffer(ResourceRef<Image> image, ResourceRef<Buffer> buffer, gfx::Copy copyInfo = {}) = 0;
 
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
+        static void SingleTimeCommand(const std::function<void(gfx::CommandBuffer&)>& command, Usage usage = Usage::eGraphics);
 
         virtual void Submit() = 0;
         virtual void Reset() = 0;
@@ -240,8 +267,8 @@ namespace gfx
         CommandBuffer& BufferBarrier(const BufferBarrier& barrier) { return Barrier({ barrier }, {}); }
         CommandBuffer& ImageBarrier(const ImageBarrier& barrier) { return Barrier({}, { barrier }); }
 
-        CommandBuffer& DrawMesh(const Mesh* mesh, glm::u32 instanceCount , glm::u32 baseInstance);
-        CommandBuffer& DrawSubMesh(const Mesh *mesh, glm::u32 baseIndex, glm::u32 indexCount);
+        CommandBuffer& DrawMesh(ResourceRef<Mesh> mesh, glm::u32 instanceCount , glm::u32 baseInstance);
+        CommandBuffer& DrawSubMesh(ResourceRef<Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount);
 
         static std::unique_ptr<CommandBuffer> Create(Flags<Usage> usage);
 
@@ -249,10 +276,10 @@ namespace gfx
 
     protected:
         struct {
-            std::optional<const Framebuffer*> boundFramebuffer = std::nullopt;
-            std::optional<const ComputePipeline*> boundComputePipeline = std::nullopt;
-            std::optional<const GraphicsPipeline*> boundGraphicsPipeline = std::nullopt;
-            std::optional<const Mesh*> boundMesh = std::nullopt;
+            std::optional<gfx::ResourceRef<Framebuffer>> boundFramebuffer = std::nullopt;
+            std::optional<gfx::ResourceRef<ComputePipeline>> boundComputePipeline = std::nullopt;
+            std::optional<gfx::ResourceRef<GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
+            std::optional<gfx::ResourceRef<Mesh>> boundMesh = std::nullopt;
 
             bool viewportSet = false;
             bool scissorSet = false;

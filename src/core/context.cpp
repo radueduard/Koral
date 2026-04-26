@@ -49,13 +49,13 @@ const gfx::Scheduler& gfx::Context::Scheduler()
     return *_scheduler;
 }
 
-const gfx::Framebuffer& gfx::Context::DefaultFramebuffer()
+gfx::ResourceRef<gfx::Framebuffer> gfx::Context::DefaultFramebuffer()
 {
     if (_window == nullptr)
     {
         throw std::runtime_error("There is no default framebuffer!");
     }
-    return *_window->getFramebuffer();
+    return _window->getFramebuffer();
 }
 
 ImGuiContext* gfx::Context::GetCurrentImGuiContext()

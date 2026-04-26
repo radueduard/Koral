@@ -7,6 +7,7 @@
 #include <filesystem>
 
 #include "Task.h"
+#include "resource.h"
 
 struct ImGuiContext;
 class MainThreadExecutor;
@@ -41,7 +42,7 @@ namespace gfx {
         static GFX_API io::Window& Window();
         static GFX_API const gfx::Scheduler& Scheduler();
 
-        static GFX_API const gfx::Framebuffer& DefaultFramebuffer();
+        static GFX_API gfx::ResourceRef<gfx::Framebuffer> DefaultFramebuffer();
         static GFX_API ImGuiContext* GetCurrentImGuiContext();
 
         static GFX_API gfx::SwitchAwaiter SwitchToMainThread();

@@ -4,7 +4,10 @@
 
 #pragma once
 
+#include <variant>
+
 #include "api.h"
+#include "resource.h"
 
 namespace gfx
 {
@@ -12,12 +15,33 @@ namespace gfx
     class Sampler;
     class ImageView;
 
+    struct BufferDescriptor {
+        ResourceRef<Buffer> _buffer;
+        glm::i64 _offset = 0;
+        glm::i64 _range = 0;
+    };
+
+    struct ImageDescriptor {
+        ResourceRef<ImageView> _imageView;
+    };
+
+    struct SamplerDescriptor {
+        ResourceRef<Sampler> _sampler;
+    };
+
+    struct CombinedImageSamplerDescriptor {
+        ResourceRef<ImageView> _imageView;
+        ResourceRef<Sampler> _sampler;
+    };
+
     class GFX_API Descriptor
     {
     public:
         Descriptor() = default;
-        explicit Descriptor(const Buffer* buffer, glm::i64 offset = 0, glm::i64 range = 0);
-        explicit Descriptor(const ImageView* imageView, const Sampler* sampler);
+        explicit Descriptor(const ResourceRef<Buffer>& buffer, glm::i64 offset = 0, glm::i64 range = 0);
+        explicit Descriptor(const ResourceRef<ImageView>& imageView, const ResourceRef<Sampler>& sampler);
+        explicit Descriptor(const ResourceRef<ImageView>& imageView);
+        explicit Descriptor(const ResourceRef<Sampler>& sampler);
 
         Descriptor(const Descriptor& other) = default;
         Descriptor& operator=(const Descriptor& other) = default;
@@ -25,19 +49,21 @@ namespace gfx
         ~Descriptor() = default;
         [[nodiscard]] bool isValid() const { return valid; }
 
-        [[nodiscard]] const Buffer* getBuffer() const { return _buffer; }
-        [[nodiscard]] glm::i64 getOffset() const { return _offset; }
-        [[nodiscard]] glm::i64 getRange() const { return _range; }
-        [[nodiscard]] const ImageView* getImageView() const { return _imageView; }
-        [[nodiscard]] const Sampler* getSampler() const { return _sampler; }
+        [[nodiscard]] const Buffer& getBuffer() const;
+        [[nodiscard]] glm::i64 getOffset() const;
+        [[nodiscard]] glm::i64 getRange() const;
+        [[nodiscard]] const ImageView& getImageView() const;
+        [[nodiscard]] const Sampler& getSampler() const;
 
     protected:
         bool valid = false;
-        const gfx::Buffer* _buffer = nullptr;
-        glm::i64 _offset = 0;
-        glm::i64 _range = 0;
-        const ImageView* _imageView = nullptr;
-        const Sampler* _sampler = nullptr;
+        std::variant<
+            std::nullptr_t,
+            BufferDescriptor,
+            ImageDescriptor,
+            SamplerDescriptor,
+            CombinedImageSamplerDescriptor
+        > _descriptor;
     };
 }
 

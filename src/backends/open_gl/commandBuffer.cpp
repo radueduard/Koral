@@ -48,42 +48,49 @@ namespace gfx::ogl
         _filled = true;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* _framebuffer, RenderParameters renderParameters)
+    gfx::CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
+        CheckRecording();
+        _commands.emplace_back([this, renderParameters] () {
+            if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Another rendering operation is still in progress!");
+            gfx::CommandBuffer::BeginRendering(renderParameters);
+            const auto framebuffer = _state.boundFramebuffer.value();
+            const auto& oglFramebuffer = dynamic_cast<const ogl::Framebuffer&>(*framebuffer);
+            framebuffer->Bind();
+
+            if (renderParameters.colorLoadOperation == LoadOperation::eClear)
+                glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer.getClearColor(0)));
+            glCheckError();
+            if (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear)
+                glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
+            glCheckError();
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<gfx::Framebuffer> _framebuffer, RenderParameters renderParameters)
     {
         CheckRecording();
         _commands.emplace_back([_framebuffer, this, renderParameters] ()
         {
             if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Another rendering operation is still in progress!");
-            gfx::CommandBuffer::BeginRendering(_framebuffer);
+            gfx::CommandBuffer::BeginRendering(_framebuffer, renderParameters);
             const auto framebuffer = _state.boundFramebuffer.value();
-            auto oglFramebuffer = dynamic_cast<const ogl::Framebuffer*>(framebuffer);
-            _state.boundFramebuffer = oglFramebuffer;
-            _state.boundComputePipeline = std::nullopt;
-            _state.boundGraphicsPipeline = std::nullopt;
+            const auto& oglFramebuffer = dynamic_cast<const ogl::Framebuffer&>(*framebuffer);
             framebuffer->Bind();
 
-            if (**oglFramebuffer == 0) {
-                if (renderParameters.colorLoadOperation == LoadOperation::eClear)
-                    glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer->getClearColor(0)));
-                    glCheckError();
-                if (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear)
-                    glClearNamedFramebufferfi(**oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer->getClearDepth(), oglFramebuffer->getClearStencil());
-                    glCheckError();
-            } else {
-                int i = 0;
-                for (const auto& attachment : _state.boundFramebuffer.value()->getColorAttachments())
-                {
-                    if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
-                        glClearNamedFramebufferfv(**oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer->getClearColor(i)));
-                        glCheckError();
-                    }
-                    i++;
-                }
-                if (framebuffer->hasDepthStencilAttachment() && (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear))
-                {
-                    glClearNamedFramebufferfi(**oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer->getClearDepth(), oglFramebuffer->getClearStencil());
+            int i = 0;
+            for (const auto& attachment : _state.boundFramebuffer.value()->getColorAttachments())
+            {
+                if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
+                    glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer.getClearColor(i)));
                     glCheckError();
                 }
+                i++;
+            }
+            if (framebuffer->hasDepthStencilAttachment() && (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear))
+            {
+                glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
+                glCheckError();
             }
         });
         return *this;
@@ -99,33 +106,33 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(const gfx::ComputePipeline* pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
     {
         CheckRecording();
         _commands.emplace_back([this, pipeline] ()
         {
-            _state.boundComputePipeline = dynamic_cast<const ogl::ComputePipeline*>(pipeline);
+            _state.boundComputePipeline = pipeline;
             _state.boundGraphicsPipeline = std::nullopt;
             pipeline->Bind(*this);
         });
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(const gfx::GraphicsPipeline* pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
     {
         CheckRecording();
         _commands.emplace_back([this, pipeline] ()
         {
             if (!_state.boundFramebuffer.has_value())
                 throw std::runtime_error("You can't use a graphics pipeline without a framebuffer!");
-            _state.boundGraphicsPipeline = dynamic_cast<const ogl::GraphicsPipeline*>(pipeline);
+            _state.boundGraphicsPipeline = pipeline;
             _state.boundComputePipeline = std::nullopt;
             pipeline->Bind(*this);
         });
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, const DescriptorSet* set, bool debug)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, gfx::ResourceRef<DescriptorSet> set, bool debug)
     {
         if (debug) set->DebugPrint();
 
@@ -137,7 +144,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::BindMesh(const Mesh *mesh) {
+    gfx::CommandBuffer & CommandBuffer::BindMesh(gfx::ResourceRef<Mesh> mesh) {
         CheckRecording();
         _commands.emplace_back([mesh, this] () {
             gfx::CommandBuffer::BindMesh(mesh);
@@ -147,7 +154,7 @@ namespace gfx::ogl
             const auto vertexBuffers = mesh->getVertexBuffers();
             for (size_t i = 0; i < vertexBuffers.size(); ++i)
             {
-                const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(vertexBuffers[i].get());
+                const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(*vertexBuffers[i]);
                 glBindBuffer(GL_ARRAY_BUFFER, *vertexBuffer);
                 glCheckError();
 
@@ -170,7 +177,7 @@ namespace gfx::ogl
                 }
             }
             if (const auto indexBuffer = mesh->getIndexBuffer(); indexBuffer.has_value()) {
-                const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(indexBuffer.value().get());
+                const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(*indexBuffer.value());
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *oglIndexBuffer);
                 glCheckError();
             }
@@ -254,8 +261,8 @@ namespace gfx::ogl
         {
             if (!_state.boundGraphicsPipeline.has_value())
                 throw std::runtime_error("You can't draw without a graphics pipeline!");
-            const auto& oglPipeline = dynamic_cast<const GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
-            const auto mode = oglPipeline->getMode();
+            const auto& oglPipeline = dynamic_cast<const GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
+            const auto mode = oglPipeline.getMode();
             glDrawArraysInstancedBaseInstance(mode, firstVertex, vertexCount, instanceCount, firstInstance);
         });
         return *this;
@@ -265,8 +272,8 @@ namespace gfx::ogl
         CheckRecording();
         _commands.emplace_back([this, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance] () {
             gfx::CommandBuffer::DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-            const auto& oglPipeline = dynamic_cast<const GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
-            const auto mode = oglPipeline->getMode();
+            const auto& oglPipeline = dynamic_cast<const GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
+            const auto mode = oglPipeline.getMode();
             const auto mesh = _state.boundMesh.value();
             const auto indexType = mesh->getIndexType().value();
             glDrawElementsInstancedBaseInstance(
@@ -304,7 +311,45 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage, gfx::Blit blitInfo)
+    gfx::CommandBuffer & CommandBuffer::Blit(ResourceRef<gfx::Image> srcImage, gfx::Blit blitInfo) {
+
+        if (srcImage->getMSAA() != MSAA::eNone)
+            throw std::runtime_error("Source image must not be multisampled for blit operation!");
+
+        if (blitInfo.srcExtent == glm::ivec3(-1))
+            blitInfo.srcExtent = srcImage->getExtent();
+        if (blitInfo.dstExtent == glm::ivec3(-1))
+            blitInfo.dstExtent = glm::uvec3 { Context::Window().getExtent(), 1 };
+
+        CheckRecording();
+
+        _commands.emplace_back([srcImage, blitInfo] ()
+        {
+            const auto& glSrcImage = dynamic_cast<const ogl::Image&>(*srcImage);
+            GLuint framebuffer = 0;
+            glGenFramebuffers(1, &framebuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            glCheckError();
+
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *glSrcImage, 0);
+            glCheckError();
+
+            glBlitNamedFramebuffer(
+                framebuffer,
+                0,
+                blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y,
+                blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y,
+                GL_COLOR_BUFFER_BIT,
+                blitInfo.filtering == gfx::Filter::eNearest ? GL_NEAREST : GL_LINEAR);
+            glCheckError();
+
+            glDeleteFramebuffers(1, &framebuffer);
+            glCheckError();
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Blit blitInfo)
     {
         if (srcImage->getMSAA() != MSAA::eNone)
             throw std::runtime_error("Source image must not be multisampled for blit operation!");
@@ -314,73 +359,78 @@ namespace gfx::ogl
         if (blitInfo.srcExtent == glm::ivec3(-1))
             blitInfo.srcExtent = srcImage->getExtent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = dstImage ? dstImage->getExtent() : glm::uvec3 { Context::Window().getExtent(), 1 };
+            blitInfo.dstExtent = dstImage->getExtent();
 
         CheckRecording();
+        _commands.emplace_back([srcImage, dstImage, blitInfo] {
+            const auto& glSrcImage = dynamic_cast<const ogl::Image&>(*srcImage);
+            const auto& glDstImage = dynamic_cast<const ogl::Image&>(*dstImage);
+            GLuint srcFramebuffer = 0;
+            glGenFramebuffers(1, &srcFramebuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, srcFramebuffer);
+            glCheckError();
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *glSrcImage, 0);
+            glCheckError();
 
-        if (dstImage == nullptr)
-        {
-            _commands.emplace_back([srcImage, blitInfo] ()
-            {
-                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
-                GLuint framebuffer = 0;
-                glGenFramebuffers(1, &framebuffer);
-                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-                glCheckError();
+            GLuint dstFramebuffer = 0;
+            glGenFramebuffers(1, &dstFramebuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, dstFramebuffer);
+            glCheckError();
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *glDstImage, 0);
+            glCheckError();
 
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
-                glCheckError();
+            glBlitNamedFramebuffer(
+                srcFramebuffer,
+                dstFramebuffer,
+                blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y,
+                blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y,
+                GL_COLOR_BUFFER_BIT,
+                blitInfo.filtering == gfx::Filter::eNearest ? GL_NEAREST : GL_LINEAR);
+            glCheckError();
 
-                glBlitNamedFramebuffer(
-                    framebuffer,
-                    0,
-                    blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y,
-                    blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y,
-                    GL_COLOR_BUFFER_BIT,
-                    blitInfo.filtering == gfx::Filter::eNearest ? GL_NEAREST : GL_LINEAR);
-                glCheckError();
-
-                glDeleteFramebuffers(1, &framebuffer);
-                glCheckError();
-            });
-        } else
-        {
-            _commands.emplace_back([srcImage, dstImage, blitInfo] ()
-            {
-                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
-                const auto* glDstImage = dynamic_cast<const ogl::Image*>(dstImage);
-                GLuint srcFramebuffer = 0;
-                glGenFramebuffers(1, &srcFramebuffer);
-                glBindFramebuffer(GL_FRAMEBUFFER, srcFramebuffer);
-                glCheckError();
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
-                glCheckError();
-
-                GLuint dstFramebuffer = 0;
-                glGenFramebuffers(1, &dstFramebuffer);
-                glBindFramebuffer(GL_FRAMEBUFFER, dstFramebuffer);
-                glCheckError();
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glDstImage, 0);
-                glCheckError();
-
-                glBlitNamedFramebuffer(
-                    srcFramebuffer,
-                    dstFramebuffer,
-                    blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y,
-                    blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y,
-                    GL_COLOR_BUFFER_BIT,
-                    blitInfo.filtering == gfx::Filter::eNearest ? GL_NEAREST : GL_LINEAR);
-                glCheckError();
-
-                glDeleteFramebuffers(1, &srcFramebuffer);
-                glDeleteFramebuffers(1, &dstFramebuffer);
-                glCheckError();
-            });
-        }
+            glDeleteFramebuffers(1, &srcFramebuffer);
+            glDeleteFramebuffers(1, &dstFramebuffer);
+            glCheckError();
+        });
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::Resolve(const gfx::Image *srcImage, const gfx::Image *dstImage, gfx::Resolve resolveInfo) {
+    gfx::CommandBuffer & CommandBuffer::Resolve(ResourceRef<gfx::Image> srcImage, gfx::Resolve resolveInfo) {
+        if (srcImage->getMSAA() == MSAA::eNone)
+            throw std::runtime_error("Source image must be multisampled for resolve operation!");
+
+        if (resolveInfo.srcExtent == glm::ivec3(-1))
+            resolveInfo.srcExtent = srcImage->getExtent();
+        if (resolveInfo.dstExtent == glm::ivec3(-1))
+            resolveInfo.dstExtent = glm::uvec3 { Context::Window().getExtent(), 1 };
+
+        CheckRecording();
+        _commands.emplace_back([srcImage, resolveInfo] {
+            const auto& glSrcImage = dynamic_cast<const ogl::Image&>(*srcImage);
+            GLuint framebuffer = 0;
+            glGenFramebuffers(1, &framebuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            glCheckError();
+
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *glSrcImage, 0);
+            glCheckError();
+
+            glBlitNamedFramebuffer(
+                framebuffer,
+                0,
+                resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.x + resolveInfo.srcExtent.x, resolveInfo.srcOffset.y + resolveInfo.srcExtent.y,
+                resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.x + resolveInfo.dstExtent.x, resolveInfo.dstOffset.y + resolveInfo.dstExtent.y,
+                GL_COLOR_BUFFER_BIT,
+                GL_NEAREST);
+            glCheckError();
+
+            glDeleteFramebuffers(1, &framebuffer);
+            glCheckError();
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::Resolve(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Resolve resolveInfo) {
         if (srcImage->getMSAA() == MSAA::eNone)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
         if (dstImage && dstImage->getMSAA() != MSAA::eNone)
@@ -389,73 +439,49 @@ namespace gfx::ogl
         if (resolveInfo.srcExtent == glm::ivec3(-1))
             resolveInfo.srcExtent = srcImage->getExtent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = dstImage ? dstImage->getExtent() : glm::uvec3 { Context::Window().getExtent(), 1 };
+            resolveInfo.dstExtent = dstImage->getExtent();
 
         CheckRecording();
-        if (dstImage == nullptr)
+        _commands.emplace_back([srcImage, dstImage, resolveInfo] ()
         {
-            _commands.emplace_back([srcImage, resolveInfo] ()
-            {
-                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
-                GLuint framebuffer = 0;
-                glGenFramebuffers(1, &framebuffer);
-                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-                glCheckError();
+            const auto& glSrcImage = dynamic_cast<const ogl::Image&>(*srcImage);
+            const auto& glDstImage = dynamic_cast<const ogl::Image&>(*dstImage);
 
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
-                glCheckError();
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+            glCheckError();
+            glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *glSrcImage, 0);
+            glCheckError();
 
-                glBlitNamedFramebuffer(
-                    framebuffer,
-                    0,
-                    resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.x + resolveInfo.srcExtent.x, resolveInfo.srcOffset.y + resolveInfo.srcExtent.y,
-                    resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.x + resolveInfo.dstExtent.x, resolveInfo.dstOffset.y + resolveInfo.dstExtent.y,
-                    GL_COLOR_BUFFER_BIT,
-                    GL_NEAREST);
-                glCheckError();
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            glCheckError();
+            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *glDstImage, 0);
+            glCheckError();
 
-                glDeleteFramebuffers(1, &framebuffer);
-                glCheckError();
-            });
-        } else
-        {
-            _commands.emplace_back([srcImage, dstImage, resolveInfo] ()
-            {
-                const auto* glSrcImage = dynamic_cast<const ogl::Image*>(srcImage);
-                const auto* glDstImage = dynamic_cast<const ogl::Image*>(dstImage);
-
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-                glCheckError();
-                glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glSrcImage, 0);
-                glCheckError();
-
-                glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-                glCheckError();
-                glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, **glDstImage, 0);
-                glCheckError();
-
-                glBlitFramebuffer(
-                    resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.x + resolveInfo.srcExtent.x, resolveInfo.srcOffset.y + resolveInfo.srcExtent.y,
-                    resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.x + resolveInfo.dstExtent.x, resolveInfo.dstOffset.y + resolveInfo.dstExtent.y,
-                    GL_COLOR_BUFFER_BIT,
-                    GL_NEAREST);
-                glCheckError();
-            });
-        }
-        return *this;
-    }
-
-    gfx::CommandBuffer & CommandBuffer::ClearBuffer(const gfx::Buffer *buffer, glm::u64 offset, glm::u64 size) {
-        CheckRecording();
-        _commands.emplace_back([buffer, offset, size] () {
-            const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
-            glClearNamedBufferData(*oglBuffer, GL_R8, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+            glBlitFramebuffer(
+                resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.x + resolveInfo.srcExtent.x, resolveInfo.srcOffset.y + resolveInfo.srcExtent.y,
+                resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.x + resolveInfo.dstExtent.x, resolveInfo.dstOffset.y + resolveInfo.dstExtent.y,
+                GL_COLOR_BUFFER_BIT,
+                GL_NEAREST);
             glCheckError();
         });
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::FillBuffer(const gfx::Buffer *buffer, void *data, glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::ClearBuffer(gfx::ResourceRef<gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
+        CheckRecording();
+        _commands.emplace_back([buffer, offset, size] () {
+            const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
+            auto actualSize = size;
+            if (size == UINT64_MAX) {
+                actualSize = oglBuffer.getSize() - offset;
+            }
+            glNamedBufferSubData(*oglBuffer, offset, actualSize, nullptr);
+            glCheckError();
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::FillBuffer(gfx::ResourceRef<gfx::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) {
         CheckRecording();
         _commands.emplace_back([buffer, data, offset, size] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
@@ -469,12 +495,85 @@ namespace gfx::ogl
         return *this;
     }
 
+    gfx::CommandBuffer & CommandBuffer::CopyBuffer(ResourceRef<gfx::Buffer> srcBuffer, ResourceRef<gfx::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) {
+        CheckRecording();
+        _commands.emplace_back([srcBuffer, dstBuffer, size, srcOffset, dstOffset] () {
+            const auto& oglSrcBuffer = dynamic_cast<const ogl::Buffer&>(*srcBuffer);
+            const auto& oglDstBuffer = dynamic_cast<const ogl::Buffer&>(*dstBuffer);
+            auto actualSize = size;
+            if (size == UINT64_MAX) {
+                actualSize = std::min(oglSrcBuffer.getSize() - srcOffset, oglDstBuffer.getSize() - dstOffset);
+            }
+            glCopyNamedBufferSubData(*oglSrcBuffer, *oglDstBuffer, srcOffset, dstOffset, actualSize);
+            glCheckError();
+        });
+        return *this;
+    }
+
     gfx::CommandBuffer& CommandBuffer::Run(const std::function<void(gfx::CommandBuffer&)>& command)
     {
         CheckRecording();
         _commands.emplace_back([command, this] ()
         {
             command(*this);
+        });
+        return *this;
+    }
+
+    // TODO!
+    gfx::CommandBuffer & CommandBuffer::CopyBufferToImage(ResourceRef<gfx::Buffer> buffer, ResourceRef<gfx::Image> image, gfx::Copy copyInfo) {
+        CheckRecording();
+        _commands.emplace_back([buffer, image, copyInfo] () {
+            const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
+            const auto& oglImage = dynamic_cast<const ogl::Image&>(*image);
+
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *oglBuffer);
+            glCheckError();
+
+            glBindTexture(GL_TEXTURE_2D, *oglImage);
+            glCheckError();
+
+            // glTexSubImage2D(
+            //     GL_TEXTURE_2D,
+            //     copyInfo.imageMipLevel,
+            //     copyInfo.imageOffset.x, copyInfo.imageOffset.y,
+            //     copyInfo.imageExtent.x, copyInfo.imageExtent.y,
+            //     toGLChannelFormat(oglImage.getFormat()),
+            //     toGLChannelType(oglImage.getFormat()),
+            //     nullptr
+            // );
+            glCheckError();
+
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+            glCheckError();
+        });
+        return *this;
+    }
+
+    // TODO!
+    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<gfx::Image> image, ResourceRef<gfx::Buffer> buffer, gfx::Copy copyInfo) {
+        CheckRecording();
+        _commands.emplace_back([image, buffer, copyInfo] () {
+            const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
+            const auto& oglImage = dynamic_cast<const ogl::Image&>(*image);
+
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, *oglBuffer);
+            glCheckError();
+
+            glBindTexture(GL_TEXTURE_2D, *oglImage);
+            glCheckError();
+
+            // glGetTexImage(
+            //     GL_TEXTURE_2D,
+            //     copyInfo.imageMipLevel,
+            //     toGLChannelFormat(oglImage.getFormat()),
+            //     toGLChannelType(oglImage.getFormat()),
+            //     nullptr
+            // );
+            glCheckError();
+
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+            glCheckError();
         });
         return *this;
     }
@@ -503,12 +602,12 @@ namespace gfx::ogl
     const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& CommandBuffer::getRemappingTableForBoundPipeline() const
     {
         if (_state.boundComputePipeline.has_value()) {
-            const auto& oglPipeline = dynamic_cast<const gfx::ogl::ComputePipeline*>(_state.boundComputePipeline.value());
-            return oglPipeline->getSetAndBindingToBindingPointMap();
+            const auto& oglPipeline = dynamic_cast<const gfx::ogl::ComputePipeline&>(*_state.boundComputePipeline.value());
+            return oglPipeline.getSetAndBindingToBindingPointMap();
         }
         if (_state.boundGraphicsPipeline.has_value()) {
-            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
-            return oglPipeline->getSetAndBindingToBindingPointMap();
+            const auto& oglPipeline = dynamic_cast<const gfx::ogl::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
+            return oglPipeline.getSetAndBindingToBindingPointMap();
         }
         throw std::runtime_error("No pipeline is currently bound!");
     }

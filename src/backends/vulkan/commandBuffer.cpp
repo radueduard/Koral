@@ -87,51 +87,31 @@ namespace gfx::vk
         _handle.end();
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(const gfx::Framebuffer* framebuffer, RenderParameters renderParameters)
+    gfx::CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
+        gfx::CommandBuffer::BeginRendering();
+        const auto framebuffer = _state.boundFramebuffer.value();
+        return BeginRendering(framebuffer, renderParameters);
+    }
+
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<gfx::Framebuffer> framebuffer, RenderParameters renderParameters)
     {
         gfx::CommandBuffer::BeginRendering(framebuffer);
-        framebuffer = _state.boundFramebuffer.value();
-        if (!framebuffer->IsDefault())
+        std::vector<gfx::ImageBarrier> imageBarriers;
+        for (const auto& attachment : framebuffer->getColorAttachments())
         {
-
-            std::vector<gfx::ImageBarrier> imageBarriers;
-            for (const auto& attachment : framebuffer->getColorAttachments())
-            {
-                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(attachment.get().getImage());
-                imageBarriers.push_back({
-                    vkImage,
-                    ResourceAccess::ColorAttachment
-                });
-            }
-            if (framebuffer->hasDepthStencilAttachment())
-            {
-                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(framebuffer->getDepthStencilAttachment().getImage());
-                imageBarriers.push_back({
-                    vkImage,
-                    ResourceAccess::DepthAttachment
-                });
-            }
-
-            Barrier({}, imageBarriers);
-        } else {
-            const auto& vkFramebuffer = dynamic_cast<const gfx::vk::Framebuffer*>(framebuffer);
-            const auto& vkColorImageView = dynamic_cast<const gfx::vk::ImageView&>(vkFramebuffer->getColorAttachments()[0].get());
-            const auto& vkDepthStencilImageView = vkFramebuffer->getDepthStencilAttachment();
-            const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(vkColorImageView.getImage());
-            const auto& vkDepthStencilImage = dynamic_cast<const gfx::vk::Image&>(vkDepthStencilImageView.getImage());
-
-            gfx::ImageBarrier colorImageBarrier = {
-                vkImage,
+            imageBarriers.push_back({
+                attachment.get().getImage(),
                 ResourceAccess::ColorAttachment
-            };
-
-            gfx::ImageBarrier depthStencilImageBarrier = {
-                vkDepthStencilImage,
-                ResourceAccess::DepthAttachment
-            };
-
-            Barrier({}, { colorImageBarrier, depthStencilImageBarrier });
+            });
         }
+        if (framebuffer->hasDepthStencilAttachment())
+        {
+            imageBarriers.push_back({
+                framebuffer->getDepthStencilAttachment().getImage(),
+                ResourceAccess::DepthAttachment
+            });
+        }
+        Barrier({}, imageBarriers);
 
         std::vector<::vk::RenderingAttachmentInfoKHR> colorAttachmentInfos;
         int i = 0;
@@ -209,14 +189,14 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(const gfx::ComputePipeline* pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
     {
         gfx::CommandBuffer::BindPipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(const gfx::GraphicsPipeline* pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
     {
         gfx::CommandBuffer::BindPipeline(pipeline);
         pipeline->Bind(*this);
@@ -229,29 +209,29 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, const gfx::DescriptorSet* set, const bool debug)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, gfx::ResourceRef<gfx::DescriptorSet> set, const bool debug)
     {
         if (debug) set->DebugPrint();
 
         if (_state.boundComputePipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline*>(_state.boundComputePipeline.value());
-            const auto pipelineLayout = vkPipeline->getPipelineLayout();
-            const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet*>(set);
+            const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
+            const auto pipelineLayout = vkPipeline.getPipelineLayout();
+            const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet&>(*set);
             _handle.bindDescriptorSets(
                 ::vk::PipelineBindPoint::eCompute,
                 pipelineLayout,
                 index,
-                **vkSet,
+                *vkSet,
                 nullptr);
         } else if (_state.boundGraphicsPipeline.has_value()) {
-                const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
-                const auto pipelineLayout = vkPipeline->getPipelineLayout();
-                const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet*>(set);
+                const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
+                const auto pipelineLayout = vkPipeline.getPipelineLayout();
+                const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet&>(*set);
                 _handle.bindDescriptorSets(
                     ::vk::PipelineBindPoint::eGraphics,
                     pipelineLayout,
                     index,
-                    **vkSet,
+                    *vkSet,
                     nullptr);
         } else {
             std::cerr << "No pipeline bound when trying to bind descriptor set" << std::endl;
@@ -259,20 +239,20 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindMesh(const gfx::Mesh* mesh)
+    gfx::CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<gfx::Mesh> mesh)
     {
         gfx::CommandBuffer::BindMesh(mesh);
         std::vector<::vk::Buffer> vertexBuffers;
         std::vector<::vk::DeviceSize> offsets;
         for (const auto& buffer : mesh->getVertexBuffers()) {
-            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&buffer.get());
+            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
             vertexBuffers.push_back(*vkBuffer);
             offsets.push_back(0);
         }
         _handle.bindVertexBuffers(0, vertexBuffers, offsets);
         if (mesh->hasIndexBuffer())
         {
-            const auto& vkBuffer = *dynamic_cast<const gfx::vk::Buffer*>(&mesh->getIndexBuffer().value().get());
+            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*mesh->getIndexBuffer().value());
             _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
         }
         return *this;
@@ -288,7 +268,7 @@ namespace gfx::vk
         std::vector<::vk::BufferMemoryBarrier> vkBufferBarriers;
         std::vector<::vk::ImageMemoryBarrier> vkImageBarriers;
         for (const auto& barrier : bufferBarriers) {
-            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(barrier.getBuffer());
+            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*barrier.getBuffer());
             vkBufferBarriers.push_back(::vk::BufferMemoryBarrier()
                 .setSrcAccessMask(vkBuffer.getAccessMask())
                 .setDstAccessMask(getVkAccessFlags(barrier.getDstAccess()))
@@ -303,7 +283,7 @@ namespace gfx::vk
             vkBuffer.setAccessMask(getVkAccessFlags(barrier.getDstAccess()));
         }
         for (const auto& barrier : imageBarriers) {
-            const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(barrier.getImage());
+            const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*barrier.getImage());
 
             const auto oldLayout = vkImage.getImageLayout(barrier.getBaseMipLevel().value_or(0), barrier.getBaseArrayLayer().value_or(0));
             const auto newLayout = getVkImageLayout(barrier.getDstAccess());
@@ -372,13 +352,13 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::ClearBuffer(const gfx::Buffer *buffer, glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::ClearBuffer(gfx::ResourceRef<gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         _handle.fillBuffer(*vkBuffer, offset, size, 0);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::FillBuffer(const gfx::Buffer *buffer, void *data, const glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::FillBuffer(gfx::ResourceRef<gfx::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         if (size == UINT64_MAX) {
             size = vkBuffer.getSize() - offset;
@@ -387,30 +367,36 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(const gfx::Image* srcImage, const gfx::Image* dstImage, gfx::Blit blitInfo)
-    {
-        const auto vkSrcImage = dynamic_cast<const Image*>(srcImage);
-        const Image* vkDstImage = dstImage != nullptr ? dynamic_cast<const Image*>(dstImage) : nullptr;
+    gfx::CommandBuffer & CommandBuffer::CopyBuffer(ResourceRef<gfx::Buffer> srcBuffer, ResourceRef<gfx::Buffer> dstBuffer, glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset) {
+        const auto& vkSrcBuffer = dynamic_cast<const gfx::vk::Buffer&>(*srcBuffer);
+        const auto& vkDstBuffer = dynamic_cast<const gfx::vk::Buffer&>(*dstBuffer);
+        if (size == UINT64_MAX) {
+            size = std::min(vkSrcBuffer.getSize() - srcOffset, vkDstBuffer.getSize() - dstOffset);
+        }
+        if (size > vkSrcBuffer.getSize() - srcOffset || size > vkDstBuffer.getSize() - dstOffset) {
+            gfx::log::error("Copy size exceeds buffer size (srcBuffer size: {}, dstBuffer size: {}, srcOffset: {}, dstOffset: {}, copy size: {})", vkSrcBuffer.getSize(), vkDstBuffer.getSize(), srcOffset, dstOffset, size);
+            throw std::runtime_error("Copy size exceeds buffer size");
+        }
 
-        bool blitToScreen = dstImage == nullptr;
-        if (blitToScreen)
-            vkDstImage = &dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
+        _handle.copyBuffer(*vkSrcBuffer, *vkDstBuffer, ::vk::BufferCopy()
+            .setSrcOffset(srcOffset)
+            .setDstOffset(dstOffset)
+            .setSize(size));
+        return *this;
+    }
 
-        if (blitInfo.srcExtent == glm::ivec3(-1))
-            blitInfo.srcExtent = vkSrcImage->getExtent();
-        if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = vkDstImage->getExtent();
-
+    gfx::CommandBuffer& CommandBuffer::Blit(ResourceRef<gfx::Image> srcImage, gfx::Blit blitInfo) {
+        ResourceRef<gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
         Barrier({}, {
             {
-                *vkSrcImage,
+                srcImage,
                 ResourceAccess::TransferSrc,
                 blitInfo.srcMipLevel,
                 1,
                 blitInfo.srcBaseArrayLayer,
                 blitInfo.layerCount
             }, {
-                *vkDstImage,
+                dstImage,
                 ResourceAccess::TransferDst,
                 blitInfo.dstMipLevel,
                 1,
@@ -419,12 +405,20 @@ namespace gfx::vk
             }
         });
 
+        if (blitInfo.srcExtent == glm::ivec3(-1))
+            blitInfo.srcExtent = srcImage->getExtent();
+        if (blitInfo.dstExtent == glm::ivec3(-1))
+            blitInfo.dstExtent = dstImage->getExtent();
+
+        const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
+        const auto& vkDstImage = dynamic_cast<const Image&>(*dstImage);
+
         _handle.blitImage(
-            **vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
-            **vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
+            *vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+            *vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
             ::vk::ImageBlit()
                 .setSrcSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(vkSrcImage->getAspectFlags())
+                    .setAspectMask(vkSrcImage.getAspectFlags())
                     .setMipLevel(blitInfo.srcMipLevel)
                     .setBaseArrayLayer(blitInfo.srcBaseArrayLayer)
                     .setLayerCount(blitInfo.layerCount))
@@ -433,57 +427,106 @@ namespace gfx::vk
                     ::vk::Offset3D{ blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y, blitInfo.srcOffset.z + blitInfo.srcExtent.z }
                 })
                 .setDstSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(vkDstImage->getAspectFlags())
+                    .setAspectMask(vkDstImage.getAspectFlags())
                     .setMipLevel(blitInfo.dstMipLevel)
                     .setBaseArrayLayer(blitInfo.dstBaseArrayLayer)
                     .setLayerCount(blitInfo.layerCount))
                 .setDstOffsets({
-                    ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y + (blitToScreen ?  blitInfo.dstExtent.y : 0), blitInfo.dstOffset.z },
-                    ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + (blitToScreen ? 0 : blitInfo.dstExtent.y), blitInfo.dstOffset.z + blitInfo.dstExtent.z }
+                    ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y +  blitInfo.dstExtent.y, blitInfo.dstOffset.z },
+                    ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y, blitInfo.dstOffset.z + blitInfo.dstExtent.z }
+                }),
+            ::vk::Filter::eNearest);
+
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Blit blitInfo)
+    {
+        if (blitInfo.srcExtent == glm::ivec3(-1))
+            blitInfo.srcExtent = srcImage->getExtent();
+        if (blitInfo.dstExtent == glm::ivec3(-1))
+            blitInfo.dstExtent = dstImage->getExtent();
+
+        Barrier({}, {
+            {
+                srcImage,
+                ResourceAccess::TransferSrc,
+                blitInfo.srcMipLevel,
+                1,
+                blitInfo.srcBaseArrayLayer,
+                blitInfo.layerCount
+            }, {
+                dstImage,
+                ResourceAccess::TransferDst,
+                blitInfo.dstMipLevel,
+                1,
+                blitInfo.dstBaseArrayLayer,
+                blitInfo.layerCount
+            }
+        });
+
+        const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
+        const auto& vkDstImage = dynamic_cast<const Image&>(*dstImage);
+
+        _handle.blitImage(
+            *vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+            *vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
+            ::vk::ImageBlit()
+                .setSrcSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(vkSrcImage.getAspectFlags())
+                    .setMipLevel(blitInfo.srcMipLevel)
+                    .setBaseArrayLayer(blitInfo.srcBaseArrayLayer)
+                    .setLayerCount(blitInfo.layerCount))
+                .setSrcOffsets({
+                    ::vk::Offset3D{ blitInfo.srcOffset.x, blitInfo.srcOffset.y, blitInfo.srcOffset.z },
+                    ::vk::Offset3D{ blitInfo.srcOffset.x + blitInfo.srcExtent.x, blitInfo.srcOffset.y + blitInfo.srcExtent.y, blitInfo.srcOffset.z + blitInfo.srcExtent.z }
+                })
+                .setDstSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(vkDstImage.getAspectFlags())
+                    .setMipLevel(blitInfo.dstMipLevel)
+                    .setBaseArrayLayer(blitInfo.dstBaseArrayLayer)
+                    .setLayerCount(blitInfo.layerCount))
+                .setDstOffsets({
+                    ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.z },
+                    ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y, blitInfo.dstOffset.z + blitInfo.dstExtent.z }
                 }),
             ::vk::Filter::eNearest);
          return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Resolve(const gfx::Image *srcImage, const gfx::Image *dstImage, gfx::Resolve resolveInfo) {
+    gfx::CommandBuffer & CommandBuffer::Resolve(ResourceRef<gfx::Image> srcImage, gfx::Resolve resolveInfo) {
         if (srcImage->getMSAA() == MSAA::eNone)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
-        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
-            throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
 
-        const auto vkSrcImage = dynamic_cast<const Image*>(srcImage);
-        const Image* vkDstImage = dstImage != nullptr ? dynamic_cast<const Image*>(dstImage) : nullptr;
+        if (!_resolveHelperImage)
+            _resolveHelperImage = gfx::Image::Builder()
+                .setIsPerFrame(true)
+                .setExtent(srcImage->getExtent())
+                .setFormat(srcImage->getFormat())
+                .setUsage(gfx::Image::Usage::eTransferDst)
+                .addUsage(gfx::Image::Usage::eTransferSrc)
+                .build();
+        if (_resolveHelperImage->getExtent() != srcImage->getExtent())
+            _resolveHelperImage->Resize(srcImage->getExtent());
 
-        bool resolveToScreen = dstImage == nullptr;
-        if (resolveToScreen) {
-            if (!_resolveHelperImage)
-                _resolveHelperImage = gfx::Image::Builder()
-                    .setIsPerFrame(true)
-                    .setExtent(vkSrcImage->getExtent())
-                    .setFormat(vkSrcImage->getFormat())
-                    .setUsage(gfx::Image::Usage::eTransferDst)
-                    .addUsage(gfx::Image::Usage::eTransferSrc)
-                    .build();
-            if (_resolveHelperImage->getExtent() != vkSrcImage->getExtent())
-                _resolveHelperImage->Resize(vkSrcImage->getExtent());
-            vkDstImage = dynamic_cast<const Image *>(_resolveHelperImage.get());
-        }
+        const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
+        const auto& vkDstImage =  dynamic_cast<const Image&>(*_resolveHelperImage);
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
-            resolveInfo.srcExtent = vkSrcImage->getExtent();
+            resolveInfo.srcExtent = vkSrcImage.getExtent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = vkDstImage->getExtent();
+            resolveInfo.dstExtent = vkDstImage.getExtent();
 
         Barrier({}, {
             {
-                *vkSrcImage,
+                srcImage,
                 ResourceAccess::TransferSrc,
                 resolveInfo.srcMipLevel,
                 1,
                 resolveInfo.srcBaseArrayLayer,
                 resolveInfo.layerCount
             }, {
-                *vkDstImage,
+                _resolveHelperImage,
                 ResourceAccess::TransferDst,
                 resolveInfo.dstMipLevel,
                 1,
@@ -493,25 +536,194 @@ namespace gfx::vk
         });
 
         _handle.resolveImage(
-            **vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
-            **vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
+            *vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+            *vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
             ::vk::ImageResolve()
                 .setSrcSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(vkSrcImage->getAspectFlags())
+                    .setAspectMask(vkSrcImage.getAspectFlags())
                     .setMipLevel(resolveInfo.srcMipLevel)
                     .setBaseArrayLayer(resolveInfo.srcBaseArrayLayer)
                     .setLayerCount(resolveInfo.layerCount))
                 .setSrcOffset({ resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.z })
                 .setDstSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(vkDstImage->getAspectFlags())
+                    .setAspectMask(vkDstImage.getAspectFlags())
                     .setMipLevel(resolveInfo.dstMipLevel)
                     .setBaseArrayLayer(resolveInfo.dstBaseArrayLayer)
                     .setLayerCount(resolveInfo.layerCount))
                 .setDstOffset({ resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.z })
                 .setExtent({ static_cast<glm::u32>(resolveInfo.srcExtent.x), static_cast<glm::u32>(resolveInfo.srcExtent.y), static_cast<glm::u32>(resolveInfo.srcExtent.z) }));
 
-        if (resolveToScreen)
-            Blit(_resolveHelperImage.get(), nullptr, {});
+        Blit(_resolveHelperImage, {});
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Resolve resolveInfo) {
+        if (srcImage->getMSAA() == MSAA::eNone)
+            throw std::runtime_error("Source image must be multisampled for resolve operation!");
+        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+            throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
+
+        const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
+        const auto& vkDstImage =dynamic_cast<const Image&>(*dstImage);
+
+        if (resolveInfo.srcExtent == glm::ivec3(-1))
+            resolveInfo.srcExtent = vkSrcImage.getExtent();
+        if (resolveInfo.dstExtent == glm::ivec3(-1))
+            resolveInfo.dstExtent = vkDstImage.getExtent();
+
+        Barrier({}, {
+            {
+                srcImage,
+                ResourceAccess::TransferSrc,
+                resolveInfo.srcMipLevel,
+                1,
+                resolveInfo.srcBaseArrayLayer,
+                resolveInfo.layerCount
+            }, {
+                dstImage,
+                ResourceAccess::TransferDst,
+                resolveInfo.dstMipLevel,
+                1,
+                resolveInfo.dstBaseArrayLayer,
+                resolveInfo.layerCount
+            }
+        });
+
+        _handle.resolveImage(
+            *vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+            *vkDstImage, ::vk::ImageLayout::eTransferDstOptimal,
+            ::vk::ImageResolve()
+                .setSrcSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(vkSrcImage.getAspectFlags())
+                    .setMipLevel(resolveInfo.srcMipLevel)
+                    .setBaseArrayLayer(resolveInfo.srcBaseArrayLayer)
+                    .setLayerCount(resolveInfo.layerCount))
+                .setSrcOffset({ resolveInfo.srcOffset.x, resolveInfo.srcOffset.y, resolveInfo.srcOffset.z })
+                .setDstSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(vkDstImage.getAspectFlags())
+                    .setMipLevel(resolveInfo.dstMipLevel)
+                    .setBaseArrayLayer(resolveInfo.dstBaseArrayLayer)
+                    .setLayerCount(resolveInfo.layerCount))
+                .setDstOffset({ resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.z })
+                .setExtent({ static_cast<glm::u32>(resolveInfo.srcExtent.x), static_cast<glm::u32>(resolveInfo.srcExtent.y), static_cast<glm::u32>(resolveInfo.srcExtent.z) }));
+
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::CopyBufferToImage(ResourceRef<gfx::Buffer> buffer, ResourceRef<gfx::Image> image, gfx::Copy copyInfo) {
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
+        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
+
+        if (copyInfo.bufferOffset >= vkBuffer.getSize()) {
+            gfx::log::error("Buffer offset exceeds buffer size (buffer size: {}, buffer offset: {})", vkBuffer.getSize(), copyInfo.bufferOffset);
+            throw std::runtime_error("Buffer offset exceeds buffer size");
+        }
+
+        if (copyInfo.imageMipLevel >= vkImage.getMipLevels()) {
+            gfx::log::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
+            throw std::runtime_error("Image mip level exceeds image mip levels");
+        }
+
+        if (copyInfo.imageBaseArrayLayer >= vkImage.getArrayLayers()) {
+            gfx::log::error("Image base array layer exceeds image array layers (image array layers: {}, image subresource base array layer: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer);
+            throw std::runtime_error("Image base array layer exceeds image array layers");
+        }
+
+        if (copyInfo.imageExtent == glm::ivec3(-1))
+            copyInfo.imageExtent = image->getExtent();
+
+        if (copyInfo.bufferRowLength == 0)
+            copyInfo.bufferRowLength = copyInfo.imageExtent.x;
+        if (copyInfo.bufferImageHeight == 0)
+            copyInfo.bufferImageHeight = copyInfo.imageExtent.y;
+        if (copyInfo.bufferRowLength < copyInfo.imageExtent.x || copyInfo.bufferImageHeight < copyInfo.imageExtent.y) {
+            gfx::log::error("Buffer row length or image height is too small for the specified image extent (buffer row length: {}, buffer image height: {}, image extent: {}x{})", copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y);
+            throw std::runtime_error("Buffer row length or image height is too small for the specified image extent");
+        }
+        if (copyInfo.bufferRowLength * copyInfo.bufferImageHeight * copyInfo.imageExtent.z + copyInfo.bufferOffset > vkBuffer.getSize()) {
+            gfx::log::error("Buffer offset + copy size exceeds buffer size (buffer size: {}, buffer offset: {}, copy size: {})", vkBuffer.getSize(), copyInfo.bufferOffset, copyInfo.bufferRowLength * copyInfo.bufferImageHeight * copyInfo.imageExtent.z);
+            throw std::runtime_error("Buffer offset + copy size exceeds buffer size");
+        }
+        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.getArrayLayers()) {
+            gfx::log::error("Image base array layer + layer count exceeds image array layers (image array layers: {}, image subresource base array layer: {}, image subresource layer count: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount);
+            throw std::runtime_error("Image base array layer + layer count exceeds image array layers");
+        }
+        if (copyInfo.imageMipLevel >= vkImage.getMipLevels()) {
+            gfx::log::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
+            throw std::runtime_error("Image mip level exceeds image mip levels");
+        }
+
+        ImageBarrier({
+            image,
+            ResourceAccess::TransferDst,
+            copyInfo.imageMipLevel,
+            1,
+            copyInfo.imageBaseArrayLayer,
+            copyInfo.imageLayerCount
+        });
+
+        _handle.copyBufferToImage(
+            *vkBuffer,
+            *vkImage,
+            ::vk::ImageLayout::eTransferDstOptimal,
+            ::vk::BufferImageCopy()
+                .setBufferOffset(copyInfo.bufferOffset)
+                .setBufferRowLength(copyInfo.bufferRowLength)
+                .setBufferImageHeight(copyInfo.bufferImageHeight)
+                .setImageSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(getVkImageAspectFlags(vkImage.getFormat()))
+                    .setMipLevel(copyInfo.imageMipLevel)
+                    .setBaseArrayLayer(copyInfo.imageBaseArrayLayer)
+                    .setLayerCount(copyInfo.imageLayerCount))
+                .setImageOffset({ copyInfo.imageOffset.x, copyInfo.imageOffset.y, copyInfo.imageOffset.z })
+                .setImageExtent({ static_cast<uint32_t>(copyInfo.imageExtent.x), static_cast<uint32_t>(copyInfo.imageExtent.y), static_cast<uint32_t>(copyInfo.imageExtent.z) }));
+
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<gfx::Image> image, ResourceRef<gfx::Buffer> buffer, gfx::Copy copyInfo) {
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
+        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
+
+        if (copyInfo.bufferOffset >= vkBuffer.getSize()) {
+            gfx::log::error("Buffer offset exceeds buffer size (buffer size: {}, buffer offset: {})", vkBuffer.getSize(), copyInfo.bufferOffset);
+            throw std::runtime_error("Buffer offset exceeds buffer size");
+        }
+
+        if (copyInfo.imageMipLevel >= vkImage.getMipLevels()) {
+            gfx::log::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
+            throw std::runtime_error("Image mip level exceeds image mip levels");
+        }
+
+        if (copyInfo.imageBaseArrayLayer >= vkImage.getArrayLayers()) {
+            gfx::log::error("Image base array layer exceeds image array layers (image array layers: {}, image subresource base array layer: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer);
+            throw std::runtime_error("Image base array layer exceeds image array layers");
+        }
+
+        ImageBarrier({
+            image,
+            ResourceAccess::TransferSrc,
+            copyInfo.imageMipLevel,
+            1,
+            copyInfo.imageBaseArrayLayer,
+            copyInfo.imageLayerCount
+        });
+
+        _handle.copyImageToBuffer(
+            *vkImage,
+            ::vk::ImageLayout::eTransferSrcOptimal,
+            *vkBuffer,
+            ::vk::BufferImageCopy()
+                .setBufferOffset(copyInfo.bufferOffset)
+                .setBufferRowLength(copyInfo.bufferRowLength)
+                .setBufferImageHeight(copyInfo.bufferImageHeight)
+                .setImageSubresource(::vk::ImageSubresourceLayers()
+                    .setAspectMask(getVkImageAspectFlags(vkImage.getFormat()))
+                    .setMipLevel(copyInfo.imageMipLevel)
+                    .setBaseArrayLayer(copyInfo.imageBaseArrayLayer)
+                    .setLayerCount(copyInfo.imageLayerCount))
+                .setImageOffset({ copyInfo.imageOffset.x, copyInfo.imageOffset.y, copyInfo.imageOffset.z })
+                .setImageExtent({ static_cast<uint32_t>(copyInfo.imageExtent.x), static_cast<uint32_t>(copyInfo.imageExtent.y), static_cast<uint32_t>(copyInfo.imageExtent.z) }));
 
         return *this;
     }
@@ -560,18 +772,18 @@ namespace gfx::vk
 
     gfx::CommandBuffer& CommandBuffer::PushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {
         if (_state.boundComputePipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline*>(_state.boundComputePipeline.value());
+            const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
             _handle.pushConstants(
-                vkPipeline->getPipelineLayout(),
+                vkPipeline.getPipelineLayout(),
                 ::vk::ShaderStageFlagBits::eCompute,
                 offset,
                 size,
                 data);
         } else if (_state.boundGraphicsPipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline*>(_state.boundGraphicsPipeline.value());
+            const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
             _handle.pushConstants(
-                vkPipeline->getPipelineLayout(),
-                getVkShaderStageFlags(vkPipeline->getPushConstantRange(offset).stages),
+                vkPipeline.getPipelineLayout(),
+                getVkShaderStageFlags(vkPipeline.getPushConstantRange(offset).stages),
                 offset,
                 size,
                 data);

@@ -28,7 +28,7 @@ namespace gfx
             std::map<glm::u32, std::vector<Descriptor>> writes;
 
             Builder& write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index = 0);
-            std::unique_ptr<DescriptorSet> build();
+            gfx::Resource<DescriptorSet> build();
         };
 
         virtual ~DescriptorSet() = default;

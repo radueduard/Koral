@@ -24,11 +24,11 @@ namespace gfx
         virtual ~GUI_Image() = default;
 
         virtual void setLayerAndLevel(glm::u32 layer, glm::u32 level) = 0;
-        virtual void setImage(const Image& image) = 0;
+        virtual void setImage(gfx::ResourceRef<Image> image) = 0;
 
         virtual ImTextureID operator*() const = 0;
 
-        static std::unique_ptr<GUI_Image> Create(const gfx::Image& image, glm::u32 layer = 0, glm::u32 level = 0);
+        static gfx::Resource<GUI_Image> Create(gfx::ResourceRef<gfx::Image> image, glm::u32 layer = 0, glm::u32 level = 0);
     };
 
     enum class Font

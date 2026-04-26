@@ -20,13 +20,13 @@ namespace gfx
         return *this;
     }
 
-    std::unique_ptr<ComputePipeline> ComputePipeline::Builder::build() const
+    gfx::Resource<ComputePipeline> ComputePipeline::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return std::make_unique<ogl::ComputePipeline>(*this);
-        case API::eVulkan:
-            return std::make_unique<vk::ComputePipeline>(*this);
+            case API::eOpenGL:
+            return gfx::MakeResource<ogl::ComputePipeline>(*this);
+            case API::eVulkan:
+            return gfx::MakeResource<vk::ComputePipeline>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

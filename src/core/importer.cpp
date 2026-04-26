@@ -81,11 +81,16 @@ gfx::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
 
 namespace gfx
 {
-    std::unique_ptr<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
+    gfx::Resource<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
     {
         const auto imageInput = OIIO::ImageInput::open(path.string());
         if (!imageInput) {
             throw std::runtime_error("Could not open image file: " + path.string() + "\nError: " + OIIO::geterror());
+        }
+
+        glm::u32 layerCount = 0;
+        while (imageInput->seek_subimage(layerCount, 0)) {
+            layerCount++;
         }
 
         auto spec = imageInput->spec();
@@ -93,32 +98,42 @@ namespace gfx
             spec.nchannels = 4;
         }
 
-        std::unique_ptr<gfx::Image> image = gfx::Image::Builder()
+        auto image = gfx::Image::Builder()
             .setExtent({ spec.width, spec.height, spec.depth })
             .setFormat(getFormat(spec.format, spec.nchannels))
             .setMipLevels(generateMipmaps ? 0 : 1)
+            .setArrayLayers(layerCount)
             .addUsage(gfx::Image::Usage::eTransferDst)
             .build();
 
 
-        std::vector<unsigned char> data(spec.width * spec.height * spec.depth * spec.nchannels * spec.format.size());
-        if (!imageInput->read_image(0, 0, 0, spec.nchannels, spec.format, data.data())) {
-            std::cerr << "Could not read image data: " << imageInput->geterror() << std::endl;
+        CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics)->Run([&](CommandBuffer& commandBuffer) {
+            for (glm::u32 layer = 0; layer < layerCount; layer++) {
+                imageInput->seek_subimage(layer, spec);
+                std::vector<unsigned char> data(spec.width * spec.height * spec.depth * spec.nchannels * spec.format.size());
+                if (!imageInput->read_image(layer, 0, 0, spec.nchannels, spec.format, data.data())) {
+                    std::cerr << "Could not read image data: " << imageInput->geterror() << std::endl;
+                }
 
-        }
+                const auto stagingBuffer = gfx::Buffer::Builder<unsigned char>()
+                    .setDataView(data)
+                    .setUsage(gfx::Buffer::Usage::eTransferSrc)
+                    .setType(gfx::Buffer::Type::eStaging)
+                    .build();
 
-        const auto stagingBuffer = gfx::Buffer::Builder<unsigned char>()
-            .setDataView(data)
-            .setUsage(gfx::Buffer::Usage::eTransferSrc)
-            .setType(gfx::Buffer::Type::eStaging)
-            .build();
-
-        image->CopyFrom(*stagingBuffer, 0, 0);
+                commandBuffer.CopyBufferToImage(stagingBuffer, image, gfx::Copy {
+                    .imageOffset = { 0, 0, 0 },
+                    .imageExtent = { spec.width, spec.height, spec.depth },
+                    .imageBaseArrayLayer = layer,
+                    .imageLayerCount = 1,
+                    .imageMipLevel = 0,
+                });
+            }
+            if (generateMipmaps) {
+                commandBuffer.GenerateMipmaps(image);
+            }
+        });
         imageInput->close();
-
-        if (generateMipmaps) {
-            image->GenerateMipmaps();
-        }
 
         return image;
     }
@@ -164,7 +179,7 @@ namespace gfx
         return gfx::Image::Type::e1D;
     }
 
-    Task<void> LoadKTXAsync(const std::filesystem::path& path, const bool generateMipmaps, std::shared_ptr<Image>& returnImage) {
+    Task<void> LoadKTXAsync(const std::filesystem::path& path, const bool generateMipmaps, gfx::Resource<Image>& returnImage) {
         ktxTexture2* rawTexture = nullptr;
         const KTX_error_code createResult = ktxTexture2_CreateFromNamedFile(
             path.string().c_str(),
@@ -199,7 +214,7 @@ namespace gfx
             .addUsage(Image::Usage::eTransferDst)
             .build();
 
-        const auto image = returnImage;
+        ResourceRef image = returnImage;
 
         // Phase 2a: disk/data load off main thread
         co_await Context::SwitchToBackgroundThread();
@@ -251,18 +266,30 @@ namespace gfx
                 .setUsage(Buffer::Usage::eTransferSrc)
                 .setType(Buffer::Type::eStaging)
                 .build();
+            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                commandBuffer.CopyBufferToImage(stagingBuffer, image, gfx::Copy {
+                    .imageOffset = { 0, 0, 0 },
+                    .imageExtent = {
+                        std::max(1u, texture->baseWidth >> mip),
+                        std::max(1u, texture->baseHeight >> mip),
+                        std::max(1u, texture->baseDepth >> mip)
+                    },
+                    .imageBaseArrayLayer = layer,
+                    .imageLayerCount = 1,
+                    .imageMipLevel = mip,
+                });
+            });
 
-            image->CopyFrom(*stagingBuffer, mip, layer);
+            if (generateMipmaps && fileMipLevels == 1) {
+                CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                    commandBuffer.GenerateMipmaps(image);
+                });
+            }
         }
-
-        if (generateMipmaps && fileMipLevels == 1) {
-            image->GenerateMipmaps();
-        }
-
         co_return;
     }
 
-    Task<void> LoadRegularImageAsync(const std::filesystem::path path, const bool generateMipmaps, std::shared_ptr<Image>& returnImage) {
+    Task<void> LoadRegularImageAsync(const std::filesystem::path path, const bool generateMipmaps, gfx::Resource<Image>& returnImage) {
         const auto image_input = OIIO::ImageInput::open(path.string());
         if (!image_input) {
             std::cerr << "Could not open image file: " << OIIO::geterror() << std::endl;
@@ -279,7 +306,7 @@ namespace gfx
             .addUsage(Image::Usage::eTransferDst)
             .build();
 
-        const auto image = returnImage;
+        ResourceRef image = returnImage;
 
         co_await Context::SwitchToBackgroundThread();
 
@@ -302,44 +329,68 @@ namespace gfx
         co_await Context::SwitchToMainThread();
 
         const auto stagingBuffer = Buffer::Builder<unsigned char>()
-            .setDataView(data)
-            .setUsage(Buffer::Usage::eTransferSrc)
-            .setType(Buffer::Type::eStaging)
-            .build();
-
-        image->CopyFrom(*stagingBuffer, 0, 0);
-        if (generateMipmaps) {
-            image->GenerateMipmaps();
-        }
-
+                .setDataView(data)
+                .setUsage(Buffer::Usage::eTransferSrc)
+                .setType(Buffer::Type::eStaging)
+                .build();
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+            commandBuffer.CopyBufferToImage(stagingBuffer, image, gfx::Copy {
+                .imageOffset = { 0, 0, 0 },
+                .imageExtent = { spec.width, spec.height, spec.depth },
+                .imageBaseArrayLayer = 0,
+                .imageLayerCount = 1,
+                .imageMipLevel = 0,
+            });
+            if (generateMipmaps) {
+                commandBuffer.GenerateMipmaps(image);
+            }
+        });
         co_return;
     }
 
-    Task<void> Importer::LoadImageAsync(const std::filesystem::path& path, const bool generateMipmaps, std::shared_ptr<Image>& returnImage) {
+    Task<void> Importer::LoadImageAsync(const std::filesystem::path& path, const bool generateMipmaps, Resource<Image>& returnImage) {
         if (path.extension() == ".ktx" || path.extension() == ".ktx2") {
             return LoadKTXAsync(path, generateMipmaps, returnImage);
         }
         return LoadRegularImageAsync(path, generateMipmaps, returnImage);
     }
 
-    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, const Image &image) {
-            const auto imageOutput = OIIO::ImageOutput::create(path.string());
-            if (!imageOutput) {
-                throw std::runtime_error("Could not create image file: " + path.string() + "\nError: " + OIIO::geterror());
-            }
+    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, gfx::ResourceRef<Image> image) {
+        const auto imageOutput = OIIO::ImageOutput::create(path.string());
+        if (!imageOutput) {
+            throw std::runtime_error("Could not create image file: " + path.string() + "\nError: " + OIIO::geterror());
+        }
 
-            OIIO::ImageSpec spec(image.getExtent().x, image.getExtent().y, 4, OIIO::TypeDesc::UINT8);
-            if (!imageOutput->open(path.string(), spec)) {
-                throw std::runtime_error("Could not open image file for writing: " + path.string() + "\nError: " + OIIO::geterror());
-            }
+        OIIO::ImageSpec spec(image->getExtent().x, image->getExtent().y, 4, OIIO::TypeDesc::UINT8);
+        if (!imageOutput->open(path.string(), spec)) {
+            throw std::runtime_error("Could not open image file for writing: " + path.string() + "\nError: " + OIIO::geterror());
+        }
 
-            auto data = image.ReadData(0, 0);
 
-            if (!imageOutput->write_image(OIIO::TypeDesc::UINT8, data.data())) {
-                throw std::runtime_error("Could not write image data: " + path.string() + "\nError: " + OIIO::geterror());
-            }
+        std::vector<std::byte> data;
+        CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics)->Run([&](CommandBuffer& commandBuffer) {
+            const auto stagingBuffer = Buffer::Builder<glm::u8vec4>()
+                .setInstanceCount(image->getExtent().x * image->getExtent().y * image->getExtent().z)
+                .setUsage(Buffer::Usage::eTransferDst)
+                .setType(Buffer::Type::eStaging)
+                .build();
 
-            imageOutput->close();
+            commandBuffer.CopyImageToBuffer(image, stagingBuffer, gfx::Copy {
+                .imageOffset = { 0, 0, 0 },
+                .imageExtent = image->getExtent(),
+                .imageBaseArrayLayer = 0,
+                .imageLayerCount = 1,
+                .imageMipLevel = 0,
+            });
+
+            data = stagingBuffer->Read<std::byte>(stagingBuffer->getSize());
+        });
+
+        if (!imageOutput->write_image(OIIO::TypeDesc::UINT8, data.data())) {
+            throw std::runtime_error("Could not write image data: " + path.string() + "\nError: " + OIIO::geterror());
+        }
+
+        imageOutput->close();
     }
 
     std::unique_ptr<Importer> Importer::Load(const std::filesystem::path &path) {

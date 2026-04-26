@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 
 #include "api.h"
+#include "resource.h"
 
 namespace gfx
 {
@@ -34,11 +35,11 @@ namespace gfx
 
             Builder& addColorAttachment(const ImageView& imageView, glm::vec4 clearColor);
             Builder& setDepthStencilAttachment(const ImageView& imageView, float depth, glm::i32 stencil);
-            [[nodiscard]] std::unique_ptr<Framebuffer> build() const;
+            [[nodiscard]] Resource<Framebuffer> build() const;
         };
 
         virtual ~Framebuffer() = default;
-        static std::unique_ptr<Framebuffer> CreateDefault();
+        static Resource<Framebuffer> CreateDefault();
 
         [[nodiscard]] virtual bool hasDepthStencilAttachment() const;
         [[nodiscard]] const std::vector<std::reference_wrapper<const ImageView>>& getColorAttachments() const;

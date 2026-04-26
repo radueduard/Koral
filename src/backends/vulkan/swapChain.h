@@ -47,8 +47,8 @@ namespace gfx::vk
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
         [[nodiscard]] ::vk::SampleCountFlagBits getMSAA() const { return getVkSampleCount(_msaa); }
 
-        [[nodiscard]] const gfx::vk::Image& getImage() const { return *_swapChainImages; }
-        [[nodiscard]] const gfx::Image& getDepthImage() const { return *_depthImages; }
+        [[nodiscard]] gfx::ResourceRef<gfx::Image> getImage() const { return _swapChainImages; }
+        [[nodiscard]] gfx::ResourceRef<gfx::Image> getDepthImage() const { return _depthImages; }
 
         [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getSwapChainImageViews() const { return *_swapChainImageViews; }
         [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getDepthImageViews() const { return *_depthImageViews; }
@@ -74,12 +74,12 @@ namespace gfx::vk
         ::vk::PresentModeKHR _presentMode = {};
 
         const gfx::vk::Queue& _presentQueue;
-        std::unique_ptr<gfx::vk::Image> _swapChainImages;
-        std::unique_ptr<gfx::Image> _depthImages;
+        gfx::Resource<gfx::Image> _swapChainImages;
+        gfx::Resource<gfx::Image> _depthImages;
         std::vector<::vk::Semaphore> _renderFinishedSemaphores;
 
-        std::unique_ptr<gfx::ImageView> _swapChainImageViews;
-        std::unique_ptr<gfx::ImageView> _depthImageViews;
+        gfx::Resource<gfx::ImageView> _swapChainImageViews;
+        gfx::Resource<gfx::ImageView> _depthImageViews;
 
         void CreateSwapChain();
 

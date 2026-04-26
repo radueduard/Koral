@@ -4,6 +4,8 @@
 
 #include "buffer.h"
 
+#include <unordered_set>
+
 #include "commandBuffer.h"
 #include "device.h"
 #include <scheduler.h>
@@ -96,21 +98,6 @@ namespace gfx::vk
 		return _buffers[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
 
-	void Buffer::CopyFrom(const gfx::Buffer& srcBuffer, glm::u64 srcOffset, glm::u64 dstOffset, glm::u64 size) const
-	{
-		Context::Device().runSingleTimeCommand([this, srcOffset, dstOffset, &srcBuffer, size](const gfx::vk::CommandBuffer& commandBuffer) {
-			const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
-			const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(srcBuffer);
-			for (int i = 0; i < frameCount; ++i) {
-				const auto copyRegion = ::vk::BufferCopy()
-					.setSrcOffset(srcOffset)
-					.setDstOffset(dstOffset)
-					.setSize(size);
-				commandBuffer->copyBuffer(*vkBuffer, _buffers[i], 1, &copyRegion);
-			}
-		}, ::vk::QueueFlagBits::eTransfer);
-	}
-
 	::vk::AccessFlags Buffer::getAccessMask() const {
 		const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
 		return _accessFlags[currentFrame];
@@ -122,16 +109,45 @@ namespace gfx::vk
 	}
 
 	::vk::Buffer Buffer::operator[](const size_t i) const {
-		if (_isPerFrame) {
-			const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
-			return _buffers[currentFrame];
+		if (i >= _buffers.size()) {
+			throw std::out_of_range("Buffer index out of range!");
 		}
-		return _buffers[0];
+		return _buffers[i];
+	}
+
+	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
+	void Buffer::applyPendingWrites() const {
+		const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
+
+		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
+
+		for (auto&[srcFrameIndex, offset, size, framesToWrite] : _pendingWrites) {
+			if (framesToWrite.contains(currentFrame)) {
+				auto srcBuffer = _buffers[srcFrameIndex];
+				copyRegionsPerBuffer[srcBuffer].push_back(
+					::vk::BufferCopy()
+						.setSrcOffset(offset)
+						.setDstOffset(offset)
+						.setSize(size)
+				);
+				framesToWrite.erase(currentFrame);
+			}
+		}
+		if (copyRegionsPerBuffer.empty()) {
+			return;
+		}
+
+		auto dstBuffer = _buffers[currentFrame];
+		Context::Device().runSingleTimeCommand([dstBuffer, &copyRegionsPerBuffer](const gfx::vk::CommandBuffer& commandBuffer) {
+			for (const auto&[srcBuffer, copyRegions] : copyRegionsPerBuffer) {
+				commandBuffer->copyBuffer(srcBuffer, dstBuffer, static_cast<uint32_t>(copyRegions.size()), copyRegions.data());
+			}
+		}, ::vk::QueueFlagBits::eTransfer);
+
+		std::erase_if(_pendingWrites, [](const struct PendingWrite& write) { return write.buffersLeftToUpdate.empty(); });
 	}
 
 	VmaAllocation Buffer::getAllocation() const {
 		return  _allocations[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
-
-
 }

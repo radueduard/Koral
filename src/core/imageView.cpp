@@ -14,18 +14,18 @@
 
 namespace gfx
 {
-    ImageView::Builder::Builder(const Image& image) : image(image) {
-        arrayLayerCount = image.getArrayLayers();
-        mipLevelCount = image.getMipLevels();
+    ImageView::Builder::Builder(gfx::ResourceRef<Image> image) : image(image) {
+        arrayLayerCount = image->getArrayLayers();
+        mipLevelCount = image->getMipLevels();
     }
 
-    std::unique_ptr<ImageView> ImageView::Builder::build() const
+    gfx::Resource<ImageView> ImageView::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
-            return std::make_unique<ogl::ImageView>(*this);
+            return gfx::MakeResource<ogl::ImageView>(*this);
         case API::eVulkan:
-            return std::make_unique<vk::ImageView>(*this);
+            return gfx::MakeResource<vk::ImageView>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
@@ -33,7 +33,7 @@ namespace gfx
 
     ImageView::ImageView(const Builder& createInfo) :
         _image(createInfo.image),
-        _isPerFrame(_image.isPerFrame()),
+        _isPerFrame(_image->isPerFrame()),
         _viewType(createInfo.type),
         _baseMipLevel(createInfo.baseMipLevel),
         _mipLevelCount(createInfo.mipLevelCount),

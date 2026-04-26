@@ -97,10 +97,10 @@ namespace gfx
 
         virtual ~Importer() = default;
 
-        static std::unique_ptr<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
-        static Task<void> LoadImageAsync(const std::filesystem::path& path, bool generateMipmaps, std::shared_ptr<Image> &returnImage);
+        static gfx::Resource<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
+        static Task<void> LoadImageAsync(const std::filesystem::path& path, bool generateMipmaps, Resource<Image> &returnImage);
 
-        static void SaveImage(const std::filesystem::path& path, const std::string& name, FileFormat fileFormat, const Image& image);
+        static void SaveImage(const std::filesystem::path& path, const std::string& name, FileFormat fileFormat, ResourceRef<Image> image);
         static std::unique_ptr<Importer> Load(const std::filesystem::path& path);
 
         virtual std::vector<std::string> GetMeshNames() = 0;

@@ -7,6 +7,7 @@
 #include <vector>
 #include <functional>
 #include <memory>
+#include <unordered_set>
 
 #include "commandBuffer.h"
 
@@ -65,6 +66,17 @@ namespace gfx
 
     	[[nodiscard]] bool hasStarted() const { return _started; }
     	virtual void WaitIdle() const = 0;
+
+    	std::unordered_set<glm::u32> ImageIndicesExcept(const glm::u32 index) const
+		{
+			std::unordered_set<glm::u32> indices;
+			for (glm::u32 i = 0; i < _imageCount; ++i) {
+				if (i != index) {
+					indices.insert(i);
+				}
+			}
+			return indices;
+		}
 
     protected:
     	virtual void createFrames() = 0;

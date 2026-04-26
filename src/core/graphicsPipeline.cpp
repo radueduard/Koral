@@ -84,19 +84,19 @@ namespace gfx
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(const Framebuffer& framebuffer)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(gfx::ResourceRef<gfx::Framebuffer> framebuffer)
     {
-        this->framebuffer = std::cref(framebuffer);
+        this->framebuffer = framebuffer;
         return *this;
     }
 
-    std::unique_ptr<GraphicsPipeline> GraphicsPipeline::Builder::build() const
+    gfx::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
-            return std::make_unique<ogl::GraphicsPipeline>(*this);
+            return gfx::MakeResource<ogl::GraphicsPipeline>(*this);
         case API::eVulkan:
-            return std::make_unique<vk::GraphicsPipeline>(*this);
+            return gfx::MakeResource<vk::GraphicsPipeline>(*this);
         default:
             throw std::runtime_error("Unknown API");
         }
@@ -124,7 +124,7 @@ namespace gfx
         _fragmentShader(createInfo.fragmentShader),
         _taskShader(createInfo.taskShader),
         _meshShader(createInfo.meshShader),
-        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value().get() : Context::DefaultFramebuffer()),
+        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::DefaultFramebuffer()),
         _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),

@@ -112,7 +112,7 @@ namespace gfx::vk
         }
 
         const auto swapChainImageHandles = Context::Device()->getSwapchainImagesKHR(_handle);
-        _swapChainImages = std::make_unique<gfx::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa);
+        _swapChainImages = Resource<gfx::Image>(std::make_unique<gfx::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa));
 
         _depthImages = Image::Builder()
             .setIsPerFrame(true)
@@ -123,10 +123,10 @@ namespace gfx::vk
             .setMSAA(_msaa)
             .build();
 
-        _swapChainImageViews = gfx::ImageView::Builder(*_swapChainImages)
+        _swapChainImageViews = gfx::ImageView::Builder(_swapChainImages)
             .setViewType(gfx::ImageView::Type::e2D)
             .build();
-        _depthImageViews = ImageView::Builder(*_depthImages)
+        _depthImageViews = ImageView::Builder(_depthImages)
             .setViewType(gfx::ImageView::Type::e2D)
             .build();
     }
@@ -144,7 +144,7 @@ namespace gfx::vk
         _extent = newSize;
         Context::Device()->waitIdle();
         CreateSwapChain();
-        gfx::Context::DefaultFramebuffer().Resize(_swapChainImages->getExtent());
+        gfx::Context::DefaultFramebuffer()->Resize(_swapChainImages->getExtent());
 
     }
 

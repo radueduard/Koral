@@ -16,8 +16,6 @@ namespace gfx::ogl
         explicit Buffer(const gfx::Buffer::RawBuilder& createInfo);
         ~Buffer() override;
 
-        void CopyFrom(const gfx::Buffer& srcBuffer, glm::u64 srcOffset, glm::u64 dstOffset, glm::u64 size) const override;
-
         void Bind(GLenum target);
         void Unbind();
 
@@ -28,13 +26,15 @@ namespace gfx::ogl
         void Flush(glm::i64 size, glm::u64 offset) const override;
         void Invalidate(glm::i64 size, glm::u64 offset) const override;
 
-    private:
-        GLuint _id = 0;
         static GLenum GetTargetFromUsage(Flags<gfx::Buffer::Usage> usage);
         static GLenum GetFlagsFromType(Type type);
-
+    private:
+        GLuint _id = 0;
         std::optional<GLenum> _boundTarget = std::nullopt;
 
         GLenum _defaultTarget;
+
+    public:
+        void applyPendingWrites() const override {}
     };
 }

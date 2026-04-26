@@ -51,8 +51,8 @@ namespace gfx::vk
                     switch (type) {
                     case DescriptorType::eUniformBuffer:
                         {
-                            auto* buffer = dynamic_cast<const gfx::vk::Buffer*>(descriptor.getBuffer());
-                            const auto& bufferHandle = buffer->isPerFrame() ? (*buffer)[frame] : (*buffer)[0];
+                            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(descriptor.getBuffer());
+                            const auto& bufferHandle = vkBuffer.isPerFrame() ? vkBuffer[frame] : vkBuffer[0];
                             const auto& bufferInfo = bufferInfos.emplace_back()
                                 .setBuffer(bufferHandle)
                                 .setOffset(descriptor.getOffset())
@@ -67,8 +67,8 @@ namespace gfx::vk
                         }
                     case DescriptorType::eStorageBuffer:
                         {
-                            auto* buffer = dynamic_cast<const Buffer*>(descriptor.getBuffer());
-                            const auto& bufferHandle = buffer->isPerFrame() ? (*buffer)[frame] : (*buffer)[0];
+                            const auto& buffer = dynamic_cast<const Buffer&>(descriptor.getBuffer());
+                            const auto& bufferHandle = buffer.isPerFrame() ? buffer[frame] : buffer[0];
                             const auto& bufferInfo = bufferInfos.emplace_back()
                                 .setBuffer(bufferHandle)
                                 .setOffset(descriptor.getOffset())
@@ -83,9 +83,9 @@ namespace gfx::vk
                         }
                     case DescriptorType::eSampler:
                         {
-                            auto* sampler = dynamic_cast<const Sampler*>(descriptor.getSampler());
+                            const auto& sampler = dynamic_cast<const Sampler&>(descriptor.getSampler());
                             const auto& imageInfo = imageInfos.emplace_back()
-                                .setSampler(**sampler);
+                                .setSampler(*sampler);
                             writes.emplace_back()
                                 .setDstSet(_descriptorSets[frame])
                                 .setDstBinding(binding)
@@ -96,12 +96,12 @@ namespace gfx::vk
                         }
                     case DescriptorType::eCombinedImageSampler:
                         {
-                            auto* sampler = dynamic_cast<const vk::Sampler*>(descriptor.getSampler());
-                            auto* imageView = dynamic_cast<const vk::ImageView*>(descriptor.getImageView());
-                            const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                            const auto& sampler = dynamic_cast<const vk::Sampler&>(descriptor.getSampler());
+                            const auto& imageView = dynamic_cast<const vk::ImageView&>(descriptor.getImageView());
+                            const auto& imageViewHandle = imageView.isPerFrame() ? imageView[frame] : imageView[0];
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setImageView(imageViewHandle)
-                                .setSampler(**sampler)
+                                .setSampler(*sampler)
                                 .setImageLayout(::vk::ImageLayout::eShaderReadOnlyOptimal);
 
                             writes.emplace_back()
@@ -114,8 +114,8 @@ namespace gfx::vk
                         }
                     case DescriptorType::eStorageImage:
                         {
-                            auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
-                            const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                            const auto& imageView = dynamic_cast<const ImageView&>(descriptor.getImageView());
+                            const auto& imageViewHandle = imageView.isPerFrame() ? imageView[frame] : imageView[0];
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setImageView(imageViewHandle)
                                 .setImageLayout(::vk::ImageLayout::eGeneral);
@@ -129,8 +129,8 @@ namespace gfx::vk
                         }
                     case DescriptorType::eSampledImage:
                         {
-                            auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
-                            const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                            const auto& imageView = dynamic_cast<const ImageView&>(descriptor.getImageView());
+                            const auto& imageViewHandle = imageView.isPerFrame() ? imageView[frame] : imageView[0];
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setImageView(imageViewHandle)
                                 .setImageLayout(::vk::ImageLayout::eShaderReadOnlyOptimal);
@@ -173,8 +173,8 @@ namespace gfx::vk
             switch (type) {
                 case DescriptorType::eUniformBuffer:
                 {
-                    auto* buffer = dynamic_cast<const gfx::vk::Buffer*>(descriptor.getBuffer());
-                    const auto& bufferHandle = buffer->isPerFrame() ? (*buffer)[frame] : (*buffer)[0];
+                    const auto& buffer = dynamic_cast<const Buffer&>(descriptor.getBuffer());
+                    const auto& bufferHandle = buffer.isPerFrame() ? buffer[frame] : buffer[0];
                     const auto& bufferInfo = bufferInfos.emplace_back()
                         .setBuffer(bufferHandle)
                         .setOffset(descriptor.getOffset())
@@ -189,8 +189,8 @@ namespace gfx::vk
                 }
                 case DescriptorType::eStorageBuffer:
                 {
-                    auto* buffer = dynamic_cast<const Buffer*>(descriptor.getBuffer());
-                    const auto& bufferHandle = buffer->isPerFrame() ? (*buffer)[frame] : (*buffer)[0];
+                    const auto& buffer = dynamic_cast<const Buffer&>(descriptor.getBuffer());
+                    const auto& bufferHandle = buffer.isPerFrame() ? buffer[frame] : buffer[0];
                     const auto& bufferInfo = bufferInfos.emplace_back()
                         .setBuffer(bufferHandle)
                         .setOffset(descriptor.getOffset())
@@ -205,9 +205,9 @@ namespace gfx::vk
                 }
                 case DescriptorType::eSampler:
                 {
-                    auto* sampler = dynamic_cast<const Sampler*>(descriptor.getSampler());
+                    const auto& sampler = dynamic_cast<const Sampler&>(descriptor.getSampler());
                     const auto& imageInfo = imageInfos.emplace_back()
-                        .setSampler(**sampler);
+                        .setSampler(*sampler);
                     writes.emplace_back()
                         .setDstSet(_descriptorSets[frame])
                         .setDstBinding(binding)
@@ -218,12 +218,12 @@ namespace gfx::vk
                 }
                 case DescriptorType::eCombinedImageSampler:
                 {
-                    auto* sampler = dynamic_cast<const vk::Sampler*>(descriptor.getSampler());
-                    auto* imageView = dynamic_cast<const vk::ImageView*>(descriptor.getImageView());
-                    const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                    const auto& sampler = dynamic_cast<const vk::Sampler&>(descriptor.getSampler());
+                    const auto& imageView = dynamic_cast<const vk::ImageView&>(descriptor.getImageView());
+                    const auto& imageViewHandle = imageView.isPerFrame() ? imageView[frame] : imageView[0];
                     const auto& imageInfo = imageInfos.emplace_back()
                         .setImageView(imageViewHandle)
-                        .setSampler(**sampler)
+                        .setSampler(*sampler)
                         .setImageLayout(::vk::ImageLayout::eShaderReadOnlyOptimal);
                     writes.emplace_back()
                         .setDstSet(_descriptorSets[frame])
@@ -235,8 +235,8 @@ namespace gfx::vk
                 }
                 case DescriptorType::eStorageImage:
                 {
-                    auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
-                    const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                    const auto& imageView = dynamic_cast<const ImageView&>(descriptor.getImageView());
+                    const auto& imageViewHandle = imageView.isPerFrame() ? imageView[frame] : imageView[0];
                     const auto& imageInfo = imageInfos.emplace_back()
                         .setImageView(imageViewHandle)
                         .setImageLayout(::vk::ImageLayout::eGeneral);
@@ -250,8 +250,8 @@ namespace gfx::vk
                 }
                 case DescriptorType::eSampledImage:
                 {
-                    auto* imageView = dynamic_cast<const ImageView*>(descriptor.getImageView());
-                    const auto& imageViewHandle = imageView->isPerFrame() ? (*imageView)[frame] : (*imageView)[0];
+                    const auto& imageView = dynamic_cast<const ImageView&>(descriptor.getImageView());
+                    const auto& imageViewHandle = imageView.isPerFrame() ? imageView[frame] : imageView[0];
                     const auto& imageInfo = imageInfos.emplace_back()
                         .setImageView(imageViewHandle)
                         .setImageLayout(::vk::ImageLayout::eShaderReadOnlyOptimal);

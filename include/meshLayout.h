@@ -192,7 +192,7 @@ namespace gfx {
             (appendStream<Streams>(binding++, location), ...);
         }
 
-    static std::unique_ptr<Self> Create(std::span<const Streams>... streams)
+    static gfx::Resource<Self> Create(std::span<const Streams>... streams)
     {
         Builder builder;
         setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
@@ -200,7 +200,7 @@ namespace gfx {
     }
 
     template<typename IndexT> requires std::is_integral_v<IndexT>
-    static std::unique_ptr<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
+    static gfx::Resource<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
     {
         Builder builder;
         setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
@@ -215,33 +215,33 @@ namespace gfx {
     }
 
     // Convenience: vectors
-    static std::unique_ptr<Self> Create(const std::vector<Streams>&... streams)
+    static gfx::Resource<Self> Create(const std::vector<Streams>&... streams)
     {
         return Create(std::span<const Streams>(streams)...);
     }
 
     template<typename IndexT>
-    static std::unique_ptr<Self> Create(const std::vector<Streams>&... streams, const std::vector<IndexT>& indices)
+    static gfx::Resource<Self> Create(const std::vector<Streams>&... streams, const std::vector<IndexT>& indices)
     {
         return Create(std::span<const Streams>(streams)..., std::span<const IndexT>(indices));
     }
 
     // Convenience: arrays
     template<std::size_t... N>
-    static std::unique_ptr<Self> Create(const std::array<Streams, N>&... streams)
+    static gfx::Resource<Self> Create(const std::array<Streams, N>&... streams)
     {
         return Create(std::span<const Streams>(streams)...);
     }
 
     template<typename IndexT, std::size_t... N, std::size_t NI>
-    static std::unique_ptr<Self> Create(const std::array<Streams, N>&... streams, const std::array<IndexT, NI>& indices)
+    static gfx::Resource<Self> Create(const std::array<Streams, N>&... streams, const std::array<IndexT, NI>& indices)
     {
         return Create(std::span<const Streams>(streams)..., std::span<const IndexT>(indices));
     }
 
 private:
     template<typename T>
-    static std::unique_ptr<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
+    static gfx::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
         {
             // Keep final buffers transfer-capable as requested.
             const auto finalUsage = usage

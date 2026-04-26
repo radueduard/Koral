@@ -130,15 +130,14 @@ void gfx::GUI::DefineStyle()
 }
 
 
-
-std::unique_ptr<gfx::GUI_Image> gfx::GUI_Image::Create(const gfx::Image& image, glm::u32 layer, glm::u32 level)
+gfx::Resource<gfx::GUI_Image> gfx::GUI_Image::Create(gfx::ResourceRef<gfx::Image> image, glm::u32 layer, glm::u32 level)
 {
     switch (Context::Window().getAPI())
     {
-    case API::eOpenGL:
-        return std::make_unique<gfx::ogl::GUI_Image>(image, layer, level);
+        case API::eOpenGL:
+        return gfx::MakeResource<gfx::ogl::GUI_Image>(image, layer, level);
     case API::eVulkan:
-        return std::make_unique<gfx::vk::GUI_Image>(image, layer, level);
+        return gfx::MakeResource<gfx::vk::GUI_Image>(image, layer, level);
     default:
         throw std::runtime_error("Unsupported graphics API");
     }

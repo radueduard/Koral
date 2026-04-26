@@ -12,13 +12,13 @@
 
 namespace gfx
 {
-    std::unique_ptr<Buffer> Buffer::RawBuilder::build() const
+    gfx::Resource<Buffer> Buffer::RawBuilder::build() const
     {
         switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return std::make_unique<ogl::Buffer>(*this);
+            case API::eOpenGL:
+            return gfx::MakeResource<ogl::Buffer>(*this);
         case API::eVulkan:
-            return std::make_unique<vk::Buffer>(*this);
+            return gfx::MakeResource<vk::Buffer>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

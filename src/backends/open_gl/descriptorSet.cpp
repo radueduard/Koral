@@ -44,28 +44,28 @@ namespace gfx::ogl
                 {
                 case DescriptorType::eUniformBuffer:
                     {
-                        auto* buffer = dynamic_cast<const ogl::Buffer*>(descriptor.getBuffer());
-                        glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint->second, **buffer, descriptor.getOffset(), descriptor.getRange());
+                        const auto& buffer = dynamic_cast<const ogl::Buffer&>(descriptor.getBuffer());
+                        glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint->second, *buffer, descriptor.getOffset(), descriptor.getRange());
                         glCheckError();
                         break;
                     }
                 case DescriptorType::eStorageBuffer:
                     {
-                        auto* buffer = dynamic_cast<const ogl::Buffer*>(descriptor.getBuffer());
-                        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, bindingPoint->second, **buffer, descriptor.getOffset(), descriptor.getRange());
+                        const auto& buffer = dynamic_cast<const ogl::Buffer&>(descriptor.getBuffer());
+                        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, bindingPoint->second, *buffer, descriptor.getOffset(), descriptor.getRange());
                         glCheckError();
                         break;
                     }
                 case DescriptorType::eCombinedImageSampler:
                     {
-                        auto* sampler = dynamic_cast<const ogl::Sampler*>(descriptor.getSampler());
-                        auto* imageView = dynamic_cast<const ogl::ImageView*>(descriptor.getImageView());
+                        const auto& sampler = dynamic_cast<const ogl::Sampler&>(descriptor.getSampler());
+                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.getImageView());
 
-                        glBindSampler(bindingPoint->second, **sampler);
+                        glBindSampler(bindingPoint->second, *sampler);
                         glCheckError();
                         glActiveTexture(GL_TEXTURE0 + bindingPoint->second);
                         GLenum target = GL_TEXTURE_2D;
-                        switch (imageView->getViewType())
+                        switch (imageView.getViewType())
                         {
                         case ImageView::Type::e1D:
                             target = GL_TEXTURE_1D;
@@ -89,41 +89,41 @@ namespace gfx::ogl
                             target = GL_TEXTURE_CUBE_MAP_ARRAY;
                             break;
                         }
-                        glBindTexture(target, **imageView);
+                        glBindTexture(target, *imageView);
                         glCheckError();
                         break;
                     }
                 case DescriptorType::eStorageImage:
                     {
-                        auto* imageView = dynamic_cast<const ogl::ImageView*>(descriptor.getImageView());
+                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.getImageView());
 
                         glBindImageTexture(bindingPoint->second,
-                                           **imageView,
-                                           imageView->getBaseMipLevel(),
-                                           imageView->getArrayLayerCount() > 1,
-                                           imageView->getBaseArrayLayer(),
+                                           *imageView,
+                                           imageView.getBaseMipLevel(),
+                                           imageView.getArrayLayerCount() > 1,
+                                           imageView.getBaseArrayLayer(),
                                            GL_READ_WRITE,
-                                           imageView->getFormat());
+                                           imageView.getFormat());
                         glCheckError();
                         break;
                     }
                 case DescriptorType::eSampledImage:
                     {
-                        auto* imageView = dynamic_cast<const ogl::ImageView*>(descriptor.getImageView());
+                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.getImageView());
                         glBindImageTexture(bindingPoint->second,
-                                             **imageView,
-                                             imageView->getBaseMipLevel(),
-                                             imageView->getArrayLayerCount() > 1,
-                                             imageView->getBaseArrayLayer(),
+                                             *imageView,
+                                             imageView.getBaseMipLevel(),
+                                             imageView.getArrayLayerCount() > 1,
+                                             imageView.getBaseArrayLayer(),
                                              GL_READ_ONLY,
-                                             imageView->getFormat());
+                                             imageView.getFormat());
                         glCheckError();
                         break;
                     }
                 case DescriptorType::eSampler:
                     {
-                        auto* sampler = dynamic_cast<const ogl::Sampler*>(descriptor.getSampler());
-                        glBindSampler(bindingPoint->second, **sampler);
+                        const auto& sampler = dynamic_cast<const ogl::Sampler&>(descriptor.getSampler());
+                        glBindSampler(bindingPoint->second, *sampler);
                         glCheckError();
                         break;
                     }

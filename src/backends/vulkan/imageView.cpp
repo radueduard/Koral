@@ -16,19 +16,19 @@ namespace gfx::vk
     ImageView::ImageView(const Builder& builder) : gfx::ImageView(builder)
     {
         ::vk::ImageAspectFlags aspectMask = ::vk::ImageAspectFlagBits::eColor;
-        if (gfx::IsDepthStencilFormat(_image.getFormat())) {
+        if (gfx::IsDepthStencilFormat(_image->getFormat())) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (gfx::IsStencilFormat(_image.getFormat())) {
+            if (gfx::IsStencilFormat(_image->getFormat())) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         }
 
-        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(_image);
+        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*_image);
         for (const auto& image : vkImage._images) {
             auto viewInfo = ::vk::ImageViewCreateInfo()
                 .setImage(image)
                 .setViewType(getVkImageViewType(_viewType))
-                .setFormat(getVkFormat(_image.getFormat()))
+                .setFormat(getVkFormat(_image->getFormat()))
                 .setComponents(::vk::ComponentMapping()
                     .setR(getVkComponentSwizzle(_componentMapping.r))
                     .setG(getVkComponentSwizzle(_componentMapping.g))

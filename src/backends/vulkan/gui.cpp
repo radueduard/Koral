@@ -26,7 +26,7 @@ gfx::vk::DescriptorPool* gfx::vk::GUI::_descriptorPool = nullptr;
 
 namespace gfx::vk
 {
-    GUI_Image::GUI_Image(const gfx::Image& image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    GUI_Image::GUI_Image(gfx::ResourceRef<gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         _helperSampler = Sampler::Builder()
             .setMagFilter(Filter::eNearest)
@@ -48,13 +48,13 @@ namespace gfx::vk
     {
         Context::Device().runSingleTimeCommand([&](CommandBuffer& commandBuffer)
             {
-                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(_image.get());
-                const auto& vkHelperImage = *dynamic_cast<const gfx::vk::Image*>(_helperImage.get());
+                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*_image);
+                const auto& vkHelperImage = dynamic_cast<const gfx::vk::Image&>(*_helperImage);
 
                 const auto imageType = vkImage.getType();
 
                 commandBuffer.Blit(
-                    &_image.get(), _helperImage.get(),
+                    _image, _helperImage,
                     gfx::Blit {
                         .srcOffset = { 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
                         .srcExtent = {
@@ -72,11 +72,11 @@ namespace gfx::vk
                         .filtering = gfx::Filter::eNearest
                     });
 
-                commandBuffer.ImageBarrier({ *_helperImage, ResourceAccess::FragmentShaderRead });
+                commandBuffer.ImageBarrier({ _helperImage, ResourceAccess::FragmentShaderRead });
             }, ::vk::QueueFlagBits::eGraphics);
     }
 
-    void GUI_Image::setImage(const gfx::Image& image)
+    void GUI_Image::setImage(gfx::ResourceRef<gfx::Image> image)
     {
         Context::Device()->waitIdle();
         ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
@@ -87,32 +87,32 @@ namespace gfx::vk
 
         _image = image;
         _helperImage = gfx::Image::Builder()
-            .setIsPerFrame(_image.get().isPerFrame())
+            .setIsPerFrame(_image->isPerFrame())
             .setType(Image::Type::e2D)
-            .setFormat(image.getFormat())
-            .setExtent({ image.getExtent().x, image.getExtent().y })
-            .setMSAA(image.getMSAA())
+            .setFormat(image->getFormat())
+            .setExtent({ image->getExtent().x, image->getExtent().y })
+            .setMSAA(image->getMSAA())
             .setUsage(Image::Usage::eTransferDst)
             .addUsage(Image::Usage::eSampled)
             .build();
 
         auto components = gfx::ImageView::ComponentMapping();
-        if (image.getFormat() == Image::Format::eR8_UNORM) {
+        if (image->getFormat() == Image::Format::eR8_UNORM) {
             components.r = gfx::ImageView::Swizzle::eR;
             components.g = gfx::ImageView::Swizzle::eR;
             components.b = gfx::ImageView::Swizzle::eR;
             components.a = gfx::ImageView::Swizzle::eR;
         }
 
-        _helperImageView = gfx::ImageView::Builder(*_helperImage)
+        _helperImageView = gfx::ImageView::Builder(_helperImage)
             .setViewType(ImageView::Type::e2D)
             .setComponentMapping(components)
             .build();
 
         for (int frame = 0; frame < gfx::Context::Scheduler().getImageCount(); ++frame) {
             _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
-                **dynamic_cast<const gfx::vk::Sampler*>(_helperSampler.get()),
-                (*dynamic_cast<const gfx::vk::ImageView*>(_helperImageView.get()))[frame],
+                *dynamic_cast<const gfx::vk::Sampler&>(*_helperSampler),
+                dynamic_cast<const gfx::vk::ImageView&>(*_helperImageView)[frame],
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
         }
 
@@ -147,7 +147,7 @@ namespace gfx::vk
 
         const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
         static std::vector colorAttachmentFormats = {
-            static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().getImage().getFormat()))
+            static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().getImage()->getFormat()))
         };
 
         const auto pipelineRenderingCreateInfo = VkPipelineRenderingCreateInfo {
@@ -197,9 +197,9 @@ namespace gfx::vk
     void GUI::Render(gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
         const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
-        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(gfx::Context::DefaultFramebuffer());
+        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*gfx::Context::DefaultFramebuffer());
         const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(vkFramebuffer.getColorAttachments()[0].get());
-        const auto& vkImage = dynamic_cast<const vk::Image&>(vkColorImageView.getImage());
+        const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.getImage());
 
         auto colorAttachment = ::vk::RenderingAttachmentInfo()
             .setImageView(*vkColorImageView)
@@ -216,7 +216,7 @@ namespace gfx::vk
             .setLayerCount(1);
 
         commandBuffer.ImageBarrier({
-            vkImage,
+            vkColorImageView.getImage(),
             ResourceAccess::ColorAttachment
         });
 
@@ -229,7 +229,7 @@ namespace gfx::vk
         vkCommandBuffer->endRendering();
 
         commandBuffer.ImageBarrier({
-            vkImage,
+            vkColorImageView.getImage(),
             ResourceAccess::Present
         });
     }

@@ -30,24 +30,24 @@ namespace gfx {
         return *this;
     }
 
-    std::unique_ptr<Framebuffer> Framebuffer::Builder::build() const
+    Resource<Framebuffer> Framebuffer::Builder::build() const
     {
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
-            return std::make_unique<ogl::Framebuffer>(*this);
+            return MakeResource<ogl::Framebuffer>(*this);
         case API::eVulkan:
-            return std::make_unique<vk::Framebuffer>(*this);
+            return MakeResource<vk::Framebuffer>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
     }
 
-    std::unique_ptr<Framebuffer> Framebuffer::CreateDefault() {
+    gfx::Resource<Framebuffer> Framebuffer::CreateDefault() {
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
-            return std::make_unique<ogl::Framebuffer>();
+            return gfx::MakeResource<ogl::Framebuffer>();
         case API::eVulkan:
-            return std::make_unique<vk::Framebuffer>();
+            return gfx::MakeResource<vk::Framebuffer>();
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
@@ -89,6 +89,8 @@ namespace gfx {
         _clearValues(createInfo.clearValues)
     {
         _isDefault = false;
-        _extent = _colorAttachments.empty() ? _depthStencilAttachment.has_value() ? _depthStencilAttachment.value().get().getImage().getExtent() : glm::uvec2{ 0, 0 } : _colorAttachments[0].get().getImage().getExtent();
+        _extent = _colorAttachments.empty() ? _depthStencilAttachment.has_value() ?
+                                                 _depthStencilAttachment.value().get().getImage()->getExtent() : glm::uvec2{ 0, 0 } :
+                                                                                                                 _colorAttachments[0].get().getImage()->getExtent();
     }
 }

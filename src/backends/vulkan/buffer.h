@@ -22,7 +22,6 @@ namespace gfx::vk
 		Buffer(const Buffer &) = delete;
         Buffer &operator=(const Buffer &) = delete;
 
-
     	void Map() const override;
         void Unmap() const override;
 		void Flush(glm::i64 size, glm::u64 offset) const override;
@@ -31,13 +30,12 @@ namespace gfx::vk
 		::vk::Buffer operator*() const;
         [[nodiscard]] VmaAllocation getAllocation() const;
 
-        void CopyFrom(const gfx::Buffer& srcBuffer, glm::u64 srcOffset, glm::u64 dstOffset, glm::u64 size) const override;
-
 		[[nodiscard]] ::vk::AccessFlags getAccessMask() const;
 		void setAccessMask(::vk::AccessFlags access) const;
 
 		::vk::Buffer operator[](size_t i) const;
     private:
+		void applyPendingWrites() const override;
 
 		std::vector<::vk::Buffer> _buffers {};
 		std::vector<VmaAllocation> _allocations {};

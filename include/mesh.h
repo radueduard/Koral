@@ -26,29 +26,29 @@ namespace gfx
         [[nodiscard]] std::optional<glm::u32> getIndexCount() const { return _indexCount; }
         [[nodiscard]] std::optional<ChannelType> getIndexType() const { return _indexType; }
 
-        [[nodiscard]] std::vector<std::reference_wrapper<const Buffer>> getVertexBuffers() const
+        [[nodiscard]] std::vector<gfx::ResourceRef<Buffer>> getVertexBuffers() const
         {
-            std::vector<std::reference_wrapper<const Buffer>> vertexBuffers;
+            std::vector<gfx::ResourceRef<Buffer>> vertexBuffers;
             for (const auto& vertexBuffer : _vertexBuffers)
             {
                 vertexBuffers.emplace_back(*vertexBuffer);
             }
             return vertexBuffers;
         }
-        [[nodiscard]] std::optional<std::reference_wrapper<const Buffer>> getIndexBuffer() const {
+        [[nodiscard]] std::optional<gfx::ResourceRef<Buffer>> getIndexBuffer() const {
             if (!_indexBuffer.has_value())
                 return std::nullopt;
-            return std::make_optional(std::reference_wrapper<const Buffer>(*_indexBuffer.value()));
+            return _indexBuffer;
         }
 
     protected:
         glm::u64 _vertexCount{};
-        std::vector<std::unique_ptr<Buffer>> _vertexBuffers = {};
+        std::vector<gfx::Resource<Buffer>> _vertexBuffers = {};
 
         std::optional<glm::u32> _indexCount = std::nullopt;
-        std::optional<std::unique_ptr<Buffer>> _indexBuffer = std::nullopt;
+        std::optional<gfx::Resource<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
-        std::optional<std::unique_ptr<Buffer>> _indirectBuffer = std::nullopt;
+        std::optional<gfx::Resource<Buffer>> _indirectBuffer = std::nullopt;
     };
 
     template<typename Derived>
@@ -63,12 +63,12 @@ namespace gfx
         struct Builder
         {
             glm::u64 vertexCount = 0;
-            std::vector<std::unique_ptr<Buffer>> vertexBuffers {};
+            std::vector<gfx::Resource<Buffer>> vertexBuffers {};
 
             std::optional<glm::u32> indexCount = std::nullopt;
-            std::optional<std::unique_ptr<Buffer>> indexBuffer = std::nullopt;
+            std::optional<gfx::Resource<Buffer>> indexBuffer = std::nullopt;
             std::optional<ChannelType> indexType = std::nullopt;
-            std::optional<std::unique_ptr<Buffer>> indirectBuffer = std::nullopt;
+            std::optional<gfx::Resource<Buffer>> indirectBuffer = std::nullopt;
 
             explicit Builder()
             {
@@ -77,7 +77,7 @@ namespace gfx
                 vertexBuffers.resize(Derived::VertexBindingDescription().size());
             }
 
-            Builder& SetVertexBuffer(const glm::u32 binding, std::unique_ptr<Buffer> vertexBuffer) {
+            Builder& SetVertexBuffer(const glm::u32 binding, gfx::Resource<Buffer> vertexBuffer) {
                 if (vertexCount == 0)
                     vertexCount = vertexBuffer->getSize() / _vertexBindingDescription[binding].stride;
                 else if (vertexCount != vertexBuffer->getSize() / _vertexBindingDescription[binding].stride)
@@ -87,21 +87,21 @@ namespace gfx
                 return *this;
             }
 
-            Builder& SetIndexBuffer(std::unique_ptr<Buffer> indexBuffer, const ChannelType indexType) {
+            Builder& SetIndexBuffer(gfx::Resource<Buffer> indexBuffer, const ChannelType indexType) {
                 this->indexCount = static_cast<glm::u32>(indexBuffer->getSize() / sizeofChannelType(indexType));
                 this->indexBuffer = std::move(indexBuffer);
                 this->indexType = indexType;
                 return *this;
             }
 
-            Builder& SetIndirectBuffer(std::unique_ptr<Buffer> indirectBuffer) {
+            Builder& SetIndirectBuffer(gfx::Resource<Buffer> indirectBuffer) {
                 this->indirectBuffer = std::move(indirectBuffer);
                 return *this;
             }
 
-            std::unique_ptr<Derived> Build()
+            gfx::Resource<Derived> Build()
             {
-                return std::make_unique<Derived>(*this);
+                return gfx::MakeResource<Derived>(*this);
             }
         };
 

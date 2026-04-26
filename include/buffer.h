@@ -11,12 +11,16 @@
 #include <stdexcept>
 #include <cstring>
 #include <limits>
+#include <unordered_set>
 
 #include <glm/fwd.hpp>
 
 #include "flags.h"
 #include "api.h"
 #include "../src/log.h"
+#include "context.h"
+#include "resource.h"
+#include "scheduler.h"
 
 namespace gfx
 {
@@ -62,6 +66,8 @@ namespace gfx
 
             RawBuilder& setIsPerFrame(const bool value) {
                 isPerFrame = value;
+                usage |= Usage::eTransferSrc;
+                usage |= Usage::eTransferDst;
                 return *this;
             }
 
@@ -80,7 +86,7 @@ namespace gfx
                 return *this;
             }
 
-            [[nodiscard]] virtual std::unique_ptr<Buffer> build() const;
+            [[nodiscard]] virtual Resource<Buffer> build() const;
 
         protected:
             RawBuilder& setSize(const glm::i64 value) {
@@ -104,6 +110,8 @@ namespace gfx
             std::span<const T> _dataView{};
 
         public:
+            virtual ~Builder() = default;
+
             Builder& setInstanceCount(const glm::i64 value) {
                 if (value < 0) {
                     throw std::invalid_argument("Builder<T>::instanceCount must be >= 0");
@@ -138,11 +146,11 @@ namespace gfx
                 this->size = static_cast<glm::i64>(sizeof(T)) * instanceCount;
                 return *this;
             }
-            [[nodiscard]] std::unique_ptr<Buffer> build() const override {
+            [[nodiscard]] Resource<Buffer> build() const override {
                 auto buffer = RawBuilder::build();
 
                 if (!_dataView.empty()) {
-                    switch (type) {
+                    switch (buffer->getType()) {
                         case Type::eDeviceLocal: {
                             const auto byteSize = checkedByteSize<T>(static_cast<glm::u64>(instanceCount), "Builder::build");
                             Builder<std::byte> stagingBuilder;
@@ -150,10 +158,12 @@ namespace gfx
                                 .setInstanceCount(toBuilderSize(byteSize, "Builder::build"))
                                 .setUsage(Usage::eTransferSrc)
                                 .setType(Type::eStaging);
-                            const auto stagingBuffer = stagingBuilder.build();
+                            auto stagingBuffer = stagingBuilder.build();
 
                             stagingBuffer->Write(_dataView, 0);
-                            buffer->CopyFrom(*stagingBuffer, 0, 0, byteSize);
+                            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                                commandBuffer.CopyBuffer(stagingBuffer, buffer, byteSize);
+                            }, CommandBuffer::Usage::eTransfer);
                             break;
                         }
                         case Type::eStaging:
@@ -174,18 +184,20 @@ namespace gfx
         [[nodiscard]] T ReadAt(const glm::u64 index = 0) const
         {
             validateElementRange<T>(index, 1, "ReadAt");
-            constexpr glm::u64 elemBytes = sizeof(T);
 
             switch (_type) {
                 case Type::eDeviceLocal:
                 {
+                    constexpr glm::u64 elemBytes = sizeof(T);
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
                         .setInstanceCount(toBuilderSize(elemBytes, "ReadAt"))
                         .setUsage(Usage::eTransferDst)
                         .setType(Type::eStaging);
                     const auto stagingBuffer = stagingBuilder.build();
-                    stagingBuffer->CopyFrom(*this, index * elemBytes, 0, elemBytes);
+                    CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                        commandBuffer.CopyBuffer(ResourceRef(*this), stagingBuffer, elemBytes, index * elemBytes, 0);
+                    }, CommandBuffer::Usage::eTransfer);
                     return stagingBuffer->ReadAt<T>(0);
                 }
                 case Type::eStaging:
@@ -201,11 +213,11 @@ namespace gfx
         void WriteAt(const glm::u64 index, const T& data)
         {
             validateElementRange<T>(index, 1, "WriteAt");
-            constexpr glm::u64 elemBytes = sizeof(T);
 
             switch (_type) {
                 case Type::eDeviceLocal:
                 {
+                    constexpr glm::u64 elemBytes = sizeof(T);
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
                         .setInstanceCount(toBuilderSize(elemBytes, "WriteAt"))
@@ -214,7 +226,9 @@ namespace gfx
                     const auto stagingBuffer = stagingBuilder.build();
 
                     stagingBuffer->WriteAt<T>(0, data);
-                    this->CopyFrom(*stagingBuffer, 0, index * elemBytes, elemBytes);
+                    CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                        commandBuffer.CopyBuffer(stagingBuffer, ResourceRef(*this), elemBytes, 0, index * elemBytes);
+                    }, CommandBuffer::Usage::eTransfer);
                     break;
                 }
                 case Type::eStaging:
@@ -260,7 +274,9 @@ namespace gfx
                         .setUsage(Usage::eTransferDst)
                         .setType(Type::eStaging);
                     const auto stagingBuffer = stagingBuilder.build();
-                    stagingBuffer->CopyFrom(*this, byteOffset, 0, byteSize);
+                    CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                        commandBuffer.CopyBuffer(ResourceRef(*this), stagingBuffer, byteSize, byteOffset, 0);
+                    }, CommandBuffer::Usage::eTransfer);
                     return stagingBuffer->Read<T>(count, 0);
                 }
                 case Type::eStaging:
@@ -300,9 +316,11 @@ namespace gfx
                         .setInstanceCount(toBuilderSize(byteSize, "Write"))
                         .setUsage(Usage::eTransferSrc)
                         .setType(Type::eStaging);
-                    const auto stagingBuffer = stagingBuilder.build();
+                    auto stagingBuffer = stagingBuilder.build();
                     stagingBuffer->Write<T>(data, 0);
-                    this->CopyFrom(*stagingBuffer, 0, byteOffset, byteSize);
+                    CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                        commandBuffer.CopyBuffer(stagingBuffer, ResourceRef(*this), byteSize, 0, byteOffset);
+                    }, CommandBuffer::Usage::eTransfer);
                     break;
                 }
                 case Type::eStaging:
@@ -427,14 +445,24 @@ namespace gfx
                 if (_active) _buffer->releaseMutableMapping();
             }
 
-            T& operator[](glm::u64 index) {
+            T& operator[](const glm::u64 index) {
+                if (_buffer->isPerFrame()) {
+                    auto currentImageIndex = gfx::Context::Scheduler().getCurrentImageIndex();
+                    _buffer->_pendingWrites.emplace_back(
+                        currentImageIndex,
+                        (_offset + index) * sizeof(T),
+                        sizeof(T),
+                        gfx::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
+                    );
+                }
+
                 return *reinterpret_cast<T*>(
                     static_cast<std::byte*>(_buffer->_mappedPtr) + (_offset + index) * sizeof(T));
             }
 
             const T& operator[](glm::u64 index) const {
                 return *reinterpret_cast<const T*>(
-                    static_cast<const std::byte*>(_buffer->_mappedPtr) + (_offset + index) * sizeof(T));
+                static_cast<const std::byte*>(_buffer->_mappedPtr) + (_offset + index) * sizeof(T));
             }
 
             [[nodiscard]] std::span<T> asSpan() {
@@ -468,6 +496,16 @@ namespace gfx
                 }
 
                 std::memcpy(static_cast<std::byte*>(_buffer->_mappedPtr) + (_offset + localOffset) * sizeof(T), data.data(), sizeof(T) * count);
+
+                if (_buffer->isPerFrame()) {
+                    auto currentImageIndex = gfx::Context::Scheduler().getCurrentImageIndex();
+                    _buffer->_pendingWrites.emplace_back(
+                        currentImageIndex,
+                        (_offset + localOffset) * sizeof(T),
+                        count * sizeof(T),
+                        gfx::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
+                    );
+                }
             }
 
             void Flush(glm::u64 localOffset = 0, glm::u64 count = 0) const {
@@ -508,8 +546,6 @@ namespace gfx
             bool _active = false;
          };
 
-        virtual void CopyFrom(const Buffer& srcBuffer, glm::u64 srcOffset, glm::u64 dstOffset, glm::u64 size) const = 0;
-
         [[nodiscard]] glm::u64 getSize() const { return _size; }
         [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
         [[nodiscard]] Type getType() const { return _type; }
@@ -540,8 +576,7 @@ namespace gfx
         explicit Buffer(const RawBuilder& createInfo);
 
         [[nodiscard]] static glm::i64 toBuilderSize(const glm::u64 bytes, const char* op) {
-            constexpr auto maxI64 = static_cast<glm::u64>(std::numeric_limits<glm::i64>::max());
-            if (bytes > maxI64) {
+            if (constexpr auto maxI64 = static_cast<glm::u64>(std::numeric_limits<glm::i64>::max()); bytes > maxI64) {
                 gfx::log::error("{}: requested byte size {} exceeds glm::i64 max {}", op, bytes, maxI64);
                 throw std::out_of_range("Byte size exceeds RawBuilder::size range");
             }
@@ -625,5 +660,17 @@ namespace gfx
             _isMappedMutably = false;
             Unmap();
         }
+
+        struct PendingWrite {
+            glm::u32 srcFrameIndex;
+            glm::u64 offset;
+            glm::u64 byteSize;
+            std::unordered_set<glm::u32> buffersLeftToUpdate;
+        };
+
+        mutable std::vector<PendingWrite> _pendingWrites{};
+
+    public:
+        virtual void applyPendingWrites() const = 0;
     };
 }

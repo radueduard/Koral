@@ -10,6 +10,7 @@
 
 #include "api.h"
 #include "descriptorSetLayout.h"
+#include "resource.h"
 #include "shader.h"
 
 namespace gfx
@@ -22,7 +23,7 @@ namespace gfx
         struct GFX_API Builder {
             std::optional<std::reference_wrapper<const Shader>> computeShader;
             Builder& setComputeShader(const Shader& computeShader);
-            [[nodiscard]] std::unique_ptr<ComputePipeline> build() const;
+            [[nodiscard]] Resource<ComputePipeline> build() const;
         };
 
         virtual ~ComputePipeline();

@@ -7,6 +7,7 @@
 
 #include "structs.h"
 #include "api.h"
+#include "resource.h"
 
 namespace gfx
 {
@@ -118,7 +119,7 @@ namespace gfx
                 return *this;
             }
 
-            [[nodiscard]] std::unique_ptr<Sampler> build() const;
+            [[nodiscard]] gfx::Resource<Sampler> build() const;
         };
 
         virtual ~Sampler() = default;

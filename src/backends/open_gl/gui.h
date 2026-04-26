@@ -24,16 +24,16 @@ namespace gfx::ogl
     class GUI_Image final : public gfx::GUI_Image
     {
     public:
-        explicit GUI_Image(const gfx::Image& image, glm::u32 layer, glm::u32 level);
+        explicit GUI_Image(gfx::ResourceRef<gfx::Image> image, glm::u32 layer, glm::u32 level);
         ~GUI_Image() override;
 
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(const gfx::Image& image) override;
+        void setImage(gfx::ResourceRef<gfx::Image> image) override;
 
         ImTextureID operator*() const override;
 
     private:
         GLint _id;
-        std::reference_wrapper<const gfx::Image> _image;
+        gfx::ResourceRef<gfx::Image> _image;
     };
 }

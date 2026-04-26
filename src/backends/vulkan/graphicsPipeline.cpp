@@ -22,14 +22,14 @@ namespace gfx::vk
         // dynamic rendering structs
 
         std::vector<::vk::Format> colorAttachmentFormats;
-        for (const auto& format : _framebuffer.get().getColorAttachments()) {
-            colorAttachmentFormats.push_back(getVkFormat(format.get().getImage().getFormat()));
+        for (const auto& format : _framebuffer->getColorAttachments()) {
+            colorAttachmentFormats.push_back(getVkFormat(format.get().getImage()->getFormat()));
         }
         auto pipelineRenderingCreateInfo = ::vk::PipelineRenderingCreateInfo()
             .setColorAttachmentFormats(colorAttachmentFormats);
-        if (_framebuffer.get().hasDepthStencilAttachment()) {
-            pipelineRenderingCreateInfo.setDepthAttachmentFormat(getVkFormat(_framebuffer.get().getDepthStencilAttachment().getImage().getFormat()));
-            pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer.get().getDepthStencilAttachment().getImage().getFormat()));
+        if (_framebuffer->hasDepthStencilAttachment()) {
+            pipelineRenderingCreateInfo.setDepthAttachmentFormat(getVkFormat(_framebuffer->getDepthStencilAttachment().getImage()->getFormat()));
+            pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer->getDepthStencilAttachment().getImage()->getFormat()));
         }
 
         std::vector<::vk::DescriptorSetLayout> setLayouts;
@@ -170,7 +170,7 @@ namespace gfx::vk
 
         std::vector<::vk::PipelineColorBlendAttachmentState> vkColorBlendAttachmentStates;
         int index = 0;
-        for (const auto& _ : _framebuffer.get().getColorAttachments()) {
+        for (const auto& _ : _framebuffer->getColorAttachments()) {
             if (createInfo.colorBlendState.attachments.empty()) {
                 vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
                     .setBlendEnable(false)
