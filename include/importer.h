@@ -9,7 +9,7 @@
 #include <memory>
 
 #include "api.h"
-#include "Task.h"
+#include "task.h"
 
 namespace gfx
 {

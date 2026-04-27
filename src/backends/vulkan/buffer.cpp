@@ -116,7 +116,7 @@ namespace gfx::vk
 	}
 
 	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
-	void Buffer::applyPendingWrites() const {
+	void Buffer::automaticUpdate() const {
 		const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;

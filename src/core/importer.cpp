@@ -11,8 +11,9 @@
 #include "assimpImporter.h"
 
 #include <OpenImageIO/imageio.h>
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
 #include <ktx.h>
+#include <GL/glew.h>
 
 #include "context.h"
 
@@ -89,8 +90,13 @@ namespace gfx
         }
 
         glm::u32 layerCount = 0;
-        while (imageInput->seek_subimage(layerCount, 0)) {
+        while (imageInput->seek_subimage(static_cast<int>(layerCount), 0)) {
             layerCount++;
+        }
+
+        glm::u32 mipLevels = 0;
+        while (imageInput->seek_subimage(0, static_cast<int>(mipLevels)) && !generateMipmaps) {
+            mipLevels++;
         }
 
         auto spec = imageInput->spec();
@@ -101,17 +107,21 @@ namespace gfx
         auto image = gfx::Image::Builder()
             .setExtent({ spec.width, spec.height, spec.depth })
             .setFormat(getFormat(spec.format, spec.nchannels))
-            .setMipLevels(generateMipmaps ? 0 : 1)
+            .setMipLevels(mipLevels)
             .setArrayLayers(layerCount)
             .addUsage(gfx::Image::Usage::eTransferDst)
             .build();
 
+        for (glm::u32 layer = 0; layer < layerCount; layer++) {
+            if (generateMipmaps) {
+                mipLevels = 1;
+            }
 
-        CommandBuffer::Create(gfx::CommandBuffer::Usage::eGraphics)->Run([&](CommandBuffer& commandBuffer) {
-            for (glm::u32 layer = 0; layer < layerCount; layer++) {
-                imageInput->seek_subimage(layer, spec);
+            for (glm::u32 mip = 0; mip < mipLevels; mip++) {
+                imageInput->seek_subimage(static_cast<int>(layer), static_cast<int>(mip));
+                spec = imageInput->spec();
                 std::vector<unsigned char> data(spec.width * spec.height * spec.depth * spec.nchannels * spec.format.size());
-                if (!imageInput->read_image(layer, 0, 0, spec.nchannels, spec.format, data.data())) {
+                if (!imageInput->read_image(static_cast<int>(layer), 0, 0, spec.nchannels, spec.format, data.data())) {
                     std::cerr << "Could not read image data: " << imageInput->geterror() << std::endl;
                 }
 
@@ -121,18 +131,22 @@ namespace gfx
                     .setType(gfx::Buffer::Type::eStaging)
                     .build();
 
-                commandBuffer.CopyBufferToImage(stagingBuffer, image, gfx::Copy {
-                    .imageOffset = { 0, 0, 0 },
-                    .imageExtent = { spec.width, spec.height, spec.depth },
-                    .imageBaseArrayLayer = layer,
-                    .imageLayerCount = 1,
-                    .imageMipLevel = 0,
+                CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                    commandBuffer.CopyBufferToImage(stagingBuffer, image, gfx::Copy {
+                        .imageOffset = { 0, 0, 0 },
+                        .imageExtent = { spec.width, spec.height, spec.depth },
+                        .imageBaseArrayLayer = layer,
+                        .imageLayerCount = 1,
+                        .imageMipLevel = 0,
+                    });
                 });
             }
-            if (generateMipmaps) {
+        }
+        if (generateMipmaps) {
+            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                 commandBuffer.GenerateMipmaps(image);
-            }
-        });
+            });
+        }
         imageInput->close();
 
         return image;
@@ -146,8 +160,33 @@ namespace gfx
         }
     };
 
+    gfx::Image::Format GetFormatFromGl(const ktx_uint32_t glInternalFormat) {
+        switch (glInternalFormat) {
+            case GL_R8: return gfx::Image::Format::eR8_UNORM;
+            case GL_RG8: return gfx::Image::Format::eRG8_UNORM;
+            case GL_RGBA8: return gfx::Image::Format::eRGBA8_UNORM;
+            case GL_SRGB8_ALPHA8: return gfx::Image::Format::eRGBA8_SRGB;
 
-    gfx::Image::Format GetFormatFromKtxVkFormat(const ktx_uint32_t vkFormat) {
+            case GL_R16: return gfx::Image::Format::eR16_UNORM;
+            case GL_RG16: return gfx::Image::Format::eRG16_UNORM;
+            case GL_RGBA16: return gfx::Image::Format::eRGBA16_UNORM;
+            case GL_RGBA16F: return gfx::Image::Format::eRGBA16_SFLOAT;
+
+            case GL_R32F: return gfx::Image::Format::eR32_SFLOAT;
+            case GL_RG32F: return gfx::Image::Format::eRG32_SFLOAT;
+            case GL_RGBA32F: return gfx::Image::Format::eRGBA32_SFLOAT;
+
+            case GL_COMPRESSED_RGBA_BPTC_UNORM_ARB: return gfx::Image::Format::eBC7_UNORM;
+            case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB: return gfx::Image::Format::eBC7_SRGB;
+
+            default: {
+                std::cerr << "Unknown format: " << glInternalFormat << std::endl;
+                throw std::runtime_error("Unsupported KTX glInternalformat: " + std::to_string(glInternalFormat));
+            }
+        }
+    }
+
+    gfx::Image::Format GetFormatFromVk(const ktx_uint32_t vkFormat) {
         switch (vkFormat) {
             case VK_FORMAT_R8_UNORM: return gfx::Image::Format::eR8_UNORM;
             case VK_FORMAT_R8G8_UNORM: return gfx::Image::Format::eRG8_UNORM;
@@ -180,20 +219,44 @@ namespace gfx
     }
 
     Task<void> LoadKTXAsync(const std::filesystem::path& path, const bool generateMipmaps, gfx::Resource<Image>& returnImage) {
-        ktxTexture2* rawTexture = nullptr;
-        const KTX_error_code createResult = ktxTexture2_CreateFromNamedFile(
-            path.string().c_str(),
-            KTX_TEXTURE_CREATE_NO_FLAGS, // metadata only (phase 1)
-            &rawTexture
-        );
+        std::unique_ptr<ktxTexture, KtxTextureDeleter> texture = nullptr;
+        Image::Format format;
 
-        if (createResult != KTX_SUCCESS || !rawTexture) {
-            std::cerr << "Could not open KTX file: " << path.string()
-                      << " error=" << ktxErrorString(createResult) << std::endl;
-            co_return;
+        if (path.extension() == ".ktx") {
+            ktxTexture1* rawTexture = nullptr;
+            const KTX_error_code createResult = ktxTexture1_CreateFromNamedFile(
+                path.string().c_str(),
+                KTX_TEXTURE_CREATE_NO_FLAGS, // metadata only (phase 1)
+                &rawTexture
+            );
+
+            if (createResult != KTX_SUCCESS || !rawTexture) {
+                std::cerr << "Could not open KTX file: " << path.string()
+                          << " error=" << ktxErrorString(createResult) << std::endl;
+                co_return;
+            }
+
+            format = GetFormatFromGl(rawTexture->glInternalformat);
+            texture = std::unique_ptr<ktxTexture, KtxTextureDeleter>(ktxTexture(rawTexture));
         }
+        else if (path.extension() == ".ktx2") {
+            ktxTexture2* rawTexture = nullptr;
+            const KTX_error_code createResult = ktxTexture2_CreateFromNamedFile(
+                path.string().c_str(),
+                KTX_TEXTURE_CREATE_NO_FLAGS, // metadata only (phase 1)
+                &rawTexture
+            );
 
-        const std::unique_ptr<ktxTexture, KtxTextureDeleter> texture(ktxTexture(rawTexture));
+            if (createResult != KTX_SUCCESS || !rawTexture) {
+                std::cerr << "Could not open KTX file: " << path.string()
+                          << " error=" << ktxErrorString(createResult) << std::endl;
+                co_return;
+            }
+            format = GetFormatFromVk(rawTexture->vkFormat);
+            texture = std::unique_ptr<ktxTexture, KtxTextureDeleter>(ktxTexture(rawTexture));
+        } else {
+            throw std::runtime_error("Unsupported KTX file extension: " + path.extension().string());
+        }
 
         const glm::u32 layers = std::max<glm::u32>(1u, texture->numLayers);
         const glm::u32 faces  = std::max<glm::u32>(1u, texture->numFaces);
@@ -209,7 +272,7 @@ namespace gfx
             .setExtent({ texture->baseWidth, texture->baseHeight, texture->baseDepth })
             .setArrayLayers(arrayLayers)
             .setMipLevels(mipLevels)
-            .setFormat(GetFormatFromKtxVkFormat(rawTexture->vkFormat))
+            .setFormat(format)
             .addUsage(Image::Usage::eTransferSrc)
             .addUsage(Image::Usage::eTransferDst)
             .build();

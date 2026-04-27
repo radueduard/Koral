@@ -671,6 +671,6 @@ namespace gfx
         mutable std::vector<PendingWrite> _pendingWrites{};
 
     public:
-        virtual void applyPendingWrites() const = 0;
+        virtual void automaticUpdate() const = 0;
     };
 }

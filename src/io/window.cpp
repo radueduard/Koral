@@ -127,6 +127,8 @@ namespace gfx::io {
         Context::_mainThreadExecutor = new MainThreadExecutor();
         Context::_backgroundExecutor = new BackgroundExecutor();
 
+        Context::_repository = new Repository();
+
         _scene->Initialize();
     }
 
@@ -143,6 +145,7 @@ namespace gfx::io {
         delete Context::_scheduler;
         delete Context::_mainThreadExecutor;
         delete Context::_backgroundExecutor;
+        delete Context::_repository;
         _surface.reset();
         if (_api == API::eVulkan) {
             vk::Context::Destroy();

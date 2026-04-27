@@ -6,7 +6,7 @@
 #include "api.h"
 #include <filesystem>
 
-#include "Task.h"
+#include "task.h"
 #include "resource.h"
 
 struct ImGuiContext;
@@ -49,6 +49,8 @@ namespace gfx {
         static GFX_API gfx::SwitchAwaiter SwitchToBackgroundThread();
         static GFX_API void DrainMainThread();
 
+        static GFX_API gfx::Repository& Repository();
+
     private:
         static GFX_API void setFocusedWindow(io::Window* window);
 
@@ -59,5 +61,7 @@ namespace gfx {
 
         inline static MainThreadExecutor* _mainThreadExecutor = nullptr;
         inline static BackgroundExecutor* _backgroundExecutor   = nullptr;
+
+        inline static gfx::Repository* _repository = nullptr;
     };
 }

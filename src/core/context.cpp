@@ -87,6 +87,13 @@ void gfx::Context::DrainMainThread() {
     _mainThreadExecutor->Drain();
 }
 
+gfx::Repository & gfx::Context::Repository() {
+    if (!_repository) {
+        throw std::runtime_error("Resource repository is not initialized for this thread!");
+    }
+    return *_repository;
+}
+
 void gfx::Context::setFocusedWindow(io::Window* window)
 {
     _focusedWindow = window;

@@ -46,9 +46,6 @@
     "version>=" : "1.91.9",
     "features" : [ "glfw-binding", "opengl3-binding", "vulkan-binding", "docking-experimental" ]
   }, {
-    "name" : "devil",
-    "version>=" : "1.8.0#13"
-  }, {
     "name" : "jasper",
     "version>=" : "4.2.9"
   }, {
@@ -63,9 +60,6 @@
   }, {
     "name" : "ktx",
     "version>=" : "4.4.2"
-  }, {
-    "name" : "directxtex",
-    "version>=" : "2025-10-27"
   }, {
     "name" : "openimageio",
     "version>=" : "3.0.9.1#3"

@@ -4,6 +4,7 @@
 
 #pragma once
 #include <memory>
+#include <ranges>
 #include <stdexcept>
 #include <string>
 #include <typeindex>
@@ -57,6 +58,7 @@ namespace gfx {
 
     template<typename ResourceType>
     class ResourceRef {
+        friend class Repository;
     public:
         ResourceRef() = default;
         ResourceRef(const Resource<ResourceType>& resource)
@@ -97,19 +99,46 @@ namespace gfx {
     class Repository {
         struct IStorage {
             virtual ~IStorage() = default;
+            virtual void update() = 0;
         };
 
         template<typename T>
         struct Storage final : IStorage {
             std::unordered_map<std::string, Resource<T>> items{};
+
+            void update() override {
+                if constexpr (requires(T t) { t.update(); }) {
+                    for (auto& [id, resource] : items) {
+                        if (resource) {
+                            resource->update();
+                        }
+                    }
+                }
+            }
         };
 
         template<typename T>
         struct RefStorage final : IStorage {
             std::vector<ResourceRef<T>> items{};
+
+            void update() override {
+                if constexpr (requires(T t) { t.automaticUpdate(); }) {
+                    for (auto& item : items) {
+                        if (!item.lifetimeStamp.expired()) {
+                            item->automaticUpdate();
+                        }
+                    }
+                }
+            }
         };
 
     public:
+        void update() {
+            for (const auto &storage: _refStorages | std::views::values) {
+                storage->update();
+            }
+        }
+
         template<typename T>
         T& get(std::string_view id) {
             auto& s = storage<T>();
@@ -138,6 +167,22 @@ namespace gfx {
                 throw std::runtime_error("Resource with id '" + std::string(id) + "' not found in repository!");
             }
             return *it->second;
+        }
+
+        template<typename T>
+        void add(std::string_view id, Resource<T> resource) {
+            auto& s = storage<T>();
+            if (s.items.contains(std::string(id))) {
+                gfx::log::error("Resource with id '{}' already exists in repository!", id);
+                throw std::runtime_error("Resource with id '" + std::string(id) + "' already exists in repository!");
+            }
+            s.items.emplace(std::string(id), std::move(resource));
+        }
+
+        template<typename T>
+        void addRef(ResourceRef<T> resource) {
+            auto& s = refStorage<T>();
+            s.items.emplace_back(std::move(resource));
         }
 
         template<typename T>
@@ -178,6 +223,19 @@ namespace gfx {
                 return *raw;
             }
             return *static_cast<Storage<T>*>(it->second.get());
+        }
+
+        template<typename T>
+        RefStorage<T>& refStorage() {
+            const std::type_index key(typeid(T));
+            const auto it = _refStorages.find(key);
+            if (it == _refStorages.end()) {
+                auto ptr = std::make_unique<RefStorage<T>>();
+                auto* raw = ptr.get();
+                _refStorages.emplace(key, std::move(ptr));
+                return *raw;
+            }
+            return *static_cast<RefStorage<T>*>(it->second.get());
         }
 
         template<typename T>

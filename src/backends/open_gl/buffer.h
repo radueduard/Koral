@@ -35,6 +35,6 @@ namespace gfx::ogl
         GLenum _defaultTarget;
 
     public:
-        void applyPendingWrites() const override {}
+        void automaticUpdate() const override {}
     };
 }

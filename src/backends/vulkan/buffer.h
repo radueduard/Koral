@@ -35,7 +35,7 @@ namespace gfx::vk
 
 		::vk::Buffer operator[](size_t i) const;
     private:
-		void applyPendingWrites() const override;
+		void automaticUpdate() const override;
 
 		std::vector<::vk::Buffer> _buffers {};
 		std::vector<VmaAllocation> _allocations {};

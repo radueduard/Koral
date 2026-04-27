@@ -14,14 +14,19 @@ namespace gfx
 {
     gfx::Resource<Buffer> Buffer::RawBuilder::build() const
     {
+        gfx::Resource<Buffer> buffer = nullptr;
         switch (Context::Window().getAPI()) {
             case API::eOpenGL:
-            return gfx::MakeResource<ogl::Buffer>(*this);
+            buffer = gfx::MakeResource<ogl::Buffer>(*this);
+            break;
         case API::eVulkan:
-            return gfx::MakeResource<vk::Buffer>(*this);
+            buffer = gfx::MakeResource<vk::Buffer>(*this);
+            break;
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
+        Context::Repository().addRef(ResourceRef(buffer));
+        return buffer;
     }
 
     Buffer::Buffer(const RawBuilder& createInfo) :
