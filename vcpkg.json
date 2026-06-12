@@ -63,5 +63,11 @@
   }, {
     "name" : "openimageio",
     "version>=" : "3.0.9.1#3"
-  } ]
+  } ],
+  "features" : {
+    "hub" : {
+      "description" : "Extra deps for building the Hub launcher in the SDK super-build (-DVCPKG_MANIFEST_FEATURES=hub)",
+      "dependencies" : [ "nlohmann-json" ]
+    }
+  }
 }

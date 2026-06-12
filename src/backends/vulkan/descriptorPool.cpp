@@ -2,14 +2,15 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "descriptorPool.h"
+module;
 
 #include <ranges>
+#include <glm/fwd.hpp>
 
-#include "descriptorSetLayout.h"
-#include "device.h"
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
+
+module vk.descriptorPool;
 
 namespace gfx::vk
 {
@@ -63,7 +64,11 @@ namespace gfx::vk
         glm::u32 descriptorCount = 0;
         for (const auto& [_a, _b, count] : layout.getBindings()) {
             if (count == 0) {
-                descriptorCount += 64;
+                // Unbounded (bindless) array: reserve a capacity that matches the
+                // renderer's material ceiling (Material::propertiesBuffer holds
+                // 256). 64 overflowed on material-heavy scenes (e.g. Bistro, 132
+                // materials), corrupting descriptor memory.
+                descriptorCount += 256;
                 break;
             }
             descriptorCount += count;

@@ -2,19 +2,17 @@
 // Created by radue on 3/7/2026.
 //
 
-#include "surface.h"
-#include <framebuffer.h>
-#include <surface.h>
-#include <window.h>
+module;
 
 #include <iostream>
 
-#include "runtime.h"
-#include "vulkanContext.h"
-
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#include <vulkan/vulkan_to_string.hpp>
 
+module vk.surface;
+import gfx.window;
+import vk.context;
 
 namespace gfx::vk
 {

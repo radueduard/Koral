@@ -33,14 +33,35 @@ namespace gfx::io {
     {
         Context::_window = this;
 
+        // If you want to force a backend on Linux, do it here BEFORE glfwInit().
+        // Uncomment one of these to pin the platform; otherwise GLFW auto-picks via XDG_SESSION_TYPE.
+        // glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+        // glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+
         if (const auto result = glfwInit(); result != GLFW_TRUE) {
             std::cerr << "Failed to initialize GLFW: " << result << std::endl;
         }
+
+#ifndef NDEBUG
+        const int platform = glfwGetPlatform();
+        std::cerr << "GLFW platform: "
+                  << (platform == GLFW_PLATFORM_WAYLAND ? "Wayland"
+                    : platform == GLFW_PLATFORM_X11     ? "X11"
+                    : platform == GLFW_PLATFORM_WIN32   ? "Win32"
+                    : platform == GLFW_PLATFORM_COCOA   ? "Cocoa"
+                                                        : "Unknown")
+                  << std::endl;
+#endif
 
         glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::eOpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
         glfwWindowHint(GLFW_DECORATED, createInfo.decorated);
         glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, createInfo.transparentFramebuffer);
+
+        // Be explicit about HiDPI behaviour. true (the GLFW 3.4 default) means the
+        // framebuffer is in physical pixels; flip to false if you'd rather render at
+        // logical size and let the compositor scale.
+        glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
 
         const glm::u32 width = createInfo.extent.x;
         const glm::u32 height = createInfo.extent.y;
@@ -82,12 +103,29 @@ namespace gfx::io {
         glfwSetWindowFocusCallback(_window, Input::Callbacks::focusCallback);
         glfwSetWindowCloseCallback(_window, Input::Callbacks::closeCallback);
 
-    	glm::uvec2 extent;
-    	glfwGetFramebufferSize(_window, reinterpret_cast<int*>(&extent.x), reinterpret_cast<int*>(&extent.y));
-		_extent = extent;
-        glfwMakeContextCurrent(_window);
+        // On Wayland the framebuffer size isn't valid until the compositor has sent
+        // at least one xdg_surface.configure. Pump events and wait until we have a
+        // non-zero size before doing anything that consumes it (Surface, Scheduler).
+        {
+            int fbw = 0, fbh = 0;
+            glfwPollEvents();
+            glfwGetFramebufferSize(_window, &fbw, &fbh);
+            while ((fbw == 0 || fbh == 0) && !glfwWindowShouldClose(_window)) {
+                glfwWaitEvents();
+                glfwGetFramebufferSize(_window, &fbw, &fbh);
+            }
+            _extent = { static_cast<glm::u32>(fbw), static_cast<glm::u32>(fbh) };
+        }
 
-        if (!_fullscreen) {
+        // glfwMakeContextCurrent is invalid on a GLFW_NO_API (Vulkan) window;
+        // it would emit GLFW_NO_WINDOW_CONTEXT and pollute the error state.
+        if (_api == API::eOpenGL) {
+            glfwMakeContextCurrent(_window);
+        }
+
+        // glfwSetWindowPos is unsupported on Wayland (compositors deny client
+        // positioning). Skip the centering dance entirely there.
+        if (!_fullscreen && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {
             if (const auto primaryMonitor = glfwGetPrimaryMonitor()) {
                 if (const auto videoMode = glfwGetVideoMode(primaryMonitor)) {
                     int monitorX, monitorY;
@@ -111,6 +149,7 @@ namespace gfx::io {
         } else if (_api == API::eVulkan) {
             gfx::vk::Context::Init();
         }
+        Context::_repository = new Repository();
 
         _surface = gfx::Surface::Create(*this);
         Context::_scheduler = Scheduler::Builder()
@@ -127,7 +166,6 @@ namespace gfx::io {
         Context::_mainThreadExecutor = new MainThreadExecutor();
         Context::_backgroundExecutor = new BackgroundExecutor();
 
-        Context::_repository = new Repository();
 
         _scene->Initialize();
     }
@@ -187,7 +225,13 @@ namespace gfx::io {
         _icon = image;
     }
 
+    void Window::Update() {
+        glfwPollEvents();
+        _timeState.update();
+    }
+
     void Window::LateUpdate() {
+        _inputState.update();
         _hasResized = false;
     }
 
@@ -197,15 +241,15 @@ namespace gfx::io {
     }
 
     void Window::framebufferResize(GLFWwindow* handle, const int width, const int height) {
-    	const auto app = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+        const auto app = static_cast<Window*>(glfwGetWindowUserPointer(handle));
 
         app->_hasResized = true;
 
-    	app->_extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
-    	if (width == 0 || height == 0) {
-    		app->pause();
-    	} else {
-    		app->unPause();
-    	}
+        app->_extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
+        if (width == 0 || height == 0) {
+            app->pause();
+        } else {
+            app->unPause();
+        }
     }
 }

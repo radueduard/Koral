@@ -2,15 +2,15 @@
 // Created by radue on 2/18/2026.
 //
 
-#include <image.h>
-#include <framebuffer.h>
-#include <surface.h>
+module;
 
-#include "../backends/open_gl/image.h"
-#include "../backends/vulkan/image.h"
-#include "../../include/window.h"
+#include <stdexcept>
 
-#include "context.h"
+module gfx.image;
+import vk.image;
+import ogl.image;
+import gfx.context;
+import gfx.window;
 
 namespace gfx
 {
@@ -179,11 +179,33 @@ namespace gfx
         _extent(createInfo.extent),
         _mipLevels(createInfo.mipLevels),
         _arrayLayers(createInfo.arrayLayers),
-        _msaa(createInfo.msaa),
+        _sampleCount(createInfo.sampleCount),
         _usage(createInfo.usage) {
         if (_mipLevels == 0) {
             _mipLevels = 1 + static_cast<glm::u32>(std::floor(std::log2(std::max(_extent.x, std::max(_extent.y, _extent.z)))));
         }
+    }
+
+    void Image::ReadPixel(const glm::uvec3 &coord, void *outData, const glm::u32 dataSize) const {
+        const auto stagingBuffer = gfx::Buffer::RawBuilder()
+            .setRawSize(dataSize)
+            .setUsage(Buffer::Usage::eTransferDst)
+            .setType(Buffer::Type::eStaging)
+            .build();
+        CommandBuffer::SingleTimeCommand([&](gfx::CommandBuffer& commandBuffer) {
+            commandBuffer.CopyImageToBuffer(ResourceRef<const gfx::Image>(this), stagingBuffer, Copy {
+                .bufferOffset = 0,
+                .bufferRowLength = 0,
+                .bufferImageHeight = 0,
+                .imageOffset = { static_cast<int32_t>(coord.x), static_cast<int32_t>(coord.y), static_cast<int32_t>(coord.z) },
+                .imageExtent = { 1, 1, 1 },
+                .imageBaseArrayLayer = 0,
+                .imageLayerCount = 1,
+                .imageMipLevel = 0
+            });
+        });
+        const auto bytes = stagingBuffer->Read<std::byte>(dataSize, 0);
+        std::memcpy(outData, bytes.data(), dataSize);
     }
 
     bool IsDepthStencilFormat(const Image::Format format)

@@ -2,14 +2,14 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "imageView.h"
+module;
 
-#include "device.h"
-#include "vulkanContext.h"
-#include <scheduler.h>
-
-#include "context.h"
 #include "vk_enum_conversions.h"
+
+module vk.imageView;
+import vk.image;
+import vk.context;
+import gfx.context;
 
 namespace gfx::vk
 {

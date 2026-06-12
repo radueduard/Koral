@@ -1,0 +1,266 @@
+//
+// Created by radue on 2/18/2026.
+//
+
+module;
+
+#include <glm/glm.hpp>
+#include "api.h"
+
+export module gfx.image;
+import gfx.structs;
+import gfx.flags;
+import gfx.resource;
+
+
+namespace gfx
+{
+    class Buffer;
+
+    export class GFX_API Image
+    {
+    public:
+        enum class Type
+        {
+            e1D,
+            e2D,
+            e3D,
+        };
+
+        enum class Format
+        {
+            // </hint> 8-bit single channel formats
+            eR8_UNORM,
+            eR8_SNORM,
+            eR8_UINT,
+            eR8_SINT,
+
+            // </hint> 8-bit dual channel formats
+            eRG8_UNORM,
+            eRG8_SNORM,
+            eRG8_UINT,
+            eRG8_SINT,
+
+            // </hint> 8-bit triple channel formats
+            eRGB8_UNORM,
+            eRGB8_SNORM,
+            eRGB8_UINT,
+            eRGB8_SINT,
+            eRGB8_SRGB,
+
+            // </hint> 8-bit quad channel formats
+            eRGBA8_UNORM,
+            eRGBA8_SNORM,
+            eRGBA8_UINT,
+            eRGBA8_SINT,
+            eRGBA8_SRGB,
+
+            // </hint> 16-bit single channel formats
+            eR16_UNORM,
+            eR16_SNORM,
+            eR16_UINT,
+            eR16_SINT,
+            eR16_SFLOAT,
+
+            // </hint> 16-bit dual channel formats
+            eRG16_UNORM,
+            eRG16_SNORM,
+            eRG16_UINT,
+            eRG16_SINT,
+            eRG16_SFLOAT,
+
+            // </hint> 16-bit triple channel formats
+            eRGB16_UNORM,
+            eRGB16_SNORM,
+            eRGB16_UINT,
+            eRGB16_SINT,
+            eRGB16_SFLOAT,
+
+            // </hint> 16-bit quad channel formats
+            eRGBA16_UNORM,
+            eRGBA16_SNORM,
+            eRGBA16_UINT,
+            eRGBA16_SINT,
+            eRGBA16_SFLOAT,
+
+            // </hint> 32-bit single channel formats
+            eR32_UINT,
+            eR32_SINT,
+            eR32_SFLOAT,
+
+            // </hint> 32-bit dual channel formats
+            eRG32_UINT,
+            eRG32_SINT,
+            eRG32_SFLOAT,
+
+            // </hint> 32-bit triple channel formats
+            eRGB32_UINT,
+            eRGB32_SINT,
+            eRGB32_SFLOAT,
+
+            // </hint> 32-bit quad channel formats
+            eRGBA32_UINT,
+            eRGBA32_SINT,
+            eRGBA32_SFLOAT,
+
+            // </hint> Depth/stencil formats
+            eD16_UNORM,
+            eD24_UNORM_S8_UINT,
+            eD32_SFLOAT,
+            eD32_SFLOAT_S8_UINT,
+
+            // </hint> Surface formats
+            eBGRA8_UNORM,
+            eBGRA8_SRGB,
+
+            // </hint> Compressed formats
+            eBC1_RGB_UNORM,
+            eBC1_RGB_SRGB,
+            eBC1_RGBA_UNORM,
+            eBC1_RGBA_SRGB,
+            eBC2_UNORM,
+            eBC2_SRGB,
+            eBC3_UNORM,
+            eBC3_SRGB,
+            eBC7_UNORM,
+            eBC7_SRGB,
+        };
+
+        enum class Usage
+        {
+            eTransferSrc = 1 << 0,
+            eTransferDst = 1 << 1,
+            eSampled = 1 << 2,
+            eStorage = 1 << 3,
+            eColorAttachment = 1 << 4,
+            eDepthStencilAttachment = 1 << 5,
+        };
+
+        struct GFX_API Builder {
+            bool isPerFrame = false;
+            Type type = Type::e2D;
+            Format format = Format::eRGBA8_UNORM;
+            glm::uvec3 extent = { 1, 1, 1 };
+            glm::u32 mipLevels = 1;
+            glm::u32 arrayLayers = 1;
+            SampleCount sampleCount = SampleCount::e1;
+            Flags<Usage> usage = Usage::eSampled;
+
+            Builder& setIsPerFrame(const bool isPerFrame) {
+                this->isPerFrame = isPerFrame;
+                return *this;
+            }
+
+            Builder& setType(const Type type) {
+                this->type = type;
+                return *this;
+            }
+
+            Builder& setFormat(const Format format) {
+                this->format = format;
+                return *this;
+            }
+
+            Builder& setExtent(const glm::u32& extent) {
+                this->extent = { extent, extent, extent };
+                return *this;
+            }
+
+            Builder& setExtent(const glm::uvec2& extent) {
+                this->extent = { extent, 1 };
+                return *this;
+            }
+
+            Builder& setExtent(const glm::uvec3& extent) {
+                this->extent = extent;
+                return *this;
+            }
+
+            Builder& setMipLevels(const glm::u32 mipLevels) {
+                this->mipLevels = mipLevels;
+                return *this;
+            }
+
+            Builder& setArrayLayers(const glm::u32 arrayLayers) {
+                this->arrayLayers = arrayLayers;
+                return *this;
+            }
+
+            Builder& setSampleCount(const SampleCount msaa) {
+                this->sampleCount = msaa;
+                return *this;
+            }
+
+            Builder& setUsage(const Flags<Usage>& usage) {
+                this->usage = usage;
+                return *this;
+            }
+
+            Builder& addUsage(const Usage usage) {
+                this->usage |= usage;
+                return *this;
+            }
+
+            [[nodiscard]] Resource<Image> build() const;
+        };
+
+        virtual ~Image() = default;
+
+        virtual void Resize(const glm::uvec3& extent) = 0;
+
+        template<typename T>
+        [[nodiscard]]
+        T operator[](const glm::u32& x) const {
+            T value;
+            ReadPixel({ x, 0, 0 }, &value, sizeof(T));
+            return value;
+        }
+
+        template<typename T>
+        [[nodiscard]]
+        T operator[](const glm::u32& x, const glm::u32& y) const {
+            T value;
+            ReadPixel({ x, y, 0 }, &value, sizeof(T));
+            return value;
+        }
+
+        template<typename T>
+        [[nodiscard]]
+        T operator[](const glm::u32& x, const glm::u32& y, const glm::u32& z) const {
+            T value;
+            ReadPixel({ x, y, z }, &value, sizeof(T));
+            return value;
+        }
+
+        [[nodiscard]] glm::uvec3 getExtent() const { return _extent; }
+
+        [[nodiscard]] Type getType() const { return _type; }
+        [[nodiscard]] Format getFormat() const { return _format; }
+        [[nodiscard]] SampleCount getSampleCount() const { return _sampleCount; }
+        [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
+        [[nodiscard]] glm::u32 getMipLevels() const { return _mipLevels; }
+        [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }
+
+        [[nodiscard]] static glm::u32 ChannelSizeFromImageFormat(gfx::Image::Format format);
+        [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(gfx::Image::Format format);
+
+        [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
+
+    protected:
+        explicit Image(const Builder&);
+        bool _isPerFrame = false;
+        Type _type;
+        Format _format;
+        glm::uvec3 _extent;
+        glm::u32 _mipLevels;
+        glm::u32 _arrayLayers;
+        SampleCount _sampleCount;
+        Flags<Usage> _usage;
+
+        void ReadPixel(const glm::uvec3& coord, void* outData, glm::u32 dataSize) const;
+    };
+
+    export bool IsDepthStencilFormat(Image::Format format);
+    export bool IsStencilFormat(Image::Format format);
+}
+

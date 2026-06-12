@@ -1,20 +1,15 @@
 //
 // Created by radue on 2/21/2026.
 //
+module;
 
-#include <commandBuffer.h>
-#include <framebuffer.h>
-#include <surface.h>
+#include <vulkan/vulkan.hpp>
 
-#include "../backends/open_gl/commandBuffer.h"
-#include "../backends/vulkan/commandBuffer.h"
-
-#include "image.h"
-#include "mesh.h"
-#include "../log.h"
-#include "../backends/vulkan/device.h"
-#include "../backends/vulkan/vulkanContext.h"
-#include "../../include/window.h"
+module gfx.commandBuffer;
+import gfx.image;
+import gfx.context;
+import gfx.log;
+import vk.context;
 
 namespace gfx
 {
@@ -31,13 +26,13 @@ namespace gfx
     }
 
     BufferBarrier::BufferBarrier(
-        const gfx::ResourceRef<gfx::Buffer> &buffer, const ResourceAccess dstAccess,
+        const gfx::ResourceRef<const gfx::Buffer> &buffer, const ResourceAccess dstAccess,
         const glm::u64 offset, const glm::u64 size)
       : _buffer(buffer), _dstAccess(dstAccess),
         _offset(offset), _size(size) {}
 
     ImageBarrier::ImageBarrier(
-        const gfx::ResourceRef<gfx::Image> &image,
+        const gfx::ResourceRef<const gfx::Image> &image,
         const ResourceAccess dstAccess,
         const std::optional<glm::u32> baseMipLevel, const std::optional<glm::u32> levelCount,
         const std::optional<glm::u32> baseArrayLayer, const std::optional<glm::u32> layerCount)
@@ -55,7 +50,7 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<Framebuffer> framebuffer, RenderParameters renderParameters)
+    CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters)
     {
         _state.boundFramebuffer = framebuffer;
         _state.boundComputePipeline = std::nullopt;
@@ -89,25 +84,41 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<ComputePipeline> pipeline)
+    CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::ComputePipeline> pipeline)
     {
         _state.boundComputePipeline = pipeline;
         _state.boundGraphicsPipeline = std::nullopt;
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<GraphicsPipeline> pipeline)
+    CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::GraphicsPipeline> pipeline)
     {
         _state.boundGraphicsPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<Mesh> mesh) {
+    CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<const Mesh> mesh) {
         if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't bind a mesh without a graphics pipeline bound!");
+            gfx::log::error("You can't bind a mesh without a graphics pipeline bound!");
         _state.boundMesh = mesh;
 
+        return *this;
+    }
+
+    CommandBuffer & CommandBuffer::Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) {
+        if (!_state.boundComputePipeline.has_value())
+            gfx::log::error("You can't dispatch without a compute pipeline bound!");
+        return *this;
+    }
+
+    CommandBuffer & CommandBuffer::DispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) {
+        if (!_state.boundComputePipeline.has_value())
+            log::error("You can't dispatch indirect without a compute pipeline bound!");
+        if (!(indirectBuffer->getUsage() & Buffer::Usage::eIndirect))
+            log::error("The buffer used for indirect dispatch must have the IndirectBuffer usage flag set!");
+        if (indirectBuffer->getSize() - offset < sizeof(glm::u32) * 3)
+            log::error("Indirect dispatch parameters exceed the bounds of the indirect buffer!");
         return *this;
     }
 
@@ -140,7 +151,65 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::GenerateMipmaps(ResourceRef<Image> image) {
+    CommandBuffer & CommandBuffer::DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ) {
+        if (!_state.boundGraphicsPipeline.has_value())
+            log::error("You can't draw mesh tasks without a graphics pipeline bound!");
+        if (!_state.viewportSet)
+            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        if (!_state.scissorSet)
+            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        return *this;
+    }
+
+    CommandBuffer & CommandBuffer::DrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        if (!_state.boundGraphicsPipeline.has_value())
+            log::error("You can't draw indirect without a graphics pipeline bound!");
+        if (!(indirectBuffer->getUsage() & Buffer::Usage::eIndirect))
+            log::error("The buffer used for indirect drawing must have the IndirectBuffer usage flag set!");
+        if (indirectBuffer->getSize() - offset < drawCount * stride)
+            log::error("Indirect draw parameters exceed the bounds of the indirect buffer!");
+        if (!_state.viewportSet) {
+            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        if (!_state.scissorSet) {
+            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        return *this;
+    }
+
+    CommandBuffer & CommandBuffer::DrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        if (!_state.boundGraphicsPipeline.has_value())
+            log::error("You can't draw indexed indirect without a graphics pipeline bound!");
+        if (!(indirectBuffer->getUsage() & Buffer::Usage::eIndirect))
+            log::error("The buffer used for indirect drawing must have the IndirectBuffer usage flag set!");
+        if (indirectBuffer->getSize() - offset < drawCount * stride)
+            log::error("Indirect draw parameters exceed the bounds of the indirect buffer!");
+        if (!_state.viewportSet) {
+            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        if (!_state.scissorSet) {
+            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        return *this;
+    }
+
+    CommandBuffer & CommandBuffer::DrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        if (!_state.boundGraphicsPipeline.has_value())
+            log::error("You can't draw mesh tasks indirect without a graphics pipeline bound!");
+        if (!(indirectBuffer->getUsage() & Buffer::Usage::eIndirect))
+            log::error("The buffer used for indirect drawing must have the IndirectBuffer usage flag set!");
+        if (indirectBuffer->getSize() - offset < drawCount * stride)
+            log::error("Indirect draw parameters exceed the bounds of the indirect buffer!");
+        if (!_state.viewportSet) {
+            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        if (!_state.scissorSet) {
+            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        }
+        return *this;
+    }
+
+    CommandBuffer & CommandBuffer::GenerateMipmaps(ResourceRef<const Image> image) {
         const auto& extent = image->getExtent();
         const auto mipLevels = image->getMipLevels();
         const auto arrayLayers = image->getArrayLayers();
@@ -184,7 +253,7 @@ namespace gfx
         commandBuffer->WaitForFence();
     }
 
-    CommandBuffer& CommandBuffer::DrawMesh(gfx::ResourceRef<Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
+    CommandBuffer& CommandBuffer::DrawMesh(gfx::ResourceRef<const Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
     {
         if (!_state.boundGraphicsPipeline.has_value())
             throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
@@ -199,7 +268,7 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::DrawSubMesh(gfx::ResourceRef<Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
+    CommandBuffer & CommandBuffer::DrawSubMesh(gfx::ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
         if (!_state.boundGraphicsPipeline.has_value())
             throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
         if (!_state.viewportSet) {

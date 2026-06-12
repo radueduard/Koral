@@ -2,31 +2,38 @@
 // Created by radue on 3/17/2026.
 //
 
-#include "gui.h"
+module;
 
 #include <iostream>
-
-#include "context.h"
-#include "descriptorPool.h"
-#include "device.h"
-#include "runtime.h"
-#include "scheduler.h"
-#include "vulkanContext.h"
-#include "window.h"
-#include "framebuffer.h"
-#include "surface.h"
-#include "imageView.h"
-
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
-#include <scheduler.h>
+#include <vulkan/vulkan.hpp>
+#include <glm/glm.hpp>
+
+#include "vk_enum_conversions.h"
+
+module vk.gui;
+import vk.descriptorPool;
+import gfx.gui;
+import gfx.resource;
+import gfx.image;
+import gfx.sampler;
+import gfx.structs;
+import gfx.context;
+import vk.image;
+import vk.imageView;
+import vk.sampler;
+import vk.context;
+import vk.scheduler;
+import vk.commandBuffer;
+import vk.framebuffer;
 
 gfx::vk::DescriptorPool* gfx::vk::GUI::_descriptorPool = nullptr;
 
 namespace gfx::vk
 {
-    GUI_Image::GUI_Image(gfx::ResourceRef<gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    GUI_Image::GUI_Image(ResourceRef<const gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         _helperSampler = Sampler::Builder()
             .setMagFilter(Filter::eNearest)
@@ -76,7 +83,7 @@ namespace gfx::vk
             }, ::vk::QueueFlagBits::eGraphics);
     }
 
-    void GUI_Image::setImage(gfx::ResourceRef<gfx::Image> image)
+    void GUI_Image::setImage(gfx::ResourceRef<const gfx::Image> image)
     {
         Context::Device()->waitIdle();
         ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
@@ -91,7 +98,7 @@ namespace gfx::vk
             .setType(Image::Type::e2D)
             .setFormat(image->getFormat())
             .setExtent({ image->getExtent().x, image->getExtent().y })
-            .setMSAA(image->getMSAA())
+            .setSampleCount(image->getSampleCount())
             .setUsage(Image::Usage::eTransferDst)
             .addUsage(Image::Usage::eSampled)
             .build();
@@ -110,9 +117,10 @@ namespace gfx::vk
             .build();
 
         for (int frame = 0; frame < gfx::Context::Scheduler().getImageCount(); ++frame) {
+            auto imageView = dynamic_cast<const gfx::vk::ImageView&>(*_helperImageView)[_helperImageView->isPerFrame() ? frame : 0];
             _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
                 *dynamic_cast<const gfx::vk::Sampler&>(*_helperSampler),
-                dynamic_cast<const gfx::vk::ImageView&>(*_helperImageView)[frame],
+                imageView,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
         }
 
@@ -198,7 +206,7 @@ namespace gfx::vk
     {
         const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
         const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*gfx::Context::DefaultFramebuffer());
-        const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(vkFramebuffer.getColorAttachments()[0].get());
+        const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(*vkFramebuffer.getColorAttachments()[0]);
         const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.getImage());
 
         auto colorAttachment = ::vk::RenderingAttachmentInfo()

@@ -2,16 +2,9 @@
 // Created by radue on 2/21/2026.
 //
 
-#include "../backends/open_gl/shader.h"
-#include "../backends/vulkan/shader.h"
+module;
 
-#include <shader.h>
-#include <window.h>
-#include <context.h>
 #include <file.h>
-#include <framebuffer.h>
-#include <surface.h>
-
 #include <iostream>
 
 #include <spirv_cross.hpp>
@@ -20,20 +13,44 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
-#include "structs.h"
+module gfx.shader;
+import vk.shader;
+import ogl.shader;
+import gfx.context;
+import gfx.resource;
 
 
 namespace gfx {
-    std::unique_ptr<Shader> Shader::Builder::build() const
+    Resource<Shader> Shader::Builder::build() const
     {
+		Resource<Shader> shader;
         switch (Context::Window().getAPI()) {
         case API::eOpenGL:
-            return std::make_unique<ogl::Shader>(*this);
+            shader = gfx::MakeResource<ogl::Shader>(*this);
+        	break;
         case API::eVulkan:
-            return std::make_unique<vk::Shader>(*this);
+            shader = gfx::MakeResource<vk::Shader>(*this);
+        	break;
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
+    	Context::Repository().addRef(ResourceRef<const Shader>(shader));
+    	return shader;
+    }
+
+    ResourceRef<const Shader> Shader::Builder::buildManaged(const std::string& identifier) const {
+    	Resource<Shader> shader;
+    	switch (Context::Window().getAPI()) {
+    		case API::eOpenGL:
+    			shader = gfx::MakeResource<ogl::Shader>(*this);
+    			break;
+    		case API::eVulkan:
+    			shader = gfx::MakeResource<vk::Shader>(*this);
+    			break;
+    		default:
+    			throw std::runtime_error("Unknown graphics API!");
+    	}
+    	return Context::Repository().add(identifier, std::move(shader));
     }
 
     static EShLanguage shaderStageToEShLanguage(const Shader::Stage &stage) {
@@ -137,8 +154,10 @@ namespace gfx {
 	    	case spv::ExecutionModelGeometry: return Shader::Stage::eGeometry;
 	    	case spv::ExecutionModelFragment: return Shader::Stage::eFragment;
 	    	case spv::ExecutionModelGLCompute: return Shader::Stage::eCompute;
-	    	case spv::ExecutionModelMeshNV: return Shader::Stage::eMesh;
-	    	case spv::ExecutionModelTaskNV: return Shader::Stage::eTask;
+	    	case spv::ExecutionModelMeshNV:
+	    	case spv::ExecutionModelMeshEXT: return Shader::Stage::eMesh;
+	    	case spv::ExecutionModelTaskNV:
+	    	case spv::ExecutionModelTaskEXT: return Shader::Stage::eTask;
 	    	case spv::ExecutionModelRayGenerationNV: return Shader::Stage::eRaygen;
 	    	case spv::ExecutionModelIntersectionNV: return Shader::Stage::eIntersection;
 	    	case spv::ExecutionModelAnyHitNV: return Shader::Stage::eAnyHit;

@@ -2,12 +2,12 @@
 // Created by radue on 3/6/2026.
 //
 
-#include "descriptorSetLayout.h"
-
-#include "device.h"
-#include "vulkanContext.h"
+module;
 
 #include "vk_enum_conversions.h"
+
+module vk.descriptorSetLayout;
+import gfx.descriptorSetLayout;
 
 namespace gfx::vk
 {

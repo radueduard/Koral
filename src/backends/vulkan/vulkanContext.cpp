@@ -2,13 +2,16 @@
 // Created by radue on 2/27/2026.
 //
 
-#include "vulkanContext.h"
+module;
 
-#include "allocator.h"
-#include "descriptorPool.h"
-#include "device.h"
-#include "runtime.h"
-#include "scheduler.h"
+#include <stdexcept>
+#include <vulkan/vulkan.hpp>
+
+module vk.context;
+import vk.runtime;
+import vk.allocator;
+import vk.device;
+import vk.descriptorPool;
 
 const gfx::vk::Runtime& gfx::vk::Context::Runtime()
 {
@@ -52,7 +55,9 @@ void gfx::vk::Context::Init()
         .setMaxSets(1000)
         .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
         .addPoolSize(::vk::DescriptorType::eUniformBuffer, 1000)
-        .addPoolSize(::vk::DescriptorType::eSampledImage, 1000)
+        // Bindless texture arrays reserve up to 256 each (see DescriptorPool::
+        // Allocate); the forward pass alone has 4 such sets, so keep ample room.
+        .addPoolSize(::vk::DescriptorType::eSampledImage, 8192)
         .addPoolSize(::vk::DescriptorType::eStorageBuffer, 1000)
         .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
         .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)

@@ -71,15 +71,12 @@ namespace gfx
             .build();
 
         while (!window->shouldClose()) {
-            glfwPollEvents();
             Context::DrainMainThread();
-
+            window->Update();
             if (window->isPaused()) {
                 continue;
             }
             auto& scene = *window->_scene;
-            window->_inputState.update();
-            window->_timeState.update();
             Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
                 Context::Repository().update();
                 scene.Update();

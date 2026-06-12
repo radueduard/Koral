@@ -2,13 +2,16 @@
 // Created by radue on 2/21/2026.
 //
 
-#include "computePipeline.h"
+module;
 
-#include <descriptorSetLayout.h>
-
-#include "buffer.h"
-#include "shader.h"
 #include "ogl_err_handling.h"
+
+module ogl.computePipeline;
+
+import std;
+import gfx.computePipeline;
+import gfx.shader;
+import gfx.descriptorSetLayout;
 
 namespace gfx::ogl
 {
@@ -16,7 +19,7 @@ namespace gfx::ogl
         if (!createInfo.computeShader.has_value())
             throw std::runtime_error("You can not create a compute pipeline without a compute shader!");
 
-        const auto& shader = dynamic_cast<const Shader&>(createInfo.computeShader.value().get());
+        const auto& shader = dynamic_cast<const Shader&>(*createInfo.computeShader.value());
         if (shader.getStage() != Shader::Stage::eCompute) {
             throw std::runtime_error("The shader provided to the compute pipeline must be a compute shader!");
         }

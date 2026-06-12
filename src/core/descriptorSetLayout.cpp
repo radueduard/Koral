@@ -2,17 +2,14 @@
 // Created by radue on 3/4/2026.
 //
 
-#include <descriptorSetLayout.h>
-#include <framebuffer.h>
-#include <surface.h>
-
-#include "../backends/vulkan/descriptorSetLayout.h"
+module;
 
 #include <stdexcept>
 #include <string>
 
-#include "context.h"
-#include "../../include/window.h"
+module gfx.descriptorSetLayout;
+import vk.descriptorSetLayout;
+import gfx.context;
 
 namespace gfx
 {

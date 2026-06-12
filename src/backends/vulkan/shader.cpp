@@ -2,10 +2,13 @@
 // Created by radue on 3/6/2026.
 //
 
-#include "shader.h"
+module;
 
-#include "device.h"
-#include "vulkanContext.h"
+#include <vulkan/vulkan.hpp>
+
+module vk.shader;
+import vk.context;
+import vk.device;
 
 namespace gfx::vk
 {

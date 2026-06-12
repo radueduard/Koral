@@ -2,22 +2,20 @@
 // Created by radue on 3/17/2026.
 //
 
-#include "gui.h"
 
-#include <commandBuffer.h>
-
-#include "context.h"
-#include "window.h"
-#include "framebuffer.h"
-#include "surface.h"
+module;
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <GLFW/glfw3.h>
-
-#include <image.h>
 #include "ogl_err_handling.h"
+
+module ogl.gui;
+
+import gfx.commandBuffer;
+import gfx.context;
+import ogl.image;
 
 namespace gfx
 {
@@ -51,7 +49,7 @@ namespace gfx
         ImGui_ImplGlfw_Shutdown();
     }
 
-    ogl::GUI_Image::GUI_Image(gfx::ResourceRef<gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    ogl::GUI_Image::GUI_Image(gfx::ResourceRef<const gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         setImage(image);
         setLayerAndLevel(layer, level);
@@ -108,7 +106,7 @@ namespace gfx
         glCheckError();
     }
 
-    void ogl::GUI_Image::setImage(gfx::ResourceRef<gfx::Image> image)
+    void ogl::GUI_Image::setImage(gfx::ResourceRef<const gfx::Image> image)
     {
         _image = image;
         const auto& oglImage = dynamic_cast<const gfx::ogl::Image&>(*image);

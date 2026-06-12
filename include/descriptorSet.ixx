@@ -1,0 +1,47 @@
+//
+// Created by radue on 3/4/2026.
+//
+
+module;
+
+#include <glm/fwd.hpp>
+#include "api.h"
+
+export module gfx.descriptorSet;
+
+import std;
+import gfx.descriptorSetLayout;
+import gfx.resource;
+import gfx.descriptorBinding;
+
+
+namespace gfx
+{
+    export class GFX_API DescriptorSet
+    {
+    public:
+        struct GFX_API Builder
+        {
+            explicit Builder(const DescriptorSetLayout& layout);
+
+            const DescriptorSetLayout& layout;
+            std::map<glm::u32, std::vector<Descriptor>> writes;
+
+            Builder& write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index = 0);
+            Resource<DescriptorSet> build();
+        };
+
+        virtual ~DescriptorSet() = default;
+
+        virtual void bind(const CommandBuffer& commandBuffer, glm::u32 index) const {};
+        virtual void Write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index) = 0;
+
+        virtual void DebugPrint() const {};
+
+    protected:
+        explicit DescriptorSet(const Builder &builder);
+        bool _isPerFrame = false;
+        const gfx::DescriptorSetLayout& _layout;
+        std::map<glm::u32, std::vector<Descriptor>> _writes;
+    };
+}

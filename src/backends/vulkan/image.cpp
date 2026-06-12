@@ -2,18 +2,20 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "image.h"
-
-#include <image.h>
-#include <scheduler.h>
+module;
 
 #include <magic_enum/magic_enum.hpp>
-
-#include "buffer.h"
-#include "context.h"
-#include "device.h"
-#include "vulkanContext.h"
 #include "vk_enum_conversions.h"
+#include <vulkan/vulkan.hpp>
+#include <glm/glm.hpp>
+#include <vma/vk_mem_alloc.h>
+
+module vk.image;
+import vk.context;
+import vk.runtime;
+import vk.commandBuffer;
+import gfx.context;
+import gfx.structs;
 
 namespace gfx::vk
 {
@@ -45,7 +47,7 @@ namespace gfx::vk
             .setExtent(::vk::Extent3D(_extent.x, _extent.y, _extent.z))
             .setMipLevels(_mipLevels)
             .setArrayLayers(_arrayLayers)
-            .setSamples(getVkSampleCount(_msaa))
+            .setSamples(getVkSampleCount(_sampleCount))
             .setTiling(tiling)
             .setUsage(usage)
             .setSharingMode(::vk::SharingMode::eExclusive)
@@ -76,7 +78,7 @@ namespace gfx::vk
         }
     }
 
-    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const MSAA msaa)
+    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const SampleCount sampleCount)
         : gfx::Image(Builder()
             .setIsPerFrame(true)
             .setType(Type::e2D)
@@ -86,7 +88,7 @@ namespace gfx::vk
             .setArrayLayers(1)
             .setMipLevels(1)
             .setFormat(format)
-            .setMSAA(msaa)) {
+            .setSampleCount(sampleCount)) {
         _images = surfaceImages;
 
         int frameIndex = 0;
@@ -206,7 +208,7 @@ namespace gfx::vk
             .setExtent(::vk::Extent3D(extent.x, extent.y, extent.z))
             .setMipLevels(_mipLevels)
             .setArrayLayers(_arrayLayers)
-            .setSamples(getVkSampleCount(_msaa))
+            .setSamples(getVkSampleCount(_sampleCount))
             .setTiling(::vk::ImageTiling::eOptimal)
             .setUsage(getVkUsage(_usage))
             .setSharingMode(::vk::SharingMode::eExclusive)

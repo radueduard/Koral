@@ -2,11 +2,15 @@
 // Created by radue on 2/20/2026.
 //
 
-#include "imageView.h"
+module;
 
+#include <GL/gl.h>
 #include <stdexcept>
+#include <GL/glew.h>
 
-#include "image.h"
+module ogl.imageView;
+import ogl.image;
+import gfx.structs;
 
 namespace gfx::ogl
 {
@@ -21,8 +25,8 @@ namespace gfx::ogl
                 break;
             case Type::e2D:
                 target = image.getArrayLayers() == 1
-                    ? (image.getMSAA() == MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
-                    : (image.getMSAA() == MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
+                    ? (image.getSampleCount() == SampleCount::e1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
+                    : (image.getSampleCount() == SampleCount::e1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
                 break;
             case Type::e3D:
                 target = GL_TEXTURE_3D;

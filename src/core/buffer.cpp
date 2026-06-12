@@ -2,31 +2,32 @@
 // Created by radue on 2/18/2026.
 //
 
-#include "../backends/open_gl/buffer.h"
-#include "../backends/vulkan/buffer.h"
+module;
 
-#include <buffer.h>
-#include <window.h>
-#include <framebuffer.h>
-#include <surface.h>
+#include <stdexcept>
+
+module gfx.buffer;
+import vk.buffer;
+import ogl.buffer;
+import gfx.context;
+import gfx.window;
+
+import gfx;
 
 namespace gfx
 {
     gfx::Resource<Buffer> Buffer::RawBuilder::build() const
     {
-        gfx::Resource<Buffer> buffer = nullptr;
         switch (Context::Window().getAPI()) {
             case API::eOpenGL:
-            buffer = gfx::MakeResource<ogl::Buffer>(*this);
+            return gfx::Resource<gfx::Buffer>(std::make_unique<ogl::Buffer>(*this));
             break;
         case API::eVulkan:
-            buffer = gfx::MakeResource<vk::Buffer>(*this);
+            return gfx::Resource<gfx::Buffer>(std::make_unique<vk::Buffer>(*this));
             break;
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
-        Context::Repository().addRef(ResourceRef(buffer));
-        return buffer;
     }
 
     Buffer::Buffer(const RawBuilder& createInfo) :

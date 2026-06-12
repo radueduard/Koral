@@ -2,14 +2,15 @@
 // Created by radue on 2/22/2026.
 //
 
-#include "graphicsPipeline.h"
+module;
 
 #include <ranges>
-
-#include <descriptorSetLayout.h>
-
 #include "ogl_err_handling.h"
-#include "shader.h"
+
+module ogl.graphicsPipeline;
+import ogl.shader;
+import gfx.flags;
+
 
 namespace gfx::ogl
 {
@@ -51,7 +52,7 @@ namespace gfx::ogl
         std::vector<GLuint> shaderIds;
         if (_vertexShader.has_value())
         {
-            const auto& vertexShader = dynamic_cast<const ogl::Shader&>(_vertexShader.value().get());
+            const auto& vertexShader = dynamic_cast<const ogl::Shader&>(*_vertexShader.value());
             const GLuint shaderId = vertexShader.compile(_setAndBindingToBindingPoint);
 
             glAttachShader(_id, shaderId);
@@ -62,10 +63,10 @@ namespace gfx::ogl
 
         if (_tessellationState.has_value())
         {
-            const auto& controlShader = dynamic_cast<const ogl::Shader&>(_tessellationState->controlShader.get());
+            const auto& controlShader = dynamic_cast<const ogl::Shader&>(*_tessellationState->controlShader);
             const GLuint controlShaderId = controlShader.compile(_setAndBindingToBindingPoint);
 
-            const auto& evalShader = dynamic_cast<const ogl::Shader&>(_tessellationState->evalShader.get());
+            const auto& evalShader = dynamic_cast<const ogl::Shader&>(*_tessellationState->evalShader);
             const GLuint evalShaderId = evalShader.compile(_setAndBindingToBindingPoint);
 
             glAttachShader(_id, controlShaderId);
@@ -79,7 +80,7 @@ namespace gfx::ogl
 
         if (_geometryShader.has_value())
         {
-            const auto& geometryShader = dynamic_cast<const ogl::Shader&>(_geometryShader->get());
+            const auto& geometryShader = dynamic_cast<const ogl::Shader&>(**_geometryShader);
             const GLuint shaderId = geometryShader.compile(_setAndBindingToBindingPoint);
             glAttachShader(_id, shaderId);
             glCheckError();
@@ -88,7 +89,7 @@ namespace gfx::ogl
 
         if (_taskShader.has_value())
         {
-            const auto& taskShader = dynamic_cast<const ogl::Shader&>(_taskShader->get());
+            const auto& taskShader = dynamic_cast<const ogl::Shader&>(**_taskShader);
             const GLuint shaderId = taskShader.compile(_setAndBindingToBindingPoint);
             glAttachShader(_id, shaderId);
             glCheckError();
@@ -97,7 +98,7 @@ namespace gfx::ogl
 
         if (_meshShader.has_value())
         {
-            const auto& meshShader = dynamic_cast<const ogl::Shader&>(_meshShader->get());
+            const auto& meshShader = dynamic_cast<const ogl::Shader&>(**_meshShader);
             const GLuint shaderId = meshShader.compile(_setAndBindingToBindingPoint);
             glAttachShader(_id, shaderId);
             glCheckError();
@@ -106,7 +107,7 @@ namespace gfx::ogl
 
         if (_fragmentShader.has_value())
         {
-            const auto& fragmentShader = dynamic_cast<const ogl::Shader&>(_fragmentShader->get());
+            const auto& fragmentShader = dynamic_cast<const ogl::Shader&>(**_fragmentShader);
             const GLuint shaderId = fragmentShader.compile(_setAndBindingToBindingPoint);
             glAttachShader(_id, shaderId);
             glCheckError();

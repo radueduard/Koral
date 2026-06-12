@@ -4,9 +4,8 @@
 
 #pragma once
 
-#include <fstream>
-#include <vector>
-#include <filesystem>
+import std;
+#include <glm/fwd.hpp>
 
 namespace gfx::utils
 {

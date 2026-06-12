@@ -2,14 +2,14 @@
 // Created by radue on 2/27/2026.
 //
 
-#include "physicalDevice.h"
+module;
 
 #include <iostream>
 #include <unordered_set>
 #include <glm/fwd.hpp>
+import vk.context;
 
-#include "runtime.h"
-#include "vulkanContext.h"
+module vk.physicalDevice;
 
 namespace gfx::vk
 {

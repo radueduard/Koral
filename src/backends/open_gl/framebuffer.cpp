@@ -1,21 +1,22 @@
 //
 // Created by radue on 2/21/2026.
 //
-
-#include "framebuffer.h"
+module;
 
 #include <ranges>
-#include <scheduler.h>
-
-#include "imageView.h"
 #include "ogl_err_handling.h"
+#include <glm/glm.hpp>
+
+module ogl.framebuffer;
+import gfx.imageView;
+import ogl.imageView;
 
 namespace gfx::ogl
 {
     Framebuffer::Framebuffer() : _id(0)
     {
         _isDefault = true;
-        _clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 0.0 );
+        _clearValues = ClearValues();
     }
 
     Framebuffer::Framebuffer(const gfx::Framebuffer::Builder& createInfo) : gfx::Framebuffer(createInfo) {
@@ -25,14 +26,19 @@ namespace gfx::ogl
 
         std::vector<GLenum> drawAttachments {};
         for (glm::uint i = 0; i < _colorAttachments.size(); ++i) {
-            const std::reference_wrapper imageView = dynamic_cast<const ImageView&>(_colorAttachments[i].get());
+            const std::reference_wrapper imageView = dynamic_cast<const gfx::ogl::ImageView&>(*_colorAttachments[i]);
             glNamedFramebufferTexture(_id, GL_COLOR_ATTACHMENT0 + i, *imageView.get(), 0);
             drawAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + i);
             glCheckError();
         }
-        if (_depthStencilAttachment.has_value()) {
-            const auto& imageView = dynamic_cast<const ImageView&>(_depthStencilAttachment->get());
-            glNamedFramebufferTexture(_id, GL_DEPTH_STENCIL_ATTACHMENT, *imageView, 0);
+        if (_depthAttachment.has_value()) {
+            const auto& imageView = dynamic_cast<const ImageView&>(*_depthAttachment.value());
+            glNamedFramebufferTexture(_id, GL_DEPTH_ATTACHMENT, *imageView, 0);
+            glCheckError();
+        }
+        if (_stencilAttachment.has_value()) {
+            const auto& imageView = dynamic_cast<const ImageView&>(*_stencilAttachment.value());
+            glNamedFramebufferTexture(_id, GL_STENCIL_ATTACHMENT, *imageView, 0);
             glCheckError();
         }
         glNamedFramebufferDrawBuffers(_id, drawAttachments.size(), drawAttachments.data());
@@ -65,10 +71,5 @@ namespace gfx::ogl
     void Framebuffer::Unbind() const
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    }
-
-    bool Framebuffer::hasDepthStencilAttachment() const
-    {
-        return gfx::Framebuffer::hasDepthStencilAttachment() || _id == 0;
     }
 }

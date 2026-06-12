@@ -2,22 +2,21 @@
 // Created by radue on 3/6/2026.
 //
 
-#include "descriptorSet.h"
+module;
 
 #include <ranges>
 #include <iostream>
-
-#include "buffer.h"
-#include "context.h"
-#include "descriptorBinding.h"
-#include "descriptorPool.h"
-#include "descriptorSetLayout.h"
-#include "device.h"
-#include "imageView.h"
-#include "sampler.h"
+#include <vulkan/vulkan.hpp>
 #include "vulkanContext.h"
-#include <descriptorSetLayout.h>
-#include <scheduler.h>
+
+module vk.descriptorSet;
+import gfx.context;
+import gfx.descriptorBinding;
+import gfx.descriptorSetLayout;
+import gfx.structs;
+import vk.buffer;
+import vk.sampler;
+import vk.imageView;
 
 namespace gfx::vk
 {
@@ -67,7 +66,7 @@ namespace gfx::vk
                         }
                     case DescriptorType::eStorageBuffer:
                         {
-                            const auto& buffer = dynamic_cast<const Buffer&>(descriptor.getBuffer());
+                            const auto& buffer = dynamic_cast<const gfx::vk::Buffer&>(descriptor.getBuffer());
                             const auto& bufferHandle = buffer.isPerFrame() ? buffer[frame] : buffer[0];
                             const auto& bufferInfo = bufferInfos.emplace_back()
                                 .setBuffer(bufferHandle)
@@ -83,7 +82,7 @@ namespace gfx::vk
                         }
                     case DescriptorType::eSampler:
                         {
-                            const auto& sampler = dynamic_cast<const Sampler&>(descriptor.getSampler());
+                            const auto& sampler = dynamic_cast<const gfx::vk::Sampler&>(descriptor.getSampler());
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setSampler(*sampler);
                             writes.emplace_back()
@@ -96,8 +95,8 @@ namespace gfx::vk
                         }
                     case DescriptorType::eCombinedImageSampler:
                         {
-                            const auto& sampler = dynamic_cast<const vk::Sampler&>(descriptor.getSampler());
-                            const auto& imageView = dynamic_cast<const vk::ImageView&>(descriptor.getImageView());
+                            const auto& sampler = dynamic_cast<const gfx::vk::Sampler&>(descriptor.getSampler());
+                            const auto& imageView = dynamic_cast<const gfx::vk::ImageView&>(descriptor.getImageView());
                             const auto& imageViewHandle = imageView.isPerFrame() ? imageView[frame] : imageView[0];
                             const auto& imageInfo = imageInfos.emplace_back()
                                 .setImageView(imageViewHandle)

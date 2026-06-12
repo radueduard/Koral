@@ -2,12 +2,12 @@
 // Created by radue on 2/23/2026.
 //
 
+#include <cstring>
 #include <span>
 
 #include "image.h"
-
 #include "buffer.h"
-
+#include "context.h"
 #include "assimpImporter.h"
 
 #include <OpenImageIO/imageio.h>
@@ -15,7 +15,6 @@
 #include <ktx.h>
 #include <GL/glew.h>
 
-#include "context.h"
 
 
 gfx::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
@@ -100,15 +99,18 @@ namespace gfx
         }
 
         auto spec = imageInput->spec();
-        if (spec.nchannels == 3) {
-            spec.nchannels = 4;
-        }
+        // The engine has no 3-channel (RGB) format, so an RGB source is uploaded as RGBA with an
+        // opaque alpha channel. The native vs. upload channel counts stay fixed for every mip/layer.
+        const int nativeChannels = spec.nchannels;
+        const int uploadChannels = (nativeChannels == 3) ? 4 : nativeChannels;
+        spec.nchannels = uploadChannels;
 
         auto image = gfx::Image::Builder()
             .setExtent({ spec.width, spec.height, spec.depth })
             .setFormat(getFormat(spec.format, spec.nchannels))
             .setMipLevels(mipLevels)
             .setArrayLayers(layerCount)
+            .addUsage(gfx::Image::Usage::eTransferSrc)
             .addUsage(gfx::Image::Usage::eTransferDst)
             .build();
 
@@ -120,9 +122,28 @@ namespace gfx
             for (glm::u32 mip = 0; mip < mipLevels; mip++) {
                 imageInput->seek_subimage(static_cast<int>(layer), static_cast<int>(mip));
                 spec = imageInput->spec();
-                std::vector<unsigned char> data(spec.width * spec.height * spec.depth * spec.nchannels * spec.format.size());
-                if (!imageInput->read_image(static_cast<int>(layer), 0, 0, spec.nchannels, spec.format, data.data())) {
+
+                const std::size_t texelCount =
+                    static_cast<std::size_t>(spec.width) * spec.height * spec.depth;
+                const std::size_t channelSize = spec.format.size();
+
+                std::vector<unsigned char> nativeData(texelCount * nativeChannels * channelSize);
+                if (!imageInput->read_image(static_cast<int>(layer), 0, 0, nativeChannels, spec.format, nativeData.data())) {
                     std::cerr << "Could not read image data: " << imageInput->geterror() << std::endl;
+                }
+
+                std::vector<unsigned char> data;
+                if (uploadChannels != nativeChannels) {
+                    // Widen each texel to RGBA, leaving the added alpha bytes as 0xFF (opaque for 8/16-bit formats).
+                    data.assign(texelCount * uploadChannels * channelSize, 0xFF);
+                    for (std::size_t texel = 0; texel < texelCount; ++texel) {
+                        std::memcpy(
+                            data.data() + texel * uploadChannels * channelSize,
+                            nativeData.data() + texel * nativeChannels * channelSize,
+                            static_cast<std::size_t>(nativeChannels) * channelSize);
+                    }
+                } else {
+                    data = std::move(nativeData);
                 }
 
                 const auto stagingBuffer = gfx::Buffer::Builder<unsigned char>()
@@ -214,13 +235,18 @@ namespace gfx
 
     gfx::Image::Type GetImageTypeFromKtx(const ktxTexture* tex) {
         if (tex->baseDepth > 1) return gfx::Image::Type::e3D;
-        if (tex->baseHeight > 1) return gfx::Image::Type::e2D;
-        return gfx::Image::Type::e1D;
+        // Treat 1xN / 1x1 textures as 2D rather than 1D: material textures are
+        // sampled as texture2D, and block-compressed formats (BC7) are only valid
+        // for 2D images, so a 1x1 normal map must not become a 1D image.
+        return gfx::Image::Type::e2D;
     }
 
     Task<void> LoadKTXAsync(const std::filesystem::path& path, const bool generateMipmaps, gfx::Resource<Image>& returnImage) {
         std::unique_ptr<ktxTexture, KtxTextureDeleter> texture = nullptr;
         Image::Format format;
+        // Set when image data is already resident in CPU memory (e.g. after a
+        // Basis transcode below), so the deferred load further down is skipped.
+        bool imageDataLoaded = false;
 
         if (path.extension() == ".ktx") {
             ktxTexture1* rawTexture = nullptr;
@@ -252,6 +278,41 @@ namespace gfx
                           << " error=" << ktxErrorString(createResult) << std::endl;
                 co_return;
             }
+
+            // Basis-supercompressed KTX2 (ETC1S / UASTC, as produced via
+            // KHR_texture_basisu) report VK_FORMAT_UNDEFINED until transcoded.
+            // Transcode to BC7 — a GPU-native block format we sample directly —
+            // so such assets load without any offline preprocessing step.
+            // Transcoding needs the image data resident, so we load it here
+            // (in phase 1, before the image handle is published) and flag it so
+            // the deferred background load further down is skipped.
+            if (ktxTexture2_NeedsTranscoding(rawTexture)) {
+                const KTX_error_code dataResult =
+                    ktxTexture_LoadImageData(ktxTexture(rawTexture), nullptr, 0);
+                if (dataResult != KTX_SUCCESS) {
+                    std::cerr << "Could not load KTX image data for transcode: " << path.string()
+                              << " error=" << ktxErrorString(dataResult) << std::endl;
+                    ktxTexture_Destroy(ktxTexture(rawTexture));
+                    co_return;
+                }
+
+                // Single-mip Basis -> RGBA8 so a mip chain can be generated at
+                // load (block-compressed BC7 can't be blit-downsampled, and the
+                // missing mips cause severe normal-map aliasing / shading grain).
+                // Multi-mip Basis already carries mips, so keep it compact as BC7.
+                const ktx_transcode_fmt_e target =
+                    (rawTexture->numLevels <= 1) ? KTX_TTF_RGBA32 : KTX_TTF_BC7_RGBA;
+                const KTX_error_code transcodeResult =
+                    ktxTexture2_TranscodeBasis(rawTexture, target, 0);
+                if (transcodeResult != KTX_SUCCESS) {
+                    std::cerr << "Basis -> BC7 transcode failed: " << path.string()
+                              << " error=" << ktxErrorString(transcodeResult) << std::endl;
+                    ktxTexture_Destroy(ktxTexture(rawTexture));
+                    co_return;
+                }
+                imageDataLoaded = true;
+            }
+
             format = GetFormatFromVk(rawTexture->vkFormat);
             texture = std::unique_ptr<ktxTexture, KtxTextureDeleter>(ktxTexture(rawTexture));
         } else {
@@ -263,8 +324,17 @@ namespace gfx
         const glm::u32 arrayLayers = layers * faces;
         const glm::u32 fileMipLevels = std::max<glm::u32>(1u, texture->numLevels);
 
-        // If KTX already contains mips, use them. Otherwise optionally auto-generate.
-        const glm::u32 mipLevels = (fileMipLevels > 1) ? fileMipLevels : (generateMipmaps ? 0u : 1u);
+        // Block-compressed formats (e.g. BC7, including our Basis->BC7 transcode)
+        // cannot be mip-generated via vkCmdBlitImage. Never auto-expand the mip
+        // chain or generate mips for them — use exactly the levels in the file.
+        const bool isBlockCompressed =
+            format == Image::Format::eBC7_UNORM || format == Image::Format::eBC7_SRGB;
+
+        // If KTX already contains mips, use them. Otherwise optionally
+        // auto-generate (uncompressed formats only).
+        const glm::u32 mipLevels = (fileMipLevels > 1)
+            ? fileMipLevels
+            : ((generateMipmaps && !isBlockCompressed) ? 0u : 1u);
 
         // Phase 1: publish image handle before any suspend (matches your async contract)
         returnImage = Image::Builder()
@@ -277,16 +347,18 @@ namespace gfx
             .addUsage(Image::Usage::eTransferDst)
             .build();
 
-        ResourceRef image = returnImage;
+        ResourceRef<const Image> image = returnImage;
 
         // Phase 2a: disk/data load off main thread
         co_await Context::SwitchToBackgroundThread();
 
-        const KTX_error_code loadResult = ktxTexture_LoadImageData(texture.get(), nullptr, 0);
-        if (loadResult != KTX_SUCCESS || texture->pData == nullptr) {
-            std::cerr << "Could not load KTX image data: " << path.string()
-                      << " error=" << ktxErrorString(loadResult) << std::endl;
-            co_return;
+        if (!imageDataLoaded) {
+            const KTX_error_code loadResult = ktxTexture_LoadImageData(texture.get(), nullptr, 0);
+            if (loadResult != KTX_SUCCESS || texture->pData == nullptr) {
+                std::cerr << "Could not load KTX image data: " << path.string()
+                          << " error=" << ktxErrorString(loadResult) << std::endl;
+                co_return;
+            }
         }
 
         struct UploadSlice {
@@ -343,7 +415,7 @@ namespace gfx
                 });
             });
 
-            if (generateMipmaps && fileMipLevels == 1) {
+            if (generateMipmaps && fileMipLevels == 1 && !isBlockCompressed) {
                 CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                     commandBuffer.GenerateMipmaps(image);
                 });
@@ -369,7 +441,7 @@ namespace gfx
             .addUsage(Image::Usage::eTransferDst)
             .build();
 
-        ResourceRef image = returnImage;
+        ResourceRef<const Image> image = returnImage;
 
         co_await Context::SwitchToBackgroundThread();
 
@@ -418,7 +490,7 @@ namespace gfx
         return LoadRegularImageAsync(path, generateMipmaps, returnImage);
     }
 
-    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, gfx::ResourceRef<Image> image) {
+    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, gfx::ResourceRef<const Image> image) {
         const auto imageOutput = OIIO::ImageOutput::create(path.string());
         if (!imageOutput) {
             throw std::runtime_error("Could not create image file: " + path.string() + "\nError: " + OIIO::geterror());

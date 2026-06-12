@@ -2,18 +2,20 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "scheduler.h"
-#include <framebuffer.h>
-#include <surface.h>
+module;
 
 #include <iostream>
+#include <thread>
+#include <vulkan/vulkan.hpp>
 
-#include "surface.h"
-#include "swapChain.h"
-#include "vulkanContext.h"
-
-#include "window.h"
-
+module vk.scheduler;
+import vk.device;
+import gfx.context;
+import vk.context;
+import vk.swapChain;
+import vk.surface;
+import gfx.structs;
+import vk.commandBuffer;
 
 namespace gfx::vk
 {
@@ -41,7 +43,7 @@ namespace gfx::vk
         _swapChain = gfx::vk::SwapChain::Builder(dynamic_cast<const gfx::vk::Surface&>(gfx::Context::Window().getSurface()))
             .setMinImageCount(_minImageCount)
             .setImageCount(_imageCount)
-            .setMSAA(MSAA::eNone)
+            .setSampleCount(SampleCount::e1)
             .build();
         createFrames();
     }
@@ -60,6 +62,17 @@ namespace gfx::vk
         const auto& fence = frame.getInFlightFence();
         if (const auto result = Context::Device()->waitForFences(1, &fence, ::vk::True, UINT64_MAX); result != ::vk::Result::eSuccess) {
             throw std::runtime_error("Failed to wait fence: " + ::vk::to_string(result));
+        }
+
+        // Wayland (and HiDPI in general) doesn't always surface size mismatches as
+        // VK_SUBOPTIMAL/OUT_OF_DATE — the compositor will happily scale a stale
+        // buffer instead. Compare against the live framebuffer size so the swapchain
+        // tracks fractional-scale events that arrive after window creation.
+        if (const auto windowExtent = gfx::Context::Window().getExtent();
+            windowExtent.x > 0 && windowExtent.y > 0 && windowExtent != _swapChain->getExtent()) {
+            _started = false;
+            _swapChain->Resize(windowExtent);
+            _started = true;
         }
 
         while (true) {

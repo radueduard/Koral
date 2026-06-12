@@ -2,23 +2,19 @@
 // Created by radue on 2/27/2026.
 //
 
+module;
+
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #define VMA_IMPLEMENTATION
 #define VK_ENABLE_BETA_EXTENSIONS
-#include "device.h"
 
 #include <iostream>
 #include <ranges>
 #include <thread>
 #include <unordered_map>
-
-#include "commandBuffer.h"
-#include "context.h"
-#include "physicalDevice.h"
-#include "runtime.h"
-#include "scheduler.h"
-#include "surface.h"
 #include "vulkanContext.h"
+
+module vk.device;
 
 namespace gfx::vk {
     Queue::Family::Family(const glm::u32 index, const ::vk::QueueFamilyProperties &properties) :
@@ -141,6 +137,7 @@ namespace gfx::vk {
         auto vk13Features = ::vk::PhysicalDeviceVulkan13Features()
             .setShaderDemoteToHelperInvocation(true)
             .setDynamicRendering(true)
+            .setMaintenance4(true)
             .setPNext(&vk12Features);
 
         auto vk14Features = ::vk::PhysicalDeviceVulkan14Features()

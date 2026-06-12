@@ -2,12 +2,11 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "allocator.h"
+module;
 
 #include <iostream>
 
-#include "device.h"
-#include "vulkanContext.h"
+module vk.allocator;
 
 namespace gfx::vk
 {

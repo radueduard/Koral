@@ -2,19 +2,17 @@
 // Created by radue on 3/5/2026.
 //
 
-#include "descriptorSet.h"
-
-#include <descriptorSetLayout.h>
-#include <string>
-
-#include "buffer.h"
-#include "commandBuffer.h"
-#include "descriptorBinding.h"
-#include "imageView.h"
-#include "sampler.h"
-
+module;
 
 #include "ogl_err_handling.h"
+
+module ogl.descriptorSet;
+import ogl.commandBuffer;
+
+import gfx.descriptorSet;
+import gfx.descriptorBinding;
+import gfx.structs;
+import ogl.buffer;
 
 namespace gfx::ogl
 {
@@ -27,7 +25,7 @@ namespace gfx::ogl
     void DescriptorSet::bind(const gfx::CommandBuffer& commandBuffer, glm::u32 index) const
     {
         const auto& oglCommandBuffer = dynamic_cast<const CommandBuffer&>(commandBuffer);
-        const auto& layoutRemappings =  oglCommandBuffer.getRemappingTableForBoundPipeline();
+        const auto& remappings =  oglCommandBuffer.getRemappingTableForBoundPipeline();
 
         for (const auto& [binding, descriptors] : _writes)
         {
@@ -36,8 +34,8 @@ namespace gfx::ogl
                 const auto& descriptor = descriptors[i];
 
                 auto setBinding = std::make_pair(index, binding);
-                auto bindingPoint = layoutRemappings.find(setBinding);
-                if (bindingPoint == layoutRemappings.end()) {
+                auto bindingPoint = remappings.find(setBinding);
+                if (bindingPoint == remappings.end()) {
                     throw std::runtime_error("No binding point found for set " + std::to_string(index) + " binding " + std::to_string(binding) + "!");
                 }
                 switch (type)

@@ -1,29 +1,23 @@
 //
 // Created by radue on 2/27/2026.
 //
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include "commandBuffer.h"
 
-#include <ranges>
+module;
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+
 #include <iostream>
 
-#include "buffer.h"
-#include "computePipeline.h"
-#include "context.h"
-#include "descriptorSet.h"
-#include "device.h"
-#include "framebuffer.h"
-#include "graphicsPipeline.h"
-#include "imageView.h"
-#include "scheduler.h"
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
+
+module vk.commandBuffer;
+import gfx.flags;
 
 namespace gfx::vk
 {
     class ComputePipeline;
 
-    gfx::Flags<CommandBuffer::Usage> getCommandBufferUsage(const gfx::vk::Queue& queue)
+    Flags<CommandBuffer::Usage> getCommandBufferUsage(const gfx::vk::Queue& queue)
     {
         gfx::Flags<CommandBuffer::Usage> usage;
         if (queue.getFamily().getProperties().queueFlags & ::vk::QueueFlagBits::eGraphics)
@@ -93,22 +87,29 @@ namespace gfx::vk
         return BeginRendering(framebuffer, renderParameters);
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<gfx::Framebuffer> framebuffer, RenderParameters renderParameters)
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<const gfx::Framebuffer> framebuffer, RenderParameters renderParameters)
     {
         gfx::CommandBuffer::BeginRendering(framebuffer);
         std::vector<gfx::ImageBarrier> imageBarriers;
         for (const auto& attachment : framebuffer->getColorAttachments())
         {
             imageBarriers.push_back({
-                attachment.get().getImage(),
+                attachment->getImage(),
                 ResourceAccess::ColorAttachment
             });
         }
-        if (framebuffer->hasDepthStencilAttachment())
+        if (framebuffer->hasDepthAttachment())
         {
             imageBarriers.push_back({
-                framebuffer->getDepthStencilAttachment().getImage(),
+                framebuffer->getDepthAttachment()->getImage(),
                 ResourceAccess::DepthAttachment
+            });
+        }
+        if (framebuffer->hasStencilAttachment())
+        {
+            imageBarriers.push_back({
+                framebuffer->getStencilAttachment()->getImage(),
+                ResourceAccess::StencilAttachment
             });
         }
         Barrier({}, imageBarriers);
@@ -117,26 +118,28 @@ namespace gfx::vk
         int i = 0;
         for (auto colorAttachment : framebuffer->getColorAttachments()) {
             colorAttachmentInfos.push_back(::vk::RenderingAttachmentInfoKHR()
-                .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&colorAttachment.get()))
+                .setImageView(*dynamic_cast<const gfx::vk::ImageView&>(*colorAttachment))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                .setClearValue(::vk::ClearValue().setColor(::vk::ClearColorValue()
-                    .setFloat32({ framebuffer->getClearValues().clearColor[i].r, framebuffer->getClearValues().clearColor[i].g, framebuffer->getClearValues().clearColor[i].b, framebuffer->getClearValues().clearColor[i].a })))
+                .setClearValue(getVkClearValue(framebuffer->getClearColor(i)))
+                .setResolveImageLayout(framebuffer->hasResolveAttachments() ? ::vk::ImageLayout::eColorAttachmentOptimal : ::vk::ImageLayout::eUndefined)
+                .setResolveImageView(framebuffer->hasResolveAttachments() ? *dynamic_cast<const gfx::vk::ImageView&>(*framebuffer->getResolveAttachment(i)) : nullptr)
+                .setResolveMode(getVkResolveMode(framebuffer->getResolveMode()))
                 .setLoadOp(getVkLoadOp(renderParameters.colorLoadOperation))
                 .setStoreOp(getVkStoreOp(renderParameters.colorStoreOperation)));
             i++;
         }
 
-        const auto depthAttachment = framebuffer->hasDepthStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthStencilAttachment()))
+        const auto depthAttachment = framebuffer->hasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
+            .setImageView(*dynamic_cast<const gfx::vk::ImageView&>(*framebuffer->getDepthAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
-            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearValues().clearDepth, static_cast<glm::u32>(framebuffer->getClearValues().clearStencil) }))
+            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
             .setLoadOp(getVkLoadOp(renderParameters.depthLoadOperation))
             .setStoreOp(getVkStoreOp(renderParameters.depthStoreOperation))) : std::nullopt;
 
-        const auto stencilAttachment = framebuffer->hasDepthStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthStencilAttachment()))
+        const auto stencilAttachment = framebuffer->hasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
+            .setImageView(*dynamic_cast<const gfx::vk::ImageView&>(*framebuffer->getStencilAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
-            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearValues().clearDepth, static_cast<glm::u32>(framebuffer->getClearValues().clearStencil) }))
+            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
             .setLoadOp(getVkLoadOp(renderParameters.stencilLoadOperation))
             .setStoreOp(getVkStoreOp(renderParameters.stencilStoreOperation))) : std::nullopt;
 
@@ -189,14 +192,14 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::ComputePipeline> pipeline)
     {
         gfx::CommandBuffer::BindPipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::GraphicsPipeline> pipeline)
     {
         gfx::CommandBuffer::BindPipeline(pipeline);
         pipeline->Bind(*this);
@@ -209,7 +212,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, gfx::ResourceRef<gfx::DescriptorSet> set, const bool debug)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, gfx::ResourceRef<const gfx::DescriptorSet> set, const bool debug)
     {
         if (debug) set->DebugPrint();
 
@@ -239,7 +242,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<gfx::Mesh> mesh)
+    gfx::CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<const gfx::Mesh> mesh)
     {
         gfx::CommandBuffer::BindMesh(mesh);
         std::vector<::vk::Buffer> vertexBuffers;
@@ -326,9 +329,43 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ)
-    {
+    gfx::CommandBuffer& CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ) {
+        gfx::CommandBuffer::DrawMeshTasks(taskCountX, taskCountY, taskCountZ);
+        _handle.drawMeshTasksEXT(taskCountX, taskCountY, taskCountZ);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        gfx::CommandBuffer::DrawIndirect(indirectBuffer, offset, drawCount, stride);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.drawIndirect(*vkBuffer, offset, drawCount, stride);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawIndexedIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        gfx::CommandBuffer::DrawIndexedIndirect(indirectBuffer, offset, drawCount, stride);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.drawIndexedIndirect(*vkBuffer, offset, drawCount, stride);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawMeshTasksIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        gfx::CommandBuffer::DrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.drawMeshTasksIndirectEXT(*vkBuffer, offset, drawCount, stride);
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ) {
+        gfx::CommandBuffer::Dispatch(groupCountX, groupCountY, groupCountZ);
         _handle.dispatch(groupCountX, groupCountY, groupCountZ);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DispatchIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset) {
+        gfx::CommandBuffer::DispatchIndirect(indirectBuffer, offset);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.dispatchIndirect(*vkBuffer, offset);
         return *this;
     }
 
@@ -352,13 +389,13 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::ClearBuffer(gfx::ResourceRef<gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::ClearBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         _handle.fillBuffer(*vkBuffer, offset, size, 0);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::FillBuffer(gfx::ResourceRef<gfx::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::FillBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         if (size == UINT64_MAX) {
             size = vkBuffer.getSize() - offset;
@@ -367,7 +404,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::CopyBuffer(ResourceRef<gfx::Buffer> srcBuffer, ResourceRef<gfx::Buffer> dstBuffer, glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset) {
+    gfx::CommandBuffer & CommandBuffer::CopyBuffer(ResourceRef<const gfx::Buffer> srcBuffer, ResourceRef<const gfx::Buffer> dstBuffer, glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset) {
         const auto& vkSrcBuffer = dynamic_cast<const gfx::vk::Buffer&>(*srcBuffer);
         const auto& vkDstBuffer = dynamic_cast<const gfx::vk::Buffer&>(*dstBuffer);
         if (size == UINT64_MAX) {
@@ -385,8 +422,8 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(ResourceRef<gfx::Image> srcImage, gfx::Blit blitInfo) {
-        ResourceRef<gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
+    gfx::CommandBuffer& CommandBuffer::Blit(ResourceRef<const gfx::Image> srcImage, gfx::Blit blitInfo) {
+        ResourceRef<const gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
         Barrier({}, {
             {
                 srcImage,
@@ -440,7 +477,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Blit blitInfo)
+    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo)
     {
         if (blitInfo.srcExtent == glm::ivec3(-1))
             blitInfo.srcExtent = srcImage->getExtent();
@@ -494,8 +531,8 @@ namespace gfx::vk
          return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::Resolve(ResourceRef<gfx::Image> srcImage, gfx::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+    gfx::CommandBuffer & CommandBuffer::Resolve(ResourceRef<const gfx::Image> srcImage, gfx::Resolve resolveInfo) {
+        if (srcImage->getSampleCount() == SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
 
         if (!_resolveHelperImage)
@@ -557,10 +594,10 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+    gfx::CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Resolve resolveInfo) {
+        if (srcImage->getSampleCount() == SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
-        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+        if (dstImage && dstImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
@@ -610,7 +647,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::CopyBufferToImage(ResourceRef<gfx::Buffer> buffer, ResourceRef<gfx::Image> image, gfx::Copy copyInfo) {
+    gfx::CommandBuffer& CommandBuffer::CopyBufferToImage(ResourceRef<const gfx::Buffer> buffer, ResourceRef<const gfx::Image> image, gfx::Copy copyInfo) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
 
@@ -681,7 +718,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<gfx::Image> image, ResourceRef<gfx::Buffer> buffer, gfx::Copy copyInfo) {
+    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<const gfx::Image> image, ResourceRef<const gfx::Buffer> buffer, gfx::Copy copyInfo) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
 

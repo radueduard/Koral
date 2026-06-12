@@ -2,14 +2,13 @@
 // Created by radue on 2/21/2026.
 //
 
-#include "shader.h"
+module;
 
 #include <array>
-
-#include <file.h>
 #include "ogl_err_handling.h"
-
 #include <spirv_cross/spirv_glsl.hpp>
+
+module ogl.shader;
 
 namespace gfx::ogl
 {

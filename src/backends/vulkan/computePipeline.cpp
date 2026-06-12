@@ -2,15 +2,15 @@
 // Created by radue on 3/6/2026.
 //
 
-#include "computePipeline.h"
+module;
 
 #include <ranges>
-
-#include "commandBuffer.h"
-#include "descriptorSetLayout.h"
-#include "device.h"
-#include "shader.h"
+#include <stdexcept>
+#include <vector>
+#include <vulkan/vulkan.hpp>
 #include "vulkanContext.h"
+
+module vk.computePipeline;
 
 namespace gfx::vk
 {
@@ -19,14 +19,14 @@ namespace gfx::vk
         if (!createInfo.computeShader.has_value())
             throw std::runtime_error("You can not create a compute pipeline without a compute shader!");
 
-        const auto& shader = dynamic_cast<const Shader&>(createInfo.computeShader.value().get());
-        if (shader.getStage() != Shader::Stage::eCompute) {
+        const auto& shader = dynamic_cast<const gfx::vk::Shader&>(*createInfo.computeShader.value());
+        if (shader.getStage() != gfx::Shader::Stage::eCompute) {
             throw std::runtime_error("The shader provided to the compute pipeline must be a compute shader!");
         }
 
         std::vector<::vk::DescriptorSetLayout> setLayouts = {};
         for (const auto& layout : _setLayouts | std::views::values) {
-            setLayouts.push_back(**dynamic_cast<const DescriptorSetLayout*>(layout.get()));
+            setLayouts.push_back(**dynamic_cast<const gfx::vk::DescriptorSetLayout*>(layout.get()));
         }
 
         std::vector<::vk::PushConstantRange> pushConstantRanges = {};
@@ -43,10 +43,24 @@ namespace gfx::vk
 
         _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
 
+
+        std::vector<::vk::SpecializationMapEntry> specializationMapEntries = {};
+        for (const auto& [id, offset, size] : createInfo.specConstantsMetadata) {
+            specializationMapEntries.emplace_back(::vk::SpecializationMapEntry()
+                .setConstantID(id)
+                .setOffset(offset)
+                .setSize(size));
+        }
+        auto specializationInfo = ::vk::SpecializationInfo()
+            .setMapEntries(specializationMapEntries)
+            .setDataSize(createInfo.specConstantsData.size())
+            .setPData(createInfo.specConstantsData.data());
+
         const auto stageCreateInfo = ::vk::PipelineShaderStageCreateInfo()
-                                     .setStage(::vk::ShaderStageFlagBits::eCompute)
-                                     .setModule(*shader)
-                                     .setPName("main");
+            .setStage(::vk::ShaderStageFlagBits::eCompute)
+            .setModule(*shader)
+            .setPSpecializationInfo(createInfo.specConstantsMetadata.empty() ? nullptr : &specializationInfo)
+            .setPName("main");
 
         const auto pipelineCreateInfo = ::vk::ComputePipelineCreateInfo()
                                         .setStage(stageCreateInfo)

@@ -2,24 +2,21 @@
 // Created by radue on 3/17/2026.
 //
 
-#include "gui.h"
 
-#include "context.h"
-#include "window.h"
-#include "framebuffer.h"
-#include "surface.h"
+module;
 
-#include "../backends/open_gl/gui.h"
-#include "../backends/vulkan/gui.h"
-
+#include <stdexcept>
 #include <imgui.h>
 // #include <imguizmo.h>
 
 #include <iostream>
 #include <GLFW/glfw3.h>
+#include <imgui/IconsFontAwesome6.h>
 
-#include "commandBuffer.h"
-#include <IconsFontAwesome6.h>
+module gfx.gui;
+import ogl.gui;
+import vk.gui;
+import gfx.context;
 
 ImFont* AddFont(const std::filesystem::path& path, const float size)
 {
@@ -130,7 +127,7 @@ void gfx::GUI::DefineStyle()
 }
 
 
-gfx::Resource<gfx::GUI_Image> gfx::GUI_Image::Create(gfx::ResourceRef<gfx::Image> image, glm::u32 layer, glm::u32 level)
+gfx::Resource<gfx::GUI_Image> gfx::GUI_Image::Create(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level)
 {
     switch (Context::Window().getAPI())
     {

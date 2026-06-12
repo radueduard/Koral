@@ -1,19 +1,15 @@
 //
 // Created by eduard on 11.03.2026.
 //
+
+module;
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-
-#include <framebuffer.h>
-#include <surface.h>
-
-#include "scheduler.h"
-
 #include <iostream>
-#include <window.h>
 
-#include "commandBuffer.h"
-#include "gui.h"
+module ogl.scheduler;
+import gfx.context;
 
 namespace gfx::ogl
 {

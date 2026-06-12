@@ -1,18 +1,23 @@
 //
 // Created by radue on 2/27/2026.
 //
+
+module;
+
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
-#include "runtime.h"
-#include <framebuffer.h>
-#include <surface.h>
 
 #include <iostream>
 #include <ranges>
 
-#include <window.h>
+#define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "../../log.h"
+#include <vulkan/vulkan_to_string.hpp>
+
+module vk.runtime;
+import gfx.window;
+import gfx.log;
+import vk.physicalDevice;
 
 namespace gfx::vk
 {
@@ -42,17 +47,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
         switch (messageSeverity) {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-                gfx::log::info("[vulkan] {}", pCallbackData->pMessage);
+                gfx::log::info("[vulkan] [verbose] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-                gfx::log::info("[vulkan] {}", pCallbackData->pMessage);
+                gfx::log::info("[vulkan] [info] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-                gfx::log::warn("[vulkan] {}", pCallbackData->pMessage);
+                gfx::log::warn("[vulkan] [warning] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-                gfx::log::error("[vulkan] {}", pCallbackData->pMessage);
-                GFX_BREAK(); // drop into debugger on Vulkan errors too
+                gfx::log::error("[vulkan] [error] {}", pCallbackData->pMessage);
+                // GFX_BREAK(); // drop into debugger on Vulkan errors too
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
                 break;
@@ -74,60 +79,72 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             _instanceExtensions.emplace_back(extension);
         }
 
+        // Validation layers, debug-printf and the debug messenger are Debug-only.
+        // Release builds (NDEBUG) create the instance with no validation layer and
+        // no debug pNext chain, so benchmark numbers aren't skewed by validation.
+        const void* instancePNext = nullptr;
+#ifndef NDEBUG
         constexpr std::array<uint32_t, 1> bufferSize = { 1024 * 1024 };
-            const auto validationLayerSetting = ::vk::LayerSettingEXT()
-                .setPLayerName("VK_LAYER_KHRONOS_validation")
-                .setPSettingName("printf_buffer_size")
-                .setType(::vk::LayerSettingTypeEXT::eUint32)
-                .setValues(bufferSize);
+        const auto validationLayerSetting = ::vk::LayerSettingEXT()
+            .setPLayerName("VK_LAYER_KHRONOS_validation")
+            .setPSettingName("printf_buffer_size")
+            .setType(::vk::LayerSettingTypeEXT::eUint32)
+            .setValues(bufferSize);
 
-            const auto layerSettingsInfo = ::vk::LayerSettingsCreateInfoEXT()
-                .setSettings(validationLayerSetting);
-                // pNext = nullptr (tail)
+        const auto layerSettingsInfo = ::vk::LayerSettingsCreateInfoEXT()
+            .setSettings(validationLayerSetting);
+            // pNext = nullptr (tail)
 
-            // 2. Middle — validation features, points to layer settings
-            const ::vk::ValidationFeatureEnableEXT enabledFeatures[] = {
-                ::vk::ValidationFeatureEnableEXT::eDebugPrintf
-            };
+        // 2. Middle — validation features, points to layer settings
+        const ::vk::ValidationFeatureEnableEXT enabledFeatures[] = {
+            ::vk::ValidationFeatureEnableEXT::eDebugPrintf
+        };
 
-            const auto validationCreateInfo = ::vk::ValidationFeaturesEXT()
-                .setPNext(&layerSettingsInfo)        // ← points to tail
-                .setEnabledValidationFeatures(enabledFeatures);
+        const auto validationCreateInfo = ::vk::ValidationFeaturesEXT()
+            .setPNext(&layerSettingsInfo)        // ← points to tail
+            .setEnabledValidationFeatures(enabledFeatures);
 
-            // 3. Debug messenger, points to validation features
-            const auto debugCreateInfo = ::vk::DebugUtilsMessengerCreateInfoEXT()
-                .setPNext(&validationCreateInfo)     // ← points to middle
-                .setMessageSeverity(
-                    ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
-                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-                    // | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
-                )
-                .setMessageType(
-                    ::vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                    ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-                )
-                .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
+        // 3. Debug messenger, points to validation features
+        const auto debugCreateInfo = ::vk::DebugUtilsMessengerCreateInfoEXT()
+            .setPNext(&validationCreateInfo)     // ← points to middle
+            .setMessageSeverity(
+                ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
+                | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+                // | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
+                | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
+            )
+            .setMessageType(
+                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+            )
+            .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
 
-            // 4. Head — instance create info, points to debug messenger
-            const auto createInfo = ::vk::InstanceCreateInfo()
-            #ifdef __APPLE__
-                .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
-            #endif
-                .setPNext(&debugCreateInfo)
-                .setPApplicationInfo(&applicationInfo)
-                .setPEnabledExtensionNames(_instanceExtensions)
-                .setPEnabledLayerNames(_instanceLayers);
+        instancePNext = &debugCreateInfo;
+#endif
 
-            _instance = ::vk::createInstance(createInfo);
-            VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
+        // Head — instance create info (debug pNext only present in Debug builds)
+        const auto createInfo = ::vk::InstanceCreateInfo()
+        #ifdef __APPLE__
+            .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
+        #endif
+            .setPNext(instancePNext)
+            .setPApplicationInfo(&applicationInfo)
+            .setPEnabledExtensionNames(_instanceExtensions)
+            .setPEnabledLayerNames(_instanceLayers);
 
-            _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
+        _instance = ::vk::createInstance(createInfo);
+        VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
+
+#ifndef NDEBUG
+        _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
+#endif
     }
 
     Runtime::~Runtime()
     {
+#ifndef NDEBUG
         _instance.destroyDebugUtilsMessengerEXT(_debugMessenger);
+#endif
         _instance.destroy();
     }
 

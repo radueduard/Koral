@@ -2,9 +2,9 @@
 // Created by radue on 2/20/2026.
 //
 
-#include "sampler.h"
-
+module;
 #include "ogl_err_handling.h"
+module ogl.sampler;
 
 namespace gfx::ogl
 {

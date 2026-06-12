@@ -3,14 +3,20 @@
 //
 
 #pragma once
-#include <image.h>
 
-#include "image.h"
-#include "imageView.h"
-#include "graphicsPipeline.h"
-#include "sampler.h"
+#include <variant>
 
 #include <vulkan/vulkan.hpp>
+#include <glm/glm.hpp>
+
+import gfx.structs;
+import gfx.image;
+import gfx.flags;
+import gfx.shader;
+import gfx.imageView;
+import gfx.buffer;
+import gfx.sampler;
+import gfx.framebuffer;
 
 
 namespace gfx
@@ -34,6 +40,18 @@ namespace gfx
         }
     }
 
+    inline ::vk::ResolveModeFlagBits getVkResolveMode(const ResolveMode resolveMode) {
+        switch (resolveMode)
+        {
+        case ResolveMode::eNone: return ::vk::ResolveModeFlagBits::eNone;
+        case ResolveMode::eAverage: return ::vk::ResolveModeFlagBits::eAverage;
+        case ResolveMode::eMin: return ::vk::ResolveModeFlagBits::eMin;
+        case ResolveMode::eMax: return ::vk::ResolveModeFlagBits::eMax;
+        case ResolveMode::eSampleZero: return ::vk::ResolveModeFlagBits::eSampleZero;
+        default: throw std::runtime_error("Unknown resolve mode type!");
+        }
+    }
+
     inline ::vk::AccessFlags getVkAccessFlags(const ResourceAccess access) {
         switch (access)
         {
@@ -44,8 +62,14 @@ namespace gfx
         case ResourceAccess::IndexBuffer: return ::vk::AccessFlagBits::eIndexRead;
         case ResourceAccess::IndirectBuffer: return ::vk::AccessFlagBits::eIndirectCommandRead;
         case ResourceAccess::ColorAttachment: return ::vk::AccessFlagBits::eColorAttachmentWrite;
-        case ResourceAccess::DepthAttachment: return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-        case ResourceAccess::DepthRead: return ::vk::AccessFlagBits::eDepthStencilAttachmentRead;
+        case ResourceAccess::DepthStencilAttachment:
+        case ResourceAccess::DepthAttachment:
+        case ResourceAccess::StencilAttachment:
+            return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case ResourceAccess::DepthStencilRead:
+        case ResourceAccess::DepthRead:
+        case ResourceAccess::StencilRead:
+            return ::vk::AccessFlagBits::eDepthStencilAttachmentRead;
         case ResourceAccess::TransferSrc: return ::vk::AccessFlagBits::eTransferRead;
         case ResourceAccess::TransferDst: return ::vk::AccessFlagBits::eTransferWrite;
 
@@ -89,8 +113,13 @@ namespace gfx
             return ::vk::PipelineStageFlagBits::eFragmentShader;
         case ResourceAccess::ColorAttachment:
             return ::vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        case ResourceAccess::DepthStencilAttachment:
         case ResourceAccess::DepthAttachment:
+        case ResourceAccess::StencilAttachment:
+            return ::vk::PipelineStageFlagBits::eEarlyFragmentTests | ::vk::PipelineStageFlagBits::eLateFragmentTests;
+        case ResourceAccess::DepthStencilRead:
         case ResourceAccess::DepthRead:
+        case ResourceAccess::StencilRead:
             return ::vk::PipelineStageFlagBits::eEarlyFragmentTests | ::vk::PipelineStageFlagBits::eLateFragmentTests;
         case ResourceAccess::TransferSrc:
         case ResourceAccess::TransferDst:
@@ -137,9 +166,18 @@ namespace gfx
             return ::vk::ImageLayout::eShaderReadOnlyOptimal;
         case ResourceAccess::ColorAttachment:
             return ::vk::ImageLayout::eColorAttachmentOptimal;
-        case ResourceAccess::DepthAttachment:
-        case ResourceAccess::DepthRead:
+        case ResourceAccess::DepthStencilAttachment:
             return ::vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        case ResourceAccess::DepthStencilRead:
+            return ::vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+        case ResourceAccess::DepthAttachment:
+            return ::vk::ImageLayout::eDepthAttachmentOptimal;
+        case ResourceAccess::DepthRead:
+            return ::vk::ImageLayout::eDepthReadOnlyOptimal;
+        case ResourceAccess::StencilAttachment:
+            return ::vk::ImageLayout::eStencilAttachmentOptimal;
+        case ResourceAccess::StencilRead:
+            return ::vk::ImageLayout::eStencilReadOnlyOptimal;
         case ResourceAccess::TransferSrc:
             return ::vk::ImageLayout::eTransferSrcOptimal;
         case ResourceAccess::TransferDst:
@@ -524,18 +562,6 @@ namespace gfx
         return vkUsage;
     }
 
-    inline ::vk::SampleCountFlagBits getVkSampleCount(const MSAA msaa)
-    {
-        switch (msaa) {
-        case MSAA::eNone: return ::vk::SampleCountFlagBits::e1;
-        case MSAA::e2x: return ::vk::SampleCountFlagBits::e2;
-        case MSAA::e4x: return ::vk::SampleCountFlagBits::e4;
-        case MSAA::e8x: return ::vk::SampleCountFlagBits::e8;
-        case MSAA::e16x: return ::vk::SampleCountFlagBits::e16;
-        default: throw std::runtime_error("Unknown MSAA level");
-        }
-    }
-
     inline ::vk::Filter getVkFilter(const gfx::Filter filter)
     {
         switch (filter) {
@@ -654,4 +680,37 @@ namespace gfx
         return vkFlags;
     }
 
+inline ::vk::ClearValue getVkClearValue(const gfx::ClearColor& clearValue)
+{
+    return std::visit([&](auto&& value) -> ::vk::ClearValue {
+        using T = std::decay_t<decltype(value)>;
+        if constexpr (std::is_same_v<T, float>)
+            return ::vk::ClearColorValue{ std::array<float,4>{ value, 0.f, 0.f, 0.f } };
+        else if constexpr (std::is_same_v<T, glm::vec2>)
+            return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, 0.f, 0.f } };
+        else if constexpr (std::is_same_v<T, glm::vec3>)
+            return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, value.z, 0.f } };
+        else if constexpr (std::is_same_v<T, glm::vec4>)
+            return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, value.z, value.w } };
+
+        else if constexpr (std::is_same_v<T, glm::i32>)
+            return ::vk::ClearColorValue{ std::array<int32_t,4>{ value, 0, 0, 0 } };
+        else if constexpr (std::is_same_v<T, glm::ivec2>)
+            return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, 0, 0 } };
+        else if constexpr (std::is_same_v<T, glm::ivec3>)
+            return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, value.z, 0 } };
+        else if constexpr (std::is_same_v<T, glm::ivec4>)
+            return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, value.z, value.w } };
+
+        else if constexpr (std::is_same_v<T, glm::u32>)
+            return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value, 0u, 0u, 0u } };
+        else if constexpr (std::is_same_v<T, glm::uvec2>)
+            return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, 0u, 0u } };
+        else if constexpr (std::is_same_v<T, glm::uvec3>)
+            return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, value.z, 0u } };
+        else // glm::uvec4
+            return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, value.z, value.w } };
+
+    }, clearValue);
+}
 }

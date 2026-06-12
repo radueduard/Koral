@@ -1,24 +1,18 @@
 //
 // Created by radue on 2/21/2026.
 //
-
-#include "commandBuffer.h"
-
-#include <descriptorSet.h>
-#include <mesh.h>
+module;
 
 #include <ranges>
 #include <glm/gtc/type_ptr.inl>
 
-#include "buffer.h"
-#include "computePipeline.h"
-#include "context.h"
 #include "framebuffer.h"
 #include "graphicsPipeline.h"
 #include "image.h"
 #include "ogl_err_handling.h"
-#include "window.h"
-#include "surface.h"
+
+module ogl.commandBuffer;
+
 
 namespace gfx::ogl
 {
@@ -30,7 +24,8 @@ namespace gfx::ogl
         }
     }
 
-    CommandBuffer::CommandBuffer(const Flags<Usage> usage): gfx::CommandBuffer(usage) {}
+    CommandBuffer::CommandBuffer(const Flags<Usage> usage)
+        : gfx::CommandBuffer(usage) {}
 
     gfx::CommandBuffer& CommandBuffer::Begin()
     {
@@ -57,17 +52,17 @@ namespace gfx::ogl
             const auto& oglFramebuffer = dynamic_cast<const ogl::Framebuffer&>(*framebuffer);
             framebuffer->Bind();
 
-            if (renderParameters.colorLoadOperation == LoadOperation::eClear)
-                glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer.getClearColor(0)));
-            glCheckError();
-            if (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear)
-                glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
-            glCheckError();
+            // if (renderParameters.colorLoadOperation == LoadOperation::eClear)
+                // glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer.getClearColor(0)));
+            // glCheckError();
+            // if (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear)
+                // glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
+            // glCheckError();
         });
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<gfx::Framebuffer> _framebuffer, RenderParameters renderParameters)
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<const gfx::Framebuffer> _framebuffer, RenderParameters renderParameters)
     {
         CheckRecording();
         _commands.emplace_back([_framebuffer, this, renderParameters] ()
@@ -82,16 +77,21 @@ namespace gfx::ogl
             for (const auto& attachment : _state.boundFramebuffer.value()->getColorAttachments())
             {
                 if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
-                    glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer.getClearColor(i)));
-                    glCheckError();
+                    // glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer.getClearColor(i)));
+                    // glCheckError();
                 }
                 i++;
             }
-            if (framebuffer->hasDepthStencilAttachment() && (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear))
+            if (framebuffer->hasDepthAttachment() && renderParameters.depthLoadOperation == LoadOperation::eClear)
             {
-                glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
+                glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
                 glCheckError();
             }
+                if (framebuffer->hasStencilAttachment() && renderParameters.stencilLoadOperation == LoadOperation::eClear)
+                {
+                    glClearNamedFramebufferfi(*oglFramebuffer,  GL_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
+                    glCheckError();
+                }
         });
         return *this;
     }
@@ -106,7 +106,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::ComputePipeline> pipeline)
     {
         CheckRecording();
         _commands.emplace_back([this, pipeline] ()
@@ -118,7 +118,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::GraphicsPipeline> pipeline)
     {
         CheckRecording();
         _commands.emplace_back([this, pipeline] ()
@@ -132,7 +132,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, gfx::ResourceRef<DescriptorSet> set, bool debug)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, gfx::ResourceRef<const DescriptorSet> set, bool debug)
     {
         if (debug) set->DebugPrint();
 
@@ -144,7 +144,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::BindMesh(gfx::ResourceRef<Mesh> mesh) {
+    gfx::CommandBuffer & CommandBuffer::BindMesh(gfx::ResourceRef<const Mesh> mesh) {
         CheckRecording();
         _commands.emplace_back([mesh, this] () {
             gfx::CommandBuffer::BindMesh(mesh);
@@ -254,6 +254,19 @@ namespace gfx::ogl
         return *this;
     }
 
+    gfx::CommandBuffer & CommandBuffer::DispatchIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset) {
+        CheckRecording();
+        _commands.emplace_back([this, indirectBuffer, offset] () {
+            gfx::CommandBuffer::DispatchIndirect(indirectBuffer, offset);
+            const auto& oglIndirectBuffer = dynamic_cast<const ogl::Buffer&>(*indirectBuffer);
+            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, *oglIndirectBuffer);
+            glCheckError();
+            glDispatchComputeIndirect(offset);
+            glCheckError();
+        });
+        return *this;
+    }
+
     gfx::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance)
     {
         CheckRecording();
@@ -287,6 +300,40 @@ namespace gfx::ogl
         return *this;
     }
 
+    gfx::CommandBuffer& CommandBuffer::DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ) {
+        CheckRecording();
+        _commands.emplace_back([this, taskCountX, taskCountY, taskCountZ] () {
+            if (!_state.boundGraphicsPipeline.has_value())
+                throw std::runtime_error("You can't draw mesh tasks without a graphics pipeline!");
+            glDrawMeshTasksEXT(taskCountX, taskCountY, taskCountZ);
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        CheckRecording();
+        _commands.emplace_back([this, indirectBuffer, offset, drawCount, stride] {
+            throw std::runtime_error("Indirect drawing is not supported in OpenGL backend yet!");
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawIndexedIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        CheckRecording();
+        _commands.emplace_back([this, indirectBuffer, offset, drawCount, stride] {
+            throw std::runtime_error("Indirect drawing is not supported in OpenGL backend yet!");
+        });
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawMeshTasksIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        CheckRecording();
+        _commands.emplace_back([this, indirectBuffer, offset, drawCount, stride] {
+            throw std::runtime_error("Indirect drawing is not supported in OpenGL backend yet!");
+        });
+        return *this;
+    }
+
     gfx::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         CheckRecording();
@@ -311,9 +358,9 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::Blit(ResourceRef<gfx::Image> srcImage, gfx::Blit blitInfo) {
+    gfx::CommandBuffer & CommandBuffer::Blit(ResourceRef<const gfx::Image> srcImage, gfx::Blit blitInfo) {
 
-        if (srcImage->getMSAA() != MSAA::eNone)
+        if (srcImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Source image must not be multisampled for blit operation!");
 
         if (blitInfo.srcExtent == glm::ivec3(-1))
@@ -349,11 +396,11 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Blit blitInfo)
+    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo)
     {
-        if (srcImage->getMSAA() != MSAA::eNone)
+        if (srcImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Source image must not be multisampled for blit operation!");
-        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+        if (dstImage && dstImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Destination image must not be multisampled for blit operation!");
 
         if (blitInfo.srcExtent == glm::ivec3(-1))
@@ -395,8 +442,8 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::Resolve(ResourceRef<gfx::Image> srcImage, gfx::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+    gfx::CommandBuffer & CommandBuffer::Resolve(ResourceRef<const gfx::Image> srcImage, gfx::Resolve resolveInfo) {
+        if (srcImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
@@ -430,10 +477,10 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::Resolve(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+    gfx::CommandBuffer & CommandBuffer::Resolve(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Resolve resolveInfo) {
+        if (srcImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
-        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+        if (dstImage && dstImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
@@ -467,7 +514,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::ClearBuffer(gfx::ResourceRef<gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::ClearBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
         CheckRecording();
         _commands.emplace_back([buffer, offset, size] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
@@ -481,7 +528,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::FillBuffer(gfx::ResourceRef<gfx::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::FillBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) {
         CheckRecording();
         _commands.emplace_back([buffer, data, offset, size] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
@@ -495,7 +542,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::CopyBuffer(ResourceRef<gfx::Buffer> srcBuffer, ResourceRef<gfx::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) {
+    gfx::CommandBuffer & CommandBuffer::CopyBuffer(ResourceRef<const gfx::Buffer> srcBuffer, ResourceRef<const gfx::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) {
         CheckRecording();
         _commands.emplace_back([srcBuffer, dstBuffer, size, srcOffset, dstOffset] () {
             const auto& oglSrcBuffer = dynamic_cast<const ogl::Buffer&>(*srcBuffer);
@@ -521,7 +568,7 @@ namespace gfx::ogl
     }
 
     // TODO!
-    gfx::CommandBuffer & CommandBuffer::CopyBufferToImage(ResourceRef<gfx::Buffer> buffer, ResourceRef<gfx::Image> image, gfx::Copy copyInfo) {
+    gfx::CommandBuffer & CommandBuffer::CopyBufferToImage(ResourceRef<const gfx::Buffer> buffer, ResourceRef<const gfx::Image> image, gfx::Copy copyInfo) {
         CheckRecording();
         _commands.emplace_back([buffer, image, copyInfo] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
@@ -551,7 +598,7 @@ namespace gfx::ogl
     }
 
     // TODO!
-    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<gfx::Image> image, ResourceRef<gfx::Buffer> buffer, gfx::Copy copyInfo) {
+    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<const gfx::Image> image, ResourceRef<const gfx::Buffer> buffer, gfx::Copy copyInfo) {
         CheckRecording();
         _commands.emplace_back([image, buffer, copyInfo] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);

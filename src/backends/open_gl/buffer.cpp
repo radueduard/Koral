@@ -1,10 +1,15 @@
 //
 // Created by radue on 2/18/2026.
 //
+module;
 
-#include "buffer.h"
-#include <iostream>
 #include "ogl_err_handling.h"
+
+module ogl.buffer;
+import std;
+import gfx.log;
+
+
 
 namespace gfx::ogl
 {

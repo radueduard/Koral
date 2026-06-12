@@ -2,18 +2,13 @@
 // Created by eduard on 10.03.2026.
 //
 
-#include "graphicsPipeline.h"
+module;
 
 #include <ranges>
-
-#include "commandBuffer.h"
-#include "descriptorSetLayout.h"
-#include "device.h"
-#include "shader.h"
-#include "vulkanContext.h"
-#include "commandBuffer.h"
-#include "framebuffer.h"
 #include "vk_enum_conversions.h"
+
+module vk.graphicsPipeline;
+import vk.descriptorSetLayout;
 
 namespace gfx::vk
 {
@@ -23,20 +18,22 @@ namespace gfx::vk
 
         std::vector<::vk::Format> colorAttachmentFormats;
         for (const auto& format : _framebuffer->getColorAttachments()) {
-            colorAttachmentFormats.push_back(getVkFormat(format.get().getImage()->getFormat()));
+            colorAttachmentFormats.push_back(getVkFormat(format->getImage()->getFormat()));
         }
         auto pipelineRenderingCreateInfo = ::vk::PipelineRenderingCreateInfo()
             .setColorAttachmentFormats(colorAttachmentFormats);
-        if (_framebuffer->hasDepthStencilAttachment()) {
-            pipelineRenderingCreateInfo.setDepthAttachmentFormat(getVkFormat(_framebuffer->getDepthStencilAttachment().getImage()->getFormat()));
-            pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer->getDepthStencilAttachment().getImage()->getFormat()));
+        if (_framebuffer->hasDepthAttachment()) {
+            pipelineRenderingCreateInfo.setDepthAttachmentFormat(getVkFormat(_framebuffer->getDepthAttachment()->getImage()->getFormat()));
+        }
+        if (_framebuffer->hasStencilAttachment()) {
+            pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer->getStencilAttachment()->getImage()->getFormat()));
         }
 
         std::vector<::vk::DescriptorSetLayout> setLayouts;
         if (!_setLayouts.empty()) {
             setLayouts = { std::ranges::max(_setLayouts | std::views::keys) + 1, nullptr };
             for (const auto& [set, layout] : _setLayouts) {
-                setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.get());
+                setLayouts[set] = **dynamic_cast<const gfx::vk::DescriptorSetLayout*>(layout.get());
             }
         }
 
@@ -56,7 +53,7 @@ namespace gfx::vk
 
         std::vector<::vk::PipelineShaderStageCreateInfo> shaderStages = {};
         if (_vertexShader.has_value()) {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_vertexShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_vertexShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eVertex)
                                       .setModule(*shader)
@@ -65,12 +62,12 @@ namespace gfx::vk
         }
         if (_tessellationState.has_value())
         {
-            const auto& controlShader = dynamic_cast<const vk::Shader&>(_tessellationState->controlShader.get());
+            const auto& controlShader = dynamic_cast<const vk::Shader&>(*_tessellationState->controlShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTessellationControl)
                                       .setModule(*controlShader)
                                       .setPName("main"));
-            const auto& evalShader = dynamic_cast<const vk::Shader&>(_tessellationState->evalShader.get());
+            const auto& evalShader = dynamic_cast<const vk::Shader&>(*_tessellationState->evalShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTessellationEvaluation)
                                       .setModule(*evalShader)
@@ -78,7 +75,7 @@ namespace gfx::vk
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eTessellationControl | ::vk::ShaderStageFlagBits::eTessellationEvaluation;
         }
         if (_geometryShader.has_value()) {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_geometryShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_geometryShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eGeometry)
                                       .setModule(*shader)
@@ -87,7 +84,7 @@ namespace gfx::vk
         }
         if (_fragmentShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_fragmentShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_fragmentShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eFragment)
                                       .setModule(*shader)
@@ -96,7 +93,7 @@ namespace gfx::vk
         }
         if (_taskShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_taskShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_taskShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTaskEXT)
                                       .setModule(*shader)
@@ -105,7 +102,7 @@ namespace gfx::vk
         }
         if (_meshShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_meshShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_meshShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eMeshEXT)
                                       .setModule(*shader)

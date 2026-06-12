@@ -2,14 +2,15 @@
 // Created by radue on 2/20/2026.
 //
 
-#include "../backends/open_gl/sampler.h"
-#include "../backends/vulkan/sampler.h"
+module;
 
-#include <sampler.h>
-#include <context.h>
-#include <window.h>
-#include <framebuffer.h>
-#include <surface.h>
+#include <stdexcept>
+
+module gfx.sampler;
+import vk.sampler;
+import ogl.sampler;
+import gfx.context;
+import gfx.window;
 
 namespace gfx
 {

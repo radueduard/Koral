@@ -14,6 +14,7 @@
 #include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/GltfMaterial.h>
 
 namespace gfx {
     class AssimpImporter : public Importer {
@@ -232,9 +233,30 @@ namespace gfx {
             result.doubleSided = doubleSided != 0;
         }
 
-        float alphaCutoff;
-        if (material->Get(AI_MATKEY_OPACITY, alphaCutoff) == AI_SUCCESS) {
-            result.alphaCutoff = alphaCutoff;
+        // glTF alpha mode: "OPAQUE" → cutoff 1.0 (default, discard nothing)
+        //                  "MASK"   → use AI_MATKEY_GLTF_ALPHACUTOFF (default 0.5)
+        //                  "BLEND"  → cutoff 0.0 (no discard; blending handles transparency)
+        // The engine convention: alphaCutoff == 0.0 → blended draw bucket,
+        //                        0 < alphaCutoff < 1 → masked/two-faced bucket,
+        //                        alphaCutoff == 1.0 → fully opaque bucket.
+        aiString alphaMode;
+        if (material->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode) == AI_SUCCESS) {
+            std::string mode(alphaMode.C_Str());
+            if (mode == "BLEND") {
+                result.alphaCutoff = 0.0f;          // blended — never discard
+            } else if (mode == "MASK") {
+                float cutoff = 0.5f;
+                material->Get(AI_MATKEY_GLTF_ALPHACUTOFF, cutoff);
+                result.alphaCutoff = cutoff;        // masked — discard below threshold
+            } else {
+                result.alphaCutoff = 1.0f;          // OPAQUE — fully opaque bucket
+            }
+        } else {
+            // Non-glTF fallback: use AI_MATKEY_OPACITY (0=transparent … 1=opaque)
+            // Map opacity < 1 → blended (0.0 cutoff), opacity == 1 → opaque (1.0 cutoff)
+            float opacity = 1.0f;
+            material->Get(AI_MATKEY_OPACITY, opacity);
+            result.alphaCutoff = (opacity < 1.0f) ? 0.0f : 1.0f;
         }
 
         aiString texName;

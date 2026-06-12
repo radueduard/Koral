@@ -2,11 +2,14 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "sampler.h"
+module;
 
-#include "device.h"
-#include "vulkanContext.h"
 #include "vk_enum_conversions.h"
+
+module vk.sampler;
+import gfx.sampler;
+import vk.context;
+import vk.device;
 
 namespace gfx::vk
 {

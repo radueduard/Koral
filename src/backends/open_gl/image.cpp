@@ -2,28 +2,30 @@
 // Created by radue on 2/18/2026.
 //
 
-#include "image.h"
+module;
 
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <magic_enum/magic_enum.hpp>
-
-#include "buffer.h"
 #include "ogl_err_handling.h"
+#include <glm/glm.hpp>
+
+module ogl.image;
+import gfx.structs;
 
 namespace gfx::ogl
 {
-    GLenum GetTargetFromImageType(const gfx::Image::Type type, const gfx::MSAA msaa, const glm::u32 arrayLayers)
+    GLenum GetTargetFromImageType(const gfx::Image::Type type, const gfx::SampleCount sampleCount, const glm::u32 arrayLayers)
     {
         switch (type) {
         case gfx::Image::Type::e1D:
             return arrayLayers == 1 ? GL_TEXTURE_1D : GL_TEXTURE_1D_ARRAY;
         case gfx::Image::Type::e2D:
             if (arrayLayers == 1) {
-                return msaa == gfx::MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
+                return sampleCount == gfx::SampleCount::e1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
             } else {
-                return msaa == gfx::MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+                return sampleCount == gfx::SampleCount::e1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
             }
         case gfx::Image::Type::e3D:
             return GL_TEXTURE_3D;
@@ -34,7 +36,7 @@ namespace gfx::ogl
 
     Image::Image(const gfx::Image::Builder& createInfo) : gfx::Image(createInfo)
     {
-        if (createInfo.msaa != MSAA::eNone && createInfo.type != Type::e2D) {
+        if (createInfo.sampleCount != SampleCount::e1 && createInfo.type != Type::e2D) {
             std::cerr << "Error: Multisampled images are only supported for 2D images! Attempting to create a multisampled image with type " << magic_enum::enum_name(createInfo.type) << std::endl;
         }
 
@@ -55,8 +57,8 @@ namespace gfx::ogl
             break;
         case Type::e2D:
             target = createInfo.arrayLayers == 1
-                ? (createInfo.msaa == MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
-                : (createInfo.msaa == MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
+                ? (createInfo.sampleCount == SampleCount::e1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
+                : (createInfo.sampleCount == SampleCount::e1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
             break;
         case Type::e3D:
             target = GL_TEXTURE_3D;
@@ -83,16 +85,16 @@ namespace gfx::ogl
         } else if (createInfo.type == gfx::Image::Type::e1D && createInfo.arrayLayers > 1) {
             glTexStorage2D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.arrayLayers);
         } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers == 1) {
-            if (createInfo.msaa == gfx::MSAA::eNone) {
+            if (createInfo.sampleCount == SampleCount::e1) {
                 glTexStorage2D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y);
             } else {
-                glTexStorage2DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, GL_TRUE);
+                glTexStorage2DMultisample(target, static_cast<GLsizei>(createInfo.sampleCount), internalFormat, createInfo.extent.x, createInfo.extent.y, GL_TRUE);
             }
         } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers > 1) {
-            if (createInfo.msaa == gfx::MSAA::eNone) {
+            if (createInfo.sampleCount == SampleCount::e1) {
                 glTexStorage3D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers);
             } else {
-                glTexStorage3DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers, GL_TRUE);
+                glTexStorage3DMultisample(target, static_cast<GLsizei>(createInfo.sampleCount), internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers, GL_TRUE);
             }
         } else if (createInfo.type == gfx::Image::Type::e3D) {
             glTexStorage3D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.extent.z);
@@ -111,7 +113,7 @@ namespace gfx::ogl
     }
 
     void Image::Resize(const glm::uvec3 &extent) {
-        const GLenum target = GetTargetFromImageType(_type, _msaa, _arrayLayers);
+        const GLenum target = GetTargetFromImageType(_type, _sampleCount, _arrayLayers);
         glBindTexture(target, _id);
 
         const GLenum internalFormat = InternalFormatFromImageFormat(_format);
@@ -121,16 +123,16 @@ namespace gfx::ogl
         } else if (_type == Type::e1D && _arrayLayers > 1) {
             glTexStorage2D(target, _mipLevels, internalFormat, extent.x, _arrayLayers);
         } else if (_type == Type::e2D && _arrayLayers == 1) {
-            if (_msaa == MSAA::eNone) {
+            if (_sampleCount == SampleCount::e1) {
                 glTexStorage2D(target, _mipLevels, internalFormat, extent.x, extent.y);
             } else {
-                glTexStorage2DMultisample(target, static_cast<GLsizei>(_msaa), internalFormat, extent.x, extent.y, GL_TRUE);
+                glTexStorage2DMultisample(target, static_cast<GLsizei>(_sampleCount), internalFormat, extent.x, extent.y, GL_TRUE);
             }
         } else if (_type == Type::e2D && _arrayLayers > 1) {
-            if (_msaa == MSAA::eNone) {
+            if (_sampleCount == SampleCount::e1) {
                 glTexStorage3D(target, _mipLevels, internalFormat, extent.x, extent.y, _arrayLayers);
             } else {
-                glTexStorage3DMultisample(target, static_cast<GLsizei>(_msaa), internalFormat, extent.x, extent.y, _arrayLayers, GL_TRUE);
+                glTexStorage3DMultisample(target, static_cast<GLsizei>(_sampleCount), internalFormat, extent.x, extent.y, _arrayLayers, GL_TRUE);
             }
         } else if (_type == Type::e3D) {
             glTexStorage3D(target, _mipLevels, internalFormat, extent.x, extent.y, extent.z);

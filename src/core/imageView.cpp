@@ -2,19 +2,19 @@
 // Created by radue on 2/20/2026.
 //
 
+module;
 
-#include "../backends/open_gl/imageView.h"
-#include "../backends/vulkan/imageView.h"
+#include <stdexcept>
 
-#include <imageView.h>
-#include <context.h>
-#include <window.h>
-#include <framebuffer.h>
-#include <surface.h>
+module gfx.imageView;
+import vk.imageView;
+import ogl.imageView;
+import gfx.image;
+import gfx.context;
 
 namespace gfx
 {
-    ImageView::Builder::Builder(gfx::ResourceRef<Image> image) : image(image) {
+    ImageView::Builder::Builder(gfx::ResourceRef<const Image> image) : image(image) {
         arrayLayerCount = image->getArrayLayers();
         mipLevelCount = image->getMipLevels();
     }

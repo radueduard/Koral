@@ -2,20 +2,18 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "swapChain.h"
+module;
 
-#include <framebuffer.h>
 #include <ranges>
 #include <iostream>
-
-#include "context.h"
-#include "image.h"
-#include "runtime.h"
-#include "scheduler.h"
-#include "surface.h"
-#include "vulkanContext.h"
 #include "vk_enum_conversions.h"
-#include "window.h"
+
+module vk.swapChain;
+import gfx.context;
+import vk.scheduler;
+import gfx.context;
+import vk.context;
+
 
 namespace gfx::vk
 {
@@ -53,8 +51,8 @@ namespace gfx::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
-        _extent(1, 1),
-        _msaa(createInfo.msaa),
+        _extent(gfx::Context::Window().getExtent()),
+        _sampleCount(createInfo.sampleCount),
         _minImageCount(createInfo.minImageCount),
         _imageCount(createInfo.imageCount),
         _surface(createInfo.surface),
@@ -112,15 +110,15 @@ namespace gfx::vk
         }
 
         const auto swapChainImageHandles = Context::Device()->getSwapchainImagesKHR(_handle);
-        _swapChainImages = Resource<gfx::Image>(std::make_unique<gfx::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa));
+        _swapChainImages = Resource<gfx::Image>(std::make_unique<gfx::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _sampleCount));
 
         _depthImages = Image::Builder()
             .setIsPerFrame(true)
             .setExtent(_extent)
-            .setFormat(gfx::Image::Format::eD32_SFLOAT_S8_UINT)
+            .setFormat(gfx::Image::Format::eD32_SFLOAT)
             .setType(gfx::Image::Type::e2D)
             .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
-            .setMSAA(_msaa)
+            .setSampleCount(_sampleCount)
             .build();
 
         _swapChainImageViews = gfx::ImageView::Builder(_swapChainImages)

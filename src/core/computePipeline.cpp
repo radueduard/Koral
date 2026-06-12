@@ -1,20 +1,20 @@
 //
 // Created by radue on 2/21/2026.
 //
-#include <computePipeline.h>
-#include <descriptorSetLayout.h>
-#include <framebuffer.h>
-#include <surface.h>
 
-#include "../backends/open_gl/computePipeline.h"
-#include "../backends/vulkan/computePipeline.h"
+module;
 
-#include "shader.h"
-#include "../../include/window.h"
+#include <stdexcept>
+
+module gfx.computePipeline;
+import ogl.computePipeline;
+import vk.computePipeline;
+import gfx.context;
+import gfx.descriptorSetLayout;
 
 namespace gfx
 {
-    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(const Shader& computeShader)
+    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(gfx::ResourceRef<const Shader> computeShader)
     {
         this->computeShader = computeShader;
         return *this;
@@ -53,7 +53,7 @@ namespace gfx
 
     ComputePipeline::ComputePipeline(const Builder& createInfo) : _shader(createInfo.computeShader)
     {
-        auto memoryLayout = _shader->get().getMemoryLayout();
+        auto memoryLayout = _shader.value()->getMemoryLayout();
         for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
         {
             auto builder = DescriptorSetLayout::Builder();

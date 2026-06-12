@@ -2,17 +2,12 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "buffer.h"
+module;
 
 #include <unordered_set>
-
-#include "commandBuffer.h"
-#include "device.h"
-#include <scheduler.h>
-
-#include "context.h"
 #include "vk_enum_conversions.h"
-#include "vulkanContext.h"
+
+module vk.buffer;
 
 namespace gfx::vk
 {
@@ -116,7 +111,7 @@ namespace gfx::vk
 	}
 
 	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
-	void Buffer::automaticUpdate() const {
+	void Buffer::automaticUpdate() {
 		const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
@@ -130,7 +125,14 @@ namespace gfx::vk
 						.setDstOffset(offset)
 						.setSize(size)
 				);
-				framesToWrite.erase(currentFrame);
+				PendingWrite write{
+					.srcFrameIndex = srcFrameIndex,
+					.offset = offset,
+					.byteSize = size,
+					.buffersLeftToUpdate = framesToWrite
+				};
+				write.buffersLeftToUpdate.erase(currentFrame);
+				_pendingWrites.insert(write);
 			}
 		}
 		if (copyRegionsPerBuffer.empty()) {
@@ -144,10 +146,10 @@ namespace gfx::vk
 			}
 		}, ::vk::QueueFlagBits::eTransfer);
 
-		std::erase_if(_pendingWrites, [](const struct PendingWrite& write) { return write.buffersLeftToUpdate.empty(); });
+		std::erase_if(_pendingWrites, [](const PendingWrite& write) { return write.buffersLeftToUpdate.empty(); });
 	}
 
 	VmaAllocation Buffer::getAllocation() const {
-		return  _allocations[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
+		return _allocations[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
 }

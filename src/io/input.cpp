@@ -2,18 +2,16 @@
 // Created by radue on 10/22/2024.
 //
 
-#include "input.h"
+module;
 
 #include <GLFW/glfw3.h>
 #include <glm/fwd.hpp>
 #include <glm/vec2.hpp>
 #include <magic_enum/magic_enum.hpp>
 
-#include "context.h"
-#include "window.h"
-#include "framebuffer.h"
-#include "surface.h"
-
+module gfx.input;
+import gfx.window;
+import gfx.context;
 
 namespace gfx::io {
 	void Input::State::setup()

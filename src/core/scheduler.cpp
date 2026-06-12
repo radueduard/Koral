@@ -2,14 +2,15 @@
 // Created by eduard on 11.03.2026.
 //
 
-#include <scheduler.h>
-#include <commandBuffer.h>
-#include <window.h>
-#include <framebuffer.h>
-#include <surface.h>
+module;
 
-#include "../backends/open_gl/scheduler.h"
-#include "../backends/vulkan/scheduler.h"
+#include <stdexcept>
+
+module gfx.scheduler;
+import ogl.scheduler;
+import vk.scheduler;
+import gfx.context;
+
 
 namespace gfx
 {
@@ -33,6 +34,5 @@ namespace gfx
     Scheduler::Scheduler(const Builder& createInfo) :
         _minImageCount(createInfo.minImageCount),
         _imageCount(createInfo.imageCount) {}
-
 
 }

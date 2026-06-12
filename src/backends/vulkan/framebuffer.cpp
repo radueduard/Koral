@@ -2,12 +2,13 @@
 // Created by radue on 2/28/2026.
 //
 
-#include "framebuffer.h"
+module;
 
-#include "scheduler.h"
-#include <window.h>
-#include <framebuffer.h>
-#include <surface.h>
+#include <glm/glm.hpp>
+
+module vk.framebuffer;
+import gfx.context;
+import vk.scheduler;
 
 namespace gfx::vk
 {
@@ -31,10 +32,9 @@ namespace gfx::vk
         auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
 
         _colorAttachments.emplace_back(colorAttachment);
-        _depthStencilAttachment = depthStencilAttachment;
-        _clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 0.0 );
+        _depthAttachment = depthStencilAttachment;
+        _clearValues.clearColor.emplace_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
         _clearValues.clearDepth = 1.0f;
-        _clearValues.clearStencil = 0;
     }
 
     Framebuffer::Framebuffer(const Framebuffer::Builder& builder) : gfx::Framebuffer(builder) {}
@@ -53,7 +53,8 @@ namespace gfx::vk
             _extent = newExtent;
             _colorAttachments.clear();
             _colorAttachments.emplace_back(colorAttachment);
-            _depthStencilAttachment = depthStencilAttachment;
+            _depthAttachment = depthStencilAttachment;
+            _stencilAttachment = depthStencilAttachment;
         }
     }
 }

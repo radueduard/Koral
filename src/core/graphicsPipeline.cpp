@@ -2,53 +2,43 @@
 // Created by radue on 2/22/2026.
 //
 
-#include <graphicsPipeline.h>
-#include <descriptorSetLayout.h>
-#include <framebuffer.h>
-#include <surface.h>
-#include <window.h>
 
-#include "../backends/open_gl/graphicsPipeline.h"
-#include "../backends/vulkan/graphicsPipeline.h"
+module;
 
-#include "context.h"
-#include "meshLayout.h"
-#include "shader.h"
+#include <stdexcept>
+
+module gfx.graphicsPipeline;
+import vk.graphicsPipeline;
+import ogl.graphicsPipeline;
+import gfx.context;
 
 namespace gfx
 {
-    GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(const Shader &shader) {
-        this->vertexShader = std::cref(shader);
-        this->vertexAttributeDescriptions = DefaultMeshRegistry::Attributes();
-        this->vertexBindingDescriptions = DefaultMeshRegistry::Bindings();
-        return *this;
-    }
-
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTessellationState(const TessellationState& tessellationState)
     {
         this->tessellationState = tessellationState;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(const Shader& geometryShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(gfx::ResourceRef<const Shader> geometryShader)
     {
         this->geometryShader = std::cref(geometryShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(const Shader& fragmentShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(gfx::ResourceRef<const Shader> fragmentShader)
     {
         this->fragmentShader = std::cref(fragmentShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(const Shader& taskShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(gfx::ResourceRef<const Shader> taskShader)
     {
         this->taskShader = std::cref(taskShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(const Shader& meshShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(gfx::ResourceRef<const Shader> meshShader)
     {
         this->meshShader = std::cref(meshShader);
         return *this;
@@ -84,7 +74,7 @@ namespace gfx
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(gfx::ResourceRef<gfx::Framebuffer> framebuffer)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(gfx::ResourceRef<const gfx::Framebuffer> framebuffer)
     {
         this->framebuffer = framebuffer;
         return *this;
@@ -149,8 +139,8 @@ namespace gfx
             throw std::runtime_error("Task shader cannot be set if there is no mesh shader!");
         }
 
-        std::vector<std::reference_wrapper<const Shader>> shaders;
-        if (_vertexShader.has_value()) shaders.push_back(*_vertexShader);
+        std::vector<gfx::ResourceRef<const Shader>> shaders;
+        if (_vertexShader.has_value()) shaders.push_back(_vertexShader.value());
         if (_tessellationState.has_value()) {
             shaders.push_back(_tessellationState->controlShader);
             shaders.push_back(_tessellationState->evalShader);
@@ -162,7 +152,7 @@ namespace gfx
 
         std::vector<Shader::MemoryLayout> memoryLayouts = {};
         for (const auto& shader : shaders) {
-            memoryLayouts.push_back(shader.get().getMemoryLayout());
+            memoryLayouts.push_back(shader->getMemoryLayout());
         }
 
         // check for set layout compatibility between shaders and create set layouts

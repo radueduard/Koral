@@ -1,0 +1,133 @@
+# Builds the Gfx Reloaded SDK (framework + Gfx_Runtime + Hub) on Windows/Linux/macOS and produces
+# a native installer per platform via CPack. Runs on a version tag (vX.Y.Z) or manual dispatch.
+#
+# The packaging super-build lives here (GFX_RELOADED); the Hub is checked out from its own repo
+# and folded in via -DGFX_BUILD_HUB. Public deps (glm/imgui/spdlog) + the Hub's nlohmann-json come
+# from vcpkg at the pinned builtin-baseline; the framework's private deps are bundled next to the
+# runtime (GFX_BUNDLE_RUNTIME_DEPS=ON). The package registers itself in the user CMake registry via
+# each generator's post-install step, so GFX_REGISTER_PACKAGE is OFF (no packaging-machine writes).
+name: release
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create a Release on tag
+
+env:
+  # Route vcpkg's binary cache through the GitHub Actions cache so the heavy ports
+  # (assimp/openimageio/vulkan/glslang/...) aren't rebuilt every run.
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  package:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            os: windows-latest
+            generators: "NSIS;ZIP"
+          - name: linux
+            os: ubuntu-latest
+            generators: "DEB;TGZ"
+          - name: macos
+            os: macos-latest
+            generators: "DragNDrop;TGZ"
+
+    steps:
+      - name: Checkout framework (GFX_RELOADED)
+        uses: actions/checkout@v4
+
+      - name: Checkout Hub
+        uses: actions/checkout@v4
+        with:
+          repository: radueduard/Hub
+          path: hub
+
+      # --- Toolchain / platform prerequisites -------------------------------------------------
+      - name: Setup MSVC (Windows)
+        if: matrix.name == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install NSIS (Windows)
+        if: matrix.name == 'windows'
+        run: choco install nsis -y --no-progress
+
+      - name: Install Linux build + GUI dev packages
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update
+          # ninja + the X11/Wayland/GL headers glfw and friends need to build from vcpkg,
+          # plus dpkg-dev for the DEB generator and autotools/nasm some ports require.
+          sudo apt-get install -y \
+            ninja-build pkg-config dpkg-dev autoconf automake libtool nasm \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev \
+            libwayland-dev libxkbcommon-dev wayland-protocols libgl1-mesa-dev libltdl-dev
+
+      - name: Install Ninja (Windows/macOS)
+        if: matrix.name != 'linux'
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      # The framework's find_package(Vulkan) + vcpkg's vulkan port need a Vulkan SDK present.
+      # This is the most likely step to need version tuning per runner image.
+      - name: Install Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          install_runtime: true
+          cache: true
+
+      # Expose the GitHub Actions cache endpoints to vcpkg (for VCPKG_BINARY_SOURCES=x-gha).
+      - name: Enable vcpkg GHA binary cache
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      # --- Configure / build / package --------------------------------------------------------
+      - name: Configure (super-build with Hub)
+        run: >
+          cmake -B build -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_MANIFEST_FEATURES=hub
+          -DGFX_BUILD_HUB=ON
+          -DGFX_HUB_SOURCE_DIR=${{ github.workspace }}/hub
+          -DGFX_BUNDLE_RUNTIME_DEPS=ON
+          -DGFX_REGISTER_PACKAGE=OFF
+        shell: bash
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package
+        run: cpack -G "${{ matrix.generators }}" -C Release
+        working-directory: build
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: gfx-reloaded-${{ matrix.name }}
+          path: |
+            build/GfxReloaded-*.exe
+            build/GfxReloaded-*.zip
+            build/GfxReloaded-*.deb
+            build/GfxReloaded-*.tar.gz
+            build/GfxReloaded-*.dmg
+          if-no-files-found: error
+
+      - name: Attach to release (tag builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/GfxReloaded-*.exe
+            build/GfxReloaded-*.zip
+            build/GfxReloaded-*.deb
+            build/GfxReloaded-*.tar.gz
+            build/GfxReloaded-*.dmg

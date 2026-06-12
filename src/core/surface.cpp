@@ -2,14 +2,15 @@
 // Created by Eduard Andrei Radu on 14.03.2026.
 //
 
-#include <surface.h>
-#include <window.h>
-#include "framebuffer.h"
-#include "surface.h"
+module;
 
-#include "../backends/vulkan/surface.h"
 #include <memory>
+#include <stdexcept>
 
+module gfx.surface;
+import vk.surface;
+import gfx.context;
+import gfx.window;
 
 namespace gfx {
     std::unique_ptr<gfx::Surface> Surface::Create(const gfx::io::Window& window) {
