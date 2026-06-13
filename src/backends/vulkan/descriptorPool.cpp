@@ -4,13 +4,18 @@
 
 module;
 
-#include <ranges>
 #include <glm/fwd.hpp>
+#include <vulkan/vulkan.hpp>
 
-#include "vulkanContext.h"
-#include "vk_enum_conversions.h"
+module gfx;
+import :vk_descriptorPool;
+import :vk_context;
+import :vk_device;
+import :vk_descriptorSetLayout;
+import :vk_enum_conversions;
 
-module vk.descriptorPool;
+
+import std;
 
 namespace gfx::vk
 {

@@ -4,21 +4,22 @@
 
 module;
 
-#include <memory>
-#include <vector>
-#include <glm/fwd.hpp>
-#include "vk_enum_conversions.h"
 #include "vk_wrapper.h"
+#include <vulkan/vulkan.hpp>
+#include <glm/glm.hpp>
 
-export module vk.swapChain;
-import gfx.structs;
-import gfx.resource;
-import gfx.image;
-import gfx.imageView;
+export module gfx:vk_swapChain;
+import :vk_types;
+
+import :window;
+import :image;
+import :imageView;
+import resource;
+import :vk_enum_conversions;
 
 namespace gfx::vk
 {
-    export class SwapChain final : public gfx::vk::Wrapper<::vk::SwapchainKHR>
+    export class SwapChain final : public Wrapper<::vk::SwapchainKHR>
     {
     public:
         struct Builder {
@@ -44,10 +45,10 @@ namespace gfx::vk
         [[nodiscard]] ::vk::SampleCountFlagBits getMSAA() const { return getVkSampleCount(_sampleCount); }
 
         [[nodiscard]] ResourceRef<const gfx::Image> getImage() const { return _swapChainImages; }
-        [[nodiscard]] gfx::ResourceRef<const gfx::Image> getDepthImage() const { return _depthImages; }
+        [[nodiscard]] ResourceRef<const gfx::Image> getDepthImage() const { return _depthImages; }
 
-        [[nodiscard]] gfx::ResourceRef<const gfx::ImageView> getSwapChainImageViews() const { return _swapChainImageViews; }
-        [[nodiscard]] gfx::ResourceRef<const gfx::ImageView> getDepthImageViews() const { return _depthImageViews; }
+        [[nodiscard]] ResourceRef<const gfx::ImageView> getSwapChainImageViews() const { return _swapChainImageViews; }
+        [[nodiscard]] ResourceRef<const gfx::ImageView> getDepthImageViews() const { return _depthImageViews; }
 
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
         [[nodiscard]] glm::u32 getCurrentImageIndex() const { return _imageIndex; }
@@ -70,12 +71,12 @@ namespace gfx::vk
         ::vk::PresentModeKHR _presentMode = {};
 
         const gfx::vk::Queue& _presentQueue;
-        gfx::Resource<gfx::Image> _swapChainImages;
-        gfx::Resource<gfx::Image> _depthImages;
+        Resource<gfx::Image> _swapChainImages;
+        Resource<gfx::Image> _depthImages;
         std::vector<::vk::Semaphore> _renderFinishedSemaphores;
 
-        gfx::Resource<gfx::ImageView> _swapChainImageViews;
-        gfx::Resource<gfx::ImageView> _depthImageViews;
+        Resource<gfx::ImageView> _swapChainImageViews;
+        Resource<gfx::ImageView> _depthImageViews;
 
         void CreateSwapChain();
 

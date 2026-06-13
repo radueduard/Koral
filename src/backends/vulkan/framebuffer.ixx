@@ -6,8 +6,10 @@ module;
 
 #include <glm/glm.hpp>
 
-export module vk.framebuffer;
-import gfx.framebuffer;
+export module gfx:vk_framebuffer;
+import :vk_types;
+
+import :framebuffer;
 
 namespace gfx::vk
 {
@@ -17,7 +19,7 @@ namespace gfx::vk
         void Unbind() const override;
 
         Framebuffer();
-        explicit Framebuffer(const Framebuffer::Builder& builder);
+        explicit Framebuffer(const Builder& builder);
 
         ~Framebuffer() override;
         void Resize(const glm::uvec2& newExtent) const override;

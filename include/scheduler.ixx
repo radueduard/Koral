@@ -6,29 +6,34 @@ module;
 
 #include <glm/fwd.hpp>
 
-export module gfx.scheduler;
+export module gfx:scheduler;
+import :types;
+import :commandBuffer;
+
 import std;
-import gfx.commandBuffer;
 
 namespace gfx
 {
-    export class Frame
+    struct FrameCommandBuffer;  // PIMPL — defined in scheduler.cpp to avoid GCC serializer bug
+
+    class Frame
     {
     public:
         explicit Frame(glm::u32 imageIndex);
-        virtual ~Frame() = default;
+        virtual ~Frame();  // user-declared so unique_ptr<FrameCommandBuffer> destructor fires in .cpp
 
         Frame(const Frame&) = delete;
         Frame& operator=(const Frame&) = delete;
 
 		[[nodiscard]] glm::u32 getImageIndex() const { return _imageIndex; }
-		[[nodiscard]] gfx::CommandBuffer& getCommandBuffer() const { return *_commandBuffer; }
+		[[nodiscard]] gfx::CommandBuffer& getCommandBuffer() const;
     protected:
         glm::u32 _imageIndex;
-		std::unique_ptr<gfx::CommandBuffer> _commandBuffer;
+		std::unique_ptr<FrameCommandBuffer> _commandBuffer;
+        void setCommandBuffer(std::unique_ptr<gfx::CommandBuffer> cmd);
     };
 
-    export class Scheduler
+    class Scheduler
     {
     public:
         struct Builder {

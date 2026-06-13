@@ -7,7 +7,8 @@ module;
 #include "vk_wrapper.h"
 #include <vulkan/vulkan.hpp>
 
-export module vk.physicalDevice;
+export module gfx:vk_physicalDevice;
+import :vk_types;
 
 namespace gfx::vk
 {

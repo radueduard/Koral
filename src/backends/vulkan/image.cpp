@@ -4,18 +4,20 @@
 
 module;
 
-#include <magic_enum/magic_enum.hpp>
-#include "vk_enum_conversions.h"
 #include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
-#include <vma/vk_mem_alloc.h>
+#include <vk_mem_alloc.h>
 
-module vk.image;
-import vk.context;
-import vk.runtime;
-import vk.commandBuffer;
-import gfx.context;
-import gfx.structs;
+module gfx;
+import :vk_image;
+import :vk_context;
+import :vk_runtime;
+import :vk_device;
+import :vk_commandBuffer;
+import :vk_allocator;
+import :vk_enum_conversions;
+
+import :image;
 
 namespace gfx::vk
 {
@@ -54,7 +56,7 @@ namespace gfx::vk
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(imageCreateFlags);
 
-        const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+        const auto frameCount = _isPerFrame ? gfx::Context::GetScheduler().getImageCount() : 1;
         for (uint32_t i = 0; i < frameCount; i++)
         {
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
@@ -102,26 +104,26 @@ namespace gfx::vk
 
     ::vk::ImageLayout Image::getImageLayout(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _layouts[key];
     }
 
     ::vk::AccessFlags Image::getAccessMask(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _accessMasks[key];
     }
 
     void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
             _layouts[key] = newLayout;
         }
     }
 
     void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         if (const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _accessMasks[key] != newAccessMask) {
             _accessMasks[key] = newAccessMask;
         }
@@ -142,13 +144,13 @@ namespace gfx::vk
 
     ::vk::Image Image::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         return _images[currentFrame];
     }
 
     VmaAllocation Image::getAllocation() const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         return _allocations[currentFrame];
     }
 
@@ -215,7 +217,7 @@ namespace gfx::vk
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(_arrayLayers == 6 ? ::vk::ImageCreateFlagBits::eCubeCompatible : ::vk::ImageCreateFlags());
 
-        const auto frameIndex = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto frameIndex = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
         _images[frameIndex] = image;
         _allocations[frameIndex] = allocation;

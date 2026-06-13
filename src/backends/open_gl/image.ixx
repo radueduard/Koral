@@ -6,9 +6,10 @@ module;
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
-export module ogl.image;
+export module gfx:ogl_image;
+import :ogl_types;
 
-import gfx.image;
+import :image;
 
 namespace gfx::ogl {
     export class Image : public gfx::Image {

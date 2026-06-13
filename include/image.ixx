@@ -7,17 +7,15 @@ module;
 #include <glm/glm.hpp>
 #include "api.h"
 
-export module gfx.image;
-import gfx.structs;
-import gfx.flags;
-import gfx.resource;
+export module gfx:image;
+import :types;
 
+import flags;
+import resource;
 
 namespace gfx
 {
-    class Buffer;
-
-    export class GFX_API Image
+    class GFX_API Image
     {
     public:
         enum class Type

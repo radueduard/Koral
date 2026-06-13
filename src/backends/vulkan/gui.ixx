@@ -8,33 +8,31 @@ module;
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_core.h>
 
-export module vk.gui;
+export module gfx:vk_gui;
+import :vk_types;
+import :vk_descriptorPool;
 
-import gfx.resource;
-import gfx.sampler;
-import gfx.gui;
-import gfx.image;
-import gfx.imageView;
-import gfx.commandBuffer;
-import vk.descriptorPool;
+import resource;
+import :gui;
+import :commandBuffer;
 
 namespace gfx::vk
 {
-    export class GFX_API GUI_Image final : public gfx::GUI_Image
+    class GUI_Image final : public gfx::GUI_Image
     {
     public:
-        explicit GUI_Image(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level);
+        explicit GUI_Image(ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level);
         ~GUI_Image() override;
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(gfx::ResourceRef<const gfx::Image> image) override;
+        void setImage(ResourceRef<const gfx::Image> image) override;
 
         ImTextureID operator*() const override;
 
     private:
-        gfx::ResourceRef<const gfx::Image> _image;
+        ResourceRef<const gfx::Image> _image;
         Resource<gfx::Image> _helperImage;
-        gfx::Resource<gfx::ImageView> _helperImageView;
-        gfx::Resource<gfx::Sampler> _helperSampler;
+        Resource<gfx::ImageView> _helperImageView;
+        Resource<gfx::Sampler> _helperSampler;
 
         std::vector<VkDescriptorSet> _descriptorSets;
     };

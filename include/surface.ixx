@@ -6,17 +6,16 @@ module;
 
 #include "api.h"
 
-export module gfx.surface;
+export module gfx:surface;
+import :types;
 
 import std;
-import gfx.window;
 
 namespace gfx {
-    export class GFX_API Surface {
+    class GFX_API Surface {
     public:
-        explicit Surface(const gfx::io::Window& window) {}
+        explicit Surface(const Window& window) {}
         virtual ~Surface() = default;
-        static std::unique_ptr<gfx::Surface> Create(const gfx::io::Window &window);
-    protected:
+        static std::unique_ptr<Surface> Create(const Window &window);
     };
 }

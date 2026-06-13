@@ -4,34 +4,39 @@
 
 module;
 
-#include <ranges>
-#include <iostream>
 #include <vulkan/vulkan.hpp>
-#include "vulkanContext.h"
 
-module vk.descriptorSet;
-import gfx.context;
-import gfx.descriptorBinding;
-import gfx.descriptorSetLayout;
-import gfx.structs;
-import vk.buffer;
-import vk.sampler;
-import vk.imageView;
+module gfx;
+import :vk_descriptorSet;
+import :vk_buffer;
+import :vk_imageView;
+import :vk_sampler;
+import :vk_context;
+import :vk_device;
+import :vk_descriptorPool;
+import :vk_descriptorSetLayout;
+
+import std;
+import :descriptorSet;
+import :descriptorSetLayout;
+import :buffer;
+import :imageView;
+import :sampler;
 
 namespace gfx::vk
 {
     DescriptorSet::DescriptorSet(const Builder& builder) : gfx::DescriptorSet(builder)
     {
-        const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+        const auto frameCount = _isPerFrame ? gfx::Context::GetScheduler().getImageCount() : 1;
         for (size_t i = 0; i < frameCount; ++i) {
-            _descriptorSets.emplace_back(Context::DescriptorPool().Allocate(dynamic_cast<const DescriptorSetLayout&>(_layout)));
+            _descriptorSets.emplace_back(Context::DescriptorPool().Allocate(dynamic_cast<const DescriptorSetLayout&>(*_layout)));
         }
         std::vector<::vk::WriteDescriptorSet> writes;
         std::vector<::vk::DescriptorBufferInfo> bufferInfos;
         std::vector<::vk::DescriptorImageInfo> imageInfos;
 
         size_t totalDescriptors = 0;
-        for (const auto& descriptors : _writes | std::views::values) {
+        for (const auto& descriptors : getWrites() | std::views::values) {
             totalDescriptors += descriptors.size();
         }
 
@@ -41,9 +46,9 @@ namespace gfx::vk
             bufferInfos.reserve(totalDescriptors);
             imageInfos.reserve(totalDescriptors);
 
-            for (const auto& [binding, descriptors] : _writes)
+            for (const auto& [binding, descriptors] : getWrites())
             {
-                const auto type = _layout.getBindingType(binding);
+                const auto type = _layout->getBindingType(binding);
                 for (size_t i = 0; i < descriptors.size(); ++i)
                 {
                     const auto& descriptor = descriptors[i];
@@ -161,11 +166,11 @@ namespace gfx::vk
         }
     }
 
-    void DescriptorSet::Write(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index)
+    void DescriptorSet::Write(const glm::u32 binding, const gfx::Descriptor &descriptor, const glm::u32 index)
     {
-        const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+        const auto frameCount = _isPerFrame ? gfx::Context::GetScheduler().getImageCount() : 1;
         for (int frame = 0; frame < frameCount; ++frame) {
-            const auto type = _layout.getBindingType(binding);
+            const auto type = _layout->getBindingType(binding);
             std::vector<::vk::WriteDescriptorSet> writes;
             std::vector<::vk::DescriptorBufferInfo> bufferInfos;
             std::vector<::vk::DescriptorImageInfo> imageInfos;
@@ -270,13 +275,13 @@ namespace gfx::vk
 
     void DescriptorSet::DebugPrint() const {
         gfx::DescriptorSet::DebugPrint();
-        const auto frame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto frame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         std::cout << "Current Vulkan descriptor set handle: " << _descriptorSets[frame] << std::endl;
     }
 
     ::vk::DescriptorSet DescriptorSet::operator*() const
     {
-        const auto frameIndex = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto frameIndex = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         return _descriptorSets[frameIndex];
     }
 }

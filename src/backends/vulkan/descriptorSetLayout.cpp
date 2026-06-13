@@ -4,10 +4,15 @@
 
 module;
 
-#include "vk_enum_conversions.h"
+#include <vulkan/vulkan.hpp>
 
-module vk.descriptorSetLayout;
-import gfx.descriptorSetLayout;
+module gfx;
+import :vk_descriptorSetLayout;
+import :vk_context;
+import :vk_device;
+import :vk_enum_conversions;
+
+import :descriptorSetLayout;
 
 namespace gfx::vk
 {

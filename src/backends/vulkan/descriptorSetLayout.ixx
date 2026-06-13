@@ -7,12 +7,14 @@ module;
 #include "vk_wrapper.h"
 #include <vulkan/vulkan.hpp>
 
-export module vk.descriptorSetLayout;
-import gfx.descriptorSetLayout;
+export module gfx:vk_descriptorSetLayout;
+import :vk_types;
+
+import :descriptorSetLayout;
 
 namespace gfx::vk
 {
-    export class DescriptorSetLayout final : public gfx::DescriptorSetLayout, public Wrapper<::vk::DescriptorSetLayout>
+    class DescriptorSetLayout final : public gfx::DescriptorSetLayout, public Wrapper<::vk::DescriptorSetLayout>
     {
     public:
         explicit DescriptorSetLayout(const Builder& builder);

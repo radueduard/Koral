@@ -7,16 +7,16 @@ module;
 #include <glm/fwd.hpp>
 #include "api.h"
 
-export module gfx.shader;
+export module gfx:shader;
+import :types;
 
 import std;
-import gfx.structs;
-import gfx.flags;
-import gfx.resource;
+import flags;
+import resource;
 
 namespace gfx
 {
-    export class GFX_API Shader {
+    class GFX_API Shader {
     public:
         enum class Stage {
             // VTG Graphics Pipeline

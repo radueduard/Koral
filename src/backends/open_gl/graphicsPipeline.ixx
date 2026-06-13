@@ -9,10 +9,10 @@ module;
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
-export module ogl.graphicsPipeline;
-import gfx.structs;
-import gfx.graphicsPipeline;
-import gfx.commandBuffer;
+export module gfx:ogl_graphicsPipeline;
+import :ogl_types;
+
+import :graphicsPipeline;
 
 
 namespace gfx::ogl
@@ -31,7 +31,7 @@ namespace gfx::ogl
         }
     }
 
-    export class GraphicsPipeline final : public gfx::GraphicsPipeline
+    class GraphicsPipeline final : public gfx::GraphicsPipeline
     {
     public:
         explicit GraphicsPipeline(const Builder& createInfo);

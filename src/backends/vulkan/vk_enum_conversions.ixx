@@ -2,24 +2,24 @@
 // Created by radue on 2/28/2026.
 //
 
-#pragma once
-
-#include <variant>
+module;
 
 #include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
 
-import gfx.structs;
-import gfx.image;
-import gfx.flags;
-import gfx.shader;
-import gfx.imageView;
-import gfx.buffer;
-import gfx.sampler;
-import gfx.framebuffer;
+export module gfx:vk_enum_conversions;
 
+import :types;
+import :image;
+import :imageView;
+import :buffer;
+import :sampler;
+import :shader;
+import :framebuffer;
+import flags;
+import std;
 
-namespace gfx
+export  namespace gfx
 {
     inline ::vk::AttachmentLoadOp getVkLoadOp(const LoadOperation loadOperation) {
         switch (loadOperation)
@@ -540,7 +540,7 @@ namespace gfx
         return usageFlags;
     }
 
-    inline ::vk::BufferUsageFlags getVkBufferUsageFlags(const gfx::Flags<Buffer::Usage> usage)
+    inline ::vk::BufferUsageFlags getVkBufferUsageFlags(const Flags<Buffer::Usage> usage)
     {
         auto vkUsage = ::vk::BufferUsageFlags();
         if (usage & Buffer::Usage::eVertex)

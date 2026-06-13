@@ -4,10 +4,18 @@
 
 module;
 
-#include <unordered_set>
-#include "vk_enum_conversions.h"
+#include <vk_mem_alloc.h>
+#include <vulkan/vulkan.hpp>
 
-module vk.buffer;
+module gfx;
+import :vk_buffer;
+import :vk_context;
+import :vk_device;
+import :vk_commandBuffer;
+import :vk_allocator;
+import :vk_enum_conversions;
+
+import std;
 
 namespace gfx::vk
 {
@@ -45,7 +53,7 @@ namespace gfx::vk
 			.setSharingMode(::vk::SharingMode::eExclusive);
 
 
-		const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+		const auto frameCount = _isPerFrame ? gfx::Context::GetScheduler().getImageCount() : 1;
 		for (int i = 0; i < frameCount; ++i)
 		{
 			auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
@@ -90,16 +98,16 @@ namespace gfx::vk
 
 	::vk::Buffer Buffer::operator*() const
 	{
-		return _buffers[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
+		return _buffers[_isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0];
 	}
 
 	::vk::AccessFlags Buffer::getAccessMask() const {
-		const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
 		return _accessFlags[currentFrame];
 	}
 
 	void Buffer::setAccessMask(const ::vk::AccessFlags access) const {
-		const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
 		_accessFlags[currentFrame] = access;
 	}
 
@@ -112,7 +120,7 @@ namespace gfx::vk
 
 	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
 	void Buffer::automaticUpdate() {
-		const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
+		const auto currentFrame = gfx::Context::GetScheduler().getCurrentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
 
@@ -150,6 +158,6 @@ namespace gfx::vk
 	}
 
 	VmaAllocation Buffer::getAllocation() const {
-		return _allocations[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
+		return _allocations[_isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0];
 	}
 }

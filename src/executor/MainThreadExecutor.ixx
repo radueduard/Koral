@@ -10,10 +10,10 @@ module;
 #include <thread>
 
 export module gfx.mainThreadExecutor;
-import gfx.task;
+import task;
 
 
-export class MainThreadExecutor : public gfx::Executor {
+export class MainThreadExecutor : public Executor {
 public:
     MainThreadExecutor() : mainThreadId_(std::this_thread::get_id()) {}
 
@@ -40,13 +40,13 @@ public:
         }
     }
 
-    struct SwitchAwaiter : gfx::SwitchAwaiter {
-        explicit SwitchAwaiter(MainThreadExecutor* executor) noexcept : gfx::SwitchAwaiter(executor) {}
+    struct SwitchAwaiter : ::SwitchAwaiter {
+        explicit SwitchAwaiter(MainThreadExecutor* executor) noexcept : ::SwitchAwaiter(executor) {}
         bool await_ready() const noexcept override { return exec->IsMainThread(); }
         void await_resume() const noexcept override {}
     };
 
-    gfx::SwitchAwaiter SwitchToMainThread() noexcept { return static_cast<gfx::SwitchAwaiter>(SwitchAwaiter(this)); }
+    ::SwitchAwaiter SwitchToMainThread() noexcept { return static_cast<::SwitchAwaiter>(SwitchAwaiter(this)); }
 
 private:
     std::thread::id mainThreadId_;

@@ -7,9 +7,10 @@ module;
 #include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
 
-export module vk.descriptorSet;
-import gfx.descriptorSet;
-import gfx.descriptorBinding;
+export module gfx:vk_descriptorSet;
+import :vk_types;
+
+import :descriptorSet;
 
 namespace gfx::vk
 {
@@ -20,7 +21,7 @@ namespace gfx::vk
         explicit DescriptorSet(const Builder& builder);
         ~DescriptorSet() override;
 
-        void Write(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) override;
+        void Write(glm::u32 binding, const gfx::Descriptor &descriptor, glm::u32 index) override;
 
         void DebugPrint() const override;
 

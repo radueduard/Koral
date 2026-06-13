@@ -6,19 +6,22 @@ module;
 
 #include "ogl_err_handling.h"
 
-module ogl.descriptorSet;
-import ogl.commandBuffer;
+module gfx;
+import :ogl_descriptorSet;
 
-import gfx.descriptorSet;
-import gfx.descriptorBinding;
-import gfx.structs;
-import ogl.buffer;
+import :ogl_commandBuffer;
+import :ogl_buffer;
+import :ogl_imageView;
+import :ogl_sampler;
+
+import std;
+import :descriptorSet;
 
 namespace gfx::ogl
 {
     DescriptorSet::DescriptorSet(const Builder& builder): gfx::DescriptorSet(builder) {}
 
-    void DescriptorSet::Write(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) {
+    void DescriptorSet::Write(glm::u32 binding, const gfx::Descriptor &descriptor, glm::u32 index) {
         throw std::runtime_error("NOT YET IMPLEMENTED ON OPENGL BACKEND");
     }
 
@@ -27,9 +30,9 @@ namespace gfx::ogl
         const auto& oglCommandBuffer = dynamic_cast<const CommandBuffer&>(commandBuffer);
         const auto& remappings =  oglCommandBuffer.getRemappingTableForBoundPipeline();
 
-        for (const auto& [binding, descriptors] : _writes)
+        for (const auto& [binding, descriptors] : getWrites())
         {
-            const auto type = _layout.getBindingType(binding);
+            const auto type = _layout->getBindingType(binding);
             for (size_t i = 0; i < descriptors.size(); ++i) {
                 const auto& descriptor = descriptors[i];
 

@@ -6,8 +6,8 @@ module;
 
 #include <GL/glew.h>
 
-export module ogl.framebuffer;
-import gfx.framebuffer;
+export module gfx:ogl_framebuffer;
+import :framebuffer;
 
 namespace gfx::ogl {
     export class Framebuffer final : public gfx::Framebuffer {

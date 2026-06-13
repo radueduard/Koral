@@ -7,10 +7,11 @@ module;
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
-export module ogl.computePipeline;
+export module gfx:ogl_computePipeline;
+import :ogl_types;
+
 import std;
-import gfx.computePipeline;
-import gfx.commandBuffer;
+import :computePipeline;
 
 
 namespace gfx::ogl

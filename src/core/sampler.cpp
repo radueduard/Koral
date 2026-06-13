@@ -2,25 +2,24 @@
 // Created by radue on 2/20/2026.
 //
 
-module;
+module gfx;
+import :sampler;
+import :context;
+import :window;
 
-#include <stdexcept>
-
-module gfx.sampler;
-import vk.sampler;
-import ogl.sampler;
-import gfx.context;
-import gfx.window;
+import std;
+import :vk_sampler;
+import :ogl_sampler;
 
 namespace gfx
 {
-    gfx::Resource<Sampler> Sampler::Builder::build() const
+    Resource<Sampler> Sampler::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
             case API::eOpenGL:
-            return gfx::MakeResource<ogl::Sampler>(*this);
+            return MakeResource<ogl::Sampler>(*this);
             case API::eVulkan:
-            return gfx::MakeResource<vk::Sampler>(*this);
+            return MakeResource<vk::Sampler>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

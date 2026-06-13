@@ -4,12 +4,11 @@
 
 module;
 
-#include <utility>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
-export module vk.allocator;
-import vk.runtime;
+export module gfx:vk_allocator;
+import :vk_runtime;
 
 namespace gfx::vk
 {

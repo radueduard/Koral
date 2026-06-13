@@ -7,9 +7,11 @@ module;
 #include "ogl_err_handling.h"
 #include <glm/glm.hpp>
 
-module ogl.framebuffer;
-import gfx.imageView;
-import ogl.imageView;
+module gfx;
+import :ogl_framebuffer;
+import :ogl_imageView;
+
+import :framebuffer;
 
 namespace gfx::ogl
 {

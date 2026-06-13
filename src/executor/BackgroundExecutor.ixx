@@ -2,22 +2,16 @@
 // Created by radue on 4/15/2026.
 //
 
-module;
-
-#include <coroutine>
-#include <mutex>
-#include <thread>
-#include <queue>
-#include <vector>
-
 export module gfx.backgroundExecutor;
-import gfx.task;
 
-export class BackgroundExecutor : public gfx::Executor {
+import std;
+import task;
+
+export class BackgroundExecutor : public Executor {
 public:
-    explicit BackgroundExecutor(size_t threadCount = std::thread::hardware_concurrency()) {
+    explicit BackgroundExecutor(std::size_t threadCount = std::thread::hardware_concurrency()) {
         if (threadCount == 0) threadCount = 1;
-        for (size_t i = 0; i < threadCount; ++i) {
+        for (std::size_t i = 0; i < threadCount; ++i) {
             workers_.emplace_back([this] {
                 WorkerLoop();
             });
@@ -40,13 +34,13 @@ public:
         for (auto& t : workers_) if (t.joinable()) t.join();
     }
 
-    struct SwitchAwaiter : gfx::SwitchAwaiter {
-        explicit SwitchAwaiter(BackgroundExecutor *executor) : gfx::SwitchAwaiter(executor) {}
+    struct SwitchAwaiter : ::SwitchAwaiter {
+        explicit SwitchAwaiter(BackgroundExecutor *executor) : ::SwitchAwaiter(executor) {}
         bool await_ready() const noexcept override { return false; }
         void await_resume() const noexcept override {}
     };
 
-    gfx::SwitchAwaiter SwitchToBackground() noexcept { return static_cast<gfx::SwitchAwaiter>(SwitchAwaiter(this)); }
+    ::SwitchAwaiter SwitchToBackground() noexcept { return static_cast<::SwitchAwaiter>(SwitchAwaiter(this)); }
 
 private:
     void WorkerLoop() {

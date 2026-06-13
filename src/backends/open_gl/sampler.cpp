@@ -3,8 +3,13 @@
 //
 
 module;
+
 #include "ogl_err_handling.h"
-module ogl.sampler;
+
+module gfx;
+import :ogl_sampler;
+
+import std;
 
 namespace gfx::ogl
 {

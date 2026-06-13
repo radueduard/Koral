@@ -1,8 +1,4 @@
-
-
-#include <iostream>
-
-#include "context.h"
+import std;
 
 namespace gfx
 {
@@ -42,5 +38,5 @@ int main(const int argc, char **argv)
     enableANSI();
 #endif
     gfx::Engine::Run(argc, argv);
-    return EXIT_SUCCESS;
+    return 0;
 }

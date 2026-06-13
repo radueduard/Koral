@@ -4,19 +4,20 @@
 
 module;
 
-#include <GL/gl.h>
-#include <stdexcept>
 #include <GL/glew.h>
+#include <GL/gl.h>
 
-module ogl.imageView;
-import ogl.image;
-import gfx.structs;
+module gfx;
+import :ogl_imageView;
+import :ogl_image;
+
+import std;
 
 namespace gfx::ogl
 {
     ImageView::ImageView(const Builder& createInfo) : gfx::ImageView(createInfo) {
         glGenTextures(1, &_textureViewID);
-        const gfx::ogl::Image& image = reinterpret_cast<const gfx::ogl::Image&>(createInfo.image);
+        const auto& image = reinterpret_cast<const gfx::ogl::Image&>(createInfo.image);
 
         GLenum target;
         switch (createInfo.type) {

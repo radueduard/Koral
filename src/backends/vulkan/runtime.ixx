@@ -4,11 +4,12 @@
 
 module;
 
-#include <memory>
 #include <vulkan/vulkan.hpp>
 
-export module vk.runtime;
-import module vk.physicalDevice;
+export module gfx:vk_runtime;
+import :vk_physicalDevice;
+
+import std;
 
 namespace gfx::vk
 {
@@ -17,7 +18,7 @@ namespace gfx::vk
         ::vk::PhysicalDeviceFeatures deviceFeatures;
     };
 
-    export class Runtime
+    class Runtime
     {
     public:
         Runtime();

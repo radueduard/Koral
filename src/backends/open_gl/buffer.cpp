@@ -5,11 +5,12 @@ module;
 
 #include "ogl_err_handling.h"
 
-module ogl.buffer;
+module gfx;
+import :ogl_buffer;
+
 import std;
-import gfx.log;
-
-
+import :buffer;
+import logger;
 
 namespace gfx::ogl
 {
@@ -37,7 +38,7 @@ namespace gfx::ogl
     void Buffer::Map() const
     {
         if (_type == Type::eDeviceLocal) {
-            gfx::log::error("Attempted to map a device-local buffer! Buffer ID: {}. Device-local buffers are not mappable, as they reside in GPU-only memory. Please use a staging buffer for data transfer to or from device-local buffers.", _id);
+            logger::error("Attempted to map a device-local buffer! Buffer ID: {}. Device-local buffers are not mappable, as they reside in GPU-only memory. Please use a staging buffer for data transfer to or from device-local buffers.", _id);
             return;
         }
 
@@ -131,7 +132,7 @@ namespace gfx::ogl
         if (usage & Usage::eTexel) {
             return GL_TEXTURE_BUFFER;
         }
-        gfx::log::error("Unknown buffer usage flags specified! Defaulting to GL_ARRAY_BUFFER. Usage value: {}", static_cast<int>(usage));
+        logger::error("Unknown buffer usage flags specified! Defaulting to GL_ARRAY_BUFFER. Usage value: {}", static_cast<int>(usage));
         return GL_ARRAY_BUFFER;
     }
 
@@ -146,7 +147,7 @@ namespace gfx::ogl
             case Type::eDynamic:
                 return GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
             default:
-                gfx::log::error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
+                logger::error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
                 return GL_DYNAMIC_STORAGE_BIT;
         }
     }

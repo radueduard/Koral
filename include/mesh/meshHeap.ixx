@@ -7,11 +7,11 @@ module;
 #include "tlsfAllocator.h"
 #include <glm/glm.hpp>
 
-export module gfx.mesh.heap;
+export module gfx:meshHeap;
 import std;
-import gfx.mesh.base;
-import gfx.buffer;
-import gfx.structs;
+import :meshBase;
+import :buffer;
+import :types;
 
 namespace gfx
 {

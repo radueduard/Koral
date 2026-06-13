@@ -2,73 +2,40 @@
 // Created by radue on 2/22/2026.
 //
 
-/**
- * @file graphicsPipeline.h
- * @brief Graphics pipeline abstraction and builder configuration types.
- *
- * Defines the high-level graphics pipeline interface used by the runtime, along
- * with immutable state descriptions (rasterization, blending, depth/stencil, etc.)
- * and shader-stage selection through `GraphicsPipeline::Builder`.
- */
-
 module;
 
 #include <glm/fwd.hpp>
 #include "api.h"
 
-export module gfx.graphicsPipeline;
+export module gfx:graphicsPipeline;
+import :types;
+import :shader;
+import :descriptorSetLayout;
+import :mesh;
 
 import std;
-import gfx.resource;
-import gfx.structs;
-import gfx.flags;
-import gfx.shader;
-import gfx.descriptorSetLayout;
-import gfx.mesh;
+import resource;
+import flags;
 
 namespace gfx
 {
-    class Framebuffer;
-    class CommandBuffer;
-
-    export struct GFX_API TessellationState
-    {
-        gfx::ResourceRef<const Shader> controlShader;
-        gfx::ResourceRef<const Shader> evalShader;
-        glm::u32 patchControlPoints = 3;
-    };
-
-    export struct GFX_API ColorBlendState
-    {
-        struct GFX_API AttachmentState
-        {
-            bool blendEnable = false;
-            BlendFactor srcColorBlendFactor = BlendFactor::eOne;
-            BlendFactor dstColorBlendFactor = BlendFactor::eZero;
-            BlendOp colorBlendOp = BlendOp::eAdd;
-            BlendFactor srcAlphaBlendFactor = BlendFactor::eOne;
-            BlendFactor dstAlphaBlendFactor = BlendFactor::eZero;
-            BlendOp alphaBlendOp = BlendOp::eAdd;
-            Flags<ColorComponent> colorWriteMask =
-                Flags(ColorComponent::eR) | ColorComponent::eG | ColorComponent::eB | ColorComponent::eA;
-        };
-        bool enableLogicOp = false;
-        LogicOp logicOp = LogicOp::eCopy;
-        std::vector<AttachmentState> attachments = {};
-        float blendConstants[4] = { 0.f, 0.f, 0.f, 0.f };
-    };
-
-    export class GFX_API GraphicsPipeline
+    class GFX_API GraphicsPipeline
     {
     public:
+        struct GFX_API TessellationState
+        {
+            ResourceRef<const Shader> controlShader;
+            ResourceRef<const Shader> evalShader;
+            glm::u32 patchControlPoints = 3;
+        };
         struct GFX_API Builder {
-            std::optional<gfx::ResourceRef<const Shader>> vertexShader = std::nullopt;
+            std::optional<ResourceRef<const Shader>> vertexShader = std::nullopt;
             std::optional<TessellationState> tessellationState = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> geometryShader = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> fragmentShader = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> taskShader = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> meshShader = std::nullopt;
-            std::optional<gfx::ResourceRef<const Framebuffer>> framebuffer = std::nullopt;
+            std::optional<ResourceRef<const Shader>> geometryShader = std::nullopt;
+            std::optional<ResourceRef<const Shader>> fragmentShader = std::nullopt;
+            std::optional<ResourceRef<const Shader>> taskShader = std::nullopt;
+            std::optional<ResourceRef<const Shader>> meshShader = std::nullopt;
+            std::optional<ResourceRef<const Framebuffer>> framebuffer = std::nullopt;
             std::vector<VertexInputAttributeDescription> vertexAttributeDescriptions = {};
             std::vector<VertexInputBindingDescription> vertexBindingDescriptions = {};
             InputAssemblyState inputAssemblyState = {};
@@ -78,7 +45,7 @@ namespace gfx
             ColorBlendState colorBlendState = {};
 
             template <gfx::MeshType T>
-            Builder& setVertexShader(gfx::ResourceRef<const Shader> shader)
+            Builder& setVertexShader(ResourceRef<const Shader> shader)
             {
                 this->vertexShader = std::cref(shader);
                 this->vertexAttributeDescriptions = T::VertexAttributeDescription();
@@ -87,17 +54,17 @@ namespace gfx
             }
 
             Builder& setTessellationState(const TessellationState& tessellationState);
-            Builder& setGeometryShader(gfx::ResourceRef<const Shader> geometryShader);
-            Builder& setFragmentShader(gfx::ResourceRef<const Shader> fragmentShader);
-            Builder& setTaskShader(gfx::ResourceRef<const Shader> taskShader);
-            Builder& setMeshShader(gfx::ResourceRef<const Shader> meshShader);
+            Builder& setGeometryShader(ResourceRef<const Shader> geometryShader);
+            Builder& setFragmentShader(ResourceRef<const Shader> fragmentShader);
+            Builder& setTaskShader(ResourceRef<const Shader> taskShader);
+            Builder& setMeshShader(ResourceRef<const Shader> meshShader);
             Builder& setInputAssemblyState(const InputAssemblyState& inputAssemblyState);
             Builder& setRasterizationState(const RasterizationState& rasterizationState);
             Builder& setMultisampleState(const MultisampleState& multisampleState);
             Builder& setDepthStencilState(const DepthStencilState& depthStencilState);
             Builder& setColorBlendState(const ColorBlendState& colorBlendState);
-            Builder& setFramebuffer(gfx::ResourceRef<const Framebuffer> framebuffer);
-            [[nodiscard]] gfx::Resource<GraphicsPipeline> build() const;
+            Builder& setFramebuffer(ResourceRef<const Framebuffer> framebuffer);
+            [[nodiscard]] Resource<GraphicsPipeline> build() const;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */
@@ -157,15 +124,15 @@ namespace gfx
          */
         explicit GraphicsPipeline(const Builder& createInfo);
 
-        std::optional<gfx::ResourceRef<const Shader>> _vertexShader;
+        std::optional<ResourceRef<const Shader>> _vertexShader;
         std::optional<TessellationState> _tessellationState;
-        std::optional<gfx::ResourceRef<const Shader>> _geometryShader;
-        std::optional<gfx::ResourceRef<const Shader>> _fragmentShader;
+        std::optional<ResourceRef<const Shader>> _geometryShader;
+        std::optional<ResourceRef<const Shader>> _fragmentShader;
 
-        std::optional<gfx::ResourceRef<const Shader>> _taskShader;
-        std::optional<gfx::ResourceRef<const Shader>> _meshShader;
+        std::optional<ResourceRef<const Shader>> _taskShader;
+        std::optional<ResourceRef<const Shader>> _meshShader;
 
-        gfx::ResourceRef<const Framebuffer> _framebuffer;
+        ResourceRef<const Framebuffer> _framebuffer;
 
         InputAssemblyState _inputAssemblyState;
         RasterizationState _rasterizationState;

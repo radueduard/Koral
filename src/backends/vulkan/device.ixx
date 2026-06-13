@@ -4,23 +4,17 @@
 
 module;
 
-#include <functional>
-#include <map>
-#include <memory>
 #include <glm/fwd.hpp>
 #include <vulkan/vulkan.hpp>
 #include "vk_wrapper.h"
 
-export module vk.device;
+export module gfx:vk_device;
+import :vk_types;
+
+import std;
 
 namespace gfx::vk {
-    struct SubmitInfo;
-    class Surface;
-    class PhysicalDevice;
-}
-
-namespace gfx::vk {
-    export class Queue final : public gfx::vk::Wrapper<::vk::Queue> {
+    class Queue final : public gfx::vk::Wrapper<::vk::Queue> {
     public:
         class Family
         {

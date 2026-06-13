@@ -2,7 +2,7 @@
 // Created by eduard on 10.03.2026.
 //
 
-export module gfx.mesh.type;
+export module gfx:meshType;
 
 namespace gfx
 {

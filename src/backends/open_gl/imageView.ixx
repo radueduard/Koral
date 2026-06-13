@@ -6,12 +6,14 @@ module;
 
 #include <GL/glew.h>
 
-export module ogl.imageView;
-import gfx.imageView;
+export module gfx:ogl_imageView;
+import :ogl_types;
+
+import :imageView;
 
 namespace gfx::ogl
 {
-    export class ImageView : public gfx::ImageView
+    class ImageView : public gfx::ImageView
     {
     public:
         explicit ImageView(const Builder& createInfo);

@@ -4,21 +4,20 @@
 
 module;
 
-#include <unordered_map>
 #include <vk_mem_alloc.h>
-#include <vector>
 #include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
 
-export module vk.image;
-import gfx.image;
-import vk.commandBuffer;
-import gfx.structs;
+export module gfx:vk_image;
+import :vk_types;
+
+import :vk_commandBuffer;
+
+import std;
+import :image;
 
 namespace gfx::vk
 {
-	class ImageView;
-
 	export class Image final : public gfx::Image {
     	friend class gfx::vk::ImageView;
     public:

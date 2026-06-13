@@ -2,18 +2,20 @@
 // Created by radue on 2/28/2026.
 //
 
-module;
+module gfx;
+import :vk_swapChain;
+import :vk_context;
+import :vk_device;
+import :vk_surface;
+import :vk_image;
+import :vk_imageView;
+import :vk_scheduler;
 
-#include <ranges>
-#include <iostream>
-#include "vk_enum_conversions.h"
-
-module vk.swapChain;
-import gfx.context;
-import vk.scheduler;
-import gfx.context;
-import vk.context;
-
+import std;
+import :context;
+import :image;
+import :imageView;
+import :framebuffer;
 
 namespace gfx::vk
 {
@@ -51,7 +53,7 @@ namespace gfx::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
-        _extent(gfx::Context::Window().getExtent()),
+        _extent(gfx::Context::GetWindow().getExtent()),
         _sampleCount(createInfo.sampleCount),
         _minImageCount(createInfo.minImageCount),
         _imageCount(createInfo.imageCount),
@@ -78,7 +80,7 @@ namespace gfx::vk
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
 
-        const auto compositeAlpha = gfx::Context::Window().isFramebufferTransparent() ?
+        const auto compositeAlpha = gfx::Context::GetWindow().isFramebufferTransparent() ?
 #ifdef _WIN32
         ::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
 #elifdef __APPLE__

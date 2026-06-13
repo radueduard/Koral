@@ -4,15 +4,15 @@
 
 module;
 
-#include <iostream>
-#include <stdexcept>
-#include <string>
 #include <magic_enum/magic_enum.hpp>
 #include "ogl_err_handling.h"
 #include <glm/glm.hpp>
 
-module ogl.image;
-import gfx.structs;
+module gfx;
+import :ogl_image;
+
+import :image;
+import std;
 
 namespace gfx::ogl
 {

@@ -7,14 +7,14 @@ module;
 #include "api.h"
 #include <glm/glm.hpp>
 
-export module gfx.descriptorSetLayout;
+export module gfx:descriptorSetLayout;
+import :types;
 
 import std;
-import gfx.structs;
 
 namespace gfx
 {
-    export class GFX_API DescriptorSetLayout
+    class GFX_API DescriptorSetLayout
     {
     public:
         class GFX_API Builder

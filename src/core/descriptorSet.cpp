@@ -2,19 +2,26 @@
 // Created by radue on 3/4/2026.
 //
 
-module;
+module gfx;
+import :descriptorSet;
 
-#include <stdexcept>
-
-module gfx.descriptorSet;
-import gfx.descriptorBinding;
-import gfx.structs;
-import gfx.log;
+import :ogl_descriptorSet;
+import :vk_descriptorSet;
+import logger;
 
 namespace gfx {
-    DescriptorSet::Builder::Builder(const DescriptorSetLayout& layout) : layout(layout)
+    struct DescriptorWrites {
+        std::map<glm::u32, std::vector<Descriptor>> data;
+    };
+
+    DescriptorSet::~DescriptorSet() = default;
+
+    std::map<glm::u32, std::vector<Descriptor>>& DescriptorSet::getWrites() { return _writes->data; }
+    const std::map<glm::u32, std::vector<Descriptor>>& DescriptorSet::getWrites() const { return _writes->data; }
+
+    DescriptorSet::Builder::Builder(const DescriptorSetLayout& layout) : layout(&layout)
     {
-        for (const auto& [binding, type, count] : layout.getBindings()) {
+        for (const auto& [binding, type, count] : layout->getBindings()) {
             writes[binding] = std::vector<Descriptor>();
             writes[binding].resize(count);
         }
@@ -34,14 +41,14 @@ namespace gfx {
         if (!descriptor.isValid()) {
             throw std::runtime_error("Descriptor is not valid!");
         }
-        switch (layout.getBindingType(binding))
+        switch (layout->getBindingType(binding))
         {
         case DescriptorType::eUniformBuffer:
         case DescriptorType::eStorageBuffer:
             try {
                 auto& _ = descriptor.getBuffer();
             } catch (const std::exception& e) {
-                gfx::log::error("Descriptor for buffer binding {} index {} is invalid: {}", binding, index, e.what());
+                logger::error("Descriptor for buffer binding {} index {} is invalid: {}", binding, index, e.what());
                 throw std::runtime_error("Descriptor for buffer binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid buffer!");
             }
             break;
@@ -49,13 +56,13 @@ namespace gfx {
             try {
                 auto& _ = descriptor.getImageView();
             } catch (const std::exception& e) {
-                gfx::log::error("Descriptor for combined image sampler binding {} index {} is invalid: {}", binding, index, e.what());
+                logger::error("Descriptor for combined image sampler binding {} index {} is invalid: {}", binding, index, e.what());
                 throw std::runtime_error("Descriptor for combined image sampler binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid image view!");
             }
             try {
                 auto& _ = descriptor.getSampler();
             } catch (const std::exception& e) {
-                gfx::log::error("Descriptor for combined image sampler binding {} index {} is invalid: {}", binding, index, e.what());
+                logger::error("Descriptor for combined image sampler binding {} index {} is invalid: {}", binding, index, e.what());
                 throw std::runtime_error("Descriptor for combined image sampler binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid sampler!");
             }
             break;
@@ -64,7 +71,7 @@ namespace gfx {
             try {
                 auto& _ = descriptor.getImageView();
             } catch (const std::exception& e) {
-                gfx::log::error("Descriptor for image binding {} index {} is invalid: {}", binding, index, e.what());
+                logger::error("Descriptor for image binding {} index {} is invalid: {}", binding, index, e.what());
                 throw std::runtime_error("Descriptor for image binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid image view!");
             }
             break;
@@ -72,7 +79,7 @@ namespace gfx {
             try {
                 auto& _ = descriptor.getSampler();
             } catch (const std::exception& e) {
-                gfx::log::error("Descriptor for sampler binding {} index {} is invalid: {}", binding, index, e.what());
+                logger::error("Descriptor for sampler binding {} index {} is invalid: {}", binding, index, e.what());
                 throw std::runtime_error("Descriptor for sampler binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid sampler!");
             }
             break;
@@ -84,22 +91,27 @@ namespace gfx {
         return *this;
     }
 
-    gfx::Resource<DescriptorSet> DescriptorSet::Builder::build()
+    Resource<DescriptorSet> DescriptorSet::Builder::build()
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
             case API::eOpenGL:
-            return gfx::MakeResource<ogl::DescriptorSet>(*this);
+            return MakeResource<ogl::DescriptorSet>(*this);
             case API::eVulkan:
-            return gfx::MakeResource<vk::DescriptorSet>(*this);
+            return MakeResource<vk::DescriptorSet>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
     }
 
-    DescriptorSet::DescriptorSet(const Builder& builder) : _layout(builder.layout), _writes(builder.writes)
+    void DescriptorSet::bind(const CommandBuffer&, glm::u32) const {}
+    void DescriptorSet::DebugPrint() const {}
+
+    DescriptorSet::DescriptorSet(const Builder& builder)
+        : _layout(builder.layout),
+          _writes(std::make_unique<DescriptorWrites>(DescriptorWrites{builder.writes}))
     {
         _isPerFrame = false;
-        for (const auto& write : _writes | std::views::values) {
+        for (const auto& write : builder.writes | std::views::values) {
             for (const auto& descriptor : write)
             {
                 try {

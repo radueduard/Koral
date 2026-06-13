@@ -6,8 +6,10 @@ module;
 
 #include <vulkan/vulkan.hpp>
 
-export module vk.imageView;
-import gfx.imageView;
+export module gfx:vk_imageView;
+import :vk_types;
+
+import :imageView;
 
 namespace gfx::vk
 {

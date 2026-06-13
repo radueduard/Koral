@@ -7,8 +7,10 @@ module;
 #include "vk_wrapper.h"
 #include <vulkan/vulkan.hpp>
 
-export module vk.shader;
-import gfx.shader;
+export module gfx:vk_shader;
+import :vk_types;
+
+import :shader;
 
 namespace gfx::vk
 {

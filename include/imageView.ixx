@@ -7,12 +7,13 @@ module;
 #include <glm/fwd.hpp>
 #include "api.h"
 
-export module gfx.imageView;
-import gfx.resource;
+export module gfx:imageView;
+import :types;
+import resource;
 
 namespace gfx
 {
-    export class GFX_API ImageView {
+    class GFX_API ImageView {
     public:
         enum class Type {
             e1D,
@@ -67,7 +68,7 @@ namespace gfx
             glm::u32 arrayLayerCount = 1;
             ComponentMapping componentMapping = {};
 
-            explicit Builder(gfx::ResourceRef<const Image> image);
+            explicit Builder(ResourceRef<const Image> image);
 
             Builder& setViewType(Type viewType) {
                 this->type = viewType;
@@ -99,12 +100,12 @@ namespace gfx
                 return *this;
             }
 
-            [[nodiscard]] gfx::Resource<ImageView> build() const;
+            [[nodiscard]] Resource<ImageView> build() const;
         };
 
         virtual ~ImageView() = default;
 
-        [[nodiscard]] gfx::ResourceRef<const Image> getImage() const { return _image; }
+        [[nodiscard]] ResourceRef<const Image> getImage() const { return _image; }
         [[nodiscard]] Type getViewType() const { return _viewType; }
         [[nodiscard]] glm::u32 getBaseMipLevel() const { return _baseMipLevel; }
         [[nodiscard]] glm::u32 getMipLevelCount() const { return _mipLevelCount; }
@@ -116,7 +117,7 @@ namespace gfx
 
     protected:
         explicit ImageView(const Builder& createInfo);
-        gfx::ResourceRef<const Image> _image;
+        ResourceRef<const Image> _image;
         bool _isPerFrame = false;
         Type _viewType;
         glm::u32 _baseMipLevel;

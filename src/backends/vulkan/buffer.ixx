@@ -8,8 +8,10 @@ module;
 #include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
 
-export module vk.buffer;
-import gfx.buffer;
+export module gfx:vk_buffer;
+import :vk_types;
+
+import :buffer;
 
 namespace gfx::vk
 {

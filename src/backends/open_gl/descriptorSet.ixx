@@ -6,11 +6,9 @@ module;
 
 #include <glm/glm.hpp>
 
-export module ogl.descriptorSet;
-
-import gfx.descriptorSet;
-import gfx.descriptorBinding;
-import gfx.commandBuffer;
+export module gfx:ogl_descriptorSet;
+import :ogl_types;
+import :descriptorSet;
 
 namespace gfx::ogl
 {

@@ -4,13 +4,16 @@
 
 module;
 
-#include <ranges>
-#include <stdexcept>
-#include <vector>
 #include <vulkan/vulkan.hpp>
-#include "vulkanContext.h"
 
-module vk.computePipeline;
+module gfx;
+import :vk_computePipeline;
+import :vk_context;
+import :vk_device;
+import :vk_commandBuffer;
+
+import std;
+import :vk_shader;
 
 namespace gfx::vk
 {

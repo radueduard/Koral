@@ -4,12 +4,17 @@
 
 module;
 
-#include "vk_enum_conversions.h"
+#include <vulkan/vulkan.hpp>
 
-module vk.imageView;
-import vk.image;
-import vk.context;
-import gfx.context;
+module gfx;
+import :vk_imageView;
+import :vk_device;
+import :vk_image;
+import :vk_context;
+import :vk_enum_conversions;
+
+import :imageView;
+import :image;
 
 namespace gfx::vk
 {
@@ -53,7 +58,7 @@ namespace gfx::vk
 
     ::vk::ImageView ImageView::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? gfx::Context::GetScheduler().getCurrentImageIndex() : 0;
         return _imageViews[currentFrame];
     }
 

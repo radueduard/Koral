@@ -8,29 +8,33 @@ module;
 #include "api.h"
 #include <GLFW/glfw3.h>
 
-export module gfx.window;
+export module gfx:window;
+import :types;
+import :scene;
+import :context;
+import :input;
+import :time;
 
 import std;
-import gfx.input;
-import gfx.time;
-import gfx.framebuffer;
-import gfx.context;
-import gfx.scene;
-import gfx.resource;
-import gfx.surface;
-import gfx.framebuffer;
 
 namespace gfx
 {
     class Engine;
 }
 
-namespace gfx::io {
-    export class GFX_API Window {
+namespace gfx {
+    // PIMPL box for the Builder's owning Scene pointer. Storing `std::unique_ptr<Scene>` directly
+    // in the *nested* Builder struct triggers a GCC C++26 module serializer bug that corrupts
+    // gfx-window.gcm ("Bad file data: failed to read compiled module cluster N"). Wrapping it in an
+    // incomplete type defined in window.cpp sidesteps the bug (same workaround as gfx:descriptorSet
+    // and gfx:scheduler). The top-level Window::_scene member does NOT trip the bug, only the nested one.
+    struct WindowSceneBox;
+
+    class GFX_API Window {
         friend class Input;
         friend class Input::Callbacks;
-        friend class gfx::Engine;
         friend class Time;
+        friend class gfx::Engine;
     public:
         struct GFX_API Builder {
             std::string title = "GFXFramework";
@@ -40,9 +44,10 @@ namespace gfx::io {
             bool decorated = true;
             bool transparentFramebuffer = false;
             API api = API::eVulkan;
-            std::unique_ptr<Scene> scene = nullptr;
+            std::unique_ptr<WindowSceneBox> sceneBox;  // pimpl — see WindowSceneBox note above
 
-            explicit Builder(std::unique_ptr<Scene> scene) : scene(std::move(scene)) {}
+            explicit Builder(std::unique_ptr<Scene> scene);
+            ~Builder();  // out-of-line so unique_ptr<WindowSceneBox> destructor fires where the type is complete
 
             Builder& setTitle(const std::string& title) {
                 this->title = title;
@@ -141,7 +146,7 @@ namespace gfx::io {
 
         Input::State _inputState;
         Time::State _timeState;
-        gfx::Resource<gfx::Framebuffer> _framebuffer;
+        Resource<gfx::Framebuffer> _framebuffer;
 
         std::unique_ptr<Scene> _scene;
 

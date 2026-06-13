@@ -1,21 +1,54 @@
 //
-// Created by radue on 3/6/2026.
+// Created by radue on 12.06.2026.
 //
 
 module;
 
 #include <glm/glm.hpp>
-#include "api.h"
+#include <api.h>
+#include <optional>
 
-export module gfx.structs;
-
-import std;
-import gfx.buffer;
-import gfx.resource;
-import gfx.image;
+export module gfx:types;
+import flags;
+import resource;
 
 export namespace gfx
 {
+    class GFX_API Window;
+    class GFX_API Surface;
+    class GFX_API Scene;
+
+    class GFX_API Frame;
+    class GFX_API Scheduler;
+    class GFX_API Framebuffer;
+    class GFX_API CommandBuffer;
+
+    class GFX_API Buffer;
+    class GFX_API Image;
+    class GFX_API ImageView;
+    class GFX_API Sampler;
+    class GFX_API Mesh;
+
+    template<typename Derived>
+    class CustomMesh;
+
+    template<typename... Streams>
+    class ParamMesh;
+
+    class GFX_API Shader;
+    class GFX_API GraphicsPipeline;
+    class GFX_API ComputePipeline;
+    class GFX_API Descriptor;
+    class GFX_API DescriptorSet;
+    class GFX_API DescriptorSetLayout;
+
+    class GFX_API GUI;
+    class GFX_API GUI_Image;
+
+
+    class GFX_API Time;
+    class GFX_API Input;
+
     /**
      * @brief The type of texture filtering. Used to define how textures are sampled and how images are filtered during blit operations.
      */
@@ -28,7 +61,7 @@ export namespace gfx
     /**
      * @brief The type of vertex input pipe channels. Used to define the format of vertex attributes in the graphics pipeline.
      */
-    enum class ChannelType : glm::u32
+    enum class ChannelType : glm::u8
     {
         eFloat = 0,
         eInt = 1,
@@ -47,13 +80,13 @@ export namespace gfx
      */
     enum class DescriptorType {
         eUniformBuffer,             ///< This type of descriptor is used to bind a buffer that contains uniform data,
-                                    ///< which is read-only data that is accessed by shaders. Uniform buffers are
-                                    ///< typically used to store data that is shared across multiple draw calls,
-                                    ///< such as transformation matrices, lighting parameters, or material properties.
-                                    ///< In shader code it would appear like this:
-                                    ///< - glsl: layout(set = X, binding = Y) uniform MyUniformBuffer { ... } myUniformBuffer;
-                                    ///< - hlsl: cbuffer MyUniformBuffer : register(bY, spaceX) { ... } myUniformBuffer;
-                                    ///< - slang: [[vk::binding(Y, X)]] ConstantBuffer<MyUniformBuffer> myUniformBuffer;
+        ///< which is read-only data that is accessed by shaders. Uniform buffers are
+        ///< typically used to store data that is shared across multiple draw calls,
+        ///< such as transformation matrices, lighting parameters, or material properties.
+        ///< In shader code it would appear like this:
+        ///< - glsl: layout(set = X, binding = Y) uniform MyUniformBuffer { ... } myUniformBuffer;
+        ///< - hlsl: cbuffer MyUniformBuffer : register(bY, spaceX) { ... } myUniformBuffer;
+        ///< - slang: [[vk::binding(Y, X)]] ConstantBuffer<MyUniformBuffer> myUniformBuffer;
         eStorageBuffer,             ///< This type of descriptor is used to bind a buffer that contains storage data, which is
                                     /// read-write data that is accessed by shaders. Storage buffers are typically used to store
                                     /// data that is modified by shaders, such as particle positions, compute shader output, or indirect draw command parameters.
@@ -113,8 +146,8 @@ export namespace gfx
     {
         glm::u32 binding;   ///< The binding index of the vertex buffer. Must match the binding index specified in the vertex input attribute descriptions that reference this binding.
         glm::u32 stride;    ///< The byte stride between consecutive vertices in the vertex buffer. For example, if the vertex struct has
-                            ///< a size of 32 bytes, the stride would be 32. It is recommended to use the sizeof operator on the vertex struct to calculate
-                            ///< the stride, as this will ensure correct stride even if the struct is modified in the future.
+        ///< a size of 32 bytes, the stride would be 32. It is recommended to use the sizeof operator on the vertex struct to calculate
+        ///< the stride, as this will ensure correct stride even if the struct is modified in the future.
     };
 
     /**
@@ -142,7 +175,7 @@ export namespace gfx
     /**
      * @brief The type of primitive topology. Used to define how the vertices are assembled into primitives in the graphics pipeline.
      */
-    enum class Topology : uint8_t
+    enum class Topology : glm::u8
     {
         ePointList = 0,                 ///< Each vertex represents a single point.
         eLineList = 1,                  ///< Every two vertices form a separate line segment.
@@ -164,14 +197,14 @@ export namespace gfx
     {
         Topology topology = Topology::eTriangleList;    ///< The type of primitive topology. For example, if the topology is eTriangleList, every three vertices will form a separate triangle.
         bool primitiveRestartEnable = false;            ///< Whether primitive restart is enabled. If true, a special index value (the maximum value of the index type - 0xFFFFFFFF for 32-bit indices) can be used in the index buffer to indicate that the current primitive should be restarted, and a new primitive should
-                                                        ///< be started with the next vertex. This is only relevant for indexed draw calls, and can be useful for drawing multiple disconnected primitives with a single
-                                                        ///< draw call.
+        ///< be started with the next vertex. This is only relevant for indexed draw calls, and can be useful for drawing multiple disconnected primitives with a single
+        ///< draw call.
     };
 
     /**
      * @brief The type of polygon mode. Used to define how polygons are rasterized in the graphics pipeline.
      */
-    enum class PolygonMode : uint8_t
+    enum class PolygonMode : glm::u8
     {
         eFill = 0,      ///< Polygons are filled in. This is the default mode and the most common one for rendering solid objects.
         eLine = 1,      ///< Polygons are rasterized as wireframes, with only the edges of the polygons being drawn. This can be useful for debugging or for rendering wireframe models.
@@ -181,7 +214,7 @@ export namespace gfx
     /**
      * @brief The type of cull mode. Used to define which faces of polygons are culled (not drawn) in the graphics pipeline.
      */
-    enum class CullMode : uint8_t
+    enum class CullMode : glm::u8
     {
         eFront = 1,     ///< Front faces of polygons are culled. The definition of front and back faces is determined by the front face setting in the rasterization state.
         eBack = 2,      ///< Back faces of polygons are culled. The definition of front and back faces is determined by the front face setting in the rasterization state.
@@ -216,7 +249,7 @@ export namespace gfx
     /**
      * @brief The type of sample count for multisampling. Used to define the number of samples per pixel for multisampled images and framebuffers in the graphics pipeline.
      */
-    enum class SampleCount : uint8_t
+    enum class SampleCount : glm::u8
     {
         e1 = 1,
         e2 = 2,
@@ -240,7 +273,7 @@ export namespace gfx
     /**
      * @brief The type of comparison operation. Used to define the comparison function for depth testing and stencil testing in the graphics pipeline.
      */
-    enum class CompareOp : uint8_t
+    enum class CompareOp : glm::u8
     {
         eNever = 0,             ///< The comparison always fails, meaning that the fragment will be discarded. This can be useful for rendering techniques that require manual control over which fragments are drawn, such as stencil masking or depth pre-pass.
         eLess = 1,              ///< The comparison passes if the fragment's depth value is less than the existing depth value in the depth buffer. This is the default depth comparison function and is commonly used for rendering solid objects.
@@ -255,7 +288,7 @@ export namespace gfx
     /**
      * @brief The type of stencil operation. Used to define the operations that are performed on the stencil buffer during stencil testing in the graphics pipeline.
      */
-    enum class StencilOp : uint8_t
+    enum class StencilOp : glm::u8
     {
         eKeep = 0,                  ///< Keep the existing stencil value. This is the default operation and is commonly used when you want to preserve the current stencil buffer contents.
         eZero = 1,                  ///< Set the stencil value to zero. This can be useful for clearing the stencil buffer or for rendering techniques that require resetting the stencil value, such as stencil shadows or outlining.
@@ -303,7 +336,7 @@ export namespace gfx
     /**
      * @brief The type of blend mode. Used to define the blending operation for color blending in the graphics pipeline.
      */
-    enum class BlendMode : uint8_t
+    enum class BlendMode : glm::u8
     {
         eAdd = 0,               ///< The source and destination colors are added together. This is the default blending mode and is commonly used for rendering transparent objects.
         eSubtract = 1,          ///< The destination color is subtracted from the source color. This can be useful for rendering techniques that require subtractive blending, such as certain particle effects or for certain shadow mapping techniques.
@@ -315,7 +348,7 @@ export namespace gfx
     /**
      * @brief The type of blend factor. Used to define the blend factors for color blending in the graphics pipeline.
      */
-    enum class BlendFactor : uint8_t
+    enum class BlendFactor : glm::u8
     {
         eZero = 0,
         eOne = 1,
@@ -335,7 +368,7 @@ export namespace gfx
     /**
      * @brief The type of logic operation. Used to define the logic operation for color blending in the graphics pipeline when logic operations are enabled.
      */
-    enum class LogicOp : uint8_t
+    enum class LogicOp : glm::u8
     {
         eClear = 0,
         eAnd = 1,
@@ -358,7 +391,7 @@ export namespace gfx
     /**
      * @brief The type of blend operation. Used to define the blend operation for color blending in the graphics pipeline when blending is enabled.
      */
-    enum class BlendOp : uint8_t
+    enum class BlendOp : glm::u8
     {
         eAdd = 0,
         eSubtract = 1,
@@ -370,7 +403,7 @@ export namespace gfx
     /**
      * @brief The type of color component. Used to define which color components are affected by color blending operations in the graphics pipeline.
      */
-    enum class ColorComponent : uint8_t
+    enum class ColorComponent : glm::u8
     {
         eR = 1,
         eG = 2,
@@ -381,7 +414,7 @@ export namespace gfx
     /**
      * @brief The type of resolve mode. Used to define how multisampled images are resolved to single-sampled images in the graphics pipeline.
      */
-    enum class ResolveMode : uint8_t
+    enum class ResolveMode : glm::u8
     {
         eNone = 0,          ///< No resolve operation is performed. This can be used when you want to manually resolve multisampled images using custom shader code or compute shaders, or when you want to use multisampled images without resolving them (e.g., for certain shadow mapping techniques).
         eSampleZero = 1,    ///< The value of the first sample (sample index 0) is used as the resolved value for all samples in the pixel. This can be useful for rendering techniques that require a simple resolve operation, such as certain shadow mapping techniques or for debugging purposes.
@@ -395,10 +428,10 @@ export namespace gfx
      */
     struct GFX_API IndirectDrawCommand
     {
-        uint32_t vertexCount;     ///< The number of vertices to draw. This is used for non-indexed draw calls, and specifies how many vertices will be read from the vertex buffers and processed by the vertex shader.
-        uint32_t instanceCount;   ///< The number of instances to draw. This is used for instanced draw calls, and specifies how many instances of the geometry will be drawn. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
-        uint32_t firstVertex;     ///< The index of the first vertex to draw. This is used for non-indexed draw calls, and specifies the starting point in the vertex buffers from which vertices will be read and processed by the vertex shader.
-        uint32_t firstInstance;   ///< The index of the first instance to draw. This is used for instanced draw calls, and specifies the starting point for instance data when drawing multiple instances of geometry. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
+        glm::u32 vertexCount;     ///< The number of vertices to draw. This is used for non-indexed draw calls, and specifies how many vertices will be read from the vertex buffers and processed by the vertex shader.
+        glm::u32 instanceCount;   ///< The number of instances to draw. This is used for instanced draw calls, and specifies how many instances of the geometry will be drawn. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
+        glm::u32 firstVertex;     ///< The index of the first vertex to draw. This is used for non-indexed draw calls, and specifies the starting point in the vertex buffers from which vertices will be read and processed by the vertex shader.
+        glm::u32 firstInstance;   ///< The index of the first instance to draw. This is used for instanced draw calls, and specifies the starting point for instance data when drawing multiple instances of geometry. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
     };
 
     /**
@@ -406,11 +439,11 @@ export namespace gfx
      */
     struct GFX_API IndirectDrawIndexedCommand
     {
-        uint32_t indexCount;      ///< The number of indices to draw. This is used for indexed draw calls, and specifies how many indices will be read from the index buffer and processed by the vertex shader.
-        uint32_t instanceCount;   ///< The number of instances to draw. This is used for instanced draw calls, and specifies how many instances of the geometry will be drawn. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
-        uint32_t firstIndex;      ///< The index of the first index to draw. This is used for indexed draw calls, and specifies the starting point in the index buffer from which indices will be read and processed by the vertex shader.
-        int32_t vertexOffset;     ///< The value added to the vertex index before fetching vertex attributes from the vertex buffers. This can be used to specify a base vertex index when drawing indexed geometry, which can be useful for rendering techniques that require drawing subsets of a larger mesh or for certain shadow mapping techniques.
-        uint32_t firstInstance;   ///< The index of the first instance to draw. This is used for instanced draw calls, and specifies the starting point for instance data when drawing multiple instances of geometry. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
+        glm::u32 indexCount;      ///< The number of indices to draw. This is used for indexed draw calls, and specifies how many indices will be read from the index buffer and processed by the vertex shader.
+        glm::u32 instanceCount;   ///< The number of instances to draw. This is used for instanced draw calls, and specifies how many instances of the geometry will be drawn. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
+        glm::u32 firstIndex;      ///< The index of the first index to draw. This is used for indexed draw calls, and specifies the starting point in the index buffer from which indices will be read and processed by the vertex shader.
+        glm::i32 vertexOffset;     ///< The value added to the vertex index before fetching vertex attributes from the vertex buffers. This can be used to specify a base vertex index when drawing indexed geometry, which can be useful for rendering techniques that require drawing subsets of a larger mesh or for certain shadow mapping techniques.
+        glm::u32 firstInstance;   ///< The index of the first instance to draw. This is used for instanced draw calls, and specifies the starting point for instance data when drawing multiple instances of geometry. Each instance will have its own set of vertex attributes, which can be accessed in the vertex shader using the gl_InstanceID built-in variable.
     };
 
     /**
@@ -418,9 +451,9 @@ export namespace gfx
      */
     struct GFX_API IndirectDrawMeshTasksCommand
     {
-        uint32_t taskCountX;      ///< The number of local workgroups to dispatch in the X dimension. This is used for mesh task draw calls, and specifies how many mesh tasks will be executed in parallel across the X dimension.
-        uint32_t taskCountY;      ///< The number of local workgroups to dispatch in the Y dimension. This is used for mesh task draw calls, and specifies how many mesh tasks will be executed in parallel across the Y dimension.
-        uint32_t taskCountZ;      ///< The number of local workgroups to dispatch in the Z dimension. This is used for mesh task draw calls, and specifies how many mesh tasks will be executed in parallel across the Z dimension.
+        glm::u32 taskCountX;      ///< The number of local workgroups to dispatch in the X dimension. This is used for mesh task draw calls, and specifies how many mesh tasks will be executed in parallel across the X dimension.
+        glm::u32 taskCountY;      ///< The number of local workgroups to dispatch in the Y dimension. This is used for mesh task draw calls, and specifies how many mesh tasks will be executed in parallel across the Y dimension.
+        glm::u32 taskCountZ;      ///< The number of local workgroups to dispatch in the Z dimension. This is used for mesh task draw calls, and specifies how many mesh tasks will be executed in parallel across the Z dimension.
     };
 
     enum class PipelineStage {
@@ -443,7 +476,7 @@ export namespace gfx
         BottomOfPipe = 1 << 9
     };
 
-    enum class ResourceAccess {
+    enum class ResourceAccess : glm::u8 {
         // Compute
         ComputeRead,         // COMPUTE_SHADER + SHADER_READ
         ComputeWrite,        // COMPUTE_SHADER + SHADER_WRITE
@@ -486,52 +519,6 @@ export namespace gfx
         Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
     };
 
-    class GFX_API BufferBarrier {
-    public:
-        BufferBarrier(
-            const gfx::ResourceRef<const gfx::Buffer> &buffer,
-            ResourceAccess dstAccess,
-            glm::u64 offset = 0,
-            glm::u64 size = UINT64_MAX);
-
-        [[nodiscard]] gfx::ResourceRef<const gfx::Buffer> getBuffer() const { return _buffer; }
-        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
-        [[nodiscard]] glm::u64 getOffset() const { return _offset; }
-        [[nodiscard]] glm::u64 getSize() const { return _size; }
-
-    private:
-        gfx::ResourceRef<const gfx::Buffer> _buffer;
-        ResourceAccess _dstAccess;
-        glm::u64 _offset;
-        glm::u64 _size;
-    };
-
-    class GFX_API ImageBarrier {
-    public:
-        ImageBarrier(
-            const gfx::ResourceRef<const gfx::Image> &image,
-            ResourceAccess dstAccess,
-            std::optional<glm::u32> baseMipLevel = std::nullopt,
-            std::optional<glm::u32> levelCount = std::nullopt,
-            std::optional<glm::u32> baseArrayLayer = std::nullopt,
-            std::optional<glm::u32> layerCount = std::nullopt);
-
-        [[nodiscard]] gfx::ResourceRef<const gfx::Image> getImage() const { return _image; }
-        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
-        [[nodiscard]] std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
-        [[nodiscard]] std::optional<glm::u32> getLevelCount() const { return _levelCount; }
-        [[nodiscard]] std::optional<glm::u32> getBaseArrayLayer() const { return _baseArrayLayer; }
-        [[nodiscard]] std::optional<glm::u32> getLayerCount() const { return _layerCount; }
-
-    private:
-        gfx::ResourceRef<const gfx::Image> _image;
-        ResourceAccess _dstAccess;
-        std::optional<glm::u32> _baseMipLevel;
-        std::optional<glm::u32> _levelCount;
-        std::optional<glm::u32> _baseArrayLayer;
-        std::optional<glm::u32> _layerCount;
-    };
-
     class GFX_API Blit {
     public:
         glm::ivec3 srcOffset = { 0, 0, 0 };
@@ -571,25 +558,93 @@ export namespace gfx
         glm::u32 imageMipLevel = 0;
     };
 
-    enum class LoadOperation {
+    enum class LoadOperation : glm::u8 {
         eLoad,
         eClear,
         eDontCare
     };
 
-    enum class StoreOperation {
+    enum class StoreOperation : glm::u8 {
         eStore,
         eDontCare
     };
 
     class GFX_API RenderParameters {
     public:
-        gfx::LoadOperation colorLoadOperation = gfx::LoadOperation::eClear;
-        gfx::LoadOperation depthLoadOperation = gfx::LoadOperation::eClear;
-        gfx::LoadOperation stencilLoadOperation = gfx::LoadOperation::eClear;
+        LoadOperation colorLoadOperation = LoadOperation::eClear;
+        LoadOperation depthLoadOperation = LoadOperation::eClear;
+        LoadOperation stencilLoadOperation = LoadOperation::eClear;
 
-        gfx::StoreOperation colorStoreOperation = gfx::StoreOperation::eStore;
-        gfx::StoreOperation depthStoreOperation = gfx::StoreOperation::eStore;
-        gfx::StoreOperation stencilStoreOperation = gfx::StoreOperation::eStore;
+        StoreOperation colorStoreOperation = StoreOperation::eStore;
+        StoreOperation depthStoreOperation = StoreOperation::eStore;
+        StoreOperation stencilStoreOperation = StoreOperation::eStore;
+    };
+
+
+
+    struct GFX_API ColorBlendState
+    {
+        struct GFX_API AttachmentState
+        {
+            bool blendEnable = false;
+            BlendFactor srcColorBlendFactor = BlendFactor::eOne;
+            BlendFactor dstColorBlendFactor = BlendFactor::eZero;
+            BlendOp colorBlendOp = BlendOp::eAdd;
+            BlendFactor srcAlphaBlendFactor = BlendFactor::eOne;
+            BlendFactor dstAlphaBlendFactor = BlendFactor::eZero;
+            BlendOp alphaBlendOp = BlendOp::eAdd;
+            Flags<ColorComponent> colorWriteMask =
+                Flags(ColorComponent::eR) | ColorComponent::eG | ColorComponent::eB | ColorComponent::eA;
+        };
+        bool enableLogicOp = false;
+        LogicOp logicOp = LogicOp::eCopy;
+        std::vector<AttachmentState> attachments = {};
+        float blendConstants[4] = { 0.f, 0.f, 0.f, 0.f };
+    };
+
+    class GFX_API BufferBarrier {
+    public:
+        BufferBarrier(
+            const ResourceRef<const Buffer> &buffer,
+            ResourceAccess dstAccess,
+            glm::u64 offset = 0,
+            glm::u64 size = UINT64_MAX);
+
+        [[nodiscard]] ResourceRef<const Buffer> getBuffer() const { return _buffer; }
+        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
+        [[nodiscard]] glm::u64 getOffset() const { return _offset; }
+        [[nodiscard]] glm::u64 getSize() const { return _size; }
+
+    private:
+        ResourceRef<const Buffer> _buffer;
+        ResourceAccess _dstAccess;
+        glm::u64 _offset;
+        glm::u64 _size;
+    };
+
+    class GFX_API ImageBarrier {
+    public:
+        ImageBarrier(
+            const ResourceRef<const Image> &image,
+            ResourceAccess dstAccess,
+            std::optional<glm::u32> baseMipLevel = std::nullopt,
+            std::optional<glm::u32> levelCount = std::nullopt,
+            std::optional<glm::u32> baseArrayLayer = std::nullopt,
+            std::optional<glm::u32> layerCount = std::nullopt);
+
+        [[nodiscard]] ResourceRef<const Image> getImage() const { return _image; }
+        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
+        [[nodiscard]] std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] std::optional<glm::u32> getLevelCount() const { return _levelCount; }
+        [[nodiscard]] std::optional<glm::u32> getBaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] std::optional<glm::u32> getLayerCount() const { return _layerCount; }
+
+    private:
+        ResourceRef<const Image> _image;
+        ResourceAccess _dstAccess;
+        std::optional<glm::u32> _baseMipLevel;
+        std::optional<glm::u32> _levelCount;
+        std::optional<glm::u32> _baseArrayLayer;
+        std::optional<glm::u32> _layerCount;
     };
 }

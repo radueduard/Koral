@@ -2,14 +2,10 @@
 // Created by radue on 3/4/2026.
 //
 
-module;
+module gfx;
+import :descriptorSetLayout;
 
-#include <stdexcept>
-#include <string>
-
-module gfx.descriptorSetLayout;
-import vk.descriptorSetLayout;
-import gfx.context;
+import :vk_descriptorSetLayout;
 
 namespace gfx
 {
@@ -25,7 +21,7 @@ namespace gfx
 
     std::unique_ptr<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
         case API::eOpenGL:
             return std::make_unique<DescriptorSetLayout>(*this);
         case API::eVulkan:

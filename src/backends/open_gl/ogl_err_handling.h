@@ -5,7 +5,6 @@
 #pragma once
 
 #include <GL/glew.h>
-#include <iostream>
 
 inline bool glCheckError_(const char *file, int line)
 {

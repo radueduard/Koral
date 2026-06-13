@@ -7,23 +7,15 @@ module;
 #include "api.h"
 #include <glm/glm.hpp>
 
-export module gfx.commandBuffer;
+export module gfx:commandBuffer;
+import :types;
 
 import std;
-import gfx.structs;
-import gfx.resource;
-import gfx.flags;
-import gfx.framebuffer;
-import gfx.computePipeline;
-import gfx.graphicsPipeline;
-import gfx.descriptorSet;
-import gfx.image;
+import resource;
 
 namespace gfx
 {
-    class Buffer;
-
-    export class GFX_API CommandBuffer
+    class GFX_API CommandBuffer
     {
     public:
         virtual ~CommandBuffer() = default;
@@ -136,8 +128,8 @@ namespace gfx
         virtual void Submit() = 0;
         virtual void Reset() = 0;
 
-        CommandBuffer& BufferBarrier(const BufferBarrier& barrier) { return Barrier({ barrier }, {}); }
-        CommandBuffer& ImageBarrier(const ImageBarrier& barrier) { return Barrier({}, { barrier }); }
+        CommandBuffer& AddBufferBarrier(const BufferBarrier& barrier) { return Barrier({ barrier }, {}); }
+        CommandBuffer& AddImageBarrier(const ImageBarrier& barrier) { return Barrier({}, { barrier }); }
 
         CommandBuffer& DrawMesh(ResourceRef<const Mesh> mesh, glm::u32 instanceCount , glm::u32 baseInstance);
         CommandBuffer& DrawSubMesh(ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount);
@@ -148,10 +140,10 @@ namespace gfx
 
     protected:
         struct {
-            std::optional<gfx::ResourceRef<const Framebuffer>> boundFramebuffer = std::nullopt;
-            std::optional<gfx::ResourceRef<const ComputePipeline>> boundComputePipeline = std::nullopt;
-            std::optional<gfx::ResourceRef<const GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
-            std::optional<gfx::ResourceRef<const Mesh>> boundMesh = std::nullopt;
+            std::optional<ResourceRef<const Framebuffer>> boundFramebuffer = std::nullopt;
+            std::optional<ResourceRef<const ComputePipeline>> boundComputePipeline = std::nullopt;
+            std::optional<ResourceRef<const GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
+            std::optional<ResourceRef<const Mesh>> boundMesh = std::nullopt;
 
             bool viewportSet = false;
             bool scissorSet = false;

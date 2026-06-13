@@ -9,15 +9,12 @@ module;
 #include <glm/glm.hpp>
 #include <imgui.h>
 
-export module gfx.gui;
+export module gfx:gui;
+import :image;
+import :commandBuffer;
+
 import std;
-import gfx.image;
-import gfx.commandBuffer;
-import gfx.resource;
-
-struct ImGui_ImplVulkan_InitInfo;
-
-struct GLFWwindow;
+import resource;
 
 namespace gfx
 {
@@ -33,7 +30,7 @@ namespace gfx
 
         virtual ImTextureID operator*() const = 0;
 
-        static gfx::Resource<GUI_Image> Create(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer = 0, glm::u32 level = 0);
+        static Resource<GUI_Image> Create(ResourceRef<const gfx::Image> image, glm::u32 layer = 0, glm::u32 level = 0);
     };
 
     enum class Font

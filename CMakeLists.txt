@@ -1,15 +1,19 @@
 cmake_minimum_required(VERSION 3.30)
 
-# Enable CMake's experimental `import std` support. The gate UUID is specific to this CMake
-# version (4.2.x -> "CxxImportStd" gate). Must be set before CXX is enabled (the project() call).
-set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+# The `import std` experimental gate UUID is bumped between CMake releases. Pick the one matching
+# the active cmake so both the CLI (4.3.x) and CLion's bundled toolchain (4.2.x) can configure.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 4.3)
+    set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "451f2fe2-a8a2-47c3-bc32-94786d8fc91b")
+else()
+    set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD "d0edc3af-4c50-42ea-a356-e2862fe7a444")
+endif()
 
 project(GFX_RELOADED VERSION 0.0.1 LANGUAGES C CXX)
 include(GenerateExportHeader)
 include(GNUInstallDirs)
 
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # C++23 named modules + `import std`. Scanning is required so the build orders BMI generation;
@@ -72,7 +76,22 @@ file (GLOB_RECURSE SOURCE_FILES
         src/backends/*.cpp
 )
 
+file(GLOB_RECURSE PUBLIC_MODULE_FILES
+        include/*.ixx
+        src/executor/*.ixx
+)
+
+file(GLOB_RECURSE PRIVATE_MODULE_FILES
+        src/backends/*.ixx
+        src/core/*.ixx
+)
+
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
+
+target_sources(${PROJECT_NAME}
+    PUBLIC  FILE_SET gfx_public_modules  TYPE CXX_MODULES FILES ${PUBLIC_MODULE_FILES}
+    PRIVATE FILE_SET gfx_private_modules TYPE CXX_MODULES FILES ${PRIVATE_MODULE_FILES}
+)
 
 target_link_options(${PROJECT_NAME} PRIVATE
     "LINKER:--allow-multiple-definition"
@@ -211,7 +230,8 @@ install(TARGETS ${PROJECT_NAME} Gfx_Runtime
         EXPORT GFX_RELOADEDTargets
         RUNTIME  DESTINATION ${CMAKE_INSTALL_BINDIR}
         LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        FILE_SET gfx_public_modules DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 # Public headers: the hand-written API in include/ plus the generated export header.
 install(DIRECTORY "${CMAKE_SOURCE_DIR}/include/"

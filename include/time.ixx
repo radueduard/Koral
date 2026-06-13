@@ -6,14 +6,13 @@ module;
 
 #include "api.h"
 
-export module gfx.time;
+export module gfx:time;
+import :types;
 
 import std;
 
-namespace gfx::io {
-	class Window;
-
-	export class GFX_API Time {
+namespace gfx {
+	class GFX_API Time {
 	public:
 		static float FrameTime();
 		static float FixedDeltaTime();

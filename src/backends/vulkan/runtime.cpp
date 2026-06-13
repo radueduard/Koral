@@ -6,18 +6,19 @@ module;
 
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 
-#include <iostream>
-#include <ranges>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include <vulkan/vulkan_to_string.hpp>
 
-module vk.runtime;
-import gfx.window;
-import gfx.log;
-import vk.physicalDevice;
+module gfx;
+import :vk_runtime;
+
+import std;
+import :window;
+import :context;
+import logger;
 
 namespace gfx::vk
 {
@@ -31,7 +32,7 @@ namespace gfx::vk
         return extensions;
     }
 
-    ::vk::SurfaceKHR CreateSurface(const ::vk::Instance& instance, const io::Window& window) {
+    ::vk::SurfaceKHR CreateSurface(const ::vk::Instance& instance, const Window& window) {
         VkSurfaceKHR surface;
         if (const auto result = glfwCreateWindowSurface(instance, *window, nullptr, &surface); result != VK_SUCCESS) {
             std::cerr << "Failed to create window surface: " << ::vk::to_string(static_cast<::vk::Result>(result)) << std::endl;
@@ -47,16 +48,16 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
         switch (messageSeverity) {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-                gfx::log::info("[vulkan] [verbose] {}", pCallbackData->pMessage);
+                logger::info("[vulkan] [verbose] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-                gfx::log::info("[vulkan] [info] {}", pCallbackData->pMessage);
+                logger::info("[vulkan] [info] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-                gfx::log::warn("[vulkan] [warning] {}", pCallbackData->pMessage);
+                logger::warn("[vulkan] [warning] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-                gfx::log::error("[vulkan] [error] {}", pCallbackData->pMessage);
+                logger::error("[vulkan] [error] {}", pCallbackData->pMessage);
                 // GFX_BREAK(); // drop into debugger on Vulkan errors too
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:

@@ -5,22 +5,21 @@
 
 module;
 
-#include <stdexcept>
 #include <imgui.h>
 // #include <imguizmo.h>
 
-#include <iostream>
 #include <GLFW/glfw3.h>
 #include <imgui/IconsFontAwesome6.h>
 
-module gfx.gui;
-import ogl.gui;
-import vk.gui;
-import gfx.context;
+module gfx;
+import :gui;
+
+import :vk_gui;
+import :ogl_gui;
 
 ImFont* AddFont(const std::filesystem::path& path, const float size)
 {
-    const std::string iconPath = gfx::assetPath(FONT_ICON_FILE_NAME_FAS).string();
+    const std::string iconPath = ASSETS_PATH FONT_ICON_FILE_NAME_FAS;
     const float iconFontSize = size * 2.0f / 3.0f; // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
 
     ImFontConfig config;
@@ -116,25 +115,25 @@ void gfx::GUI::DefineStyle()
 
 
     auto& io = ImGui::GetIO();
-    _fonts[Font::Regular] = AddFont(gfx::assetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
-    _fonts[Font::Bold] = AddFont(gfx::assetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
-    _fonts[Font::Italic] = AddFont(gfx::assetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
-    _fonts[Font::Black] = AddFont(gfx::assetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
-    _fonts[Font::Light] = AddFont(gfx::assetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
+    _fonts[Font::Regular] = AddFont(ASSETS_PATH "fonts/Inter_28pt-Regular.ttf", 28.0f);
+    _fonts[Font::Bold] = AddFont(ASSETS_PATH "fonts/Inter_28pt-Bold.ttf", 32.0f);
+    _fonts[Font::Italic] = AddFont(ASSETS_PATH "fonts/Inter_28pt-Italic.ttf", 28.0f);
+    _fonts[Font::Black] = AddFont(ASSETS_PATH "fonts/Inter_28pt-Black.ttf", 36.0f);
+    _fonts[Font::Light] = AddFont(ASSETS_PATH "fonts/Inter_28pt-Light.ttf", 26.0f);
 
     io.FontDefault = _fonts[Font::Regular];
     io.FontGlobalScale = .55f;
 }
 
 
-gfx::Resource<gfx::GUI_Image> gfx::GUI_Image::Create(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level)
+Resource<gfx::GUI_Image> gfx::GUI_Image::Create(ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level)
 {
-    switch (Context::Window().getAPI())
+    switch (Context::GetWindow().getAPI())
     {
         case API::eOpenGL:
-        return gfx::MakeResource<gfx::ogl::GUI_Image>(image, layer, level);
+        return MakeResource<gfx::ogl::GUI_Image>(image, layer, level);
     case API::eVulkan:
-        return gfx::MakeResource<gfx::vk::GUI_Image>(image, layer, level);
+        return MakeResource<gfx::vk::GUI_Image>(image, layer, level);
     default:
         throw std::runtime_error("Unsupported graphics API");
     }
@@ -148,12 +147,12 @@ void gfx::GUI::Init()
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    if (!Context::Window().isFullscreen())
+    if (!Context::GetWindow().isFullscreen())
     {
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     }
 
-    switch (Context::Window().getAPI())
+    switch (Context::GetWindow().getAPI())
     {
     case API::eOpenGL:
          ogl::GUI::Init();
@@ -172,7 +171,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 {
     auto* context = Context::GetCurrentImGuiContext();
 
-    switch (Context::Window().getAPI())
+    switch (Context::GetWindow().getAPI())
     {
     case API::eOpenGL:
         ogl::GUI::NewFrame();
@@ -197,16 +196,16 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 
     window_flags |= ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground;
 
-    if (Context::Window().isDecorated())
+    if (Context::GetWindow().isDecorated())
     {
         window_flags |= ImGuiWindowFlags_NoTitleBar;
     }
 
     ImGui::PushFont(GetFont(Font::Bold));
 
-    ImGui::Begin(Context::Window().getTitle().c_str(), nullptr, window_flags);
+    ImGui::Begin(Context::GetWindow().getTitle().c_str(), nullptr, window_flags);
 
-    if (!Context::Window().isDecorated())
+    if (!Context::GetWindow().isDecorated())
     {
         ImVec2 windowPos = ImGui::GetWindowPos();
         float titleBarHeight = ImGui::GetFrameHeight();
@@ -255,11 +254,11 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
             {
                 if (btn.label[0] == 'X')
                 {
-                    Context::Window().close();
+                    Context::GetWindow().close();
                 }
                 else if (btn.label[0] == ICON_FA_SQUARE[0] && btn.label[1] == ICON_FA_SQUARE[1])
                 {
-                    GLFWwindow* win = *Context::Window();
+                    GLFWwindow* win = *Context::GetWindow();
                     if (glfwGetWindowAttrib(win, GLFW_MAXIMIZED))
                         glfwRestoreWindow(win);
                     else
@@ -267,14 +266,14 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
                 }
                 else if (btn.label[0] == ICON_FA_MINUS[0] && btn.label[1] == ICON_FA_MINUS[1])
                 {
-                    glfwIconifyWindow(*Context::Window());
+                    glfwIconifyWindow(*Context::GetWindow());
                 }
             }
         }
     }
     ImGui::PopFont();
 
-    if (!Context::Window().isDecorated())
+    if (!Context::GetWindow().isDecorated())
     {
         const ImVec2 windowPos = ImGui::GetWindowPos();
         const ImVec2 titleBarMin = windowPos;
@@ -290,7 +289,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
             isDragging = true;
             dragStartMousePos = ImGui::GetMousePos();
             int wx, wy;
-            glfwGetWindowPos(*Context::Window(), &wx, &wy);
+            glfwGetWindowPos(*Context::GetWindow(), &wx, &wy);
             dragStartWindowPos = ImVec2(static_cast<float>(wx), static_cast<float>(wy));
         }
 
@@ -306,7 +305,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
             const float dy = currentMousePos.y - dragStartMousePos.y;
 
             glfwSetWindowPos(
-                *Context::Window(),
+                *Context::GetWindow(),
                 static_cast<int>(dragStartWindowPos.x + dx),
                 static_cast<int>(dragStartWindowPos.y + dy)
             );
@@ -323,7 +322,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
     ImGui::Render();
 
     ImDrawData* draw_data = ImGui::GetDrawData();
-    switch (Context::Window().getAPI())
+    switch (Context::GetWindow().getAPI())
     {
     case API::eOpenGL:
         ogl::GUI::Render(commandBuffer, draw_data);
@@ -346,7 +345,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 
 void gfx::GUI::Shutdown()
 {
-    switch (Context::Window().getAPI())
+    switch (Context::GetWindow().getAPI())
     {
     case API::eOpenGL:
         ogl::GUI::Shutdown();

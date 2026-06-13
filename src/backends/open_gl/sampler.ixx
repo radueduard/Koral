@@ -6,14 +6,14 @@ module;
 
 #include <GL/glew.h>
 
-export module ogl.sampler;
+export module gfx:ogl_sampler;
+import :ogl_types;
 
-import gfx.sampler;
-import gfx.structs;
+import :sampler;
 
 namespace gfx::ogl
 {
-    export class Sampler final : public gfx::Sampler
+    class Sampler final : public gfx::Sampler
     {
     public:
         explicit Sampler(const gfx::Sampler::Builder& createInfo);

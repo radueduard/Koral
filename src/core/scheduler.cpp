@@ -2,26 +2,37 @@
 // Created by eduard on 11.03.2026.
 //
 
-module;
+module gfx;
+import :scheduler;
+import :commandBuffer;
 
-#include <stdexcept>
-
-module gfx.scheduler;
-import ogl.scheduler;
-import vk.scheduler;
-import gfx.context;
+import :vk_scheduler;
+import :ogl_scheduler;
 
 
 namespace gfx
 {
+    struct FrameCommandBuffer {
+        std::unique_ptr<gfx::CommandBuffer> cmd;
+    };
+
+    Frame::~Frame() = default;
+
+    gfx::CommandBuffer& Frame::getCommandBuffer() const { return *_commandBuffer->cmd; }
+
+    void Frame::setCommandBuffer(std::unique_ptr<gfx::CommandBuffer> cmd)
+    {
+        _commandBuffer = std::make_unique<FrameCommandBuffer>(FrameCommandBuffer{std::move(cmd)});
+    }
+
     Frame::Frame(const glm::u32 imageIndex) : _imageIndex(imageIndex)
     {
-        _commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+        setCommandBuffer(CommandBuffer::Create(CommandBuffer::Usage::eGraphics));
     }
 
     Scheduler* Scheduler::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
         case API::eOpenGL:
             return new ogl::Scheduler(*this);
             case API::eVulkan:

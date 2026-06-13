@@ -4,11 +4,11 @@
 
 module;
 
-#include <array>
 #include "ogl_err_handling.h"
 #include <spirv_cross/spirv_glsl.hpp>
 
-module ogl.shader;
+module gfx;
+import :ogl_shader;
 
 namespace gfx::ogl
 {

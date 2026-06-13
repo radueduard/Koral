@@ -7,17 +7,18 @@ module;
 #include "api.h"
 #include <glm/glm.hpp>
 
-export module gfx.mesh.base;
+export module gfx:meshBase;
 
 import std;
-import gfx.structs;
-import gfx.resource;
-import gfx.buffer;
-import gfx.flags;
+import :types;
+import :buffer;
+import :meshType;
+import resource;
+import flags;
 
 namespace gfx
 {
-    export class GFX_API Mesh
+    class GFX_API Mesh
     {
     public:
         Mesh() = default;
@@ -30,14 +31,14 @@ namespace gfx
 
         [[nodiscard]] std::vector<ResourceRef<Buffer>> getVertexBuffers() const
         {
-            std::vector<gfx::ResourceRef<Buffer>> vertexBuffers;
+            std::vector<ResourceRef<Buffer>> vertexBuffers;
             for (const auto& vertexBuffer : _vertexBuffers)
             {
                 vertexBuffers.emplace_back(vertexBuffer);
             }
             return vertexBuffers;
         }
-        [[nodiscard]] std::optional<gfx::ResourceRef<Buffer>> getIndexBuffer() const {
+        [[nodiscard]] std::optional<ResourceRef<Buffer>> getIndexBuffer() const {
             if (!_indexBuffer.has_value())
                 return std::nullopt;
             return _indexBuffer;
@@ -45,12 +46,12 @@ namespace gfx
 
     protected:
         glm::u64 _vertexCount{};
-        std::vector<gfx::Resource<Buffer>> _vertexBuffers = {};
+        std::vector<Resource<Buffer>> _vertexBuffers = {};
 
         std::optional<glm::u32> _indexCount = std::nullopt;
-        std::optional<gfx::Resource<Buffer>> _indexBuffer = std::nullopt;
+        std::optional<Resource<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
-        std::optional<gfx::Resource<Buffer>> _indirectBuffer = std::nullopt;
+        std::optional<Resource<Buffer>> _indirectBuffer = std::nullopt;
 
 
         /**
@@ -58,7 +59,7 @@ namespace gfx
          * `T` is deduced from the span, so the const element type does not need to be spelled out.
          */
         template<typename T>
-        static gfx::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
+        static Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
         {
             // Keep final buffers transfer-capable as requested.
             const auto finalUsage = usage
@@ -78,7 +79,7 @@ namespace gfx
          * The caller is expected to fill it later. `T` must be specified explicitly.
          */
         template<typename T>
-        static gfx::Resource<Buffer> makeBuffer(glm::u64 instanceCount, Flags<Buffer::Usage> usage)
+        static Resource<Buffer> makeBuffer(glm::u64 instanceCount, Flags<Buffer::Usage> usage)
         {
             const auto finalUsage = usage
                 | Buffer::Usage::eTransferDst
@@ -93,7 +94,7 @@ namespace gfx
         }
     };
 
-    export template<typename Derived>
+    template<typename Derived>
     class CustomMesh : public Mesh
     {
     public:
@@ -105,12 +106,12 @@ namespace gfx
         struct Builder
         {
             glm::u64 vertexCount = 0;
-            std::vector<gfx::Resource<Buffer>> vertexBuffers {};
+            std::vector<Resource<Buffer>> vertexBuffers {};
 
             std::optional<glm::u32> indexCount = std::nullopt;
-            std::optional<gfx::Resource<Buffer>> indexBuffer = std::nullopt;
+            std::optional<Resource<Buffer>> indexBuffer = std::nullopt;
             std::optional<ChannelType> indexType = std::nullopt;
-            std::optional<gfx::Resource<Buffer>> indirectBuffer = std::nullopt;
+            std::optional<Resource<Buffer>> indirectBuffer = std::nullopt;
 
             explicit Builder()
             {
@@ -119,7 +120,7 @@ namespace gfx
                 vertexBuffers.resize(Derived::VertexBindingDescription().size());
             }
 
-            Builder& SetVertexBuffer(const glm::u32 binding, gfx::Resource<Buffer> vertexBuffer) {
+            Builder& SetVertexBuffer(const glm::u32 binding, Resource<Buffer> vertexBuffer) {
                 if (vertexCount == 0)
                     vertexCount = vertexBuffer->getSize() / _vertexBindingDescription[binding].stride;
                 else if (vertexCount != vertexBuffer->getSize() / _vertexBindingDescription[binding].stride)
@@ -129,21 +130,21 @@ namespace gfx
                 return *this;
             }
 
-            Builder& SetIndexBuffer(gfx::Resource<Buffer> indexBuffer, const ChannelType indexType) {
+            Builder& SetIndexBuffer(Resource<Buffer> indexBuffer, const ChannelType indexType) {
                 this->indexCount = static_cast<glm::u32>(indexBuffer->getSize() / sizeofChannelType(indexType));
                 this->indexBuffer = std::move(indexBuffer);
                 this->indexType = indexType;
                 return *this;
             }
 
-            Builder& SetIndirectBuffer(gfx::Resource<Buffer> indirectBuffer) {
+            Builder& SetIndirectBuffer(Resource<Buffer> indirectBuffer) {
                 this->indirectBuffer = std::move(indirectBuffer);
                 return *this;
             }
 
-            gfx::Resource<Derived> Build()
+            Resource<Derived> Build()
             {
-                return gfx::MakeResource<Derived>(*this);
+                return MakeResource<Derived>(*this);
             }
         };
 

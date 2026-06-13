@@ -4,29 +4,28 @@
 
 module;
 
-#include <stdexcept>
+#include <glm/glm.hpp>
 
-module gfx.image;
-import vk.image;
-import ogl.image;
-import gfx.context;
-import gfx.window;
+module gfx;
+import :image;
+
+import std;
+import :vk_image;
+import :ogl_image;
 
 namespace gfx
 {
-    gfx::Resource<Image> Image::Builder::build() const
+    Resource<Image> Image::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
-            case API::eOpenGL:
-            return gfx::MakeResource<ogl::Image>(*this);
-            case API::eVulkan:
-            return gfx::MakeResource<vk::Image>(*this);
+        switch (Context::GetWindow().getAPI()) {
+            case API::eOpenGL: return MakeResource<ogl::Image>(*this);
+            case API::eVulkan: return MakeResource<vk::Image>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
     }
 
-    glm::u32 Image::ChannelSizeFromImageFormat(const gfx::Image::Format format)
+    glm::u32 Image::ChannelSizeFromImageFormat(const Image::Format format)
     {
         switch (format)
         {
@@ -104,7 +103,7 @@ namespace gfx
         }
     }
 
-    glm::u32 Image::ChannelCountFromImageFormat(const gfx::Image::Format format)
+    glm::u32 Image::ChannelCountFromImageFormat(const Image::Format format)
     {
         switch (format)
         {
@@ -187,17 +186,17 @@ namespace gfx
     }
 
     void Image::ReadPixel(const glm::uvec3 &coord, void *outData, const glm::u32 dataSize) const {
-        const auto stagingBuffer = gfx::Buffer::RawBuilder()
+        const auto stagingBuffer = Buffer::RawBuilder()
             .setRawSize(dataSize)
             .setUsage(Buffer::Usage::eTransferDst)
             .setType(Buffer::Type::eStaging)
             .build();
-        CommandBuffer::SingleTimeCommand([&](gfx::CommandBuffer& commandBuffer) {
-            commandBuffer.CopyImageToBuffer(ResourceRef<const gfx::Image>(this), stagingBuffer, Copy {
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+            commandBuffer.CopyImageToBuffer(ResourceRef<const Image>(this), stagingBuffer, Copy {
                 .bufferOffset = 0,
                 .bufferRowLength = 0,
                 .bufferImageHeight = 0,
-                .imageOffset = { static_cast<int32_t>(coord.x), static_cast<int32_t>(coord.y), static_cast<int32_t>(coord.z) },
+                .imageOffset = { static_cast<glm::int32_t>(coord.x), static_cast<int32_t>(coord.y), static_cast<int32_t>(coord.z) },
                 .imageExtent = { 1, 1, 1 },
                 .imageBaseArrayLayer = 0,
                 .imageLayerCount = 1,

@@ -4,30 +4,31 @@
 
 module;
 
-#include <iostream>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 #include <vulkan/vulkan.hpp>
 #include <glm/glm.hpp>
 
-#include "vk_enum_conversions.h"
+module gfx;
+import :vk_gui;
+import :vk_image;
+import :vk_imageView;
+import :vk_descriptorPool;
+import :vk_sampler;
+import :vk_context;
+import :vk_scheduler;
+import :vk_commandBuffer;
+import :vk_device;
+import :vk_swapChain;
+import :vk_framebuffer;
+import :vk_runtime;
+import :vk_enum_conversions;
 
-module vk.gui;
-import vk.descriptorPool;
-import gfx.gui;
-import gfx.resource;
-import gfx.image;
-import gfx.sampler;
-import gfx.structs;
-import gfx.context;
-import vk.image;
-import vk.imageView;
-import vk.sampler;
-import vk.context;
-import vk.scheduler;
-import vk.commandBuffer;
-import vk.framebuffer;
+import :gui;
+import :commandBuffer;
+import resource;
+
 
 gfx::vk::DescriptorPool* gfx::vk::GUI::_descriptorPool = nullptr;
 
@@ -79,11 +80,11 @@ namespace gfx::vk
                         .filtering = gfx::Filter::eNearest
                     });
 
-                commandBuffer.ImageBarrier({ _helperImage, ResourceAccess::FragmentShaderRead });
+                commandBuffer.AddImageBarrier(gfx::ImageBarrier { _helperImage, ResourceAccess::FragmentShaderRead });
             }, ::vk::QueueFlagBits::eGraphics);
     }
 
-    void GUI_Image::setImage(gfx::ResourceRef<const gfx::Image> image)
+    void GUI_Image::setImage(ResourceRef<const gfx::Image> image)
     {
         Context::Device()->waitIdle();
         ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
@@ -116,7 +117,7 @@ namespace gfx::vk
             .setComponentMapping(components)
             .build();
 
-        for (int frame = 0; frame < gfx::Context::Scheduler().getImageCount(); ++frame) {
+        for (int frame = 0; frame < gfx::Context::GetScheduler().getImageCount(); ++frame) {
             auto imageView = dynamic_cast<const gfx::vk::ImageView&>(*_helperImageView)[_helperImageView->isPerFrame() ? frame : 0];
             _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
                 *dynamic_cast<const gfx::vk::Sampler&>(*_helperSampler),
@@ -128,7 +129,7 @@ namespace gfx::vk
     }
 
     ImTextureID GUI_Image::operator*() const {
-        const auto frameIndex = gfx::Context::Scheduler().getCurrentImageIndex();
+        const auto frameIndex = gfx::Context::GetScheduler().getCurrentImageIndex();
         return reinterpret_cast<ImTextureID>(_descriptorSets[frameIndex]);
     }
 
@@ -147,13 +148,13 @@ namespace gfx::vk
             .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
             .build();
 
-        if (!ImGui_ImplGlfw_InitForVulkan(*gfx::Context::Window(), true)) {
+        if (!ImGui_ImplGlfw_InitForVulkan(*gfx::Context::GetWindow(), true)) {
             throw std::runtime_error("Failed to initialize ImGui for GLFW");
         }
 
         const auto& queue = vk::Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
 
-        const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
+        const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::GetScheduler());
         static std::vector colorAttachmentFormats = {
             static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().getImage()->getFormat()))
         };
@@ -223,7 +224,7 @@ namespace gfx::vk
             .setViewMask(0)
             .setLayerCount(1);
 
-        commandBuffer.ImageBarrier({
+        commandBuffer.AddImageBarrier({
             vkColorImageView.getImage(),
             ResourceAccess::ColorAttachment
         });
@@ -236,7 +237,7 @@ namespace gfx::vk
 
         vkCommandBuffer->endRendering();
 
-        commandBuffer.ImageBarrier({
+        commandBuffer.AddImageBarrier({
             vkColorImageView.getImage(),
             ResourceAccess::Present
         });

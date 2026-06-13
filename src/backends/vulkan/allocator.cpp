@@ -4,9 +4,15 @@
 
 module;
 
-#include <iostream>
+#include <vk_mem_alloc.h>
+#include <vulkan/vulkan.hpp>
 
-module vk.allocator;
+module gfx;
+import :vk_allocator;
+import :vk_context;
+import :vk_device;
+
+import std;
 
 namespace gfx::vk
 {

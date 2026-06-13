@@ -6,20 +6,20 @@ module;
 
 #include <glm/glm.hpp>
 
-export module ogl.scheduler;
+export module gfx:ogl_scheduler;
+import :ogl_types;
 
-import gfx.scheduler;
-import gfx.commandBuffer;
+import :scheduler;
 
 namespace gfx::ogl
 {
-    export class Frame final : public gfx::Frame {
+    class Frame final : public gfx::Frame {
     public:
         explicit Frame(const glm::u32 imageIndex)
             : gfx::Frame(imageIndex) {};
     };
 
-    export class Scheduler final : public gfx::Scheduler
+    class Scheduler final : public gfx::Scheduler
     {
     public:
         explicit Scheduler(const Builder& createInfo);

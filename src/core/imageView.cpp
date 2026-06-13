@@ -2,30 +2,27 @@
 // Created by radue on 2/20/2026.
 //
 
-module;
+module gfx;
+import :imageView;
 
-#include <stdexcept>
-
-module gfx.imageView;
-import vk.imageView;
-import ogl.imageView;
-import gfx.image;
-import gfx.context;
+import std;
+import :vk_imageView;
+import :ogl_imageView;
 
 namespace gfx
 {
-    ImageView::Builder::Builder(gfx::ResourceRef<const Image> image) : image(image) {
+    ImageView::Builder::Builder(ResourceRef<const Image> image) : image(image) {
         arrayLayerCount = image->getArrayLayers();
         mipLevelCount = image->getMipLevels();
     }
 
-    gfx::Resource<ImageView> ImageView::Builder::build() const
+    Resource<ImageView> ImageView::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
         case API::eOpenGL:
-            return gfx::MakeResource<ogl::ImageView>(*this);
+            return MakeResource<ogl::ImageView>(*this);
         case API::eVulkan:
-            return gfx::MakeResource<vk::ImageView>(*this);
+            return MakeResource<vk::ImageView>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

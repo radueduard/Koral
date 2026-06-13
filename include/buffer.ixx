@@ -7,13 +7,16 @@ module;
 #include <glm/fwd.hpp>
 #include "api.h"
 
-export module gfx.buffer;
+export module gfx:buffer;
+import :types;
+import :commandBuffer;
+import :context;
+import :scheduler;
 
 import std;
-import gfx.resource;
-import gfx.flags;
-import gfx.log;
-import gfx.commandBuffer;
+import resource;
+import flags;
+import logger;
 
 namespace gfx
 {
@@ -45,7 +48,7 @@ namespace gfx
     };
 
 
-    export class GFX_API Buffer
+    class GFX_API Buffer
     {
     public:
         /**
@@ -280,7 +283,7 @@ namespace gfx
         {
             const auto elemCapacity = static_cast<glm::u64>(_size / sizeof(T));
             if (offset > elemCapacity) {
-                gfx::log::error("Read: offset exceeds buffer elements. capacity={}, requestedOffset={}", elemCapacity, offset);
+                logger::error("Read: offset exceeds buffer elements. capacity={}, requestedOffset={}", elemCapacity, offset);
                 throw std::out_of_range("Offset exceeds buffer element capacity");
             }
             if (count == 0) {
@@ -325,12 +328,12 @@ namespace gfx
             const auto byteOffset = offset * sizeof(T);
 
             if (_isMappedMutably) {
-                gfx::log::error("Attempted to call Write() on a buffer that is already mapped mutably! You cannot call Write() while a mutable mapping is active, as it may cause synchronization issues. Please use the MutableMapping returned by Map() to write data to the buffer while it is mapped.", _size, offset, offset + count);
+                logger::error("Attempted to call Write() on a buffer that is already mapped mutably! You cannot call Write() while a mutable mapping is active, as it may cause synchronization issues. Please use the MutableMapping returned by Map() to write data to the buffer while it is mapped.", _size, offset, offset + count);
                 throw std::runtime_error("Buffer is already mapped mutably");
             }
 
             if (_constMapCount > 0) {
-                gfx::log::error("Attempted to call Write() on a buffer that is already mapped const! You cannot call Write() while a const mapping is active, as it may cause synchronization issues. Please use the ConstMapping returned by Map() to read data from the buffer while it is mapped.", _size, offset, offset + count);
+                logger::error("Attempted to call Write() on a buffer that is already mapped const! You cannot call Write() while a const mapping is active, as it may cause synchronization issues. Please use the ConstMapping returned by Map() to read data from the buffer while it is mapped.", _size, offset, offset + count);
                 throw std::runtime_error("Buffer is already mapped const");
             }
 
@@ -403,12 +406,12 @@ namespace gfx
 
             std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = 0) const {
                 if (localOffset > _count) {
-                    gfx::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    logger::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
                 const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    gfx::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    logger::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
 
@@ -419,12 +422,12 @@ namespace gfx
 
             void Invalidate(glm::u64 localOffset = 0, glm::u64 count = 0) const {
                 if (localOffset > _count) {
-                    gfx::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    logger::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    gfx::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    logger::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 _buffer->Invalidate((_offset + localOffset) * sizeof(T), n * sizeof(T));
@@ -473,12 +476,12 @@ namespace gfx
 
             T& operator[](const glm::u64 index) {
                 if (_buffer->isPerFrame()) {
-                    auto currentImageIndex = gfx::Context::Scheduler().getCurrentImageIndex();
+                    auto currentImageIndex = gfx::Context::GetScheduler().getCurrentImageIndex();
                     _buffer->_pendingWrites.emplace(
                         currentImageIndex,
                         (_offset + index) * sizeof(T),
                         sizeof(T),
-                        gfx::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
+                        gfx::Context::GetScheduler().ImageIndicesExcept(currentImageIndex)
                     );
                 }
 
@@ -500,12 +503,12 @@ namespace gfx
 
             std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = 0) const {
                 if (localOffset > _count) {
-                    gfx::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    logger::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
                 const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    gfx::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    logger::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
 
@@ -517,31 +520,31 @@ namespace gfx
             void Write(const std::span<T> data, glm::u64 localOffset = 0) {
                 const auto count = static_cast<glm::u64>(data.size());
                 if (localOffset > _count || count > (_count - localOffset)) {
-                    gfx::log::error("Attempted to write beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + count);
+                    logger::error("Attempted to write beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + count);
                     throw std::out_of_range("Write range exceeds mapped range");
                 }
 
                 std::memcpy(static_cast<std::byte*>(_buffer->_mappedPtr) + (_offset + localOffset) * sizeof(T), data.data(), sizeof(T) * count);
 
                 if (_buffer->isPerFrame()) {
-                    auto currentImageIndex = gfx::Context::Scheduler().getCurrentImageIndex();
+                    auto currentImageIndex = gfx::Context::GetScheduler().getCurrentImageIndex();
                     _buffer->_pendingWrites.emplace(
                         currentImageIndex,
                         (_offset + localOffset) * sizeof(T),
                         count * sizeof(T),
-                        gfx::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
+                        gfx::Context::GetScheduler().ImageIndicesExcept(currentImageIndex)
                     );
                 }
             }
 
             void Flush(glm::u64 localOffset = 0, glm::u64 count = 0) const {
                 if (localOffset > _count) {
-                    gfx::log::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    logger::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Flush range exceeds mapped range");
                 }
                 const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    gfx::log::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    logger::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Flush range exceeds mapped range");
                 }
                 _buffer->Flush((_offset + localOffset) * sizeof(T), n * sizeof(T));
@@ -549,12 +552,12 @@ namespace gfx
 
             void Invalidate(glm::u64 localOffset = 0, glm::u64 count = 0) const {
                 if (localOffset > _count) {
-                    gfx::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    logger::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    gfx::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    logger::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 _buffer->Invalidate((_offset + localOffset) * sizeof(T), n * sizeof(T));
@@ -603,7 +606,7 @@ namespace gfx
 
         [[nodiscard]] static glm::i64 toBuilderSize(const glm::u64 bytes, const char* op) {
             if (constexpr auto maxI64 = static_cast<glm::u64>(std::numeric_limits<glm::i64>::max()); bytes > maxI64) {
-                gfx::log::error("{}: requested byte size {} exceeds glm::i64 max {}", op, bytes, maxI64);
+                logger::error("{}: requested byte size {} exceeds glm::i64 max {}", op, bytes, maxI64);
                 throw std::out_of_range("Byte size exceeds RawBuilder::size range");
             }
             return static_cast<glm::i64>(bytes);
@@ -614,7 +617,7 @@ namespace gfx
             static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
             constexpr auto elemBytes = sizeof(T);
             if (countElements > (std::numeric_limits<glm::u64>::max() / elemBytes)) {
-                gfx::log::error("{}: element count {} overflows byte size for sizeof(T)={}", op, countElements, elemBytes);
+                logger::error("{}: element count {} overflows byte size for sizeof(T)={}", op, countElements, elemBytes);
                 throw std::out_of_range("Element byte size overflow");
             }
             return countElements * elemBytes;
@@ -631,7 +634,7 @@ namespace gfx
 
             const auto elemCapacity = _size / sizeof(T);
             if (offsetElements > elemCapacity || countElements > (elemCapacity - offsetElements)) {
-                gfx::log::error(
+                logger::error(
                     "{}: range exceeds buffer elements. capacity={}, requested=[{}, {})",
                     op, elemCapacity, offsetElements, offsetElements + countElements
                 );
@@ -651,7 +654,7 @@ namespace gfx
 
         void acquireConstMapping() const {
             if (_isMappedMutably) {
-                gfx::log::error("Attempted to acquire const mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
+                logger::error("Attempted to acquire const mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
                 throw std::runtime_error("Buffer is already mapped mutably");
             }
             if (_constMapCount == 0) {
@@ -670,11 +673,11 @@ namespace gfx
 
         void acquireMutableMapping() const {
             if (_isMappedMutably) {
-                gfx::log::error("Attempted to acquire mutable mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
+                logger::error("Attempted to acquire mutable mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
                 throw std::runtime_error("Buffer is already mapped mutably");
             }
             if (_constMapCount > 0) {
-                gfx::log::error("Attempted to acquire mutable mapping for buffer that is already mapped const! You can only have one mutable mapping or multiple const mappings at a time.");
+                logger::error("Attempted to acquire mutable mapping for buffer that is already mapped const! You can only have one mutable mapping or multiple const mappings at a time.");
                 throw std::runtime_error("Buffer is already mapped const");
             }
             Map();

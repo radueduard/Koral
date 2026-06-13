@@ -1,26 +1,35 @@
 //
 // Created by radue on 10/13/2024.
 //
+
+module;
+
 #include <GL/glew.h>
-
-#include <window.h>
-#include <framebuffer.h>
-
-#include "input.h"
-
-#include <iostream>
 #include <stb_image.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
-#include "gui.h"
-#include "scheduler.h"
-#include "surface.h"
-#include "../backends/vulkan/vulkanContext.h"
+module gfx;
+import :window;
+import :context;
+import :scheduler;
+import :framebuffer;
 
-#include "../executor/MainThreadExecutor.h"
-#include "../executor/BackgroundExecutor.h"
+import std;
+import :vk_context;
+import :vk_scheduler;
+import :vk_surface;
+import :vk_swapChain;
 
-namespace gfx::io {
+namespace gfx {
+    struct WindowSceneBox {
+        std::unique_ptr<Scene> scene;
+    };
+
+    Window::Builder::Builder(std::unique_ptr<Scene> scene)
+        : sceneBox(std::make_unique<WindowSceneBox>(WindowSceneBox{std::move(scene)})) {}
+    Window::Builder::~Builder() = default;
+
     Window::Window(Builder& createInfo) :
         _title(createInfo.title),
         _extent(createInfo.extent),
@@ -29,7 +38,7 @@ namespace gfx::io {
         _decorated(createInfo.decorated),
         _transparentFramebuffer(createInfo.transparentFramebuffer),
         _api(createInfo.api),
-        _scene(std::move(createInfo.scene))
+        _scene(std::move(createInfo.sceneBox->scene))
     {
         Context::_window = this;
 
@@ -149,7 +158,6 @@ namespace gfx::io {
         } else if (_api == API::eVulkan) {
             gfx::vk::Context::Init();
         }
-        Context::_repository = new Repository();
 
         _surface = gfx::Surface::Create(*this);
         Context::_scheduler = Scheduler::Builder()
@@ -176,14 +184,14 @@ namespace gfx::io {
     }
 
     Window::~Window() {
-        Context::Scheduler().WaitIdle();
+        Context::GetScheduler().WaitIdle();
         _scene.reset();
         GUI::Shutdown();
         _framebuffer.reset();
         delete Context::_scheduler;
         delete Context::_mainThreadExecutor;
         delete Context::_backgroundExecutor;
-        delete Context::_repository;
+        // delete Context::_repository;
         _surface.reset();
         if (_api == API::eVulkan) {
             vk::Context::Destroy();

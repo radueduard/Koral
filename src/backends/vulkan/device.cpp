@@ -7,14 +7,16 @@ module;
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #define VMA_IMPLEMENTATION
 #define VK_ENABLE_BETA_EXTENSIONS
+#include <glm/fwd.hpp>
+#include <vulkan/vulkan.hpp>
 
-#include <iostream>
-#include <ranges>
-#include <thread>
-#include <unordered_map>
-#include "vulkanContext.h"
+module gfx;
+import :vk_device;
 
-module vk.device;
+import :vk_context;
+
+import std;
+
 
 namespace gfx::vk {
     Queue::Family::Family(const glm::u32 index, const ::vk::QueueFamilyProperties &properties) :

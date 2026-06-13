@@ -9,18 +9,16 @@ module;
 #include <glm/vec4.hpp>
 
 #include "api.h"
-#include "task.h"
 
-export module gfx.importer;
+export module gfx:importer;
+import :types;
 
 import std;
-import gfx.resource;
-
+import resource;
+import task;
 
 namespace gfx
 {
-    class Image;
-
     export enum class FileFormat
     {
         ePNG,
@@ -38,7 +36,7 @@ namespace gfx
         alignas(16) glm::vec3 max;
     };
 
-    export class GFX_API Importer
+    class GFX_API Importer
     {
     public:
         struct GFX_API Material {

@@ -2,13 +2,7 @@
 // Created by radue on 4/1/2026.
 //
 
-#pragma once
-
-#include <queue>
-#include <unordered_map>
-#include <iostream>
-
-#include "importer.h"
+module;
 
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
@@ -16,8 +10,15 @@
 #include <assimp/postprocess.h>
 #include <assimp/GltfMaterial.h>
 
+#include <glm/glm.hpp>
+
+export module gfx:assimpImporter;
+import :importer;
+
+import std;
+
 namespace gfx {
-    class AssimpImporter : public Importer {
+    export class AssimpImporter : public gfx::Importer {
     public:
         explicit AssimpImporter(const std::filesystem::path &path);
 
@@ -445,3 +446,4 @@ namespace gfx {
         return boneMatrices;
     }
 }
+

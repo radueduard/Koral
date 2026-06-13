@@ -7,9 +7,10 @@ module;
 #include <vulkan/vulkan.hpp>
 #include "vk_wrapper.h"
 
-export module vk.computePipeline;
-import gfx.computePipeline;
-import gfx.commandBuffer;
+export module gfx:vk_computePipeline;
+import :vk_types;
+
+import :computePipeline;
 
 namespace gfx::vk
 {

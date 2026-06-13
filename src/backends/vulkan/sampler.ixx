@@ -7,8 +7,8 @@ module;
 #include <vulkan/vulkan.hpp>
 #include "vk_wrapper.h"
 
-export module vk.sampler;
-import gfx.sampler;
+export module gfx:vk_sampler;
+import :sampler;
 
 namespace gfx::vk
 {

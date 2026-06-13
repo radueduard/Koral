@@ -7,9 +7,9 @@ module;
 #include <api.h>
 #include <spdlog/spdlog.h>
 
-export module gfx.log;
+export module logger;
 
-namespace gfx::log {
+namespace logger {
     export void init(); // call once at framework startup
 
     export template<typename... Args>

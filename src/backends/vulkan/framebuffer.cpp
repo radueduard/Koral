@@ -6,27 +6,20 @@ module;
 
 #include <glm/glm.hpp>
 
-module vk.framebuffer;
-import gfx.context;
-import vk.scheduler;
+module gfx;
+import :vk_framebuffer;
+import :vk_scheduler;
+import :vk_swapChain;
 
 namespace gfx::vk
 {
-    void Framebuffer::Bind() const
-    {
-    }
-
-    void Framebuffer::Unbind() const
-    {
-    }
-
     Framebuffer::Framebuffer()
     {
         _isDefault = true;
-        _extent = gfx::Context::Window().getExtent();
+        _extent = gfx::Context::GetWindow().getExtent();
 
         // Default framebuffer has one color attachment which is the swap chain image, and one depth stencil attachment which is the depth image of the swap chain.
-        const auto& scheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
+        const auto& scheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::GetScheduler());
 
         auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
         auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
@@ -46,7 +39,7 @@ namespace gfx::vk
 
         if (_isDefault)
         {
-            const auto& scheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
+            const auto& scheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::GetScheduler());
             auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
             auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
 

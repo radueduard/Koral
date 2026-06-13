@@ -6,14 +6,14 @@ module;
 
 #include "api.h"
 
-export module gfx.sampler;
+export module gfx:sampler;
+import :types;
 
-import gfx.structs;
-import gfx.resource;
+import resource;
 
 namespace gfx
 {
-    export class GFX_API Sampler
+    class GFX_API Sampler
     {
     public:
         enum class MipmapMode {
@@ -115,7 +115,7 @@ namespace gfx
                 return *this;
             }
 
-            [[nodiscard]] gfx::Resource<Sampler> build() const;
+            [[nodiscard]] Resource<Sampler> build() const;
         };
 
         virtual ~Sampler() = default;

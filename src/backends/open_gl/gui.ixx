@@ -8,17 +8,16 @@ module;
 #include <GL/gl.h>
 #include <glm/glm.hpp>
 
-export module ogl.gui;
+export module gfx:ogl_gui;
+import :ogl_types;
 
-import gfx.gui;
-import gfx.commandBuffer;
-import gfx.resource;
-import gfx.image;
+import :gui;
+import resource;
 
 
 namespace gfx::ogl
 {
-    export class GUI
+    class GUI
     {
     public:
         static void Init();
@@ -27,19 +26,19 @@ namespace gfx::ogl
         static void Shutdown();
     };
 
-    export class GUI_Image final : public gfx::GUI_Image
+    class GUI_Image final : public gfx::GUI_Image
     {
     public:
         explicit GUI_Image(ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level);
         ~GUI_Image() override;
 
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(gfx::ResourceRef<const gfx::Image> image) override;
+        void setImage(ResourceRef<const gfx::Image> image) override;
 
         ImTextureID operator*() const override;
 
     private:
         GLint _id;
-        gfx::ResourceRef<const gfx::Image> _image;
+        ResourceRef<const gfx::Image> _image;
     };
 }

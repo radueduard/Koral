@@ -6,17 +6,13 @@
 #include <filesystem>
 
 
-#include <scene.h>
-
-#include "context.h"
-#include "window.h"
-
 #ifdef _WIN32
 #include <windows.h>
 #elif defined(__linux__) || defined(__APPLE__)
 #include <dlfcn.h>
 #endif
 
+import gfx;
 
 using CreateSceneFn = gfx::Scene*(*)();
 

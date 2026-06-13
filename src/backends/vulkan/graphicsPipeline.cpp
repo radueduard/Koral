@@ -4,11 +4,15 @@
 
 module;
 
-#include <ranges>
-#include "vk_enum_conversions.h"
+#include <vulkan/vulkan.hpp>
 
-module vk.graphicsPipeline;
-import vk.descriptorSetLayout;
+module gfx;
+import :vk_graphicsPipeline;
+import :vk_descriptorSetLayout;
+import :vk_shader;
+import :vk_enum_conversions;
+
+import std;
 
 namespace gfx::vk
 {

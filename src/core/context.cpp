@@ -4,11 +4,6 @@
 
 module;
 
-#include <filesystem>
-
-#include "../executor/BackgroundExecutor.h"
-#include "../executor/MainThreadExecutor.h"
-
 #if defined(_WIN32)
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
@@ -16,7 +11,13 @@ module;
     #include <dlfcn.h>
 #endif
 
-module gfx.context;
+module gfx;
+import :context;
+import :window;
+
+import std;
+import gfx.backgroundExecutor;
+import gfx.mainThreadExecutor;
 
 namespace
 {
@@ -40,7 +41,7 @@ namespace
         Dl_info info{};
         if (dladdr(reinterpret_cast<void*>(&CurrentModuleDir), &info) && info.dli_fname) {
             std::error_code ec;
-            auto resolved = std::filesystem::canonical(info.dli_fname, ec);
+            const auto resolved = std::filesystem::canonical(info.dli_fname, ec);
             return (ec ? std::filesystem::path(info.dli_fname) : resolved).parent_path();
         }
 #endif
@@ -74,21 +75,7 @@ namespace
     }
 }
 
-std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
-{
-    const auto& share = InstalledShareDir();
-    const auto base = share.empty() ? std::filesystem::path(ASSETS_PATH) : share / "assets";
-    return base / relativePath;
-}
-
-std::filesystem::path gfx::shaderPath(const std::filesystem::path& relativePath)
-{
-    const auto& share = InstalledShareDir();
-    const auto base = share.empty() ? std::filesystem::path(SHADERS_PATH) : share / "shaders";
-    return base / relativePath;
-}
-
-gfx::io::Window& gfx::Context::FocusedWindow()
+gfx::Window& gfx::Context::FocusedWindow()
 {
     if (_focusedWindow == nullptr) {
         throw std::runtime_error("No window is currently focused!");
@@ -96,7 +83,7 @@ gfx::io::Window& gfx::Context::FocusedWindow()
     return *_focusedWindow;
 }
 
-gfx::io::Window& gfx::Context::Window()
+gfx::Window& gfx::Context::GetWindow()
 {
     if (_window == nullptr) {
         throw std::runtime_error("No window is linked to the current thread!");
@@ -104,7 +91,7 @@ gfx::io::Window& gfx::Context::Window()
     return *_window;
 }
 
-const gfx::Scheduler& gfx::Context::Scheduler()
+const gfx::Scheduler& gfx::Context::GetScheduler()
 {
     if (_scheduler == nullptr) {
         throw std::runtime_error("No scheduler is linked to the current thread!");
@@ -112,7 +99,7 @@ const gfx::Scheduler& gfx::Context::Scheduler()
     return *_scheduler;
 }
 
-gfx::ResourceRef<const gfx::Framebuffer> gfx::Context::DefaultFramebuffer()
+ResourceRef<const gfx::Framebuffer> gfx::Context::DefaultFramebuffer()
 {
     if (_window == nullptr)
     {
@@ -150,14 +137,7 @@ void gfx::Context::DrainMainThread() {
     _mainThreadExecutor->Drain();
 }
 
-gfx::Repository & gfx::Context::Repository() {
-    if (!_repository) {
-        throw std::runtime_error("Resource repository is not initialized for this thread!");
-    }
-    return *_repository;
-}
-
-void gfx::Context::setFocusedWindow(io::Window* window)
+void gfx::Context::setFocusedWindow(gfx::Window* window)
 {
     _focusedWindow = window;
 }

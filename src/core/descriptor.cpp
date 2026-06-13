@@ -7,9 +7,10 @@ module;
 #include <stdexcept>
 #include <glm/glm.hpp>
 
-module gfx.descriptorBinding;
-import gfx.buffer;
-import gfx.log;
+module gfx;
+import :descriptor;
+import :buffer;
+import logger;
 
 namespace gfx {
     Descriptor::Descriptor(const ResourceRef<const Buffer>& buffer, const glm::i64 offset, const glm::i64 range)

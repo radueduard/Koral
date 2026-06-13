@@ -8,10 +8,12 @@ module;
 #include <glm/fwd.hpp>
 #include <vulkan/vulkan.hpp>
 
-export module vk.scheduler;
-import gfx.scheduler;
-import gfx.commandBuffer;
+export module gfx:vk_scheduler;
+import :vk_types;
 
+import std;
+import :scheduler;
+import :commandBuffer;
 
 namespace gfx::vk
 {
@@ -60,8 +62,7 @@ namespace gfx::vk
 
 	    [[nodiscard]] const gfx::vk::SwapChain &getSwapChain() const { return *_swapChain; }
     	[[nodiscard]] bool isResized() const { return _resized; }
-		glm::u32 getCurrentImageIndex() const override { return _swapChain->getCurrentImageIndex(); }
-
+		glm::u32 getCurrentImageIndex() const override;
 
     private:
     	std::unique_ptr<gfx::vk::SwapChain> _swapChain;

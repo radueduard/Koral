@@ -6,31 +6,15 @@ module;
 
 #include <api.h>
 
-export module vk.context;
-
-namespace gfx
-{
-    class Engine;
-}
-
-namespace gfx::io
-{
-    class Window;
-}
+export module gfx:vk_context;
+import :vk_types;
+import :context;
 
 namespace gfx::vk
 {
-    class Surface;
-    class Scheduler;
-    class DescriptorPool;
-    class Allocator;
-    class Runtime;
-    class Device;
-
-    export class GFX_API Context
+    class GFX_API Context
     {
-        friend class gfx::io::Window;
-        friend class gfx::Engine;
+        friend class gfx::Window;
     public:
         static const gfx::vk::Runtime& Runtime();
         static const gfx::vk::Device& Device();

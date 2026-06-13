@@ -4,18 +4,19 @@
 
 module;
 
-#include <optional>
 #include <GL/glew.h>
 #include <glm/glm.hpp>
 
-export module ogl.buffer;
+export module gfx:ogl_buffer;
+import :ogl_types;
 
-import gfx.buffer;
-import gfx.flags;
+import std;
+import :buffer;
+import flags;
 
 namespace gfx::ogl
 {
-    export class Buffer : public gfx::Buffer
+    class Buffer : public gfx::Buffer
     {
     public:
         explicit Buffer(const gfx::Buffer::RawBuilder& createInfo);

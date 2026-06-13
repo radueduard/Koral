@@ -9,11 +9,12 @@ module;
 #include <glm/vec2.hpp>
 #include <magic_enum/magic_enum.hpp>
 
-module gfx.input;
-import gfx.window;
-import gfx.context;
+module gfx;
+import :input;
+import :window;
+import :context;
 
-namespace gfx::io {
+namespace gfx {
 	void Input::State::setup()
 	{
 		for (const auto key : magic_enum::enum_values<Key>()) {
@@ -49,52 +50,52 @@ namespace gfx::io {
 	}
 
     KeyState Input::getKeyState(const Key key) {
-        return Context::Window()._inputState.keyboardKeyStates[key];
+        return Context::GetWindow()._inputState.keyboardKeyStates[key];
     }
 
     KeyState Input::getMouseButtonState(const MouseButton button) {
-        return Context::Window()._inputState.mouseButtonStates[button];
+        return Context::GetWindow()._inputState.mouseButtonStates[button];
     }
 
     bool Input::isKeyPressed(const Key key) {
-        return Context::Window()._inputState.keyboardKeyStates[key] == KeyState::ePressed;
+        return Context::GetWindow()._inputState.keyboardKeyStates[key] == KeyState::ePressed;
     }
 
     bool Input::isKeyHeld(const Key key) {
-        return Context::Window()._inputState.keyboardKeyStates[key] == KeyState::eHeld;
+        return Context::GetWindow()._inputState.keyboardKeyStates[key] == KeyState::eHeld;
     }
 
     bool Input::isKeyReleased(const Key key) {
-        return Context::Window()._inputState.keyboardKeyStates[key] == KeyState::eReleased;
+        return Context::GetWindow()._inputState.keyboardKeyStates[key] == KeyState::eReleased;
     }
 
     bool Input::isMouseButtonPressed(const MouseButton button) {
-        return Context::Window()._inputState.mouseButtonStates[button] == KeyState::ePressed;
+        return Context::GetWindow()._inputState.mouseButtonStates[button] == KeyState::ePressed;
     }
 
     bool Input::isMouseButtonHeld(const MouseButton button) {
-        return Context::Window()._inputState.mouseButtonStates[button] == KeyState::eHeld;
+        return Context::GetWindow()._inputState.mouseButtonStates[button] == KeyState::eHeld;
     }
 
     bool Input::isMouseButtonReleased(const MouseButton button) {
-        return Context::Window()._inputState.mouseButtonStates[button] == KeyState::eReleased;
+        return Context::GetWindow()._inputState.mouseButtonStates[button] == KeyState::eReleased;
     }
 
 	const glm::vec2& Input::getMousePosition() {
-        return Context::Window()._inputState.mousePosition;
+        return Context::GetWindow()._inputState.mousePosition;
     }
 
     const glm::vec2& Input::getMousePositionDelta() {
-        return Context::Window()._inputState.mouseDelta;
+        return Context::GetWindow()._inputState.mouseDelta;
     }
 
     const glm::vec2& Input::getMouseScrollDelta() {
-        return Context::Window()._inputState.scrollDelta;
+        return Context::GetWindow()._inputState.scrollDelta;
     }
 
     const glm::vec2& Input::getLastMousePosition()
     {
-		return Context::Window()._inputState.lastMousePosition;
+		return Context::GetWindow()._inputState.lastMousePosition;
     }
 
     void Input::Callbacks::keyCallback(GLFWwindow * handle, int key, int, const int action, const int mods) {

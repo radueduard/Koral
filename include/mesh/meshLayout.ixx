@@ -2,12 +2,12 @@ module;
 
 #include <glm/glm.hpp>
 
-export module gfx.mesh.layout;
+export module gfx:meshLayout;
 import std;
-import gfx.mesh.base;
-import gfx.structs;
-import gfx.resource;
-import gfx.buffer;
+import :meshBase;
+import :buffer;
+import :types;
+import resource;
 
 namespace gfx {
     export template<typename T>
@@ -134,7 +134,7 @@ namespace gfx {
         }
     };
 
-    export template<typename... Streams>
+    template<typename... Streams>
     class ParamMesh : public CustomMesh<ParamMesh<Streams...>>
     {
     public:
@@ -167,7 +167,7 @@ namespace gfx {
     }
 
     template<typename IndexT> requires std::is_integral_v<IndexT>
-    static gfx::Resource<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
+    static Resource<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
     {
         Builder builder;
         setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
@@ -182,26 +182,26 @@ namespace gfx {
     }
 
     // Convenience: vectors
-    static gfx::Resource<Self> Create(const std::vector<Streams>&... streams)
+    static Resource<Self> Create(const std::vector<Streams>&... streams)
     {
         return Create(std::span<const Streams>(streams)...);
     }
 
     template<typename IndexT>
-    static gfx::Resource<Self> Create(const std::vector<Streams>&... streams, const std::vector<IndexT>& indices)
+    static Resource<Self> Create(const std::vector<Streams>&... streams, const std::vector<IndexT>& indices)
     {
         return Create(std::span<const Streams>(streams)..., std::span<const IndexT>(indices));
     }
 
     // Convenience: arrays
     template<std::size_t... N>
-    static gfx::Resource<Self> Create(const std::array<Streams, N>&... streams)
+    static Resource<Self> Create(const std::array<Streams, N>&... streams)
     {
         return Create(std::span<const Streams>(streams)...);
     }
 
     template<typename IndexT, std::size_t... N, std::size_t NI>
-    static gfx::Resource<Self> Create(const std::array<Streams, N>&... streams, const std::array<IndexT, NI>& indices)
+    static Resource<Self> Create(const std::array<Streams, N>&... streams, const std::array<IndexT, NI>& indices)
     {
         return Create(std::span<const Streams>(streams)..., std::span<const IndexT>(indices));
     }

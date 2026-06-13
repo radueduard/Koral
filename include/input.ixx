@@ -6,16 +6,13 @@ module;
 
 #include <glm/vec2.hpp>
 #include "api.h"
+#include <GLFW/glfw3.h>
 
-export module gfx.input;
+export module gfx:input;
 
 import std;
 
-struct GLFWwindow;
-
-namespace gfx::io {
-    class Window;
-
+namespace gfx {
     export enum class Key : unsigned short {
         eSpace = 32,
         eApostrophe = 39,

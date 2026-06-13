@@ -7,22 +7,21 @@ module;
 #include <glm/fwd.hpp>
 #include "api.h"
 
-export module gfx.computePipeline;
+export module gfx:computePipeline;
+import :types;
+import :shader;
+import :descriptorSetLayout;
 
 import std;
-import gfx.resource;
-import gfx.descriptorSetLayout;
+import resource;
 
 namespace gfx
 {
-    class Shader;
-    class CommandBuffer;
-
-    export class GFX_API ComputePipeline {
+    class GFX_API ComputePipeline {
     public:
         struct GFX_API Builder {
-            std::optional<gfx::ResourceRef<const Shader>> computeShader;
-            Builder& setComputeShader(gfx::ResourceRef<const Shader> computeShader);
+            std::optional<ResourceRef<const Shader>> computeShader;
+            Builder& setComputeShader(ResourceRef<const Shader> computeShader);
 
             template<typename T> requires std::is_trivially_copyable_v<T>
             Builder& setSpecializationConstant(glm::u32 id, T value) {
@@ -58,7 +57,7 @@ namespace gfx
         mutable bool _bound = false;
         explicit ComputePipeline(const Builder& createInfo);
 
-        std::optional<gfx::ResourceRef<const Shader>> _shader;
+        std::optional<ResourceRef<const Shader>> _shader;
         std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts;
         std::map<glm::u32, gfx::Shader::PushConstant> _pushConstantRanges;
     };

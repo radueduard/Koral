@@ -5,31 +5,32 @@
 module;
 
 #include <file.h>
-#include <iostream>
 
 #include <spirv_cross.hpp>
-
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
-module gfx.shader;
-import vk.shader;
-import ogl.shader;
-import gfx.context;
-import gfx.resource;
+module gfx;
+import :shader;
+
+import :vk_shader;
+import :ogl_shader;
+
+import :context;
+import resource;
 
 
 namespace gfx {
     Resource<Shader> Shader::Builder::build() const
     {
 		Resource<Shader> shader;
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
         case API::eOpenGL:
-            shader = gfx::MakeResource<ogl::Shader>(*this);
+            shader = MakeResource<ogl::Shader>(*this);
         	break;
         case API::eVulkan:
-            shader = gfx::MakeResource<vk::Shader>(*this);
+            shader = MakeResource<vk::Shader>(*this);
         	break;
         default:
             throw std::runtime_error("Unknown graphics API!");
@@ -40,12 +41,12 @@ namespace gfx {
 
     ResourceRef<const Shader> Shader::Builder::buildManaged(const std::string& identifier) const {
     	Resource<Shader> shader;
-    	switch (Context::Window().getAPI()) {
+    	switch (Context::GetWindow().getAPI()) {
     		case API::eOpenGL:
-    			shader = gfx::MakeResource<ogl::Shader>(*this);
+    			shader = MakeResource<ogl::Shader>(*this);
     			break;
     		case API::eVulkan:
-    			shader = gfx::MakeResource<vk::Shader>(*this);
+    			shader = MakeResource<vk::Shader>(*this);
     			break;
     		default:
     			throw std::runtime_error("Unknown graphics API!");

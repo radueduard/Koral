@@ -7,11 +7,11 @@ module;
 #include <glm/glm.hpp>
 #include "api.h"
 
-export module gfx.framebuffer;
+export module gfx:framebuffer;
+import :types;
 
 import std;
-import gfx.structs;
-import gfx.resource;
+import resource;
 
 namespace gfx
 {

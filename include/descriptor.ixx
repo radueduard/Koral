@@ -7,17 +7,14 @@ module;
 #include <glm/fwd.hpp>
 #include "api.h"
 
-export module gfx.descriptorBinding;
+export module gfx:descriptor;
+import :types;
 
 import std;
-import gfx.resource;
-import gfx.buffer;
-import gfx.imageView;
-import gfx.sampler;
+import resource;
 
 namespace gfx
 {
-
     struct BufferDescriptor {
         ResourceRef<const Buffer> _buffer;
         glm::i64 _offset = 0;
@@ -37,7 +34,7 @@ namespace gfx
         ResourceRef<const Sampler> _sampler;
     };
 
-    export class GFX_API Descriptor
+    class GFX_API Descriptor
     {
     public:
         Descriptor() = default;

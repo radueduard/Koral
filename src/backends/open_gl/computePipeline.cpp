@@ -6,12 +6,11 @@ module;
 
 #include "ogl_err_handling.h"
 
-module ogl.computePipeline;
+module gfx;
+import :ogl_computePipeline;
 
 import std;
-import gfx.computePipeline;
-import gfx.shader;
-import gfx.descriptorSetLayout;
+import :computePipeline;
 
 namespace gfx::ogl
 {

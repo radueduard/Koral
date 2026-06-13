@@ -2,13 +2,11 @@
 // Created by radue on 2/17/2026.
 //
 
-#include <iostream>
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-
-#include "gui.h"
+#include <glm/glm.hpp>
 #include "sceneManager.h"
-#include "scheduler.h"
+
+import gfx;
+import std;
 
 namespace gfx
 {
@@ -60,7 +58,7 @@ namespace gfx
             }
         }
 
-        auto window = io::Window::Builder(SceneManager::LoadScene(scenePath))
+        auto window = Window::Builder(SceneManager::LoadScene(scenePath))
             .setTitle(scenePath)
             .setExtent(extent)
             .setFullscreen(fullscreen)
@@ -77,7 +75,7 @@ namespace gfx
                 continue;
             }
             auto& scene = *window->_scene;
-            Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
+            Context::GetScheduler().Draw([&](CommandBuffer& commandBuffer) {
                 Context::Repository().update();
                 scene.Update();
                 scene.Render(commandBuffer);

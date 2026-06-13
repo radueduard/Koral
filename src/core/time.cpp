@@ -2,14 +2,13 @@
 // Created by radue on 2/24/2026.
 //
 
-module;
+module gfx;
+import :time;
+import :context;
 
-#include <chrono>
+import std;
 
-module gfx.time;
-import gfx.context;
-
-namespace gfx::io
+namespace gfx
 {
     /**
      *
@@ -18,17 +17,17 @@ namespace gfx::io
      */
     float Time::FrameTime()
     {
-        return Context::Window()._timeState.frameDeltaTime;
+        return Context::GetWindow()._timeState.frameDeltaTime;
     }
 
     float Time::FixedDeltaTime()
     {
-        return Context::Window()._timeState.fixedDeltaTime;
+        return Context::GetWindow()._timeState.fixedDeltaTime;
     }
 
     float Time::WindowTime()
     {
-        return Context::Window()._timeState.timeSinceStart;
+        return Context::GetWindow()._timeState.timeSinceStart;
     }
 
     void Time::State::setup()

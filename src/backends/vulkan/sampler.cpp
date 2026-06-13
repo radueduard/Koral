@@ -4,12 +4,15 @@
 
 module;
 
-#include "vk_enum_conversions.h"
+#include <vulkan/vulkan.hpp>
 
-module vk.sampler;
-import gfx.sampler;
-import vk.context;
-import vk.device;
+module gfx;
+import :vk_sampler;
+import :vk_enum_conversions;
+
+import :sampler;
+import :vk_device;
+import :vk_context;
 
 namespace gfx::vk
 {

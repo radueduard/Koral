@@ -3,15 +3,25 @@
 //
 
 module;
+
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include <vulkan/vulkan.hpp>
 
-#include <iostream>
+module gfx;
+import :vk_commandBuffer;
+import :vk_device;
+import :vk_context;
+import :vk_image;
+import :vk_imageView;
+import :vk_buffer;
+import :vk_computePipeline;
+import :vk_graphicsPipeline;
+import :vk_descriptorSet;
+import :vk_enum_conversions;
 
-#include "vulkanContext.h"
-#include "vk_enum_conversions.h"
 
-module vk.commandBuffer;
-import gfx.flags;
+import std;
+import flags;
 
 namespace gfx::vk
 {
@@ -19,7 +29,7 @@ namespace gfx::vk
 
     Flags<CommandBuffer::Usage> getCommandBufferUsage(const gfx::vk::Queue& queue)
     {
-        gfx::Flags<CommandBuffer::Usage> usage;
+        Flags<CommandBuffer::Usage> usage;
         if (queue.getFamily().getProperties().queueFlags & ::vk::QueueFlagBits::eGraphics)
             usage |= CommandBuffer::Usage::eGraphics;
         if (queue.getFamily().getProperties().queueFlags & ::vk::QueueFlagBits::eCompute)
@@ -87,7 +97,7 @@ namespace gfx::vk
         return BeginRendering(framebuffer, renderParameters);
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<const gfx::Framebuffer> framebuffer, RenderParameters renderParameters)
+    gfx::CommandBuffer& CommandBuffer::BeginRendering(ResourceRef<const gfx::Framebuffer> framebuffer, RenderParameters renderParameters)
     {
         gfx::CommandBuffer::BeginRendering(framebuffer);
         std::vector<gfx::ImageBarrier> imageBarriers;
@@ -192,14 +202,14 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::ComputePipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(ResourceRef<const gfx::ComputePipeline> pipeline)
     {
         gfx::CommandBuffer::BindPipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<const gfx::GraphicsPipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindPipeline(ResourceRef<const gfx::GraphicsPipeline> pipeline)
     {
         gfx::CommandBuffer::BindPipeline(pipeline);
         pipeline->Bind(*this);
@@ -212,7 +222,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, gfx::ResourceRef<const gfx::DescriptorSet> set, const bool debug)
+    gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, ResourceRef<const gfx::DescriptorSet> set, const bool debug)
     {
         if (debug) set->DebugPrint();
 
@@ -242,7 +252,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<const gfx::Mesh> mesh)
+    gfx::CommandBuffer& CommandBuffer::BindMesh(ResourceRef<const gfx::Mesh> mesh)
     {
         gfx::CommandBuffer::BindMesh(mesh);
         std::vector<::vk::Buffer> vertexBuffers;
@@ -389,13 +399,13 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::ClearBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::ClearBuffer(ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         _handle.fillBuffer(*vkBuffer, offset, size, 0);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::FillBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
+    gfx::CommandBuffer & CommandBuffer::FillBuffer(ResourceRef<const gfx::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         if (size == UINT64_MAX) {
             size = vkBuffer.getSize() - offset;
@@ -411,7 +421,7 @@ namespace gfx::vk
             size = std::min(vkSrcBuffer.getSize() - srcOffset, vkDstBuffer.getSize() - dstOffset);
         }
         if (size > vkSrcBuffer.getSize() - srcOffset || size > vkDstBuffer.getSize() - dstOffset) {
-            gfx::log::error("Copy size exceeds buffer size (srcBuffer size: {}, dstBuffer size: {}, srcOffset: {}, dstOffset: {}, copy size: {})", vkSrcBuffer.getSize(), vkDstBuffer.getSize(), srcOffset, dstOffset, size);
+            logger::error("Copy size exceeds buffer size (srcBuffer size: {}, dstBuffer size: {}, srcOffset: {}, dstOffset: {}, copy size: {})", vkSrcBuffer.getSize(), vkDstBuffer.getSize(), srcOffset, dstOffset, size);
             throw std::runtime_error("Copy size exceeds buffer size");
         }
 
@@ -423,7 +433,7 @@ namespace gfx::vk
     }
 
     gfx::CommandBuffer& CommandBuffer::Blit(ResourceRef<const gfx::Image> srcImage, gfx::Blit blitInfo) {
-        ResourceRef<const gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
+        ResourceRef<const gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::GetScheduler()).getSwapChain().getImage();
         Barrier({}, {
             {
                 srcImage,
@@ -477,7 +487,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo)
+    gfx::CommandBuffer& CommandBuffer::Blit(ResourceRef<const gfx::Image> srcImage, ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo)
     {
         if (blitInfo.srcExtent == glm::ivec3(-1))
             blitInfo.srcExtent = srcImage->getExtent();
@@ -594,7 +604,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Resolve resolveInfo) {
+    gfx::CommandBuffer& CommandBuffer::Resolve(ResourceRef<const gfx::Image> srcImage, ResourceRef<const gfx::Image> dstImage, gfx::Resolve resolveInfo) {
         if (srcImage->getSampleCount() == SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
         if (dstImage && dstImage->getSampleCount() != SampleCount::e1)
@@ -652,17 +662,17 @@ namespace gfx::vk
         const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
 
         if (copyInfo.bufferOffset >= vkBuffer.getSize()) {
-            gfx::log::error("Buffer offset exceeds buffer size (buffer size: {}, buffer offset: {})", vkBuffer.getSize(), copyInfo.bufferOffset);
+            logger::error("Buffer offset exceeds buffer size (buffer size: {}, buffer offset: {})", vkBuffer.getSize(), copyInfo.bufferOffset);
             throw std::runtime_error("Buffer offset exceeds buffer size");
         }
 
         if (copyInfo.imageMipLevel >= vkImage.getMipLevels()) {
-            gfx::log::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
+            logger::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
             throw std::runtime_error("Image mip level exceeds image mip levels");
         }
 
         if (copyInfo.imageBaseArrayLayer >= vkImage.getArrayLayers()) {
-            gfx::log::error("Image base array layer exceeds image array layers (image array layers: {}, image subresource base array layer: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer);
+            logger::error("Image base array layer exceeds image array layers (image array layers: {}, image subresource base array layer: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer);
             throw std::runtime_error("Image base array layer exceeds image array layers");
         }
 
@@ -674,19 +684,19 @@ namespace gfx::vk
         if (copyInfo.bufferImageHeight == 0)
             copyInfo.bufferImageHeight = copyInfo.imageExtent.y;
         if (copyInfo.bufferRowLength < copyInfo.imageExtent.x || copyInfo.bufferImageHeight < copyInfo.imageExtent.y) {
-            gfx::log::error("Buffer row length or image height is too small for the specified image extent (buffer row length: {}, buffer image height: {}, image extent: {}x{})", copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y);
+            logger::error("Buffer row length or image height is too small for the specified image extent (buffer row length: {}, buffer image height: {}, image extent: {}x{})", copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y);
             throw std::runtime_error("Buffer row length or image height is too small for the specified image extent");
         }
         if (copyInfo.bufferRowLength * copyInfo.bufferImageHeight * copyInfo.imageExtent.z + copyInfo.bufferOffset > vkBuffer.getSize()) {
-            gfx::log::error("Buffer offset + copy size exceeds buffer size (buffer size: {}, buffer offset: {}, copy size: {})", vkBuffer.getSize(), copyInfo.bufferOffset, copyInfo.bufferRowLength * copyInfo.bufferImageHeight * copyInfo.imageExtent.z);
+            logger::error("Buffer offset + copy size exceeds buffer size (buffer size: {}, buffer offset: {}, copy size: {})", vkBuffer.getSize(), copyInfo.bufferOffset, copyInfo.bufferRowLength * copyInfo.bufferImageHeight * copyInfo.imageExtent.z);
             throw std::runtime_error("Buffer offset + copy size exceeds buffer size");
         }
         if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.getArrayLayers()) {
-            gfx::log::error("Image base array layer + layer count exceeds image array layers (image array layers: {}, image subresource base array layer: {}, image subresource layer count: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount);
+            logger::error("Image base array layer + layer count exceeds image array layers (image array layers: {}, image subresource base array layer: {}, image subresource layer count: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount);
             throw std::runtime_error("Image base array layer + layer count exceeds image array layers");
         }
         if (copyInfo.imageMipLevel >= vkImage.getMipLevels()) {
-            gfx::log::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
+            logger::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
             throw std::runtime_error("Image mip level exceeds image mip levels");
         }
 
@@ -723,17 +733,17 @@ namespace gfx::vk
         const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
 
         if (copyInfo.bufferOffset >= vkBuffer.getSize()) {
-            gfx::log::error("Buffer offset exceeds buffer size (buffer size: {}, buffer offset: {})", vkBuffer.getSize(), copyInfo.bufferOffset);
+            logger::error("Buffer offset exceeds buffer size (buffer size: {}, buffer offset: {})", vkBuffer.getSize(), copyInfo.bufferOffset);
             throw std::runtime_error("Buffer offset exceeds buffer size");
         }
 
         if (copyInfo.imageMipLevel >= vkImage.getMipLevels()) {
-            gfx::log::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
+            logger::error("Image mip level exceeds image mip levels (image mip levels: {}, image subresource mip level: {})", vkImage.getMipLevels(), copyInfo.imageMipLevel);
             throw std::runtime_error("Image mip level exceeds image mip levels");
         }
 
         if (copyInfo.imageBaseArrayLayer >= vkImage.getArrayLayers()) {
-            gfx::log::error("Image base array layer exceeds image array layers (image array layers: {}, image subresource base array layer: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer);
+            logger::error("Image base array layer exceeds image array layers (image array layers: {}, image subresource base array layer: {})", vkImage.getArrayLayers(), copyInfo.imageBaseArrayLayer);
             throw std::runtime_error("Image base array layer exceeds image array layers");
         }
 

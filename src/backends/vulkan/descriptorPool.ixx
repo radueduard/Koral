@@ -4,23 +4,20 @@
 
 module;
 
-#include <unordered_map>
 #include <glm/fwd.hpp>
 #include <vulkan/vulkan.hpp>
 #include "vk_wrapper.h"
 
-export module vk.descriptorPool;
+export module gfx:vk_descriptorPool;
+import :vk_types;
 
-namespace gfx
-{
-    enum class DescriptorType;
-}
+import std;
+import :descriptorSet;
+import :descriptorSetLayout;
 
 namespace gfx::vk
 {
-    class DescriptorSetLayout;
-
-    export class DescriptorPool : public Wrapper<::vk::DescriptorPool> {
+    class DescriptorPool : public Wrapper<::vk::DescriptorPool> {
     public:
         class Builder {
             friend class DescriptorPool;
@@ -49,7 +46,7 @@ namespace gfx::vk
 
     private:
         mutable glm::u32 _allocatedSetCount = 0;
-        mutable std::unordered_map<DescriptorType, glm::u32> _allocatedBindingCounts;
+        mutable std::unordered_map<gfx::DescriptorType, glm::u32> _allocatedBindingCounts;
 
         std::vector<::vk::DescriptorPoolSize> _poolSizes;
         ::vk::DescriptorPoolCreateFlags _flags;

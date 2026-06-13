@@ -4,14 +4,16 @@
 
 module;
 
-#include <stdexcept>
 #include <vulkan/vulkan.hpp>
 
-module vk.context;
-import vk.runtime;
-import vk.allocator;
-import vk.device;
-import vk.descriptorPool;
+module gfx;
+import :vk_context;
+import :vk_runtime;
+import :vk_allocator;
+import :vk_device;
+import :vk_descriptorPool;
+
+import std;
 
 const gfx::vk::Runtime& gfx::vk::Context::Runtime()
 {

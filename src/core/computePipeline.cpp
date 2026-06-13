@@ -2,31 +2,29 @@
 // Created by radue on 2/21/2026.
 //
 
-module;
 
-#include <stdexcept>
+module gfx;
+import :computePipeline;
 
-module gfx.computePipeline;
-import ogl.computePipeline;
-import vk.computePipeline;
-import gfx.context;
-import gfx.descriptorSetLayout;
+import std;
+import :ogl_computePipeline;
+import :vk_computePipeline;
 
 namespace gfx
 {
-    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(gfx::ResourceRef<const Shader> computeShader)
+    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(ResourceRef<const Shader> computeShader)
     {
         this->computeShader = computeShader;
         return *this;
     }
 
-    gfx::Resource<ComputePipeline> ComputePipeline::Builder::build() const
+    Resource<ComputePipeline> ComputePipeline::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
             case API::eOpenGL:
-            return gfx::MakeResource<ogl::ComputePipeline>(*this);
+            return MakeResource<ogl::ComputePipeline>(*this);
             case API::eVulkan:
-            return gfx::MakeResource<vk::ComputePipeline>(*this);
+            return MakeResource<vk::ComputePipeline>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

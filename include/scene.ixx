@@ -5,15 +5,14 @@
 module;
 
 #include "api.h"
+#include <imgui.h>
 
-export module gfx.scene;
-import gfx.commandBuffer;
-
-struct ImGuiContext;
+export module gfx:scene;
+import :types;
 
 namespace gfx
 {
-    export class GFX_API Scene {
+    class GFX_API Scene {
     public:
         virtual ~Scene() = default;
 
@@ -23,4 +22,3 @@ namespace gfx
         virtual void RenderUI(ImGuiContext* context) {}
     };
 }
-

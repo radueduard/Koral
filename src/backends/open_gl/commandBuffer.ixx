@@ -6,23 +6,17 @@ module;
 
 #include <glm/glm.hpp>
 
-export module ogl.commandBuffer;
+export module gfx:ogl_commandBuffer;
+import :ogl_types;
 
 import std;
-import gfx.commandBuffer;
-import gfx.computePipeline;
-import gfx.structs;
-import gfx.framebuffer;
-import gfx.resource;
-import gfx.flags;
-import gfx.graphicsPipeline;
-import gfx.descriptorSet;
-import gfx.buffer;
-import gfx.image;
+import flags;
+import resource;
+import :commandBuffer;
 
 namespace gfx::ogl
 {
-    export class CommandBuffer : public gfx::CommandBuffer {
+    class CommandBuffer : public gfx::CommandBuffer {
     public:
         void CheckRecording() const;
         explicit CommandBuffer(Flags<Usage> usage);
@@ -33,10 +27,10 @@ namespace gfx::ogl
         gfx::CommandBuffer& BeginRendering(RenderParameters renderParameters) override;
         gfx::CommandBuffer& BeginRendering(ResourceRef<const gfx::Framebuffer> framebuffer, RenderParameters renderParameters) override;
         gfx::CommandBuffer& EndRendering() override;
-        gfx::CommandBuffer& BindPipeline(gfx::ResourceRef<const gfx::ComputePipeline> pipeline) override;
-        gfx::CommandBuffer& BindPipeline(gfx::ResourceRef<const gfx::GraphicsPipeline> pipeline) override;
-        gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, gfx::ResourceRef<const gfx::DescriptorSet> set, bool debug) override;
-        gfx::CommandBuffer& BindMesh(gfx::ResourceRef<const Mesh> mesh) override;
+        gfx::CommandBuffer& BindPipeline(ResourceRef<const gfx::ComputePipeline> pipeline) override;
+        gfx::CommandBuffer& BindPipeline(ResourceRef<const gfx::GraphicsPipeline> pipeline) override;
+        gfx::CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<const gfx::DescriptorSet> set, bool debug) override;
+        gfx::CommandBuffer& BindMesh(ResourceRef<const Mesh> mesh) override;
         gfx::CommandBuffer& Barrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers) override;
         gfx::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
         gfx::CommandBuffer& DispatchIndirect(ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset) override;
@@ -50,13 +44,13 @@ namespace gfx::ogl
         gfx::CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
         gfx::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
 
-        gfx::CommandBuffer& Blit(ResourceRef<const Image> srcImage, gfx::Blit blitInfo) override;
-        gfx::CommandBuffer& Blit(gfx::ResourceRef<const Image> srcImage, gfx::ResourceRef<const Image> dstImage, gfx::Blit blitInfo) override;
-        gfx::CommandBuffer& Resolve(ResourceRef<const Image> srcImage, gfx::Resolve resolveInfo) override;
-        gfx::CommandBuffer& Resolve(gfx::ResourceRef<const Image> srcImage, gfx::ResourceRef<const Image> dstImage, gfx::Resolve resolveInfo) override;
+        gfx::CommandBuffer& Blit(ResourceRef<const gfx::Image> srcImage, gfx::Blit blitInfo) override;
+        gfx::CommandBuffer& Blit(ResourceRef<const gfx::Image> srcImage, ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo) override;
+        gfx::CommandBuffer& Resolve(ResourceRef<const gfx::Image> srcImage, gfx::Resolve resolveInfo) override;
+        gfx::CommandBuffer& Resolve(ResourceRef<const gfx::Image> srcImage, ResourceRef<const gfx::Image> dstImage, gfx::Resolve resolveInfo) override;
 
-        gfx::CommandBuffer& ClearBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) override;
-        gfx::CommandBuffer& FillBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) override;
+        gfx::CommandBuffer& ClearBuffer(ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) override;
+        gfx::CommandBuffer& FillBuffer(ResourceRef<const gfx::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) override;
         gfx::CommandBuffer& CopyBuffer(ResourceRef<const gfx::Buffer> srcBuffer, ResourceRef<const gfx::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) override;
 
         gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;

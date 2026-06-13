@@ -6,10 +6,11 @@ module;
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <iostream>
 
-module ogl.scheduler;
-import gfx.context;
+module gfx;
+import :ogl_scheduler;
+
+import std;
 
 namespace gfx::ogl
 {
@@ -33,7 +34,7 @@ namespace gfx::ogl
         commandBuffer.End();
         commandBuffer.Submit();
 
-        glfwSwapBuffers(Context::Window().operator*());
+        glfwSwapBuffers(Context::GetWindow().operator*());
         advanceFrame();
     }
 

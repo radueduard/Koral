@@ -4,13 +4,15 @@
 
 module;
 
-#include <ranges>
 #include "ogl_err_handling.h"
 
-module ogl.graphicsPipeline;
-import ogl.shader;
-import gfx.flags;
+module gfx;
+import :ogl_graphicsPipeline;
+import :ogl_shader;
 
+import std;
+import flags;
+import :graphicsPipeline;
 
 namespace gfx::ogl
 {

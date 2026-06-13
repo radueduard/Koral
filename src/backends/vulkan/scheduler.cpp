@@ -4,24 +4,27 @@
 
 module;
 
-#include <iostream>
-#include <thread>
+#include <glm/glm.hpp>
 #include <vulkan/vulkan.hpp>
 
-module vk.scheduler;
-import vk.device;
-import gfx.context;
-import vk.context;
-import vk.swapChain;
-import vk.surface;
-import gfx.structs;
-import vk.commandBuffer;
+module gfx;
+import :vk_scheduler;
+import :vk_device;
+import :vk_context;
+import :vk_surface;
+import :vk_swapChain;
+import :vk_commandBuffer;
+
+import :scheduler;
+import :commandBuffer;
+import :context;
+import :window;
 
 namespace gfx::vk
 {
     Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : gfx::Frame(imageIndex), _queue(queue)
     {
-        _commandBuffer = Context::Device().requestCommandBuffer(_queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
+        setCommandBuffer(Context::Device().requestCommandBuffer(_queue, std::hash<std::thread::id>{}(std::this_thread::get_id())));
         _imageAvailable = vk::Context::Device()->createSemaphore({});
         _inFlightFence = Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
     }
@@ -40,7 +43,7 @@ namespace gfx::vk
 
     void Scheduler::Initialize()
     {
-        _swapChain = gfx::vk::SwapChain::Builder(dynamic_cast<const gfx::vk::Surface&>(gfx::Context::Window().getSurface()))
+        _swapChain = gfx::vk::SwapChain::Builder(dynamic_cast<const gfx::vk::Surface&>(gfx::Context::GetWindow().getSurface()))
             .setMinImageCount(_minImageCount)
             .setImageCount(_imageCount)
             .setSampleCount(SampleCount::e1)
@@ -68,7 +71,7 @@ namespace gfx::vk
         // VK_SUBOPTIMAL/OUT_OF_DATE — the compositor will happily scale a stale
         // buffer instead. Compare against the live framebuffer size so the swapchain
         // tracks fractional-scale events that arrive after window creation.
-        if (const auto windowExtent = gfx::Context::Window().getExtent();
+        if (const auto windowExtent = gfx::Context::GetWindow().getExtent();
             windowExtent.x > 0 && windowExtent.y > 0 && windowExtent != _swapChain->getExtent()) {
             _started = false;
             _swapChain->Resize(windowExtent);
@@ -79,7 +82,7 @@ namespace gfx::vk
             auto result = _swapChain->Acquire(frame);
             if (result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
                 _started = false;
-                _swapChain->Resize(gfx::Context::Window().getExtent());
+                _swapChain->Resize(gfx::Context::GetWindow().getExtent());
                 _started = true;
                 // recreate the semaphore
                 frame.ResetSemaphore();
@@ -112,13 +115,15 @@ namespace gfx::vk
         if (const auto result = _swapChain->Present(frame);
             result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
             _started = false;
-            _swapChain->Resize(gfx::Context::Window().getExtent());
+            _swapChain->Resize(gfx::Context::GetWindow().getExtent());
             _started = true;
             return;
         }
 
         advanceFrame();
     }
+
+    glm::u32 Scheduler::getCurrentImageIndex() const { return _swapChain->getCurrentImageIndex(); }
 
     void Scheduler::createFrames() {
         _frames.reserve(_imageCount);

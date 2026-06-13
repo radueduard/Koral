@@ -8,20 +8,18 @@ module;
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-#include <GLFW/glfw3.h>
 #include "ogl_err_handling.h"
 
-module ogl.gui;
+module gfx;
+import :ogl_gui;
 
-import gfx.commandBuffer;
-import gfx.context;
-import ogl.image;
+import :gui;
 
 namespace gfx
 {
     void ogl::GUI::Init()
     {
-        ImGui_ImplGlfw_InitForOpenGL(*Context::Window(), true);
+        ImGui_ImplGlfw_InitForOpenGL(*Context::GetWindow(), true);
         ImGui_ImplOpenGL3_Init("#version 450");
 
         ImGui::StyleColorsDark();
@@ -49,7 +47,7 @@ namespace gfx
         ImGui_ImplGlfw_Shutdown();
     }
 
-    ogl::GUI_Image::GUI_Image(gfx::ResourceRef<const gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    ogl::GUI_Image::GUI_Image(ResourceRef<const gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         setImage(image);
         setLayerAndLevel(layer, level);
@@ -106,7 +104,7 @@ namespace gfx
         glCheckError();
     }
 
-    void ogl::GUI_Image::setImage(gfx::ResourceRef<const gfx::Image> image)
+    void ogl::GUI_Image::setImage(ResourceRef<const gfx::Image> image)
     {
         _image = image;
         const auto& oglImage = dynamic_cast<const gfx::ogl::Image&>(*image);

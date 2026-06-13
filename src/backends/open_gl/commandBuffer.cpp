@@ -3,16 +3,17 @@
 //
 module;
 
-#include <ranges>
 #include <glm/gtc/type_ptr.inl>
-
-#include "framebuffer.h"
-#include "graphicsPipeline.h"
-#include "image.h"
 #include "ogl_err_handling.h"
 
-module ogl.commandBuffer;
+module gfx;
+import :ogl_commandBuffer;
+import :ogl_framebuffer;
+import :ogl_graphicsPipeline;
+import :ogl_image;
 
+import std;
+import flags;
 
 namespace gfx::ogl
 {
@@ -366,7 +367,7 @@ namespace gfx::ogl
         if (blitInfo.srcExtent == glm::ivec3(-1))
             blitInfo.srcExtent = srcImage->getExtent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = glm::uvec3 { Context::Window().getExtent(), 1 };
+            blitInfo.dstExtent = glm::uvec3 { Context::GetWindow().getExtent(), 1 };
 
         CheckRecording();
 
@@ -449,7 +450,7 @@ namespace gfx::ogl
         if (resolveInfo.srcExtent == glm::ivec3(-1))
             resolveInfo.srcExtent = srcImage->getExtent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = glm::uvec3 { Context::Window().getExtent(), 1 };
+            resolveInfo.dstExtent = glm::uvec3 { Context::GetWindow().getExtent(), 1 };
 
         CheckRecording();
         _commands.emplace_back([srcImage, resolveInfo] {

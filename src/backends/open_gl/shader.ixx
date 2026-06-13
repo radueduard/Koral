@@ -6,11 +6,13 @@ module;
 
 #include <GL/glew.h>
 #include <glm/glm.hpp>
-#include <map>
-#include <string>
 
-export module ogl.shader;
-import gfx.shader;
+export module gfx:ogl_shader;
+import :ogl_types;
+
+import std;
+
+import :shader;
 
 namespace gfx::ogl {
     export class Shader final : public gfx::Shader {

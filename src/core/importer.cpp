@@ -2,20 +2,21 @@
 // Created by radue on 2/23/2026.
 //
 
-#include <cstring>
-#include <span>
-
-#include "image.h"
-#include "buffer.h"
-#include "context.h"
-#include "assimpImporter.h"
+module;
 
 #include <OpenImageIO/imageio.h>
 #include <vulkan/vulkan.hpp>
 #include <ktx.h>
 #include <GL/glew.h>
+#include <glm/glm.hpp>
 
+module gfx;
+import :importer;
 
+import :image;
+import :buffer;
+import :context;
+import :commandBuffer;
 
 gfx::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
     switch (type.basetype) {
@@ -81,7 +82,7 @@ gfx::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
 
 namespace gfx
 {
-    gfx::Resource<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
+    Resource<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
     {
         const auto imageInput = OIIO::ImageInput::open(path.string());
         if (!imageInput) {
@@ -241,7 +242,7 @@ namespace gfx
         return gfx::Image::Type::e2D;
     }
 
-    Task<void> LoadKTXAsync(const std::filesystem::path& path, const bool generateMipmaps, gfx::Resource<Image>& returnImage) {
+    Task<void> LoadKTXAsync(const std::filesystem::path& path, const bool generateMipmaps, Resource<Image>& returnImage) {
         std::unique_ptr<ktxTexture, KtxTextureDeleter> texture = nullptr;
         Image::Format format;
         // Set when image data is already resident in CPU memory (e.g. after a
@@ -424,7 +425,7 @@ namespace gfx
         co_return;
     }
 
-    Task<void> LoadRegularImageAsync(const std::filesystem::path path, const bool generateMipmaps, gfx::Resource<Image>& returnImage) {
+    Task<void> LoadRegularImageAsync(const std::filesystem::path path, const bool generateMipmaps, Resource<Image>& returnImage) {
         const auto image_input = OIIO::ImageInput::open(path.string());
         if (!image_input) {
             std::cerr << "Could not open image file: " << OIIO::geterror() << std::endl;
@@ -490,7 +491,7 @@ namespace gfx
         return LoadRegularImageAsync(path, generateMipmaps, returnImage);
     }
 
-    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, gfx::ResourceRef<const Image> image) {
+    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, ResourceRef<const Image> image) {
         const auto imageOutput = OIIO::ImageOutput::create(path.string());
         if (!imageOutput) {
             throw std::runtime_error("Could not create image file: " + path.string() + "\nError: " + OIIO::geterror());

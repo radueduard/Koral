@@ -6,9 +6,11 @@ module;
 
 #include <vulkan/vulkan.hpp>
 
-module vk.shader;
-import vk.context;
-import vk.device;
+module gfx;
+import :vk_shader;
+
+import :vk_context;
+import :vk_device;
 
 namespace gfx::vk
 {

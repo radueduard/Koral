@@ -3,14 +3,11 @@
 //
 
 
-module;
-
-#include <stdexcept>
-
-module gfx.graphicsPipeline;
-import vk.graphicsPipeline;
-import ogl.graphicsPipeline;
-import gfx.context;
+module gfx;
+import :graphicsPipeline;
+import :vk_graphicsPipeline;
+import :ogl_graphicsPipeline;
+import :context;
 
 namespace gfx
 {
@@ -20,25 +17,25 @@ namespace gfx
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(gfx::ResourceRef<const Shader> geometryShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(ResourceRef<const Shader> geometryShader)
     {
         this->geometryShader = std::cref(geometryShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(gfx::ResourceRef<const Shader> fragmentShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(ResourceRef<const Shader> fragmentShader)
     {
         this->fragmentShader = std::cref(fragmentShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(gfx::ResourceRef<const Shader> taskShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(ResourceRef<const Shader> taskShader)
     {
         this->taskShader = std::cref(taskShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(gfx::ResourceRef<const Shader> meshShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(ResourceRef<const Shader> meshShader)
     {
         this->meshShader = std::cref(meshShader);
         return *this;
@@ -74,19 +71,19 @@ namespace gfx
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(gfx::ResourceRef<const gfx::Framebuffer> framebuffer)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(ResourceRef<const gfx::Framebuffer> framebuffer)
     {
         this->framebuffer = framebuffer;
         return *this;
     }
 
-    gfx::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build() const
+    Resource<GraphicsPipeline> GraphicsPipeline::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::GetWindow().getAPI()) {
         case API::eOpenGL:
-            return gfx::MakeResource<ogl::GraphicsPipeline>(*this);
+            return MakeResource<ogl::GraphicsPipeline>(*this);
         case API::eVulkan:
-            return gfx::MakeResource<vk::GraphicsPipeline>(*this);
+            return MakeResource<vk::GraphicsPipeline>(*this);
         default:
             throw std::runtime_error("Unknown API");
         }
@@ -139,7 +136,7 @@ namespace gfx
             throw std::runtime_error("Task shader cannot be set if there is no mesh shader!");
         }
 
-        std::vector<gfx::ResourceRef<const Shader>> shaders;
+        std::vector<ResourceRef<const Shader>> shaders;
         if (_vertexShader.has_value()) shaders.push_back(_vertexShader.value());
         if (_tessellationState.has_value()) {
             shaders.push_back(_tessellationState->controlShader);

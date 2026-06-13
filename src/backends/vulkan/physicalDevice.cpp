@@ -4,12 +4,15 @@
 
 module;
 
-#include <iostream>
-#include <unordered_set>
 #include <glm/fwd.hpp>
-import vk.context;
 
-module vk.physicalDevice;
+
+module gfx;
+import :vk_physicalDevice;
+import :vk_context;
+import :vk_runtime;
+
+import std;
 
 namespace gfx::vk
 {
