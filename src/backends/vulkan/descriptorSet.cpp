@@ -9,7 +9,7 @@
 
 #include "buffer.h"
 #include "context.h"
-#include "descriptorBinding.h"
+#include "descriptor.h"
 #include "descriptorPool.h"
 #include "descriptorSetLayout.h"
 #include "device.h"

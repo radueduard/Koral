@@ -17,14 +17,40 @@
 
 #include "flags.h"
 #include "api.h"
-#include "../src/log.h"
+#include "builder.h"
+#include "log.h"
 #include "context.h"
 #include "resource.h"
 #include "scheduler.h"
 
 namespace gfx
 {
-    class GFX_API Buffer
+    struct PendingWrite {
+        glm::u32 srcFrameIndex;
+        glm::u64 offset;
+        glm::u64 byteSize;
+        std::unordered_set<glm::u32> buffersLeftToUpdate;
+
+        auto operator <=> (const PendingWrite& other) const {
+            if (srcFrameIndex != other.srcFrameIndex) return srcFrameIndex <=> other.srcFrameIndex;
+            if (offset != other.offset) return offset <=> other.offset;
+            return byteSize <=> other.byteSize;
+        }
+
+        bool operator == (const PendingWrite& other) const {
+            return srcFrameIndex == other.srcFrameIndex && offset == other.offset && byteSize == other.byteSize;
+        }
+
+        struct Hash {
+            std::size_t operator()(const PendingWrite& write) const {
+                return std::hash<glm::u32>()(write.srcFrameIndex)
+                    ^ std::hash<glm::u64>()(write.offset)
+                    ^ std::hash<glm::u64>()(write.byteSize);
+            }
+        };
+    };
+
+    class GFX_API Buffer : public AutoUpdatable
     {
     public:
         /**
@@ -33,6 +59,7 @@ namespace gfx
          */
         enum class Usage
         {
+            eNone        = 0,       ///< No usage specified. This is not a valid usage flag and should be combined with other flags.
             eTransferSrc = 1 << 0,  ///< Buffer can be used as a source for transfer operations (e.g., copying to another buffer or image).
             eTransferDst = 1 << 1,  ///< Buffer can be used as a destination for transfer operations (e.g., copying from another buffer or image).
             eTexel       = 1 << 2,  ///< Buffer can be used for formatted memory access in shaders (e.g., as a storage texel buffer or uniform texel buffer).
@@ -58,51 +85,70 @@ namespace gfx
          * @brief Untyped builder (raw byte size + usage + memory type).
          * Use this when creating a generic buffer without element type semantics.
          */
-        struct GFX_API RawBuilder {
-            bool isPerFrame = false;
-            glm::i64 size = 0;
-            Flags<Usage> usage = Usage::eUniform;
-            Type type = Type::eDynamic;
+        struct GFX_API RawBuilder : Builder {
+            bool _isPerFrame = false;
+            glm::i64 _size = 0;
+            Flags<Usage> _usage = Usage::eNone;
+            Type _type = Type::eDynamic;
+
+            RawBuilder& setRawSize(const glm::i64 size) {
+                if (size <= 0) {
+                    fail("size must be > 0");
+                } else {
+                    _size = size;
+                }
+                return *this;
+            }
 
             RawBuilder& setIsPerFrame(const bool value) {
-                isPerFrame = value;
-                usage |= Usage::eTransferSrc;
-                usage |= Usage::eTransferDst;
+                _isPerFrame = value;
+                _usage |= Usage::eTransferSrc;
+                _usage |= Usage::eTransferDst;
+                _usageTouched = true;
                 return *this;
             }
 
-            RawBuilder& setUsage(const Flags<Usage> value) {
-                usage = value;
+            RawBuilder& setUsage(const Flags<Usage> usage) {
+                if (_usageTouched) {
+                    warn("setUsage overwrites usage flags previously set via addUsage/setIsPerFrame");
+                }
+                _usage = usage;
+                _usageTouched = true;
                 return *this;
             }
 
-            RawBuilder& addUsage(const Usage value) {
-                usage |= value;
+            RawBuilder& addUsage(const Usage usage) {
+                _usage |= usage;
+                _usageTouched = true;
                 return *this;
             }
 
-            RawBuilder& setType(const Type value) {
-                type = value;
+            RawBuilder& setType(const Type type) {
+                _type = type;
                 return *this;
             }
 
             [[nodiscard]] virtual Resource<Buffer> build() const;
 
         protected:
+            bool _usageTouched = false; ///< tracks explicit usage edits so setUsage can warn on overwrite
+
             RawBuilder& setSize(const glm::i64 value) {
                 if (value <= 0) {
-                    throw std::invalid_argument("RawBuilder::size must be > 0");
+                    fail("RawBuilder::size must be > 0");
+                } else {
+                    _size = value;
                 }
-                size = value;
                 return *this;
             }
         };
 
         template <typename T> requires std::is_trivially_copyable_v<T>
         struct Builder : RawBuilder {
-            glm::i64 instanceCount = 1;
+            glm::i64 _instanceCount = 1;
+
             Builder() {
-                this->size = static_cast<glm::i64>(sizeof(T));
+                _size = static_cast<glm::i64>(sizeof(T));
             }
 
         private:
@@ -114,10 +160,10 @@ namespace gfx
 
             Builder& setInstanceCount(const glm::i64 value) {
                 if (value < 0) {
-                    throw std::invalid_argument("Builder<T>::instanceCount must be >= 0");
+                    fail("instanceCount must be >= 0");
                 }
-                instanceCount = value;
-                this->size = static_cast<glm::i64>(sizeof(T)) * instanceCount;
+                _instanceCount = value;
+                _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
 
@@ -125,25 +171,28 @@ namespace gfx
             Builder& setData(const T& value) {
                 _ownedData.assign(1, value);
                 _dataView = std::span<const T>(_ownedData.data(), _ownedData.size());
-                instanceCount = 1;
-                this->size = static_cast<glm::i64>(sizeof(T));
+                _instanceCount = 1;
+                _size = static_cast<glm::i64>(sizeof(T));
                 return *this;
             }
 
             template <std::ranges::contiguous_range Container> requires std::same_as<std::ranges::range_value_t<Container>, T>
             Builder& setData(const Container& data) {
+                if (data.size() <= 0) {
+                    fail("Data container must have size > 0");
+                }
                 _ownedData.assign(data.begin(), data.end());
                 _dataView = std::span<const T>(_ownedData.data(), _ownedData.size());
-                instanceCount = static_cast<glm::i64>(_ownedData.size());
-                this->size = static_cast<glm::i64>(sizeof(T)) * instanceCount;
+                _instanceCount = static_cast<glm::i64>(_ownedData.size());
+                _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
 
             Builder& setDataView(const std::span<const T> view) {
                 _ownedData.clear();
                 _dataView = view;
-                instanceCount = static_cast<glm::i64>(view.size());
-                this->size = static_cast<glm::i64>(sizeof(T)) * instanceCount;
+                _instanceCount = static_cast<glm::i64>(view.size());
+                _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
             [[nodiscard]] Resource<Buffer> build() const override {
@@ -152,7 +201,7 @@ namespace gfx
                 if (!_dataView.empty()) {
                     switch (buffer->getType()) {
                         case Type::eDeviceLocal: {
-                            const auto byteSize = checkedByteSize<T>(static_cast<glm::u64>(instanceCount), "Builder::build");
+                            const auto byteSize = checkedByteSize<T>(static_cast<glm::u64>(_instanceCount), "Builder::build");
                             Builder<std::byte> stagingBuilder;
                             stagingBuilder
                                 .setInstanceCount(toBuilderSize(byteSize, "Builder::build"))
@@ -448,10 +497,18 @@ namespace gfx
             T& operator[](const glm::u64 index) {
                 if (_buffer->isPerFrame()) {
                     auto currentImageIndex = gfx::Context::Scheduler().getCurrentImageIndex();
-                    _buffer->_pendingWrites.emplace_back(
+                    const glm::u64 writeOffset = (_offset + index) * sizeof(T);
+                    constexpr glm::u64 writeSize = sizeof(T);
+                    // A fresh write to this region supersedes any still-pending propagation
+                    // of older data covering it; drop those so automaticUpdate() can't copy
+                    // stale data over this write (the two run in an unspecified order).
+                    std::erase_if(_buffer->_pendingWrites, [&](const PendingWrite& w) {
+                        return w.offset >= writeOffset && w.offset + w.byteSize <= writeOffset + writeSize;
+                    });
+                    _buffer->_pendingWrites.emplace(
                         currentImageIndex,
-                        (_offset + index) * sizeof(T),
-                        sizeof(T),
+                        writeOffset,
+                        writeSize,
                         gfx::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
                     );
                 }
@@ -499,10 +556,18 @@ namespace gfx
 
                 if (_buffer->isPerFrame()) {
                     auto currentImageIndex = gfx::Context::Scheduler().getCurrentImageIndex();
-                    _buffer->_pendingWrites.emplace_back(
+                    const glm::u64 writeOffset = (_offset + localOffset) * sizeof(T);
+                    const glm::u64 writeSize = count * sizeof(T);
+                    // A fresh write to this region supersedes any still-pending propagation
+                    // of older data covering it; drop those so automaticUpdate() can't copy
+                    // stale data over this write (the two run in an unspecified order).
+                    std::erase_if(_buffer->_pendingWrites, [&](const PendingWrite& w) {
+                        return w.offset >= writeOffset && w.offset + w.byteSize <= writeOffset + writeSize;
+                    });
+                    _buffer->_pendingWrites.emplace(
                         currentImageIndex,
-                        (_offset + localOffset) * sizeof(T),
-                        count * sizeof(T),
+                        writeOffset,
+                        writeSize,
                         gfx::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
                     );
                 }
@@ -661,16 +726,8 @@ namespace gfx
             Unmap();
         }
 
-        struct PendingWrite {
-            glm::u32 srcFrameIndex;
-            glm::u64 offset;
-            glm::u64 byteSize;
-            std::unordered_set<glm::u32> buffersLeftToUpdate;
-        };
-
-        mutable std::vector<PendingWrite> _pendingWrites{};
-
-    public:
-        virtual void automaticUpdate() const = 0;
+        mutable std::unordered_set<PendingWrite, PendingWrite::Hash> _pendingWrites {};
     };
 }
+
+

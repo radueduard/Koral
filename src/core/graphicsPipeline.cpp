@@ -17,8 +17,8 @@
 
 namespace gfx
 {
-    GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(const Shader &shader) {
-        this->vertexShader = std::cref(shader);
+    GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader) {
+        this->vertexShader = std::cref(*shader);
         this->vertexAttributeDescriptions = DefaultMeshRegistry::Attributes();
         this->vertexBindingDescriptions = DefaultMeshRegistry::Bindings();
         return *this;
@@ -30,27 +30,27 @@ namespace gfx
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(const Shader& geometryShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(ResourceRef<const Shader> geometryShader)
     {
-        this->geometryShader = std::cref(geometryShader);
+        this->geometryShader = std::cref(*geometryShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(const Shader& fragmentShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(ResourceRef<const Shader> fragmentShader)
     {
-        this->fragmentShader = std::cref(fragmentShader);
+        this->fragmentShader = std::cref(*fragmentShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(const Shader& taskShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(ResourceRef<const Shader> taskShader)
     {
-        this->taskShader = std::cref(taskShader);
+        this->taskShader = std::cref(*taskShader);
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(const Shader& meshShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(ResourceRef<const Shader> meshShader)
     {
-        this->meshShader = std::cref(meshShader);
+        this->meshShader = std::cref(*meshShader);
         return *this;
     }
 
@@ -191,10 +191,10 @@ namespace gfx
             {
                 if (mergedPushConstants.contains(offset)) {
                     auto& existingPushConstant = mergedPushConstants[offset];
-                    if (existingPushConstant.size != pushConstant.size)
-                    {
-                        throw std::runtime_error("Push constant layout conflict between shaders in pipeline!");
-                    }
+                    // if (existingPushConstant.size != pushConstant.size)
+                    // {
+                    //     throw std::runtime_error("Push constant layout conflict between shaders in pipeline!");
+                    // }
                     existingPushConstant.stages |= pushConstant.stages;
                 } else {
                     mergedPushConstants[offset] = pushConstant;

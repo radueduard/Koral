@@ -363,4 +363,49 @@ namespace gfx
         eB = 4,
         eA = 8
     };
+
+    /**
+     * @brief The type of resolve mode. Used to define how multisampled images are resolved to single-sampled images in the graphics pipeline.
+     */
+    enum class ResolveMode : uint8_t
+    {
+        eNone = 0,          ///< No resolve operation is performed.
+        eSampleZero = 1,    ///< The value of the first sample (sample index 0) is used as the resolved value.
+        eAverage = 2,       ///< The average of all samples in the pixel is calculated and used as the resolved value.
+        eMin = 3,           ///< The minimum value of all samples is used as the resolved value.
+        eMax = 4            ///< The maximum value of all samples is used as the resolved value.
+    };
+
+    /**
+     * @brief Description of an indirect draw command.
+     */
+    struct GFX_API IndirectDrawCommand
+    {
+        uint32_t vertexCount;
+        uint32_t instanceCount;
+        uint32_t firstVertex;
+        uint32_t firstInstance;
+    };
+
+    /**
+     * @brief Description of an indirect indexed draw command.
+     */
+    struct GFX_API IndirectDrawIndexedCommand
+    {
+        uint32_t indexCount;
+        uint32_t instanceCount;
+        uint32_t firstIndex;
+        int32_t vertexOffset;
+        uint32_t firstInstance;
+    };
+
+    /**
+     * @brief Description of an indirect draw command for mesh tasks.
+     */
+    struct GFX_API IndirectDrawMeshTasksCommand
+    {
+        uint32_t taskCountX;
+        uint32_t taskCountY;
+        uint32_t taskCountZ;
+    };
 }

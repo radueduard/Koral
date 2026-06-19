@@ -9,7 +9,7 @@
 #include <glm/fwd.hpp>
 
 #include "descriptorSetLayout.h"
-#include "descriptorBinding.h"
+#include "descriptor.h"
 #include "api.h"
 
 namespace gfx

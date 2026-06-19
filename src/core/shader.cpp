@@ -36,6 +36,22 @@ namespace gfx {
         }
     }
 
+    ResourceRef<const Shader> Shader::Builder::buildManaged(const std::string& identifier) const
+    {
+        Resource<Shader> shader;
+        switch (Context::Window().getAPI()) {
+        case API::eOpenGL:
+            shader = MakeResource<ogl::Shader>(*this);
+            break;
+        case API::eVulkan:
+            shader = MakeResource<vk::Shader>(*this);
+            break;
+        default:
+            throw std::runtime_error("Unknown graphics API!");
+        }
+        return Context::Repository().add(identifier, std::move(shader));
+    }
+
     static EShLanguage shaderStageToEShLanguage(const Shader::Stage &stage) {
         switch (stage) {
         case Shader::Stage::eVertex: return EShLangVertex;

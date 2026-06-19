@@ -15,7 +15,7 @@ namespace gfx::ogl
     Framebuffer::Framebuffer() : _id(0)
     {
         _isDefault = true;
-        _clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 0.0 );
+        _clearValues.clearColor.emplace_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
     }
 
     Framebuffer::Framebuffer(const gfx::Framebuffer::Builder& createInfo) : gfx::Framebuffer(createInfo) {
@@ -30,9 +30,14 @@ namespace gfx::ogl
             drawAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + i);
             glCheckError();
         }
-        if (_depthStencilAttachment.has_value()) {
-            const auto& imageView = dynamic_cast<const ImageView&>(_depthStencilAttachment->get());
-            glNamedFramebufferTexture(_id, GL_DEPTH_STENCIL_ATTACHMENT, *imageView, 0);
+        if (_depthAttachment.has_value()) {
+            const auto& imageView = dynamic_cast<const ImageView&>(_depthAttachment->get());
+            glNamedFramebufferTexture(_id, GL_DEPTH_ATTACHMENT, *imageView, 0);
+            glCheckError();
+        }
+        if (_stencilAttachment.has_value() && (!_depthAttachment.has_value() || &_stencilAttachment->get() != &_depthAttachment->get())) {
+            const auto& imageView = dynamic_cast<const ImageView&>(_stencilAttachment->get());
+            glNamedFramebufferTexture(_id, GL_STENCIL_ATTACHMENT, *imageView, 0);
             glCheckError();
         }
         glNamedFramebufferDrawBuffers(_id, drawAttachments.size(), drawAttachments.data());
@@ -69,6 +74,6 @@ namespace gfx::ogl
 
     bool Framebuffer::hasDepthStencilAttachment() const
     {
-        return gfx::Framebuffer::hasDepthStencilAttachment() || _id == 0;
+        return gfx::Framebuffer::hasDepthAttachment() || _id == 0;
     }
 }

@@ -40,15 +40,18 @@ namespace gfx::vk
     private:
         ::vk::Instance _instance;
         std::vector<const char*> _instanceLayers {
+#ifndef NDEBUG
             "VK_LAYER_KHRONOS_validation",
+#endif
         };
         std::vector<const char*> _instanceExtensions {
-            VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
             VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef __linux__
+            "VK_KHR_wayland_surface",
+#endif
 #ifdef __APPLE__
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
 #endif
-            VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME
         };
         std::vector<const char*> _deviceExtensions {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,

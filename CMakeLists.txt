@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 project(GFX_RELOADED VERSION 0.0.1 LANGUAGES C CXX)
 include(GenerateExportHeader)
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 23)
@@ -39,7 +41,6 @@ find_package(spirv_cross_glsl CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
 
 find_package(Ktx CONFIG REQUIRED)
-find_package(directxtex CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 
 find_package(imgui CONFIG REQUIRED)
@@ -47,7 +48,7 @@ find_package(spdlog CONFIG REQUIRED)
 
 
 
-file (GLOB_RECURSE SOURCE_FILES
+file(GLOB_RECURSE SOURCE_FILES
         src/core/*.cpp
         src/io/*.cpp
         src/backends/*.cpp
@@ -65,20 +66,20 @@ target_compile_definitions(${PROJECT_NAME}
         PRIVATE GFX_RELOADED_EXPORTS
         INTERFACE GFX_RELOADED_IMPORTS)
 
-if (UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE)
     set(GLFW_USE_WAYLAND ON)
 endif()
 
-target_link_libraries(${PROJECT_NAME} glfw)
-target_link_libraries(${PROJECT_NAME} magic_enum::magic_enum)
-target_link_libraries(${PROJECT_NAME} glm::glm)
-target_link_libraries(${PROJECT_NAME} GLEW::GLEW OpenGL::GL)
-target_link_libraries(${PROJECT_NAME} assimp::assimp)
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+target_link_libraries(${PROJECT_NAME} PRIVATE magic_enum::magic_enum)
+target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
+target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW OpenGL::GL)
+target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 
-target_link_libraries(${PROJECT_NAME} Vulkan::Vulkan)
-target_link_libraries(${PROJECT_NAME} GPUOpen::VulkanMemoryAllocator)
+target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
+target_link_libraries(${PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${PROJECT_NAME} PRIVATE
         glslang::glslang
         glslang::MachineIndependent
         glslang::OSDependent
@@ -86,36 +87,47 @@ target_link_libraries(${PROJECT_NAME}
         glslang::glslang-default-resource-limits
 )
 
-target_link_libraries(${PROJECT_NAME} spirv-cross-core)
-target_link_libraries(${PROJECT_NAME} spirv-cross-glsl)
-target_link_libraries(${PROJECT_NAME} reflectcpp::reflectcpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-core)
+target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-glsl)
+target_link_libraries(${PROJECT_NAME} PRIVATE reflectcpp::reflectcpp)
 
-target_link_libraries(${PROJECT_NAME} ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} ${JASPER_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} imgui::imgui)
-target_link_libraries(${PROJECT_NAME} spdlog::spdlog)
+target_link_libraries(${PROJECT_NAME} PRIVATE ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${JASPER_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE imgui::imgui)
+target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
 
-target_link_libraries(${PROJECT_NAME} KTX::ktx)
-target_link_libraries(${PROJECT_NAME} Microsoft::DirectXTex)
-target_link_libraries(${PROJECT_NAME} OpenImageIO::OpenImageIO)
+target_link_libraries(${PROJECT_NAME} PRIVATE KTX::ktx)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenImageIO::OpenImageIO)
 
-if (UNIX AND NOT APPLE)
-    target_link_libraries(${PROJECT_NAME} OpenGL::GLX)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GLX)
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
-target_link_libraries(${PROJECT_NAME} glad::glad)
+target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)
+
+# std::stacktrace support (GCC libstdc++). fail()/warn() in builder.h capture a
+# stacktrace; the symbols live in libstdc++exp. PUBLIC so consumers that
+# instantiate the header-inline diagnostics also link it.
+target_link_libraries(${PROJECT_NAME} PUBLIC $<$<CXX_COMPILER_ID:GNU>:stdc++exp>)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-    ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
-    SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/"
-    PROJECT_ROOT="${CMAKE_SOURCE_DIR}/"
+        ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
+        SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/"
+        PROJECT_ROOT="${CMAKE_SOURCE_DIR}/"
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE
+target_include_directories(${PROJECT_NAME}
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        PRIVATE
         ${CMAKE_BINARY_DIR}/include
-        ${CMAKE_SOURCE_DIR}/include)
+        ${CMAKE_SOURCE_DIR}/include
+)
 
-file (GLOB_RECURSE RUNTIME_SOURCE_FILES
+file(GLOB_RECURSE RUNTIME_SOURCE_FILES
         src/main.cpp
         src/engine.cpp
         src/lab/*.cpp
@@ -127,12 +139,61 @@ add_executable(Gfx_Runtime ${RUNTIME_SOURCE_FILES})
 target_include_directories(Gfx_Runtime PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include)
-# link the GFX_RELOADED dll
+
 target_link_libraries(Gfx_Runtime PRIVATE ${PROJECT_NAME})
+
+# Gfx_Runtime includes public headers from GFX that expose these deps directly
+target_link_libraries(Gfx_Runtime PRIVATE
+        imgui::imgui
+        glm::glm
+        spdlog::spdlog
+        Vulkan::Vulkan
+        glfw
+)
 
 string(REPLACE "\\" "/" VCPKG_TOOLCHAIN_FWD "${CMAKE_TOOLCHAIN_FILE}")
 target_compile_definitions(Gfx_Runtime PRIVATE
-    PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
-    VCPKG_ROOT="${VCPKG_TOOLCHAIN_FWD}"
-    ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
-    SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/")
+        PROJECT_ROOT="${CMAKE_SOURCE_DIR}"
+        VCPKG_ROOT="${VCPKG_TOOLCHAIN_FWD}"
+        ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
+        SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/")
+
+# ---------------------------------------------------------------------------
+# Export & install — generates GFX_RELOADEDConfig.cmake into cmake/
+# ---------------------------------------------------------------------------
+
+set_target_properties(Gfx_Runtime PROPERTIES EXPORT_NAME Gfx_Runtime)
+
+# Declare the export set via install() — export(EXPORT) requires this to exist
+install(TARGETS ${PROJECT_NAME} Gfx_Runtime
+        EXPORT ${PROJECT_NAME}Targets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+# Write config files directly at configure time (no build step needed)
+set(GFX_CMAKE_OUTPUT_DIR "/mnt/w/CLionProjects/GFX/cmake" CACHE PATH "Directory where GFX_RELOADED cmake config files are written")
+file(MAKE_DIRECTORY "${GFX_CMAKE_OUTPUT_DIR}")
+
+# Export build-tree targets directly into the output dir
+export(EXPORT ${PROJECT_NAME}Targets
+        FILE "${GFX_CMAKE_OUTPUT_DIR}/GFX_RELOADEDTargets.cmake"
+        NAMESPACE GFX_RELOADED::)
+
+# Config file that pulls in the targets
+file(WRITE "${GFX_CMAKE_OUTPUT_DIR}/GFX_RELOADEDConfig.cmake"
+        "include(CMakeFindDependencyMacro)
+include(\"\${CMAKE_CURRENT_LIST_DIR}/GFX_RELOADEDTargets.cmake\")
+")
+
+# Re-export after each build to keep target file paths up to date
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -DEXPORT_SET=${PROJECT_NAME}Targets
+            -DOUTPUT_FILE="${GFX_CMAKE_OUTPUT_DIR}/GFX_RELOADEDTargets.cmake"
+            -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_export_targets.cmake"
+        COMMENT "Refreshing GFX_RELOADED cmake config in ${GFX_CMAKE_OUTPUT_DIR}"
+)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cmake_export_targets.cmake"
+        "include(\"${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/Export/${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/${PROJECT_NAME}Targets.cmake\" OPTIONAL)
+")

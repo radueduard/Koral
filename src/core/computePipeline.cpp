@@ -14,9 +14,9 @@
 
 namespace gfx
 {
-    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(const Shader& computeShader)
+    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(ResourceRef<const Shader> computeShader)
     {
-        this->computeShader = computeShader;
+        this->computeShader = std::cref(*computeShader);
         return *this;
     }
 

@@ -60,7 +60,7 @@ namespace gfx
         };
 
         struct GFX_API Builder {
-            gfx::ResourceRef<Image> image;
+            gfx::ResourceRef<const Image> image;
             Type type = Type::e2D;
             glm::u32 baseMipLevel = 0;
             glm::u32 mipLevelCount = 1;
@@ -68,7 +68,7 @@ namespace gfx
             glm::u32 arrayLayerCount = 1;
             ComponentMapping componentMapping = {};
 
-            explicit Builder(gfx::ResourceRef<Image> image);
+            explicit Builder(gfx::ResourceRef<const Image> image);
 
             Builder& setViewType(Type viewType) {
                 this->type = viewType;
@@ -105,7 +105,7 @@ namespace gfx
 
         virtual ~ImageView() = default;
 
-        [[nodiscard]] gfx::ResourceRef<Image> getImage() const { return _image; }
+        [[nodiscard]] gfx::ResourceRef<const Image> getImage() const { return _image; }
         [[nodiscard]] Type getViewType() const { return _viewType; }
         [[nodiscard]] glm::u32 getBaseMipLevel() const { return _baseMipLevel; }
         [[nodiscard]] glm::u32 getMipLevelCount() const { return _mipLevelCount; }
@@ -117,7 +117,7 @@ namespace gfx
 
     protected:
         explicit ImageView(const Builder& createInfo);
-        gfx::ResourceRef<Image> _image;
+        gfx::ResourceRef<const Image> _image;
         bool _isPerFrame = false;
         Type _viewType;
         glm::u32 _baseMipLevel;

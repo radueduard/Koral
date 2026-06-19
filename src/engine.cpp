@@ -75,10 +75,10 @@ namespace gfx
             Context::DrainMainThread();
 
             if (window->isPaused()) {
+                window->_inputState.update();
                 continue;
             }
             auto& scene = *window->_scene;
-            window->_inputState.update();
             window->_timeState.update();
             Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
                 Context::Repository().update();
@@ -86,6 +86,7 @@ namespace gfx
                 scene.Render(commandBuffer);
                 GUI::Render(commandBuffer, scene);
             });
+            window->_inputState.update();
             window->LateUpdate();
         }
         window.reset();

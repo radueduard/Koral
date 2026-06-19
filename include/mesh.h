@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include "meshType.h"
@@ -49,6 +50,45 @@ namespace gfx
         std::optional<gfx::Resource<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
         std::optional<gfx::Resource<Buffer>> _indirectBuffer = std::nullopt;
+
+        /**
+         * Creates a device-local buffer and copies the contents of `data` into it.
+         * `T` is deduced from the span, so the const element type does not need to be spelled out.
+         */
+        template<typename T>
+        static gfx::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
+        {
+            // Keep final buffers transfer-capable as requested.
+            const auto finalUsage = usage
+                | Buffer::Usage::eTransferDst
+                | Buffer::Usage::eTransferSrc
+                | Buffer::Usage::eStorage;
+
+            return Buffer::Builder<T>()
+                .setDataView(data)
+                .setUsage(finalUsage)
+                .setType(Buffer::Type::eDeviceLocal)
+                .build();
+        }
+
+        /**
+         * Creates an empty device-local buffer sized for `instanceCount` elements of `T`.
+         * The caller is expected to fill it later. `T` must be specified explicitly.
+         */
+        template<typename T>
+        static gfx::Resource<Buffer> makeBuffer(glm::u64 instanceCount, Flags<Buffer::Usage> usage)
+        {
+            const auto finalUsage = usage
+                | Buffer::Usage::eTransferDst
+                | Buffer::Usage::eTransferSrc
+                | Buffer::Usage::eStorage;
+
+            return Buffer::Builder<T>()
+                .setInstanceCount(static_cast<glm::i64>(instanceCount))
+                .setUsage(finalUsage)
+                .setType(Buffer::Type::eDeviceLocal)
+                .build();
+        }
     };
 
     template<typename Derived>

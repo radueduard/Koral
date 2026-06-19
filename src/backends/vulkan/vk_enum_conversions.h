@@ -4,6 +4,7 @@
 
 #pragma once
 #include <image.h>
+#include <framebuffer.h>
 
 #include "image.h"
 #include "imageView.h"
@@ -34,6 +35,18 @@ namespace gfx
         }
     }
 
+    inline ::vk::ResolveModeFlagBits getVkResolveMode(const ResolveMode resolveMode) {
+        switch (resolveMode)
+        {
+        case ResolveMode::eNone: return ::vk::ResolveModeFlagBits::eNone;
+        case ResolveMode::eAverage: return ::vk::ResolveModeFlagBits::eAverage;
+        case ResolveMode::eMin: return ::vk::ResolveModeFlagBits::eMin;
+        case ResolveMode::eMax: return ::vk::ResolveModeFlagBits::eMax;
+        case ResolveMode::eSampleZero: return ::vk::ResolveModeFlagBits::eSampleZero;
+        default: throw std::runtime_error("Unknown resolve mode type!");
+        }
+    }
+
     inline ::vk::AccessFlags getVkAccessFlags(const ResourceAccess access) {
         switch (access)
         {
@@ -44,8 +57,14 @@ namespace gfx
         case ResourceAccess::IndexBuffer: return ::vk::AccessFlagBits::eIndexRead;
         case ResourceAccess::IndirectBuffer: return ::vk::AccessFlagBits::eIndirectCommandRead;
         case ResourceAccess::ColorAttachment: return ::vk::AccessFlagBits::eColorAttachmentWrite;
-        case ResourceAccess::DepthAttachment: return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-        case ResourceAccess::DepthRead: return ::vk::AccessFlagBits::eDepthStencilAttachmentRead;
+        case ResourceAccess::DepthStencilAttachment:
+        case ResourceAccess::DepthAttachment:
+        case ResourceAccess::StencilAttachment:
+            return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+        case ResourceAccess::DepthStencilRead:
+        case ResourceAccess::DepthRead:
+        case ResourceAccess::StencilRead:
+            return ::vk::AccessFlagBits::eDepthStencilAttachmentRead;
         case ResourceAccess::TransferSrc: return ::vk::AccessFlagBits::eTransferRead;
         case ResourceAccess::TransferDst: return ::vk::AccessFlagBits::eTransferWrite;
 
@@ -89,8 +108,12 @@ namespace gfx
             return ::vk::PipelineStageFlagBits::eFragmentShader;
         case ResourceAccess::ColorAttachment:
             return ::vk::PipelineStageFlagBits::eColorAttachmentOutput;
+        case ResourceAccess::DepthStencilAttachment:
+        case ResourceAccess::DepthStencilRead:
         case ResourceAccess::DepthAttachment:
         case ResourceAccess::DepthRead:
+        case ResourceAccess::StencilAttachment:
+        case ResourceAccess::StencilRead:
             return ::vk::PipelineStageFlagBits::eEarlyFragmentTests | ::vk::PipelineStageFlagBits::eLateFragmentTests;
         case ResourceAccess::TransferSrc:
         case ResourceAccess::TransferDst:
@@ -137,9 +160,18 @@ namespace gfx
             return ::vk::ImageLayout::eShaderReadOnlyOptimal;
         case ResourceAccess::ColorAttachment:
             return ::vk::ImageLayout::eColorAttachmentOptimal;
-        case ResourceAccess::DepthAttachment:
-        case ResourceAccess::DepthRead:
+        case ResourceAccess::DepthStencilAttachment:
             return ::vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        case ResourceAccess::DepthStencilRead:
+            return ::vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+        case ResourceAccess::DepthAttachment:
+            return ::vk::ImageLayout::eDepthAttachmentOptimal;
+        case ResourceAccess::DepthRead:
+            return ::vk::ImageLayout::eDepthReadOnlyOptimal;
+        case ResourceAccess::StencilAttachment:
+            return ::vk::ImageLayout::eStencilAttachmentOptimal;
+        case ResourceAccess::StencilRead:
+            return ::vk::ImageLayout::eStencilReadOnlyOptimal;
         case ResourceAccess::TransferSrc:
             return ::vk::ImageLayout::eTransferSrcOptimal;
         case ResourceAccess::TransferDst:
@@ -654,4 +686,39 @@ namespace gfx
         return vkFlags;
     }
 
+    inline ::vk::ClearValue getVkClearValue(const gfx::ClearColor& clearValue)
+    {
+        return std::visit([](auto&& value) -> ::vk::ClearValue {
+            using T = std::decay_t<decltype(value)>;
+            if constexpr (std::is_same_v<T, float>)
+                return ::vk::ClearColorValue{ std::array<float,4>{ value, 0.f, 0.f, 0.f } };
+            else if constexpr (std::is_same_v<T, glm::vec2>)
+                return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, 0.f, 0.f } };
+            else if constexpr (std::is_same_v<T, glm::vec3>)
+                return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, value.z, 0.f } };
+            else if constexpr (std::is_same_v<T, glm::vec4>)
+                return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, value.z, value.w } };
+            else if constexpr (std::is_same_v<T, glm::i32>)
+                return ::vk::ClearColorValue{ std::array<int32_t,4>{ value, 0, 0, 0 } };
+            else if constexpr (std::is_same_v<T, glm::ivec2>)
+                return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, 0, 0 } };
+            else if constexpr (std::is_same_v<T, glm::ivec3>)
+                return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, value.z, 0 } };
+            else if constexpr (std::is_same_v<T, glm::ivec4>)
+                return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, value.z, value.w } };
+            else if constexpr (std::is_same_v<T, glm::u32>)
+                return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value, 0u, 0u, 0u } };
+            else if constexpr (std::is_same_v<T, glm::uvec2>)
+                return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, 0u, 0u } };
+            else if constexpr (std::is_same_v<T, glm::uvec3>)
+                return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, value.z, 0u } };
+            else if constexpr (std::is_same_v<T, glm::uvec4>)
+                return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, value.z, value.w } };
+            else
+                return ::vk::ClearColorValue{ std::array<float,4>{ 0.f, 0.f, 0.f, 0.f } };
+        }, clearValue);
+    }
+
 }
+
+

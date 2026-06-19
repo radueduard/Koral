@@ -43,9 +43,22 @@ namespace gfx::vk
 
         _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
 
+        std::vector<::vk::SpecializationMapEntry> specializationMapEntries;
+        for (const auto& [id, offset, size] : createInfo.specConstantsMetadata) {
+            specializationMapEntries.emplace_back(::vk::SpecializationMapEntry()
+                .setConstantID(id)
+                .setOffset(offset)
+                .setSize(size));
+        }
+        auto specializationInfo = ::vk::SpecializationInfo()
+            .setMapEntries(specializationMapEntries)
+            .setDataSize(createInfo.specConstantsData.size())
+            .setPData(createInfo.specConstantsData.data());
+
         const auto stageCreateInfo = ::vk::PipelineShaderStageCreateInfo()
                                      .setStage(::vk::ShaderStageFlagBits::eCompute)
                                      .setModule(*shader)
+                                     .setPSpecializationInfo(createInfo.specConstantsMetadata.empty() ? nullptr : &specializationInfo)
                                      .setPName("main");
 
         const auto pipelineCreateInfo = ::vk::ComputePipelineCreateInfo()

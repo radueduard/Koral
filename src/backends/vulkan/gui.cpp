@@ -139,7 +139,7 @@ namespace gfx::vk
             .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
             .build();
 
-        if (!ImGui_ImplGlfw_InitForVulkan(*gfx::Context::Window(), true)) {
+        if (!ImGui_ImplGlfw_InitForVulkan(*gfx::Context::Window(), false)) {
             throw std::runtime_error("Failed to initialize ImGui for GLFW");
         }
 

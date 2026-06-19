@@ -31,8 +31,9 @@ namespace gfx::vk
         auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
 
         _colorAttachments.emplace_back(colorAttachment);
-        _depthStencilAttachment = depthStencilAttachment;
-        _clearValues.clearColor.emplace_back( 0.0, 0.0, 0.0, 0.0 );
+        _depthAttachment = depthStencilAttachment;
+        _stencilAttachment = depthStencilAttachment;
+        _clearValues.clearColor.emplace_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
         _clearValues.clearDepth = 1.0f;
         _clearValues.clearStencil = 0;
     }
@@ -53,7 +54,8 @@ namespace gfx::vk
             _extent = newExtent;
             _colorAttachments.clear();
             _colorAttachments.emplace_back(colorAttachment);
-            _depthStencilAttachment = depthStencilAttachment;
+            _depthAttachment = depthStencilAttachment;
+            _stencilAttachment = depthStencilAttachment;
         }
     }
 }

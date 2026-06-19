@@ -23,7 +23,7 @@ namespace gfx
 {
     void ogl::GUI::Init()
     {
-        ImGui_ImplGlfw_InitForOpenGL(*Context::Window(), true);
+        ImGui_ImplGlfw_InitForOpenGL(*Context::Window(), false);
         ImGui_ImplOpenGL3_Init("#version 450");
 
         ImGui::StyleColorsDark();

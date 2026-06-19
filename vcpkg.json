@@ -4,7 +4,11 @@
   "builtin-baseline" : "62159a45e18f3a9ac0548628dcaf74fcb60c6ff9",
   "dependencies" : [ {
     "name" : "glfw3",
-    "version>=" : "3.4#1"
+    "version>=" : "3.4#1",
+    "features" : [ "wayland" ]
+  }, {
+    "name" : "vulkan-loader",
+    "features" : [ "wayland" ]
   }, {
     "name" : "magic-enum",
     "version>=" : "0.9.7#1"
@@ -63,5 +67,14 @@
   }, {
     "name" : "openimageio",
     "version>=" : "3.0.9.1#3"
-  } ]
+  } ],
+  "overrides": [
+    { "name": "openexr", "version": "3.2.4" }
+  ],
+  "features" : {
+    "hub" : {
+      "description" : "Extra deps for building the Hub launcher in the SDK super-build (-DVCPKG_MANIFEST_FEATURES=hub)",
+      "dependencies" : [ "nlohmann-json" ]
+    }
+  }
 }

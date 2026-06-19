@@ -29,6 +29,8 @@ namespace gfx::log {
     #define GFX_ASSERT(condition, msg, ...)                          \
     do { if (!(condition))                                       \
     gfx::log::error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); } while(0)
+
+    #define GFX_BREAK() []{}();
 #else
     #ifdef _MSC_VER
         #define GFX_BREAK() __debugbreak()

@@ -77,22 +77,22 @@ namespace gfx
             DepthStencilState depthStencilState = {};
             ColorBlendState colorBlendState = {};
 
-            Builder& setVertexShader(const Shader& shader);
+            Builder& setVertexShader(ResourceRef<const Shader> shader);
 
             template <gfx::MeshType T>
-            Builder& setVertexShader(const Shader& shader)
+            Builder& setVertexShader(ResourceRef<const Shader> shader)
             {
-                this->vertexShader = std::cref(shader);
+                this->vertexShader = std::cref(*shader);
                 this->vertexAttributeDescriptions = T::VertexAttributeDescription();
                 this->vertexBindingDescriptions = T::VertexBindingDescription();
                 return *this;
             }
 
             Builder& setTessellationState(const TessellationState& tessellationState);
-            Builder& setGeometryShader(const Shader& geometryShader);
-            Builder& setFragmentShader(const Shader& fragmentShader);
-            Builder& setTaskShader(const Shader& taskShader);
-            Builder& setMeshShader(const Shader& meshShader);
+            Builder& setGeometryShader(ResourceRef<const Shader> geometryShader);
+            Builder& setFragmentShader(ResourceRef<const Shader> fragmentShader);
+            Builder& setTaskShader(ResourceRef<const Shader> taskShader);
+            Builder& setMeshShader(ResourceRef<const Shader> meshShader);
             Builder& setInputAssemblyState(const InputAssemblyState& inputAssemblyState);
             Builder& setRasterizationState(const RasterizationState& rasterizationState);
             Builder& setMultisampleState(const MultisampleState& multisampleState);

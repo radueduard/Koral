@@ -121,18 +121,23 @@ namespace gfx::vk
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
 
-		for (auto&[srcFrameIndex, offset, size, framesToWrite] : _pendingWrites) {
-			if (framesToWrite.contains(currentFrame)) {
-				auto srcBuffer = _buffers[srcFrameIndex];
-				copyRegionsPerBuffer[srcBuffer].push_back(
+		std::unordered_set<PendingWrite, PendingWrite::Hash> remaining;
+		for (auto write : _pendingWrites) {
+			if (write.buffersLeftToUpdate.contains(currentFrame)) {
+				copyRegionsPerBuffer[_buffers[write.srcFrameIndex]].push_back(
 					::vk::BufferCopy()
-						.setSrcOffset(offset)
-						.setDstOffset(offset)
-						.setSize(size)
+						.setSrcOffset(write.offset)
+						.setDstOffset(write.offset)
+						.setSize(write.byteSize)
 				);
-				framesToWrite.erase(currentFrame);
+				write.buffersLeftToUpdate.erase(currentFrame);
+			}
+			if (!write.buffersLeftToUpdate.empty()) {
+				remaining.insert(std::move(write));
 			}
 		}
+		_pendingWrites = std::move(remaining);
+
 		if (copyRegionsPerBuffer.empty()) {
 			return;
 		}
@@ -143,8 +148,6 @@ namespace gfx::vk
 				commandBuffer->copyBuffer(srcBuffer, dstBuffer, static_cast<uint32_t>(copyRegions.size()), copyRegions.data());
 			}
 		}, ::vk::QueueFlagBits::eTransfer);
-
-		std::erase_if(_pendingWrites, [](const struct PendingWrite& write) { return write.buffersLeftToUpdate.empty(); });
 	}
 
 	VmaAllocation Buffer::getAllocation() const {

@@ -58,6 +58,9 @@ namespace gfx::vk
     }
 
     ::vk::ImageView ImageView::operator[](size_t i) const {
+        if (!_isPerFrame) {
+            return _imageViews[0];
+        }
         if (i >= _imageViews.size()) {
             throw std::out_of_range("ImageView index out of range!");
         }

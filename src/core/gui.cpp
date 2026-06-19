@@ -151,10 +151,10 @@ void gfx::GUI::Init()
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    if (!Context::Window().isFullscreen())
-    {
-        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    }
+    // if (!Context::Window().isFullscreen())
+    // {
+        // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    // }
 
     switch (Context::Window().getAPI())
     {

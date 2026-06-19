@@ -53,7 +53,7 @@ namespace gfx::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
-        _extent(1, 1),
+        _extent(gfx::Context::Window().getExtent()),
         _msaa(createInfo.msaa),
         _minImageCount(createInfo.minImageCount),
         _imageCount(createInfo.imageCount),

@@ -27,9 +27,17 @@ namespace gfx::vk
         }
         auto pipelineRenderingCreateInfo = ::vk::PipelineRenderingCreateInfo()
             .setColorAttachmentFormats(colorAttachmentFormats);
-        if (_framebuffer->hasDepthStencilAttachment()) {
-            pipelineRenderingCreateInfo.setDepthAttachmentFormat(getVkFormat(_framebuffer->getDepthStencilAttachment().getImage()->getFormat()));
-            pipelineRenderingCreateInfo.setStencilAttachmentFormat(getVkFormat(_framebuffer->getDepthStencilAttachment().getImage()->getFormat()));
+        if (_framebuffer->hasDepthAttachment()) {
+            const auto depthFormat = getVkFormat(_framebuffer->getDepthAttachment().getImage()->getFormat());
+            pipelineRenderingCreateInfo.setDepthAttachmentFormat(depthFormat);
+        }
+        if (_framebuffer->hasStencilAttachment()) {
+            const auto stencilFormat = getVkFormat(_framebuffer->getStencilAttachment().getImage()->getFormat());
+            // Only set stencil format if the image actually has a stencil aspect
+            const auto aspectFlags = getVkImageAspectFlags(_framebuffer->getStencilAttachment().getImage()->getFormat());
+            if (aspectFlags & ::vk::ImageAspectFlagBits::eStencil) {
+                pipelineRenderingCreateInfo.setStencilAttachmentFormat(stencilFormat);
+            }
         }
 
         std::vector<::vk::DescriptorSetLayout> setLayouts;

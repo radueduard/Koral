@@ -12,20 +12,10 @@
 #include <window.h>
 #include <GLFW/glfw3.h>
 
-#include "../../log.h"
+#include "../../../include/log.h"
 
 namespace gfx::vk
 {
-    std::vector <const char*> GetRequiredExtensions() {
-        uint32_t glfwExtensionCount = 0;
-        const auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        std::vector <const char*> extensions;
-        for (uint32_t i = 0; i < glfwExtensionCount; i++) {
-            extensions.emplace_back(glfwExtensions[i]);
-        }
-        return extensions;
-    }
-
     ::vk::SurfaceKHR CreateSurface(const ::vk::Instance& instance, const io::Window& window) {
         VkSurfaceKHR surface;
         if (const auto result = glfwCreateWindowSurface(instance, *window, nullptr, &surface); result != VK_SUCCESS) {
@@ -52,12 +42,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
                 gfx::log::error("[vulkan] {}", pCallbackData->pMessage);
-                GFX_BREAK(); // drop into debugger on Vulkan errors too
+                GFX_BREAK();
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
                 break;
         }
-        return VK_FALSE; // never abort the Vulkan call
+        return VK_FALSE;
     }
 
     Runtime::Runtime()
@@ -69,65 +59,150 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             .setEngineVersion(VK_MAKE_VERSION(1, 0, 0))
             .setApiVersion(VK_API_VERSION_1_4);
 
-        const auto windowExtensions = GetRequiredExtensions();
-        for (const auto& extension : windowExtensions) {
-            _instanceExtensions.emplace_back(extension);
+        // Add GLFW-required surface extensions (VK_KHR_surface + platform-specific)
+        // These are REQUIRED — do NOT filter them against available extensions
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        if (glfwExtensions == nullptr || glfwExtensionCount == 0) {
+            gfx::log::warn("[vulkan] glfwGetRequiredInstanceExtensions returned null — platform surface extension may be missing.");
+        } else {
+            for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
+                // Deduplicate (VK_KHR_surface is already in the hardcoded list)
+                const std::string_view ext(glfwExtensions[i]);
+                const bool already = std::ranges::any_of(_instanceExtensions,
+                    [&](const char* e){ return std::string_view(e) == ext; });
+                if (!already) {
+                    gfx::log::info("[vulkan] Adding GLFW platform extension: {}", glfwExtensions[i]);
+                    _instanceExtensions.emplace_back(glfwExtensions[i]);
+                }
+            }
         }
 
-        constexpr std::array<uint32_t, 1> bufferSize = { 1024 * 1024 };
-            const auto validationLayerSetting = ::vk::LayerSettingEXT()
-                .setPLayerName("VK_LAYER_KHRONOS_validation")
-                .setPSettingName("printf_buffer_size")
-                .setType(::vk::LayerSettingTypeEXT::eUint32)
-                .setValues(bufferSize);
-
-            const auto layerSettingsInfo = ::vk::LayerSettingsCreateInfoEXT()
-                .setSettings(validationLayerSetting);
-                // pNext = nullptr (tail)
-
-            // 2. Middle — validation features, points to layer settings
-            const ::vk::ValidationFeatureEnableEXT enabledFeatures[] = {
-                ::vk::ValidationFeatureEnableEXT::eDebugPrintf
+        // Fallback: if no platform surface extension was added by GLFW (e.g. GLFW built X11-only
+        // but running on Wayland, or vice-versa), probe the available extensions and add whatever
+        // WSI surface extension is actually present on this system.
+        {
+            constexpr std::array platformExts = {
+                "VK_KHR_wayland_surface",
+                "VK_KHR_xcb_surface",
             };
+            const bool hasPlatformExt = std::ranges::any_of(_instanceExtensions, [&](const char* e) {
+                return std::ranges::any_of(platformExts, [&](const char* p){ return std::string_view(e) == p; });
+            });
+            if (!hasPlatformExt) {
+                gfx::log::warn("[vulkan] No platform surface extension from GLFW — probing available WSI extensions.");
+                const auto availableExts = ::vk::enumerateInstanceExtensionProperties();
+                for (const char* candidate : platformExts) {
+                    for (const auto& avail : availableExts) {
+                        if (std::string_view(avail.extensionName) == candidate) {
+                            gfx::log::info("[vulkan] Adding fallback platform extension: {}", candidate);
+                            _instanceExtensions.push_back(candidate);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
 
-            const auto validationCreateInfo = ::vk::ValidationFeaturesEXT()
-                .setPNext(&layerSettingsInfo)        // ← points to tail
-                .setEnabledValidationFeatures(enabledFeatures);
+        // Filter layers to only those available on this system
+        {
+            const auto availableLayers = ::vk::enumerateInstanceLayerProperties();
+            std::vector<const char*> supported;
+            for (const char* req : _instanceLayers) {
+                bool found = false;
+                for (const auto& avail : availableLayers)
+                    if (std::string_view(avail.layerName) == req) { found = true; break; }
+                if (found) supported.push_back(req);
+                else gfx::log::warn("[vulkan] Layer '{}' not available, skipping.", req);
+            }
+            _instanceLayers = supported;
+        }
 
-            // 3. Debug messenger, points to validation features
-            const auto debugCreateInfo = ::vk::DebugUtilsMessengerCreateInfoEXT()
-                .setPNext(&validationCreateInfo)     // ← points to middle
-                .setMessageSeverity(
-                    ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
-                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
-                    // | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose
-                    | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
-                )
-                .setMessageType(
-                    ::vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                    ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-                )
-                .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
+        const bool hasValidation = !_instanceLayers.empty();
 
-            // 4. Head — instance create info, points to debug messenger
-            const auto createInfo = ::vk::InstanceCreateInfo()
-            #ifdef __APPLE__
-                .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
-            #endif
-                .setPNext(&debugCreateInfo)
-                .setPApplicationInfo(&applicationInfo)
-                .setPEnabledExtensionNames(_instanceExtensions)
-                .setPEnabledLayerNames(_instanceLayers);
+        // Filter only our optional extra extensions (NOT the GLFW ones we just added)
+        // against what the loader/ICDs actually expose
+        {
+            const auto availableExts = ::vk::enumerateInstanceExtensionProperties();
+            // Separate GLFW extensions (already in vector, added above) from our optional ones
+            // We only filter the ones that were in the vector BEFORE the GLFW extensions were added
+            std::vector<const char*> optionalToCheck = {
+                VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME,
+            };
+            if (hasValidation) {
+                optionalToCheck.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+            }
+            for (const char* req : optionalToCheck) {
+                bool found = false;
+                for (const auto& avail : availableExts)
+                    if (std::string_view(avail.extensionName) == req) { found = true; break; }
+                if (found) {
+                    _instanceExtensions.push_back(req);
+                } else {
+                    gfx::log::warn("[vulkan] Optional extension '{}' not available, skipping.", req);
+                }
+            }
+        }
 
-            _instance = ::vk::createInstance(createInfo);
-            VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
+        gfx::log::info("[vulkan] Final instance extensions ({}):", _instanceExtensions.size());
+        for (const auto& ext : _instanceExtensions)
+            gfx::log::info("[vulkan]   [ext] {}", ext);
 
+        constexpr std::array<uint32_t, 1> bufferSize = { 1024 * 1024 };
+        const auto validationLayerSetting = ::vk::LayerSettingEXT()
+            .setPLayerName("VK_LAYER_KHRONOS_validation")
+            .setPSettingName("printf_buffer_size")
+            .setType(::vk::LayerSettingTypeEXT::eUint32)
+            .setValues(bufferSize);
+
+        const auto layerSettingsInfo = ::vk::LayerSettingsCreateInfoEXT()
+            .setSettings(validationLayerSetting);
+
+        const ::vk::ValidationFeatureEnableEXT enabledFeatures[] = {
+            ::vk::ValidationFeatureEnableEXT::eDebugPrintf
+        };
+
+        const auto validationCreateInfo = ::vk::ValidationFeaturesEXT()
+            .setPNext(&layerSettingsInfo)
+            .setEnabledValidationFeatures(enabledFeatures);
+
+        const auto debugCreateInfo = ::vk::DebugUtilsMessengerCreateInfoEXT()
+            .setPNext(hasValidation ? static_cast<const void*>(&validationCreateInfo) : nullptr)
+            .setMessageSeverity(
+                ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
+                | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
+                | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo
+            )
+            .setMessageType(
+                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
+                ::vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+            )
+            .setPfnUserCallback(reinterpret_cast<::vk::PFN_DebugUtilsMessengerCallbackEXT>(debugCallback));
+
+        const auto createInfo = ::vk::InstanceCreateInfo()
+        #ifdef __APPLE__
+            .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
+        #endif
+            .setPNext(hasValidation ? static_cast<const void*>(&debugCreateInfo) : nullptr)
+            .setPApplicationInfo(&applicationInfo)
+            .setPEnabledExtensionNames(_instanceExtensions)
+            .setPEnabledLayerNames(_instanceLayers);
+
+        _instance = ::vk::createInstance(createInfo);
+        VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
+
+        if (hasValidation) {
             _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
+        } else {
+            gfx::log::warn("[vulkan] Validation layer unavailable — debug messenger disabled.");
+        }
     }
 
     Runtime::~Runtime()
     {
-        _instance.destroyDebugUtilsMessengerEXT(_debugMessenger);
+        if (_debugMessenger) {
+            _instance.destroyDebugUtilsMessengerEXT(_debugMessenger);
+        }
         _instance.destroy();
     }
 

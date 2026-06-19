@@ -109,6 +109,7 @@ namespace gfx
             .setFormat(getFormat(spec.format, spec.nchannels))
             .setMipLevels(mipLevels)
             .setArrayLayers(layerCount)
+            .addUsage(gfx::Image::Usage::eTransferSrc)
             .addUsage(gfx::Image::Usage::eTransferDst)
             .build();
 

@@ -8,18 +8,12 @@
 
 namespace gfx::ogl
 {
-    Buffer::Buffer(const gfx::Buffer::RawBuilder& createInfo) : gfx::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo.usage))
+    Buffer::Buffer(const gfx::Buffer::RawBuilder& createInfo) : gfx::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo._usage))
     {
-        if (createInfo.usage & Usage::eUniform) {
-            if (createInfo.size > 0xFFFF) {
-                std::cerr << "Warning: Uniform buffer size exceeds the maximum allowed size of 65536 bytes! Attempting to create a uniform buffer of size " << createInfo.size << " bytes." << std::endl;
-            }
-        }
-
         glCreateBuffers(1, &_id);
         glCheckError();
 
-        glNamedBufferStorage(_id, createInfo.size, nullptr, GetFlagsFromType(createInfo.type));
+        glNamedBufferStorage(_id, createInfo._size, nullptr, GetFlagsFromType(createInfo._type));
         glCheckError();
     }
 

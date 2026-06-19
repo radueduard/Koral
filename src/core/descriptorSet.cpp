@@ -3,7 +3,7 @@
 //
 
 #include <descriptorSet.h>
-#include <descriptorBinding.h>
+#include <descriptor.h>
 #include <descriptorSetLayout.h>
 #include <window.h>
 #include <framebuffer.h>
@@ -20,27 +20,27 @@
 
 namespace gfx
 {
-    Descriptor::Descriptor(const ResourceRef<Buffer>& buffer, const glm::i64 offset, const glm::i64 range)
+    Descriptor::Descriptor(const ResourceRef<const Buffer>& buffer, const glm::i64 offset, const glm::i64 range)
         : valid(true), _descriptor(BufferDescriptor{ buffer, offset, range })
     {
         if (!buffer) {
             gfx::log::error("Attempted to create a buffer descriptor with an invalid buffer!");
-            throw std::runtime_error("Buffer must be valid!");
+            throw;
         }
 
         if (offset < 0 || offset >= buffer->getSize()) {
             gfx::log::error("Attempted to create a buffer descriptor with an invalid offset! Buffer size: {}, offset: {}", buffer->getSize(), offset);
-            throw std::runtime_error("Offset must be within the bounds of the buffer!");
+            throw;
         }
 
         if (range < 0) {
             gfx::log::error("Attempted to create a buffer descriptor with a negative range! Range: {}", range);
-            throw std::runtime_error("Range must be non-negative!");
+            throw;
         }
 
         if (offset + range > buffer->getSize()) {
             gfx::log::error("Attempted to create a buffer descriptor with an offset + range that exceeds the buffer size! Buffer size: {}, offset: {}, range: {}", buffer->getSize(), offset, range);
-            throw std::runtime_error("Offset + range must be within the bounds of the buffer!");
+            throw;
         }
 
         if (range == 0) {
@@ -55,69 +55,76 @@ namespace gfx
         }
     }
 
-    Descriptor::Descriptor(const ResourceRef<ImageView> &imageView, const ResourceRef<Sampler> &sampler)
+    Descriptor::Descriptor(const ResourceRef<const ImageView>&imageView, const ResourceRef<const Sampler>&sampler)
         : valid(true), _descriptor(CombinedImageSamplerDescriptor{ imageView, sampler })
     {
         if (!imageView) {
             gfx::log::error("Attempted to create a combined image sampler descriptor with an invalid image view!");
-            throw std::runtime_error("Image view must be valid!");
+            throw;
         }
         if (!sampler) {
             gfx::log::error("Attempted to create a combined image sampler descriptor with an invalid sampler!");
-            throw std::runtime_error("Sampler must be valid!");
+            throw;
         }
     }
 
-    Descriptor::Descriptor(const ResourceRef<ImageView> &imageView)
+    Descriptor::Descriptor(const ResourceRef<const ImageView>&imageView)
         : valid(true), _descriptor(ImageDescriptor{ imageView })
     {
         if (!imageView) {
             gfx::log::error("Attempted to create an image descriptor with an invalid image view!");
-            throw std::runtime_error("Image view must be valid!");
+            throw;
         }
     }
 
-    Descriptor::Descriptor(const ResourceRef<Sampler> &sampler)
+    Descriptor::Descriptor(const ResourceRef<const Sampler>&sampler)
         : valid(true), _descriptor(SamplerDescriptor{ sampler }) {
         if (!sampler) {
             gfx::log::error("Attempted to create a sampler descriptor with an invalid sampler!");
-            throw std::runtime_error("Sampler must be valid!");
+            throw;
         }
     }
 
     const Buffer & Descriptor::getBuffer() const {
         if (!valid) {
-            throw std::runtime_error("Descriptor is not valid!");
+            gfx::log::error("Attempted to get buffer from an invalid descriptor!");
+            throw;
         }
         if (!std::holds_alternative<BufferDescriptor>(_descriptor)) {
-            throw std::runtime_error("Descriptor does not hold a buffer!");
+            gfx::log::error("Attempted to get buffer from a descriptor that does not hold a buffer!");
+            throw;
         }
         return *std::get<BufferDescriptor>(_descriptor)._buffer;
     }
 
     glm::i64 Descriptor::getOffset() const {
         if (!valid) {
-            throw std::runtime_error("Descriptor is not valid!");
+            gfx::log::error("Attempted to get offset from an invalid descriptor!");
+            throw;
         }
         if (!std::holds_alternative<BufferDescriptor>(_descriptor)) {
-            throw std::runtime_error("Descriptor does not hold a buffer!");
+            gfx::log::error("Attempted to get offset from a descriptor that does not hold a buffer!");
+            throw;
         }
         return std::get<BufferDescriptor>(_descriptor)._offset;
     }
 
     glm::i64 Descriptor::getRange() const {
         if (!valid) {
-            throw std::runtime_error("Descriptor is not valid!");
+            gfx::log::error("Attempted to get range from an invalid descriptor!");
+            throw;
         }
         if (!std::holds_alternative<BufferDescriptor>(_descriptor)) {
-            throw std::runtime_error("Descriptor does not hold a buffer!");
+            gfx::log::error("Attempted to get range from a descriptor that does not hold a buffer!");
+            throw;
         }
         return std::get<BufferDescriptor>(_descriptor)._range;
     }
 
     const ImageView & Descriptor::getImageView() const {
         if (!valid) {
-            throw std::runtime_error("Descriptor is not valid!");
+            gfx::log::error("Attempted to get image view from an invalid descriptor!");
+            throw;
         }
         if (std::holds_alternative<ImageDescriptor>(_descriptor)) {
             return *std::get<ImageDescriptor>(_descriptor)._imageView;
@@ -125,12 +132,14 @@ namespace gfx
         if (std::holds_alternative<CombinedImageSamplerDescriptor>(_descriptor)) {
             return *std::get<CombinedImageSamplerDescriptor>(_descriptor)._imageView;
         }
-        throw std::runtime_error("Descriptor does not hold an image view!");
+        gfx::log::error("Attempted to get image view from a descriptor that does not hold an image view!");
+        throw;
     }
 
     const Sampler & Descriptor::getSampler() const {
         if (!valid) {
-            throw std::runtime_error("Descriptor is not valid!");
+            gfx::log::error("Attempted to get sampler from an invalid descriptor!");
+            throw;
         }
         if (std::holds_alternative<SamplerDescriptor>(_descriptor)) {
             return *std::get<SamplerDescriptor>(_descriptor)._sampler;
@@ -138,7 +147,8 @@ namespace gfx
         if (std::holds_alternative<CombinedImageSamplerDescriptor>(_descriptor)) {
             return *std::get<CombinedImageSamplerDescriptor>(_descriptor)._sampler;
         }
-        throw std::runtime_error("Descriptor does not hold a sampler!");
+        gfx::log::error("Attempted to get sampler from a descriptor that does not hold a sampler!");
+        throw;
     }
 
 
@@ -153,16 +163,20 @@ namespace gfx
     DescriptorSet::Builder& DescriptorSet::Builder::write(const glm::u32 binding, const Descriptor& descriptor, const glm::u32 index)
     {
         if (!writes.contains(binding)) {
-            throw std::runtime_error("Binding " + std::to_string(binding) + " does not exist in the layout!");
+            gfx::log::error("Binding {} does not exist in the layout!", binding);
+            throw;
         }
         if (index >= writes[binding].size()) {
-            throw std::runtime_error("Index " + std::to_string(index) + " is out of bounds for binding " + std::to_string(binding) + " which has count " + std::to_string(writes[binding].size()) + "!");
+            gfx::log::error("Index {} is out of bounds for binding {} which has count {}!", index, binding, writes[binding].size());
+            throw;
         }
         if (writes[binding][index].isValid()) {
-            throw std::runtime_error("Descriptor at binding " + std::to_string(binding) + " index " + std::to_string(index) + " is already written!");
+            gfx::log::error("Descriptor at binding {} index {} is already written!", binding, index);
+            throw;
         }
         if (!descriptor.isValid()) {
-            throw std::runtime_error("Descriptor is not valid!");
+            gfx::log::error("Descriptor at binding {} index {} is not valid!", binding, index);
+            throw;
         }
         switch (layout.getBindingType(binding))
         {
@@ -172,7 +186,7 @@ namespace gfx
                 auto& _ = descriptor.getBuffer();
             } catch (const std::exception& e) {
                 gfx::log::error("Descriptor for buffer binding {} index {} is invalid: {}", binding, index, e.what());
-                throw std::runtime_error("Descriptor for buffer binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid buffer!");
+                throw;
             }
             break;
         case DescriptorType::eCombinedImageSampler:
@@ -180,13 +194,13 @@ namespace gfx
                 auto& _ = descriptor.getImageView();
             } catch (const std::exception& e) {
                 gfx::log::error("Descriptor for combined image sampler binding {} index {} is invalid: {}", binding, index, e.what());
-                throw std::runtime_error("Descriptor for combined image sampler binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid image view!");
+                throw;
             }
             try {
                 auto& _ = descriptor.getSampler();
             } catch (const std::exception& e) {
                 gfx::log::error("Descriptor for combined image sampler binding {} index {} is invalid: {}", binding, index, e.what());
-                throw std::runtime_error("Descriptor for combined image sampler binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid sampler!");
+                throw;
             }
             break;
         case DescriptorType::eSampledImage:
@@ -195,7 +209,7 @@ namespace gfx
                 auto& _ = descriptor.getImageView();
             } catch (const std::exception& e) {
                 gfx::log::error("Descriptor for image binding {} index {} is invalid: {}", binding, index, e.what());
-                throw std::runtime_error("Descriptor for image binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid image view!");
+                throw;
             }
             break;
         case DescriptorType::eSampler:
@@ -203,11 +217,12 @@ namespace gfx
                 auto& _ = descriptor.getSampler();
             } catch (const std::exception& e) {
                 gfx::log::error("Descriptor for sampler binding {} index {} is invalid: {}", binding, index, e.what());
-                throw std::runtime_error("Descriptor for sampler binding " + std::to_string(binding) + " index " + std::to_string(index) + " must have a valid sampler!");
+                throw;
             }
             break;
         default:
-            throw std::runtime_error("Unknown descriptor type for binding " + std::to_string(binding) + " index " + std::to_string(index) + "!");
+            gfx::log::error("Unknown descriptor type for binding {} index {}!", binding, index);
+            throw;
         }
 
         writes[binding][index] = descriptor;
@@ -232,22 +247,22 @@ namespace gfx
         for (const auto& write : _writes | std::views::values) {
             for (const auto& descriptor : write)
             {
-                try {
-                    if (const auto& buffer = descriptor.getBuffer(); buffer.isPerFrame()) {
-                        _isPerFrame = true;
-                        break;
+                std::visit([this]<typename T0>(T0 binding)
+                {
+                    using T = std::decay_t<T0>;
+                    if constexpr (std::is_same_v<BufferDescriptor, T>)
+                    {
+                        if (binding._buffer->isPerFrame()) {
+                            _isPerFrame = true;
+                        }
                     }
-                } catch (const std::exception&) {
-                    // Not a buffer descriptor, ignore
-                }
-                try {
-                    if (const auto imageView = descriptor.getImageView(); imageView.isPerFrame()) {
-                        _isPerFrame = true;
-                        break;
+                    else if constexpr (std::is_same_v<ImageDescriptor, T> || std::is_same_v<CombinedImageSamplerDescriptor, T>)
+                    {
+                        if (binding._imageView->isPerFrame()) {
+                            _isPerFrame = true;
+                        }
                     }
-                } catch (const std::exception&) {
-                    // Not an image view descriptor, ignore
-                }
+                }, descriptor._descriptor);
             }
         }
     }

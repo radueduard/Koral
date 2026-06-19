@@ -104,39 +104,52 @@ namespace gfx::vk
                 ResourceAccess::ColorAttachment
             });
         }
-        if (framebuffer->hasDepthStencilAttachment())
+        if (framebuffer->hasDepthAttachment())
         {
             imageBarriers.push_back({
-                framebuffer->getDepthStencilAttachment().getImage(),
+                framebuffer->getDepthAttachment().getImage(),
                 ResourceAccess::DepthAttachment
+            });
+        }
+        if (framebuffer->hasStencilAttachment())
+        {
+            imageBarriers.push_back({
+                framebuffer->getStencilAttachment().getImage(),
+                ResourceAccess::StencilAttachment
             });
         }
         Barrier({}, imageBarriers);
 
         std::vector<::vk::RenderingAttachmentInfoKHR> colorAttachmentInfos;
         int i = 0;
-        for (auto colorAttachment : framebuffer->getColorAttachments()) {
-            colorAttachmentInfos.push_back(::vk::RenderingAttachmentInfoKHR()
+        for (auto& colorAttachment : framebuffer->getColorAttachments()) {
+            auto attachInfo = ::vk::RenderingAttachmentInfoKHR()
                 .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&colorAttachment.get()))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                .setClearValue(::vk::ClearValue().setColor(::vk::ClearColorValue()
-                    .setFloat32({ framebuffer->getClearValues().clearColor[i].r, framebuffer->getClearValues().clearColor[i].g, framebuffer->getClearValues().clearColor[i].b, framebuffer->getClearValues().clearColor[i].a })))
+                .setClearValue(getVkClearValue(framebuffer->getClearColor(i)))
                 .setLoadOp(getVkLoadOp(renderParameters.colorLoadOperation))
-                .setStoreOp(getVkStoreOp(renderParameters.colorStoreOperation)));
+                .setStoreOp(getVkStoreOp(renderParameters.colorStoreOperation));
+            if (framebuffer->hasResolveAttachments()) {
+                attachInfo
+                    .setResolveImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
+                    .setResolveImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getResolveAttachment(i)))
+                    .setResolveMode(getVkResolveMode(framebuffer->getResolveMode()));
+            }
+            colorAttachmentInfos.push_back(attachInfo);
             i++;
         }
 
-        const auto depthAttachment = framebuffer->hasDepthStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthStencilAttachment()))
+        const auto depthAttachment = framebuffer->hasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
+            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
-            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearValues().clearDepth, static_cast<glm::u32>(framebuffer->getClearValues().clearStencil) }))
+            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
             .setLoadOp(getVkLoadOp(renderParameters.depthLoadOperation))
             .setStoreOp(getVkStoreOp(renderParameters.depthStoreOperation))) : std::nullopt;
 
-        const auto stencilAttachment = framebuffer->hasDepthStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthStencilAttachment()))
+        const auto stencilAttachment = framebuffer->hasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
+            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getStencilAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
-            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearValues().clearDepth, static_cast<glm::u32>(framebuffer->getClearValues().clearStencil) }))
+            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
             .setLoadOp(getVkLoadOp(renderParameters.stencilLoadOperation))
             .setStoreOp(getVkStoreOp(renderParameters.stencilStoreOperation))) : std::nullopt;
 
@@ -189,16 +202,16 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindComputePipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
     {
-        gfx::CommandBuffer::BindPipeline(pipeline);
+        gfx::CommandBuffer::BindComputePipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindGraphicsPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
     {
-        gfx::CommandBuffer::BindPipeline(pipeline);
+        gfx::CommandBuffer::BindGraphicsPipeline(pipeline);
         pipeline->Bind(*this);
         const bool isDefaultFramebuffer = _state.boundFramebuffer.has_value() && _state.boundFramebuffer.value()->IsDefault();
         const auto frontFace = pipeline->getRasterizationState().frontFace;
@@ -223,6 +236,7 @@ namespace gfx::vk
                 index,
                 *vkSet,
                 nullptr);
+            _state.boundComputeDescriptorSets.insert_or_assign(index, set);
         } else if (_state.boundGraphicsPipeline.has_value()) {
                 const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
                 const auto pipelineLayout = vkPipeline.getPipelineLayout();
@@ -233,6 +247,7 @@ namespace gfx::vk
                     index,
                     *vkSet,
                     nullptr);
+                _state.boundGraphicsDescriptorSets.insert_or_assign(index, set);
         } else {
             std::cerr << "No pipeline bound when trying to bind descriptor set" << std::endl;
         }
@@ -332,6 +347,40 @@ namespace gfx::vk
         return *this;
     }
 
+    gfx::CommandBuffer & CommandBuffer::DispatchIndirect(gfx::ResourceRef<gfx::Buffer> indirectBuffer, glm::u64 offset) {
+        gfx::CommandBuffer::DispatchIndirect(indirectBuffer, offset);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.dispatchIndirect(*vkBuffer, offset);
+        return *this;
+    }
+
+    gfx::CommandBuffer& CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ) {
+        gfx::CommandBuffer::DrawMeshTasks(taskCountX, taskCountY, taskCountZ);
+        _handle.drawMeshTasksEXT(taskCountX, taskCountY, taskCountZ);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawIndirect(gfx::ResourceRef<gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        gfx::CommandBuffer::DrawIndirect(indirectBuffer, offset, drawCount, stride);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.drawIndirect(*vkBuffer, offset, drawCount, stride);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawIndexedIndirect(gfx::ResourceRef<gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        gfx::CommandBuffer::DrawIndexedIndirect(indirectBuffer, offset, drawCount, stride);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.drawIndexedIndirect(*vkBuffer, offset, drawCount, stride);
+        return *this;
+    }
+
+    gfx::CommandBuffer & CommandBuffer::DrawMeshTasksIndirect(gfx::ResourceRef<gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+        gfx::CommandBuffer::DrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride);
+        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        _handle.drawMeshTasksIndirectEXT(*vkBuffer, offset, drawCount, stride);
+        return *this;
+    }
+
     gfx::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance)
     {
         if (vertexCount == UINT64_MAX) {
@@ -385,8 +434,8 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(ResourceRef<gfx::Image> srcImage, gfx::Blit blitInfo) {
-        ResourceRef<gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
+    gfx::CommandBuffer& CommandBuffer::Blit(ResourceRef<const gfx::Image> srcImage, gfx::Blit blitInfo) {
+        ResourceRef<const gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
         Barrier({}, {
             {
                 srcImage,
@@ -440,7 +489,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Blit blitInfo)
+    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo)
     {
         if (blitInfo.srcExtent == glm::ivec3(-1))
             blitInfo.srcExtent = srcImage->getExtent();
@@ -495,7 +544,7 @@ namespace gfx::vk
     }
 
     gfx::CommandBuffer & CommandBuffer::Resolve(ResourceRef<gfx::Image> srcImage, gfx::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+        if (srcImage->getSampleCount() == SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
 
         if (!_resolveHelperImage)
@@ -558,9 +607,9 @@ namespace gfx::vk
     }
 
     gfx::CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+        if (srcImage->getSampleCount() == SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
-        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+        if (dstImage && dstImage->getSampleCount() != SampleCount::e1)
             throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
@@ -681,7 +730,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<gfx::Image> image, ResourceRef<gfx::Buffer> buffer, gfx::Copy copyInfo) {
+    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<const gfx::Image> image, ResourceRef<const gfx::Buffer> buffer, gfx::Copy copyInfo) {
         const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
         const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
 

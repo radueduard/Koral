@@ -60,16 +60,17 @@ namespace gfx::vk
     {
         const auto layoutHandle = *layout;
 
-        glm::u32 descriptorCount = 0;
+        glm::u32 variableDescriptorCount = 0;
         for (const auto& [_a, _b, count] : layout.getBindings()) {
             if (count == 0) {
-                descriptorCount += 64;
+                // Unbounded (bindless) array: allocate up to the layout's cap.
+                // Must match descriptorSetLayout.cpp's bindless max (256).
+                variableDescriptorCount = 256;
                 break;
             }
-            descriptorCount += count;
         }
         const auto variableCountInfo = ::vk::DescriptorSetVariableDescriptorCountAllocateInfo()
-            .setDescriptorCounts(descriptorCount);
+            .setDescriptorCounts(variableDescriptorCount);
 
         const auto allocateInfo = ::vk::DescriptorSetAllocateInfo()
             .setPNext(&variableCountInfo)

@@ -22,11 +22,14 @@ namespace gfx::vk
 		Buffer(const Buffer &) = delete;
         Buffer &operator=(const Buffer &) = delete;
 
+	protected:
     	void Map() const override;
         void Unmap() const override;
 		void Flush(glm::i64 size, glm::u64 offset) const override;
 		void Invalidate(glm::i64 size, glm::u64 offset) const override;
+		void automaticUpdate() const override;
 
+	public:
 		::vk::Buffer operator*() const;
         [[nodiscard]] VmaAllocation getAllocation() const;
 
@@ -34,9 +37,8 @@ namespace gfx::vk
 		void setAccessMask(::vk::AccessFlags access) const;
 
 		::vk::Buffer operator[](size_t i) const;
-    private:
-		void automaticUpdate() const override;
 
+	private:
 		std::vector<::vk::Buffer> _buffers {};
 		std::vector<VmaAllocation> _allocations {};
 		mutable std::vector<::vk::AccessFlags> _accessFlags {};

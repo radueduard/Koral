@@ -36,7 +36,7 @@ namespace gfx::vk
             bindings[binding] = ::vk::DescriptorSetLayoutBinding()
                 .setBinding(binding)
                 .setDescriptorType(getVkDescriptorType(type))
-                .setDescriptorCount(count == 0 ? 128 : count)
+                .setDescriptorCount(count == 0 ? 256 : count)
                 .setStageFlags(::vk::ShaderStageFlagBits::eAll);
         }
 

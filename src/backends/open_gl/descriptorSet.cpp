@@ -9,7 +9,7 @@
 
 #include "buffer.h"
 #include "commandBuffer.h"
-#include "descriptorBinding.h"
+#include "descriptor.h"
 #include "imageView.h"
 #include "sampler.h"
 

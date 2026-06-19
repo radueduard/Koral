@@ -10,15 +10,25 @@
 #include <typeindex>
 #include <unordered_map>
 
-#include "../src/log.h"
+#include "log.h"
 
 namespace gfx {
+    // Marker base for resources the Repository drives once per frame. Inheriting
+    // it (rather than just declaring automaticUpdate()) is what RefStorage keys
+    // on, so the auto-update can never be silently disabled by an inaccessible
+    // override — a non-public automaticUpdate() becomes a compile error.
+    struct AutoUpdatable {
+        virtual ~AutoUpdatable() = default;
+        virtual void automaticUpdate() const = 0;
+    };
+
     template<typename ResourceType>
     class ResourceRef;
 
     template<typename ResourceType>
     class Resource {
-        friend class ResourceRef<ResourceType>;
+        template<typename>
+        friend class ResourceRef;
 
         template<typename>
         friend class Resource;
@@ -59,13 +69,58 @@ namespace gfx {
     template<typename ResourceType>
     class ResourceRef {
         friend class Repository;
+
+        template<typename U>
+        friend class Resource;
+
+        template<typename>
+        friend class ResourceRef;
+
     public:
         ResourceRef() = default;
-        ResourceRef(const Resource<ResourceType>& resource)
+
+        // Const-qualifying conversion: ResourceRef<T> → ResourceRef<const T>.
+        ResourceRef(const ResourceRef<std::remove_const_t<ResourceType>>& other)
+            requires (std::is_const_v<ResourceType>)
+            : resource(other.resource), lifetimeStamp(other.lifetimeStamp), unsafe(other.unsafe) {}
+
+        ResourceRef(const Resource<std::remove_const_t<ResourceType>>& resource)
+            requires (!std::is_const_v<ResourceType>)
+            : resource(*resource.resource), lifetimeStamp(resource.lifetimeStamp) {}
+
+        ResourceRef(const Resource<std::remove_const_t<ResourceType>>& resource)
+            requires (std::is_const_v<ResourceType>)
+            : resource(*resource.resource), lifetimeStamp(resource.lifetimeStamp) {}
+
+        ResourceRef(const Resource<const std::remove_const_t<ResourceType>>& resource)
+            requires (std::is_const_v<ResourceType>)
+            : resource(*resource.resource), lifetimeStamp(resource.lifetimeStamp) {}
+
+        // Implicit upcast: Resource<Derived> → ResourceRef<Base> / ResourceRef<const Base>
+        template<typename Derived>
+            requires ((!std::is_const_v<ResourceType>) &&
+                     std::is_base_of_v<ResourceType, std::remove_const_t<Derived>> &&
+                     (!std::is_same_v<std::remove_const_t<Derived>, std::remove_const_t<ResourceType>>))
+        ResourceRef(const Resource<Derived>& resource)
+            : resource(*resource.resource), lifetimeStamp(resource.lifetimeStamp) {}
+
+        template<typename Derived>
+            requires (std::is_const_v<ResourceType> &&
+                     std::is_base_of_v<std::remove_const_t<ResourceType>, std::remove_const_t<Derived>> &&
+                     (!std::is_same_v<std::remove_const_t<Derived>, std::remove_const_t<ResourceType>>))
+        ResourceRef(const Resource<Derived>& resource)
             : resource(*resource.resource), lifetimeStamp(resource.lifetimeStamp) {}
 
         explicit ResourceRef(const ResourceType& resource)
             : resource(resource), unsafe(true) {}
+
+        template<typename P>
+        explicit ResourceRef(P* ptr)
+            requires (
+                std::is_same_v<std::remove_const_t<P>, std::remove_const_t<ResourceType>> &&
+                (std::is_const_v<ResourceType> || !std::is_const_v<P>)
+            )
+            : resource(*ptr), unsafe(true) {}
 
         ResourceRef(const ResourceRef&) = default;
         ResourceRef& operator=(const ResourceRef&) = default;
@@ -96,6 +151,12 @@ namespace gfx {
         bool unsafe {false};
     };
 
+    // Deduction guide: `ResourceRef ref = someResource;` deduces ResourceRef<T>
+    // from Resource<T>. The converting constructors use non-deduced contexts
+    // (remove_const_t), so without this CTAD from a Resource would fail.
+    template<typename T>
+    ResourceRef(const Resource<T>&) -> ResourceRef<T>;
+
     class Repository {
         struct IStorage {
             virtual ~IStorage() = default;
@@ -122,7 +183,7 @@ namespace gfx {
             std::vector<ResourceRef<T>> items{};
 
             void update() override {
-                if constexpr (requires(T t) { t.automaticUpdate(); }) {
+                if constexpr (std::is_base_of_v<AutoUpdatable, T>) {
                     for (auto& item : items) {
                         if (!item.lifetimeStamp.expired()) {
                             item->automaticUpdate();
@@ -170,13 +231,13 @@ namespace gfx {
         }
 
         template<typename T>
-        void add(std::string_view id, Resource<T> resource) {
+        ResourceRef<const T> add(std::string_view id, Resource<T> resource) {
             auto& s = storage<T>();
             if (s.items.contains(std::string(id))) {
                 gfx::log::error("Resource with id '{}' already exists in repository!", id);
-                throw std::runtime_error("Resource with id '" + std::string(id) + "' already exists in repository!");
             }
-            s.items.emplace(std::string(id), std::move(resource));
+            auto [it, inserted] = s.items.emplace(std::string(id), std::move(resource));
+            return ResourceRef<const T>(it->second);
         }
 
         template<typename T>

@@ -14,7 +14,7 @@
 
 namespace gfx
 {
-    ImageView::Builder::Builder(gfx::ResourceRef<Image> image) : image(image) {
+    ImageView::Builder::Builder(gfx::ResourceRef<const Image> image) : image(image) {
         arrayLayerCount = image->getArrayLayers();
         mipLevelCount = image->getMipLevels();
     }

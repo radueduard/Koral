@@ -9,8 +9,10 @@
 #include <set>
 #include <vector>
 #include <glm/fwd.hpp>
+#include <string>
 #include "api.h"
 #include "structs.h"
+#include "resource.h"
 
 namespace gfx
 {
@@ -124,6 +126,10 @@ namespace gfx
             }
 
             [[nodiscard]] std::unique_ptr<Shader> build() const;
+
+            // Builds the shader, stores it in the thread's resource repository under
+            // `identifier`, and returns a managed reference to it.
+            [[nodiscard]] ResourceRef<const Shader> buildManaged(const std::string& identifier) const;
         };
 
         virtual ~Shader() = default;

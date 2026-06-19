@@ -198,7 +198,7 @@ namespace gfx::io {
             glm::vec2 mouseDelta;
             glm::vec2 scrollDelta;
 
-            void setup();
+            void setup(GLFWwindow* window);
             void update();
         };
 
@@ -208,6 +208,8 @@ namespace gfx::io {
     		static void mouseButtonCallback(GLFWwindow*, int, int, int);
     		static void scrollCallback(GLFWwindow*, double, double);
     	    static void focusCallback(GLFWwindow*, int);
+    	    static void charCallback(GLFWwindow*, unsigned int);
+    	    static void cursorEnterCallback(GLFWwindow*, int);
     	    static void closeCallback(GLFWwindow*);
     	};
     };

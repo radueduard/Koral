@@ -8,6 +8,7 @@
 #include <mesh.h>
 
 #include <ranges>
+#include <variant>
 #include <glm/gtc/type_ptr.inl>
 
 #include "buffer.h"
@@ -57,8 +58,18 @@ namespace gfx::ogl
             const auto& oglFramebuffer = dynamic_cast<const ogl::Framebuffer&>(*framebuffer);
             framebuffer->Bind();
 
-            if (renderParameters.colorLoadOperation == LoadOperation::eClear)
-                glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, 0, glm::value_ptr(oglFramebuffer.getClearColor(0)));
+            if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
+                const auto& clearColor = oglFramebuffer.getClearColor(0);
+                const glm::vec4 clearVec4 = std::visit([](auto&& v) -> glm::vec4 {
+                    using T = std::decay_t<decltype(v)>;
+                    if constexpr (std::is_same_v<T, glm::vec4>) return v;
+                    else if constexpr (std::is_same_v<T, glm::vec3>) return glm::vec4(v, 0.f);
+                    else if constexpr (std::is_same_v<T, glm::vec2>) return glm::vec4(v, 0.f, 0.f);
+                    else if constexpr (std::is_same_v<T, float>) return glm::vec4(v, 0.f, 0.f, 0.f);
+                    else return glm::vec4(0.f, 0.f, 0.f, 1.f);
+                }, clearColor);
+                glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, 0, glm::value_ptr(clearVec4));
+            }
             glCheckError();
             if (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear)
                 glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
@@ -82,7 +93,16 @@ namespace gfx::ogl
             for (const auto& attachment : _state.boundFramebuffer.value()->getColorAttachments())
             {
                 if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
-                    glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, i, glm::value_ptr(oglFramebuffer.getClearColor(i)));
+                    const auto& clearColor = oglFramebuffer.getClearColor(i);
+                    const glm::vec4 clearVec4 = std::visit([](auto&& v) -> glm::vec4 {
+                        using T = std::decay_t<decltype(v)>;
+                        if constexpr (std::is_same_v<T, glm::vec4>) return v;
+                        else if constexpr (std::is_same_v<T, glm::vec3>) return glm::vec4(v, 0.f);
+                        else if constexpr (std::is_same_v<T, glm::vec2>) return glm::vec4(v, 0.f, 0.f);
+                        else if constexpr (std::is_same_v<T, float>) return glm::vec4(v, 0.f, 0.f, 0.f);
+                        else return glm::vec4(0.f, 0.f, 0.f, 1.f);
+                    }, clearColor);
+                    glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, i, glm::value_ptr(clearVec4));
                     glCheckError();
                 }
                 i++;
@@ -106,7 +126,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindComputePipeline(gfx::ResourceRef<gfx::ComputePipeline> pipeline)
     {
         CheckRecording();
         _commands.emplace_back([this, pipeline] ()
@@ -118,7 +138,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::BindPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
+    gfx::CommandBuffer& CommandBuffer::BindGraphicsPipeline(gfx::ResourceRef<gfx::GraphicsPipeline> pipeline)
     {
         CheckRecording();
         _commands.emplace_back([this, pipeline] ()
@@ -135,6 +155,11 @@ namespace gfx::ogl
     gfx::CommandBuffer& CommandBuffer::BindDescriptorSet(glm::u32 index, gfx::ResourceRef<DescriptorSet> set, bool debug)
     {
         if (debug) set->DebugPrint();
+
+        if (_state.boundComputePipeline.has_value())
+            _state.boundComputeDescriptorSets.insert_or_assign(index, set);
+        else if (_state.boundGraphicsPipeline.has_value())
+            _state.boundGraphicsDescriptorSets.insert_or_assign(index, set);
 
         CheckRecording();
         _commands.emplace_back([set, index, this] ()
@@ -311,7 +336,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::Blit(ResourceRef<gfx::Image> srcImage, gfx::Blit blitInfo) {
+    gfx::CommandBuffer & CommandBuffer::Blit(ResourceRef<const gfx::Image> srcImage, gfx::Blit blitInfo) {
 
         if (srcImage->getMSAA() != MSAA::eNone)
             throw std::runtime_error("Source image must not be multisampled for blit operation!");
@@ -349,7 +374,7 @@ namespace gfx::ogl
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<gfx::Image> srcImage, gfx::ResourceRef<gfx::Image> dstImage, gfx::Blit blitInfo)
+    gfx::CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo)
     {
         if (srcImage->getMSAA() != MSAA::eNone)
             throw std::runtime_error("Source image must not be multisampled for blit operation!");
@@ -551,7 +576,7 @@ namespace gfx::ogl
     }
 
     // TODO!
-    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<gfx::Image> image, ResourceRef<gfx::Buffer> buffer, gfx::Copy copyInfo) {
+    gfx::CommandBuffer & CommandBuffer::CopyImageToBuffer(ResourceRef<const gfx::Image> image, ResourceRef<const gfx::Buffer> buffer, gfx::Copy copyInfo) {
         CheckRecording();
         _commands.emplace_back([image, buffer, copyInfo] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);

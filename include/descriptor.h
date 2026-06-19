@@ -16,32 +16,33 @@ namespace gfx
     class ImageView;
 
     struct BufferDescriptor {
-        ResourceRef<Buffer> _buffer;
+        ResourceRef<const Buffer> _buffer;
         glm::i64 _offset = 0;
         glm::i64 _range = 0;
     };
 
     struct ImageDescriptor {
-        ResourceRef<ImageView> _imageView;
+        ResourceRef<const ImageView> _imageView;
     };
 
     struct SamplerDescriptor {
-        ResourceRef<Sampler> _sampler;
+        ResourceRef<const Sampler> _sampler;
     };
 
     struct CombinedImageSamplerDescriptor {
-        ResourceRef<ImageView> _imageView;
-        ResourceRef<Sampler> _sampler;
+        ResourceRef<const ImageView> _imageView;
+        ResourceRef<const Sampler> _sampler;
     };
 
     class GFX_API Descriptor
     {
+        friend class DescriptorSet;
     public:
         Descriptor() = default;
-        explicit Descriptor(const ResourceRef<Buffer>& buffer, glm::i64 offset = 0, glm::i64 range = 0);
-        explicit Descriptor(const ResourceRef<ImageView>& imageView, const ResourceRef<Sampler>& sampler);
-        explicit Descriptor(const ResourceRef<ImageView>& imageView);
-        explicit Descriptor(const ResourceRef<Sampler>& sampler);
+        explicit Descriptor(const ResourceRef<const Buffer>& buffer, glm::i64 offset = 0, glm::i64 range = 0);
+        explicit Descriptor(const ResourceRef<const ImageView>& imageView, const ResourceRef<const Sampler>& sampler);
+        explicit Descriptor(const ResourceRef<const ImageView>& imageView);
+        explicit Descriptor(const ResourceRef<const Sampler>& sampler);
 
         Descriptor(const Descriptor& other) = default;
         Descriptor& operator=(const Descriptor& other) = default;

@@ -8,7 +8,7 @@
 
 #include "flags.h"
 #include "api.h"
-
+#include "structs.h"
 #include "resource.h"
 
 namespace gfx
@@ -199,6 +199,19 @@ namespace gfx
                 return *this;
             }
 
+            // Convenience: set MSAA from a SampleCount value.
+            Builder& setSampleCount(const SampleCount sampleCount) {
+                switch (sampleCount) {
+                case SampleCount::e1:  this->msaa = MSAA::eNone; break;
+                case SampleCount::e2:  this->msaa = MSAA::e2x;   break;
+                case SampleCount::e4:  this->msaa = MSAA::e4x;   break;
+                case SampleCount::e8:  this->msaa = MSAA::e8x;   break;
+                case SampleCount::e16: this->msaa = MSAA::e16x;  break;
+                default:               this->msaa = MSAA::eNone; break;
+                }
+                return *this;
+            }
+
             Builder& setUsage(const Flags<Usage>& usage) {
                 this->usage = usage;
                 return *this;
@@ -221,6 +234,17 @@ namespace gfx
         [[nodiscard]] Type getType() const { return _type; }
         [[nodiscard]] Format getFormat() const { return _format; }
         [[nodiscard]] MSAA getMSAA() const { return _msaa; }
+
+        [[nodiscard]] SampleCount getSampleCount() const {
+            switch (_msaa) {
+            case MSAA::eNone:  return SampleCount::e1;
+            case MSAA::e2x:    return SampleCount::e2;
+            case MSAA::e4x:    return SampleCount::e4;
+            case MSAA::e8x:    return SampleCount::e8;
+            case MSAA::e16x:   return SampleCount::e16;
+            default:           return SampleCount::e1;
+            }
+        }
         [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
         [[nodiscard]] glm::u32 getMipLevels() const { return _mipLevels; }
         [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }

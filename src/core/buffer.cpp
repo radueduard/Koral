@@ -14,6 +14,13 @@ namespace gfx
 {
     gfx::Resource<Buffer> Buffer::RawBuilder::build() const
     {
+        if (_usage & Usage::eUniform &&_size > 0xFFFF) {
+            fail(std::format("Uniform buffer size of {} bytes exceeds the maximum allowed size of 65536 bytes!", _size));
+        }
+
+
+        flushDiagnostics(); // logs all warnings/errors with call sites; throws if any error
+
         gfx::Resource<Buffer> buffer = nullptr;
         switch (Context::Window().getAPI()) {
             case API::eOpenGL:
@@ -30,8 +37,8 @@ namespace gfx
     }
 
     Buffer::Buffer(const RawBuilder& createInfo) :
-        _isPerFrame(createInfo.isPerFrame),
-        _size(createInfo.size),
-        _usage(createInfo.usage),
-        _type(createInfo.type) {}
+        _isPerFrame(createInfo._isPerFrame),
+        _size(createInfo._size),
+        _usage(createInfo._usage),
+        _type(createInfo._type) {}
 }
