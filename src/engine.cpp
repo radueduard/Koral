@@ -3,12 +3,16 @@
 //
 
 #include <iostream>
+#include <chrono>
+#include <thread>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include "gui.h"
+#include "log.h"
 #include "sceneManager.h"
 #include "scheduler.h"
+#include "shader.h"
 
 namespace gfx
 {
@@ -22,52 +26,66 @@ namespace gfx
     {
         const auto scenePath = argv[1];
 
-        bool fullscreen = false;
-        bool resizable = false;
-        bool decorated = true;
-        bool transparentFramebuffer = false;
-        glm::uvec2 extent = { 1280, 720 };
-        auto api = API::eVulkan;
+        // The project may export a config (CreateProjectConfig) carrying its shader folder
+        // and window/runtime defaults; present CLI flags override those defaults.
+        ProjectConfig config = SceneManager::LoadConfig(scenePath).value_or(ProjectConfig{});
 
         for (int i = 2; i < argc; ++i) {
             if (const std::string arg = argv[i]; arg == "--fullscreen") {
-                fullscreen = true;
+                config.fullscreen = true;
             } else if (arg == "--resizable") {
-                resizable = true;
+                config.resizable = true;
             } else if (arg == "--borderless") {
-                decorated = false;
+                config.decorated = false;
             } else if (arg == "--transparent") {
-                transparentFramebuffer = true;
-            }
-            else if (arg == "--width") {
-                if (i + 1 < argc) {
-                    extent.x = std::stoul(argv[++i]);
-                } else {
-                    std::cerr << "Missing value for --width" << std::endl;
-                }
+                config.transparentFramebuffer = true;
+            } else if (arg == "--vsync") {
+                config.vsync = true;
+            } else if (arg == "--no-vsync") {
+                config.vsync = false;
+            } else if (arg == "--width") {
+                if (i + 1 < argc) config.extent.x = std::stoul(argv[++i]);
+                else std::cerr << "Missing value for --width" << std::endl;
             } else if (arg == "--height") {
-                if (i + 1 < argc) {
-                    extent.y = std::stoul(argv[++i]);
-                } else {
-                    std::cerr << "Missing value for --height" << std::endl;
-                }
+                if (i + 1 < argc) config.extent.y = std::stoul(argv[++i]);
+                else std::cerr << "Missing value for --height" << std::endl;
             } else if (arg == "--api" && i + 1 < argc) {
-                if (const std::string apiStr = argv[++i]; apiStr == "Vulkan") {
-                    api = API::eVulkan;
-                } else if (apiStr == "OpenGL") {
-                    api = API::eOpenGL;
-                }
+                if (const std::string apiStr = argv[++i]; apiStr == "Vulkan") config.api = API::eVulkan;
+                else if (apiStr == "OpenGL") config.api = API::eOpenGL;
             }
         }
 
-        auto window = io::Window::Builder(SceneManager::LoadScene(scenePath))
-            .setTitle(scenePath)
-            .setExtent(extent)
-            .setFullscreen(fullscreen)
-            .setResizable(resizable)
-            .setDecorated(decorated)
-            .setTransparentFramebuffer(transparentFramebuffer)
-            .setAPI(api)
+        // Register the project's shader folder; the API's own shaders/ is always a root.
+        if (!config.shaderDirectory.empty())
+            Shader::addSearchPath(config.shaderDirectory);
+
+        // Headless path: a library exporting CreateJob runs on a device-only context
+        // and terminates — no window, surface, swap chain or GUI. Run() returns a
+        // Task, so we pump the executors until it (and anything it co_awaited) finishes.
+        if (auto job = SceneManager::LoadJob(scenePath)) {
+            Context::InitHeadless(config.api);
+            {
+                Task<void> task = job->Run();
+                while (!task.done()) {
+                    Context::DrainMainThread();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                if (auto result = task.take(); !result)
+                    log::error("[engine] job failed: {}", result.error());
+            } // task destroyed before the executors it may reference
+            Context::ShutdownHeadless();
+            return;
+        }
+
+        auto window = Window::Builder(SceneManager::LoadScene(scenePath))
+            .setTitle(config.title.empty() ? std::string(scenePath) : config.title)
+            .setExtent(config.extent)
+            .setFullscreen(config.fullscreen)
+            .setResizable(config.resizable)
+            .setDecorated(config.decorated)
+            .setTransparentFramebuffer(config.transparentFramebuffer)
+            .setVSync(config.vsync)
+            .setAPI(config.api)
             .build();
 
         while (!window->shouldClose()) {
@@ -75,18 +93,21 @@ namespace gfx
             Context::DrainMainThread();
 
             if (window->isPaused()) {
-                window->_inputState.update();
+                Input::update();
                 continue;
             }
             auto& scene = *window->_scene;
-            window->_timeState.update();
+            if (window->hasResized()) {
+                scene.OnResize(window->getExtent());
+            }
+            Time::update();
             Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
                 Context::Repository().update();
                 scene.Update();
                 scene.Render(commandBuffer);
                 GUI::Render(commandBuffer, scene);
             });
-            window->_inputState.update();
+            Input::update();
             window->LateUpdate();
         }
         window.reset();

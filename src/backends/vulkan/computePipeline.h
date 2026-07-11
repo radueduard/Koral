@@ -28,6 +28,10 @@ namespace gfx::vk
 
         ::vk::PipelineLayout getPipelineLayout() const { return _pipelineLayout; }
 
+    protected:
+        void Setup() override;
+        void Teardown() override;
+
     private:
         ::vk::PipelineLayout _pipelineLayout;
     };

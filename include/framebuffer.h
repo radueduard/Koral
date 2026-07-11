@@ -10,8 +10,10 @@
 #include <glm/glm.hpp>
 
 #include "api.h"
+#include "builder.h"
 #include "resource.h"
 #include "structs.h"
+#include "error.h"
 
 namespace gfx
 {
@@ -40,12 +42,15 @@ namespace gfx
 
         struct GFX_API ClearValues
         {
-            std::vector<ClearColor> clearColor { glm::vec4{ 0.f, 0.f, 0.f, 1.f } };
+            // One entry per color attachment, appended by addColorAttachment. Starts
+            // empty: pre-seeding an entry here shifted every user-supplied clear color
+            // to index attachment+1, so getClearColor(i) silently returned black.
+            std::vector<ClearColor> clearColor {};
             float clearDepth = 1.f;
             glm::i32 clearStencil = 0;
         };
 
-        struct GFX_API Builder {
+        struct GFX_API Builder : ::Builder {
             std::vector<std::reference_wrapper<const ImageView>> colorAttachments {};
             std::optional<std::vector<std::reference_wrapper<const ImageView>>> colorResolveAttachments = std::nullopt;
             std::optional<std::reference_wrapper<const ImageView>> depthAttachment = std::nullopt;
@@ -70,7 +75,9 @@ namespace gfx
 
             Builder& setResolveMode(ResolveMode mode);
 
-            [[nodiscard]] Resource<Framebuffer> build() const;
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] Result<std::unique_ptr<Framebuffer>> create() const;
+            [[nodiscard]] gfx::Resource<Framebuffer> build() const;
         };
 
         virtual ~Framebuffer() = default;

@@ -13,7 +13,9 @@
 #include <glm/fwd.hpp>
 
 #include "api.h"
+#include "builder.h"
 #include "descriptorSetLayout.h"
+#include "pipeline.h"
 #include "resource.h"
 #include "shader.h"
 
@@ -22,10 +24,14 @@ namespace gfx
     class Shader;
     class CommandBuffer;
 
-    class GFX_API ComputePipeline {
+    class GFX_API ComputePipeline : public Pipeline {
     public:
-        struct GFX_API Builder {
-            std::optional<std::reference_wrapper<const Shader>> computeShader;
+        struct GFX_API Builder : ::Builder {
+            // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
+            // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
+            static constexpr bool Recoverable = true;
+
+            std::optional<ResourceRef<const Shader>> computeShader;
             Builder& setComputeShader(ResourceRef<const Shader> computeShader);
 
             template<typename T> requires std::is_trivially_copyable_v<T>
@@ -40,7 +46,9 @@ namespace gfx
                 return *this;
             }
 
-            [[nodiscard]] Resource<ComputePipeline> build() const;
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] Result<std::unique_ptr<ComputePipeline>> create() const;
+            [[nodiscard]] gfx::Resource<ComputePipeline> build() const;
 
             std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
@@ -49,22 +57,19 @@ namespace gfx
             glm::u32 currentSpecConstantSize = 0;
         };
 
-        virtual ~ComputePipeline();
-        ComputePipeline(const ComputePipeline&) = delete;
-        ComputePipeline& operator=(const ComputePipeline&) = delete;
+        ~ComputePipeline() override;
 
-        virtual void Bind(const CommandBuffer& commandBuffer) const;;
-
-        virtual void Unbind() const;
-
-        const DescriptorSetLayout& getSetLayout(glm::u32 index) const;
+        void Bind(const CommandBuffer& commandBuffer) const override;
+        void Unbind() const override;
 
     protected:
-        mutable bool _bound = false;
         explicit ComputePipeline(const Builder& createInfo);
 
-        std::optional<std::reference_wrapper<const Shader>> _shader;
-        std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts;
-        std::map<glm::u32, Shader::PushConstant> _pushConstantRanges;
+        VoidResult Validate() override;
+
+        std::optional<ResourceRef<const Shader>> _shader;
+
+        std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> _specConstantsMetadata;
+        std::vector<std::byte> _specConstantsData;
     };
 }

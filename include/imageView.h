@@ -7,7 +7,9 @@
 #include <glm/fwd.hpp>
 
 #include "api.h"
+#include "builder.h"
 #include "resource.h"
+#include "error.h"
 
 namespace gfx
 {
@@ -59,7 +61,7 @@ namespace gfx
             }
         };
 
-        struct GFX_API Builder {
+        struct GFX_API Builder : ::Builder {
             gfx::ResourceRef<const Image> image;
             Type type = Type::e2D;
             glm::u32 baseMipLevel = 0;
@@ -100,6 +102,8 @@ namespace gfx
                 return *this;
             }
 
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] Result<std::unique_ptr<ImageView>> create() const;
             [[nodiscard]] gfx::Resource<ImageView> build() const;
         };
 

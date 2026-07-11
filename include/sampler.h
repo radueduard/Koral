@@ -7,7 +7,9 @@
 
 #include "structs.h"
 #include "api.h"
+#include "builder.h"
 #include "resource.h"
+#include "error.h"
 
 namespace gfx
 {
@@ -32,7 +34,7 @@ namespace gfx
             eClampToBorder
         };
 
-        struct GFX_API Builder
+        struct GFX_API Builder : ::Builder
         {
             Filter minFilter = Filter::eLinear;
             Filter magFilter = Filter::eLinear;
@@ -119,6 +121,8 @@ namespace gfx
                 return *this;
             }
 
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] Result<std::unique_ptr<Sampler>> create() const;
             [[nodiscard]] gfx::Resource<Sampler> build() const;
         };
 

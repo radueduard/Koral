@@ -13,15 +13,19 @@
 namespace gfx::ogl
 {
     ComputePipeline::ComputePipeline(const Builder& createInfo) : gfx::ComputePipeline(createInfo) {
-        if (!createInfo.computeShader.has_value())
-            throw std::runtime_error("You can not create a compute pipeline without a compute shader!");
+        Setup();
+    }
 
-        const auto& shader = dynamic_cast<const Shader&>(createInfo.computeShader.value().get());
-        if (shader.getStage() != Shader::Stage::eCompute) {
-            throw std::runtime_error("The shader provided to the compute pipeline must be a compute shader!");
-        }
+    ComputePipeline::~ComputePipeline()
+    {
+        Teardown();
+    }
 
+    void ComputePipeline::Setup()
+    {
+        const auto& shader = dynamic_cast<const Shader&>(**_shader);
 
+        _setAndBindingToBindingPoint.clear();
         glm::u32 nextDescriptorBindingPoint = 0;
         for (const auto& [set, layout] : _setLayouts) {
             for (const auto& [binding, type, Count] : layout->getBindings()) {
@@ -29,7 +33,22 @@ namespace gfx::ogl
             }
         }
 
-        const GLuint shaderId = shader.compile(_setAndBindingToBindingPoint);
+        // Reserve a UBO binding point for push constants (see graphics-pipeline Setup).
+        _pushConstantSize = 0;
+        for (const auto& [offset, pc] : _pushConstantRanges) {
+            const glm::u32 end = pc.offset + pc.size;
+            if (end > _pushConstantSize) _pushConstantSize = end;
+        }
+        std::optional<glm::u32> pushConstantBinding;
+        if (_pushConstantSize > 0) {
+            _pushConstantBindingPoint = nextDescriptorBindingPoint++;
+            pushConstantBinding = _pushConstantBindingPoint;
+            glCreateBuffers(1, &_pushConstantUBO);
+            glNamedBufferData(_pushConstantUBO, _pushConstantSize, nullptr, GL_DYNAMIC_DRAW);
+            glCheckError();
+        }
+
+        const GLuint shaderId = shader.compile(_setAndBindingToBindingPoint, pushConstantBinding);
 
         // Check shader compilation status first
         GLint compileStatus;
@@ -64,8 +83,13 @@ namespace gfx::ogl
         glDeleteShader(shaderId);
     }
 
-    ComputePipeline::~ComputePipeline()
+    void ComputePipeline::Teardown()
     {
+        if (_pushConstantUBO != 0) {
+            glDeleteBuffers(1, &_pushConstantUBO);
+            _pushConstantUBO = 0;
+            glCheckError();
+        }
         glDeleteProgram(_id);
         glCheckError();
     }

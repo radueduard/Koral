@@ -7,6 +7,7 @@
 #include <fstream>
 #include <vector>
 #include <filesystem>
+#include <glm/fwd.hpp>
 
 namespace gfx::utils
 {

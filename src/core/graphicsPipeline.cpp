@@ -18,7 +18,7 @@
 namespace gfx
 {
     GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader) {
-        this->vertexShader = std::cref(*shader);
+        this->vertexShader = shader;
         this->vertexAttributeDescriptions = DefaultMeshRegistry::Attributes();
         this->vertexBindingDescriptions = DefaultMeshRegistry::Bindings();
         return *this;
@@ -32,25 +32,25 @@ namespace gfx
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(ResourceRef<const Shader> geometryShader)
     {
-        this->geometryShader = std::cref(*geometryShader);
+        this->geometryShader = geometryShader;
         return *this;
     }
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(ResourceRef<const Shader> fragmentShader)
     {
-        this->fragmentShader = std::cref(*fragmentShader);
+        this->fragmentShader = fragmentShader;
         return *this;
     }
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(ResourceRef<const Shader> taskShader)
     {
-        this->taskShader = std::cref(*taskShader);
+        this->taskShader = taskShader;
         return *this;
     }
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(ResourceRef<const Shader> meshShader)
     {
-        this->meshShader = std::cref(*meshShader);
+        this->meshShader = meshShader;
         return *this;
     }
 
@@ -90,66 +90,104 @@ namespace gfx
         return *this;
     }
 
+    gfx::Result<std::unique_ptr<GraphicsPipeline>> GraphicsPipeline::Builder::create() const
+    {
+        beginAttempt();
+
+        // A pipeline is only as usable as its shaders. Adopting them here is what turns "the
+        // fragment shader failed to compile" into "this pipeline is unusable, *because* the
+        // fragment shader failed to compile" — and what lets it come back when that is fixed.
+        if (vertexShader)   adopt(*vertexShader,   "vertex shader");
+        if (geometryShader) adopt(*geometryShader, "geometry shader");
+        if (fragmentShader) adopt(*fragmentShader, "fragment shader");
+        if (taskShader)     adopt(*taskShader,     "task shader");
+        if (meshShader)     adopt(*meshShader,     "mesh shader");
+        if (tessellationState) {
+            adopt(tessellationState->controlShader, "tessellation control shader");
+            adopt(tessellationState->evalShader,    "tessellation evaluation shader");
+        }
+        if (framebuffer) adopt(*framebuffer, "framebuffer");
+
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan)
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+
+        // Construction runs Validate() (which may throw BackendException with a specific
+        // code) and the backend Setup(); guard() turns any escape into a gfx::Error.
+        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<GraphicsPipeline> {
+            return (api == API::eVulkan)
+                ? gfx::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(*this)
+                : gfx::MakeBackendPtr<GraphicsPipeline, ogl::GraphicsPipeline>(*this);
+        });
+    }
+
     gfx::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return gfx::MakeResource<ogl::GraphicsPipeline>(*this);
-        case API::eVulkan:
-            return gfx::MakeResource<vk::GraphicsPipeline>(*this);
-        default:
-            throw std::runtime_error("Unknown API");
-        }
+        auto pipeline = materialize<GraphicsPipeline>(*this, "GraphicsPipeline");
+        // Registered even when poisoned: the Repository is what drives the retry that brings it
+        // back once its shaders compile again.
+        Context::Repository().addRef(ResourceRef<const GraphicsPipeline>(pipeline));
+        return pipeline;
     }
 
-    GraphicsPipeline::~GraphicsPipeline() = default;
-
-    const gfx::DescriptorSetLayout& GraphicsPipeline::getSetLayout(const glm::u32 index) const
+    GraphicsPipeline::~GraphicsPipeline()
     {
-        if (!_setLayouts.contains(index))
-            throw std::runtime_error("This pipeline does not contain a set with that index!");
-        return *_setLayouts.at(index);
+        if (_vertexShader.has_value()) unsubscribeReload(*_vertexShader);
+        if (_tessellationState.has_value()) {
+            unsubscribeReload(_tessellationState->controlShader);
+            unsubscribeReload(_tessellationState->evalShader);
+        }
+        if (_geometryShader.has_value()) unsubscribeReload(*_geometryShader);
+        if (_fragmentShader.has_value()) unsubscribeReload(*_fragmentShader);
+        if (_taskShader.has_value()) unsubscribeReload(*_taskShader);
+        if (_meshShader.has_value()) unsubscribeReload(*_meshShader);
     }
 
-    const Shader::PushConstant & GraphicsPipeline::getPushConstantRange(glm::u32 offset) const {
-        if (!_pushConstantRanges.contains(offset))
-            throw std::runtime_error("This pipeline does not contain a push constant with that offset!");
-        return _pushConstantRanges.at(offset);
-    }
-
-    GraphicsPipeline::GraphicsPipeline(const Builder& createInfo) :
-        _vertexShader(createInfo.vertexShader),
+    GraphicsPipeline::GraphicsPipeline(const Builder& createInfo)
+        : _vertexShader(createInfo.vertexShader),
         _tessellationState(createInfo.tessellationState),
         _geometryShader(createInfo.geometryShader),
         _fragmentShader(createInfo.fragmentShader),
         _taskShader(createInfo.taskShader),
         _meshShader(createInfo.meshShader),
-        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::DefaultFramebuffer()),
         _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),
+        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::DefaultFramebuffer()),
         _depthStencilState(createInfo.depthStencilState),
         _colorBlendState(createInfo.colorBlendState),
         _vertexAttributeDescriptions(createInfo.vertexAttributeDescriptions),
-        _vertexBindingDescriptions(createInfo.vertexBindingDescriptions)
+        _vertexBindingDescriptions(createInfo.vertexBindingDescriptions),
+        _specConstantsMetadata(createInfo.specConstantsMetadata),
+        _specConstantsData(createInfo.specConstantsData)
     {
-        if (!_vertexShader.has_value() && !_meshShader.has_value()) {
-            throw std::runtime_error("Graphics pipeline must have either a vertex shader or a mesh shader!");
-        }
+        if (auto v = Validate(); !v) throw BackendException(v.error());
 
-        if (!_vertexShader.has_value() && _tessellationState.has_value()) {
-            throw std::runtime_error("Tessellation state cannot be set if there is no vertex shader!");
+        if (_vertexShader.has_value()) subscribeReload(*_vertexShader);
+        if (_tessellationState.has_value()) {
+            subscribeReload(_tessellationState->controlShader);
+            subscribeReload(_tessellationState->evalShader);
         }
+        if (_geometryShader.has_value()) subscribeReload(*_geometryShader);
+        if (_fragmentShader.has_value()) subscribeReload(*_fragmentShader);
+        if (_taskShader.has_value()) subscribeReload(*_taskShader);
+        if (_meshShader.has_value()) subscribeReload(*_meshShader);
+    }
 
-        if (!_vertexShader.has_value() && _geometryShader.has_value()) {
-            throw std::runtime_error("Geometry shader cannot be set if there is no vertex shader!");
-        }
+    VoidResult GraphicsPipeline::Validate()
+    {
+        if (!_vertexShader.has_value() && !_meshShader.has_value())
+            return fail(ErrorCode::eMissingShaderStage, "Graphics pipeline must have either a vertex shader or a mesh shader.");
+        if (!_vertexShader.has_value() && _tessellationState.has_value())
+            return fail(ErrorCode::eShaderStageMismatch, "Tessellation state requires a vertex shader.");
+        if (!_vertexShader.has_value() && _geometryShader.has_value())
+            return fail(ErrorCode::eShaderStageMismatch, "Geometry shader requires a vertex shader.");
+        if (!_meshShader.has_value() && _taskShader.has_value())
+            return fail(ErrorCode::eShaderStageMismatch, "Task shader requires a mesh shader.");
 
-        if (!_meshShader.has_value() && _taskShader.has_value()) {
-            throw std::runtime_error("Task shader cannot be set if there is no mesh shader!");
-        }
-
-        std::vector<std::reference_wrapper<const Shader>> shaders;
+        std::vector<gfx::ResourceRef<const Shader>> shaders;
         if (_vertexShader.has_value()) shaders.push_back(*_vertexShader);
         if (_tessellationState.has_value()) {
             shaders.push_back(_tessellationState->controlShader);
@@ -160,62 +198,10 @@ namespace gfx
         if (_taskShader.has_value()) shaders.push_back(*_taskShader);
         if (_meshShader.has_value()) shaders.push_back(*_meshShader);
 
-        std::vector<Shader::MemoryLayout> memoryLayouts = {};
-        for (const auto& shader : shaders) {
-            memoryLayouts.push_back(shader.get().getMemoryLayout());
-        }
+        // Merge descriptor set layouts and push constants across all stages.
+        if (!buildLayouts(shaders))
+            return fail(ErrorCode::eDescriptorConflict, "Descriptor declarations conflict across the pipeline's shader stages.");
 
-        // check for set layout compatibility between shaders and create set layouts
-        std::unordered_map<glm::u32, std::map<glm::u32, Shader::Descriptor>> mergedSetLayouts;
-        std::unordered_map<glm::u32, Shader::PushConstant> mergedPushConstants;
-        for (const auto& memoryLayout : memoryLayouts)
-        {
-            for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
-            {
-                for (const auto& [binding, descriptor] : setDescription.descriptors)
-                {
-                    if (mergedSetLayouts[setIndex].contains(binding)) {
-                        auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
-                        if (existingDescriptor != descriptor)
-                        {
-                            throw std::runtime_error("Descriptor set layout conflict between shaders in pipeline!");
-                        }
-                        existingDescriptor.stages |= descriptor.stages;
-                    } else
-                    {
-                        mergedSetLayouts[setIndex][binding] = descriptor;
-                    }
-                }
-            }
-            for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
-            {
-                if (mergedPushConstants.contains(offset)) {
-                    auto& existingPushConstant = mergedPushConstants[offset];
-                    // if (existingPushConstant.size != pushConstant.size)
-                    // {
-                    //     throw std::runtime_error("Push constant layout conflict between shaders in pipeline!");
-                    // }
-                    existingPushConstant.stages |= pushConstant.stages;
-                } else {
-                    mergedPushConstants[offset] = pushConstant;
-                }
-            }
-        }
-
-        for (const auto& [setIndex, setDescription] : mergedSetLayouts)
-        {
-            auto builder = DescriptorSetLayout::Builder();
-            for (const auto& [binding, descriptor] : setDescription)
-            {
-                const auto& [type, name, count, _] = descriptor;
-                builder.addBinding(binding, type, count);
-            }
-            _setLayouts[setIndex] = builder.build();
-        }
-
-        for (const auto& [offset, pushConstant] : mergedPushConstants)
-        {
-            _pushConstantRanges[offset] = pushConstant;
-        }
+        return {};
     }
 }

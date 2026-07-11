@@ -15,15 +15,10 @@ namespace gfx {
     };
 
     template<typename T>
-    struct is_vertex_attribute : std::false_type {};
+    concept VertexAttributeType = requires {
+        typename T::ValueType;
+    } && std::is_base_of_v<VertexAttribute<typename T::ValueType>, T>;
 
-    template<typename T>
-    struct is_vertex_attribute<VertexAttribute<T>> : std::true_type {};
-
-    template<typename T>
-    inline constexpr bool is_vertex_attribute_v = is_vertex_attribute<T>::value;
-
-    // Maps scalar types to engine channel metadata.
     template<typename T>
     struct ScalarChannelTraits;
 
@@ -136,7 +131,7 @@ namespace gfx {
         inline static AttributeGetter _attributeGetter = nullptr;
     };
 
-    template<typename... Attrs> requires (is_vertex_attribute_v<Attrs> && ...)
+    template<typename... Attrs> requires (VertexAttributeType<Attrs> && ...)
     struct ParamVertex
     {
         using Attributes = std::tuple<Attrs...>;
@@ -167,8 +162,68 @@ namespace gfx {
         }
     };
 
+    // Marker for vertex attributes that carry the vertex position. A mesh records
+    // its position attribute (see Mesh::getPositionAttribute) so ray-tracing
+    // acceleration structures know which buffer/offset/format to read geometry from.
+    struct PositionAttribute {};
+
+    // A vertex stream that exposes enough static reflection to locate its attributes.
+    template<typename T>
+    concept ReflectableStream = requires {
+        typename T::Attributes;
+        { T::kAttributeCount } -> std::convertible_to<glm::u32>;
+    };
+
+    // Scans a parameter pack of vertex streams (one per binding) and returns the
+    // description of the first attribute marked with PositionAttribute, if any.
+    // Used by MeshHeap so heap suballocations can back ray-tracing acceleration
+    // structures the same way standalone ParamMeshes do.
     template<typename... Streams>
-    class ParamMesh : public CustomMesh<ParamMesh<Streams...>>
+    std::optional<VertexInputAttributeDescription> FindPositionAttribute()
+    {
+        std::optional<VertexInputAttributeDescription> result = std::nullopt;
+        glm::u32 binding = 0;
+
+        ([&]<typename Stream>() {
+            if constexpr (ReflectableStream<Stream>) {
+                [&]<std::size_t... I>(std::index_sequence<I...>) {
+                    ([&]<std::size_t Idx>() {
+                        using Attr = std::tuple_element_t<Idx, typename Stream::Attributes>;
+                        if constexpr (std::is_base_of_v<PositionAttribute, Attr>) {
+                            if (!result.has_value()) {
+                                using Value  = typename Attr::ValueType;
+                                using Traits = VertexValueTraits<Value>;
+                                result = VertexInputAttributeDescription{
+                                    .location     = 0,
+                                    .binding      = binding,
+                                    .channelCount = Traits::channelCount,
+                                    .channelType  = Traits::channelType,
+                                    .offset       = Stream::template OffsetOf<Idx>()
+                                };
+                            }
+                        }
+                    }.template operator()<I>(), ...);
+                }(std::make_index_sequence<Stream::kAttributeCount>{});
+            }
+            ++binding;
+        }.template operator()<Streams>(), ...);
+
+        return result;
+    }
+
+    // Carries the per-binding vertex stream types as a tuple. Generic code such as
+    // Importer::LoadMesh reflects over `MeshT::Streams` to know how many vertex
+    // buffers to build and which stream type backs each binding. Kept in a small base
+    // so the alias can be named `Streams` without clashing with ParamMesh's own
+    // template parameter pack of the same name.
+    template<typename... StreamTs>
+    struct ParamMeshStreams
+    {
+        using Streams = std::tuple<StreamTs...>;
+    };
+
+    template<typename... Streams>
+    class ParamMesh : public CustomMesh<ParamMesh<Streams...>>, public ParamMeshStreams<Streams...>
     {
     public:
         using Self = ParamMesh<Streams...>;
@@ -177,12 +232,14 @@ namespace gfx {
 
         explicit ParamMesh(Builder& createInfo) : Base(createInfo) {
             DefaultMeshRegistry::TryRegister<Self>(); // first initialized mesh type becomes default
+            this->_positionAttribute = _positionAttributeDescription;
         }
 
         static void DefineMesh()
         {
             Base::_vertexBindingDescription.clear();
             Base::_vertexAttributeDescription.clear();
+            _positionAttributeDescription = std::nullopt;
 
             Base::_vertexBindingDescription.reserve(sizeof...(Streams));
             Base::_vertexAttributeDescription.reserve((0u + ... + Streams::kAttributeCount));
@@ -207,7 +264,7 @@ namespace gfx {
 
         if (!indices.empty())
         {
-            auto indexBuffer = makeBuffer(indices, Buffer::Usage::eIndex);
+            auto indexBuffer = Mesh::makeBuffer(indices, Buffer::Usage::eIndex);
             builder.SetIndexBuffer(std::move(indexBuffer), indexChannelType<IndexT>());
         }
 
@@ -240,29 +297,11 @@ namespace gfx {
     }
 
 private:
-    template<typename T>
-    static gfx::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
-        {
-            // Keep final buffers transfer-capable as requested.
-            const auto finalUsage = usage
-                | Buffer::Usage::eTransferDst
-                | Buffer::Usage::eTransferSrc
-                | Buffer::Usage::eStorage;
-
-            auto finalBuffer = Buffer::Builder<T>()
-                .setDataView(data)
-                .setUsage(finalUsage)
-                .setType(Buffer::Type::eDeviceLocal)
-                .build();
-
-            return finalBuffer;
-        }
-
     template<typename Tuple, std::size_t... I>
     static void setVertexBuffers(Builder& builder, const Tuple& streamTuple, std::index_sequence<I...>)
     {
         (builder.SetVertexBuffer(static_cast<glm::u32>(I),
-            makeBuffer(std::get<I>(streamTuple), Buffer::Usage::eVertex)), ...);
+            Mesh::makeBuffer(std::get<I>(streamTuple), Buffer::Usage::eVertex)), ...);
     }
 
     template<typename IndexT>
@@ -303,36 +342,51 @@ private:
             using Value = typename Attr::ValueType;
             using Traits = VertexValueTraits<Value>;
 
-            Base::_vertexAttributeDescription.push_back(VertexInputAttributeDescription{
+            const auto attribute = VertexInputAttributeDescription{
                 .location = location++,
                 .binding = binding,
                 .channelCount = Traits::channelCount,
                 .channelType = Traits::channelType,
                 .offset = Stream::template OffsetOf<I>()
-            });
+            };
+            Base::_vertexAttributeDescription.push_back(attribute);
+
+            // Record the position attribute so acceleration structures can locate geometry.
+            if constexpr (std::is_base_of_v<PositionAttribute, Attr>) {
+                _positionAttributeDescription = attribute;
+            }
         }
+
+        inline static std::optional<VertexInputAttributeDescription> _positionAttributeDescription = std::nullopt;
     };
 
-    // Common named vertex attributes.
-    // These are aliases over VertexAttribute<T>, so they work directly in ParamVertex<...>.
-    using Position2  = VertexAttribute<glm::vec2>;
-    using Position   = VertexAttribute<glm::vec3>;
-    using Position4  = VertexAttribute<glm::vec4>;
+    struct Position2  : VertexAttribute<glm::vec2>, PositionAttribute {};
+    struct Position   : VertexAttribute<glm::vec3>, PositionAttribute {};
+    struct Position4  : VertexAttribute<glm::vec4>, PositionAttribute {};
 
-    using Normal  = VertexAttribute<glm::vec3>;
-    using Normal4 = VertexAttribute<glm::vec4>;
+    struct Normal     : VertexAttribute<glm::vec3> {};
+    struct Normal4    : VertexAttribute<glm::vec4> {};
 
-    using Color3     = VertexAttribute<glm::vec3>;
-    using Color      = VertexAttribute<glm::vec4>;
+    struct Color3     : VertexAttribute<glm::vec3> {};
+    struct Color      : VertexAttribute<glm::vec4> {};
 
-    using UV        = VertexAttribute<glm::vec2>;
-    using UV3       = VertexAttribute<glm::vec3>;
+    struct UV         : VertexAttribute<glm::vec2> {};
+    struct UV3        : VertexAttribute<glm::vec3> {};
 
-    using Tangent         = VertexAttribute<glm::vec3>;
-    using PackedTangent   = VertexAttribute<glm::vec4>; // xyz + handedness in w
-    using Bitangent       = VertexAttribute<glm::vec3>;
+    struct Tangent    : VertexAttribute<glm::vec3> {};
+    struct PackedTangent : VertexAttribute<glm::vec4> {}; // xyz + handedness in w
+    struct Bitangent  : VertexAttribute<glm::vec3> {};
 
     using BoneIds     = VertexAttribute<glm::ivec4>;
     using BoneWeights = VertexAttribute<glm::vec4>;
+
+    // Wraps any VertexAttributeType with a channel index.
+    // Use this to have multiple attributes of the same type in one vertex,
+    // e.g. two UV sets: IndexedAttribute<UV, 0>, IndexedAttribute<UV, 1>.
+    template<VertexAttributeType Attr, std::size_t Channel>
+    struct IndexedAttribute : Attr
+    {
+        static constexpr std::size_t kChannel = Channel;
+    };
 }
 

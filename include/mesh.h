@@ -27,20 +27,29 @@ namespace gfx
         [[nodiscard]] std::optional<glm::u32> getIndexCount() const { return _indexCount; }
         [[nodiscard]] std::optional<ChannelType> getIndexType() const { return _indexType; }
 
-        [[nodiscard]] std::vector<gfx::ResourceRef<Buffer>> getVertexBuffers() const
+        [[nodiscard]] std::vector<gfx::ResourceRef<const Buffer>> getVertexBuffers() const
         {
-            std::vector<gfx::ResourceRef<Buffer>> vertexBuffers;
+            std::vector<gfx::ResourceRef<const Buffer>> vertexBuffers;
             for (const auto& vertexBuffer : _vertexBuffers)
             {
-                vertexBuffers.emplace_back(*vertexBuffer);
+                // Convert from the owning Resource (lifetime-tracked) rather than from a
+                // raw Buffer&: the latter takes the `unsafe` ResourceRef ctor with an empty
+                // lifetime stamp, which the descriptor layer rejects as an invalid buffer.
+                vertexBuffers.emplace_back(vertexBuffer);
             }
             return vertexBuffers;
         }
-        [[nodiscard]] std::optional<gfx::ResourceRef<Buffer>> getIndexBuffer() const {
+        [[nodiscard]] std::optional<gfx::ResourceRef<const Buffer>> getIndexBuffer() const {
             if (!_indexBuffer.has_value())
                 return std::nullopt;
             return _indexBuffer;
         }
+
+        /**
+         * @brief The vertex attribute carrying the vertex position, if the mesh declares one.
+         * Used as the position source when building a ray-tracing acceleration structure.
+         */
+        [[nodiscard]] const std::optional<VertexInputAttributeDescription>& getPositionAttribute() const { return _positionAttribute; }
 
     protected:
         glm::u64 _vertexCount{};
@@ -49,8 +58,10 @@ namespace gfx
         std::optional<glm::u32> _indexCount = std::nullopt;
         std::optional<gfx::Resource<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
-        std::optional<gfx::Resource<Buffer>> _indirectBuffer = std::nullopt;
 
+        std::optional<VertexInputAttributeDescription> _positionAttribute = std::nullopt;
+
+    public:
         /**
          * Creates a device-local buffer and copies the contents of `data` into it.
          * `T` is deduced from the span, so the const element type does not need to be spelled out.
@@ -58,11 +69,13 @@ namespace gfx
         template<typename T>
         static gfx::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
         {
-            // Keep final buffers transfer-capable as requested.
+            // Keep final buffers transfer-capable as requested, and usable as
+            // ray-tracing acceleration structure build input (implies device address).
             const auto finalUsage = usage
                 | Buffer::Usage::eTransferDst
                 | Buffer::Usage::eTransferSrc
-                | Buffer::Usage::eStorage;
+                | Buffer::Usage::eStorage
+                | Buffer::Usage::eAccelerationStructureInput;
 
             return Buffer::Builder<T>()
                 .setDataView(data)
@@ -108,7 +121,6 @@ namespace gfx
             std::optional<glm::u32> indexCount = std::nullopt;
             std::optional<gfx::Resource<Buffer>> indexBuffer = std::nullopt;
             std::optional<ChannelType> indexType = std::nullopt;
-            std::optional<gfx::Resource<Buffer>> indirectBuffer = std::nullopt;
 
             explicit Builder()
             {
@@ -134,11 +146,6 @@ namespace gfx
                 return *this;
             }
 
-            Builder& SetIndirectBuffer(gfx::Resource<Buffer> indirectBuffer) {
-                this->indirectBuffer = std::move(indirectBuffer);
-                return *this;
-            }
-
             gfx::Resource<Derived> Build()
             {
                 return gfx::MakeResource<Derived>(*this);
@@ -153,7 +160,6 @@ namespace gfx
             _indexCount = createInfo.indexCount;
             _indexBuffer = std::move(createInfo.indexBuffer);
             _indexType = createInfo.indexType;
-            _indirectBuffer = std::move(createInfo.indirectBuffer);
         }
 
         [[nodiscard]] static const std::vector<VertexInputBindingDescription>& VertexBindingDescription() { return _vertexBindingDescription; }

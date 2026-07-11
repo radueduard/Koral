@@ -9,6 +9,7 @@
 #include <expected>
 #include <optional>
 #include <utility>
+#include <string>
 
 namespace gfx {
     struct Executor {
@@ -101,13 +102,24 @@ namespace gfx {
         struct promise_type {
             std::optional<T> value;
             std::exception_ptr exception;
+            std::coroutine_handle<> continuation; // who's waiting on us
 
             Task get_return_object() noexcept {
                 return Task{std::coroutine_handle<promise_type>::from_promise(*this)};
             }
 
             std::suspend_never initial_suspend() noexcept { return {}; }
-            std::suspend_always final_suspend() noexcept { return {}; }
+
+            // Custom final awaiter: resume the continuation (if any) when this task finishes
+            struct FinalAwaiter {
+                bool await_ready() const noexcept { return false; }
+                void await_suspend(std::coroutine_handle<promise_type> h) const noexcept {
+                    if (auto cont = h.promise().continuation)
+                        cont.resume(); // or enqueue on an executor
+                }
+                void await_resume() const noexcept {}
+            };
+            FinalAwaiter final_suspend() noexcept { return {}; }
 
             void unhandled_exception() noexcept { exception = std::current_exception(); }
 
@@ -162,6 +174,26 @@ namespace gfx {
             handle_.destroy();
             handle_ = {};
             return out;
+        }
+
+        struct Awaiter {
+            std::coroutine_handle<promise_type> handle;
+
+            bool await_ready() const noexcept { return handle.done(); }
+
+            void await_suspend(std::coroutine_handle<> awaiting) const noexcept {
+                handle.promise().continuation = awaiting;
+            }
+
+            T await_resume() const {
+                auto& p = handle.promise();
+                if (p.exception) std::rethrow_exception(p.exception);
+                return std::move(*p.value);
+            }
+        };
+
+        Awaiter operator co_await() noexcept {
+            return Awaiter{handle_};
         }
 
     private:

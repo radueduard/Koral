@@ -10,6 +10,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <format>
 
 #include "context.h"
 #include "../../include/window.h"
@@ -19,23 +20,41 @@ namespace gfx
     DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::addBinding(glm::u32 binding, DescriptorType type,
         glm::u32 count)
     {
+        // Defer the failure to build() (which returns a Result) rather than throwing here.
         if (_bindings.contains(binding)) {
-            throw std::runtime_error("Binding " + std::to_string(binding) + " already exists in the layout!");
+            if (!_error) _error = Error{ .code = ErrorCode::eInvalidArgument,
+                .message = std::format("Binding {} already exists in the layout.", binding) };
+            return *this;
         }
         _bindings[binding] = { type, count };
         return *this;
     }
 
-    std::unique_ptr<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const
+    bool DescriptorSetLayout::matches(const Builder& builder) const
     {
-        switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return std::make_unique<DescriptorSetLayout>(*this);
-        case API::eVulkan:
-            return std::make_unique<vk::DescriptorSetLayout>(*this);
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
+        return _bindings == builder._bindings;
+    }
+
+    Result<std::unique_ptr<DescriptorSetLayout>> DescriptorSetLayout::Builder::create() const
+    {
+        beginAttempt();
+        if (_error) return std::unexpected(*_error);
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan)
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+
+        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<DescriptorSetLayout> {
+            return (api == API::eVulkan)
+                ? gfx::MakeBackendPtr<DescriptorSetLayout, vk::DescriptorSetLayout>(*this)
+                : std::unique_ptr<DescriptorSetLayout>(std::make_unique<DescriptorSetLayout>(*this));
+        });
+    }
+
+    gfx::Resource<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const
+    {
+        return materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout");
     }
 
     std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> DescriptorSetLayout::getBindings() const

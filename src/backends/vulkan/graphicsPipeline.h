@@ -26,13 +26,37 @@ namespace gfx::vk
 
         [[nodiscard]] const ::vk::PipelineLayout& getPipelineLayout() const { return _pipelineLayout; }
         [[nodiscard]] ::vk::ShaderStageFlags getPipelineStageFlags() const { return _pipelineStageFlags; }
+
+    protected:
+        void Setup() override;
+        void Teardown() override;
+
     private:
         ::vk::PipelineLayout _pipelineLayout;
         ::vk::ShaderStageFlags _pipelineStageFlags = ::vk::ShaderStageFlags();
-        inline static std::array<::vk::DynamicState, 3> _dynamicStates = {
+
+        static constexpr std::array _dynamicStates = std::to_array<::vk::DynamicState>({
+            // Vulkan 1.0 core
             ::vk::DynamicState::eViewport,
             ::vk::DynamicState::eScissor,
-            ::vk::DynamicState::eFrontFace
-        };
+            ::vk::DynamicState::eLineWidth,
+            ::vk::DynamicState::eDepthBias,
+            ::vk::DynamicState::eBlendConstants,
+            ::vk::DynamicState::eStencilCompareMask,
+            ::vk::DynamicState::eStencilWriteMask,
+            ::vk::DynamicState::eStencilReference,
+            // Extended dynamic state 1
+            ::vk::DynamicState::eCullMode,
+            ::vk::DynamicState::eFrontFace,
+            ::vk::DynamicState::eDepthTestEnable,
+            ::vk::DynamicState::eDepthWriteEnable,
+            ::vk::DynamicState::eDepthCompareOp,
+            ::vk::DynamicState::eStencilTestEnable,
+            ::vk::DynamicState::eStencilOp,
+            // Extended dynamic state 2
+            ::vk::DynamicState::eDepthBiasEnable,
+            ::vk::DynamicState::eRasterizerDiscardEnable,
+            ::vk::DynamicState::ePrimitiveRestartEnable,
+        });
     };
 }

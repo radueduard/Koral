@@ -6,6 +6,8 @@
 
 #include <descriptorSetLayout.h>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 
 #include "buffer.h"
 #include "commandBuffer.h"
@@ -20,8 +22,39 @@ namespace gfx::ogl
 {
     DescriptorSet::DescriptorSet(const Builder& builder): gfx::DescriptorSet(builder) {}
 
-    void DescriptorSet::Write(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) {
-        throw std::runtime_error("NOT YET IMPLEMENTED ON OPENGL BACKEND");
+    void DescriptorSet::Write(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index) {
+        // GL has no persistent descriptor objects: bind() re-issues every write each
+        // time the set is bound, so a runtime write only has to update the stored
+        // descriptor and the next bind picks it up.
+        auto it = _writes.find(binding);
+        if (it == _writes.end())
+            throw std::runtime_error("Cannot write to binding " + std::to_string(binding) + ": it is not part of this descriptor set's layout!");
+        if (index >= it->second.size()) {
+            // Bindless (variable-count) bindings reflect a layout count of 0 and are
+            // filled by index at runtime; grow the write list to fit, matching the
+            // builder's behaviour. See DescriptorSet::Builder::write.
+            bool variableCount = false;
+            for (const auto& [b, type, count] : _layout->getBindings())
+                if (b == binding) { variableCount = (count == 0); break; }
+            if (variableCount)
+                it->second.resize(index + 1);
+            else
+                throw std::runtime_error("Descriptor index " + std::to_string(index) + " out of range for binding " + std::to_string(binding) + "!");
+        }
+        it->second[index] = descriptor;
+    }
+
+    // GL_ARB_bindless_texture handles must be made resident before use, and making an
+    // already-resident handle resident again is an error. Forming a handle also freezes
+    // the texture immutable, so we do it exactly once per (texture, sampler) pair and
+    // cache the resident handle globally (a pair's handle is stable, and the same
+    // texture may appear in several descriptor sets). Never freed — material textures
+    // live for the whole session. Key: (texture << 32) | sampler.
+    namespace {
+        std::unordered_map<glm::u64, GLuint64>& handleCache() {
+            static std::unordered_map<glm::u64, GLuint64> cache;
+            return cache;
+        }
     }
 
     void DescriptorSet::bind(const gfx::CommandBuffer& commandBuffer, glm::u32 index) const
@@ -29,9 +62,22 @@ namespace gfx::ogl
         const auto& oglCommandBuffer = dynamic_cast<const CommandBuffer&>(commandBuffer);
         const auto& layoutRemappings =  oglCommandBuffer.getRemappingTableForBoundPipeline();
 
+        // Bindless material arrays declared by the bound pipeline that draw their
+        // textures from THIS descriptor set. Their image/sampler bindings are driven by
+        // sampler handles below, not by texture units, so skip them in the normal loop.
+        const auto& bindlessArrays = oglCommandBuffer.getBoundPipelineBindlessArrays();
+        std::unordered_set<glm::u32> bindlessConsumedBindings;
+        for (const auto& arr : bindlessArrays) {
+            if (arr.imageSet == index) {
+                bindlessConsumedBindings.insert(arr.imageBinding);
+                if (arr.samplerSet == index) bindlessConsumedBindings.insert(arr.samplerBinding);
+            }
+        }
+
         for (const auto& [binding, descriptors] : _writes)
         {
-            const auto type = _layout.getBindingType(binding);
+            if (bindlessConsumedBindings.contains(binding)) continue;
+            const auto type = _layout->getBindingType(binding);
             for (size_t i = 0; i < descriptors.size(); ++i) {
                 const auto& descriptor = descriptors[i];
 
@@ -129,6 +175,52 @@ namespace gfx::ogl
                     }
                 default:
                     throw std::runtime_error("Unknown descriptor type for binding " + std::to_string(binding) + " index " + std::to_string(i) + "!");
+                }
+            }
+        }
+
+        // Bindless material arrays: for each element, form a resident texture+sampler
+        // handle and set it into the pipeline's sampler2D[] uniform at location + i.
+        // The shader indexes this array by material id (see albedo.frag).
+        if (!bindlessArrays.empty()) {
+            const GLuint program = oglCommandBuffer.getBoundPipelineProgram();
+            for (const auto& arr : bindlessArrays) {
+                if (arr.imageSet != index || arr.location < 0) continue;
+
+                // Sampler shared by every element of this array (single descriptor).
+                GLuint samplerId = 0;
+                if (const auto s = _writes.find(arr.samplerBinding);
+                    s != _writes.end() && !s->second.empty() && s->second[0].isValid())
+                    samplerId = *dynamic_cast<const ogl::Sampler&>(s->second[0].getSampler());
+
+                const auto imgIt = _writes.find(arr.imageBinding);
+                if (imgIt == _writes.end()) continue;
+                const auto& images = imgIt->second;
+                for (size_t i = 0; i < images.size(); ++i) {
+                    if (!images[i].isValid()) continue;
+                    const GLuint texture = *dynamic_cast<const ogl::ImageView&>(images[i].getImageView());
+
+                    // Cache the resident handle per (texture, sampler): forming a handle
+                    // freezes the texture immutable, so we do it once, and skip the whole
+                    // per-frame re-forming. A handle is stable for a given pair.
+                    const glm::u64 key = (static_cast<glm::u64>(texture) << 32) | samplerId;
+                    auto cached = handleCache().find(key);
+                    if (cached == handleCache().end()) {
+                        while (glGetError() != GL_NO_ERROR) {}
+                        const GLuint64 handle = samplerId != 0
+                            ? glGetTextureSamplerHandleARB(texture, samplerId)
+                            : glGetTextureHandleARB(texture);
+                        // Incomplete texture (still uploading): leave the slot on its
+                        // previous handle and retry next frame instead of writing 0
+                        // (which would sample black and get alpha-discarded).
+                        if (handle == 0 || glGetError() != GL_NO_ERROR)
+                            continue;
+                        glMakeTextureHandleResidentARB(handle);
+                        glCheckError();
+                        cached = handleCache().emplace(key, handle).first;
+                    }
+                    glProgramUniformHandleui64ARB(program, arr.location + static_cast<GLint>(i), cached->second);
+                    glCheckError();
                 }
             }
         }

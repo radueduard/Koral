@@ -7,6 +7,7 @@
 #include <ranges>
 #include <iostream>
 
+#include "accelerationStructure.h"
 #include "buffer.h"
 #include "context.h"
 #include "descriptor.h"
@@ -25,11 +26,13 @@ namespace gfx::vk
     {
         const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
         for (size_t i = 0; i < frameCount; ++i) {
-            _descriptorSets.emplace_back(Context::DescriptorPool().Allocate(dynamic_cast<const DescriptorSetLayout&>(_layout)));
+            _descriptorSets.emplace_back(Context::DescriptorPool().Allocate(dynamic_cast<const DescriptorSetLayout&>(*_layout)));
         }
         std::vector<::vk::WriteDescriptorSet> writes;
         std::vector<::vk::DescriptorBufferInfo> bufferInfos;
         std::vector<::vk::DescriptorImageInfo> imageInfos;
+        std::vector<::vk::WriteDescriptorSetAccelerationStructureKHR> accelerationStructureInfos;
+        std::vector<::vk::AccelerationStructureKHR> accelerationStructureHandles;
 
         size_t totalDescriptors = 0;
         for (const auto& descriptors : _writes | std::views::values) {
@@ -41,10 +44,12 @@ namespace gfx::vk
             writes.reserve(totalDescriptors);
             bufferInfos.reserve(totalDescriptors);
             imageInfos.reserve(totalDescriptors);
+            accelerationStructureInfos.reserve(totalDescriptors);
+            accelerationStructureHandles.reserve(totalDescriptors);
 
             for (const auto& [binding, descriptors] : _writes)
             {
-                const auto type = _layout.getBindingType(binding);
+                const auto type = _layout->getBindingType(binding);
                 for (size_t i = 0; i < descriptors.size(); ++i)
                 {
                     const auto& descriptor = descriptors[i];
@@ -142,6 +147,21 @@ namespace gfx::vk
                                 .setImageInfo(imageInfo);
                             break;
                         }
+                    case DescriptorType::eAccelerationStructure:
+                        {
+                            const auto& accelerationStructure = dynamic_cast<const AccelerationStructure&>(descriptor.getAccelerationStructure());
+                            const auto& handle = accelerationStructureHandles.emplace_back(*accelerationStructure);
+                            const auto& accelerationStructureInfo = accelerationStructureInfos.emplace_back()
+                                .setAccelerationStructures(handle);
+                            writes.emplace_back()
+                                .setDstSet(_descriptorSets[frame])
+                                .setDstBinding(binding)
+                                .setDstArrayElement(i)
+                                .setDescriptorType(::vk::DescriptorType::eAccelerationStructureKHR)
+                                .setDescriptorCount(1)
+                                .setPNext(&accelerationStructureInfo);
+                            break;
+                        }
                     default:
                         throw std::runtime_error("Unknown descriptor type for binding " + std::to_string(binding) + " index " + std::to_string(i) + "!");
                     }
@@ -152,6 +172,8 @@ namespace gfx::vk
             writes.clear();
             bufferInfos.clear();
             imageInfos.clear();
+            accelerationStructureInfos.clear();
+            accelerationStructureHandles.clear();
         }
     }
 
@@ -166,7 +188,7 @@ namespace gfx::vk
     {
         const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
         for (int frame = 0; frame < frameCount; ++frame) {
-            const auto type = _layout.getBindingType(binding);
+            const auto type = _layout->getBindingType(binding);
             std::vector<::vk::WriteDescriptorSet> writes;
             std::vector<::vk::DescriptorBufferInfo> bufferInfos;
             std::vector<::vk::DescriptorImageInfo> imageInfos;
@@ -262,6 +284,22 @@ namespace gfx::vk
                         .setDescriptorType(::vk::DescriptorType::eSampledImage)
                         .setImageInfo(imageInfo);
                     break;
+                }
+                case DescriptorType::eAccelerationStructure:
+                {
+                    const auto& accelerationStructure = dynamic_cast<const AccelerationStructure&>(descriptor.getAccelerationStructure());
+                    const auto handle = *accelerationStructure;
+                    const auto accelerationStructureInfo = ::vk::WriteDescriptorSetAccelerationStructureKHR()
+                        .setAccelerationStructures(handle);
+                    writes.emplace_back()
+                        .setDstSet(_descriptorSets[frame])
+                        .setDstBinding(binding)
+                        .setDstArrayElement(index)
+                        .setDescriptorType(::vk::DescriptorType::eAccelerationStructureKHR)
+                        .setDescriptorCount(1)
+                        .setPNext(&accelerationStructureInfo);
+                    Context::Device()->updateDescriptorSets(writes, {});
+                    continue;
                 }
                 default: throw std::runtime_error("Unknown descriptor type for binding " + std::to_string(binding) + " index " + std::to_string(index) + "!");
             }

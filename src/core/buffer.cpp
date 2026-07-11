@@ -12,27 +12,35 @@
 
 namespace gfx
 {
+    gfx::Result<std::unique_ptr<Buffer>> Buffer::RawBuilder::create() const
+    {
+        beginAttempt();
+
+        if (_usage & Usage::eUniform && _size > 0xFFFF) {
+            addError(ErrorCode::eUniformBufferTooLarge,
+                     std::format("Uniform buffer size of {} bytes exceeds the maximum allowed size of 65536 bytes!", _size));
+        }
+
+        // Logs all warnings/errors with call sites; returns the first error as a gfx::Error.
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan) {
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+        }
+
+        // Backend allocation/creation may throw; convert any escape into a gfx::Error.
+        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Buffer> {
+            return (api == API::eVulkan)
+                ? gfx::MakeBackendPtr<Buffer, vk::Buffer>(*this)
+                : gfx::MakeBackendPtr<Buffer, ogl::Buffer>(*this);
+        });
+    }
+
     gfx::Resource<Buffer> Buffer::RawBuilder::build() const
     {
-        if (_usage & Usage::eUniform &&_size > 0xFFFF) {
-            fail(std::format("Uniform buffer size of {} bytes exceeds the maximum allowed size of 65536 bytes!", _size));
-        }
-
-
-        flushDiagnostics(); // logs all warnings/errors with call sites; throws if any error
-
-        gfx::Resource<Buffer> buffer = nullptr;
-        switch (Context::Window().getAPI()) {
-            case API::eOpenGL:
-            buffer = gfx::MakeResource<ogl::Buffer>(*this);
-            break;
-        case API::eVulkan:
-            buffer = gfx::MakeResource<vk::Buffer>(*this);
-            break;
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
-        Context::Repository().addRef(ResourceRef(buffer));
+        auto buffer = materialize<Buffer>(*this, "Buffer");
+        Context::Repository().addRef(ResourceRef<const Buffer>(buffer));
         return buffer;
     }
 

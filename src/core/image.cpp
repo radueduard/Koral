@@ -3,6 +3,8 @@
 //
 
 #include <image.h>
+#include <buffer.h>
+#include <commandBuffer.h>
 #include <framebuffer.h>
 #include <surface.h>
 
@@ -14,16 +16,75 @@
 
 namespace gfx
 {
+    gfx::Result<std::unique_ptr<Image>> Image::Builder::create() const
+    {
+        beginAttempt();
+
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan)
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+
+        // Construct and (optionally) upload inside guard(): any backend exception becomes a
+        // gfx::Error, and a staging-buffer failure is re-thrown with its own cause attached.
+        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Image> {
+        // The object, not a Resource: materialize() builds the owning Resource around it. The
+        // upload below needs a ResourceRef, so it takes an unsafe (untracked) one — sound here
+        // because the image cannot outlive this scope before we hand it over.
+        std::unique_ptr<Image> image = (api == API::eVulkan)
+            ? gfx::MakeBackendPtr<Image, vk::Image>(*this)
+            : gfx::MakeBackendPtr<Image, ogl::Image>(*this);
+
+        const auto imageRef = ResourceRef<const Image>(image.get());
+
+        // Upload initial pixel data, if any was supplied via setData(). Uses the same
+        // staging-buffer + copy path as the importer, so it works on both backends.
+        if (!data.empty()) {
+            const auto staging = gfx::Buffer::Builder<std::byte>()
+                .setDataView(std::span<const std::byte>(data))
+                .setUsage(gfx::Buffer::Usage::eTransferSrc)
+                .setType(gfx::Buffer::Type::eStaging)
+                .build();
+
+            // The staging buffer is an internal detail of the upload, so its failure is *our*
+            // failure — rethrow it so guard() turns it back into our error, with the allocation
+            // failure kept as the cause the user actually needs to see.
+            if (!staging.valid()) {
+                throw BackendException(causedBy(
+                    Error{ .code = ErrorCode::eBackend, .message = "Could not stage the image's initial pixel data." },
+                    staging.errorPtr()));
+            }
+
+            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                commandBuffer.CopyBufferToImage(staging, imageRef, gfx::Copy {
+                    .imageBaseArrayLayer = 0,
+                    .imageLayerCount = image->getArrayLayers(),
+                    .imageMipLevel = 0,
+                });
+            });
+
+            if (image->getMipLevels() > 1) {
+                CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                    commandBuffer.GenerateMipmaps(imageRef);
+                });
+            }
+
+            // Leave the image shader-readable: the copy/mip commands leave it in a
+            // transfer-destination state, but descriptors bind sampled images as read-only.
+            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::AllShaderRead }});
+            });
+        }
+
+        return image;
+        });
+    }
+
+
     gfx::Resource<Image> Image::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
-            case API::eOpenGL:
-            return gfx::MakeResource<ogl::Image>(*this);
-            case API::eVulkan:
-            return gfx::MakeResource<vk::Image>(*this);
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
+        return materialize<Image>(*this, "Image");
     }
 
     glm::u32 Image::ChannelSizeFromImageFormat(const gfx::Image::Format format)

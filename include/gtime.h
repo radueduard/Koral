@@ -3,12 +3,12 @@
 //
 
 #pragma once
-#include <chrono>
 
 #include "api.h"
 
-namespace gfx::io {
+namespace gfx {
 	class Window;
+	class Engine;
 
 	class GFX_API Time {
 	public:
@@ -16,22 +16,13 @@ namespace gfx::io {
 		static float FixedDeltaTime();
 		static float WindowTime();
 
-		friend class Window;
-
 	private:
-		struct GFX_API State
-		{
-			float timeSinceStart = 0;
+		friend class Window;
+		friend class Engine;
 
-			std::chrono::time_point<std::chrono::high_resolution_clock> lastFrameStart;
-			float frameDeltaTime;
-
-			std::chrono::time_point<std::chrono::high_resolution_clock> lastFixedPoint;
-			float fixedDeltaTime;
-			bool shouldRunFixedUpdate = false;
-
-			void setup();
-			void update();
-		};
+		// There is a single window, so time is a process-wide singleton (state
+		// lives in time.cpp). Driven by the frame loop via these two hooks.
+		static void setup();
+		static void update();
 	};
 }

@@ -19,8 +19,22 @@ namespace gfx::vk
 {
     GraphicsPipeline::GraphicsPipeline(const Builder& createInfo): gfx::GraphicsPipeline(createInfo)
     {
-        // dynamic rendering structs
+        Setup();
+    }
 
+    GraphicsPipeline::~GraphicsPipeline()
+    {
+        Teardown();
+    }
+
+    void GraphicsPipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    {
+        const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
+        vkCommandBuffer->bindPipeline(::vk::PipelineBindPoint::eGraphics, **this);
+    }
+
+    void GraphicsPipeline::Setup()
+    {
         std::vector<::vk::Format> colorAttachmentFormats;
         for (const auto& format : _framebuffer->getColorAttachments()) {
             colorAttachmentFormats.push_back(getVkFormat(format.get().getImage()->getFormat()));
@@ -64,7 +78,7 @@ namespace gfx::vk
 
         std::vector<::vk::PipelineShaderStageCreateInfo> shaderStages = {};
         if (_vertexShader.has_value()) {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_vertexShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_vertexShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eVertex)
                                       .setModule(*shader)
@@ -73,12 +87,12 @@ namespace gfx::vk
         }
         if (_tessellationState.has_value())
         {
-            const auto& controlShader = dynamic_cast<const vk::Shader&>(_tessellationState->controlShader.get());
+            const auto& controlShader = dynamic_cast<const vk::Shader&>(*_tessellationState->controlShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTessellationControl)
                                       .setModule(*controlShader)
                                       .setPName("main"));
-            const auto& evalShader = dynamic_cast<const vk::Shader&>(_tessellationState->evalShader.get());
+            const auto& evalShader = dynamic_cast<const vk::Shader&>(*_tessellationState->evalShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTessellationEvaluation)
                                       .setModule(*evalShader)
@@ -86,7 +100,7 @@ namespace gfx::vk
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eTessellationControl | ::vk::ShaderStageFlagBits::eTessellationEvaluation;
         }
         if (_geometryShader.has_value()) {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_geometryShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_geometryShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eGeometry)
                                       .setModule(*shader)
@@ -95,7 +109,7 @@ namespace gfx::vk
         }
         if (_fragmentShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_fragmentShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_fragmentShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eFragment)
                                       .setModule(*shader)
@@ -104,7 +118,7 @@ namespace gfx::vk
         }
         if (_taskShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_taskShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_taskShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTaskEXT)
                                       .setModule(*shader)
@@ -113,12 +127,31 @@ namespace gfx::vk
         }
         if (_meshShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(_meshShader.value().get());
+            const auto& shader = dynamic_cast<const vk::Shader&>(**_meshShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eMeshEXT)
                                       .setModule(*shader)
                                       .setPName("main"));
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eMeshEXT;
+        }
+
+        std::vector<::vk::SpecializationMapEntry> specializationMapEntries;
+        for (const auto& [id, offset, size] : _specConstantsMetadata) {
+            specializationMapEntries.emplace_back(::vk::SpecializationMapEntry()
+                .setConstantID(id)
+                .setOffset(offset)
+                .setSize(size));
+        }
+        auto specializationInfo = ::vk::SpecializationInfo()
+            .setMapEntries(specializationMapEntries)
+            .setDataSize(_specConstantsData.size())
+            .setPData(_specConstantsData.data());
+        // Share one specialization block across every stage; stages that don't declare a
+        // given constant id ignore it, so this matches the beginner-facing Builder API.
+        if (!_specConstantsMetadata.empty()) {
+            for (auto& stage : shaderStages) {
+                stage.setPSpecializationInfo(&specializationInfo);
+            }
         }
 
         auto dynamicStateCreateInfo = ::vk::PipelineDynamicStateCreateInfo()
@@ -131,26 +164,26 @@ namespace gfx::vk
             .setLayout(_pipelineLayout);
 
         auto rasterizationStateCreateInfo = ::vk::PipelineRasterizationStateCreateInfo()
-            .setPolygonMode(getVkPolygonMode(createInfo.rasterizationState.polygonMode))
-            .setCullMode(getVkCullMode(createInfo.rasterizationState.cullMode))
-            .setFrontFace(getVkFrontFace(createInfo.rasterizationState.frontFace))
-            .setDepthClampEnable(createInfo.rasterizationState.depthClampEnable)
-            .setLineWidth(createInfo.rasterizationState.lineWidth)
-            .setRasterizerDiscardEnable(createInfo.rasterizationState.rasterizerDiscardEnable);
+            .setPolygonMode(getVkPolygonMode(_rasterizationState.polygonMode))
+            .setCullMode(getVkCullMode(_rasterizationState.cullMode))
+            .setFrontFace(getVkFrontFace(_rasterizationState.frontFace))
+            .setDepthClampEnable(_rasterizationState.depthClampEnable)
+            .setLineWidth(_rasterizationState.lineWidth)
+            .setRasterizerDiscardEnable(_rasterizationState.rasterizerDiscardEnable);
         pipelineCreateInfo.setPRasterizationState(&rasterizationStateCreateInfo);
 
         const auto multisampleStateCreateInfo = ::vk::PipelineMultisampleStateCreateInfo()
-            .setRasterizationSamples(getVkSampleCount(createInfo.multisampleState.sampleCount))
-            .setSampleShadingEnable(createInfo.multisampleState.sampleShadingEnable)
-            .setMinSampleShading(createInfo.multisampleState.minSampleShading);
+            .setRasterizationSamples(getVkSampleCount(_multisampleState.sampleCount))
+            .setSampleShadingEnable(_multisampleState.sampleShadingEnable)
+            .setMinSampleShading(_multisampleState.minSampleShading);
         pipelineCreateInfo.setPMultisampleState(&multisampleStateCreateInfo);
 
         auto vertexInputStateCreateInfo = ::vk::PipelineVertexInputStateCreateInfo();
         std::vector<::vk::VertexInputBindingDescription> vkVertexInputBindingDescriptions = {};
         std::vector<::vk::VertexInputAttributeDescription> vkVertexInputAttributeDescriptions = {};
 
-        if (!createInfo.vertexBindingDescriptions.empty() && !createInfo.vertexAttributeDescriptions.empty()) {
-            for (const auto& [binding, stride] : createInfo.vertexBindingDescriptions) {
+        if (_vertexBindingDescriptions && _vertexAttributeDescriptions) {
+            for (const auto& [binding, stride] : *_vertexBindingDescriptions) {
                 vkVertexInputBindingDescriptions.push_back(::vk::VertexInputBindingDescription()
                                                               .setBinding(binding)
                                                               .setStride(stride)
@@ -158,7 +191,7 @@ namespace gfx::vk
             }
             vertexInputStateCreateInfo.setVertexBindingDescriptions(vkVertexInputBindingDescriptions);
 
-            for (const auto& [location, binding, channelCount, channelType, offset] : createInfo.vertexAttributeDescriptions) {
+            for (const auto& [location, binding, channelCount, channelType, offset] : *_vertexAttributeDescriptions) {
                 vkVertexInputAttributeDescriptions.push_back(::vk::VertexInputAttributeDescription()
                                                               .setLocation(location)
                                                               .setBinding(binding)
@@ -170,21 +203,21 @@ namespace gfx::vk
         pipelineCreateInfo.setPVertexInputState(&vertexInputStateCreateInfo);
 
         auto depthStencilStateCreateInfo = ::vk::PipelineDepthStencilStateCreateInfo()
-            .setDepthTestEnable(createInfo.depthStencilState.depthTestEnable)
-            .setDepthWriteEnable(createInfo.depthStencilState.depthWriteEnable)
-            .setDepthCompareOp(getVkCompareOp(createInfo.depthStencilState.depthCompareOp))
-            .setStencilTestEnable(createInfo.depthStencilState.stencilEnable);
+            .setDepthTestEnable(_depthStencilState.depthTestEnable)
+            .setDepthWriteEnable(_depthStencilState.depthWriteEnable)
+            .setDepthCompareOp(getVkCompareOp(_depthStencilState.depthCompareOp))
+            .setStencilTestEnable(_depthStencilState.stencilEnable);
         pipelineCreateInfo.setPDepthStencilState(&depthStencilStateCreateInfo);
 
         std::vector<::vk::PipelineColorBlendAttachmentState> vkColorBlendAttachmentStates;
         int index = 0;
         for (const auto& _ : _framebuffer->getColorAttachments()) {
-            if (createInfo.colorBlendState.attachments.empty()) {
+            if (_colorBlendState.attachments.empty()) {
                 vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
                     .setBlendEnable(false)
                     .setColorWriteMask(::vk::ColorComponentFlagBits::eR | ::vk::ColorComponentFlagBits::eG | ::vk::ColorComponentFlagBits::eB | ::vk::ColorComponentFlagBits::eA));
             } else {
-                const auto& attachmentBlendState = createInfo.colorBlendState.attachments[index];
+                const auto& attachmentBlendState = _colorBlendState.attachments[index];
                 vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
                     .setBlendEnable(attachmentBlendState.blendEnable)
                     .setSrcColorBlendFactor(getVkBlendFactor(attachmentBlendState.srcColorBlendFactor))
@@ -198,14 +231,14 @@ namespace gfx::vk
             index++;
         }
         auto colorBlendStateCreateInfo = ::vk::PipelineColorBlendStateCreateInfo()
-            .setLogicOpEnable(createInfo.colorBlendState.enableLogicOp)
-            .setLogicOp(getVkLogicOp(createInfo.colorBlendState.logicOp))
+            .setLogicOpEnable(_colorBlendState.enableLogicOp)
+            .setLogicOp(getVkLogicOp(_colorBlendState.logicOp))
             .setAttachments(vkColorBlendAttachmentStates);
         pipelineCreateInfo.setPColorBlendState(&colorBlendStateCreateInfo);
 
         auto inputAssemblyStateCreateInfo = ::vk::PipelineInputAssemblyStateCreateInfo()
-            .setTopology(getVkPrimitiveTopology(createInfo.inputAssemblyState.topology))
-            .setPrimitiveRestartEnable(createInfo.inputAssemblyState.primitiveRestartEnable);
+            .setTopology(getVkPrimitiveTopology(_inputAssemblyState.topology))
+            .setPrimitiveRestartEnable(_inputAssemblyState.primitiveRestartEnable);
         pipelineCreateInfo.setPInputAssemblyState(&inputAssemblyStateCreateInfo);
 
         auto viewportStateCreateInfo = ::vk::PipelineViewportStateCreateInfo()
@@ -220,7 +253,7 @@ namespace gfx::vk
         _handle = result.value;
     }
 
-    GraphicsPipeline::~GraphicsPipeline()
+    void GraphicsPipeline::Teardown()
     {
         const Device& device = Context::Device();
         device.queuesWaitIdle();
@@ -228,11 +261,5 @@ namespace gfx::vk
             device->destroyPipelineLayout(_pipelineLayout);
         if (_handle)
             device->destroyPipeline(_handle);
-    }
-
-    void GraphicsPipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
-    {
-        const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
-        vkCommandBuffer->bindPipeline(::vk::PipelineBindPoint::eGraphics, **this);
     }
 }

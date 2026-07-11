@@ -33,9 +33,49 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
 find_package(assimp REQUIRED)
+
+# Pin find_package(Vulkan) to the vcpkg-provided headers + loader instead of a
+# system SDK. Without this, CMake's FindVulkan picks up /usr/{include,lib}; we then
+# link the system libvulkan while the vcpkg loader also sits in the runtime search
+# path, so CMake strips the vcpkg dir from the RPATH "for safety" and the build
+# silently runs the system loader — defeating the bundled-WSI loader and emitting
+# "Cannot generate a safe runtime search path" warnings. Pointing FindVulkan at the
+# vcpkg tree makes link-time and runtime agree (one loader), which removes both.
+if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+    set(GFX_VCPKG_PREFIX "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+    if(EXISTS "${GFX_VCPKG_PREFIX}/include/vulkan/vulkan.h")
+        set(Vulkan_INCLUDE_DIR "${GFX_VCPKG_PREFIX}/include" CACHE PATH "vcpkg Vulkan headers" FORCE)
+        # Loader lib: release tree serves both configs (the C loader is config-agnostic
+        # and its debug/release copies are ABI-identical). Drop any stale cached path
+        # (e.g. a prior /usr/lib pick) so the vcpkg-only search below actually applies.
+        unset(Vulkan_LIBRARY CACHE)
+        find_library(Vulkan_LIBRARY NAMES vulkan vulkan-1
+                PATHS "${GFX_VCPKG_PREFIX}/lib" NO_DEFAULT_PATH)
+    endif()
+endif()
+
 find_package(Vulkan REQUIRED)
+message(STATUS "Using Vulkan headers: ${Vulkan_INCLUDE_DIRS}")
+message(STATUS "Using Vulkan loader:  ${Vulkan_LIBRARIES}")
+
+# ---------------------------------------------------------------------------
+# Runtime Vulkan loader.
+#
+# We link and ship the vcpkg-built Vulkan-Loader. The manifest requests its WSI
+# features (Wayland + XCB + Xlib on Linux, Win32 is always built, Metal on macOS
+# via molten-vk), so this one loader creates surfaces on every platform and still
+# discovers the user's installed ICDs/drivers and layers through the standard
+# search paths + env vars. No system loader or LD_LIBRARY_PATH override needed.
+#
+# Bundled layers/ICD manifest dirs (from vcpkg) are handed to the runtime as
+# compile definitions below so it can add them to the loader's search paths at
+# startup — this makes validation (and MoltenVK on macOS) work with no system SDK.
+# ---------------------------------------------------------------------------
+set(GFX_VK_SHARE_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(glslang CONFIG REQUIRED)
+find_package(slang CONFIG REQUIRED)
 find_package(spirv_cross_core CONFIG REQUIRED)
 find_package(spirv_cross_glsl CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
@@ -43,6 +83,7 @@ find_package(reflectcpp CONFIG REQUIRED)
 find_package(Ktx CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 
+find_package(asio CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
@@ -50,7 +91,6 @@ find_package(spdlog CONFIG REQUIRED)
 
 file(GLOB_RECURSE SOURCE_FILES
         src/core/*.cpp
-        src/io/*.cpp
         src/backends/*.cpp
 )
 
@@ -79,6 +119,38 @@ target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
 target_link_libraries(${PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
 
+# Hand the vcpkg-bundled layer/ICD manifest dirs to the runtime so it can add them
+# to the loader's search paths at startup (see runtime.cpp). This makes validation
+# available with no system Vulkan SDK; on macOS it also points the loader at the
+# molten-vk ICD. Additive (VK_ADD_*), so a user's own layers/drivers still load.
+# The manifest layout differs per platform (share/vulkan/... on Linux/macOS, bin/
+# on Windows), so glob for the actual file rather than hardcoding one path.
+file(GLOB_RECURSE GFX_VK_LAYER_MANIFEST
+        "${GFX_VK_SHARE_DIR}/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json"
+        "${GFX_VK_SHARE_DIR}/bin/VkLayer_khronos_validation.json")
+if(GFX_VK_LAYER_MANIFEST)
+    list(GET GFX_VK_LAYER_MANIFEST 0 GFX_VK_LAYER_MANIFEST0)
+    get_filename_component(GFX_VK_LAYER_DIR "${GFX_VK_LAYER_MANIFEST0}" DIRECTORY)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GFX_VK_LAYER_PATH="${GFX_VK_LAYER_DIR}")
+    message(STATUS "Bundled Vulkan validation layers: ${GFX_VK_LAYER_DIR}")
+else()
+    message(WARNING "vcpkg validation-layer manifest not found under ${GFX_VK_SHARE_DIR}; "
+            "portable validation will be unavailable (loader still finds a system SDK if present).")
+endif()
+
+if(APPLE)
+    file(GLOB_RECURSE GFX_VK_ICD_MANIFEST
+            "${GFX_VK_SHARE_DIR}/share/vulkan/icd.d/MoltenVK_icd.json"
+            "${GFX_VK_SHARE_DIR}/bin/MoltenVK_icd.json")
+    if(GFX_VK_ICD_MANIFEST)
+        list(GET GFX_VK_ICD_MANIFEST 0 GFX_VK_ICD_MANIFEST0)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE GFX_VK_ICD_PATH="${GFX_VK_ICD_MANIFEST0}")
+        message(STATUS "Bundled MoltenVK ICD: ${GFX_VK_ICD_MANIFEST0}")
+    else()
+        message(WARNING "molten-vk ICD manifest not found under ${GFX_VK_SHARE_DIR}.")
+    endif()
+endif()
+
 target_link_libraries(${PROJECT_NAME} PRIVATE
         glslang::glslang
         glslang::MachineIndependent
@@ -89,12 +161,14 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-core)
 target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-glsl)
+target_link_libraries(${PROJECT_NAME} PRIVATE slang::slang)
 target_link_libraries(${PROJECT_NAME} PRIVATE reflectcpp::reflectcpp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${JASPER_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui::imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
+target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE KTX::ktx)
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenImageIO::OpenImageIO)
@@ -171,8 +245,13 @@ install(TARGETS ${PROJECT_NAME} Gfx_Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-# Write config files directly at configure time (no build step needed)
-set(GFX_CMAKE_OUTPUT_DIR "/mnt/w/CLionProjects/GFX/cmake" CACHE PATH "Directory where GFX_RELOADED cmake config files are written")
+# Write config files directly at configure time (no build step needed).
+# Each build configuration exports into its own subdirectory so that single-config
+# generators (Ninja) don't clobber each other's exports in a shared folder. A
+# consumer then selects the subdir matching its own build type, giving
+# debug->debug / release->release linkage.
+set(GFX_CMAKE_OUTPUT_BASE_DIR "/mnt/w/CLionProjects/GFX/cmake" CACHE PATH "Base directory where per-config GFX_RELOADED cmake config files are written")
+set(GFX_CMAKE_OUTPUT_DIR "${GFX_CMAKE_OUTPUT_BASE_DIR}/${CMAKE_BUILD_TYPE}")
 file(MAKE_DIRECTORY "${GFX_CMAKE_OUTPUT_DIR}")
 
 # Export build-tree targets directly into the output dir
@@ -197,3 +276,12 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cmake_export_targets.cmake"
         "include(\"${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/Export/${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/${PROJECT_NAME}Targets.cmake\" OPTIONAL)
 ")
+
+# ---------------------------------------------------------------------------
+# Unit tests (gtest). Enable with -DGFX_BUILD_TESTS=ON (default ON).
+# ---------------------------------------------------------------------------
+option(GFX_BUILD_TESTS "Build the GFX unit test suite" ON)
+if(GFX_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

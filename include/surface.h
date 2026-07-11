@@ -8,15 +8,13 @@
 #include "api.h"
 
 namespace gfx {
-    namespace io {
-        class Window;
-    }
+    class Window;
 
     class GFX_API Surface {
     public:
-        explicit Surface(const gfx::io::Window& window) {}
+        explicit Surface(const gfx::Window& window) {}
         virtual ~Surface() {};
-        static std::unique_ptr<gfx::Surface> Create(const gfx::io::Window &window);
+        static std::unique_ptr<gfx::Surface> Create(const gfx::Window &window);
     protected:
     };
 }

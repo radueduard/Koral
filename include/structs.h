@@ -78,6 +78,11 @@ namespace gfx
                                     /// - glsl: layout(set = X, binding = Y) uniform samplerBuffer myStorageTexelBuffer;
                                     /// - hlsl: RWBuffer<float4> myStorageTexelBuffer : register(uY, spaceX);
                                     /// - slang: [[vk::binding(Y, X)]] RWBuffer<float4> myStorageTexelBuffer;
+        eAccelerationStructure,     ///< This type of descriptor is used to bind a ray-tracing acceleration structure (a TLAS), which is traversed by ray queries or trace calls in shaders.
+                                    /// In shader code it would appear like this:
+                                    /// - glsl: layout(set = X, binding = Y) uniform accelerationStructureEXT myTLAS;
+                                    /// - hlsl: RaytracingAccelerationStructure myTLAS : register(tY, spaceX);
+                                    /// - slang: [[vk::binding(Y, X)]] RaytracingAccelerationStructure myTLAS;
     };
 
     /**

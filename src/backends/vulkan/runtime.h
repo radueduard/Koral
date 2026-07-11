@@ -46,9 +46,6 @@ namespace gfx::vk
         };
         std::vector<const char*> _instanceExtensions {
             VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef __linux__
-            "VK_KHR_wayland_surface",
-#endif
 #ifdef __APPLE__
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
 #endif
@@ -60,7 +57,11 @@ namespace gfx::vk
             "VK_KHR_portability_subset",
 #endif
             VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
-            VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
+            VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+            // Ray tracing
+            VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+            VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+            VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
             // VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME
         };
 

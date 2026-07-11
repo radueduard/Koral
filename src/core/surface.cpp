@@ -12,7 +12,7 @@
 
 
 namespace gfx {
-    std::unique_ptr<gfx::Surface> Surface::Create(const gfx::io::Window& window) {
+    std::unique_ptr<gfx::Surface> Surface::Create(const gfx::Window& window) {
         switch (window.getAPI()) {
             case API::eOpenGL: return std::make_unique<gfx::Surface>(window);
             case API::eVulkan: return std::make_unique<gfx::vk::Surface>(window);

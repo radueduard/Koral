@@ -35,6 +35,6 @@ namespace gfx::ogl
         GLenum _defaultTarget;
 
     public:
-        void automaticUpdate() const override {}
+        void automaticUpdate() override {}
     };
 }

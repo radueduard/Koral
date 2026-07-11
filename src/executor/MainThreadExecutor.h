@@ -4,9 +4,10 @@
 
 #pragma once
 #include <coroutine>
-#include <mutex>
-#include <queue>
 #include <thread>
+
+#include <asio/io_context.hpp>
+#include <asio/post.hpp>
 
 #include "task.h"
 
@@ -19,34 +20,35 @@ public:
     }
 
     void Enqueue(std::coroutine_handle<> h) override {
-        std::scoped_lock lock(mutex_);
-        queue_.push(h);
+        asio::post(ctx_, [h]() mutable { h.resume(); });
     }
 
-    // Call once per frame from ParallelTextureLoading::Update()
+    // Call once per frame from the main loop (replaces the manual queue drain).
     void Drain() {
-        std::queue<std::coroutine_handle<>> local;
-        {
-            std::scoped_lock lock(mutex_);
-            std::swap(local, queue_);
-        }
-        while (!local.empty()) {
-            auto h = local.front();
-            local.pop();
-            if (h) h.resume();
+        ctx_.restart();
+
+        const auto budget = std::chrono::milliseconds(1); // 1 ms budget for processing tasks
+        const auto deadline = std::chrono::steady_clock::now() + budget;
+
+        // poll_one() runs at most one ready handler and returns 0 if none ran.
+        while (ctx_.poll_one() != 0) {
+            if (std::chrono::steady_clock::now() >= deadline) {
+                break;
+            }
         }
     }
 
     struct SwitchAwaiter : gfx::SwitchAwaiter {
         explicit SwitchAwaiter(MainThreadExecutor* executor) noexcept : gfx::SwitchAwaiter(executor) {}
-        bool await_ready() const noexcept override { return exec->IsMainThread(); }
+        bool await_ready()  const noexcept override { return exec->IsMainThread(); }
         void await_resume() const noexcept override {}
     };
 
-    gfx::SwitchAwaiter SwitchToMainThread() noexcept { return static_cast<gfx::SwitchAwaiter>(SwitchAwaiter(this)); }
+    gfx::SwitchAwaiter SwitchToMainThread() noexcept {
+        return static_cast<gfx::SwitchAwaiter>(SwitchAwaiter(this));
+    }
 
 private:
-    std::thread::id mainThreadId_;
-    std::mutex mutex_;
-    std::queue<std::coroutine_handle<>> queue_;
+    std::thread::id   mainThreadId_;
+    asio::io_context  ctx_;
 };

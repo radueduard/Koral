@@ -6,6 +6,8 @@
 #include <GL/glew.h>
 #include <graphicsPipeline.h>
 
+#include "shader.h"
+
 
 namespace gfx::ogl
 {
@@ -38,11 +40,33 @@ namespace gfx::ogl
             return _setAndBindingToBindingPoint;
         }
 
+        // Push-constant UBO backing (see CommandBuffer::PushConstants). Zero-sized when
+        // the pipeline declares no push constants.
+        [[nodiscard]] bool hasPushConstants() const { return _pushConstantSize > 0; }
+        [[nodiscard]] GLuint getPushConstantUBO() const { return _pushConstantUBO; }
+        [[nodiscard]] glm::u32 getPushConstantBindingPoint() const { return _pushConstantBindingPoint; }
+        [[nodiscard]] glm::u32 getPushConstantSize() const { return _pushConstantSize; }
+
+        [[nodiscard]] GLuint getProgram() const { return _id; }
+        [[nodiscard]] const std::vector<BindlessSamplerArray>& getBindlessArrays() const { return _bindlessArrays; }
+
+    protected:
+        void Setup() override;
+        void Teardown() override;
+
     private:
         mutable bool _bound = false;
         GLuint _id = 0;
 
         std::map<std::pair<glm::u32, glm::u32>, glm::u32> _setAndBindingToBindingPoint;
+
+        GLuint _pushConstantUBO = 0;
+        glm::u32 _pushConstantBindingPoint = 0;
+        glm::u32 _pushConstantSize = 0;
+
+        // GL_ARB_bindless_texture material arrays declared by this pipeline's shaders,
+        // with uniform locations resolved after link. See DescriptorSet::bind.
+        std::vector<BindlessSamplerArray> _bindlessArrays;
     };
 }
 

@@ -18,13 +18,18 @@
 
 namespace gfx::vk
 {
-    Surface::Surface(const gfx::io::Window& window) : gfx::Surface(window)
+    Surface::Surface(const gfx::Window& window) : gfx::Surface(window)
     {
         const auto instance = Context::Runtime().getInstance();
         const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
-        VkSurfaceKHR surface;
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
         if (const auto result = glfwCreateWindowSurface(instance, *window, nullptr, &surface); result != VK_SUCCESS) {
-            std::cerr << "Failed to create window surface: " << ::vk::to_string(static_cast<::vk::Result>(result)) << std::endl;
+            // Unrecoverable: the swap chain and all presentation depend on a valid
+            // surface. Fail fast with a clear message instead of continuing with a
+            // null handle (which later trips validation and crashes).
+            const auto msg = "Failed to create window surface: " + ::vk::to_string(static_cast<::vk::Result>(result));
+            gfx::log::error("[vulkan] {}", msg);
+            throw std::runtime_error(msg);
         }
         _handle = surface;
 

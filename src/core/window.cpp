@@ -20,7 +20,7 @@
 #include "../executor/MainThreadExecutor.h"
 #include "../executor/BackgroundExecutor.h"
 
-namespace gfx::io {
+namespace gfx {
     Window::Window(Builder& createInfo) :
         _title(createInfo.title),
         _extent(createInfo.extent),
@@ -28,15 +28,21 @@ namespace gfx::io {
         _fullscreen(createInfo.fullscreen),
         _decorated(createInfo.decorated),
         _transparentFramebuffer(createInfo.transparentFramebuffer),
+        _vsync(createInfo.vsync),
         _api(createInfo.api),
         _scene(std::move(createInfo.scene))
     {
         Context::_window = this;
+        Context::_activeAPI = createInfo.api; // backend selection keys off this, not the window
 
-        // If you want to force a backend on Linux, do it here BEFORE glfwInit().
-        // Uncomment one of these to pin the platform; otherwise GLFW auto-picks via XDG_SESSION_TYPE.
-        // glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
-        // glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+        // GLEW (our OpenGL function loader) resolves entry points through GLX, so a
+        // Wayland-platform GLFW window (EGL context) makes glewInit() fail with
+        // "No GLX display". Pin OpenGL windows to X11/XWayland where the GLFW build
+        // supports it; Vulkan windows keep GLFW's automatic platform selection.
+        // (To force a platform manually, hint it here BEFORE glfwInit().)
+        if (createInfo.api == API::eOpenGL && glfwPlatformSupported(GLFW_PLATFORM_X11)) {
+            glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+        }
 
         if (const auto result = glfwInit(); result != GLFW_TRUE) {
             std::cerr << "Failed to initialize GLFW: " << result << std::endl;
@@ -119,6 +125,8 @@ namespace gfx::io {
         // it would emit GLFW_NO_WINDOW_CONTEXT and pollute the error state.
         if (_api == API::eOpenGL) {
             glfwMakeContextCurrent(_window);
+            // OpenGL presents through GLFW's buffer swap; map vsync onto the swap interval.
+            glfwSwapInterval(_vsync ? 1 : 0);
         }
 
         // glfwSetWindowPos is unsupported on Wayland (compositors deny client
@@ -142,7 +150,10 @@ namespace gfx::io {
         if (_api == API::eOpenGL) {
             glewExperimental = GL_TRUE;
             if (const auto result = glewInit(); result != GLEW_OK) {
-                std::cerr << "Failed to initialize GLEW: " << glewGetErrorString(result) << std::endl;
+                // Without a function loader every later GL call is a null pointer;
+                // fail loudly here instead of crashing somewhere confusing.
+                throw std::runtime_error(std::string("Failed to initialize GLEW: ")
+                    + reinterpret_cast<const char*>(glewGetErrorString(result)));
             }
         } else if (_api == API::eVulkan) {
             gfx::vk::Context::Init();
@@ -169,8 +180,8 @@ namespace gfx::io {
         glfwSetCharCallback(_window, Input::Callbacks::charCallback);
         glfwSetCursorEnterCallback(_window, Input::Callbacks::cursorEnterCallback);
 
-        _timeState.setup();
-        _inputState.setup(_window);
+        Time::setup();
+        Input::setup(_window);
 
         Context::_mainThreadExecutor = new MainThreadExecutor();
         Context::_backgroundExecutor = new BackgroundExecutor();
@@ -191,9 +202,9 @@ namespace gfx::io {
         GUI::Shutdown();
         _framebuffer.reset();
         delete Context::_scheduler;
+        delete Context::_repository;
         delete Context::_mainThreadExecutor;
         delete Context::_backgroundExecutor;
-        delete Context::_repository;
         _surface.reset();
         if (_api == API::eVulkan) {
             vk::Context::Destroy();
@@ -237,11 +248,6 @@ namespace gfx::io {
 
     void Window::LateUpdate() {
         _hasResized = false;
-    }
-
-    void Window::focus()
-    {
-        Context::setFocusedWindow(this);
     }
 
     void Window::framebufferResize(GLFWwindow* handle, const int width, const int height) {

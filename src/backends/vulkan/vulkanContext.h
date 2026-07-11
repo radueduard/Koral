@@ -10,10 +10,7 @@
 namespace gfx
 {
     class Engine;
-}
-
-namespace gfx::io
-{
+    class Context;
     class Window;
 }
 
@@ -28,8 +25,9 @@ namespace gfx::vk
 
     class GFX_API Context
     {
-        friend class gfx::io::Window;
+        friend class gfx::Window;
         friend class gfx::Engine;
+        friend class gfx::Context;
     public:
         static const gfx::vk::Runtime& Runtime();
         static const gfx::vk::Device& Device();

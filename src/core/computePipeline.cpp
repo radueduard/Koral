@@ -2,13 +2,16 @@
 // Created by radue on 2/21/2026.
 //
 #include <computePipeline.h>
+#include <array>
 #include <descriptorSetLayout.h>
 #include <framebuffer.h>
+#include <log.h>
 #include <surface.h>
 
 #include "../backends/open_gl/computePipeline.h"
 #include "../backends/vulkan/computePipeline.h"
 
+#include "context.h"
 #include "shader.h"
 #include "../../include/window.h"
 
@@ -16,23 +19,41 @@ namespace gfx
 {
     ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(ResourceRef<const Shader> computeShader)
     {
-        this->computeShader = std::cref(*computeShader);
+        this->computeShader = computeShader;
         return *this;
+    }
+
+    gfx::Result<std::unique_ptr<ComputePipeline>> ComputePipeline::Builder::create() const
+    {
+        beginAttempt();
+        if (computeShader) adopt(*computeShader, "compute shader");
+
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan)
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+
+        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<ComputePipeline> {
+            return (api == API::eVulkan)
+                ? gfx::MakeBackendPtr<ComputePipeline, vk::ComputePipeline>(*this)
+                : gfx::MakeBackendPtr<ComputePipeline, ogl::ComputePipeline>(*this);
+        });
     }
 
     gfx::Resource<ComputePipeline> ComputePipeline::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
-            case API::eOpenGL:
-            return gfx::MakeResource<ogl::ComputePipeline>(*this);
-            case API::eVulkan:
-            return gfx::MakeResource<vk::ComputePipeline>(*this);
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
+        auto pipeline = materialize<ComputePipeline>(*this, "ComputePipeline");
+        // Registered even when poisoned: the Repository is what drives the retry that brings it
+        // back once its shader compiles again.
+        Context::Repository().addRef(ResourceRef<const ComputePipeline>(pipeline));
+        return pipeline;
     }
 
-    ComputePipeline::~ComputePipeline() = default;
+    ComputePipeline::~ComputePipeline()
+    {
+        if (_shader.has_value()) unsubscribeReload(*_shader);
+    }
 
     void ComputePipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
     {
@@ -44,29 +65,26 @@ namespace gfx
         _bound = false;
     }
 
-    const gfx::DescriptorSetLayout& ComputePipeline::getSetLayout(const glm::u32 index) const
+    VoidResult ComputePipeline::Validate()
     {
-        if (!_setLayouts.contains(index))
-            throw std::runtime_error("This pipeline does not contain a set with that index!");
-        return *_setLayouts.at(index);
+        if (!_shader.has_value())
+            return fail(ErrorCode::eMissingShaderStage, "A compute pipeline must have a compute shader.");
+        if ((*_shader)->getStage() != Shader::Stage::eCompute)
+            return fail(ErrorCode::eShaderStageMismatch, "The shader provided to a compute pipeline must be a compute shader.");
+
+        const std::array shaders = { *_shader };
+        if (!buildLayouts(shaders))
+            return fail(ErrorCode::eDescriptorConflict, "Descriptor declarations conflict in the compute pipeline.");
+        return {};
     }
 
-    ComputePipeline::ComputePipeline(const Builder& createInfo) : _shader(createInfo.computeShader)
+    ComputePipeline::ComputePipeline(const Builder& createInfo)
+        : _shader(createInfo.computeShader),
+          _specConstantsMetadata(createInfo.specConstantsMetadata),
+          _specConstantsData(createInfo.specConstantsData)
     {
-        auto memoryLayout = _shader->get().getMemoryLayout();
-        for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
-        {
-            auto builder = DescriptorSetLayout::Builder();
-            for (const auto& [binding, descriptor] : setDescription.descriptors)
-            {
-                const auto& [type, name, count, stages] = descriptor;
-                builder.addBinding(binding, type, count);
-            }
-            _setLayouts[setIndex] = builder.build();
-        }
-        for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
-        {
-            _pushConstantRanges[offset] = pushConstant;
-        }
+        if (auto v = Validate(); !v) throw BackendException(v.error());
+
+        if (_shader.has_value()) subscribeReload(*_shader);
     }
 }

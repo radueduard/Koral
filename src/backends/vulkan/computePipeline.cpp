@@ -16,13 +16,17 @@ namespace gfx::vk
 {
     ComputePipeline::ComputePipeline(const Builder& createInfo): gfx::ComputePipeline(createInfo)
     {
-        if (!createInfo.computeShader.has_value())
-            throw std::runtime_error("You can not create a compute pipeline without a compute shader!");
+        Setup();
+    }
 
-        const auto& shader = dynamic_cast<const Shader&>(createInfo.computeShader.value().get());
-        if (shader.getStage() != Shader::Stage::eCompute) {
-            throw std::runtime_error("The shader provided to the compute pipeline must be a compute shader!");
-        }
+    ComputePipeline::~ComputePipeline()
+    {
+        Teardown();
+    }
+
+    void ComputePipeline::Setup()
+    {
+        const auto& shader = dynamic_cast<const Shader&>(**_shader);
 
         std::vector<::vk::DescriptorSetLayout> setLayouts = {};
         for (const auto& layout : _setLayouts | std::views::values) {
@@ -44,7 +48,7 @@ namespace gfx::vk
         _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
 
         std::vector<::vk::SpecializationMapEntry> specializationMapEntries;
-        for (const auto& [id, offset, size] : createInfo.specConstantsMetadata) {
+        for (const auto& [id, offset, size] : _specConstantsMetadata) {
             specializationMapEntries.emplace_back(::vk::SpecializationMapEntry()
                 .setConstantID(id)
                 .setOffset(offset)
@@ -52,13 +56,13 @@ namespace gfx::vk
         }
         auto specializationInfo = ::vk::SpecializationInfo()
             .setMapEntries(specializationMapEntries)
-            .setDataSize(createInfo.specConstantsData.size())
-            .setPData(createInfo.specConstantsData.data());
+            .setDataSize(_specConstantsData.size())
+            .setPData(_specConstantsData.data());
 
         const auto stageCreateInfo = ::vk::PipelineShaderStageCreateInfo()
                                      .setStage(::vk::ShaderStageFlagBits::eCompute)
                                      .setModule(*shader)
-                                     .setPSpecializationInfo(createInfo.specConstantsMetadata.empty() ? nullptr : &specializationInfo)
+                                     .setPSpecializationInfo(_specConstantsMetadata.empty() ? nullptr : &specializationInfo)
                                      .setPName("main");
 
         const auto pipelineCreateInfo = ::vk::ComputePipelineCreateInfo()
@@ -68,7 +72,7 @@ namespace gfx::vk
         _handle = Context::Device()->createComputePipeline(nullptr, pipelineCreateInfo).value;
     }
 
-    ComputePipeline::~ComputePipeline()
+    void ComputePipeline::Teardown()
     {
         const Device& device = Context::Device();
         device.queuesWaitIdle();

@@ -151,6 +151,14 @@ namespace gfx::vk {
             .setPNext(&vk14Features)
             .setMaintenance9(true);
 
+        auto accelerationStructureFeatures = ::vk::PhysicalDeviceAccelerationStructureFeaturesKHR()
+            .setPNext(&maintenance9)
+            .setAccelerationStructure(true);
+
+        auto rayTracingPipelineFeatures = ::vk::PhysicalDeviceRayTracingPipelineFeaturesKHR()
+            .setPNext(&accelerationStructureFeatures)
+            .setRayTracingPipeline(true);
+
         auto deviceExtensions = Context::Runtime().getDeviceExtensions();
 
         auto features = Context::Runtime().getPhysicalDevice().getFeatures();
@@ -158,7 +166,7 @@ namespace gfx::vk {
         const auto deviceCreateInfo = ::vk::DeviceCreateInfo()
             .setQueueCreateInfos(queueCreateInfos)
             .setPEnabledFeatures(&features)
-            .setPNext(&maintenance9)
+            .setPNext(&rayTracingPipelineFeatures)
             .setPEnabledExtensionNames(deviceExtensions);
 
         _handle = physicalDevice->createDevice(deviceCreateInfo);
@@ -167,6 +175,11 @@ namespace gfx::vk {
 
     Device::~Device() {
         _handle.waitIdle();
+        // Destroy the per-queue command pools before the device. In the windowed
+        // path Scheduler::~Scheduler() already called freeQueues() (leaving
+        // _queuesInUse empty, so this is a no-op); the headless path has no
+        // Scheduler, so without this the pools would leak past vkDestroyDevice.
+        freeQueues();
         _handle.destroy();
     }
 
@@ -192,6 +205,12 @@ namespace gfx::vk {
             try {
                 auto queue = queueFamily.RequestQueue();
                 auto* queueRef = queue.get();
+                // Keep the queue alive: without storing it, the unique_ptr would be
+                // destroyed here and *queueRef returned as a dangling reference (the
+                // Queue holds the vk::Queue handle, so the next submit would segfault).
+                // Masked in the windowed path because requestPresentQueue() populates
+                // _queuesInUse first with a family that also handles gfx/compute/transfer.
+                _queuesInUse.emplace_back(std::move(queue));
                 _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
                     .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
                     .setQueueFamilyIndex(queueFamily.getIndex()));

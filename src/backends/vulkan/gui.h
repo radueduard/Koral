@@ -17,15 +17,15 @@ namespace gfx::vk
     class GFX_API GUI_Image final : public gfx::GUI_Image
     {
     public:
-        explicit GUI_Image(gfx::ResourceRef<gfx::Image> image, glm::u32 layer, glm::u32 level);
+        explicit GUI_Image(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level);
         ~GUI_Image() override;
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(gfx::ResourceRef<gfx::Image> image) override;
+        void setImage(gfx::ResourceRef<const gfx::Image> image) override;
 
         ImTextureID operator*() const override;
 
     private:
-        gfx::ResourceRef<gfx::Image> _image;
+        gfx::ResourceRef<const gfx::Image> _image;
         gfx::Resource<gfx::Image> _helperImage;
         gfx::Resource<gfx::ImageView> _helperImageView;
         gfx::Resource<gfx::Sampler> _helperSampler;

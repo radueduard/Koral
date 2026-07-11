@@ -4,126 +4,135 @@
 
 #include "input.h"
 
-#include <cstdio>
+#include <unordered_map>
 #include <GLFW/glfw3.h>
-#include <imgui.h>
-#include <glm/fwd.hpp>
 #include <glm/vec2.hpp>
 #include <magic_enum/magic_enum.hpp>
 #include <imgui_impl_glfw.h>
 
-#include "context.h"
 #include "window.h"
-#include "framebuffer.h"
-#include "surface.h"
 
 
-namespace gfx::io {
-	void Input::State::setup(GLFWwindow* window)
-	{
-		for (const auto key : magic_enum::enum_values<Key>()) {
-			keyboardKeyStates[key] = KeyState::eNotPressed;
-		}
+namespace gfx {
+	namespace {
+		// Process-wide input state: there is only ever one window, so this need not
+		// be per-window. Encapsulated in this TU; reached through Input's methods.
+		struct InputState {
+			std::unordered_map<Key, KeyState> keyboardKeyStates;
+			std::unordered_map<MouseButton, KeyState> mouseButtonStates;
 
-		for (const auto button : magic_enum::enum_values<MouseButton>()) {
-			mouseButtonStates[button] = KeyState::eNotPressed;
-		}
+			glm::vec2 lastMousePosition;
+			glm::vec2 mousePosition;
+			glm::vec2 mouseDelta;
+			glm::vec2 scrollDelta;
 
-		// Initialize mouse position to the actual cursor position to avoid a
-		// large spurious delta on the very first frame.
-		double cx = 0.0, cy = 0.0;
-		if (window) {
-			glfwGetCursorPos(window, &cx, &cy);
-		}
-		mousePosition     = { static_cast<float>(cx), static_cast<float>(cy) };
-		lastMousePosition = mousePosition;
-		mouseDelta        = { 0.0f, 0.0f };
-		scrollDelta       = { 0.0f, 0.0f };
+			void setup(GLFWwindow* window)
+			{
+				for (const auto key : magic_enum::enum_values<Key>()) {
+					keyboardKeyStates[key] = KeyState::eNotPressed;
+				}
+
+				for (const auto button : magic_enum::enum_values<MouseButton>()) {
+					mouseButtonStates[button] = KeyState::eNotPressed;
+				}
+
+				// Initialize mouse position to the actual cursor position to avoid a
+				// large spurious delta on the very first frame.
+				double cx = 0.0, cy = 0.0;
+				if (window) {
+					glfwGetCursorPos(window, &cx, &cy);
+				}
+				mousePosition     = { static_cast<float>(cx), static_cast<float>(cy) };
+				lastMousePosition = mousePosition;
+				mouseDelta        = { 0.0f, 0.0f };
+				scrollDelta       = { 0.0f, 0.0f };
+			}
+
+			void update()
+			{
+				for (const auto key : magic_enum::enum_values<Key>()) {
+					if (keyboardKeyStates[key] == KeyState::ePressed) {
+						keyboardKeyStates[key] = KeyState::eHeld;
+					} else if (keyboardKeyStates[key] == KeyState::eReleased) {
+						keyboardKeyStates[key] = KeyState::eNotPressed;
+					}
+				}
+
+				for (const auto button : magic_enum::enum_values<MouseButton>()) {
+					if (mouseButtonStates[button] == KeyState::ePressed) {
+						mouseButtonStates[button] = KeyState::eHeld;
+					} else if (mouseButtonStates[button] == KeyState::eReleased) {
+						mouseButtonStates[button] = KeyState::eNotPressed;
+					}
+				}
+
+				// mouseDelta is accumulated by mouseMoveCallback during the frame;
+				// reset it here so the next frame starts from zero.
+				lastMousePosition = mousePosition;
+				mouseDelta  = { 0.0f, 0.0f };
+				scrollDelta = { 0.0f, 0.0f };
+			}
+		};
+
+		InputState g_input;
 	}
 
-	void Input::State::update()
-	{
-		for (const auto key : magic_enum::enum_values<Key>()) {
-			if (keyboardKeyStates[key] == KeyState::ePressed) {
-				keyboardKeyStates[key] = KeyState::eHeld;
-			} else if (keyboardKeyStates[key] == KeyState::eReleased) {
-				keyboardKeyStates[key] = KeyState::eNotPressed;
-			}
-		}
-
-		for (const auto button : magic_enum::enum_values<MouseButton>()) {
-			if (mouseButtonStates[button] == KeyState::ePressed) {
-				mouseButtonStates[button] = KeyState::eHeld;
-			} else if (mouseButtonStates[button] == KeyState::eReleased) {
-				mouseButtonStates[button] = KeyState::eNotPressed;
-			}
-		}
-
-		// mouseDelta is accumulated by mouseMoveCallback during the frame;
-		// reset it here so the next frame starts from zero.
-		lastMousePosition = mousePosition;
-		mouseDelta  = { 0.0f, 0.0f };
-		scrollDelta = { 0.0f, 0.0f };
-	}
+	void Input::setup(GLFWwindow* window) { g_input.setup(window); }
+	void Input::update() { g_input.update(); }
 
     KeyState Input::getKeyState(const Key key) {
-        auto& state = Context::Window()._inputState;
-        return state.keyboardKeyStates[key];
+        return g_input.keyboardKeyStates[key];
     }
 
     KeyState Input::getMouseButtonState(const MouseButton button) {
-        return Context::Window()._inputState.mouseButtonStates[button];
+        return g_input.mouseButtonStates[button];
     }
 
     bool Input::isKeyPressed(const Key key) {
-        auto& state = Context::Window()._inputState;
-        return state.keyboardKeyStates[key] == KeyState::ePressed;
+        return g_input.keyboardKeyStates[key] == KeyState::ePressed;
     }
 
     bool Input::isKeyHeld(const Key key) {
-        auto& state = Context::Window()._inputState;
-        return state.keyboardKeyStates[key] == KeyState::eHeld;
+        return g_input.keyboardKeyStates[key] == KeyState::eHeld;
     }
 
     bool Input::isKeyReleased(const Key key) {
-        return Context::Window()._inputState.keyboardKeyStates[key] == KeyState::eReleased;
+        return g_input.keyboardKeyStates[key] == KeyState::eReleased;
     }
 
     bool Input::isMouseButtonPressed(const MouseButton button) {
-        const auto s = Context::Window()._inputState.mouseButtonStates[button];
-        return s == KeyState::ePressed;
+        return g_input.mouseButtonStates[button] == KeyState::ePressed;
     }
 
     bool Input::isMouseButtonHeld(const MouseButton button) {
-        const auto s = Context::Window()._inputState.mouseButtonStates[button];
-        return s == KeyState::eHeld;
+        return g_input.mouseButtonStates[button] == KeyState::eHeld;
     }
 
     bool Input::isMouseButtonReleased(const MouseButton button) {
-        return Context::Window()._inputState.mouseButtonStates[button] == KeyState::eReleased;
+        return g_input.mouseButtonStates[button] == KeyState::eReleased;
     }
 
 	const glm::vec2& Input::getMousePosition() {
-        return Context::Window()._inputState.mousePosition;
+        return g_input.mousePosition;
     }
 
     const glm::vec2& Input::getMousePositionDelta() {
-        return Context::Window()._inputState.mouseDelta;
+        return g_input.mouseDelta;
     }
 
     const glm::vec2& Input::getMouseScrollDelta() {
-        return Context::Window()._inputState.scrollDelta;
+        return g_input.scrollDelta;
     }
 
     const glm::vec2& Input::getLastMousePosition()
     {
-		return Context::Window()._inputState.lastMousePosition;
+		return g_input.lastMousePosition;
     }
 
     void Input::Callbacks::keyCallback(GLFWwindow * handle, int key, int scancode, const int action, const int mods) {
     	ImGui_ImplGlfw_KeyCallback(handle, key, scancode, action, mods);
 
-    	auto& state = Context::Window()._inputState;
+    	auto& state = g_input;
     	const auto k = static_cast<Key>(key);
 
     	switch (action) {
@@ -163,7 +172,7 @@ namespace gfx::io {
 	void Input::Callbacks::mouseMoveCallback(GLFWwindow *handle, const double x, const double y) {
 		ImGui_ImplGlfw_CursorPosCallback(handle, x, y);
 
-		auto& state = Context::Window()._inputState;
+		auto& state = g_input;
 		const glm::vec2 newPos = { static_cast<float>(x), static_cast<float>(y) };
 		// Accumulate delta so scene.Update() sees the full movement for this frame.
 		state.mouseDelta    += newPos - state.mousePosition;
@@ -173,7 +182,7 @@ namespace gfx::io {
 	void Input::Callbacks::mouseButtonCallback(GLFWwindow *handle, int button, const int action, int mods) {
 		ImGui_ImplGlfw_MouseButtonCallback(handle, button, action, mods);
 
-		auto& state = Context::Window()._inputState;
+		auto& state = g_input;
     	const auto b = static_cast<MouseButton>(button);
     	switch (action) {
     	case GLFW_PRESS:
@@ -190,7 +199,7 @@ namespace gfx::io {
 	void Input::Callbacks::scrollCallback(GLFWwindow *handle, const double x, const double y) {
 		ImGui_ImplGlfw_ScrollCallback(handle, x, y);
 
-		Context::Window()._inputState.scrollDelta += glm::vec2 { x, y };
+		g_input.scrollDelta += glm::vec2 { x, y };
     }
 
 	void Input::Callbacks::focusCallback(GLFWwindow* handle, int focus)
@@ -198,9 +207,6 @@ namespace gfx::io {
 		ImGui_ImplGlfw_WindowFocusCallback(handle, focus);
 
     	auto* window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
-    	if (focus == GLFW_TRUE) {
-			window->focus();
-		}
 		window->_focused = focus;
 	}
 

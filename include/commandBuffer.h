@@ -15,10 +15,12 @@
 #include <unordered_map>
 #include "flags.h"
 #include "api.h"
+#include "error.h"
 
 #include <glm/glm.hpp>
 
 #include "sampler.h"
+#include "structs.h"
 
 namespace gfx
 {
@@ -28,6 +30,7 @@ namespace gfx
     class DescriptorSet;
     class GraphicsPipeline;
     class ComputePipeline;
+    class RayTracingPipeline;
     class Framebuffer;
     class Mesh;
 
@@ -211,6 +214,37 @@ namespace gfx
         double   totalMs = 0.0; ///< Accumulated GPU time.
     };
 
+    // Selects which polygon face(s) a stencil setter affects. Mirrors Vulkan's
+    // per-face stencil model so front and back can be configured independently.
+    enum class StencilFace : glm::u8 {
+        eFront = 1,
+        eBack = 2,
+        eFrontAndBack = 3,
+    };
+
+    // One flag per pipeline-derived dynamic state the command buffer tracks. A bit
+    // is set once the state has a current value on the GPU (either applied from the
+    // bound pipeline's default or overridden by an explicit Set* call) and cleared
+    // when a new graphics pipeline is bound. See CommandBuffer::applyDynamicDefaults.
+    enum class DynamicState : glm::u32 {
+        eLineWidth              = 1 << 0,
+        eDepthBias              = 1 << 1,
+        eBlendConstants         = 1 << 2,
+        eStencilCompareMask     = 1 << 3,
+        eStencilWriteMask       = 1 << 4,
+        eStencilReference       = 1 << 5,
+        eCullMode               = 1 << 6,
+        eFrontFace              = 1 << 7,
+        eDepthTestEnable        = 1 << 8,
+        eDepthWriteEnable       = 1 << 9,
+        eDepthCompareOp         = 1 << 10,
+        eStencilTestEnable      = 1 << 11,
+        eStencilOp              = 1 << 12,
+        eDepthBiasEnable        = 1 << 13,
+        eRasterizerDiscardEnable = 1 << 14,
+        ePrimitiveRestartEnable = 1 << 15,
+    };
+
     class GFX_API CommandBuffer
     {
     public:
@@ -228,6 +262,15 @@ namespace gfx
         [[nodiscard]] glm::u64 getLastFrameCommandCount() const { return _lastFrameCommandCount; }
         void resetStatistics() { _statistics.clear(); _lastFrameCommandCount = 0; }
 
+        // ---- Error railway ------------------------------------------------
+        // Recording uses a sticky-error model: a validation failure is recorded and
+        // the command buffer enters a failed state in which later GPU ops become
+        // no-ops. Chaining still returns CommandBuffer&; inspect the outcome with
+        // ok()/result()/errors() and Submit()'s VoidResult after recording.
+        [[nodiscard]] bool ok() const { return !_failed; }
+        [[nodiscard]] VoidResult result() const;
+        [[nodiscard]] const std::vector<Error>& errors() const { return _errors; }
+
         enum class Usage
         {
             eGraphics = 1 << 0,
@@ -239,59 +282,86 @@ namespace gfx
         virtual void End() = 0;
 
         virtual CommandBuffer& BeginRendering(RenderParameters renderParameters = {});
-        virtual CommandBuffer& BeginRendering(ResourceRef<Framebuffer> framebuffer, RenderParameters renderParameters = {});
+        CommandBuffer& BeginRendering(ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters = {});
         virtual CommandBuffer& EndRendering();
         virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
-        virtual CommandBuffer& BindComputePipeline(ResourceRef<ComputePipeline> pipeline);
-        virtual CommandBuffer& BindGraphicsPipeline(ResourceRef<GraphicsPipeline> pipeline);
-        virtual CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<DescriptorSet> descriptorSet, bool debug = false) = 0;
-        virtual CommandBuffer& BindMesh(ResourceRef<Mesh> mesh);
+
+        // ---- Dynamic state ------------------------------------------------
+        // Per-draw overrides for the pipeline state that every GPU since 2015 can
+        // change dynamically (Vulkan 1.0 core + extended-dynamic-state 1/2, all of
+        // which are core in the 1.3 floor this engine targets). Each state has a
+        // default baked into the bound pipeline; if you never call the setter, that
+        // default is applied automatically before the draw. Calling a setter after
+        // BindGraphicsPipeline overrides the default until the next pipeline bind.
+        // All require a graphics pipeline to be bound.
+        virtual CommandBuffer& SetLineWidth(float lineWidth);
+        virtual CommandBuffer& SetDepthBias(float constantFactor, float clamp, float slopeFactor);
+        virtual CommandBuffer& SetBlendConstants(glm::vec4 constants);
+        virtual CommandBuffer& SetStencilCompareMask(StencilFace face, glm::u32 compareMask);
+        virtual CommandBuffer& SetStencilWriteMask(StencilFace face, glm::u32 writeMask);
+        virtual CommandBuffer& SetStencilReference(StencilFace face, glm::u32 reference);
+        virtual CommandBuffer& SetCullMode(Flags<CullMode> cullMode);
+        virtual CommandBuffer& SetFrontFace(FrontFace frontFace);
+        virtual CommandBuffer& SetDepthTestEnable(bool enable);
+        virtual CommandBuffer& SetDepthWriteEnable(bool enable);
+        virtual CommandBuffer& SetDepthCompareOp(CompareOp compareOp);
+        virtual CommandBuffer& SetStencilTestEnable(bool enable);
+        virtual CommandBuffer& SetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp);
+        virtual CommandBuffer& SetDepthBiasEnable(bool enable);
+        virtual CommandBuffer& SetRasterizerDiscardEnable(bool enable);
+        virtual CommandBuffer& SetPrimitiveRestartEnable(bool enable);
+        CommandBuffer& BindComputePipeline(ResourceRef<const ComputePipeline> pipeline);
+        CommandBuffer& BindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline);
+        CommandBuffer& BindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
+        CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet, bool debug = false);
+        CommandBuffer& BindMesh(ResourceRef<const Mesh> mesh);
 
         template<typename T> requires std::is_trivially_copyable_v<T>
         CommandBuffer& PushConstants(const T& data, const glm::u32 offset = 0) {
             return PushConstants(&data, sizeof(T), offset);
         }
 
-        virtual CommandBuffer& Barrier(std::vector<BufferBarrier> bufferBarriers = {}, std::vector<ImageBarrier> imageBarriers = {}) = 0;
+        CommandBuffer& Barrier(std::vector<BufferBarrier> bufferBarriers = {}, std::vector<ImageBarrier> imageBarriers = {});
+
+        // ---- Debug labels -------------------------------------------------
+        // Named regions and single markers surfaced in GPU debuggers (RenderDoc,
+        // Nsight, etc.). These are pure debugging aids: on backends or drivers
+        // without marker support they are silently no-ops.
+        virtual CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
+        virtual CommandBuffer& EndDebugLabel();
+        virtual CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
 
         virtual CommandBuffer& Dispatch(glm::u32 groupCountX = 1, glm::u32 groupCountY = 1, glm::u32 groupCountZ = 1) = 0;
-        virtual CommandBuffer& DispatchIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset = 0);
+        CommandBuffer& DispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0);
+
+        virtual CommandBuffer& TraceRays(glm::u32 width = 1, glm::u32 height = 1, glm::u32 depth = 1);
 
         virtual CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0);
         virtual CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0);
         virtual CommandBuffer& DrawMeshTasks(glm::u32 taskCountX = 1, glm::u32 taskCountY = 1, glm::u32 taskCountZ = 1);
 
-        virtual CommandBuffer& DrawIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
-        virtual CommandBuffer& DrawIndexedIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
-        virtual CommandBuffer& DrawMeshTasksIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
+        CommandBuffer& DrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
+        CommandBuffer& DrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
+        CommandBuffer& DrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
 
-        virtual CommandBuffer& ClearBuffer(ResourceRef<Buffer> buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
-        virtual CommandBuffer& FillBuffer(ResourceRef<Buffer> buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX) = 0;
-        virtual CommandBuffer& CopyBuffer(ResourceRef<Buffer> srcBuffer, ResourceRef<Buffer> dstBuffer, glm::u64 size = UINT64_MAX, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0) = 0;
+        CommandBuffer& ClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX);
+        // Clears every mip/array level of a color image to a constant value. The image is
+        // transitioned to a transfer-destination state automatically; a follow-up barrier
+        // is still needed before sampling/rendering with it again.
+        CommandBuffer& ClearColorImage(ResourceRef<const Image> image, glm::vec4 color = { 0.f, 0.f, 0.f, 1.f });
+        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX);
+        CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size = UINT64_MAX, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0);
 
-        virtual CommandBuffer& Blit(
-            ResourceRef<const Image> srcImage,
-            gfx::Blit blitInfo = {}) = 0;
+        CommandBuffer& Blit(ResourceRef<const Image> srcImage, gfx::Blit blitInfo = {});
+        CommandBuffer& Blit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Blit blitInfo = {});
+        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, gfx::Resolve resolveInfo = {});
+        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Resolve resolveInfo = {});
 
-        virtual CommandBuffer& Blit(
-            ResourceRef<const Image> srcImage,
-            ResourceRef<const Image> dstImage,
-            gfx::Blit blitInfo = {}) = 0;
+        CommandBuffer& GenerateMipmaps(ResourceRef<const Image> image);
 
-        virtual CommandBuffer& Resolve(
-            ResourceRef<Image> srcImage,
-            gfx::Resolve resolveInfo = {}) = 0;
-
-        virtual CommandBuffer& Resolve(
-            ResourceRef<Image> srcImage,
-            ResourceRef<Image> dstImage,
-            gfx::Resolve resolveInfo = {}) = 0;
-
-        CommandBuffer& GenerateMipmaps(ResourceRef<Image> image);
-
-        virtual CommandBuffer& CopyBufferToImage(ResourceRef<Buffer> buffer, ResourceRef<Image> image, gfx::Copy copyInfo = {}) = 0;
-        virtual CommandBuffer& CopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, gfx::Copy copyInfo = {}) = 0;
+        CommandBuffer& CopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, gfx::Copy copyInfo = {});
+        CommandBuffer& CopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, gfx::Copy copyInfo = {});
 
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 
@@ -328,16 +398,26 @@ namespace gfx
             return *this;
         }
 
+        // Scoped debug region: opens a label, records everything in `body` inside it,
+        // then closes it. Pairs BeginDebugLabel/EndDebugLabel so they can't be unbalanced.
+        template<typename Func> requires std::is_invocable_v<Func, CommandBuffer&>
+        CommandBuffer& DebugLabel(const std::string& label, Func&& body, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f }) {
+            BeginDebugLabel(label, color);
+            body(*this);
+            EndDebugLabel();
+            return *this;
+        }
+
         static void SingleTimeCommand(const std::function<void(gfx::CommandBuffer&)>& command, Usage usage = Usage::eGraphics);
 
-        virtual void Submit() = 0;
+        virtual VoidResult Submit() = 0;
         virtual void Reset() = 0;
 
         CommandBuffer& BufferBarrier(const BufferBarrier& barrier) { return Barrier({ barrier }, {}); }
         CommandBuffer& ImageBarrier(const ImageBarrier& barrier) { return Barrier({}, { barrier }); }
 
-        CommandBuffer& DrawMesh(ResourceRef<Mesh> mesh, glm::u32 instanceCount , glm::u32 baseInstance);
-        CommandBuffer& DrawSubMesh(ResourceRef<Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount);
+        CommandBuffer& DrawMesh(ResourceRef<const Mesh> mesh, glm::u32 instanceCount , glm::u32 baseInstance);
+        CommandBuffer& DrawSubMesh(ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount);
 
         static std::unique_ptr<CommandBuffer> Create(Flags<Usage> usage);
 
@@ -345,20 +425,112 @@ namespace gfx
 
     protected:
         struct {
-            std::optional<gfx::ResourceRef<Framebuffer>> boundFramebuffer = std::nullopt;
-            std::optional<gfx::ResourceRef<ComputePipeline>> boundComputePipeline = std::nullopt;
-            std::optional<gfx::ResourceRef<GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
-            std::optional<gfx::ResourceRef<Mesh>> boundMesh = std::nullopt;
+            std::optional<gfx::ResourceRef<const Framebuffer>> boundFramebuffer = std::nullopt;
+            std::optional<gfx::ResourceRef<const ComputePipeline>> boundComputePipeline = std::nullopt;
+            std::optional<gfx::ResourceRef<const GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
+            std::optional<gfx::ResourceRef<const RayTracingPipeline>> boundRayTracingPipeline = std::nullopt;
+            std::optional<gfx::ResourceRef<const Mesh>> boundMesh = std::nullopt;
 
-            std::map<glm::u32, gfx::ResourceRef<DescriptorSet>> boundGraphicsDescriptorSets;
-            std::map<glm::u32, gfx::ResourceRef<DescriptorSet>> boundComputeDescriptorSets;
+            std::map<glm::u32, gfx::ResourceRef<const DescriptorSet>> boundGraphicsDescriptorSets;
+            std::map<glm::u32, gfx::ResourceRef<const DescriptorSet>> boundComputeDescriptorSets;
+            std::map<glm::u32, gfx::ResourceRef<const DescriptorSet>> boundRayTracingDescriptorSets;
 
             bool viewportSet = false;
             bool scissorSet = false;
+
+            // Which pipeline-derived dynamic states currently have a value on the GPU.
+            // Reset on BindGraphicsPipeline; a bit is set by the matching Set* call.
+            Flags<DynamicState> dynamicStateSet;
         } _state;
 
         explicit CommandBuffer(const Flags<Usage> usage) : _usage(usage) {}
         Flags<Usage> _usage;
+
+        // Before a draw, apply the bound pipeline's default for every dynamic state
+        // the caller has not explicitly overridden since the pipeline was bound.
+        // Backends invoke this from their draw commands; it dispatches through the
+        // virtual Set* overrides so the backend records the actual GPU commands.
+        void applyDynamicDefaults();
+
+        // Append an error and enter the failed state; returns *this for chaining.
+        CommandBuffer& record(ErrorCode code, std::string message);
+        // Append an already-built error (so a cause chain survives); returns *this for chaining.
+        CommandBuffer& record(Error error);
+        // Clear accumulated errors (called by Begin()).
+        void resetErrors() { _errors.clear(); _failed = false; }
+
+        /**
+         * @brief Refuse a resource that cannot be used, failing the recording rather than the process.
+         * @return true if the command must not proceed.
+         *
+         * A poisoned resource fails the command buffer with its *own* error linked as the cause, so
+         * Submit() reports the shader that failed to compile rather than an opaque "invalid pipeline".
+         * Nothing throws, and the backend is never reached.
+         */
+        template<typename T>
+        bool reject(const ResourceRef<T>& input, const std::string_view what) {
+            if (!input.alive()) {
+                record(ErrorCode::eInvalidArgument, std::format("The {} has been destroyed.", what));
+                return true;
+            }
+            if (input.poisoned()) {
+                const auto name = input.name();
+                record(Error{
+                    .code = input.error()->code,
+                    .message = std::format("Cannot record with the {} '{}': it is unusable.",
+                                           what, name.empty() ? "<unnamed>" : name),
+                    .cause = input.errorPtr(),
+                });
+                return true;
+            }
+            return false;
+        }
+
+        // ---- Tracked-state updates ------------------------------------------
+        // The state mutations the gated commands perform, split out from the gate itself so the
+        // OpenGL backend can re-apply them at *replay* time as well as record time (it defers its
+        // commands, and its state mirror has to advance in both passes). Callers must already have
+        // validated the resource: these only touch _state.
+        void stateBeginRendering(const ResourceRef<const Framebuffer>& framebuffer);
+        void stateBindComputePipeline(const ResourceRef<const ComputePipeline>& pipeline);
+        void stateBindGraphicsPipeline(const ResourceRef<const GraphicsPipeline>& pipeline);
+        void stateBindRayTracingPipeline(const ResourceRef<const RayTracingPipeline>& pipeline);
+        void stateBindMesh(const ResourceRef<const Mesh>& mesh);
+
+        // ---- Backend commands (non-virtual interface) -----------------------
+        // Every command above that takes a resource is a non-virtual wrapper in the core: it
+        // validates, rejects unusable resources, updates the tracked state, and only then calls
+        // the matching do* below. A backend therefore *cannot* be handed a poisoned or destroyed
+        // resource — which is the precondition that all ~150 `dynamic_cast<const vk::X&>(*ref)`
+        // sites in the backends have always silently assumed. That used to be a convention each
+        // override had to remember, and several did not; now it is structural.
+        virtual CommandBuffer& doBeginRendering(ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters) = 0;
+        virtual CommandBuffer& doBindComputePipeline(ResourceRef<const ComputePipeline> pipeline) = 0;
+        virtual CommandBuffer& doBindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline) = 0;
+        // Defaults to reporting ray tracing as unsupported, like TraceRays; OpenGL leaves it alone.
+        virtual CommandBuffer& doBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
+        virtual CommandBuffer& doBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet, bool debug) = 0;
+        virtual CommandBuffer& doBindMesh(ResourceRef<const Mesh> mesh) = 0;
+        virtual CommandBuffer& doBarrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers) = 0;
+        virtual CommandBuffer& doDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
+        virtual CommandBuffer& doDrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
+        virtual CommandBuffer& doDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
+        // OpenGL never implemented this; the base is a no-op there, as it was before.
+        virtual CommandBuffer& doDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) { return *this; }
+        virtual CommandBuffer& doClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset, glm::u64 size) = 0;
+        virtual CommandBuffer& doClearColorImage(ResourceRef<const Image> image, glm::vec4 color) = 0;
+        virtual CommandBuffer& doFillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset, glm::u64 size) = 0;
+        virtual CommandBuffer& doCopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) = 0;
+        virtual CommandBuffer& doGenerateMipmaps(ResourceRef<const Image> image);
+        virtual CommandBuffer& doCopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, gfx::Copy copyInfo) = 0;
+        virtual CommandBuffer& doCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, gfx::Copy copyInfo) = 0;
+        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, gfx::Blit blitInfo) = 0;
+        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Blit blitInfo) = 0;
+        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, gfx::Resolve resolveInfo) = 0;
+        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Resolve resolveInfo) = 0;
+
+        std::vector<Error> _errors;
+        bool _failed = false;
 
         bool _collectingStatistics = false;
         std::unordered_map<std::string, CommandStatistics> _statistics;

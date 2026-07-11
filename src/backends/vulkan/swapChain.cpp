@@ -33,12 +33,23 @@ namespace gfx::vk
     }
 
     ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes) {
+        if (!gfx::Context::Window().isVSync()) {
+            // VSync off: present uncapped. Prefer immediate (may tear); Fifo is the
+            // guaranteed-available fallback if the driver lacks an immediate mode.
+            for (const auto &availablePresentMode : availablePresentModes) {
+                if (availablePresentMode == ::vk::PresentModeKHR::eImmediate) {
+                    return availablePresentMode;
+                }
+            }
+            return ::vk::PresentModeKHR::eFifo;
+        }
+
+        // VSync on (no tearing): prefer mailbox for lower latency, else Fifo (always available).
         for (const auto &availablePresentMode : availablePresentModes) {
             if (availablePresentMode == ::vk::PresentModeKHR::eMailbox) {
                 return availablePresentMode;
             }
         }
-        std::cerr << "Failed to find suitable present mode" << std::endl;
         return ::vk::PresentModeKHR::eFifo;
     }
 

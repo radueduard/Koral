@@ -11,7 +11,7 @@
 #include "runtime.h"
 #include "vulkanContext.h"
 
-namespace gfx::io
+namespace gfx
 {
     class Window;
 }
@@ -21,7 +21,7 @@ namespace gfx::vk
     class Surface final : public gfx::Surface, public Wrapper<::vk::SurfaceKHR>
     {
     public:
-        explicit Surface(const gfx::io::Window& window);
+        explicit Surface(const gfx::Window& window);
         ~Surface() override;
 
         [[nodiscard]] const std::vector<::vk::SurfaceFormatKHR>& getFormats() const

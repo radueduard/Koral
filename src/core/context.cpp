@@ -8,11 +8,17 @@
 #include "context.h"
 #include <filesystem>
 #include <mutex>
+#include <stdexcept>
+
+#include <GLFW/glfw3.h>
 
 #include "scheduler.h"
+#include "shader.h"
 #include "window.h"
+#include "resource.h"
 #include "../executor/BackgroundExecutor.h"
 #include "../executor/MainThreadExecutor.h"
+#include "../backends/vulkan/vulkanContext.h"
 
 
 std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
@@ -22,18 +28,15 @@ std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
 
 std::filesystem::path gfx::shaderPath(const std::filesystem::path& relativePath)
 {
-    return std::filesystem::path(SHADERS_PATH) / relativePath;
-}
-
-gfx::io::Window& gfx::Context::FocusedWindow()
-{
-    if (_focusedWindow == nullptr) {
-        throw std::runtime_error("No window is currently focused!");
+    // Resolve across the registered shader roots (project + API helpers); first existing wins.
+    for (const auto& root : Shader::searchPaths()) {
+        if (auto candidate = root / relativePath; std::filesystem::exists(candidate))
+            return candidate;
     }
-    return *_focusedWindow;
+    return std::filesystem::path(SHADERS_PATH) / relativePath; // fallback
 }
 
-gfx::io::Window& gfx::Context::Window()
+gfx::Window& gfx::Context::Window()
 {
     if (_window == nullptr) {
         throw std::runtime_error("No window is linked to the current thread!");
@@ -49,7 +52,7 @@ const gfx::Scheduler& gfx::Context::Scheduler()
     return *_scheduler;
 }
 
-gfx::ResourceRef<gfx::Framebuffer> gfx::Context::DefaultFramebuffer()
+gfx::ResourceRef<const gfx::Framebuffer> gfx::Context::DefaultFramebuffer()
 {
     if (_window == nullptr)
     {
@@ -94,7 +97,60 @@ gfx::Repository & gfx::Context::Repository() {
     return *_repository;
 }
 
-void gfx::Context::setFocusedWindow(io::Window* window)
+gfx::API gfx::Context::activeAPI()
 {
-    _focusedWindow = window;
+    return _activeAPI;
+}
+
+bool gfx::Context::IsHeadless()
+{
+    return _headless;
+}
+
+void gfx::Context::InitHeadless(const API api)
+{
+    if (_window != nullptr)
+        throw std::runtime_error("Context::InitHeadless: a window is already active; headless mode is mutually exclusive with a window.");
+    if (_headless)
+        throw std::runtime_error("Context::InitHeadless: a headless context is already active.");
+    if (api != API::eVulkan)
+        throw std::runtime_error("Context::InitHeadless: only the Vulkan backend supports headless (device-only) mode.");
+
+    _activeAPI = api;
+
+    // GLFW is initialized so the Vulkan runtime can query platform instance
+    // extensions; no window is created. A failure here is non-fatal — a
+    // compute/transfer-only instance does not require the WSI surface extensions.
+    glfwInit();
+
+    gfx::vk::Context::Init();            // instance + physical/logical device + allocator + descriptor pool
+
+    // Same async machinery as a window: a Job's Initialize() returns a Task and
+    // may co_await background work, so the executors must exist even headless.
+    _mainThreadExecutor = new MainThreadExecutor();
+    _backgroundExecutor = new BackgroundExecutor();
+
+    _repository = new gfx::Repository(); // pipelines register themselves here on build
+                                         // (qualified: Context::Repository() the method shadows the type here)
+    _headless = true;
+}
+
+void gfx::Context::ShutdownHeadless()
+{
+    if (!_headless) return;
+
+    // Destroy the repository first: its destructor stops the FileWatcher and waits
+    // for that coroutine to finish, which requires the background executor to still
+    // be alive so the worker can run the watcher to completion.
+    delete _repository;
+    _repository = nullptr;
+
+    delete _mainThreadExecutor;
+    _mainThreadExecutor = nullptr;
+    delete _backgroundExecutor;
+    _backgroundExecutor = nullptr;
+
+    gfx::vk::Context::Destroy();
+    glfwTerminate();
+    _headless = false;
 }

@@ -13,8 +13,21 @@ namespace gfx::ogl
         glCreateBuffers(1, &_id);
         glCheckError();
 
-        glNamedBufferStorage(_id, createInfo._size, nullptr, GetFlagsFromType(createInfo._type));
-        glCheckError();
+        const GLbitfield storageFlags = GetFlagsFromType(createInfo._type);
+        while (glGetError() != GL_NO_ERROR) {} // clear any pending error before the allocation
+        glNamedBufferStorage(_id, createInfo._size, nullptr, storageFlags);
+
+        // A device-local buffer larger than VRAM fails here with OUT_OF_MEMORY, whereas
+        // the Vulkan backend's allocator transparently places it in host/GTT memory.
+        // Match that: on OOM, recreate the buffer requesting client (host) storage so
+        // huge buffers (e.g. the light-index list) still allocate, just from system RAM.
+        if (glGetError() == GL_OUT_OF_MEMORY) {
+            glDeleteBuffers(1, &_id);
+            glCreateBuffers(1, &_id);
+            glNamedBufferStorage(_id, createInfo._size, nullptr, storageFlags | GL_CLIENT_STORAGE_BIT);
+            if (glGetError() != GL_NO_ERROR)
+                gfx::log::error("[buffer] failed to allocate {} bytes even from host storage", createInfo._size);
+        }
     }
 
     Buffer::~Buffer()
@@ -30,7 +43,12 @@ namespace gfx::ogl
             return;
         }
 
-        const auto accessFlags = GetFlagsFromType(_type);
+        // glMapNamedBufferRange only accepts the MAP_* access bits; the storage-only
+        // bits used at creation (notably GL_DYNAMIC_STORAGE_BIT for eDynamic) are
+        // illegal here and raise INVALID_VALUE. Mask to the valid mapping flags.
+        constexpr GLbitfield kMapFlagMask =
+            GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+        const auto accessFlags = GetFlagsFromType(_type) & kMapFlagMask;
         _mappedPtr = glMapNamedBufferRange(
             _id,
             0,
@@ -55,13 +73,11 @@ namespace gfx::ogl
         glCheckError();
     }
 
-    void Buffer::Flush(const glm::i64 size, const glm::u64 offset) const {
-        glFlushMappedNamedBufferRange(
-            _id,
-            static_cast<GLintptr>(offset),
-            static_cast<GLsizeiptr>(size)
-        );
-        glCheckError();
+    void Buffer::Flush(const glm::i64, const glm::u64) const {
+        // No-op: our mappings are GL_MAP_COHERENT (staging/readback) or made visible
+        // at unmap (dynamic). glFlushMappedNamedBufferRange is only legal on mappings
+        // created with GL_MAP_FLUSH_EXPLICIT_BIT, which we never use, so calling it
+        // here raised INVALID_OPERATION and did nothing.
     }
 
     void Buffer::Invalidate(const glm::i64 size, const glm::u64 offset) const {

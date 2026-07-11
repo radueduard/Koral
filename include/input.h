@@ -11,8 +11,9 @@ struct GLFWwindow;
 
 #include "api.h"
 
-namespace gfx::io {
+namespace gfx {
     class Window;
+    class Engine;
 
     enum class Key : unsigned short {
         eSpace = 32,
@@ -171,6 +172,7 @@ namespace gfx::io {
 
     class GFX_API Input {
     	friend class Window;
+    	friend class Engine;
     public:
         static KeyState getKeyState(Key key);
         static KeyState getMouseButtonState(MouseButton button);
@@ -189,18 +191,10 @@ namespace gfx::io {
         static const glm::vec2& getLastMousePosition();
 
     private:
-        struct GFX_API State {
-            std::unordered_map<Key, KeyState> keyboardKeyStates;
-            std::unordered_map<MouseButton, KeyState> mouseButtonStates;
-
-            glm::vec2 lastMousePosition;
-            glm::vec2 mousePosition;
-            glm::vec2 mouseDelta;
-            glm::vec2 scrollDelta;
-
-            void setup(GLFWwindow* window);
-            void update();
-        };
+        // There is a single window, so input is a process-wide singleton (state
+        // lives in input.cpp). Driven by the frame loop via these two hooks.
+        static void setup(GLFWwindow* window);
+        static void update();
 
     	struct GFX_API Callbacks {
     		static void keyCallback(GLFWwindow*, int, int, int, int);

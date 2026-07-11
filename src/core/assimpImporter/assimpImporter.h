@@ -9,11 +9,13 @@
 #include <iostream>
 
 #include "importer.h"
+#include "vertexBufferLoader.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/GltfMaterial.h>
 
 namespace gfx {
     class AssimpImporter : public Importer {
@@ -32,6 +34,52 @@ namespace gfx {
 
         std::expected<std::vector<glm::mat4>, std::string> GetBoneTransformationMatrices() override;
 
+        // -----------------------------------------------------------------
+        // Typed mesh loading — builds GPU buffers directly from the aiMesh.
+        // MeshT must be a ParamMesh<Stream0, ...>.
+        // -----------------------------------------------------------------
+        template<typename MeshT>
+        gfx::Resource<MeshT> LoadMesh(const std::string& meshName)
+        {
+            const auto it = _meshNameToIndex.find(meshName);
+            if (it == _meshNameToIndex.end())
+                throw std::runtime_error("Mesh not found: " + meshName);
+            return gfx::LoadMesh<MeshT>(*_scene->mMeshes[it->second]);
+        }
+
+        // Overload: load by index.
+        template<typename MeshT>
+        gfx::Resource<MeshT> LoadMesh(glm::u32 index)
+        {
+            if (index >= _scene->mNumMeshes)
+                throw std::out_of_range("Mesh index out of range: " + std::to_string(index));
+            return gfx::LoadMesh<MeshT>(*_scene->mMeshes[index]);
+        }
+
+        // -----------------------------------------------------------------
+        // Heap variants — suballocate into an existing MeshHeap.
+        // Returns nullopt when the heap is full.
+        // -----------------------------------------------------------------
+        template<typename... Streams>
+        std::optional<typename MeshHeap<Streams...>::Allocation>
+        LoadMeshIntoHeap(const std::string& meshName, const MeshHeap<Streams...>& heap)
+        {
+            const auto it = _meshNameToIndex.find(meshName);
+            if (it == _meshNameToIndex.end())
+                throw std::runtime_error("Mesh not found: " + meshName);
+            return gfx::LoadMeshIntoHeap(heap, *_scene->mMeshes[it->second]);
+        }
+
+        // Overload: load by index.
+        template<typename... Streams>
+        std::optional<typename MeshHeap<Streams...>::Allocation>
+        LoadMeshIntoHeap(glm::u32 index, const MeshHeap<Streams...>& heap)
+        {
+            if (index >= _scene->mNumMeshes)
+                throw std::out_of_range("Mesh index out of range: " + std::to_string(index));
+            return gfx::LoadMeshIntoHeap(heap, *_scene->mMeshes[index]);
+        }
+
     private:
         Assimp::Importer _importer = {};
         Assimp::Exporter _exporter = {};
@@ -48,6 +96,14 @@ namespace gfx {
         _scene = _importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_GenBoundingBoxes);
         std::string format = path.extension().string();
 
+        // Assimp returns null when the file is missing or unreadable. Bail out before
+        // touching _scene below, otherwise an invalid path is an outright segfault.
+        if (_scene == nullptr) {
+            std::cerr << "Could not read file: " << path.string()
+                      << " (" << _importer.GetErrorString() << ")" << std::endl;
+            return;
+        }
+
         if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTextureCoords(0)) {
             _importer.ApplyPostProcessing(aiProcess_GenUVCoords);
         }
@@ -59,11 +115,6 @@ namespace gfx {
 
         if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTangentsAndBitangents()) {
             _importer.ApplyPostProcessing(aiProcess_CalcTangentSpace);
-        }
-
-        if (_scene == nullptr) {
-            std::cerr << "Could not read file: " << path.string() << std::endl;
-            return;
         }
 
         for (unsigned int i = 0; i < _scene->mNumMeshes; ++i) {
@@ -232,9 +283,23 @@ namespace gfx {
             result.doubleSided = doubleSided != 0;
         }
 
-        float alphaCutoff;
-        if (material->Get(AI_MATKEY_OPACITY, alphaCutoff) == AI_SUCCESS) {
-            result.alphaCutoff = alphaCutoff;
+        // glTF alpha handling. The renderer encodes the alpha mode in alphaCutoff:
+        //   OPAQUE -> 1.0, MASK -> cutoff in (0,1), BLEND -> 0.0  (see SceneTree bucketing).
+        // Use the real glTF alphaMode/alphaCutoff, NOT AI_MATKEY_OPACITY — opacity is
+        // unrelated and is 1.0 for MASK materials, which made masked decals look fully
+        // opaque and get discarded (pixelated black specks) instead of alpha-tested.
+        aiString alphaMode;
+        if (material->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode) == AI_SUCCESS) {
+            const std::string mode = alphaMode.C_Str();
+            if (mode == "BLEND") {
+                result.alphaCutoff = 0.0f;
+            } else if (mode == "MASK") {
+                float cutoff = 0.5f; // glTF default mask cutoff
+                material->Get(AI_MATKEY_GLTF_ALPHACUTOFF, cutoff);
+                result.alphaCutoff = glm::clamp(cutoff, 0.0001f, 1.0f);
+            } else { // "OPAQUE"
+                result.alphaCutoff = 1.0f;
+            }
         }
 
         aiString texName;
@@ -402,6 +467,45 @@ namespace gfx {
             for (unsigned int i = 0; i < currentNode->mNumChildren; ++i) {
                 nodeQueue.emplace(currentNode->mChildren[i], nodeIndex);
             }
+        }
+
+        // Punctual lights (e.g. glTF KHR_lights_punctual). assimp stores each light's
+        // position/direction in the local space of the node it is attached to, so we
+        // resolve that node's world transform and bake the light into world space.
+        result.lights.reserve(_scene->mNumLights);
+        for (unsigned int i = 0; i < _scene->mNumLights; ++i) {
+            const aiLight* light = _scene->mLights[i];
+
+            aiMatrix4x4 world;  // identity
+            if (const aiNode* node = _scene->mRootNode->FindNode(light->mName)) {
+                world = node->mTransformation;
+                for (const aiNode* p = node->mParent; p != nullptr; p = p->mParent)
+                    world = p->mTransformation * world;
+            }
+
+            const aiVector3D pos = world * light->mPosition;
+            const aiVector3D d   = light->mDirection;
+            aiVector3D dir(
+                world.a1 * d.x + world.a2 * d.y + world.a3 * d.z,
+                world.b1 * d.x + world.b2 * d.y + world.b3 * d.z,
+                world.c1 * d.x + world.c2 * d.y + world.c3 * d.z);
+            if (dir.SquareLength() > 0.0f) dir.Normalize();
+
+            Importer::Light out;
+            out.name      = light->mName.C_Str();
+            out.position  = glm::vec3(pos.x, pos.y, pos.z);
+            out.direction = glm::vec3(dir.x, dir.y, dir.z);
+            out.color     = glm::vec3(light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b);
+            out.innerConeAngle = light->mAngleInnerCone;
+            out.outerConeAngle = light->mAngleOuterCone;
+
+            switch (light->mType) {
+                case aiLightSource_DIRECTIONAL: out.type = Importer::Light::Type::eDirectional; break;
+                case aiLightSource_SPOT:        out.type = Importer::Light::Type::eSpot;        break;
+                default:                        out.type = Importer::Light::Type::ePoint;       break;
+            }
+
+            result.lights.push_back(out);
         }
 
         return result;

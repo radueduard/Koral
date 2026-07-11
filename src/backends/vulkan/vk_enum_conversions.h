@@ -286,6 +286,7 @@ namespace gfx
         case DescriptorType::eSampledImage: return ::vk::DescriptorType::eSampledImage;
         case DescriptorType::eStorageTexelBuffer: return ::vk::DescriptorType::eStorageTexelBuffer;
         case DescriptorType::eStorageBuffer: return ::vk::DescriptorType::eStorageBuffer;
+        case DescriptorType::eAccelerationStructure: return ::vk::DescriptorType::eAccelerationStructureKHR;
         default: throw std::runtime_error("Unknown descriptor type!");
         }
     }
@@ -302,6 +303,7 @@ namespace gfx
         case ::vk::DescriptorType::eStorageTexelBuffer: return DescriptorType::eStorageTexelBuffer;
         case ::vk::DescriptorType::eUniformBuffer: return DescriptorType::eUniformBuffer;
         case ::vk::DescriptorType::eStorageBuffer: return DescriptorType::eStorageBuffer;
+        case ::vk::DescriptorType::eAccelerationStructureKHR: return DescriptorType::eAccelerationStructure;
 
         default: throw std::runtime_error("Unknown descriptor type!");
         }
@@ -553,6 +555,10 @@ namespace gfx
             vkUsage |= ::vk::BufferUsageFlagBits::eUniformBuffer;
         if (usage & Buffer::Usage::eTexel)
             vkUsage |= ::vk::BufferUsageFlagBits::eUniformTexelBuffer | ::vk::BufferUsageFlagBits::eStorageTexelBuffer;
+        if (usage & Buffer::Usage::eShaderDeviceAddress)
+            vkUsage |= ::vk::BufferUsageFlagBits::eShaderDeviceAddress;
+        if (usage & Buffer::Usage::eAccelerationStructureInput)
+            vkUsage |= ::vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | ::vk::BufferUsageFlagBits::eShaderDeviceAddress;
         return vkUsage;
     }
 
@@ -609,6 +615,31 @@ namespace gfx
         case gfx::CompareOp::eGreaterOrEqual: return ::vk::CompareOp::eGreaterOrEqual;
         case gfx::CompareOp::eAlways: return ::vk::CompareOp::eAlways;
         default: throw std::runtime_error("Unknown compare operation");
+        }
+    }
+
+    inline ::vk::StencilOp getVkStencilOp(const gfx::StencilOp op)
+    {
+        switch (op) {
+        case gfx::StencilOp::eKeep: return ::vk::StencilOp::eKeep;
+        case gfx::StencilOp::eZero: return ::vk::StencilOp::eZero;
+        case gfx::StencilOp::eReplace: return ::vk::StencilOp::eReplace;
+        case gfx::StencilOp::eIncrementAndClamp: return ::vk::StencilOp::eIncrementAndClamp;
+        case gfx::StencilOp::eDecrementAndClamp: return ::vk::StencilOp::eDecrementAndClamp;
+        case gfx::StencilOp::eInvert: return ::vk::StencilOp::eInvert;
+        case gfx::StencilOp::eIncrementAndWrap: return ::vk::StencilOp::eIncrementAndWrap;
+        case gfx::StencilOp::eDecrementAndWrap: return ::vk::StencilOp::eDecrementAndWrap;
+        default: throw std::runtime_error("Unknown stencil operation");
+        }
+    }
+
+    inline ::vk::StencilFaceFlags getVkStencilFace(const gfx::StencilFace face)
+    {
+        switch (face) {
+        case gfx::StencilFace::eFront: return ::vk::StencilFaceFlagBits::eFront;
+        case gfx::StencilFace::eBack: return ::vk::StencilFaceFlagBits::eBack;
+        case gfx::StencilFace::eFrontAndBack: return ::vk::StencilFaceFlagBits::eFrontAndBack;
+        default: throw std::runtime_error("Unknown stencil face");
         }
     }
 

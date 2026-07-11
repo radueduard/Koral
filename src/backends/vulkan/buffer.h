@@ -27,11 +27,17 @@ namespace gfx::vk
         void Unmap() const override;
 		void Flush(glm::i64 size, glm::u64 offset) const override;
 		void Invalidate(glm::i64 size, glm::u64 offset) const override;
-		void automaticUpdate() const override;
+		void automaticUpdate() override;
 
 	public:
 		::vk::Buffer operator*() const;
         [[nodiscard]] VmaAllocation getAllocation() const;
+
+		/**
+		 * @brief GPU device address of this buffer (current frame if per-frame).
+		 * Requires the buffer to have been created with Usage::eShaderDeviceAddress.
+		 */
+		[[nodiscard]] glm::u64 getDeviceAddress() const override;
 
 		[[nodiscard]] ::vk::AccessFlags getAccessMask() const;
 		void setAccessMask(::vk::AccessFlags access) const;

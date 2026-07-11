@@ -15,6 +15,7 @@
 
 #include "tlsfAllocator.h"
 #include "mesh.h"
+#include "meshLayout.h"
 #include "buffer.h"
 #include "structs.h"
 
@@ -30,10 +31,58 @@ namespace gfx
             glm::u64 size;
         };
 
+        // Owning handle to a suballocation inside a MeshHeap. Frees the space back
+        // to the heap on destruction, so dropping it never leaks heap capacity.
+        // Move-only: copying would let two handles free the same range. The handle
+        // does not keep the heap alive — it must not outlive the heap it came from.
         struct Allocation
         {
-            Identifier                vertexIdentifier;
-            std::optional<Identifier> indexIdentifier;
+            Identifier                vertexIdentifier {};
+            std::optional<Identifier> indexIdentifier  = std::nullopt;
+
+            Allocation() = default;
+            ~Allocation() { reset(); }
+
+            Allocation(const Allocation&)            = delete;
+            Allocation& operator=(const Allocation&) = delete;
+
+            Allocation(Allocation&& other) noexcept
+                : vertexIdentifier(other.vertexIdentifier)
+                , indexIdentifier(other.indexIdentifier)
+                , _heap(other._heap)
+            {
+                other._heap = nullptr;
+            }
+
+            Allocation& operator=(Allocation&& other) noexcept
+            {
+                if (this != &other)
+                {
+                    reset();
+                    vertexIdentifier = other.vertexIdentifier;
+                    indexIdentifier  = other.indexIdentifier;
+                    _heap            = other._heap;
+                    other._heap      = nullptr;
+                }
+                return *this;
+            }
+
+            // Frees the suballocation back to its heap, leaving this handle empty.
+            void reset()
+            {
+                if (_heap)
+                {
+                    _heap->free(vertexIdentifier, indexIdentifier);
+                    _heap = nullptr;
+                }
+            }
+
+            // True while this handle still owns space in a heap.
+            [[nodiscard]] explicit operator bool() const { return _heap != nullptr; }
+
+        private:
+            friend class MeshHeap;
+            const MeshHeap* _heap = nullptr;
         };
 
         // ---------------------------------------------------------------------
@@ -47,14 +96,23 @@ namespace gfx
             if (indexCapacity.has_value())
                 _indexCount = static_cast<glm::u32>(*indexCapacity);
 
+            // Request eAccelerationStructureInput (implies device address) so a heap
+            // suballocation can directly back a ray-tracing BLAS; the empty-buffer
+            // makeBuffer overload otherwise omits it.
             _vertexBuffers.reserve(sizeof...(Streams));
             (_vertexBuffers.emplace_back(
-                makeBuffer<Streams>(vertexCapacity, Buffer::Usage::eVertex)), ...);
+                makeBuffer<Streams>(vertexCapacity,
+                    Flags<Buffer::Usage>(Buffer::Usage::eVertex) | Buffer::Usage::eAccelerationStructureInput)), ...);
 
             if (indexCapacity.has_value()) {
-                _indexBuffer = makeBuffer<glm::u32>(*indexCapacity, Buffer::Usage::eIndex);
+                _indexBuffer = makeBuffer<glm::u32>(*indexCapacity,
+                    Flags<Buffer::Usage>(Buffer::Usage::eIndex) | Buffer::Usage::eAccelerationStructureInput);
                 _indexType   = ChannelType::eUInt;
             }
+
+            // Record which stream/offset/format carries the position so heap
+            // suballocations can be used to build ray-tracing acceleration structures.
+            _positionAttribute = FindPositionAttribute<Streams...>();
         }
 
         ~MeshHeap() override = default;
@@ -89,10 +147,11 @@ namespace gfx
                 indexId = Identifier{ idxAlloc->offset, idxAlloc->size };
             }
 
-            return Allocation{
-                Identifier{ vertAlloc->offset, vertAlloc->size },
-                indexId
-            };
+            Allocation allocation;
+            allocation.vertexIdentifier = Identifier{ vertAlloc->offset, vertAlloc->size };
+            allocation.indexIdentifier  = indexId;
+            allocation._heap            = this;
+            return allocation;
         }
 
         // ---------------------------------------------------------------------
@@ -139,16 +198,6 @@ namespace gfx
             return alloc;
         }
 
-        // ---------------------------------------------------------------------
-        // FreeMesh
-        // ---------------------------------------------------------------------
-        void FreeMesh(const Allocation& alloc)
-        {
-            _vertexAllocator.Free({ alloc.vertexIdentifier.offset, alloc.vertexIdentifier.size });
-            if (alloc.indexIdentifier.has_value() && _indexAllocator)
-                _indexAllocator->Free({ alloc.indexIdentifier->offset, alloc.indexIdentifier->size });
-        }
-
         [[nodiscard]] glm::u64 VertexCapacity() const { return _vertexAllocator.Capacity(); }
         [[nodiscard]] glm::u64 IndexCapacity()  const
         {
@@ -156,6 +205,15 @@ namespace gfx
         }
 
     private:
+        // Returns a suballocation's space to the heap. Const because the allocators
+        // are mutable; called by Allocation's destructor through its heap pointer.
+        void free(const Identifier& vertexId, const std::optional<Identifier>& indexId) const
+        {
+            _vertexAllocator.Free({ vertexId.offset, vertexId.size });
+            if (indexId.has_value() && _indexAllocator)
+                _indexAllocator->Free({ indexId->offset, indexId->size });
+        }
+
         mutable TLSFAllocator                _vertexAllocator;
         mutable std::optional<TLSFAllocator> _indexAllocator;
 

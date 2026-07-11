@@ -51,7 +51,7 @@ namespace gfx
         ImGui_ImplGlfw_Shutdown();
     }
 
-    ogl::GUI_Image::GUI_Image(gfx::ResourceRef<gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    ogl::GUI_Image::GUI_Image(gfx::ResourceRef<const gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         setImage(image);
         setLayerAndLevel(layer, level);
@@ -108,7 +108,7 @@ namespace gfx
         glCheckError();
     }
 
-    void ogl::GUI_Image::setImage(gfx::ResourceRef<gfx::Image> image)
+    void ogl::GUI_Image::setImage(gfx::ResourceRef<const gfx::Image> image)
     {
         _image = image;
         const auto& oglImage = dynamic_cast<const gfx::ogl::Image&>(*image);

@@ -79,23 +79,23 @@ namespace gfx::ogl
         const GLenum internalFormat = InternalFormatFromImageFormat(createInfo.format);
 
         if (createInfo.type == gfx::Image::Type::e1D && createInfo.arrayLayers == 1) {
-            glTexStorage1D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x);
+            glTexStorage1D(target, _mipLevels, internalFormat, createInfo.extent.x);
         } else if (createInfo.type == gfx::Image::Type::e1D && createInfo.arrayLayers > 1) {
-            glTexStorage2D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.arrayLayers);
+            glTexStorage2D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.arrayLayers);
         } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers == 1) {
             if (createInfo.msaa == gfx::MSAA::eNone) {
-                glTexStorage2D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y);
+                glTexStorage2D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y);
             } else {
                 glTexStorage2DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, GL_TRUE);
             }
         } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers > 1) {
             if (createInfo.msaa == gfx::MSAA::eNone) {
-                glTexStorage3D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers);
+                glTexStorage3D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers);
             } else {
                 glTexStorage3DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers, GL_TRUE);
             }
         } else if (createInfo.type == gfx::Image::Type::e3D) {
-            glTexStorage3D(target, createInfo.mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.extent.z);
+            glTexStorage3D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.extent.z);
         }
 
         // check for errors
@@ -111,9 +111,19 @@ namespace gfx::ogl
     }
 
     void Image::Resize(const glm::uvec3 &extent) {
-        const GLenum target = GetTargetFromImageType(_type, _msaa, _arrayLayers);
-        glBindTexture(target, _id);
+        if (_extent == extent || extent.x == 0 || extent.y == 0 || extent.z == 0)
+            return;
 
+        // glTexStorage* storage is immutable, so a resize must recreate the texture.
+        // Image views forward to the image's current id (see ImageView::operator*),
+        // so they keep working across the swap.
+        const GLenum target = GetTargetFromImageType(_type, _msaa, _arrayLayers);
+        glDeleteTextures(1, &_id);
+        glCreateTextures(target, 1, &_id);
+        glBindTexture(target, _id);
+        glCheckError();
+
+        _extent = extent;
         const GLenum internalFormat = InternalFormatFromImageFormat(_format);
 
         if (_type == Type::e1D && _arrayLayers == 1) {

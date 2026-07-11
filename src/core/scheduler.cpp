@@ -20,7 +20,7 @@ namespace gfx
 
     Scheduler* Scheduler::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::activeAPI()) {
         case API::eOpenGL:
             return new ogl::Scheduler(*this);
             case API::eVulkan:

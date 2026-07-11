@@ -4,12 +4,17 @@
 
 #pragma once
 #include <memory>
+#include <span>
+#include <vector>
+#include <cstddef>
 #include <glm/glm.hpp>
 
 #include "flags.h"
 #include "api.h"
+#include "builder.h"
 #include "structs.h"
 #include "resource.h"
+#include "error.h"
 
 namespace gfx
 {
@@ -144,7 +149,7 @@ namespace gfx
             eDepthStencilAttachment = 1 << 5,
         };
 
-        struct GFX_API Builder {
+        struct GFX_API Builder : ::Builder {
             bool isPerFrame = false;
             Type type = Type::e2D;
             Format format = Format::eRGBA8_UNORM;
@@ -222,6 +227,33 @@ namespace gfx
                 return *this;
             }
 
+            // Initial pixel data, uploaded to mip 0 of every array layer when build() runs.
+            // Bytes are laid out layer-major, tightly packed, matching the image's format.
+            // If the image has more than one mip level, the remaining levels are generated.
+            std::vector<std::byte> data {};
+
+            // Sets initial pixel data from a typed span (e.g. std::span<const glm::u8vec4>).
+            // Implies eTransferDst/eTransferSrc usage so the upload (and mip generation) work.
+            template<typename T>
+            Builder& setData(std::span<const T> pixels) {
+                const auto bytes = std::as_bytes(pixels);
+                data.assign(bytes.begin(), bytes.end());
+                usage |= Usage::eTransferDst;
+                usage |= Usage::eTransferSrc;
+                return *this;
+            }
+
+            // Raw-bytes overload for callers that already have an untyped pixel buffer.
+            Builder& setData(const void* pixels, const glm::u64 sizeBytes) {
+                const auto* p = static_cast<const std::byte*>(pixels);
+                data.assign(p, p + sizeBytes);
+                usage |= Usage::eTransferDst;
+                usage |= Usage::eTransferSrc;
+                return *this;
+            }
+
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] Result<std::unique_ptr<Image>> create() const;
             [[nodiscard]] gfx::Resource<Image> build() const;
         };
 

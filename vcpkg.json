@@ -3,11 +3,11 @@
   "version-string" : "1.0.0",
   "builtin-baseline" : "62159a45e18f3a9ac0548628dcaf74fcb60c6ff9",
   "dependencies" : [ {
+    "name" : "asio",
+    "version>=" : "1.32.0"
+  }, {
     "name" : "glfw3",
     "version>=" : "3.4#1",
-    "features" : [ "wayland" ]
-  }, {
-    "name" : "vulkan-loader",
     "features" : [ "wayland" ]
   }, {
     "name" : "magic-enum",
@@ -31,6 +31,9 @@
     "name" : "glslang",
     "version>=" : "16.1.0"
   }, {
+    "name" : "shader-slang",
+    "version>=" : "2026.7.1"
+  }, {
     "name" : "spirv-cross",
     "version>=" : "1.4.341.0"
   }, {
@@ -39,12 +42,6 @@
   }, {
     "name" : "spirv-reflect",
     "version>=" : "1.4.341.0"
-  }, {
-    "name" : "vulkan",
-    "version>=" : "2023-12-17"
-  }, {
-    "name" : "vulkan-memory-allocator",
-    "version>=" : "3.3.0"
   }, {
     "name" : "imgui",
     "version>=" : "1.91.9",
@@ -67,10 +64,34 @@
   }, {
     "name" : "openimageio",
     "version>=" : "3.0.9.1#3"
+  }, {
+    "name" : "vulkan-memory-allocator",
+    "version>=" : "3.4.0"
+  }, {
+    "name" : "vulkan-loader",
+    "features" : [ {
+      "name" : "wayland",
+      "platform" : "linux"
+    }, {
+      "name" : "xcb",
+      "platform" : "linux"
+    }, {
+      "name" : "xlib",
+      "platform" : "linux"
+    } ]
+  }, {
+    "name" : "vulkan-validationlayers"
+  }, {
+    "name" : "molten-vk",
+    "platform" : "osx"
+  }, {
+    "name" : "gtest",
+    "version>=" : "1.15.2"
   } ],
-  "overrides": [
-    { "name": "openexr", "version": "3.2.4" }
-  ],
+  "overrides" : [ {
+    "name" : "openexr",
+    "version" : "3.2.4"
+  } ],
   "features" : {
     "hub" : {
       "description" : "Extra deps for building the Hub launcher in the SDK super-build (-DVCPKG_MANIFEST_FEATURES=hub)",

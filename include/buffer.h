@@ -68,6 +68,8 @@ namespace gfx
             eVertex      = 1 << 5,  ///< Buffer can be used as a vertex buffer, providing vertex attribute data to the vertex shader stage.
             eIndex       = 1 << 6,  ///< Buffer can be used as an index buffer, providing indices for indexed drawing commands.
             eIndirect    = 1 << 7,  ///< Buffer can be used as an indirect buffer, providing draw or dispatch parameters for indirect drawing or compute dispatch commands.
+            eShaderDeviceAddress      = 1 << 8,  ///< Buffer can have its GPU device address queried (e.g. for buffer references or as a ray-tracing build input).
+            eAccelerationStructureInput = 1 << 9,  ///< Buffer can be used as read-only input geometry when building a ray-tracing acceleration structure.
         };
 
         /**
@@ -93,7 +95,7 @@ namespace gfx
 
             RawBuilder& setRawSize(const glm::i64 size) {
                 if (size <= 0) {
-                    fail("size must be > 0");
+                    addError(ErrorCode::eBufferSizeInvalid, "size must be > 0");
                 } else {
                     _size = size;
                 }
@@ -128,6 +130,8 @@ namespace gfx
                 return *this;
             }
 
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] virtual Result<std::unique_ptr<Buffer>> create() const;
             [[nodiscard]] virtual Resource<Buffer> build() const;
 
         protected:
@@ -135,7 +139,7 @@ namespace gfx
 
             RawBuilder& setSize(const glm::i64 value) {
                 if (value <= 0) {
-                    fail("RawBuilder::size must be > 0");
+                    addError(ErrorCode::eBufferSizeInvalid, "RawBuilder::size must be > 0");
                 } else {
                     _size = value;
                 }
@@ -152,15 +156,27 @@ namespace gfx
             }
 
         private:
-            std::vector<T> _ownedData{};
-            std::span<const T> _dataView{};
+            std::vector<T> _ownedData{};        ///< setData: we hold a copy of the caller's data.
+            std::span<const T> _externalView{}; ///< setDataView: the caller keeps ownership.
 
         public:
             virtual ~Builder() = default;
 
+            /**
+             * @brief The initial data, from whichever of setData/setDataView is in play.
+             *
+             * Derived, not stored. A stored span into _ownedData would survive a copy of this
+             * builder still pointing at the *source's* vector, so the copy would dangle the moment
+             * that source (usually a temporary) died. Computing it makes copy and move correct by
+             * default, with no hand-written copy constructor to get wrong.
+             */
+            [[nodiscard]] std::span<const T> dataView() const {
+                return _ownedData.empty() ? _externalView : std::span<const T>(_ownedData);
+            }
+
             Builder& setInstanceCount(const glm::i64 value) {
                 if (value < 0) {
-                    fail("instanceCount must be >= 0");
+                    addError(ErrorCode::eBufferSizeInvalid, "instanceCount must be >= 0");
                 }
                 _instanceCount = value;
                 _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
@@ -170,7 +186,7 @@ namespace gfx
             // Safe default: copy single value
             Builder& setData(const T& value) {
                 _ownedData.assign(1, value);
-                _dataView = std::span<const T>(_ownedData.data(), _ownedData.size());
+                _externalView = {};
                 _instanceCount = 1;
                 _size = static_cast<glm::i64>(sizeof(T));
                 return *this;
@@ -179,10 +195,10 @@ namespace gfx
             template <std::ranges::contiguous_range Container> requires std::same_as<std::ranges::range_value_t<Container>, T>
             Builder& setData(const Container& data) {
                 if (data.size() <= 0) {
-                    fail("Data container must have size > 0");
+                    addError(ErrorCode::eBufferSizeInvalid, "Data container must have size > 0");
                 }
                 _ownedData.assign(data.begin(), data.end());
-                _dataView = std::span<const T>(_ownedData.data(), _ownedData.size());
+                _externalView = {};
                 _instanceCount = static_cast<glm::i64>(_ownedData.size());
                 _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
                 return *this;
@@ -190,15 +206,22 @@ namespace gfx
 
             Builder& setDataView(const std::span<const T> view) {
                 _ownedData.clear();
-                _dataView = view;
+                _externalView = view;
                 _instanceCount = static_cast<glm::i64>(view.size());
                 _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
-            [[nodiscard]] Resource<Buffer> build() const override {
-                auto buffer = RawBuilder::build();
+            [[nodiscard]] Result<std::unique_ptr<Buffer>> create() const override {
+                auto created = RawBuilder::create();
+                if (!created) return created;
+                std::unique_ptr<Buffer> buffer = std::move(*created);
 
-                if (!_dataView.empty()) {
+                const auto data = dataView();
+                if (!data.empty()) {
+                    // The upload needs a ResourceRef; an unsafe (untracked) one is sound here
+                    // because the buffer cannot outlive this scope before we hand it over.
+                    const auto bufferRef = ResourceRef<const Buffer>(buffer.get());
+
                     switch (buffer->getType()) {
                         case Type::eDeviceLocal: {
                             const auto byteSize = checkedByteSize<T>(static_cast<glm::u64>(_instanceCount), "Builder::build");
@@ -207,22 +230,39 @@ namespace gfx
                                 .setInstanceCount(toBuilderSize(byteSize, "Builder::build"))
                                 .setUsage(Usage::eTransferSrc)
                                 .setType(Type::eStaging);
-                            auto stagingBuffer = stagingBuilder.build();
 
-                            stagingBuffer->Write(_dataView, 0);
+                            // The staging buffer is an internal detail of this upload, so its
+                            // failure is ours — inherit it as our cause rather than reporting a
+                            // second, unrelated-looking error.
+                            auto staging = stagingBuilder.create();
+                            if (!staging) {
+                                return failCausedBy(ErrorCode::eBackend,
+                                    std::make_shared<const Error>(std::move(staging.error())),
+                                    "Could not stage the buffer's initial data.");
+                            }
+                            std::unique_ptr<Buffer> stagingBuffer = std::move(*staging);
+                            const auto stagingRef = ResourceRef<const Buffer>(stagingBuffer.get());
+
+                            stagingBuffer->Write(data, 0);
                             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                                commandBuffer.CopyBuffer(stagingBuffer, buffer, byteSize);
+                                commandBuffer.CopyBuffer(stagingRef, bufferRef, byteSize);
                             }, CommandBuffer::Usage::eTransfer);
                             break;
                         }
                         case Type::eStaging:
                         case Type::eReadback:
                         case Type::eDynamic:
-                            buffer->Write(_dataView, 0);
+                            buffer->Write(data, 0);
                             break;
                     }
                 }
 
+                return buffer;
+            }
+
+            [[nodiscard]] Resource<Buffer> build() const override {
+                auto buffer = materialize<Buffer>(*this, "Buffer");
+                Context::Repository().addRef(ResourceRef<const Buffer>(buffer));
                 return buffer;
             }
         };
@@ -245,7 +285,7 @@ namespace gfx
                         .setType(Type::eStaging);
                     const auto stagingBuffer = stagingBuilder.build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                        commandBuffer.CopyBuffer(ResourceRef(*this), stagingBuffer, elemBytes, index * elemBytes, 0);
+                        commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, elemBytes, index * elemBytes, 0);
                     }, CommandBuffer::Usage::eTransfer);
                     return stagingBuffer->ReadAt<T>(0);
                 }
@@ -276,7 +316,7 @@ namespace gfx
 
                     stagingBuffer->WriteAt<T>(0, data);
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                        commandBuffer.CopyBuffer(stagingBuffer, ResourceRef(*this), elemBytes, 0, index * elemBytes);
+                        commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), elemBytes, 0, index * elemBytes);
                     }, CommandBuffer::Usage::eTransfer);
                     break;
                 }
@@ -324,7 +364,7 @@ namespace gfx
                         .setType(Type::eStaging);
                     const auto stagingBuffer = stagingBuilder.build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                        commandBuffer.CopyBuffer(ResourceRef(*this), stagingBuffer, byteSize, byteOffset, 0);
+                        commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, byteSize, byteOffset, 0);
                     }, CommandBuffer::Usage::eTransfer);
                     return stagingBuffer->Read<T>(count, 0);
                 }
@@ -368,7 +408,7 @@ namespace gfx
                     auto stagingBuffer = stagingBuilder.build();
                     stagingBuffer->Write<T>(data, 0);
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                        commandBuffer.CopyBuffer(stagingBuffer, ResourceRef(*this), byteSize, 0, byteOffset);
+                        commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), byteSize, 0, byteOffset);
                     }, CommandBuffer::Usage::eTransfer);
                     break;
                 }
@@ -616,6 +656,14 @@ namespace gfx
         [[nodiscard]] Type getType() const { return _type; }
 
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
+
+        /**
+         * @brief GPU device address of this buffer, for use as a buffer_reference in
+         * shaders or as a ray-tracing build input. Requires the buffer to have been
+         * created with Usage::eShaderDeviceAddress. Returns 0 on backends that do not
+         * support buffer device addresses.
+         */
+        [[nodiscard]] virtual glm::u64 getDeviceAddress() const { return 0; }
 
         template <typename T> requires std::is_trivially_copyable_v<T>
         [[nodiscard]]

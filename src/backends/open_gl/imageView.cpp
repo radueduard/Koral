@@ -12,7 +12,8 @@ namespace gfx::ogl
 {
     ImageView::ImageView(const Builder& createInfo) : gfx::ImageView(createInfo) {
         glGenTextures(1, &_textureViewID);
-        const gfx::ogl::Image& image = reinterpret_cast<const gfx::ogl::Image&>(createInfo.image);
+        // _image is a ResourceRef handle; the backend image is behind it.
+        const auto& image = dynamic_cast<const gfx::ogl::Image&>(*_image);
 
         GLenum target;
         switch (createInfo.type) {
@@ -34,8 +35,8 @@ namespace gfx::ogl
         glTextureView(
             _textureViewID,
             target,
-            *reinterpret_cast<const gfx::ogl::Image&>(_image),
-            image.InternalFormatFromImageFormat(image.getFormat()),
+            *image,
+            gfx::ogl::Image::InternalFormatFromImageFormat(image.getFormat()),
             _baseMipLevel,
             _mipLevelCount,
             _baseArrayLayer,
@@ -44,11 +45,11 @@ namespace gfx::ogl
 
     GLuint ImageView::operator*() const
     {
-        return *reinterpret_cast<const gfx::ogl::Image&>(_image);
+        return *dynamic_cast<const gfx::ogl::Image&>(*_image);
     }
 
     GLenum ImageView::getFormat() const
     {
-        return reinterpret_cast<const gfx::ogl::Image&>(_image).getGLFormat();
+        return dynamic_cast<const gfx::ogl::Image&>(*_image).getGLFormat();
     }
 }

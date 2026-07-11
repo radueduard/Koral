@@ -57,6 +57,7 @@ void gfx::vk::Context::Init()
         .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
         .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)
         .addPoolSize(::vk::DescriptorType::eSampler, 1000)
+        .addPoolSize(::vk::DescriptorType::eAccelerationStructureKHR, 1000)
         .build();
 }
 

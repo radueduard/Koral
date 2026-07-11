@@ -13,8 +13,14 @@
 #include <surface.h>
 
 #include <iostream>
+#include <algorithm>
+#include <cstring>
+#include <iterator>
+#include <unordered_set>
 
 #include <spirv_cross.hpp>
+
+#include "slangCompiler.h"
 
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
@@ -24,32 +30,120 @@
 
 
 namespace gfx {
-    std::unique_ptr<Shader> Shader::Builder::build() const
-    {
-        switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return std::make_unique<ogl::Shader>(*this);
-        case API::eVulkan:
-            return std::make_unique<vk::Shader>(*this);
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
+    namespace {
+        // Per-shader hot-reload watch state, owned by the Shader via an opaque shared_ptr<void>
+        // (Shader::_watchContext). `watched` is the set of files already registered with the
+        // FileWatcher; `onChange` reloads the shader and re-syncs `watched` against the current
+        // dependency list so files added by an edit start being watched too.
+        struct WatchContext {
+            std::unordered_set<std::filesystem::path> watched;
+            std::function<void()> onChange;
+        };
     }
 
-    ResourceRef<const Shader> Shader::Builder::buildManaged(const std::string& identifier) const
+    Result<std::unique_ptr<Shader>> Shader::Builder::create() const
     {
-        Resource<Shader> shader;
-        switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            shader = MakeResource<ogl::Shader>(*this);
-            break;
-        case API::eVulkan:
-            shader = MakeResource<vk::Shader>(*this);
-            break;
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
-        return Context::Repository().add(identifier, std::move(shader));
+        beginAttempt();
+
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan)
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+
+        // Construction compiles the shader; a compile/parse failure throws and is
+        // surfaced as a gfx::Error (eShaderCompileFailed unless a more specific cause).
+        return guard(ErrorCode::eShaderCompileFailed, [&]() -> std::unique_ptr<Shader> {
+            return (api == API::eVulkan)
+                ? gfx::MakeBackendPtr<Shader, vk::Shader>(*this)
+                : gfx::MakeBackendPtr<Shader, ogl::Shader>(*this);
+        });
+    }
+
+    gfx::Resource<Shader> Shader::Builder::build() const
+    {
+        // Name it after whatever identifies the source, so a compile failure reads as
+        // "shaders/forward.frag.glsl" rather than "Shader".
+        std::string name = path.empty() ? std::format("{}:{}", module, entry) : path.string();
+        return materialize<Shader>(*this, std::move(name));
+    }
+
+    ResourceRef<const Shader> Shader::Builder::getOrBuild(const std::string& identifier) const
+    {
+        // Get-or-create: a shader already registered under this identifier is reused as-is.
+        // Rebuilding would recompile the shader (wasted work) and double-register its file
+        // watcher; the identifier is the cache key and the file path drives hot-reload.
+        //
+        // A poisoned entry is reused too, deliberately: it is the same object every pipeline
+        // built from this shader already refers to, and repairing it in place is what brings
+        // all of them back at once.
+        if (Context::Repository().contains<Shader>(identifier))
+            return ResourceRef<const Shader>(Context::Repository().getRef<Shader>(identifier));
+
+        // Registered whether or not it compiled. A shader that failed to compile has to stay
+        // alive, registered and watched — otherwise the file watcher never learns about the
+        // file, fixing the source raises no event, and neither the shader nor anything built
+        // from it could ever recover. The poisoned resource is the recovery mechanism.
+        ResourceRef<Shader> shaderRef = Context::Repository().add(identifier, build());
+
+        auto ctx = std::make_shared<WatchContext>();
+        std::weak_ptr<WatchContext> weakCtx = ctx;
+
+        // Register a FileWatcher for every dependency not already watched: the primary source
+        // plus any #include'd (GLSL) or import'ed (Slang) files. Called once now and again
+        // after each reload, so files newly referenced by an edit start being watched too.
+        //
+        // A shader that failed to compile reports no dependencies (there was no successful
+        // parse), so fall back to its declared source path — which is the very file the user
+        // is about to fix, and thus the one event we cannot afford to miss.
+        auto resync = [shaderRef, weakCtx, fallback = path] () mutable
+        {
+            const auto ctx = weakCtx.lock();
+            if (!ctx || !shaderRef.alive()) return;
+
+            std::vector<std::filesystem::path> dependencies;
+            if (shaderRef.valid()) dependencies = shaderRef->getDependencies();
+            else if (!fallback.empty()) dependencies.push_back(fallback);
+
+            for (const auto& dependency : dependencies)
+            {
+                std::error_code ec;
+                auto path = std::filesystem::weakly_canonical(dependency, ec);
+                if (ec) path = dependency;
+                if (ctx->watched.insert(path).second) FileWatcher::TrackFile(path, ctx->onChange);
+            }
+        };
+
+        ctx->onChange = [shaderRef, resync] () mutable
+        {
+            if (!shaderRef.alive()) return; // shader destroyed; its watch callbacks safely no-op
+
+            if (shaderRef.poisoned()) {
+                // The shader never compiled, so there is no object to reload — it has to be rebuilt
+                // from its builder. Ask for that rather than doing it here: we are on the file
+                // watcher's thread, and a rebuild replaces the underlying object, which must not
+                // race whatever is recording with it. Repository::repair() picks this up at the top
+                // of the next frame, and brings back every pipeline built from this shader with it.
+                shaderRef.requestRepair();
+                return;
+            }
+
+            shaderRef->OnReload();
+
+            for (const auto& callback : shaderRef->_reloadCallbacks | std::views::values)
+            {
+                callback();
+            }
+            resync(); // pick up any dependencies the edit added
+        };
+
+        // Tie the watch state to the resource *slot*, not to the shader object: a shader that
+        // failed to compile has no object, and that is exactly when the watch must survive.
+        shaderRef.attach(ctx);
+
+        resync();  // initial registration
+
+        return ResourceRef<const Shader>(shaderRef);
     }
 
     static EShLanguage shaderStageToEShLanguage(const Shader::Stage &stage) {
@@ -72,16 +166,131 @@ namespace gfx {
         }
     }
 
-    std::vector<glm::u32> Shader::CompileToSPIRV(const std::filesystem::path& path, const Stage stage)
+    static std::vector<std::filesystem::path>& shaderSearchPathsStorage()
     {
-        const auto source = utils::ReadFileAsString(path);
+        // Seeded with the API's own shaders/ folder; projects add their roots via addSearchPath.
+        static std::vector<std::filesystem::path> paths = { std::filesystem::path(SHADERS_PATH) };
+        return paths;
+    }
+
+    void Shader::addSearchPath(const std::filesystem::path& dir)
+    {
+        auto& paths = shaderSearchPathsStorage();
+        if (std::ranges::find(paths, dir) == paths.end()) paths.push_back(dir);
+    }
+
+    const std::vector<std::filesystem::path>& Shader::searchPaths() { return shaderSearchPathsStorage(); }
+
+    namespace {
+        // glslang includer that resolves `#include`d files across the shader search roots
+        // (and, for quoted includes, relative to the including file) and records every file
+        // it opens so the shader can watch them for hot-reload. Requires the source to enable
+        // `#extension GL_GOOGLE_include_directive : require`.
+        class ShaderIncluder final : public glslang::TShader::Includer {
+        public:
+            explicit ShaderIncluder(std::filesystem::path sourceDir)
+            {
+                _directoryStack.push_back(std::move(sourceDir));
+            }
+
+            IncludeResult* includeLocal(const char* headerName, const char*, size_t) override
+            {
+                return resolve(headerName, /*local=*/true);
+            }
+            IncludeResult* includeSystem(const char* headerName, const char*, size_t) override
+            {
+                return resolve(headerName, /*local=*/false);
+            }
+            void releaseInclude(IncludeResult* result) override
+            {
+                if (!result) return;
+                _directoryStack.pop_back(); // matches the push in a successful resolve()
+                delete[] static_cast<char*>(result->userData);
+                delete result;
+            }
+
+            [[nodiscard]] const std::unordered_set<std::filesystem::path>& dependencies() const { return _dependencies; }
+
+        private:
+            IncludeResult* resolve(const std::string& headerName, const bool local)
+            {
+                // Quoted includes look next to the including file first, then the search roots;
+                // angle-bracket includes only look in the search roots.
+                std::vector<std::filesystem::path> roots;
+                if (local && !_directoryStack.empty()) roots.push_back(_directoryStack.back());
+                for (const auto& root : Shader::searchPaths()) roots.push_back(root);
+
+                for (const auto& root : roots) {
+                    std::error_code ec;
+                    auto candidate = std::filesystem::weakly_canonical(root / headerName, ec);
+                    if (ec || !std::filesystem::exists(candidate, ec)) continue;
+
+                    std::ifstream file(candidate, std::ios::binary);
+                    if (!file) continue;
+                    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+                    _dependencies.insert(candidate);
+                    _directoryStack.push_back(candidate.parent_path()); // popped in releaseInclude
+
+                    auto* data = new char[content.size()];
+                    std::memcpy(data, content.data(), content.size());
+                    return new IncludeResult(candidate.string(), data, content.size(), data);
+                }
+                return nullptr;
+            }
+
+            std::unordered_set<std::filesystem::path> _dependencies;
+            std::vector<std::filesystem::path> _directoryStack;
+        };
+    }
+
+    void Shader::Compile()
+    {
+        if (!_modified) return;
+        _modified = false;
+
+        switch (_lang) {
+        case Lang::eSPIRV:
+            _spirvCode = utils::ReadFileToUIntVector(_path);
+            _dependencies = { _path };
+            if (_spirvCode.empty())
+                throw BackendException(Error{
+                    .code = ErrorCode::eShaderCompileFailed,
+                    .message = std::format("SPIR-V module '{}' is missing or empty.", _path.string()),
+                });
+            _valid = true;
+            return;
+        case Lang::eSlang: {
+            auto result = SlangCompiler::Compile(_module, _entry, searchPaths());
+            _spirvCode = std::move(result.spirv);
+            _stage = result.stage;                          // auto-detected from [shader(...)]
+            if (!result.resolvedPath.empty()) _path = result.resolvedPath; // for hot-reload
+            _dependencies = std::move(result.dependencies); // module + imports, for hot-reload
+            if (_spirvCode.empty())
+                throw BackendException(Error{
+                    .code = ErrorCode::eShaderCompileFailed,
+                    .message = std::format("Slang compilation of '{}:{}' produced no code.", _module, _entry),
+                });
+            _valid = true;
+            return;
+        }
+        case Lang::eGLSL:
+        default:
+            break; // fall through to the glslang path below
+        }
+
+        const auto source = utils::ReadFileAsString(_path);
         glslang::InitializeProcess();
-        const auto eShStage = shaderStageToEShLanguage(stage);
+        const auto eShStage = shaderStageToEShLanguage(_stage);
 
         const auto shader = new glslang::TShader(eShStage);
         const auto shaderStrings = new std::string(source);
         const auto shaderStringsPointer = shaderStrings->c_str();
         shader->setStrings(&shaderStringsPointer, 1);
+
+        // Enable `#include` without requiring every shader to declare the extension itself.
+        // A preamble is processed ahead of the source but doesn't disturb #version ordering.
+        shader->setPreamble("#extension GL_GOOGLE_include_directive : require\n");
 
         shader->setEnvInput(glslang::EShSourceGlsl, eShStage, glslang::EShClientVulkan, 450);
         shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
@@ -89,16 +298,35 @@ namespace gfx {
 
         constexpr auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDefault | EShMsgDebugInfo | EShMsgEnhanced);
 
-        if (!shader->parse(GetDefaultResources(), 450, false, messages)) {
-            std::cerr << shader->getInfoLog() << std::endl;
-            throw std::runtime_error("GLSL parsing failed for stage: " + std::to_string(eShStage));
+        // Resolve #include directives across the search roots and record the opened files.
+        ShaderIncluder includer(_path.parent_path());
+
+        // The primary source is always a dependency; #include'd files are added on success.
+        _dependencies = { _path };
+
+        if (!shader->parse(GetDefaultResources(), 450, false, messages, includer)) {
+        	// Carry glslang's own diagnostics out as the error: they name the file and line the
+        	// user has to fix, and they become the root cause of every pipeline built from this.
+        	std::string info = shader->getInfoLog();
+        	delete shader;
+        	throw BackendException(Error{
+        		.code = ErrorCode::eShaderCompileFailed,
+        		.message = std::format("GLSL compilation failed for '{}':\n{}", _path.string(), info),
+        	});
         }
+        _dependencies.insert(_dependencies.end(), includer.dependencies().begin(), includer.dependencies().end());
 
         const auto program = new glslang::TProgram;
         program->addShader(shader);
 
         if (!program->link(messages)) {
-            throw std::runtime_error("GLSL linking failed for stage: " + std::to_string(eShStage));
+        	std::string info = program->getInfoLog();
+        	delete program;
+        	delete shader;
+        	throw BackendException(Error{
+        		.code = ErrorCode::eShaderCompileFailed,
+        		.message = std::format("GLSL linking failed for '{}':\n{}", _path.string(), info),
+        	});
         }
 
         std::vector<uint32_t> spirV;
@@ -111,7 +339,9 @@ namespace gfx {
         delete shaderStrings;
 
         glslang::FinalizeProcess();
-        return spirV;
+
+    	_valid = true;
+    	_spirvCode = spirV;
     }
 
 	std::pair<ChannelType, glm::u32> SPIRTypeConverter(const spirv_cross::SPIRType& type)
@@ -165,10 +395,11 @@ namespace gfx {
 	    }
     }
 
-    Shader::MemoryLayout Shader::fetchMemoryLayout(const std::vector<glm::u32>& spirvCode)
+    void Shader::fetchMemoryLayout()
     {
-    	std::vector words(spirvCode.begin(), spirvCode.end());
-        const auto module = spirv_cross::Compiler(words);
+    	if (!_valid) return;
+
+        const auto module = spirv_cross::Compiler(_spirvCode);
         const auto resources = module.get_shader_resources();
     	const auto stage = StageFrom(module.get_execution_model());
 
@@ -206,13 +437,13 @@ namespace gfx {
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
 			if (module.get_type(sampledImage.type_id).image.dim == spv::DimBuffer) {
-				// memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eUniformTexelBuffer, name, count));
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformTexelBuffer, name, count, stage });
 			}
 			else {
 				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage });
 			}
 		} // eSampledImage and eUniformTexelBuffer
-		for (const auto& sampledImage : resources.sampled_images) {
+    	for (const auto& sampledImage : resources.sampled_images) {
 			const uint32_t set = module.get_decoration(sampledImage.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
@@ -225,7 +456,7 @@ namespace gfx {
 			const uint32_t count = GetCount(module.get_type(image.type_id));
 			const auto& name = module.get_name(image.id);
 			if (module.get_type(image.type_id).image.dim == spv::DimBuffer) {
-				// memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::make_tuple(DescriptorType::eStorageTexelBuffer, name, count));
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageTexelBuffer, name, count, stage });
 			}
 			else {
 				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage });
@@ -245,6 +476,13 @@ namespace gfx {
 			const auto& name = module.get_name(buffer.id);
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageBuffer, name, count, stage });
 		} // eStorageBuffer
+		for (const auto& accelerationStructure : resources.acceleration_structures) {
+			const uint32_t set = module.get_decoration(accelerationStructure.id, spv::DecorationDescriptorSet);
+			const uint32_t binding = module.get_decoration(accelerationStructure.id, spv::DecorationBinding);
+			const uint32_t count = GetCount(module.get_type(accelerationStructure.type_id));
+			const auto& name = module.get_name(accelerationStructure.id);
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eAccelerationStructure, name, count, stage });
+		} // eAccelerationStructure
 
     	for (const auto& pushConstant : resources.push_constant_buffers) {
 			const auto& name = module.get_name(pushConstant.id);
@@ -265,16 +503,54 @@ namespace gfx {
 			memoryLayout.pushConstants.emplace(offset, PushConstant { name, size, offset, stage });
 		} // push constants
 
-    	return memoryLayout;
+    	_memoryLayout = memoryLayout;
+    }
+
+    void Shader::OnReload()
+    {
+    	gfx::log::info("Reloading shader: {}", _path.string());
+
+    	_modified = true;
+
+    	// A reload runs on the file-watcher thread, and Compile() throws when the source does not
+    	// compile — so an edit that breaks a working shader has to be caught here, or it would tear
+    	// the process down. Keep the last good SPIR-V instead: the shader, and everything built from
+    	// it, goes on working while the user fixes the error we just printed, and the next save
+    	// re-enters here and picks the fix up.
+    	//
+    	// Only a shader that has *never* compiled becomes poisoned, and that is decided at
+    	// construction — where the throw is exactly what guard() turns into the poison.
+    	try {
+    		Compile();
+    		fetchMemoryLayout();
+    	} catch (const BackendException& e) {
+    		gfx::log::error("Reload of '{}' failed; keeping the last working version:\n{}",
+    		                _path.string(), e.error.history());
+    		_modified = true; // still stale, so the next save retries
+    	} catch (const std::exception& e) {
+    		gfx::log::error("Reload of '{}' failed; keeping the last working version: {}",
+    		                _path.string(), e.what());
+    		_modified = true;
+    	}
     }
 
     Shader::Shader(const Builder& createInfo) :
         _stage(createInfo.stage),
         _lang(createInfo.lang),
-        _path(createInfo.path)
+        _path(createInfo.path),
+        _module(createInfo.module),
+        _entry(createInfo.entry)
     {
-        if (_path.empty()) {
-            throw std::runtime_error("Shader path cannot be empty!");
+        if (_lang == Lang::eSlang) {
+            if (_module.empty() || _entry.empty())
+                throw BackendException(Error{ .code = ErrorCode::eShaderCompileFailed,
+                    .message = "A Slang shader requires a module and an entry point." });
+        } else if (_path.empty()) {
+            throw BackendException(Error{ .code = ErrorCode::eShaderCompileFailed,
+                .message = "Shader path cannot be empty." });
         }
+
+    	Compile();
+    	fetchMemoryLayout();
     }
 }

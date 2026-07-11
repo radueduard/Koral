@@ -6,6 +6,7 @@
 #include <framebuffer.h>
 #include <surface.h>
 
+#include <cstdlib>
 #include <iostream>
 #include <ranges>
 
@@ -16,10 +17,15 @@
 
 namespace gfx::vk
 {
-    ::vk::SurfaceKHR CreateSurface(const ::vk::Instance& instance, const io::Window& window) {
-        VkSurfaceKHR surface;
+    ::vk::SurfaceKHR CreateSurface(const ::vk::Instance& instance, const gfx::Window& window) {
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
         if (const auto result = glfwCreateWindowSurface(instance, *window, nullptr, &surface); result != VK_SUCCESS) {
-            std::cerr << "Failed to create window surface: " << ::vk::to_string(static_cast<::vk::Result>(result)) << std::endl;
+            // A null/garbage surface is unrecoverable — everything downstream (swap
+            // chain, present) needs it — so fail fast with a clear message rather
+            // than returning an uninitialized handle and crashing later.
+            const auto msg = "Failed to create window surface: " + ::vk::to_string(static_cast<::vk::Result>(result));
+            gfx::log::error("[vulkan] {}", msg);
+            throw std::runtime_error(msg);
         }
         return { surface };
     }
@@ -42,7 +48,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
                 gfx::log::error("[vulkan] {}", pCallbackData->pMessage);
-                GFX_BREAK();
+                // GFX_BREAK();
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
                 break;
@@ -50,8 +56,31 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         return VK_FALSE;
     }
 
+    namespace {
+        // Add a dir/file to one of the loader's *additive* search-path env vars, but
+        // only when the user hasn't set it themselves — an explicit override wins.
+        void addLoaderSearchPath(const char* var, const char* value) {
+            if (std::getenv(var) != nullptr) return;
+#ifdef _WIN32
+            _putenv_s(var, value);
+#else
+            setenv(var, value, /*overwrite=*/0);
+#endif
+        }
+    }
+
     Runtime::Runtime()
     {
+        // Point the vcpkg Vulkan-Loader at the bundled validation layers (and, on
+        // macOS, the molten-vk ICD) so they resolve with no system Vulkan SDK present.
+        // VK_ADD_* are additive, so the user's own layers/drivers still load too.
+#ifdef GFX_VK_LAYER_PATH
+        addLoaderSearchPath("VK_ADD_LAYER_PATH", GFX_VK_LAYER_PATH);
+#endif
+#ifdef GFX_VK_ICD_PATH
+        addLoaderSearchPath("VK_ADD_DRIVER_FILES", GFX_VK_ICD_PATH);
+#endif
+
         constexpr auto applicationInfo = ::vk::ApplicationInfo()
             .setPApplicationName("GFXFramework Application")
             .setApplicationVersion(VK_MAKE_VERSION(1, 0, 0))
@@ -63,6 +92,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         // These are REQUIRED — do NOT filter them against available extensions
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
+            gfx::log::info("[vulkan] {}", glfwExtensions[i]);
+        }
+
         if (glfwExtensions == nullptr || glfwExtensionCount == 0) {
             gfx::log::warn("[vulkan] glfwGetRequiredInstanceExtensions returned null — platform surface extension may be missing.");
         } else {
@@ -122,6 +155,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
         // Filter only our optional extra extensions (NOT the GLFW ones we just added)
         // against what the loader/ICDs actually expose
+        bool debugUtilsEnabled = false;
         {
             const auto availableExts = ::vk::enumerateInstanceExtensionProperties();
             // Separate GLFW extensions (already in vector, added above) from our optional ones
@@ -137,6 +171,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 for (const auto& avail : availableExts)
                     if (std::string_view(avail.extensionName) == req) { found = true; break; }
                 if (found) {
+                    if (std::string_view(req) == VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
+                        debugUtilsEnabled = true;
                     _instanceExtensions.push_back(req);
                 } else {
                     gfx::log::warn("[vulkan] Optional extension '{}' not available, skipping.", req);
@@ -147,6 +183,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         gfx::log::info("[vulkan] Final instance extensions ({}):", _instanceExtensions.size());
         for (const auto& ext : _instanceExtensions)
             gfx::log::info("[vulkan]   [ext] {}", ext);
+
+        // DebugPrintf GPU-assisted instrumentation is opt-in: it instruments every
+        // shader and crashes the validation layer at queue submit on some drivers
+        // (seen on NVIDIA 610 / RTX 50-series). Enable only when GFX_DEBUG_PRINTF is
+        // set in the environment (and the shaders actually use debugPrintfEXT).
+        const bool enableDebugPrintf = hasValidation && std::getenv("GFX_DEBUG_PRINTF") != nullptr;
 
         constexpr std::array<uint32_t, 1> bufferSize = { 1024 * 1024 };
         const auto validationLayerSetting = ::vk::LayerSettingEXT()
@@ -167,7 +209,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             .setEnabledValidationFeatures(enabledFeatures);
 
         const auto debugCreateInfo = ::vk::DebugUtilsMessengerCreateInfoEXT()
-            .setPNext(hasValidation ? static_cast<const void*>(&validationCreateInfo) : nullptr)
+            .setPNext(enableDebugPrintf ? static_cast<const void*>(&validationCreateInfo) : nullptr)
             .setMessageSeverity(
                 ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
                 | ::vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
@@ -183,7 +225,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         #ifdef __APPLE__
             .setFlags(::vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR)
         #endif
-            .setPNext(hasValidation ? static_cast<const void*>(&debugCreateInfo) : nullptr)
+            .setPNext(debugUtilsEnabled ? static_cast<const void*>(&debugCreateInfo) : nullptr)
             .setPApplicationInfo(&applicationInfo)
             .setPEnabledExtensionNames(_instanceExtensions)
             .setPEnabledLayerNames(_instanceLayers);
@@ -191,10 +233,14 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         _instance = ::vk::createInstance(createInfo);
         VULKAN_HPP_DEFAULT_DISPATCHER.init(_instance);
 
-        if (hasValidation) {
+        // Create the debug messenger only when VK_EXT_debug_utils is both enabled and
+        // actually resolvable through the active loader. Some loaders (e.g. the WSI-less
+        // vcpkg-provided one) advertise and enable the extension yet still return a null
+        // vkCreateDebugUtilsMessengerEXT, which would trip vulkan-hpp's debug assertion.
+        if (debugUtilsEnabled && VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateDebugUtilsMessengerEXT) {
             _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
-        } else {
-            gfx::log::warn("[vulkan] Validation layer unavailable — debug messenger disabled.");
+        } else if (hasValidation) {
+            gfx::log::warn("[vulkan] VK_EXT_debug_utils unavailable — debug messenger disabled.");
         }
     }
 

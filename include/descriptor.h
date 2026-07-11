@@ -5,15 +5,18 @@
 #pragma once
 
 #include <variant>
+#include <optional>
 
 #include "api.h"
 #include "resource.h"
+#include "error.h"
 
 namespace gfx
 {
     class Buffer;
     class Sampler;
     class ImageView;
+    class AccelerationStructure;
 
     struct BufferDescriptor {
         ResourceRef<const Buffer> _buffer;
@@ -34,6 +37,10 @@ namespace gfx
         ResourceRef<const Sampler> _sampler;
     };
 
+    struct AccelerationStructureDescriptor {
+        ResourceRef<const AccelerationStructure> _accelerationStructure;
+    };
+
     class GFX_API Descriptor
     {
         friend class DescriptorSet;
@@ -43,27 +50,34 @@ namespace gfx
         explicit Descriptor(const ResourceRef<const ImageView>& imageView, const ResourceRef<const Sampler>& sampler);
         explicit Descriptor(const ResourceRef<const ImageView>& imageView);
         explicit Descriptor(const ResourceRef<const Sampler>& sampler);
+        explicit Descriptor(const ResourceRef<const AccelerationStructure>& accelerationStructure);
 
         Descriptor(const Descriptor& other) = default;
         Descriptor& operator=(const Descriptor& other) = default;
 
         ~Descriptor() = default;
         [[nodiscard]] bool isValid() const { return valid; }
+        // The reason this descriptor is invalid, if any (set instead of throwing from
+        // the constructors); surfaced by DescriptorSet::Builder::build().
+        [[nodiscard]] const std::optional<Error>& error() const { return _error; }
 
         [[nodiscard]] const Buffer& getBuffer() const;
         [[nodiscard]] glm::i64 getOffset() const;
         [[nodiscard]] glm::i64 getRange() const;
         [[nodiscard]] const ImageView& getImageView() const;
         [[nodiscard]] const Sampler& getSampler() const;
+        [[nodiscard]] const AccelerationStructure& getAccelerationStructure() const;
 
     protected:
         bool valid = false;
+        std::optional<Error> _error;
         std::variant<
             std::nullptr_t,
             BufferDescriptor,
             ImageDescriptor,
             SamplerDescriptor,
-            CombinedImageSamplerDescriptor
+            CombinedImageSamplerDescriptor,
+            AccelerationStructureDescriptor
         > _descriptor;
     };
 }

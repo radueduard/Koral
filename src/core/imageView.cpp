@@ -19,16 +19,27 @@ namespace gfx
         mipLevelCount = image->getMipLevels();
     }
 
+    gfx::Result<std::unique_ptr<ImageView>> ImageView::Builder::create() const
+    {
+        beginAttempt();
+        adopt(image, "image view's image");
+
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan)
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+
+        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<ImageView> {
+            return (api == API::eVulkan)
+                ? gfx::MakeBackendPtr<ImageView, vk::ImageView>(*this)
+                : gfx::MakeBackendPtr<ImageView, ogl::ImageView>(*this);
+        });
+    }
+
     gfx::Resource<ImageView> ImageView::Builder::build() const
     {
-        switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return gfx::MakeResource<ogl::ImageView>(*this);
-        case API::eVulkan:
-            return gfx::MakeResource<vk::ImageView>(*this);
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
+        return materialize<ImageView>(*this, "ImageView");
     }
 
     ImageView::ImageView(const Builder& createInfo) :

@@ -11,6 +11,7 @@
 
 #include "image.h"
 #include "mesh.h"
+#include "graphicsPipeline.h"
 #include "../../include/log.h"
 #include "../backends/vulkan/device.h"
 #include "../backends/vulkan/vulkanContext.h"
@@ -46,23 +47,54 @@ namespace gfx
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
 
+    CommandBuffer& CommandBuffer::record(const ErrorCode code, std::string message)
+    {
+        return record(Error{ .code = code, .message = std::move(message) });
+    }
+
+    CommandBuffer& CommandBuffer::record(Error error)
+    {
+        // history() rather than toString(): when a command fails because a resource is unusable,
+        // the line the user needs is the root cause (the shader that would not compile), not the
+        // symptom (the pipeline that could not be bound).
+        gfx::log::error("[command] {}", error.history());
+        _errors.push_back(std::move(error));
+        _failed = true;
+        return *this;
+    }
+
+    VoidResult CommandBuffer::result() const
+    {
+        if (_errors.empty()) return {};
+        return std::unexpected(_errors.front());
+    }
+
     CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
         _state.boundFramebuffer = Context::Window().getFramebuffer();
         _state.boundComputePipeline = std::nullopt;
         _state.boundGraphicsPipeline = std::nullopt;
+        _state.boundRayTracingPipeline = std::nullopt;
         _state.viewportSet = false;
         _state.scissorSet = false;
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<Framebuffer> framebuffer, RenderParameters renderParameters)
+    void CommandBuffer::stateBeginRendering(const gfx::ResourceRef<const Framebuffer>& framebuffer)
     {
         _state.boundFramebuffer = framebuffer;
         _state.boundComputePipeline = std::nullopt;
         _state.boundGraphicsPipeline = std::nullopt;
+        _state.boundRayTracingPipeline = std::nullopt;
         _state.viewportSet = false;
         _state.scissorSet = false;
-        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters)
+    {
+        if (_failed) return *this;
+        if (reject(framebuffer, "framebuffer")) return *this;
+
+        return doBeginRendering(framebuffer, renderParameters);
     }
 
     CommandBuffer& CommandBuffer::EndRendering()
@@ -70,13 +102,14 @@ namespace gfx
         _state.boundFramebuffer = std::nullopt;
         _state.boundComputePipeline = std::nullopt;
         _state.boundGraphicsPipeline = std::nullopt;
+        _state.boundRayTracingPipeline = std::nullopt;
         return *this;
     }
 
     CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         if (!_state.boundGraphicsPipeline.has_value())
-            throw std::runtime_error("You can't set the viewport without a graphics pipeline bound!");
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the viewport without a graphics pipeline bound.");
         _state.viewportSet = true;
         return *this;
     }
@@ -84,41 +117,216 @@ namespace gfx
     CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         if (!_state.boundGraphicsPipeline.has_value())
-            throw std::runtime_error("You can't set the scissor without a graphics pipeline bound!");
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the scissor without a graphics pipeline bound.");
         _state.scissorSet = true;
         return *this;
     }
 
-    CommandBuffer& CommandBuffer::BindComputePipeline(gfx::ResourceRef<ComputePipeline> pipeline)
+    // ---- Dynamic state --------------------------------------------------
+    // The base implementations only validate and record intent (which state the
+    // caller has established); backends override to emit the GPU command and then
+    // chain up to these to mark the tracking bit.
+#define GFX_DYNAMIC_STATE_SETTER_GUARD(bit, name)                                            \
+        if (!_state.boundGraphicsPipeline.has_value())                                       \
+            return record(ErrorCode::eNoGraphicsPipelineBound,                               \
+                "Cannot set " name " without a graphics pipeline bound.");                   \
+        _state.dynamicStateSet |= DynamicState::bit;
+
+    CommandBuffer& CommandBuffer::SetLineWidth(float)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eLineWidth, "line width") return *this; }
+
+    CommandBuffer& CommandBuffer::SetDepthBias(float, float, float)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return *this; }
+
+    CommandBuffer& CommandBuffer::SetBlendConstants(glm::vec4)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return *this; }
+
+    CommandBuffer& CommandBuffer::SetStencilCompareMask(StencilFace, glm::u32)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return *this; }
+
+    CommandBuffer& CommandBuffer::SetStencilWriteMask(StencilFace, glm::u32)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return *this; }
+
+    CommandBuffer& CommandBuffer::SetStencilReference(StencilFace, glm::u32)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return *this; }
+
+    CommandBuffer& CommandBuffer::SetCullMode(Flags<CullMode>)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eCullMode, "cull mode") return *this; }
+
+    CommandBuffer& CommandBuffer::SetFrontFace(FrontFace)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eFrontFace, "front face") return *this; }
+
+    CommandBuffer& CommandBuffer::SetDepthTestEnable(bool)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthTestEnable, "depth test enable") return *this; }
+
+    CommandBuffer& CommandBuffer::SetDepthWriteEnable(bool)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthWriteEnable, "depth write enable") return *this; }
+
+    CommandBuffer& CommandBuffer::SetDepthCompareOp(CompareOp)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthCompareOp, "depth compare op") return *this; }
+
+    CommandBuffer& CommandBuffer::SetStencilTestEnable(bool)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilTestEnable, "stencil test enable") return *this; }
+
+    CommandBuffer& CommandBuffer::SetStencilOp(StencilFace, StencilOp, StencilOp, StencilOp, CompareOp)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilOp, "stencil op") return *this; }
+
+    CommandBuffer& CommandBuffer::SetDepthBiasEnable(bool)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthBiasEnable, "depth bias enable") return *this; }
+
+    CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(bool)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(eRasterizerDiscardEnable, "rasterizer discard enable") return *this; }
+
+    CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(bool)
+    { GFX_DYNAMIC_STATE_SETTER_GUARD(ePrimitiveRestartEnable, "primitive restart enable") return *this; }
+
+#undef GFX_DYNAMIC_STATE_SETTER_GUARD
+
+    void CommandBuffer::applyDynamicDefaults()
     {
-        if (!_state.boundComputePipeline.has_value() || &**_state.boundComputePipeline != &*pipeline)
+        if (!_state.boundGraphicsPipeline.has_value()) return;
+        const auto& pipeline = *_state.boundGraphicsPipeline.value();
+        const RasterizationState& rs = pipeline.getRasterizationState();
+        const DepthStencilState&  ds = pipeline.getDepthStencilState();
+        const ColorBlendState&    cb = pipeline.getColorBlendState();
+        const InputAssemblyState& ia = pipeline.getInputAssemblyState();
+
+        // Snapshot the mask so setters marking their own bit don't affect sibling
+        // decisions (e.g. the front/back pair below).
+        const Flags<DynamicState> set = _state.dynamicStateSet;
+
+        if (!(set & DynamicState::eLineWidth))
+            SetLineWidth(rs.lineWidth);
+        if (!(set & DynamicState::eDepthBias))
+            SetDepthBias(rs.depthBiasConstantFactor, rs.depthBiasClamp, rs.depthBiasSlopeFactor);
+        if (!(set & DynamicState::eBlendConstants))
+            SetBlendConstants({ cb.blendConstants[0], cb.blendConstants[1], cb.blendConstants[2], cb.blendConstants[3] });
+        if (!(set & DynamicState::eStencilCompareMask)) {
+            SetStencilCompareMask(StencilFace::eFront, ds.stencilFront.compareMask);
+            SetStencilCompareMask(StencilFace::eBack,  ds.stencilBack.compareMask);
+        }
+        if (!(set & DynamicState::eStencilWriteMask)) {
+            SetStencilWriteMask(StencilFace::eFront, ds.stencilFront.writeMask);
+            SetStencilWriteMask(StencilFace::eBack,  ds.stencilBack.writeMask);
+        }
+        if (!(set & DynamicState::eStencilReference)) {
+            SetStencilReference(StencilFace::eFront, ds.stencilFront.reference);
+            SetStencilReference(StencilFace::eBack,  ds.stencilBack.reference);
+        }
+        if (!(set & DynamicState::eCullMode))
+            SetCullMode(rs.cullMode);
+        if (!(set & DynamicState::eFrontFace))
+            SetFrontFace(rs.frontFace);
+        if (!(set & DynamicState::eDepthTestEnable))
+            SetDepthTestEnable(ds.depthTestEnable);
+        if (!(set & DynamicState::eDepthWriteEnable))
+            SetDepthWriteEnable(ds.depthWriteEnable);
+        if (!(set & DynamicState::eDepthCompareOp))
+            SetDepthCompareOp(ds.depthCompareOp);
+        if (!(set & DynamicState::eStencilTestEnable))
+            SetStencilTestEnable(ds.stencilEnable);
+        if (!(set & DynamicState::eStencilOp)) {
+            SetStencilOp(StencilFace::eFront, ds.stencilFront.failOp, ds.stencilFront.passOp, ds.stencilFront.depthFailOp, ds.stencilFront.compareOp);
+            SetStencilOp(StencilFace::eBack,  ds.stencilBack.failOp,  ds.stencilBack.passOp,  ds.stencilBack.depthFailOp,  ds.stencilBack.compareOp);
+        }
+        if (!(set & DynamicState::eDepthBiasEnable))
+            SetDepthBiasEnable(rs.depthBiasEnable);
+        if (!(set & DynamicState::eRasterizerDiscardEnable))
+            SetRasterizerDiscardEnable(rs.rasterizerDiscardEnable);
+        if (!(set & DynamicState::ePrimitiveRestartEnable))
+            SetPrimitiveRestartEnable(ia.primitiveRestartEnable);
+    }
+
+    void CommandBuffer::stateBindComputePipeline(const gfx::ResourceRef<const ComputePipeline>& pipeline)
+    {
+        // get(), not &*: comparing identity must not dereference.
+        if (!_state.boundComputePipeline.has_value() || _state.boundComputePipeline->get() != pipeline.get())
             _state.boundComputeDescriptorSets.clear();
         _state.boundComputePipeline = pipeline;
         _state.boundGraphicsPipeline = std::nullopt;
-        return *this;
+        _state.boundRayTracingPipeline = std::nullopt;
     }
 
-    CommandBuffer& CommandBuffer::BindGraphicsPipeline(gfx::ResourceRef<GraphicsPipeline> pipeline)
+    CommandBuffer& CommandBuffer::BindComputePipeline(gfx::ResourceRef<const ComputePipeline> pipeline)
     {
-        if (!_state.boundGraphicsPipeline.has_value() || &**_state.boundGraphicsPipeline != &*pipeline)
+        if (_failed) return *this;
+        if (reject(pipeline, "compute pipeline")) return *this;
+
+        return doBindComputePipeline(pipeline);
+    }
+
+    void CommandBuffer::stateBindGraphicsPipeline(const gfx::ResourceRef<const GraphicsPipeline>& pipeline)
+    {
+        // get(), not &*: comparing identity must not dereference.
+        if (!_state.boundGraphicsPipeline.has_value() || _state.boundGraphicsPipeline->get() != pipeline.get())
             _state.boundGraphicsDescriptorSets.clear();
         _state.boundGraphicsPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
-        return *this;
+        _state.boundRayTracingPipeline = std::nullopt;
+        // A new pipeline brings its own dynamic-state defaults; forget whatever the
+        // previous pipeline established so the next draw re-applies them.
+        _state.dynamicStateSet = Flags<DynamicState>{};
     }
 
-    CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<Mesh> mesh) {
-        if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't bind a mesh without a graphics pipeline bound!");
-        _state.boundMesh = mesh;
+    CommandBuffer& CommandBuffer::BindGraphicsPipeline(gfx::ResourceRef<const GraphicsPipeline> pipeline)
+    {
+        if (_failed) return *this;
+        if (reject(pipeline, "graphics pipeline")) return *this;
 
-        return *this;
+        return doBindGraphicsPipeline(pipeline);
+    }
+
+    void CommandBuffer::stateBindRayTracingPipeline(const gfx::ResourceRef<const RayTracingPipeline>& pipeline)
+    {
+        // get(), not &*: comparing identity must not dereference.
+        if (!_state.boundRayTracingPipeline.has_value() || _state.boundRayTracingPipeline->get() != pipeline.get())
+            _state.boundRayTracingDescriptorSets.clear();
+        _state.boundRayTracingPipeline = pipeline;
+        _state.boundComputePipeline = std::nullopt;
+        _state.boundGraphicsPipeline = std::nullopt;
+    }
+
+    CommandBuffer& CommandBuffer::BindRayTracingPipeline(gfx::ResourceRef<const RayTracingPipeline> pipeline)
+    {
+        if (_failed) return *this;
+        if (reject(pipeline, "ray tracing pipeline")) return *this;
+
+        return doBindRayTracingPipeline(pipeline);
+    }
+
+    CommandBuffer& CommandBuffer::TraceRays(glm::u32 width, glm::u32 height, glm::u32 depth)
+    {
+        return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
+    }
+
+    CommandBuffer& CommandBuffer::doBindRayTracingPipeline(gfx::ResourceRef<const RayTracingPipeline>)
+    {
+        return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
+    }
+
+    // Default no-ops: a backend without debug-marker support simply ignores labels.
+    CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string&, glm::vec4) { return *this; }
+    CommandBuffer& CommandBuffer::EndDebugLabel() { return *this; }
+    CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string&, glm::vec4) { return *this; }
+
+    void CommandBuffer::stateBindMesh(const gfx::ResourceRef<const Mesh>& mesh)
+    {
+        _state.boundMesh = mesh;
+    }
+
+    CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<const Mesh> mesh) {
+        if (_failed) return *this;
+        if (!_state.boundGraphicsPipeline.has_value())
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot bind a mesh without a graphics pipeline bound.");
+        if (reject(mesh, "mesh")) return *this;
+
+        return doBindMesh(mesh);
     }
 
     CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance)
     {
         if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't draw without a graphics pipeline bound!");
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (!_state.viewportSet) {
             this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
         }
@@ -130,11 +338,11 @@ namespace gfx
 
     CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) {
         if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't draw without a graphics pipeline bound!");
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (!_state.boundMesh.has_value())
-            log::error("You can't draw indexed without a mesh bound!");
+            return record(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
         if (!_state.boundMesh.value()->hasIndexBuffer())
-            log::error("You can't draw indexed without a mesh with an index buffer bound!");
+            return record(ErrorCode::eMeshHasNoIndexBuffer, "Cannot draw indexed: the bound mesh has no index buffer.");
         if (!_state.viewportSet) {
             this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
         }
@@ -144,8 +352,9 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ) {        if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't draw mesh tasks without a graphics pipeline bound!");
+    CommandBuffer & CommandBuffer::DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ) {
+        if (!_state.boundGraphicsPipeline.has_value())
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw mesh tasks without a graphics pipeline bound.");
         if (!_state.viewportSet)
             this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
         if (!_state.scissorSet)
@@ -153,49 +362,17 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::DispatchIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset) {
-        if (!_state.boundComputePipeline.has_value())
-            log::error("You can't dispatch indirect without a compute pipeline bound!");
-        return *this;
+
+    CommandBuffer& CommandBuffer::GenerateMipmaps(gfx::ResourceRef<const Image> image)
+    {
+        if (_failed) return *this;
+        if (reject(image, "image")) return *this;
+        return doGenerateMipmaps(image);
     }
 
-    CommandBuffer & CommandBuffer::DrawIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
-        if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't draw indirect without a graphics pipeline bound!");
-        if (!_state.viewportSet) {
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
-        }
-        if (!_state.scissorSet) {
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
-        }
-        return *this;
-    }
-
-    CommandBuffer & CommandBuffer::DrawIndexedIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
-        if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't draw indexed indirect without a graphics pipeline bound!");
-        if (!_state.viewportSet) {
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
-        }
-        if (!_state.scissorSet) {
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
-        }
-        return *this;
-    }
-
-    CommandBuffer & CommandBuffer::DrawMeshTasksIndirect(ResourceRef<Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
-        if (!_state.boundGraphicsPipeline.has_value())
-            log::error("You can't draw mesh tasks indirect without a graphics pipeline bound!");
-        if (!_state.viewportSet) {
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
-        }
-        if (!_state.scissorSet) {
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
-        }
-        return *this;
-    }
-
-    CommandBuffer & CommandBuffer::GenerateMipmaps(ResourceRef<Image> image) {
+    // Default: blit each mip from the one above it. Vulkan uses this; GL overrides it with
+    // glGenerateMipmap. Reached only through the wrapper above, so `image` is always usable.
+    CommandBuffer& CommandBuffer::doGenerateMipmaps(ResourceRef<const Image> image) {
         const auto& extent = image->getExtent();
         const auto mipLevels = image->getMipLevels();
         const auto arrayLayers = image->getArrayLayers();
@@ -235,14 +412,16 @@ namespace gfx
         commandBuffer->Begin();
         command(*commandBuffer);
         commandBuffer->End();
-        commandBuffer->Submit();
+        if (auto submitted = commandBuffer->Submit(); !submitted) {
+            gfx::log::error("[command] single-time command failed: {}", submitted.error().toString());
+        }
         commandBuffer->WaitForFence();
     }
 
-    CommandBuffer& CommandBuffer::DrawMesh(gfx::ResourceRef<Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
+    CommandBuffer& CommandBuffer::DrawMesh(gfx::ResourceRef<const Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
     {
         if (!_state.boundGraphicsPipeline.has_value())
-            throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
             this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
         }
@@ -254,9 +433,9 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::DrawSubMesh(gfx::ResourceRef<Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
+    CommandBuffer & CommandBuffer::DrawSubMesh(gfx::ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
         if (!_state.boundGraphicsPipeline.has_value())
-            throw std::runtime_error("You can't draw a mesh without a graphics pipeline bound!");
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
             this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
         }
@@ -270,7 +449,7 @@ namespace gfx
 
     std::unique_ptr<CommandBuffer> CommandBuffer::Create(const Flags<Usage> usage)
     {
-        switch (Context::Window().getAPI()) {
+        switch (Context::activeAPI()) {
         case API::eOpenGL:
             return std::make_unique<ogl::CommandBuffer>(usage);
         case API::eVulkan:
@@ -282,4 +461,155 @@ namespace gfx
             throw std::runtime_error("Unknown API");
         }
     }
+
+    // ---- Non-virtual interface: the gate ---------------------------------
+    // Each of these validates, refuses unusable resources, and only then reaches the backend.
+    // The do* implementations below them may assume every resource they receive is alive and
+    // usable — which is what the dynamic_cast at every backend deref has always assumed.
+
+    CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, gfx::ResourceRef<const DescriptorSet> descriptorSet, const bool debug)
+    {
+        if (_failed) return *this;
+        if (reject(descriptorSet, "descriptor set")) return *this;
+        return doBindDescriptorSet(index, descriptorSet, debug);
+    }
+
+    CommandBuffer& CommandBuffer::Barrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers)
+    {
+        if (_failed) return *this;
+        for (const auto& barrier : bufferBarriers)
+            if (reject(barrier.getBuffer(), "barrier's buffer")) return *this;
+        for (const auto& barrier : imageBarriers)
+            if (reject(barrier.getImage(), "barrier's image")) return *this;
+        return doBarrier(std::move(bufferBarriers), std::move(imageBarriers));
+    }
+
+    CommandBuffer& CommandBuffer::DispatchIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset)
+    {
+        if (_failed) return *this;
+        if (!_state.boundComputePipeline.has_value())
+            return record(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
+        if (reject(indirectBuffer, "indirect buffer")) return *this;
+        return doDispatchIndirect(indirectBuffer, offset);
+    }
+
+    CommandBuffer& CommandBuffer::DrawIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
+    {
+        if (_failed) return *this;
+        if (!_state.boundGraphicsPipeline.has_value())
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+        if (reject(indirectBuffer, "indirect buffer")) return *this;
+
+        if (!_state.viewportSet)
+            SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        if (!_state.scissorSet)
+            SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        return doDrawIndirect(indirectBuffer, offset, drawCount, stride);
+    }
+
+    CommandBuffer& CommandBuffer::DrawIndexedIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
+    {
+        if (_failed) return *this;
+        if (!_state.boundGraphicsPipeline.has_value())
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+        if (!_state.boundMesh.has_value())
+            return record(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
+        if (reject(indirectBuffer, "indirect buffer")) return *this;
+
+        if (!_state.viewportSet)
+            SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        if (!_state.scissorSet)
+            SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        return doDrawIndexedIndirect(indirectBuffer, offset, drawCount, stride);
+    }
+
+    CommandBuffer& CommandBuffer::DrawMeshTasksIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
+    {
+        if (_failed) return *this;
+        if (!_state.boundGraphicsPipeline.has_value())
+            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+        if (reject(indirectBuffer, "indirect buffer")) return *this;
+
+        if (!_state.viewportSet)
+            SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        if (!_state.scissorSet)
+            SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        return doDrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride);
+    }
+
+    CommandBuffer& CommandBuffer::ClearBuffer(gfx::ResourceRef<const Buffer> buffer, const glm::u64 offset, const glm::u64 size)
+    {
+        if (_failed) return *this;
+        if (reject(buffer, "buffer")) return *this;
+        return doClearBuffer(buffer, offset, size);
+    }
+
+    CommandBuffer& CommandBuffer::ClearColorImage(gfx::ResourceRef<const Image> image, const glm::vec4 color)
+    {
+        if (_failed) return *this;
+        if (reject(image, "image")) return *this;
+        return doClearColorImage(image, color);
+    }
+
+    CommandBuffer& CommandBuffer::FillBuffer(gfx::ResourceRef<const Buffer> buffer, void* data, const glm::u64 offset, const glm::u64 size)
+    {
+        if (_failed) return *this;
+        if (reject(buffer, "buffer")) return *this;
+        return doFillBuffer(buffer, data, offset, size);
+    }
+
+    CommandBuffer& CommandBuffer::CopyBuffer(gfx::ResourceRef<const Buffer> srcBuffer, gfx::ResourceRef<const Buffer> dstBuffer, const glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset)
+    {
+        if (_failed) return *this;
+        if (reject(srcBuffer, "copy source buffer")) return *this;
+        if (reject(dstBuffer, "copy destination buffer")) return *this;
+        return doCopyBuffer(srcBuffer, dstBuffer, size, srcOffset, dstOffset);
+    }
+
+    CommandBuffer& CommandBuffer::CopyBufferToImage(gfx::ResourceRef<const Buffer> buffer, gfx::ResourceRef<const Image> image, const gfx::Copy copyInfo)
+    {
+        if (_failed) return *this;
+        if (reject(buffer, "copy source buffer")) return *this;
+        if (reject(image, "copy destination image")) return *this;
+        return doCopyBufferToImage(buffer, image, copyInfo);
+    }
+
+    CommandBuffer& CommandBuffer::CopyImageToBuffer(gfx::ResourceRef<const Image> image, gfx::ResourceRef<const Buffer> buffer, const gfx::Copy copyInfo)
+    {
+        if (_failed) return *this;
+        if (reject(image, "copy source image")) return *this;
+        if (reject(buffer, "copy destination buffer")) return *this;
+        return doCopyImageToBuffer(image, buffer, copyInfo);
+    }
+
+    CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const Image> srcImage, const gfx::Blit blitInfo)
+    {
+        if (_failed) return *this;
+        if (reject(srcImage, "blit source image")) return *this;
+        return doBlit(srcImage, blitInfo);
+    }
+
+    CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const Image> srcImage, gfx::ResourceRef<const Image> dstImage, const gfx::Blit blitInfo)
+    {
+        if (_failed) return *this;
+        if (reject(srcImage, "blit source image")) return *this;
+        if (reject(dstImage, "blit destination image")) return *this;
+        return doBlit(srcImage, dstImage, blitInfo);
+    }
+
+    CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<const Image> srcImage, const gfx::Resolve resolveInfo)
+    {
+        if (_failed) return *this;
+        if (reject(srcImage, "resolve source image")) return *this;
+        return doResolve(srcImage, resolveInfo);
+    }
+
+    CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<const Image> srcImage, gfx::ResourceRef<const Image> dstImage, const gfx::Resolve resolveInfo)
+    {
+        if (_failed) return *this;
+        if (reject(srcImage, "resolve source image")) return *this;
+        if (reject(dstImage, "resolve destination image")) return *this;
+        return doResolve(srcImage, dstImage, resolveInfo);
+    }
+
 }

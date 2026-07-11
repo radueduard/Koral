@@ -26,7 +26,7 @@ gfx::vk::DescriptorPool* gfx::vk::GUI::_descriptorPool = nullptr;
 
 namespace gfx::vk
 {
-    GUI_Image::GUI_Image(gfx::ResourceRef<gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    GUI_Image::GUI_Image(gfx::ResourceRef<const gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         _helperSampler = Sampler::Builder()
             .setMagFilter(Filter::eNearest)
@@ -76,7 +76,7 @@ namespace gfx::vk
             }, ::vk::QueueFlagBits::eGraphics);
     }
 
-    void GUI_Image::setImage(gfx::ResourceRef<gfx::Image> image)
+    void GUI_Image::setImage(gfx::ResourceRef<const gfx::Image> image)
     {
         Context::Device()->waitIdle();
         ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());

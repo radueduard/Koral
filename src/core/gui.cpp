@@ -130,14 +130,14 @@ void gfx::GUI::DefineStyle()
 }
 
 
-gfx::Resource<gfx::GUI_Image> gfx::GUI_Image::Create(gfx::ResourceRef<gfx::Image> image, glm::u32 layer, glm::u32 level)
+gfx::Resource<gfx::GUI_Image> gfx::GUI_Image::Create(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level)
 {
-    switch (Context::Window().getAPI())
+    switch (Context::activeAPI())
     {
         case API::eOpenGL:
-        return gfx::MakeResource<gfx::ogl::GUI_Image>(image, layer, level);
+        return gfx::MakeBackendResource<gfx::GUI_Image, gfx::ogl::GUI_Image>(image, layer, level);
     case API::eVulkan:
-        return gfx::MakeResource<gfx::vk::GUI_Image>(image, layer, level);
+        return gfx::MakeBackendResource<gfx::GUI_Image, gfx::vk::GUI_Image>(image, layer, level);
     default:
         throw std::runtime_error("Unsupported graphics API");
     }
@@ -156,7 +156,7 @@ void gfx::GUI::Init()
         // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     // }
 
-    switch (Context::Window().getAPI())
+    switch (Context::activeAPI())
     {
     case API::eOpenGL:
          ogl::GUI::Init();
@@ -175,7 +175,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 {
     auto* context = Context::GetCurrentImGuiContext();
 
-    switch (Context::Window().getAPI())
+    switch (Context::activeAPI())
     {
     case API::eOpenGL:
         ogl::GUI::NewFrame();
@@ -326,7 +326,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
     ImGui::Render();
 
     ImDrawData* draw_data = ImGui::GetDrawData();
-    switch (Context::Window().getAPI())
+    switch (Context::activeAPI())
     {
     case API::eOpenGL:
         ogl::GUI::Render(commandBuffer, draw_data);
@@ -349,7 +349,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
 
 void gfx::GUI::Shutdown()
 {
-    switch (Context::Window().getAPI())
+    switch (Context::activeAPI())
     {
     case API::eOpenGL:
         ogl::GUI::Shutdown();

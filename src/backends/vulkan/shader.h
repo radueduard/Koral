@@ -16,5 +16,8 @@ namespace gfx::vk
     public:
         explicit Shader(const Builder& createInfo);
         ~Shader() override;
+
+    protected:
+        void OnReload() override;
     };
 }

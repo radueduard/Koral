@@ -19,10 +19,16 @@
 #include <flags.h>
 #include <map>
 #include <vector>
+#include <tuple>
+#include <cstring>
+#include <stdexcept>
+#include <type_traits>
 
 #include "descriptorSetLayout.h"
 #include "mesh.h"
 #include "api.h"
+#include "builder.h"
+#include "pipeline.h"
 #include "shader.h"
 
 namespace gfx
@@ -33,8 +39,8 @@ namespace gfx
 
     struct GFX_API TessellationState
     {
-        std::reference_wrapper<const Shader> controlShader;
-        std::reference_wrapper<const Shader> evalShader;
+        gfx::ResourceRef<const Shader> controlShader;
+        gfx::ResourceRef<const Shader> evalShader;
         glm::u32 patchControlPoints = 3;
     };
 
@@ -58,16 +64,20 @@ namespace gfx
         float blendConstants[4] = { 0.f, 0.f, 0.f, 0.f };
     };
 
-    class GFX_API GraphicsPipeline
+    class GFX_API GraphicsPipeline : public Pipeline
     {
     public:
-        struct GFX_API Builder {
-            std::optional<std::reference_wrapper<const Shader>> vertexShader = std::nullopt;
+        struct GFX_API Builder : ::Builder {
+            // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
+            // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
+            static constexpr bool Recoverable = true;
+
+            std::optional<gfx::ResourceRef<const Shader>> vertexShader = std::nullopt;
             std::optional<TessellationState> tessellationState = std::nullopt;
-            std::optional<std::reference_wrapper<const Shader>> geometryShader = std::nullopt;
-            std::optional<std::reference_wrapper<const Shader>> fragmentShader = std::nullopt;
-            std::optional<std::reference_wrapper<const Shader>> taskShader = std::nullopt;
-            std::optional<std::reference_wrapper<const Shader>> meshShader = std::nullopt;
+            std::optional<gfx::ResourceRef<const Shader>> geometryShader = std::nullopt;
+            std::optional<gfx::ResourceRef<const Shader>> fragmentShader = std::nullopt;
+            std::optional<gfx::ResourceRef<const Shader>> taskShader = std::nullopt;
+            std::optional<gfx::ResourceRef<const Shader>> meshShader = std::nullopt;
             std::optional<gfx::ResourceRef<Framebuffer>> framebuffer = std::nullopt;
             std::vector<VertexInputAttributeDescription> vertexAttributeDescriptions = {};
             std::vector<VertexInputBindingDescription> vertexBindingDescriptions = {};
@@ -82,7 +92,7 @@ namespace gfx
             template <gfx::MeshType T>
             Builder& setVertexShader(ResourceRef<const Shader> shader)
             {
-                this->vertexShader = std::cref(*shader);
+                this->vertexShader = shader;
                 this->vertexAttributeDescriptions = T::VertexAttributeDescription();
                 this->vertexBindingDescriptions = T::VertexBindingDescription();
                 return *this;
@@ -99,37 +109,35 @@ namespace gfx
             Builder& setDepthStencilState(const DepthStencilState& depthStencilState);
             Builder& setColorBlendState(const ColorBlendState& colorBlendState);
             Builder& setFramebuffer(gfx::ResourceRef<Framebuffer> framebuffer);
+
+            // Bakes a specialization constant into every shader stage of this pipeline.
+            // Mirrors ComputePipeline::Builder: stages that don't declare a constant with
+            // this id simply ignore it, so a single value can be shared across stages.
+            template<typename T> requires std::is_trivially_copyable_v<T>
+            Builder& setSpecializationConstant(glm::u32 id, T value) {
+                const glm::u32 valueSize = sizeof(T);
+                if (currentSpecConstantSize + valueSize > specConstantsData.size()) {
+                    throw std::runtime_error("Exceeded maximum specialization constant data size");
+                }
+                specConstantsMetadata.emplace_back(id, currentSpecConstantSize, valueSize);
+                std::memcpy(specConstantsData.data() + currentSpecConstantSize, &value, valueSize);
+                currentSpecConstantSize += valueSize;
+                return *this;
+            }
+
+            std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
+            std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
+
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] Result<std::unique_ptr<GraphicsPipeline>> create() const;
             [[nodiscard]] gfx::Resource<GraphicsPipeline> build() const;
+
+        private:
+            glm::u32 currentSpecConstantSize = 0;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */
-        virtual ~GraphicsPipeline();
-
-        GraphicsPipeline(const GraphicsPipeline&) = delete;
-        GraphicsPipeline& operator=(const GraphicsPipeline&) = delete;
-
-        /**
-         * @brief Bind this pipeline on a command buffer.
-         * @param commandBuffer Command buffer receiving bind commands.
-         */
-        virtual void Bind(const gfx::CommandBuffer& commandBuffer) const = 0;
-
-        /** @brief Unbind this pipeline, if supported by the backend. */
-        virtual void Unbind() const = 0;
-
-        /**
-         * @brief Get descriptor set layout for a set index.
-         * @param index Descriptor set number.
-         * @return Descriptor set layout associated with @p index.
-         */
-        [[nodiscard]] const gfx::DescriptorSetLayout& getSetLayout(glm::u32 index) const;
-
-        /**
-         * @brief Get push-constant range by byte offset.
-         * @param offset Byte offset into declared push constant ranges.
-         * @return Push-constant range covering @p offset.
-         */
-        [[nodiscard]] const Shader::PushConstant& getPushConstantRange(glm::u32 offset) const;
+        ~GraphicsPipeline() override;
 
         /** @brief Vertex input binding descriptions, if available. */
         [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& getVertexBindingDescriptions() const { return _vertexBindingDescriptions; }
@@ -159,15 +167,17 @@ namespace gfx
          */
         explicit GraphicsPipeline(const Builder& createInfo);
 
-        std::optional<std::reference_wrapper<const Shader>> _vertexShader;
+        VoidResult Validate() override;
+
+        std::optional<gfx::ResourceRef<const Shader>> _vertexShader;
         std::optional<TessellationState> _tessellationState;
-        std::optional<std::reference_wrapper<const Shader>> _geometryShader;
-        std::optional<std::reference_wrapper<const Shader>> _fragmentShader;
+        std::optional<gfx::ResourceRef<const Shader>> _geometryShader;
+        std::optional<gfx::ResourceRef<const Shader>> _fragmentShader;
 
-        std::optional<std::reference_wrapper<const Shader>> _taskShader;
-        std::optional<std::reference_wrapper<const Shader>> _meshShader;
+        std::optional<gfx::ResourceRef<const Shader>> _taskShader;
+        std::optional<gfx::ResourceRef<const Shader>> _meshShader;
 
-        gfx::ResourceRef<Framebuffer> _framebuffer;
+        gfx::ResourceRef<const Framebuffer> _framebuffer;
 
         InputAssemblyState _inputAssemblyState;
         RasterizationState _rasterizationState;
@@ -178,7 +188,7 @@ namespace gfx
         std::optional<std::vector<VertexInputAttributeDescription>> _vertexAttributeDescriptions;
         std::optional<std::vector<VertexInputBindingDescription>> _vertexBindingDescriptions;
 
-        std::map<glm::u32, std::unique_ptr<DescriptorSetLayout>> _setLayouts {};
-        std::map<glm::u32, Shader::PushConstant> _pushConstantRanges;
+        std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> _specConstantsMetadata;
+        std::vector<std::byte> _specConstantsData;
     };
 }

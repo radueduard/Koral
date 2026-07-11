@@ -47,8 +47,8 @@ namespace gfx::vk
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
         [[nodiscard]] ::vk::SampleCountFlagBits getMSAA() const { return getVkSampleCount(_msaa); }
 
-        [[nodiscard]] gfx::ResourceRef<gfx::Image> getImage() const { return _swapChainImages; }
-        [[nodiscard]] gfx::ResourceRef<gfx::Image> getDepthImage() const { return _depthImages; }
+        [[nodiscard]] gfx::ResourceRef<const gfx::Image> getImage() const { return _swapChainImages; }
+        [[nodiscard]] gfx::ResourceRef<const gfx::Image> getDepthImage() const { return _depthImages; }
 
         [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getSwapChainImageViews() const { return *_swapChainImageViews; }
         [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getDepthImageViews() const { return *_depthImageViews; }

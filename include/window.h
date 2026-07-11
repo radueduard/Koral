@@ -27,7 +27,7 @@ struct GLFWwindow;
 struct GLFWimage;
 struct GLFWvidmode;
 
-namespace gfx::io {
+namespace gfx {
     class GFX_API Window {
         friend class Input;
         friend class Input::Callbacks;
@@ -41,6 +41,7 @@ namespace gfx::io {
             bool fullscreen = false;
             bool decorated = true;
             bool transparentFramebuffer = false;
+            bool vsync = true;
             API api = API::eVulkan;
             std::unique_ptr<Scene> scene = nullptr;
 
@@ -76,6 +77,14 @@ namespace gfx::io {
                 return *this;
             }
 
+            // Vertical sync. When true (default) frames are presented without tearing
+            // and capped to the display's refresh rate; when false, frames present as
+            // fast as possible (uncapped, may tear).
+            Builder& setVSync(bool vsync) {
+                this->vsync = vsync;
+                return *this;
+            }
+
             Builder& setAPI(API api) {
                 this->api = api;
                 return *this;
@@ -103,6 +112,7 @@ namespace gfx::io {
         [[nodiscard]] bool isResizable() const { return _resizable; }
         [[nodiscard]] bool isFullscreen() const { return _fullscreen; }
         [[nodiscard]] bool isDecorated() const { return _decorated; }
+        [[nodiscard]] bool isVSync() const { return _vsync; }
         [[nodiscard]] bool isFramebufferTransparent() const { return _transparentFramebuffer; }
 
         void pause() { _paused = true; }
@@ -123,7 +133,6 @@ namespace gfx::io {
         void LateUpdate();
 
     private:
-        void focus();
     	static void framebufferResize(GLFWwindow* handle, int width, int height);
 
         GLFWwindow* _window = nullptr;
@@ -138,10 +147,9 @@ namespace gfx::io {
         bool _fullscreen;
         bool _decorated;
         bool _transparentFramebuffer;
+        bool _vsync;
         API _api;
 
-        Input::State _inputState;
-        Time::State _timeState;
         gfx::Resource<gfx::Framebuffer> _framebuffer;
 
         std::unique_ptr<Scene> _scene;

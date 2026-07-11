@@ -102,24 +102,36 @@ namespace gfx {
         return *this;
     }
 
-    Resource<Framebuffer> Framebuffer::Builder::build() const
+    Result<std::unique_ptr<Framebuffer>> Framebuffer::Builder::create() const
     {
-        switch (Context::Window().getAPI()) {
-        case API::eOpenGL:
-            return MakeResource<ogl::Framebuffer>(*this);
-        case API::eVulkan:
-            return MakeResource<vk::Framebuffer>(*this);
-        default:
-            throw std::runtime_error("Unknown graphics API!");
-        }
+        beginAttempt();
+
+        // Attachments are adopted as they are set, not here: this builder stores plain references
+        // to its image views, so it must inspect each one at the moment it is handed over.
+        if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const auto api = Context::activeAPI();
+        if (api != API::eOpenGL && api != API::eVulkan)
+            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+
+        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Framebuffer> {
+            return (api == API::eVulkan)
+                ? MakeBackendPtr<Framebuffer, vk::Framebuffer>(*this)
+                : MakeBackendPtr<Framebuffer, ogl::Framebuffer>(*this);
+        });
+    }
+
+    gfx::Resource<Framebuffer> Framebuffer::Builder::build() const
+    {
+        return materialize<Framebuffer>(*this, "Framebuffer");
     }
 
     gfx::Resource<Framebuffer> Framebuffer::CreateDefault() {
-        switch (Context::Window().getAPI()) {
+        switch (Context::activeAPI()) {
         case API::eOpenGL:
-            return gfx::MakeResource<ogl::Framebuffer>();
+            return gfx::MakeBackendResource<Framebuffer, ogl::Framebuffer>();
         case API::eVulkan:
-            return gfx::MakeResource<vk::Framebuffer>();
+            return gfx::MakeBackendResource<Framebuffer, vk::Framebuffer>();
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

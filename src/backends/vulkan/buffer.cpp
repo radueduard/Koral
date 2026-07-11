@@ -98,6 +98,12 @@ namespace gfx::vk
 		return _buffers[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
 
+	glm::u64 Buffer::getDeviceAddress() const
+	{
+		return static_cast<glm::u64>(
+			Context::Device()->getBufferAddress(::vk::BufferDeviceAddressInfo().setBuffer(**this)));
+	}
+
 	::vk::AccessFlags Buffer::getAccessMask() const {
 		const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
 		return _accessFlags[currentFrame];
@@ -116,7 +122,7 @@ namespace gfx::vk
 	}
 
 	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
-	void Buffer::automaticUpdate() const {
+	void Buffer::automaticUpdate() {
 		const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
