@@ -21,12 +21,14 @@
 #include <spirv_cross.hpp>
 
 #include "slangCompiler.h"
+#include "fileWatcher.h"
 
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
 #include "structs.h"
+#include "paths.h"
 
 
 namespace gfx {
@@ -168,8 +170,11 @@ namespace gfx {
 
     static std::vector<std::filesystem::path>& shaderSearchPathsStorage()
     {
-        // Seeded with the API's own shaders/ folder; projects add their roots via addSearchPath.
-        static std::vector<std::filesystem::path> paths = { std::filesystem::path(SHADERS_PATH) };
+        // Seeded with wherever gfx's own shaders/ actually landed — beside the installed library, or
+        // in the source tree for a dev build. Never a bare compile-time absolute path: that would be
+        // the build machine's, and meaningless on a user's. Projects add their roots via addSearchPath.
+        static std::vector<std::filesystem::path> paths =
+            detail::dataRoots("shaders", "GFX_SHADERS_DIR", SHADERS_PATH);
         return paths;
     }
 

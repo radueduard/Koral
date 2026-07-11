@@ -6,6 +6,7 @@
 #include <surface.h>
 #include <framebuffer.h>
 #include "context.h"
+#include "paths.h"
 #include <filesystem>
 #include <mutex>
 #include <stdexcept>
@@ -23,17 +24,32 @@
 
 std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
 {
-    return std::filesystem::path(ASSETS_PATH) / relativePath;
+    // Resolved once, relative to the installed library rather than to whatever machine built it.
+    static const auto roots = detail::dataRoots("assets", "GFX_ASSETS_DIR", ASSETS_PATH);
+
+    for (const auto& root : roots) {
+        std::error_code ec;
+        if (auto candidate = root / relativePath; std::filesystem::exists(candidate, ec))
+            return candidate;
+    }
+
+    // Nothing matched. Hand back the best guess anyway, so the caller's own "file not found" names
+    // a path the user can act on rather than an empty string.
+    return roots.empty() ? relativePath : roots.front() / relativePath;
 }
 
 std::filesystem::path gfx::shaderPath(const std::filesystem::path& relativePath)
 {
-    // Resolve across the registered shader roots (project + API helpers); first existing wins.
+    // Resolve across the registered shader roots (the install roots below, plus any the project
+    // added via Shader::addSearchPath); first existing wins.
     for (const auto& root : Shader::searchPaths()) {
-        if (auto candidate = root / relativePath; std::filesystem::exists(candidate))
+        std::error_code ec;
+        if (auto candidate = root / relativePath; std::filesystem::exists(candidate, ec))
             return candidate;
     }
-    return std::filesystem::path(SHADERS_PATH) / relativePath; // fallback
+
+    const auto& roots = Shader::searchPaths();
+    return roots.empty() ? relativePath : roots.front() / relativePath;
 }
 
 gfx::Window& gfx::Context::Window()
