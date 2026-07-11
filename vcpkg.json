@@ -8,7 +8,10 @@
   }, {
     "name" : "glfw3",
     "version>=" : "3.4#1",
-    "features" : [ "wayland" ]
+    "features" : [ {
+      "name" : "wayland",
+      "platform" : "linux"
+    } ]
   }, {
     "name" : "magic-enum",
     "version>=" : "0.9.7#1"

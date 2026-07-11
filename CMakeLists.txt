@@ -185,9 +185,25 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)
 # instantiate the header-inline diagnostics also link it.
 target_link_libraries(${PROJECT_NAME} PUBLIC $<$<CXX_COMPILER_ID:GNU>:stdc++exp>)
 
+# The source tree is a *fallback* for locating shaders and assets, used only when they were not
+# found beside the installed library (see src/core/paths.cpp). Baking it in is right for a dev build
+# and wrong for a shipped one: it is an absolute path on the machine that compiled the binary, which
+# on a user's machine names nothing. Release/CI builds turn it off, and then the only way gfx finds
+# its data is the install layout — which is exactly what we want to be testing.
+option(GFX_EMBED_SOURCE_PATHS
+       "Bake the source-tree shader/asset paths in as a development fallback (OFF for distribution)" ON)
+
+if(GFX_EMBED_SOURCE_PATHS)
+    set(GFX_ASSETS_PATH "${CMAKE_SOURCE_DIR}/assets/")
+    set(GFX_SHADERS_PATH "${CMAKE_SOURCE_DIR}/shaders/")
+else()
+    set(GFX_ASSETS_PATH "")
+    set(GFX_SHADERS_PATH "")
+endif()
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-        ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets/"
-        SHADERS_PATH="${CMAKE_SOURCE_DIR}/shaders/"
+        ASSETS_PATH="${GFX_ASSETS_PATH}"
+        SHADERS_PATH="${GFX_SHADERS_PATH}"
         PROJECT_ROOT="${CMAKE_SOURCE_DIR}/"
 )
 
@@ -238,6 +254,18 @@ target_compile_definitions(Gfx_Runtime PRIVATE
 
 set_target_properties(Gfx_Runtime PROPERTIES EXPORT_NAME Gfx_Runtime)
 
+# Where the loader looks for the bundled dependencies below. Without this, an installed binary
+# resolves libslang/libvulkan from the *build* machine's vcpkg tree (CMake strips the build RUNPATH
+# on install), so it links here and fails to start anywhere else. $ORIGIN is resolved by the loader
+# at load time, which is what keeps the archive relocatable.
+if(APPLE)
+    set_target_properties(${PROJECT_NAME} PROPERTIES INSTALL_RPATH "@loader_path")
+    set_target_properties(Gfx_Runtime PROPERTIES INSTALL_RPATH "@loader_path/../${CMAKE_INSTALL_LIBDIR}")
+elseif(UNIX)
+    set_target_properties(${PROJECT_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN")
+    set_target_properties(Gfx_Runtime PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}")
+endif()
+
 # Declare the export set via install() — export(EXPORT) requires this to exist
 install(TARGETS ${PROJECT_NAME} Gfx_Runtime
         EXPORT ${PROJECT_NAME}Targets
@@ -245,12 +273,217 @@ install(TARGETS ${PROJECT_NAME} Gfx_Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+# The public headers. Without these the installed library is unusable as an SDK.
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING PATTERN "*.h")
+
+# api.h is generated (generate_export_header), so it lives in the build tree, not include/ — and
+# every public header includes it. Miss it and the installed SDK fails on the consumer's first
+# #include, which is exactly how this was found.
+install(FILES ${CMAKE_BINARY_DIR}/include/api.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# gfx's own shaders and assets, into the layout src/core/paths.cpp looks for
+# (<libdir>/../share/GFX_RELOADED/<kind>). Shipping the binary without these gives a library that
+# builds and then cannot find a single shader at runtime.
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/shaders/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/GFX_RELOADED/shaders)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/GFX_RELOADED/assets)
+
+# ---------------------------------------------------------------------------
+# Bundled runtime dependencies
+#
+# Most of gfx's dependencies are static, but not all: slang and the Vulkan loader are shared
+# objects living in the build machine's vcpkg tree. CMake strips the build RUNPATH on install, so
+# an installed binary asks the loader for "libslang-compiler.so" with nowhere to find it — it
+# neither links nor starts on any machine but the one that built it.
+#
+# The closure is computed at install time rather than listed by hand: the list differs per platform
+# (DLLs on Windows, dylibs on macOS) and per vcpkg feature set, and a hand-written one is a list
+# that silently goes stale. Anything resolving to a system path is *excluded* — libX11, libGL and
+# libstdc++ are the user's, and shipping our own copies is how you break their machine.
+# ---------------------------------------------------------------------------
+# Where the bundled libraries have to land differs by platform, and getting it wrong produces a
+# package that installs cleanly and then cannot start. The Windows loader searches the directory of
+# the *executable* and never a sibling lib/, so DLLs go next to Gfx_Runtime; ELF/Mach-O resolve via
+# the RPATH set above, so they go beside the library that names them.
+if(WIN32)
+    set(GFX_DEP_DESTDIR ${CMAKE_INSTALL_BINDIR})
+else()
+    set(GFX_DEP_DESTDIR ${CMAKE_INSTALL_LIBDIR})
+endif()
+
+install(CODE "
+    set(GFX_DEP_SEARCH_DIRS \"${GFX_VCPKG_PREFIX}/lib\" \"${GFX_VCPKG_PREFIX}/bin\")
+    set(GFX_DEP_DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${GFX_DEP_DESTDIR}\")
+")
+install(CODE [[
+    file(GET_RUNTIME_DEPENDENCIES
+            LIBRARIES "$<TARGET_FILE:GFX_RELOADED>"
+            EXECUTABLES "$<TARGET_FILE:Gfx_Runtime>"
+            RESOLVED_DEPENDENCIES_VAR GFX_RESOLVED_DEPS
+            UNRESOLVED_DEPENDENCIES_VAR GFX_UNRESOLVED_DEPS
+            DIRECTORIES ${GFX_DEP_SEARCH_DIRS}
+            PRE_EXCLUDE_REGEXES "api-ms-win-.*" "ext-ms-.*"
+            POST_EXCLUDE_REGEXES
+                "^/(usr|lib|lib32|lib64)/"          # Linux system libraries
+                "^/System/Library/" "^/usr/lib/"    # macOS system libraries
+                "[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\]" # Windows system DLLs
+    )
+
+    # Gfx_Runtime links libGFX_RELOADED, so gfx resolves as a dependency of itself. install(TARGETS)
+    # has already placed it — with its RPATH rewritten to $ORIGIN — and copying the build-tree
+    # binary over that would restore the build machine's RUNPATH and undo the relocatability. (It
+    # currently survives only because file(INSTALL) skips a newer destination, which is a timestamp
+    # race, not a guarantee.) Ours is not a dependency to bundle; it *is* the thing being installed.
+    set(GFX_OWN_BINARIES "$<TARGET_FILE_NAME:GFX_RELOADED>" "$<TARGET_FILE_NAME:Gfx_Runtime>")
+
+    foreach(dep IN LISTS GFX_RESOLVED_DEPS)
+        get_filename_component(depName "${dep}" NAME)
+        if(depName IN_LIST GFX_OWN_BINARIES)
+            continue()
+        endif()
+        message(STATUS "Bundling runtime dependency: ${depName}")
+        file(INSTALL
+                DESTINATION "${GFX_DEP_DESTINATION}"
+                TYPE SHARED_LIBRARY
+                FOLLOW_SYMLINK_CHAIN
+                FILES "${dep}")
+    endforeach()
+
+    # Unresolved is the normal case for system libraries the loader will supply. It is only a
+    # problem if something we *built against* shows up here, so say what they were.
+    foreach(dep IN LISTS GFX_UNRESOLVED_DEPS)
+        message(STATUS "Leaving to the system loader: ${dep}")
+    endforeach()
+]])
+
+# ---------------------------------------------------------------------------
+# Vendored public dependencies
+#
+# gfx's public headers expose three third-party libraries: glm (in ~20 headers — vectors and
+# matrices are part of the API's vocabulary), spdlog (log.h, whose inline templates take
+# spdlog::format_string_t) and imgui (gui.h). A consumer therefore cannot compile against gfx
+# without their headers, nor link against it without their objects — spdlog and imgui are static
+# libs whose symbols do not escape libGFX_RELOADED.
+#
+# Rather than making that the consumer's problem (they would need vcpkg with matching versions,
+# which for a launcher-generated project is an absurd amount of setup), the SDK *ships* them. A
+# project needs nothing but the downloaded archive.
+#
+# This is a property of the package, not a promise to the user: consumers link only
+# GFX_RELOADED::GFX_RELOADED. When these types stop appearing in gfx's public headers, delete this
+# block and the vendored copies simply stop shipping — no consumer CMake changes.
+# ---------------------------------------------------------------------------
+option(GFX_VENDOR_PUBLIC_DEPS
+       "Ship glm/spdlog/fmt/imgui inside the SDK so consumers need no package manager" ON)
+
+if(GFX_VENDOR_PUBLIC_DEPS AND GFX_VCPKG_PREFIX)
+    set(GFX_VENDOR_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/gfx-vendor)
+    set(GFX_VENDOR_LIBDIR ${CMAKE_INSTALL_LIBDIR}/gfx-vendor)
+
+    # Headers. glm and fmt are header-only from the consumer's point of view; fmt comes along
+    # because spdlog's headers include it.
+    install(DIRECTORY
+            "${GFX_VCPKG_PREFIX}/include/glm"
+            "${GFX_VCPKG_PREFIX}/include/spdlog"
+            "${GFX_VCPKG_PREFIX}/include/fmt"
+            DESTINATION ${GFX_VENDOR_INCLUDEDIR})
+
+    # imgui's headers are loose files at the top of include/, not a directory.
+    file(GLOB GFX_VENDOR_IMGUI_HEADERS
+            "${GFX_VCPKG_PREFIX}/include/imgui*.h"
+            "${GFX_VCPKG_PREFIX}/include/imconfig.h"
+            "${GFX_VCPKG_PREFIX}/include/imstb_*.h")
+    install(FILES ${GFX_VENDOR_IMGUI_HEADERS} DESTINATION ${GFX_VENDOR_INCLUDEDIR})
+
+    # The static archives the consumer must actually link. Order matters for GNU ld: a static lib
+    # only resolves symbols demanded by something *earlier* on the command line, and spdlog's
+    # headers call into fmt — so spdlog precedes fmt. The Config.cmake below preserves this order.
+    set(GFX_VENDOR_LIBS "")
+    foreach(dep spdlog fmt imgui)
+        file(GLOB found "${GFX_VCPKG_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${dep}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        if(found)
+            list(APPEND GFX_VENDOR_LIBS ${found})
+        else()
+            message(WARNING "Vendoring: no static ${dep} under ${GFX_VCPKG_PREFIX}/lib — "
+                            "the installed SDK will not link.")
+        endif()
+    endforeach()
+    install(FILES ${GFX_VENDOR_LIBS} DESTINATION ${GFX_VENDOR_LIBDIR})
+endif()
+
+# The CMake package, so consumers can find_package(GFX_RELOADED).
+install(EXPORT ${PROJECT_NAME}Targets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE GFX_RELOADED::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion)
+
+# The install-tree config. It attaches the vendored dependencies to the gfx target's *interface*,
+# so `target_link_libraries(app PRIVATE GFX_RELOADED::GFX_RELOADED)` is the whole of what a
+# consumer writes. Paths are derived from the config file's own location, never baked in, so the
+# archive can be unpacked anywhere.
+set(GFX_INSTALL_CONFIG "${CMAKE_CURRENT_BINARY_DIR}/install/${PROJECT_NAME}Config.cmake")
+file(WRITE "${GFX_INSTALL_CONFIG}"
+"include(CMakeFindDependencyMacro)
+include(\"\${CMAKE_CURRENT_LIST_DIR}/${PROJECT_NAME}Targets.cmake\")
+
+# lib/cmake/GFX_RELOADED/ -> the install prefix
+get_filename_component(GFX_RELOADED_PREFIX \"\${CMAKE_CURRENT_LIST_DIR}/../../..\" ABSOLUTE)
+")
+
+if(GFX_VENDOR_PUBLIC_DEPS AND GFX_VCPKG_PREFIX)
+    # Names only: the paths are rebuilt relative to the unpacked prefix at find_package() time.
+    set(GFX_VENDOR_LIB_NAMES "")
+    foreach(lib ${GFX_VENDOR_LIBS})
+        get_filename_component(name "${lib}" NAME)
+        list(APPEND GFX_VENDOR_LIB_NAMES "${name}")
+    endforeach()
+
+    file(APPEND "${GFX_INSTALL_CONFIG}"
+"
+# gfx's public headers expose glm, spdlog and imgui, so the SDK ships them; see GFX_VENDOR_PUBLIC_DEPS
+# in the top-level CMakeLists. Consumers do not name these — they are pulled in by linking gfx.
+if(NOT TARGET GFX_RELOADED::vendored)
+    add_library(GFX_RELOADED::vendored INTERFACE IMPORTED)
+    set_target_properties(GFX_RELOADED::vendored PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES \"\${GFX_RELOADED_PREFIX}/${GFX_VENDOR_INCLUDEDIR}\")
+
+    set(GFX_RELOADED_VENDORED_LIBS \"\")
+    foreach(name ${GFX_VENDOR_LIB_NAMES})
+        list(APPEND GFX_RELOADED_VENDORED_LIBS \"\${GFX_RELOADED_PREFIX}/${GFX_VENDOR_LIBDIR}/\${name}\")
+    endforeach()
+    if(GFX_RELOADED_VENDORED_LIBS)
+        set_target_properties(GFX_RELOADED::vendored PROPERTIES
+                INTERFACE_LINK_LIBRARIES \"\${GFX_RELOADED_VENDORED_LIBS}\")
+    endif()
+endif()
+
+# APPEND rather than target_link_libraries: the gfx target is IMPORTED here.
+set_property(TARGET GFX_RELOADED::${PROJECT_NAME} APPEND PROPERTY
+        INTERFACE_LINK_LIBRARIES GFX_RELOADED::vendored)
+")
+endif()
+
+install(FILES
+        "${GFX_INSTALL_CONFIG}"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+
 # Write config files directly at configure time (no build step needed).
 # Each build configuration exports into its own subdirectory so that single-config
 # generators (Ninja) don't clobber each other's exports in a shared folder. A
 # consumer then selects the subdir matching its own build type, giving
 # debug->debug / release->release linkage.
-set(GFX_CMAKE_OUTPUT_BASE_DIR "/mnt/w/CLionProjects/GFX/cmake" CACHE PATH "Base directory where per-config GFX_RELOADED cmake config files are written")
+set(GFX_CMAKE_OUTPUT_BASE_DIR "${CMAKE_SOURCE_DIR}/cmake" CACHE PATH "Base directory where per-config GFX_RELOADED cmake config files are written")
 set(GFX_CMAKE_OUTPUT_DIR "${GFX_CMAKE_OUTPUT_BASE_DIR}/${CMAKE_BUILD_TYPE}")
 file(MAKE_DIRECTORY "${GFX_CMAKE_OUTPUT_DIR}")
 

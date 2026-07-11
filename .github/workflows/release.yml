@@ -1,0 +1,182 @@
+name: Release
+
+# Tag-driven: `git tag v0.0.1 && git push --tags` produces a draft release.
+# Draft, not published — the artifacts are there for you to download and try before anyone else
+# can. workflow_dispatch lets you exercise the whole thing without minting a tag first, which is
+# how you should test changes to this file.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # required to create the release
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false   # one platform breaking should not hide the other's result
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-24.04
+            triplet: x64-linux
+          - name: windows-x64
+            os: windows-2022
+            # static-md, not the default x64-windows. The default is a *dynamic* triplet, which
+            # would make spdlog/fmt/imgui DLLs — and those three are the ones the SDK vendors for
+            # consumers, so they must be static archives exactly as they are on Linux, or the
+            # vendoring silently ships nothing linkable. "-md" keeps the CRT dynamic (CMake's
+            # default), so this is only about vcpkg's own libraries. slang and the Vulkan loader
+            # stay DLLs regardless — they are bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
+            triplet: x64-windows-static-md
+
+          # Not yet built, deliberately:
+          #
+          # arm64 — GitHub's hosted ARM runners (ubuntu-24.04-arm, windows-11-arm) are free only
+          #   for *public* repositories; this repo is private, so they bill as larger runners.
+          #   Adding them is two lines here (name/os/triplet: arm64-linux, arm64-windows) once
+          #   that changes — but vcpkg resolving shader-slang, openimageio, assimp and ktx for an
+          #   arm64 triplet is unverified, so expect that to be the real work, not the YAML.
+          #
+          # macOS — blocked on two things, not just packaging. std::stacktrace is used in the
+          #   public builder.h and libc++ does not have it (needs a __cpp_lib_stacktrace guard),
+          #   and the OpenGL backend cannot work there at all: macOS caps at GL 4.1, so no compute
+          #   shaders and no bindless. Vulkan-via-MoltenVK only. Deferred to a later release.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GLFW/GLEW/the Vulkan loader need the X11 and Wayland development headers to build from
+      # source. They are not on the runner image, and vcpkg's error when they are missing names the
+      # header, not the package, so it is worth being explicit here.
+      - name: Install X11/Wayland development packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libxext-dev libxfixes-dev libxrender-dev libxkbcommon-dev \
+            libwayland-dev wayland-protocols libgl1-mesa-dev libglu1-mesa-dev \
+            libltdl-dev nasm
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          # vcpkg.json pins builtin-baseline, so the dependency versions are reproducible; this
+          # only pins the vcpkg tooling itself.
+          vcpkgGitCommitId: 62159a45e18f3a9ac0548628dcaf74fcb60c6ff9
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
+            -DGFX_BUILD_TESTS=OFF \
+            -DGFX_EMBED_SOURCE_PATHS=OFF
+        # GFX_EMBED_SOURCE_PATHS=OFF is the one flag that must never be dropped from a release
+        # build. With it ON, the shipped binary keeps this runner's source path as a fallback for
+        # locating shaders and assets — an absolute path that names nothing on a user's machine.
+        # See src/core/paths.cpp.
+
+      - name: Build
+        run: cmake --build build --config Release -j
+
+      - name: Install
+        run: cmake --install build --config Release
+
+      # Two archives from one install tree. They overlap (the SDK needs the library the runtime
+      # ships), which is fine and much simpler than trying to split them.
+      - name: Package
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [ "$GITHUB_REF_TYPE" = tag ] || version="dev-${GITHUB_SHA::7}"
+          mkdir -p dist
+
+          # Runtime: what you double-click. Executable, the library, its bundled deps, and the
+          # shaders/assets it loads at startup.
+          runtime="gfx-runtime-${version}-${{ matrix.name }}"
+          mkdir -p "$runtime"
+          cp -r stage/bin "$runtime/"
+          cp -r stage/lib "$runtime/"
+          cp -r stage/share "$runtime/"
+          rm -rf "$runtime/lib/cmake" "$runtime/lib/gfx-vendor"   # SDK-only, dead weight here
+
+          # SDK: what you build against. Everything, including the headers, the CMake package and
+          # the vendored public dependencies (glm/spdlog/imgui) so a project needs no package
+          # manager of its own.
+          sdk="gfx-sdk-${version}-${{ matrix.name }}"
+          cp -r stage "$sdk"
+
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a -tzip "dist/${runtime}.zip" "./${runtime}/*"
+            7z a -tzip "dist/${sdk}.zip"     "./${sdk}/*"
+          else
+            tar czf "dist/${runtime}.tar.gz" "$runtime"
+            tar czf "dist/${sdk}.tar.gz"     "$sdk"
+          fi
+          ls -la dist
+
+      # Proves the archive is usable *before* anyone downloads it: configure and link a project
+      # against the packaged SDK with no vcpkg and no toolchain file, exactly as a launcher-
+      # generated project would. This is what catches an unshipped header or an unbundled .so —
+      # both of which this package has already had.
+      - name: Verify the SDK links standalone
+        shell: bash
+        run: |
+          mkdir -p consumercheck && cd consumercheck
+          cat > CMakeLists.txt <<'EOF'
+          cmake_minimum_required(VERSION 3.28)
+          project(consumercheck CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(GFX_RELOADED REQUIRED)
+          add_executable(consumercheck main.cpp)
+          target_link_libraries(consumercheck PRIVATE GFX_RELOADED::GFX_RELOADED)
+          EOF
+          # Touches every third-party type that leaks through gfx's public headers.
+          cat > main.cpp <<'EOF'
+          #include <cstdio>
+          #include "context.h"
+          #include "log.h"
+          #include "gui.h"
+          #include "structs.h"
+          int main() {
+              gfx::log::info("ok");
+              const glm::vec3 v{1.f, 2.f, 3.f};
+              const ImVec2 p{4.f, 5.f};
+              std::printf("%.1f %.1f %s\n", v.x, p.y,
+                          gfx::shaderPath("doubleValues.comp.glsl").string().c_str());
+              return 0;
+          }
+          EOF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$PWD/../stage"
+          cmake --build build --config Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*
+
+  release:
+    name: Draft release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true          # you publish it, once you have tried the binaries
+          generate_release_notes: true
+          files: dist/*
