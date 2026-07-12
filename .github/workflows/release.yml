@@ -30,8 +30,6 @@ jobs:
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
-    env:
-      VCPKG_BINARY_SOURCES: ${{ matrix.binary_cache }}
     strategy:
       fail-fast: false   # one platform breaking should not hide the other's result
       matrix:
@@ -44,21 +42,15 @@ jobs:
             #
             # To fall back to GitHub's runner — if the machine is off, or to prove the build does
             # not secretly depend on something only installed locally — swap this one line for
-            # `runner: ubuntu-24.04` and set binary_cache to the x-gha line below. Nothing else in
-            # this file needs to change; the steps key off `runner.environment`.
+            # `runner: ubuntu-24.04`. Nothing else in this file needs to change: every step that
+            # differs between a persistent machine and a disposable one (apt, the binary cache)
+            # keys off `runner.environment` and switches itself over.
             runner: gfx-linux
             triplet: x64-linux
             # Ninja, not CMake's Linux default of "Unix Makefiles" — which is what this job used
             # until now, silently, while local development used Ninja. Same generator as the dev
             # build is the point: a release should not be the one configuration nobody ever builds.
             generator: Ninja
-            # The default files-based cache (~/.cache/vcpkg/archives) persists across runs on a
-            # machine that is not destroyed afterwards, so use it rather than the Actions cache.
-            # It is the *same* cache your local builds populate, since the runner runs as you.
-            #
-            # "default" is the provider name for that location. Not "files" — that one takes a
-            # mandatory absolute path (files,<abs-path>[,readwrite]) and errors out without one.
-            binary_cache: "clear;default,readwrite"
 
           # ---------------------------------------------------------------------------------------
           # windows-x64 — DISABLED, pending a self-hosted Windows runner.
@@ -69,10 +61,10 @@ jobs:
           # every iteration while the Linux side is still being shaken out.
           #
           # To re-enable: uncomment the block below. If you point it at a self-hosted Windows box,
-          # change `runner:` to that machine's label and switch `binary_cache` to
-          # "clear;default,readwrite" so it uses the persistent on-disk cache like Linux does.
-          # Nothing else needs to change — the apt and Actions-cache steps key off
-          # `runner.environment` and turn themselves on and off accordingly.
+          # change `runner:` to that machine's label. Nothing else needs to change — the apt step
+          # and the binary-cache step both key off `runner.environment`, so a self-hosted box picks
+          # up the persistent on-disk cache and a hosted one picks up the Actions cache, with no
+          # per-platform configuration.
           #
           # Until this is back, releases are Linux-only. The `release` job will happily draft a
           # release from a single platform's artifacts, so a tag pushed now yields a Linux-only
@@ -92,9 +84,6 @@ jobs:
           #   # itself. Also already the default on windows-2022 — spelled out so the generator is
           #   # stated rather than inherited.
           #   generator: Visual Studio 17 2022
-          #   # Store vcpkg's built packages in the GitHub Actions cache. "clear" drops the default
-          #   # files-based source, which would be thrown away with the runner.
-          #   binary_cache: "clear;x-gha,readwrite"
           # ---------------------------------------------------------------------------------------
 
           # Not yet built, deliberately:
@@ -134,10 +123,7 @@ jobs:
 
       # vcpkg builds openimageio, assimp, slang and the validation layers from source — the better
       # part of an hour. The x-gha binary-cache backend needs these two variables, which are in the
-      # runner's environment but not exported to steps by default.
-      #
-      # Hosted runners only. A self-hosted runner uses the files cache under ~/.cache/vcpkg
-      # (see binary_cache in the matrix), which survives because the machine does.
+      # runner's environment but not exported to steps by default. Hosted runners only.
       - name: Enable vcpkg binary caching
         if: runner.environment == 'github-hosted'
         uses: actions/github-script@v7
@@ -145,6 +131,36 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      # Where vcpkg looks for prebuilt packages, and the difference between a 1-minute Configure and
+      # a 9-minute one.
+      #
+      # This used to say "clear;default,readwrite" — meaning "the default files cache", which the
+      # docs place at ~/.cache/vcpkg/archives. It did not go there. run-vcpkg exports its own
+      # VCPKG_DEFAULT_BINARY_CACHE pointing at a per-run directory *inside the workspace*
+      # (<workspace>/<uuid>/vcpkg_cache), and `default` means "whatever that variable says". So the
+      # cache was empty on arrival and deleted on exit, and every single run rebuilt all 64 ports
+      # from source while cheerfully logging "Restored 0 package(s)".
+      #
+      # `files` cannot be hijacked that way: it takes a mandatory absolute path, so the location is
+      # stated here rather than inherited from whatever the action decided. On the self-hosted
+      # runner that path is the *same* cache local builds populate, since the runner runs as radue —
+      # a dependency you have already built at your desk never gets built again in CI.
+      #
+      # Set from a step, not the job's `env:`, because a job-level `env:` would override this on
+      # every subsequent step and put us right back where we started.
+      - name: Point vcpkg at a binary cache that survives the run
+        shell: bash
+        run: |
+          if [ "${{ runner.environment }}" = "self-hosted" ]; then
+            cache="$HOME/.cache/vcpkg/archives"
+            mkdir -p "$cache"
+            echo "VCPKG_BINARY_SOURCES=clear;files,$cache,readwrite" >> "$GITHUB_ENV"
+            echo "binary cache: $cache ($(du -sh "$cache" 2>/dev/null | cut -f1) already there)"
+          else
+            echo "VCPKG_BINARY_SOURCES=clear;x-gha,readwrite" >> "$GITHUB_ENV"
+            echo "binary cache: GitHub Actions cache (runner is disposable)"
+          fi
 
       - name: Set up vcpkg
         uses: lukka/run-vcpkg@v11
@@ -159,6 +175,14 @@ jobs:
           #
           # Keep this in step with the local checkout (~/.vcpkg-clion/vcpkg) when bumping deps.
           vcpkgGitCommitId: b216ddff25a1f432870e6c340ce79357049ef86e   # 2026-06-12
+
+          # Keep vcpkg *outside* the workspace. The default is <workspace>/vcpkg, which
+          # actions/checkout deletes at the start of every run (git clean -ffdx), so each run
+          # re-cloned the full vcpkg repo and re-bootstrapped the tool. The tool cache is not
+          # cleaned, so this survives: run-vcpkg compares the commit id against the one it recorded
+          # and does nothing at all when it matches. Bump vcpkgGitCommitId above and it re-fetches
+          # and re-bootstraps by itself — nothing here needs to be cleared by hand.
+          vcpkgDirectory: ${{ runner.tool_cache }}/vcpkg
 
       - name: Configure
         shell: bash

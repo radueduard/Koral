@@ -16,8 +16,9 @@ vCPU with a cold cache.
 
 To bring it back, uncomment the block in the matrix. If you have a Windows box or VM by then,
 register a second runner on it (Visual Studio 2022 Build Tools installed), label it `gfx-windows`,
-set that entry's `runner:` to the label, and switch its `binary_cache` to `"clear;default,readwrite"`
-so it uses a persistent on-disk cache the way Linux does.
+and set that entry's `runner:` to the label. The binary cache needs no per-platform setting: the
+"Point vcpkg at a binary cache that survives the run" step keys off `runner.environment` and picks
+the persistent on-disk cache for a self-hosted box, the Actions cache for a hosted one.
 
 **While it is disabled, releases are Linux-only** — the `release` job will draft a release from
 whatever artifacts exist, so a tag pushed today produces a Linux-only release.
@@ -111,10 +112,27 @@ back on its own. To go back to a hosted runner, change one line in the matrix:
 - name: linux-x64
   runner: ubuntu-24.04                        # was: gfx-linux
   triplet: x64-linux
-  binary_cache: "clear;x-gha,readwrite"       # was: "clear;files,readwrite"
 ```
 
-Nothing else in the workflow needs to change — the `apt` and Actions-cache steps re-enable
+Nothing else in the workflow needs to change — the `apt` step and the binary-cache step re-enable
 themselves, because they key off `runner.environment` rather than the runner's name. It is worth
 doing this occasionally anyway: a green run on a hosted runner is the only thing that proves the
-build does not quietly depend on something that happens to be installed on your desktop.
+build does not quietly depend on something that happens to be installed on your desktop. Expect it
+to be slow: a hosted runner starts with a cold cache and builds every port from source.
+
+## The binary cache
+
+`~/.cache/vcpkg/archives`, and it is the reason a run takes one minute rather than nine. It is the
+same cache your local builds populate — the runner runs as you — so a dependency you have already
+built at your desk is never rebuilt in CI.
+
+Do not set `VCPKG_BINARY_SOURCES` to `clear;default,readwrite` here, however much the vcpkg docs
+suggest it. `lukka/run-vcpkg` exports its own `VCPKG_DEFAULT_BINARY_CACHE` pointing at a per-run
+directory inside the workspace, and `default` means "wherever that variable points" — so the cache
+was empty on arrival and deleted on exit, every run rebuilt all 64 ports from source, and the only
+sign of it was one line reading `Restored 0 package(s)`. The workflow now names the path
+explicitly with the `files` provider, which requires an absolute path and therefore cannot be
+redirected out from under you.
+
+If it ever needs clearing (a corrupt archive, disk pressure), `rm -rf ~/.cache/vcpkg/archives` is
+safe — the next run is slow and then it is fast again.
