@@ -5,6 +5,7 @@
 #pragma once
 #include "api.h"
 #include <filesystem>
+#include <vector>
 
 #include "task.h"
 #include "resource.h"
@@ -19,8 +20,32 @@ namespace kor {
     class Framebuffer;
     class Window;
 
+    /**
+     * @brief Resolve @p relativePath against the asset search roots; first existing wins.
+     *
+     * An absolute path is returned untouched. When nothing matches, the path is still joined
+     * onto the first root, so the caller's "file not found" names somewhere the user can look
+     * instead of an empty string.
+     */
     KORAL_API std::filesystem::path assetPath(const std::filesystem::path& relativePath);
+
+    /** @brief The same, against the shader search roots (see Shader::searchPaths). */
     KORAL_API std::filesystem::path shaderPath(const std::filesystem::path& relativePath);
+
+    /**
+     * @brief Register a directory to resolve relative asset paths against.
+     *
+     * Koral's own assets/ is always a root. A project adds its own here — or, more usually,
+     * declares them in koral.json under "assetDirectories" and lets the runtime do it.
+     *
+     * @param front Search this root before the ones already registered. This is what the
+     *              config uses: a project's own assets take precedence over the engine's,
+     *              so it can shadow a built-in by name without ever losing access to the rest.
+     */
+    KORAL_API void addAssetSearchPath(const std::filesystem::path& dir, bool front = false);
+
+    /** @brief The asset search roots, in the order assetPath() consults them. */
+    KORAL_API const std::vector<std::filesystem::path>& assetSearchPaths();
 
     enum class API {
         eOpenGL,

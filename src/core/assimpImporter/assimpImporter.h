@@ -32,6 +32,27 @@ namespace kor {
 
         Scene LoadScene() override;
 
+        /**
+         * @brief Where to actually find a texture a material names.
+         *
+         * A material's texture paths are written relative to the model file, so that is the first
+         * place to look. When the file is not there — textures pulled out into a shared folder, a
+         * path exported on a machine that no longer exists — hand back the bare relative name and
+         * let Importer::LoadImage try it against the project's asset roots. That is the difference
+         * between a model that renders and one that comes up untextured.
+         */
+        [[nodiscard]] std::filesystem::path resolveTexture(const aiString &name) const {
+            std::filesystem::path relative(name.C_Str());
+            if (relative.is_absolute()) return relative;
+
+            std::error_code ec;
+            if (auto besideModel = _path.parent_path() / relative;
+                std::filesystem::exists(besideModel, ec)) {
+                return besideModel;
+            }
+            return relative;
+        }
+
         std::expected<std::vector<glm::mat4>, std::string> GetBoneTransformationMatrices() override;
 
         // -----------------------------------------------------------------
@@ -305,18 +326,18 @@ namespace kor {
         aiString texName;
         if (material->GetTextureCount(aiTextureType_BASE_COLOR) > 0) {
             if (material->GetTexture(aiTextureType_BASE_COLOR, 0, &texName) == AI_SUCCESS) {
-                result.albedoTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                result.albedoTexturePath = resolveTexture(texName);
             }
         }
 
         if (material->GetTextureCount(aiTextureType_EMISSIVE) > 0) {
             if (material->GetTexture(aiTextureType_EMISSIVE, 0, &texName) == AI_SUCCESS) {
-                result.emissiveTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                result.emissiveTexturePath = resolveTexture(texName);
             }
         }
         if (material->GetTextureCount(aiTextureType_EMISSION_COLOR) > 0) {
             if (material->GetTexture(aiTextureType_EMISSION_COLOR, 0, &texName) == AI_SUCCESS) {
-                result.emissiveTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                result.emissiveTexturePath = resolveTexture(texName);
             }
         }
 
@@ -324,22 +345,22 @@ namespace kor {
         {
             if (material->GetTexture(aiTextureType_AMBIENT, 0, &texName) == AI_SUCCESS) {
                 if (material->GetTexture(aiTextureType_AMBIENT, 0, &texName) == AI_SUCCESS) {
-                    result.ambientTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.ambientTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
                 if (material->GetTexture(aiTextureType_DIFFUSE, 0, &texName) == AI_SUCCESS) {
-                    result.diffuseTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.diffuseTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_SPECULAR) > 0) {
                 if (material->GetTexture(aiTextureType_SPECULAR, 0, &texName) == AI_SUCCESS) {
-                    result.specularTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.specularTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_SHININESS) > 0) {
                 if (material->GetTexture(aiTextureType_SHININESS, 0, &texName) == AI_SUCCESS) {
-                    result.roughnessTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.roughnessTexturePath = resolveTexture(texName);
                 }
             }
         }
@@ -348,22 +369,22 @@ namespace kor {
         {
             if (material->GetTextureCount(aiTextureType_NORMALS) > 0) {
                 if (material->GetTexture(aiTextureType_NORMALS, 0, &texName) == AI_SUCCESS) {
-                    result.normalTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.normalTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_NORMAL_CAMERA) > 0) {
                 if (material->GetTexture(aiTextureType_NORMAL_CAMERA, 0, &texName) == AI_SUCCESS) {
-                    result.normalTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.normalTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_DISPLACEMENT) > 0) {
                 if (material->GetTexture(aiTextureType_DISPLACEMENT, 0, &texName) == AI_SUCCESS) {
-                    result.displacementTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.displacementTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_HEIGHT) > 0) {
                 if (material->GetTexture(aiTextureType_HEIGHT, 0, &texName) == AI_SUCCESS) {
-                    result.displacementTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.displacementTexturePath = resolveTexture(texName);
                 }
             }
         }
@@ -372,23 +393,23 @@ namespace kor {
         {
             if (material->GetTextureCount(aiTextureType_METALNESS) > 0) {
                 if (material->GetTexture(aiTextureType_METALNESS, 0, &texName) == AI_SUCCESS) {
-                    result.metallicTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.metallicTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_DIFFUSE_ROUGHNESS) > 0) {
                 if (material->GetTexture(aiTextureType_DIFFUSE_ROUGHNESS, 0, &texName) == AI_SUCCESS) {
-                    result.roughnessTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.roughnessTexturePath = resolveTexture(texName);
                 }
             }
 
             if (material->GetTextureCount(aiTextureType_AMBIENT_OCCLUSION) > 0) {
                 if (material->GetTexture(aiTextureType_AMBIENT_OCCLUSION, 0, &texName) == AI_SUCCESS) {
-                    result.ambientOcclusionTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.ambientOcclusionTexturePath = resolveTexture(texName);
                 }
             }
             if (material->GetTextureCount(aiTextureType_LIGHTMAP) > 0) {
                 if (material->GetTexture(aiTextureType_LIGHTMAP, 0, &texName) == AI_SUCCESS) {
-                    result.ambientOcclusionTexturePath = _path.parent_path() / std::filesystem::path(texName.C_Str());
+                    result.ambientOcclusionTexturePath = resolveTexture(texName);
                 }
             }
         }

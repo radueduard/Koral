@@ -118,13 +118,21 @@ namespace kor
 
         virtual ~Importer() = default;
 
-        static kor::Resource<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
+        // A relative path is resolved against the asset search roots — the directories listed under
+        // "assetDirectories" in koral.json, then the ones that ship with the engine — so a scene can
+        // say LoadImage("textures/wood.png") without knowing where the project ended up on disk.
+        // An absolute path is opened as given. See kor::assetPath and projectConfig.h.
+        static kor::Resource<Image> LoadImage(const std::filesystem::path& relativePath, bool generateMipmaps = false);
         // Returns the image directly via the awaited task. All CPU work runs on background
         // threads; GPU uploads are chunked so the main/render thread is never held for long.
-        static Task<Resource<Image>> LoadImageAsync(const std::filesystem::path& path, bool generateMipmaps = false);
+        static Task<Resource<Image>> LoadImageAsync(const std::filesystem::path& relativePath, bool generateMipmaps = false);
 
+        // Writes where it is told: an output path is not a lookup, so it is never resolved.
         static void SaveImage(const std::filesystem::path& path, const std::string& name, FileFormat fileFormat, ResourceRef<const Image> image);
-        static std::unique_ptr<Importer> Load(const std::filesystem::path& path);
+
+        // Resolved like LoadImage. The model's material textures are then looked for beside the
+        // model itself, and failing that, across the same asset roots.
+        static std::unique_ptr<Importer> Load(const std::filesystem::path& relativePath);
 
         virtual std::vector<std::string> GetMeshNames() = 0;
         virtual std::vector<std::string> GetMaterialNames() = 0;

@@ -178,10 +178,12 @@ namespace kor {
         return paths;
     }
 
-    void Shader::addSearchPath(const std::filesystem::path& dir)
+    void Shader::addSearchPath(const std::filesystem::path& dir, const bool front)
     {
         auto& paths = shaderSearchPathsStorage();
-        if (std::ranges::find(paths, dir) == paths.end()) paths.push_back(dir);
+        if (dir.empty() || std::ranges::find(paths, dir) != paths.end()) return;
+        if (front) paths.insert(paths.begin(), dir);
+        else       paths.push_back(dir);
     }
 
     const std::vector<std::filesystem::path>& Shader::searchPaths() { return shaderSearchPathsStorage(); }

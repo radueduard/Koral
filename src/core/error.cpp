@@ -34,6 +34,7 @@ namespace kor
         case ErrorCode::eShaderStageMismatch:        return "eShaderStageMismatch";
         case ErrorCode::eDescriptorConflict:         return "eDescriptorConflict";
         case ErrorCode::eShaderCompileFailed:        return "eShaderCompileFailed";
+        case ErrorCode::eConfigInvalid:              return "eConfigInvalid";
         }
         return "eUnknown";
     }
@@ -83,6 +84,8 @@ namespace kor
             return "Descriptor declarations conflict across the pipeline's shader stages.";
         case ErrorCode::eShaderCompileFailed:
             return "Shader compilation or linking failed.";
+        case ErrorCode::eConfigInvalid:
+            return "The koral.json config file is malformed, or one of its keys has the wrong type.";
         }
         return "Unknown error.";
     }

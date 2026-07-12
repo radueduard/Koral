@@ -7,9 +7,11 @@
 #include <framebuffer.h>
 #include "context.h"
 #include "paths.h"
+#include <algorithm>
 #include <filesystem>
 #include <mutex>
 #include <stdexcept>
+#include <vector>
 
 #include <GLFW/glfw3.h>
 
@@ -22,34 +24,70 @@
 #include "../backends/vulkan/vulkanContext.h"
 
 
-std::filesystem::path kor::assetPath(const std::filesystem::path& relativePath)
-{
-    // Resolved once, relative to the installed library rather than to whatever machine built it.
-    static const auto roots = detail::dataRoots("assets", "KORAL_ASSETS_DIR", ASSETS_PATH);
-
-    for (const auto& root : roots) {
+namespace {
+    // Resolve a relative path against a list of roots, first existing wins.
+    //
+    // The working directory is the last resort, after every root. Before the search roots existed a
+    // relative path simply meant "relative to wherever you launched from", and some code still
+    // passes one — this keeps those callers working rather than silently failing to find a file they
+    // used to find. It goes last so it can never shadow a project's own directories.
+    //
+    // When nothing matches at all, the path is still joined onto the first root: the caller's own
+    // "file not found" then names somewhere the user can actually go and look, instead of an empty
+    // string or a bare file name.
+    std::filesystem::path resolveAgainstRoots(const std::filesystem::path& relativePath,
+                                              const std::vector<std::filesystem::path>& roots)
+    {
         std::error_code ec;
-        if (auto candidate = root / relativePath; std::filesystem::exists(candidate, ec))
-            return candidate;
+        for (const auto& root : roots) {
+            if (auto candidate = root / relativePath; std::filesystem::exists(candidate, ec))
+                return candidate;
+        }
+
+        if (std::filesystem::exists(relativePath, ec)) return relativePath;
+
+        return roots.empty() ? relativePath : roots.front() / relativePath;
     }
 
-    // Nothing matched. Hand back the best guess anyway, so the caller's own "file not found" names
-    // a path the user can act on rather than an empty string.
-    return roots.empty() ? relativePath : roots.front() / relativePath;
+    // Process-wide, and deliberately not an inline static in the header: the executable and the
+    // shared library would then each get their own copy, and a root registered by one would be
+    // invisible to the other.
+    std::vector<std::filesystem::path>& assetSearchPathsStorage()
+    {
+        // Seeded with wherever Koral's own assets/ actually landed — beside the installed library,
+        // or in the source tree for a dev build. Projects prepend their own; see addAssetSearchPath.
+        static std::vector<std::filesystem::path> paths =
+            kor::detail::dataRoots("assets", "KORAL_ASSETS_DIR", ASSETS_PATH);
+        return paths;
+    }
+}
+
+void kor::addAssetSearchPath(const std::filesystem::path& dir, const bool front)
+{
+    auto& paths = assetSearchPathsStorage();
+    if (dir.empty() || std::ranges::find(paths, dir) != paths.end()) return;
+    if (front) paths.insert(paths.begin(), dir);
+    else       paths.push_back(dir);
+}
+
+const std::vector<std::filesystem::path>& kor::assetSearchPaths() { return assetSearchPathsStorage(); }
+
+std::filesystem::path kor::assetPath(const std::filesystem::path& relativePath)
+{
+    // An absolute path is an answer already, not a question — resolving it against a root would
+    // only produce nonsense.
+    if (relativePath.is_absolute()) return relativePath;
+
+    return resolveAgainstRoots(relativePath, assetSearchPaths());
 }
 
 std::filesystem::path kor::shaderPath(const std::filesystem::path& relativePath)
 {
-    // Resolve across the registered shader roots (the install roots below, plus any the project
-    // added via Shader::addSearchPath); first existing wins.
-    for (const auto& root : Shader::searchPaths()) {
-        std::error_code ec;
-        if (auto candidate = root / relativePath; std::filesystem::exists(candidate, ec))
-            return candidate;
-    }
+    if (relativePath.is_absolute()) return relativePath;
 
-    const auto& roots = Shader::searchPaths();
-    return roots.empty() ? relativePath : roots.front() / relativePath;
+    // The registered shader roots: the install roots, plus anything the project or its koral.json
+    // added via Shader::addSearchPath.
+    return resolveAgainstRoots(relativePath, Shader::searchPaths());
 }
 
 kor::Window& kor::Context::Window()

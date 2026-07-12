@@ -24,6 +24,7 @@ add_executable(koral_tests
         test_mesh_layout.cpp
         test_resource.cpp
         test_builder_recoverable.cpp
+        test_project_config.cpp
 )
 
 target_link_libraries(koral_tests PRIVATE

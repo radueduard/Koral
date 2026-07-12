@@ -1,15 +1,17 @@
 
 
 #include <iostream>
+#include <string>
 
 #include "context.h"
+#include "projectConfig.h"
 
 namespace kor
 {
     class Engine
     {
     public:
-        static void Run(int argc, char** argv);
+        static int Run(int argc, char** argv);
     };
 }
 
@@ -32,15 +34,40 @@ void enableANSI() {
 }
 #endif
 
+namespace
+{
+    void printUsage(const char* program)
+    {
+        std::cout
+            << "Usage: " << program << " <scene_library> [options]\n\n"
+            << "Runs a Koral scene or job library. Settings come from the library's own\n"
+            << "CreateProjectConfig(), then from its koral.json, then from the options below —\n"
+            << "each layer overriding the one before it.\n\n"
+            << "Options:\n"
+            << kor::ProjectConfig::usage()
+            << "  --help              Show this message\n";
+    }
+}
+
 int main(const int argc, char **argv)
 {
-    if (argc < 2)
-    {
-        std::cerr << "Usage: " << argv[0] << " <scene_library_name>" << std::endl;
-    }
 #ifdef _WIN32
     enableANSI();
 #endif
-    kor::Engine::Run(argc, argv);
-    return EXIT_SUCCESS;
+
+    for (int i = 1; i < argc; ++i) {
+        if (const std::string arg = argv[i]; arg == "--help" || arg == "-h") {
+            printUsage(argv[0]);
+            return EXIT_SUCCESS;
+        }
+    }
+
+    // Guarding here rather than warning and carrying on: Engine::Run's first act is to read
+    // argv[1] as the scene library, and there is nothing to run without one.
+    if (argc < 2) {
+        printUsage(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    return kor::Engine::Run(argc, argv);
 }

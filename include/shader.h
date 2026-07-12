@@ -195,8 +195,13 @@ namespace kor
         [[nodiscard]] const std::vector<std::filesystem::path>& getDependencies() const { return _dependencies; }
 
         // Runtime shader search roots, shared by Slang module resolution and shaderPath().
-        // The API's own shaders/ folder is always registered; projects add their own.
-        static void addSearchPath(const std::filesystem::path& dir);
+        // The API's own shaders/ folder is always registered; projects add their own — usually by
+        // declaring them in koral.json under "shaderDirectories" and letting the runtime do it.
+        //
+        // `front` searches the new root ahead of the ones already registered, which is what the
+        // config uses: a project's shaders shadow the engine's same-named ones, without the project
+        // ever losing access to the engine's built-in shaders.
+        static void addSearchPath(const std::filesystem::path& dir, bool front = false);
         static const std::vector<std::filesystem::path>& searchPaths();
 
         // Compiles to SPIR-V (_spirvCode) according to _lang: glslang for GLSL, file read for

@@ -68,6 +68,9 @@ namespace kor
         eShaderStageMismatch,  ///< A shader was supplied for the wrong pipeline stage.
         eDescriptorConflict,   ///< Descriptor declarations conflict across merged shader stages.
         eShaderCompileFailed,  ///< Shader compilation/linking failed.
+
+        // --- configuration ---
+        eConfigInvalid,        ///< A koral.json config file is malformed or has a key of the wrong type.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */

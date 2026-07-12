@@ -83,8 +83,12 @@ kor::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
 
 namespace kor
 {
-    kor::Resource<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
+    kor::Resource<Image> Importer::LoadImage(const std::filesystem::path& relativePath, bool generateMipmaps)
     {
+        // A relative path is a question — "wood.png, wherever you keep textures" — and the asset
+        // search roots are the answer. An absolute one is left alone. See kor::assetPath.
+        const auto path = assetPath(relativePath);
+
         const auto imageInput = OIIO::ImageInput::open(path.string());
         if (!imageInput) {
             throw std::runtime_error("Could not open image file: " + path.string() + "\nError: " + OIIO::geterror());
@@ -441,7 +445,11 @@ namespace kor
         co_return std::move(image);
     }
 
-    Task<Resource<Image>> Importer::LoadImageAsync(const std::filesystem::path& path, const bool generateMipmaps) {
+    Task<Resource<Image>> Importer::LoadImageAsync(const std::filesystem::path& relativePath, const bool generateMipmaps) {
+        // Resolved here rather than inside the coroutines: they run on a background thread, and the
+        // search roots are read-mostly global state that the main thread owns.
+        const auto path = assetPath(relativePath);
+
         if (path.extension() == ".ktx" || path.extension() == ".ktx2")
             return LoadKTXAsync(path, generateMipmaps);
         return LoadRegularImageAsync(path, generateMipmaps);
@@ -487,7 +495,10 @@ namespace kor
         imageOutput->close();
     }
 
-    std::unique_ptr<Importer> Importer::Load(const std::filesystem::path &path) {
-        return std::make_unique<AssimpImporter>(path);
+    std::unique_ptr<Importer> Importer::Load(const std::filesystem::path &relativePath) {
+        // Resolving the model here is what lets its *textures* resolve too: AssimpImporter reads
+        // material texture paths relative to the model file, so it needs the real one, not the
+        // relative name the scene asked for.
+        return std::make_unique<AssimpImporter>(assetPath(relativePath));
     }
 }
