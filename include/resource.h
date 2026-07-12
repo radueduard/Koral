@@ -4,12 +4,12 @@
 
 /**
  * @file resource.h
- * @brief Owning handles (@ref gfx::Resource) and non-owning views (@ref gfx::ResourceRef)
+ * @brief Owning handles (@ref kor::Resource) and non-owning views (@ref kor::ResourceRef)
  *        for every GPU object the API hands out.
  *
  * A Resource is one of three things:
  *  - **valid**    — it owns the object, and everything works;
- *  - **poisoned** — construction failed, and it owns a @ref gfx::Error explaining why;
+ *  - **poisoned** — construction failed, and it owns a @ref kor::Error explaining why;
  *  - **empty**    — default-constructed, owning nothing.
  *
  * A poisoned Resource is not an exception and not a null pointer: it is a first-class
@@ -41,7 +41,7 @@
 #include "log.h"
 #include "task.h"
 
-namespace gfx {
+namespace kor {
     // Marker base for resources the Repository drives once per frame. Inheriting
     // it (rather than just declaring automaticUpdate()) is what RefStorage keys
     // on, so the auto-update can never be silently disabled by an inaccessible
@@ -588,19 +588,19 @@ namespace gfx {
                 for (const auto& storage : _refStorages | std::views::values) recovered |= storage->repair();
                 if (!recovered) return;
             }
-            gfx::log::warn("Resource repair did not settle after {} passes; giving up this frame.", maxPasses);
+            kor::log::warn("Resource repair did not settle after {} passes; giving up this frame.", maxPasses);
         }
 
         template<typename T>
         T& get(std::string_view id) {
             auto& s = storage<T>();
             if (!s) {
-                gfx::log::error("Resource of type '{}' not found in repository!", typeid(T).name());
+                kor::log::error("Resource of type '{}' not found in repository!", typeid(T).name());
                 throw std::runtime_error("Resource of type '" + std::string(typeid(T).name()) + "' not found in repository!");
             }
             auto it = s.items.find(std::string(id));
             if (it == s.items.end()) {
-                gfx::log::error("Resource with id '{}' not found in repository!", id);
+                kor::log::error("Resource with id '{}' not found in repository!", id);
                 throw std::runtime_error("Resource with id '" + std::string(id) + "' not found in repository!");
             }
             return *it->second;
@@ -610,12 +610,12 @@ namespace gfx {
         const T& get(std::string_view id) const {
             const auto& s = tryStorage<T>();
             if (!s) {
-                gfx::log::error("Resource of type '{}' not found in repository!", typeid(T).name());
+                kor::log::error("Resource of type '{}' not found in repository!", typeid(T).name());
                 throw std::runtime_error("Resource of type '" + std::string(typeid(T).name()) + "' not found in repository!");
             }
             const auto it = s->items.find(std::string(id));
             if (it == s->items.end()) {
-                gfx::log::error("Resource with id '{}' not found in repository!", id);
+                kor::log::error("Resource with id '{}' not found in repository!", id);
                 throw std::runtime_error("Resource with id '" + std::string(id) + "' not found in repository!");
             }
             return *it->second;
@@ -625,7 +625,7 @@ namespace gfx {
         ResourceRef<T> add(std::string_view id, Resource<T> resource) {
             auto& s = storage<T>();
             if (s.items.contains(std::string(id))) {
-                gfx::log::error("Resource with id '{}' already exists in repository!", id);
+                kor::log::error("Resource with id '{}' already exists in repository!", id);
             }
             auto [it, inserted] = s.items.emplace(std::string(id), std::move(resource));
             return ResourceRef<T>(it->second);
@@ -652,7 +652,7 @@ namespace gfx {
             auto& s = storage<T>();
             const auto it = s.items.find(std::string(id));
             if (it == s.items.end()) {
-                gfx::log::error("Resource with id '{}' not found in repository!", id);
+                kor::log::error("Resource with id '{}' not found in repository!", id);
                 throw std::runtime_error("Resource with id '" + std::string(id) + "' not found in repository!");
             }
             return ResourceRef<T>(it->second);

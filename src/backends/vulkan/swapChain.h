@@ -16,13 +16,13 @@
 #include "vk_enum_conversions.h"
 #include "vk_wrapper.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     class Surface;
     class Image;
     class Frame;
 
-    class SwapChain final : public gfx::vk::Wrapper<::vk::SwapchainKHR>
+    class SwapChain final : public kor::vk::Wrapper<::vk::SwapchainKHR>
     {
     public:
         struct Builder {
@@ -35,7 +35,7 @@ namespace gfx::vk
 
             Builder& setMinImageCount(const glm::u32 minImageCount) { this->minImageCount = minImageCount; return *this; }
             Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
-            Builder& setMSAA(const gfx::MSAA msaa) { this->msaa = msaa; return *this; }
+            Builder& setMSAA(const kor::MSAA msaa) { this->msaa = msaa; return *this; }
             std::unique_ptr<SwapChain> build() { return std::make_unique<SwapChain>(*this); }
         };
 
@@ -47,11 +47,11 @@ namespace gfx::vk
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
         [[nodiscard]] ::vk::SampleCountFlagBits getMSAA() const { return getVkSampleCount(_msaa); }
 
-        [[nodiscard]] gfx::ResourceRef<const gfx::Image> getImage() const { return _swapChainImages; }
-        [[nodiscard]] gfx::ResourceRef<const gfx::Image> getDepthImage() const { return _depthImages; }
+        [[nodiscard]] kor::ResourceRef<const kor::Image> getImage() const { return _swapChainImages; }
+        [[nodiscard]] kor::ResourceRef<const kor::Image> getDepthImage() const { return _depthImages; }
 
-        [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getSwapChainImageViews() const { return *_swapChainImageViews; }
-        [[nodiscard]] std::reference_wrapper<const gfx::ImageView> getDepthImageViews() const { return *_depthImageViews; }
+        [[nodiscard]] std::reference_wrapper<const kor::ImageView> getSwapChainImageViews() const { return *_swapChainImageViews; }
+        [[nodiscard]] std::reference_wrapper<const kor::ImageView> getDepthImageViews() const { return *_depthImageViews; }
 
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
         [[nodiscard]] glm::u32 getCurrentImageIndex() const { return _imageIndex; }
@@ -59,8 +59,8 @@ namespace gfx::vk
     	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinishedSemaphores[_imageIndex]; }
 
         void Resize(const glm::uvec2& newSize);
-        ::vk::Result Acquire(const gfx::vk::Frame &frame);
-        ::vk::Result Present(const gfx::vk::Frame &frame);
+        ::vk::Result Acquire(const kor::vk::Frame &frame);
+        ::vk::Result Present(const kor::vk::Frame &frame);
 
     private:
         glm::uvec2 _extent;
@@ -73,13 +73,13 @@ namespace gfx::vk
         ::vk::SurfaceFormatKHR _surfaceFormat = {};
         ::vk::PresentModeKHR _presentMode = {};
 
-        const gfx::vk::Queue& _presentQueue;
-        gfx::Resource<gfx::Image> _swapChainImages;
-        gfx::Resource<gfx::Image> _depthImages;
+        const kor::vk::Queue& _presentQueue;
+        kor::Resource<kor::Image> _swapChainImages;
+        kor::Resource<kor::Image> _depthImages;
         std::vector<::vk::Semaphore> _renderFinishedSemaphores;
 
-        gfx::Resource<gfx::ImageView> _swapChainImageViews;
-        gfx::Resource<gfx::ImageView> _depthImageViews;
+        kor::Resource<kor::ImageView> _swapChainImageViews;
+        kor::Resource<kor::ImageView> _depthImageViews;
 
         void CreateSwapChain();
 

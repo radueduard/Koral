@@ -17,7 +17,7 @@
 #include "vk_enum_conversions.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     namespace
     {
@@ -45,7 +45,7 @@ namespace gfx::vk
         }
     }
 
-    AccelerationStructure::AccelerationStructure(const Builder& createInfo) : gfx::AccelerationStructure(createInfo)
+    AccelerationStructure::AccelerationStructure(const Builder& createInfo) : kor::AccelerationStructure(createInfo)
     {
         if (_type == Type::eBottomLevel) {
             buildBottomLevel(createInfo);
@@ -247,7 +247,7 @@ namespace gfx::vk
         buildInfo.setDstAccelerationStructure(_handle)
             .setScratchData(::vk::DeviceOrHostAddressKHR().setDeviceAddress(scratchAddress));
 
-        Context::Device().runSingleTimeCommand([&](gfx::vk::CommandBuffer& commandBuffer) {
+        Context::Device().runSingleTimeCommand([&](kor::vk::CommandBuffer& commandBuffer) {
             commandBuffer->buildAccelerationStructuresKHR(buildInfo, rangeInfos);
         }, ::vk::QueueFlagBits::eCompute);
 

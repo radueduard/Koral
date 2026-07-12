@@ -8,7 +8,7 @@
 
 #include "runtime.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     class Allocator {
 	public:

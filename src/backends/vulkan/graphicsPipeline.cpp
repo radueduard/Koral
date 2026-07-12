@@ -15,9 +15,9 @@
 #include "framebuffer.h"
 #include "vk_enum_conversions.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    GraphicsPipeline::GraphicsPipeline(const Builder& createInfo): gfx::GraphicsPipeline(createInfo)
+    GraphicsPipeline::GraphicsPipeline(const Builder& createInfo): kor::GraphicsPipeline(createInfo)
     {
         Setup();
     }
@@ -27,7 +27,7 @@ namespace gfx::vk
         Teardown();
     }
 
-    void GraphicsPipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    void GraphicsPipeline::Bind(const kor::CommandBuffer& commandBuffer) const
     {
         const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
         vkCommandBuffer->bindPipeline(::vk::PipelineBindPoint::eGraphics, **this);

@@ -12,7 +12,7 @@
 
 #include <spirv_cross/spirv_glsl.hpp>
 
-namespace gfx::ogl
+namespace kor::ogl
 {
     namespace {
         // Vulkan bindless shaders declare descriptor arrays with no size
@@ -220,7 +220,7 @@ namespace gfx::ogl
         }
     }
 
-    Shader::Shader(const gfx::Shader::Builder& createInfo) : gfx::Shader(createInfo)
+    Shader::Shader(const kor::Shader::Builder& createInfo) : kor::Shader(createInfo)
     {}
 
     std::string Shader::TranspileSPIRVToGLSL(const std::vector<uint32_t>& spirvCode, const Stage stage) {
@@ -364,7 +364,7 @@ namespace gfx::ogl
             }
         }
 
-        if (const char* want = std::getenv("GFX_DUMP_GLSL"); want && _path.string().find(want) != std::string::npos) {
+        if (const char* want = std::getenv("KORAL_DUMP_GLSL"); want && _path.string().find(want) != std::string::npos) {
             std::cerr << "===== GLSL " << _path << " =====\n" << shaderCode << "\n===== end =====" << std::endl;
         }
 

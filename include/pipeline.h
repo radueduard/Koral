@@ -24,11 +24,11 @@
 #include "resource.h"
 #include "shader.h"
 
-namespace gfx
+namespace kor
 {
     class CommandBuffer;
 
-    class GFX_API Pipeline : public AutoUpdatable
+    class KORAL_API Pipeline : public AutoUpdatable
     {
     public:
         /** @brief Virtual destructor for polymorphic ownership. */
@@ -102,7 +102,7 @@ namespace gfx
 
         /**
          * @brief Re-validate pipeline state and rebuild descriptor/push-constant layouts.
-         * @return success, or a gfx::Error describing the first validation failure.
+         * @return success, or a kor::Error describing the first validation failure.
          */
         virtual VoidResult Validate() = 0;
 

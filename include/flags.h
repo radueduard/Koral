@@ -5,7 +5,7 @@
 #pragma once
 #include <type_traits>
 
-namespace gfx
+namespace kor
 {
     template <typename Enum> requires std::is_enum_v<Enum>
     class Flags

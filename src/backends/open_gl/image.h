@@ -8,10 +8,10 @@
 #include <image.h>
 
 
-namespace gfx::ogl {
-    class Image : public gfx::Image {
+namespace kor::ogl {
+    class Image : public kor::Image {
     public:
-        explicit Image(const gfx::Image::Builder& createInfo);
+        explicit Image(const kor::Image::Builder& createInfo);
         ~Image() override;
 
         GLuint operator*() const { return _id; }
@@ -20,9 +20,9 @@ namespace gfx::ogl {
 
         GLenum getGLFormat() const { return InternalFormatFromImageFormat(_format); }
 
-        [[nodiscard]] static GLenum InternalFormatFromImageFormat(gfx::Image::Format format);
-        [[nodiscard]] static GLenum BaseFormatFromImageFormat(gfx::Image::Format format);
-        [[nodiscard]] static GLenum DataTypeFromImageFormat(gfx::Image::Format format);
+        [[nodiscard]] static GLenum InternalFormatFromImageFormat(kor::Image::Format format);
+        [[nodiscard]] static GLenum BaseFormatFromImageFormat(kor::Image::Format format);
+        [[nodiscard]] static GLenum DataTypeFromImageFormat(kor::Image::Format format);
     private:
         GLuint _id = 0;
     };

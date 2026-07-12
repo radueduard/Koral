@@ -12,7 +12,7 @@
 #include "shader.h"
 #include "window.h"
 
-namespace gfx
+namespace kor
 {
     RayTracingPipeline::Builder& RayTracingPipeline::Builder::setRaygenShader(ResourceRef<const Shader> raygenShader)
     {
@@ -44,7 +44,7 @@ namespace gfx
         return *this;
     }
 
-    gfx::Result<std::unique_ptr<RayTracingPipeline>> RayTracingPipeline::Builder::create() const
+    kor::Result<std::unique_ptr<RayTracingPipeline>> RayTracingPipeline::Builder::create() const
     {
         beginAttempt();
 
@@ -66,11 +66,11 @@ namespace gfx
             return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<RayTracingPipeline> {
-            return gfx::MakeBackendPtr<RayTracingPipeline, vk::RayTracingPipeline>(*this);
+            return kor::MakeBackendPtr<RayTracingPipeline, vk::RayTracingPipeline>(*this);
         });
     }
 
-    gfx::Resource<RayTracingPipeline> RayTracingPipeline::Builder::build() const
+    kor::Resource<RayTracingPipeline> RayTracingPipeline::Builder::build() const
     {
         auto pipeline = materialize<RayTracingPipeline>(*this, "RayTracingPipeline");
         Context::Repository().addRef(ResourceRef<const RayTracingPipeline>(pipeline));

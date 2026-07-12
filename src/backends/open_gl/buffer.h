@@ -8,12 +8,12 @@
 
 #include <GL/glew.h>
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    class Buffer : public gfx::Buffer
+    class Buffer : public kor::Buffer
     {
     public:
-        explicit Buffer(const gfx::Buffer::RawBuilder& createInfo);
+        explicit Buffer(const kor::Buffer::RawBuilder& createInfo);
         ~Buffer() override;
 
         void Bind(GLenum target);
@@ -26,7 +26,7 @@ namespace gfx::ogl
         void Flush(glm::i64 size, glm::u64 offset) const override;
         void Invalidate(glm::i64 size, glm::u64 offset) const override;
 
-        static GLenum GetTargetFromUsage(Flags<gfx::Buffer::Usage> usage);
+        static GLenum GetTargetFromUsage(Flags<kor::Buffer::Usage> usage);
         static GLenum GetFlagsFromType(Type type);
     private:
         GLuint _id = 0;

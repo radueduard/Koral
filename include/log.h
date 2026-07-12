@@ -6,7 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace gfx::log {
+namespace kor::log {
     void init(); // call once at framework startup
 
     template<typename... Args>
@@ -26,21 +26,21 @@ namespace gfx::log {
 }
 
 #ifdef NDEBUG
-    #define GFX_ASSERT(condition, msg, ...)                          \
+    #define KORAL_ASSERT(condition, msg, ...)                          \
     do { if (!(condition))                                       \
-    gfx::log::error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); } while(0)
+    kor::log::error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); } while(0)
 
-    #define GFX_BREAK() []{}();
+    #define KORAL_BREAK() []{}();
 #else
     #ifdef _MSC_VER
-        #define GFX_BREAK() __debugbreak()
+        #define KORAL_BREAK() __debugbreak()
     #else
-        #define GFX_BREAK() __builtin_trap()
+        #define KORAL_BREAK() __builtin_trap()
     #endif
 
-    #define GFX_ASSERT(condition, msg, ...)                          \
+    #define KORAL_ASSERT(condition, msg, ...)                          \
     do { if (!(condition)) {                                     \
-    gfx::log::error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); \
-    GFX_BREAK();                                             \
+    kor::log::error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); \
+    KORAL_BREAK();                                             \
     }} while(0)
 #endif

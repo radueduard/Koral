@@ -11,7 +11,7 @@
 #include "resource.h"
 #include "error.h"
 
-namespace gfx
+namespace kor
 {
     class Buffer;
     class Sampler;
@@ -41,7 +41,7 @@ namespace gfx
         ResourceRef<const AccelerationStructure> _accelerationStructure;
     };
 
-    class GFX_API Descriptor
+    class KORAL_API Descriptor
     {
         friend class DescriptorSet;
     public:

@@ -16,16 +16,16 @@
 #include "error.h"
 #include <optional>
 
-namespace gfx
+namespace kor
 {
     class CommandBuffer;
     class Descriptor;
     class Pipeline;
 
-    class GFX_API DescriptorSet
+    class KORAL_API DescriptorSet
     {
     public:
-        struct GFX_API Builder : ::Builder
+        struct KORAL_API Builder : ::Builder
         {
             // Preferred: name the pipeline and the set index, and let the builder fetch the layout.
             // Passing the pipeline (rather than pipeline->getSetLayout(0)) means a *poisoned*
@@ -46,7 +46,7 @@ namespace gfx
             Builder& write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index = 0);
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<DescriptorSet>> create() const;
-            [[nodiscard]] gfx::Resource<DescriptorSet> build() const;
+            [[nodiscard]] kor::Resource<DescriptorSet> build() const;
 
         private:
             void initWrites();
@@ -65,7 +65,7 @@ namespace gfx
         bool _isPerFrame = false;
         // A ref, not a reference: a shader reload can replace the pipeline's layouts, and a raw
         // reference into that map would be silently left dangling. See Pipeline::buildLayouts.
-        gfx::ResourceRef<const gfx::DescriptorSetLayout> _layout;
+        kor::ResourceRef<const kor::DescriptorSetLayout> _layout;
         std::map<glm::u32, std::vector<Descriptor>> _writes;
     };
 }

@@ -8,7 +8,7 @@
 
 #include "shader.h"
 
-using gfx::Shader;
+using kor::Shader;
 
 namespace {
 

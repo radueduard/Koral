@@ -23,7 +23,7 @@
 
 ImFont* AddFont(const std::filesystem::path& path, const float size)
 {
-    const std::string iconPath = gfx::assetPath(FONT_ICON_FILE_NAME_FAS).string();
+    const std::string iconPath = kor::assetPath(FONT_ICON_FILE_NAME_FAS).string();
     const float iconFontSize = size * 2.0f / 3.0f; // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
 
     ImFontConfig config;
@@ -37,7 +37,7 @@ ImFont* AddFont(const std::filesystem::path& path, const float size)
     return ImGui::GetIO().Fonts->AddFontFromFileTTF(iconPath.c_str(), iconFontSize, &config, icons_ranges);
 }
 
-void gfx::GUI::DefineStyle()
+void kor::GUI::DefineStyle()
 {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 5.0f;
@@ -119,31 +119,31 @@ void gfx::GUI::DefineStyle()
 
 
     auto& io = ImGui::GetIO();
-    _fonts[Font::Regular] = AddFont(gfx::assetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
-    _fonts[Font::Bold] = AddFont(gfx::assetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
-    _fonts[Font::Italic] = AddFont(gfx::assetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
-    _fonts[Font::Black] = AddFont(gfx::assetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
-    _fonts[Font::Light] = AddFont(gfx::assetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
+    _fonts[Font::Regular] = AddFont(kor::assetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
+    _fonts[Font::Bold] = AddFont(kor::assetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
+    _fonts[Font::Italic] = AddFont(kor::assetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
+    _fonts[Font::Black] = AddFont(kor::assetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
+    _fonts[Font::Light] = AddFont(kor::assetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
 
     io.FontDefault = _fonts[Font::Regular];
     io.FontGlobalScale = .55f;
 }
 
 
-gfx::Resource<gfx::GUI_Image> gfx::GUI_Image::Create(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level)
+kor::Resource<kor::GUI_Image> kor::GUI_Image::Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level)
 {
     switch (Context::activeAPI())
     {
         case API::eOpenGL:
-        return gfx::MakeBackendResource<gfx::GUI_Image, gfx::ogl::GUI_Image>(image, layer, level);
+        return kor::MakeBackendResource<kor::GUI_Image, kor::ogl::GUI_Image>(image, layer, level);
     case API::eVulkan:
-        return gfx::MakeBackendResource<gfx::GUI_Image, gfx::vk::GUI_Image>(image, layer, level);
+        return kor::MakeBackendResource<kor::GUI_Image, kor::vk::GUI_Image>(image, layer, level);
     default:
         throw std::runtime_error("Unsupported graphics API");
     }
 }
 
-void gfx::GUI::Init()
+void kor::GUI::Init()
 {
     Context::_imguiContext = ImGui::CreateContext();
     // ImGuizmo::SetImGuiContext(Context::_imguiContext);
@@ -171,7 +171,7 @@ void gfx::GUI::Init()
     DefineStyle();
 }
 
-void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
+void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
 {
     auto* context = Context::GetCurrentImGuiContext();
 
@@ -347,7 +347,7 @@ void gfx::GUI::Render(gfx::CommandBuffer& commandBuffer, Scene& scene)
     }
 }
 
-void gfx::GUI::Shutdown()
+void kor::GUI::Shutdown()
 {
     switch (Context::activeAPI())
     {
@@ -363,7 +363,7 @@ void gfx::GUI::Shutdown()
     ImGui::DestroyContext();
 }
 
-ImFont* gfx::GUI::GetFont(const Font font)
+ImFont* kor::GUI::GetFont(const Font font)
 {
     return _fonts.at(font);
 }

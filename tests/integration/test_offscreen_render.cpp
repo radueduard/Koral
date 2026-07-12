@@ -27,14 +27,14 @@
 #include "meshLayout.h"
 #include "shader.h"
 
-using gfx::Buffer;
-using gfx::CommandBuffer;
-using gfx::Framebuffer;
-using gfx::GraphicsPipeline;
-using gfx::Image;
-using gfx::ImageView;
-using gfx::ResourceRef;
-using gfx::Shader;
+using kor::Buffer;
+using kor::CommandBuffer;
+using kor::Framebuffer;
+using kor::GraphicsPipeline;
+using kor::Image;
+using kor::ImageView;
+using kor::ResourceRef;
+using kor::Shader;
 
 namespace {
 
@@ -69,14 +69,14 @@ TEST_F(GpuTest, OffscreenTriangleFillsTarget) {
         Shader::Builder{}
             .setLang<Shader::Lang::eGLSL>()
             .setStage(Shader::Stage::eVertex)
-            .setPath(gfx::shaderPath("flatTriangle.vert.glsl"))
+            .setPath(kor::shaderPath("flatTriangle.vert.glsl"))
             .getOrBuild("test.flatTriangle.vert");
 
     const ResourceRef<const Shader> frag =
         Shader::Builder{}
             .setLang<Shader::Lang::eGLSL>()
             .setStage(Shader::Stage::eFragment)
-            .setPath(gfx::shaderPath("flatTriangle.frag.glsl"))
+            .setPath(kor::shaderPath("flatTriangle.frag.glsl"))
             .getOrBuild("test.flatTriangle.frag");
 
     auto pipeline =
@@ -143,10 +143,10 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
 
     const ResourceRef<const Shader> vert =
         Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eVertex)
-            .setPath(gfx::shaderPath("flatTriangle.vert.glsl")).getOrBuild("test.flatTriangle.vert");
+            .setPath(kor::shaderPath("flatTriangle.vert.glsl")).getOrBuild("test.flatTriangle.vert");
     const ResourceRef<const Shader> frag =
         Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eFragment)
-            .setPath(gfx::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
+            .setPath(kor::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
 
     auto pipeline =
         GraphicsPipeline::Builder{}
@@ -162,7 +162,7 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
         cb.SetScissor(kSx, kSy, kSw, kSh); // clip the draw to a sub-rect
         // Exercise the dynamic-state railway. None of these change the visible
         // result (no culling, depth disabled, discard off) but they must record.
-        cb.SetFrontFace(gfx::FrontFace::eCounterClockwise);
+        cb.SetFrontFace(kor::FrontFace::eCounterClockwise);
         cb.SetDepthTestEnable(false);
         cb.SetDepthWriteEnable(false);
         cb.SetRasterizerDiscardEnable(false);
@@ -226,22 +226,22 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
 
     const ResourceRef<const Shader> vert =
         Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eVertex)
-            .setPath(gfx::shaderPath("flatTriangle.vert.glsl")).getOrBuild("test.flatTriangle.vert");
+            .setPath(kor::shaderPath("flatTriangle.vert.glsl")).getOrBuild("test.flatTriangle.vert");
     const ResourceRef<const Shader> frag =
         Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eFragment)
-            .setPath(gfx::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
+            .setPath(kor::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
 
     // Explicit alpha-blend attachment state + depth test on.
-    gfx::ColorBlendState blend;
-    blend.attachments.push_back(gfx::ColorBlendState::AttachmentState{
+    kor::ColorBlendState blend;
+    blend.attachments.push_back(kor::ColorBlendState::AttachmentState{
         .blendEnable = true,
-        .srcColorBlendFactor = gfx::BlendFactor::eSrcAlpha,
-        .dstColorBlendFactor = gfx::BlendFactor::eOneMinusSrcAlpha,
+        .srcColorBlendFactor = kor::BlendFactor::eSrcAlpha,
+        .dstColorBlendFactor = kor::BlendFactor::eOneMinusSrcAlpha,
     });
-    gfx::DepthStencilState depthState;
+    kor::DepthStencilState depthState;
     depthState.depthTestEnable = true;
     depthState.depthWriteEnable = true;
-    depthState.depthCompareOp = gfx::CompareOp::eLessOrEqual;
+    depthState.depthCompareOp = kor::CompareOp::eLessOrEqual;
 
     auto pipeline = GraphicsPipeline::Builder{}
                         .setVertexShader(vert)
@@ -282,8 +282,8 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
 // pipeline's vertex binding/attribute path plus BindMesh + DrawIndexed and the
 // buffer vertex/index barrier paths, none of which the vertex-index-only tests hit.
 TEST_F(GpuTest, MeshIndexedDraw) {
-    using PosVertex = gfx::ParamVertex<gfx::Position>;
-    using PosMesh = gfx::ParamMesh<PosVertex>;
+    using PosVertex = kor::ParamVertex<kor::Position>;
+    using PosMesh = kor::ParamMesh<PosVertex>;
 
     std::vector<PosVertex> verts = {
         PosVertex{ glm::vec3{-1.0f, -1.0f, 0.0f} },
@@ -308,10 +308,10 @@ TEST_F(GpuTest, MeshIndexedDraw) {
 
     const ResourceRef<const Shader> vert =
         Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eVertex)
-            .setPath(gfx::shaderPath("meshTriangle.vert.glsl")).getOrBuild("test.meshTriangle.vert");
+            .setPath(kor::shaderPath("meshTriangle.vert.glsl")).getOrBuild("test.meshTriangle.vert");
     const ResourceRef<const Shader> frag =
         Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eFragment)
-            .setPath(gfx::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
+            .setPath(kor::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
 
     auto pipeline = GraphicsPipeline::Builder{}
                         .setVertexShader<PosMesh>(vert) // vertex-input state from the mesh layout
@@ -324,7 +324,7 @@ TEST_F(GpuTest, MeshIndexedDraw) {
         cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
-        cb.BindMesh(ResourceRef<const gfx::Mesh>(mesh));
+        cb.BindMesh(ResourceRef<const kor::Mesh>(mesh));
         cb.DrawIndexed(); // uses the bound mesh's index count
         cb.EndRendering();
     }, CommandBuffer::Usage::eGraphics);

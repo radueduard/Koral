@@ -7,14 +7,14 @@
 #include <memory>
 #include "api.h"
 
-namespace gfx {
+namespace kor {
     class Window;
 
-    class GFX_API Surface {
+    class KORAL_API Surface {
     public:
-        explicit Surface(const gfx::Window& window) {}
+        explicit Surface(const kor::Window& window) {}
         virtual ~Surface() {};
-        static std::unique_ptr<gfx::Surface> Create(const gfx::Window &window);
+        static std::unique_ptr<kor::Surface> Create(const kor::Window &window);
     protected:
     };
 }

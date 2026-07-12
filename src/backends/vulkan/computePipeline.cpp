@@ -12,9 +12,9 @@
 #include "shader.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    ComputePipeline::ComputePipeline(const Builder& createInfo): gfx::ComputePipeline(createInfo)
+    ComputePipeline::ComputePipeline(const Builder& createInfo): kor::ComputePipeline(createInfo)
     {
         Setup();
     }
@@ -82,9 +82,9 @@ namespace gfx::vk
             device->destroyPipeline(_handle);
     }
 
-    void ComputePipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    void ComputePipeline::Bind(const kor::CommandBuffer& commandBuffer) const
     {
-        gfx::ComputePipeline::Bind(commandBuffer);
+        kor::ComputePipeline::Bind(commandBuffer);
         const auto& vkCommandBuffer = dynamic_cast<const CommandBuffer&>(commandBuffer);
         vkCommandBuffer->bindPipeline(::vk::PipelineBindPoint::eCompute, _handle);
     }

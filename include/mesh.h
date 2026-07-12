@@ -14,9 +14,9 @@
 #include "buffer.h"
 #include "api.h"
 
-namespace gfx
+namespace kor
 {
-    class GFX_API Mesh
+    class KORAL_API Mesh
     {
     public:
         Mesh() = default;
@@ -27,9 +27,9 @@ namespace gfx
         [[nodiscard]] std::optional<glm::u32> getIndexCount() const { return _indexCount; }
         [[nodiscard]] std::optional<ChannelType> getIndexType() const { return _indexType; }
 
-        [[nodiscard]] std::vector<gfx::ResourceRef<const Buffer>> getVertexBuffers() const
+        [[nodiscard]] std::vector<kor::ResourceRef<const Buffer>> getVertexBuffers() const
         {
-            std::vector<gfx::ResourceRef<const Buffer>> vertexBuffers;
+            std::vector<kor::ResourceRef<const Buffer>> vertexBuffers;
             for (const auto& vertexBuffer : _vertexBuffers)
             {
                 // Convert from the owning Resource (lifetime-tracked) rather than from a
@@ -39,7 +39,7 @@ namespace gfx
             }
             return vertexBuffers;
         }
-        [[nodiscard]] std::optional<gfx::ResourceRef<const Buffer>> getIndexBuffer() const {
+        [[nodiscard]] std::optional<kor::ResourceRef<const Buffer>> getIndexBuffer() const {
             if (!_indexBuffer.has_value())
                 return std::nullopt;
             return _indexBuffer;
@@ -53,10 +53,10 @@ namespace gfx
 
     protected:
         glm::u64 _vertexCount{};
-        std::vector<gfx::Resource<Buffer>> _vertexBuffers = {};
+        std::vector<kor::Resource<Buffer>> _vertexBuffers = {};
 
         std::optional<glm::u32> _indexCount = std::nullopt;
-        std::optional<gfx::Resource<Buffer>> _indexBuffer = std::nullopt;
+        std::optional<kor::Resource<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
 
         std::optional<VertexInputAttributeDescription> _positionAttribute = std::nullopt;
@@ -67,7 +67,7 @@ namespace gfx
          * `T` is deduced from the span, so the const element type does not need to be spelled out.
          */
         template<typename T>
-        static gfx::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
+        static kor::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
         {
             // Keep final buffers transfer-capable as requested, and usable as
             // ray-tracing acceleration structure build input (implies device address).
@@ -89,7 +89,7 @@ namespace gfx
          * The caller is expected to fill it later. `T` must be specified explicitly.
          */
         template<typename T>
-        static gfx::Resource<Buffer> makeBuffer(glm::u64 instanceCount, Flags<Buffer::Usage> usage)
+        static kor::Resource<Buffer> makeBuffer(glm::u64 instanceCount, Flags<Buffer::Usage> usage)
         {
             const auto finalUsage = usage
                 | Buffer::Usage::eTransferDst
@@ -116,10 +116,10 @@ namespace gfx
         struct Builder
         {
             glm::u64 vertexCount = 0;
-            std::vector<gfx::Resource<Buffer>> vertexBuffers {};
+            std::vector<kor::Resource<Buffer>> vertexBuffers {};
 
             std::optional<glm::u32> indexCount = std::nullopt;
-            std::optional<gfx::Resource<Buffer>> indexBuffer = std::nullopt;
+            std::optional<kor::Resource<Buffer>> indexBuffer = std::nullopt;
             std::optional<ChannelType> indexType = std::nullopt;
 
             explicit Builder()
@@ -129,7 +129,7 @@ namespace gfx
                 vertexBuffers.resize(Derived::VertexBindingDescription().size());
             }
 
-            Builder& SetVertexBuffer(const glm::u32 binding, gfx::Resource<Buffer> vertexBuffer) {
+            Builder& SetVertexBuffer(const glm::u32 binding, kor::Resource<Buffer> vertexBuffer) {
                 if (vertexCount == 0)
                     vertexCount = vertexBuffer->getSize() / _vertexBindingDescription[binding].stride;
                 else if (vertexCount != vertexBuffer->getSize() / _vertexBindingDescription[binding].stride)
@@ -139,16 +139,16 @@ namespace gfx
                 return *this;
             }
 
-            Builder& SetIndexBuffer(gfx::Resource<Buffer> indexBuffer, const ChannelType indexType) {
+            Builder& SetIndexBuffer(kor::Resource<Buffer> indexBuffer, const ChannelType indexType) {
                 this->indexCount = static_cast<glm::u32>(indexBuffer->getSize() / sizeofChannelType(indexType));
                 this->indexBuffer = std::move(indexBuffer);
                 this->indexType = indexType;
                 return *this;
             }
 
-            gfx::Resource<Derived> Build()
+            kor::Resource<Derived> Build()
             {
-                return gfx::MakeResource<Derived>(*this);
+                return kor::MakeResource<Derived>(*this);
             }
         };
 

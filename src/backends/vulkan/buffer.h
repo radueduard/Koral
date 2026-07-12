@@ -9,12 +9,12 @@
 
 #include <buffer.h>
 
-namespace gfx::vk
+namespace kor::vk
 {
 	class DescriptorSet;
 
-	class Buffer final : public gfx::Buffer {
-		friend class gfx::vk::DescriptorSet;
+	class Buffer final : public kor::Buffer {
+		friend class kor::vk::DescriptorSet;
     public:
         explicit Buffer(const RawBuilder& builder);
 		~Buffer() override;

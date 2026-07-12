@@ -7,21 +7,21 @@
 #include "vk_wrapper.h"
 #include <vulkan/vulkan.hpp>
 
-namespace gfx
+namespace kor
 {
     class CommandBuffer;
 }
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class GraphicsPipeline final : public gfx::GraphicsPipeline, public Wrapper<::vk::Pipeline>
+    class GraphicsPipeline final : public kor::GraphicsPipeline, public Wrapper<::vk::Pipeline>
     {
     public:
         explicit GraphicsPipeline(const Builder& createInfo);
 
         ~GraphicsPipeline() override;
 
-        void Bind(const gfx::CommandBuffer& commandBuffer) const override;
+        void Bind(const kor::CommandBuffer& commandBuffer) const override;
         void Unbind() const override {}
 
         [[nodiscard]] const ::vk::PipelineLayout& getPipelineLayout() const { return _pipelineLayout; }

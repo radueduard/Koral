@@ -21,13 +21,13 @@
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     class ComputePipeline;
 
-    gfx::Flags<CommandBuffer::Usage> getCommandBufferUsage(const gfx::vk::Queue& queue)
+    kor::Flags<CommandBuffer::Usage> getCommandBufferUsage(const kor::vk::Queue& queue)
     {
-        gfx::Flags<CommandBuffer::Usage> usage;
+        kor::Flags<CommandBuffer::Usage> usage;
         if (queue.getFamily().getProperties().queueFlags & ::vk::QueueFlagBits::eGraphics)
             usage |= CommandBuffer::Usage::eGraphics;
         if (queue.getFamily().getProperties().queueFlags & ::vk::QueueFlagBits::eCompute)
@@ -37,11 +37,11 @@ namespace gfx::vk
         return usage;
     }
 
-    CommandBuffer::CommandBuffer(const gfx::vk::Queue& queue, const ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool& parentCommandPool)
-        : gfx::CommandBuffer(getCommandBufferUsage(queue)), _queue(queue), _parentPool(parentCommandPool) {
+    CommandBuffer::CommandBuffer(const kor::vk::Queue& queue, const ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool& parentCommandPool)
+        : kor::CommandBuffer(getCommandBufferUsage(queue)), _queue(queue), _parentPool(parentCommandPool) {
         _handle = commandBuffer;
         _signalSemaphore = Context::Device()->createSemaphore({});
-        _fence = gfx::vk::Context::Device()->createFence({});
+        _fence = kor::vk::Context::Device()->createFence({});
     }
 
     CommandBuffer::~CommandBuffer() {
@@ -51,7 +51,7 @@ namespace gfx::vk
         Context::Device()->destroyFence(_fence);
     }
 
-    void CommandBuffer::Run(const std::function<void(const gfx::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore) const {
+    void CommandBuffer::Run(const std::function<void(const kor::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore) const {
         _handle.begin(::vk::CommandBufferBeginInfo().setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
         command(*this);
         _handle.end();
@@ -76,7 +76,7 @@ namespace gfx::vk
         }
     }
 
-    gfx::CommandBuffer& CommandBuffer::Begin()
+    kor::CommandBuffer& CommandBuffer::Begin()
     {
         resetErrors();
         constexpr auto commandBufferBeginInfo = ::vk::CommandBufferBeginInfo()
@@ -90,7 +90,7 @@ namespace gfx::vk
         _handle.end();
     }
 
-    gfx::CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const glm::vec4 color)
+    kor::CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const glm::vec4 color)
     {
         // Guard on the loaded function pointer: VK_EXT_debug_utils is optional, so the
         // dispatcher entry is null when the instance was created without it.
@@ -103,7 +103,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::EndDebugLabel()
+    kor::CommandBuffer& CommandBuffer::EndDebugLabel()
     {
         if (VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdEndDebugUtilsLabelEXT) {
             _handle.endDebugUtilsLabelEXT();
@@ -111,7 +111,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const glm::vec4 color)
+    kor::CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const glm::vec4 color)
     {
         if (VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdInsertDebugUtilsLabelEXT) {
             const auto info = ::vk::DebugUtilsLabelEXT()
@@ -122,16 +122,16 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
-        gfx::CommandBuffer::BeginRendering();
+    kor::CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
+        kor::CommandBuffer::BeginRendering();
         const auto framebuffer = _state.boundFramebuffer.value();
-        return gfx::CommandBuffer::BeginRendering(framebuffer, renderParameters);
+        return kor::CommandBuffer::BeginRendering(framebuffer, renderParameters);
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBeginRendering(gfx::ResourceRef<const gfx::Framebuffer> framebuffer, RenderParameters renderParameters)
+    kor::CommandBuffer& CommandBuffer::doBeginRendering(kor::ResourceRef<const kor::Framebuffer> framebuffer, RenderParameters renderParameters)
     {
         stateBeginRendering(framebuffer);
-        std::vector<gfx::ImageBarrier> imageBarriers;
+        std::vector<kor::ImageBarrier> imageBarriers;
         for (const auto& attachment : framebuffer->getColorAttachments())
         {
             imageBarriers.push_back({
@@ -159,7 +159,7 @@ namespace gfx::vk
         int i = 0;
         for (auto& colorAttachment : framebuffer->getColorAttachments()) {
             auto attachInfo = ::vk::RenderingAttachmentInfoKHR()
-                .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&colorAttachment.get()))
+                .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&colorAttachment.get()))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
                 .setClearValue(getVkClearValue(framebuffer->getClearColor(i)))
                 .setLoadOp(getVkLoadOp(renderParameters.colorLoadOperation))
@@ -167,7 +167,7 @@ namespace gfx::vk
             if (framebuffer->hasResolveAttachments()) {
                 attachInfo
                     .setResolveImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                    .setResolveImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getResolveAttachment(i)))
+                    .setResolveImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getResolveAttachment(i)))
                     .setResolveMode(getVkResolveMode(framebuffer->getResolveMode()));
             }
             colorAttachmentInfos.push_back(attachInfo);
@@ -175,14 +175,14 @@ namespace gfx::vk
         }
 
         const auto depthAttachment = framebuffer->hasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getDepthAttachment()))
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getDepthAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
             .setLoadOp(getVkLoadOp(renderParameters.depthLoadOperation))
             .setStoreOp(getVkStoreOp(renderParameters.depthStoreOperation))) : std::nullopt;
 
         const auto stencilAttachment = framebuffer->hasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const gfx::vk::ImageView*>(&framebuffer->getStencilAttachment()))
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getStencilAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
             .setLoadOp(getVkLoadOp(renderParameters.stencilLoadOperation))
@@ -205,16 +205,16 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::EndRendering()
+    kor::CommandBuffer& CommandBuffer::EndRendering()
     {
-        gfx::CommandBuffer::EndRendering();
+        kor::CommandBuffer::EndRendering();
         _handle.endRenderingKHR();
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
-        gfx::CommandBuffer::SetViewport(x, y, width, height);
+        kor::CommandBuffer::SetViewport(x, y, width, height);
         // The app authors its geometry, texture sampling and gl_FragCoord conventions for
         // OpenGL's Y-up window origin; only the depth convention is shared (both use
         // GLM_FORCE_DEPTH_ZERO_TO_ONE). Present the default (swapchain) framebuffer through
@@ -233,9 +233,9 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
-        gfx::CommandBuffer::SetScissor(x, y, width, height);
+        kor::CommandBuffer::SetScissor(x, y, width, height);
         const ::vk::Rect2D scissor = ::vk::Rect2D()
             .setOffset({ static_cast<glm::i32>(x), static_cast<glm::i32>(y) })
             .setExtent({ width, height });
@@ -243,136 +243,136 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetLineWidth(const float lineWidth)
+    kor::CommandBuffer& CommandBuffer::SetLineWidth(const float lineWidth)
     {
-        gfx::CommandBuffer::SetLineWidth(lineWidth);
+        kor::CommandBuffer::SetLineWidth(lineWidth);
         _handle.setLineWidth(lineWidth);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
+    kor::CommandBuffer& CommandBuffer::SetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
     {
-        gfx::CommandBuffer::SetDepthBias(constantFactor, clamp, slopeFactor);
+        kor::CommandBuffer::SetDepthBias(constantFactor, clamp, slopeFactor);
         _handle.setDepthBias(constantFactor, clamp, slopeFactor);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetBlendConstants(const glm::vec4 constants)
+    kor::CommandBuffer& CommandBuffer::SetBlendConstants(const glm::vec4 constants)
     {
-        gfx::CommandBuffer::SetBlendConstants(constants);
+        kor::CommandBuffer::SetBlendConstants(constants);
         const float bc[4] = { constants.r, constants.g, constants.b, constants.a };
         _handle.setBlendConstants(bc);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
+    kor::CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
     {
-        gfx::CommandBuffer::SetStencilCompareMask(face, compareMask);
+        kor::CommandBuffer::SetStencilCompareMask(face, compareMask);
         _handle.setStencilCompareMask(getVkStencilFace(face), compareMask);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
+    kor::CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
     {
-        gfx::CommandBuffer::SetStencilWriteMask(face, writeMask);
+        kor::CommandBuffer::SetStencilWriteMask(face, writeMask);
         _handle.setStencilWriteMask(getVkStencilFace(face), writeMask);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const glm::u32 reference)
+    kor::CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const glm::u32 reference)
     {
-        gfx::CommandBuffer::SetStencilReference(face, reference);
+        kor::CommandBuffer::SetStencilReference(face, reference);
         _handle.setStencilReference(getVkStencilFace(face), reference);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetCullMode(const Flags<CullMode> cullMode)
+    kor::CommandBuffer& CommandBuffer::SetCullMode(const Flags<CullMode> cullMode)
     {
-        gfx::CommandBuffer::SetCullMode(cullMode);
+        kor::CommandBuffer::SetCullMode(cullMode);
         _handle.setCullMode(getVkCullMode(cullMode));
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetFrontFace(const FrontFace frontFace)
+    kor::CommandBuffer& CommandBuffer::SetFrontFace(const FrontFace frontFace)
     {
-        gfx::CommandBuffer::SetFrontFace(frontFace);
+        kor::CommandBuffer::SetFrontFace(frontFace);
         // The front face is authored for OpenGL's Y-up window space. Offscreen targets
         // render with Vulkan's Y-down (straight) viewport, which reverses triangle winding
         // relative to that authoring, so invert the front face there. The default
         // framebuffer uses a negative-height (flipped) viewport (see SetViewport), which
         // restores the original winding, so it takes the winding as-is.
         const bool isDefaultFramebuffer = _state.boundFramebuffer.has_value() && _state.boundFramebuffer.value()->IsDefault();
-        _handle.setFrontFace(isDefaultFramebuffer ? frontFace == gfx::FrontFace::eClockwise ? ::vk::FrontFace::eClockwise
+        _handle.setFrontFace(isDefaultFramebuffer ? frontFace == kor::FrontFace::eClockwise ? ::vk::FrontFace::eClockwise
                                                                                             : ::vk::FrontFace::eCounterClockwise
-                                                  : frontFace == gfx::FrontFace::eClockwise ? ::vk::FrontFace::eCounterClockwise
+                                                  : frontFace == kor::FrontFace::eClockwise ? ::vk::FrontFace::eCounterClockwise
                                                                                             : ::vk::FrontFace::eClockwise);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetDepthTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::SetDepthTestEnable(const bool enable)
     {
-        gfx::CommandBuffer::SetDepthTestEnable(enable);
+        kor::CommandBuffer::SetDepthTestEnable(enable);
         _handle.setDepthTestEnable(enable);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetDepthWriteEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::SetDepthWriteEnable(const bool enable)
     {
-        gfx::CommandBuffer::SetDepthWriteEnable(enable);
+        kor::CommandBuffer::SetDepthWriteEnable(enable);
         _handle.setDepthWriteEnable(enable);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetDepthCompareOp(const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::SetDepthCompareOp(const CompareOp compareOp)
     {
-        gfx::CommandBuffer::SetDepthCompareOp(compareOp);
+        kor::CommandBuffer::SetDepthCompareOp(compareOp);
         _handle.setDepthCompareOp(getVkCompareOp(compareOp));
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetStencilTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::SetStencilTestEnable(const bool enable)
     {
-        gfx::CommandBuffer::SetStencilTestEnable(enable);
+        kor::CommandBuffer::SetStencilTestEnable(enable);
         _handle.setStencilTestEnable(enable);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::SetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
     {
-        gfx::CommandBuffer::SetStencilOp(face, failOp, passOp, depthFailOp, compareOp);
+        kor::CommandBuffer::SetStencilOp(face, failOp, passOp, depthFailOp, compareOp);
         _handle.setStencilOp(getVkStencilFace(face), getVkStencilOp(failOp), getVkStencilOp(passOp), getVkStencilOp(depthFailOp), getVkCompareOp(compareOp));
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetDepthBiasEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::SetDepthBiasEnable(const bool enable)
     {
-        gfx::CommandBuffer::SetDepthBiasEnable(enable);
+        kor::CommandBuffer::SetDepthBiasEnable(enable);
         _handle.setDepthBiasEnable(enable);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(const bool enable)
     {
-        gfx::CommandBuffer::SetRasterizerDiscardEnable(enable);
+        kor::CommandBuffer::SetRasterizerDiscardEnable(enable);
         _handle.setRasterizerDiscardEnable(enable);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(const bool enable)
     {
-        gfx::CommandBuffer::SetPrimitiveRestartEnable(enable);
+        kor::CommandBuffer::SetPrimitiveRestartEnable(enable);
         _handle.setPrimitiveRestartEnable(enable);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBindComputePipeline(gfx::ResourceRef<const gfx::ComputePipeline> pipeline)
+    kor::CommandBuffer& CommandBuffer::doBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline)
     {
         stateBindComputePipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBindGraphicsPipeline(gfx::ResourceRef<const gfx::GraphicsPipeline> pipeline)
+    kor::CommandBuffer& CommandBuffer::doBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline)
     {
         stateBindGraphicsPipeline(pipeline);
         pipeline->Bind(*this);
@@ -381,20 +381,20 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBindRayTracingPipeline(gfx::ResourceRef<const gfx::RayTracingPipeline> pipeline)
+    kor::CommandBuffer& CommandBuffer::doBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline)
     {
         stateBindRayTracingPipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::TraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth)
+    kor::CommandBuffer& CommandBuffer::TraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth)
     {
         if (_failed) return *this;
         if (!_state.boundRayTracingPipeline.has_value())
             return record(ErrorCode::eNoRayTracingPipelineBound, "Cannot trace rays without a ray-tracing pipeline bound.");
 
-        const auto& vkPipeline = dynamic_cast<const gfx::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
+        const auto& vkPipeline = dynamic_cast<const kor::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
         _handle.traceRaysKHR(
             vkPipeline.getRaygenRegion(),
             vkPipeline.getMissRegion(),
@@ -404,14 +404,14 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBindDescriptorSet(const glm::u32 index, gfx::ResourceRef<const gfx::DescriptorSet> set, const bool debug)
+    kor::CommandBuffer& CommandBuffer::doBindDescriptorSet(const glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set, const bool debug)
     {
         if (debug) set->DebugPrint();
 
         if (_state.boundComputePipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
+            const auto& vkPipeline = dynamic_cast<const kor::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
             const auto pipelineLayout = vkPipeline.getPipelineLayout();
-            const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet&>(*set);
+            const auto& vkSet = dynamic_cast<const kor::vk::DescriptorSet&>(*set);
             _handle.bindDescriptorSets(
                 ::vk::PipelineBindPoint::eCompute,
                 pipelineLayout,
@@ -420,9 +420,9 @@ namespace gfx::vk
                 nullptr);
             _state.boundComputeDescriptorSets.insert_or_assign(index, set);
         } else if (_state.boundGraphicsPipeline.has_value()) {
-                const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
+                const auto& vkPipeline = dynamic_cast<const kor::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
                 const auto pipelineLayout = vkPipeline.getPipelineLayout();
-                const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet&>(*set);
+                const auto& vkSet = dynamic_cast<const kor::vk::DescriptorSet&>(*set);
                 _handle.bindDescriptorSets(
                     ::vk::PipelineBindPoint::eGraphics,
                     pipelineLayout,
@@ -431,9 +431,9 @@ namespace gfx::vk
                     nullptr);
                 _state.boundGraphicsDescriptorSets.insert_or_assign(index, set);
         } else if (_state.boundRayTracingPipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
+            const auto& vkPipeline = dynamic_cast<const kor::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
             const auto pipelineLayout = vkPipeline.getPipelineLayout();
-            const auto& vkSet = dynamic_cast<const gfx::vk::DescriptorSet&>(*set);
+            const auto& vkSet = dynamic_cast<const kor::vk::DescriptorSet&>(*set);
             _handle.bindDescriptorSets(
                 ::vk::PipelineBindPoint::eRayTracingKHR,
                 pipelineLayout,
@@ -447,28 +447,28 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBindMesh(gfx::ResourceRef<const gfx::Mesh> mesh)
+    kor::CommandBuffer& CommandBuffer::doBindMesh(kor::ResourceRef<const kor::Mesh> mesh)
     {
         stateBindMesh(mesh);
         std::vector<::vk::Buffer> vertexBuffers;
         std::vector<::vk::DeviceSize> offsets;
         for (const auto& buffer : mesh->getVertexBuffers()) {
-            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
+            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
             vertexBuffers.push_back(*vkBuffer);
             offsets.push_back(0);
         }
         _handle.bindVertexBuffers(0, vertexBuffers, offsets);
         if (mesh->hasIndexBuffer())
         {
-            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*mesh->getIndexBuffer().value());
+            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*mesh->getIndexBuffer().value());
             _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
         }
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doBarrier(
-        const std::vector<gfx::BufferBarrier> bufferBarriers,
-        const std::vector<gfx::ImageBarrier> imageBarriers) {
+    kor::CommandBuffer & CommandBuffer::doBarrier(
+        const std::vector<kor::BufferBarrier> bufferBarriers,
+        const std::vector<kor::ImageBarrier> imageBarriers) {
 
         ::vk::PipelineStageFlags srcStageMask = ::vk::PipelineStageFlagBits::eAllCommands;
         ::vk::PipelineStageFlags dstStageMask = ::vk::PipelineStageFlagBits::eNone;
@@ -476,7 +476,7 @@ namespace gfx::vk
         std::vector<::vk::BufferMemoryBarrier> vkBufferBarriers;
         std::vector<::vk::ImageMemoryBarrier> vkImageBarriers;
         for (const auto& barrier : bufferBarriers) {
-            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*barrier.getBuffer());
+            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*barrier.getBuffer());
             vkBufferBarriers.push_back(::vk::BufferMemoryBarrier()
                 .setSrcAccessMask(vkBuffer.getAccessMask())
                 .setDstAccessMask(getVkAccessFlags(barrier.getDstAccess()))
@@ -491,7 +491,7 @@ namespace gfx::vk
             vkBuffer.setAccessMask(getVkAccessFlags(barrier.getDstAccess()));
         }
         for (const auto& barrier : imageBarriers) {
-            const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*barrier.getImage());
+            const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*barrier.getImage());
 
             const auto newLayout = getVkImageLayout(barrier.getDstAccess());
             const auto dstAccessMask = getVkAccessFlags(barrier.getDstAccess());
@@ -543,66 +543,66 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ)
+    kor::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ)
     {
         if (_failed) return *this;
         _handle.dispatch(groupCountX, groupCountY, groupCountZ);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doDispatchIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset) {
+    kor::CommandBuffer & CommandBuffer::doDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) {
         if (_failed) return *this;
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
         _handle.dispatchIndirect(*vkBuffer, offset);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ) {
-        gfx::CommandBuffer::DrawMeshTasks(taskCountX, taskCountY, taskCountZ);
+    kor::CommandBuffer& CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ) {
+        kor::CommandBuffer::DrawMeshTasks(taskCountX, taskCountY, taskCountZ);
         if (_failed) return *this;
         applyDynamicDefaults();
         _handle.drawMeshTasksEXT(taskCountX, taskCountY, taskCountZ);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doDrawIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+    kor::CommandBuffer & CommandBuffer::doDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
         if (_failed) return *this;
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
         applyDynamicDefaults();
         _handle.drawIndirect(*vkBuffer, offset, drawCount, stride);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doDrawIndexedIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+    kor::CommandBuffer & CommandBuffer::doDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
         if (_failed) return *this;
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
         applyDynamicDefaults();
         _handle.drawIndexedIndirect(*vkBuffer, offset, drawCount, stride);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doDrawMeshTasksIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+    kor::CommandBuffer & CommandBuffer::doDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
         if (_failed) return *this;
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*indirectBuffer);
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
         applyDynamicDefaults();
         _handle.drawMeshTasksIndirectEXT(*vkBuffer, offset, drawCount, stride);
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance)
+    kor::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance)
     {
         if (vertexCount == UINT64_MAX && _state.boundMesh.has_value()) {
             vertexCount = _state.boundMesh.value()->getVertexCount();
         }
-        gfx::CommandBuffer::Draw(vertexCount, instanceCount, firstVertex, firstInstance);
+        kor::CommandBuffer::Draw(vertexCount, instanceCount, firstVertex, firstInstance);
         if (_failed) return *this;
         applyDynamicDefaults();
         _handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) {
-        gfx::CommandBuffer::DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    kor::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) {
+        kor::CommandBuffer::DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
         if (_failed) return *this;
         const auto mesh = _state.boundMesh.value();
         if (indexCount == UINT64_MAX) {
@@ -613,14 +613,14 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doClearBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) {
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
+    kor::CommandBuffer & CommandBuffer::doClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset, glm::u64 size) {
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         _handle.fillBuffer(*vkBuffer, offset, size, 0);
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doFillBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
+    kor::CommandBuffer & CommandBuffer::doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         if (size == UINT64_MAX) {
             size = vkBuffer.getSize() - offset;
         }
@@ -628,10 +628,10 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doCopyBuffer(ResourceRef<const gfx::Buffer> srcBuffer, ResourceRef<const gfx::Buffer> dstBuffer, glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset) {
+    kor::CommandBuffer & CommandBuffer::doCopyBuffer(ResourceRef<const kor::Buffer> srcBuffer, ResourceRef<const kor::Buffer> dstBuffer, glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset) {
         if (_failed) return *this;
-        const auto& vkSrcBuffer = dynamic_cast<const gfx::vk::Buffer&>(*srcBuffer);
-        const auto& vkDstBuffer = dynamic_cast<const gfx::vk::Buffer&>(*dstBuffer);
+        const auto& vkSrcBuffer = dynamic_cast<const kor::vk::Buffer&>(*srcBuffer);
+        const auto& vkDstBuffer = dynamic_cast<const kor::vk::Buffer&>(*dstBuffer);
         if (size == UINT64_MAX) {
             size = std::min(vkSrcBuffer.getSize() - srcOffset, vkDstBuffer.getSize() - dstOffset);
         }
@@ -648,8 +648,8 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doClearColorImage(gfx::ResourceRef<const gfx::Image> image, const glm::vec4 color) {
-        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
+    kor::CommandBuffer& CommandBuffer::doClearColorImage(kor::ResourceRef<const kor::Image> image, const glm::vec4 color) {
+        const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
         // Transition every subresource to transfer-dst; this also updates the tracked
         // layout so the subsequent clear records against the correct layout.
@@ -661,8 +661,8 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBlit(ResourceRef<const gfx::Image> srcImage, gfx::Blit blitInfo) {
-        ResourceRef<const gfx::Image> dstImage =  dynamic_cast<const Scheduler&>(gfx::Context::Scheduler()).getSwapChain().getImage();
+    kor::CommandBuffer& CommandBuffer::doBlit(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
+        ResourceRef<const kor::Image> dstImage =  dynamic_cast<const Scheduler&>(kor::Context::Scheduler()).getSwapChain().getImage();
         Barrier({}, {
             {
                 srcImage,
@@ -716,7 +716,7 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doBlit(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo)
+    kor::CommandBuffer& CommandBuffer::doBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo)
     {
         if (blitInfo.srcExtent == glm::ivec3(-1))
             blitInfo.srcExtent = srcImage->getExtent();
@@ -770,18 +770,18 @@ namespace gfx::vk
          return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doResolve(ResourceRef<const gfx::Image> srcImage, gfx::Resolve resolveInfo) {
+    kor::CommandBuffer & CommandBuffer::doResolve(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
         if (_failed) return *this;
         if (srcImage->getSampleCount() == SampleCount::e1)
             return record(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
 
         if (!_resolveHelperImage)
-            _resolveHelperImage = gfx::Image::Builder()
+            _resolveHelperImage = kor::Image::Builder()
                 .setIsPerFrame(true)
                 .setExtent(srcImage->getExtent())
                 .setFormat(srcImage->getFormat())
-                .setUsage(gfx::Image::Usage::eTransferDst)
-                .addUsage(gfx::Image::Usage::eTransferSrc)
+                .setUsage(kor::Image::Usage::eTransferDst)
+                .addUsage(kor::Image::Usage::eTransferSrc)
                 .build();
         if (_resolveHelperImage->getExtent() != srcImage->getExtent())
             _resolveHelperImage->Resize(srcImage->getExtent());
@@ -830,11 +830,11 @@ namespace gfx::vk
                 .setDstOffset({ resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.z })
                 .setExtent({ static_cast<glm::u32>(resolveInfo.srcExtent.x), static_cast<glm::u32>(resolveInfo.srcExtent.y), static_cast<glm::u32>(resolveInfo.srcExtent.z) }));
 
-        Blit(gfx::ResourceRef<const gfx::Image>(_resolveHelperImage), gfx::Blit{});
+        Blit(kor::ResourceRef<const kor::Image>(_resolveHelperImage), kor::Blit{});
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doResolve(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Resolve resolveInfo) {
+    kor::CommandBuffer& CommandBuffer::doResolve(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Resolve resolveInfo) {
         if (_failed) return *this;
         if (srcImage->getSampleCount() == SampleCount::e1)
             return record(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
@@ -888,10 +888,10 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::doCopyBufferToImage(ResourceRef<const gfx::Buffer> buffer, ResourceRef<const gfx::Image> image, gfx::Copy copyInfo) {
+    kor::CommandBuffer& CommandBuffer::doCopyBufferToImage(ResourceRef<const kor::Buffer> buffer, ResourceRef<const kor::Image> image, kor::Copy copyInfo) {
         if (_failed) return *this;
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
-        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
+        const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
         if (copyInfo.bufferOffset >= vkBuffer.getSize())
             return record(ErrorCode::eCopySizeExceedsBuffer,
@@ -961,10 +961,10 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer & CommandBuffer::doCopyImageToBuffer(ResourceRef<const gfx::Image> image, ResourceRef<const gfx::Buffer> buffer, gfx::Copy copyInfo) {
+    kor::CommandBuffer & CommandBuffer::doCopyImageToBuffer(ResourceRef<const kor::Image> image, ResourceRef<const kor::Buffer> buffer, kor::Copy copyInfo) {
         if (_failed) return *this;
-        const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(*buffer);
-        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*image);
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
+        const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
         if (copyInfo.bufferOffset >= vkBuffer.getSize())
             return record(ErrorCode::eCopySizeExceedsBuffer,
@@ -1034,13 +1034,13 @@ namespace gfx::vk
         return *this;
     }
 
-    gfx::CommandBuffer& CommandBuffer::Run(const std::function<void(gfx::CommandBuffer&)>& command)
+    kor::CommandBuffer& CommandBuffer::Run(const std::function<void(kor::CommandBuffer&)>& command)
     {
         command(*this);
         return *this;
     }
 
-    gfx::VoidResult CommandBuffer::Submit()
+    kor::VoidResult CommandBuffer::Submit()
     {
         const auto commandBuffers = std::array { _handle };
         auto submitInfo = ::vk::SubmitInfo()
@@ -1079,9 +1079,9 @@ namespace gfx::vk
         }
     }
 
-    gfx::CommandBuffer& CommandBuffer::PushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {
+    kor::CommandBuffer& CommandBuffer::PushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {
         if (_state.boundComputePipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
+            const auto& vkPipeline = dynamic_cast<const kor::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
             _handle.pushConstants(
                 vkPipeline.getPipelineLayout(),
                 ::vk::ShaderStageFlagBits::eCompute,
@@ -1089,7 +1089,7 @@ namespace gfx::vk
                 size,
                 data);
         } else if (_state.boundGraphicsPipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
+            const auto& vkPipeline = dynamic_cast<const kor::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
             _handle.pushConstants(
                 vkPipeline.getPipelineLayout(),
                 getVkShaderStageFlags(vkPipeline.getPushConstantRange(offset).stages),
@@ -1097,7 +1097,7 @@ namespace gfx::vk
                 size,
                 data);
         } else if (_state.boundRayTracingPipeline.has_value()) {
-            const auto& vkPipeline = dynamic_cast<const gfx::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
+            const auto& vkPipeline = dynamic_cast<const kor::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
             _handle.pushConstants(
                 vkPipeline.getPipelineLayout(),
                 getVkShaderStageFlags(vkPipeline.getPushConstantRange(offset).stages),

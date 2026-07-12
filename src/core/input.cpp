@@ -13,7 +13,7 @@
 #include "window.h"
 
 
-namespace gfx {
+namespace kor {
 	namespace {
 		// Process-wide input state: there is only ever one window, so this need not
 		// be per-window. Encapsulated in this TU; reached through Input's methods.

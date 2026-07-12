@@ -19,61 +19,61 @@
 #include "context.h"
 
 
-gfx::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
+kor::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
     switch (type.basetype) {
         case OIIO::TypeDesc::UINT8: {
             switch (channels) {
-                case 1: return gfx::Image::Format::eR8_UNORM;
-                case 2: return gfx::Image::Format::eRG8_UNORM;
-                case 4: return gfx::Image::Format::eRGBA8_UNORM;
+                case 1: return kor::Image::Format::eR8_UNORM;
+                case 2: return kor::Image::Format::eRG8_UNORM;
+                case 4: return kor::Image::Format::eRGBA8_UNORM;
                 default: throw std::runtime_error("Unknown format");
             }
         }
         case OIIO::TypeDesc::INT8: {
             switch (channels) {
-                case 1: return gfx::Image::Format::eR8_SINT;
-                case 2: return gfx::Image::Format::eRG8_SINT;
-                case 4: return gfx::Image::Format::eRGBA8_SINT;
+                case 1: return kor::Image::Format::eR8_SINT;
+                case 2: return kor::Image::Format::eRG8_SINT;
+                case 4: return kor::Image::Format::eRGBA8_SINT;
                 default: throw std::runtime_error("Unknown format");
             }
         }
         case OIIO::TypeDesc::UINT16: {
             switch (channels) {
-                case 1: return gfx::Image::Format::eR16_UNORM;
-                case 2: return gfx::Image::Format::eRG16_UNORM;
-                case 4: return gfx::Image::Format::eRGBA16_UNORM;
+                case 1: return kor::Image::Format::eR16_UNORM;
+                case 2: return kor::Image::Format::eRG16_UNORM;
+                case 4: return kor::Image::Format::eRGBA16_UNORM;
                 default: throw std::runtime_error("Unknown format");
             }
         }
         case OIIO::TypeDesc::INT16: {
             switch (channels) {
-                case 1: return gfx::Image::Format::eR16_SINT;
-                case 2: return gfx::Image::Format::eRG16_SINT;
-                case 4: return gfx::Image::Format::eRGBA16_SINT;
+                case 1: return kor::Image::Format::eR16_SINT;
+                case 2: return kor::Image::Format::eRG16_SINT;
+                case 4: return kor::Image::Format::eRGBA16_SINT;
                 default: throw std::runtime_error("Unknown format");
             }
         }
         case OIIO::TypeDesc::INT32: {
             switch (channels) {
-                case 1: return gfx::Image::Format::eR32_SINT;
-                case 2: return gfx::Image::Format::eRG32_SINT;
-                case 4: return gfx::Image::Format::eRGBA32_SINT;
+                case 1: return kor::Image::Format::eR32_SINT;
+                case 2: return kor::Image::Format::eRG32_SINT;
+                case 4: return kor::Image::Format::eRGBA32_SINT;
                 default: throw std::runtime_error("Unknown format");
             }
         }
         case OIIO::TypeDesc::UINT32: {
             switch (channels) {
-                case 1: return gfx::Image::Format::eR32_UINT;
-                case 2: return gfx::Image::Format::eRG32_UINT;
-                case 4: return gfx::Image::Format::eRGBA32_UINT;
+                case 1: return kor::Image::Format::eR32_UINT;
+                case 2: return kor::Image::Format::eRG32_UINT;
+                case 4: return kor::Image::Format::eRGBA32_UINT;
                 default: throw std::runtime_error("Unknown format");
             }
         }
         case OIIO::TypeDesc::FLOAT: {
             switch (channels) {
-                case 1: return gfx::Image::Format::eR32_SFLOAT;
-                case 2: return gfx::Image::Format::eRG32_SFLOAT;
-                case 4: return gfx::Image::Format::eRGBA32_SFLOAT;
+                case 1: return kor::Image::Format::eR32_SFLOAT;
+                case 2: return kor::Image::Format::eRG32_SFLOAT;
+                case 4: return kor::Image::Format::eRGBA32_SFLOAT;
                 default: throw std::runtime_error("Unknown format");
             }
         }
@@ -81,9 +81,9 @@ gfx::Image::Format getFormat(const OIIO::TypeDesc& type, const int channels) {
     }
 }
 
-namespace gfx
+namespace kor
 {
-    gfx::Resource<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
+    kor::Resource<Image> Importer::LoadImage(const std::filesystem::path& path, bool generateMipmaps)
     {
         const auto imageInput = OIIO::ImageInput::open(path.string());
         if (!imageInput) {
@@ -105,13 +105,13 @@ namespace gfx
             spec.nchannels = 4;
         }
 
-        auto image = gfx::Image::Builder()
+        auto image = kor::Image::Builder()
             .setExtent({ spec.width, spec.height, spec.depth })
             .setFormat(getFormat(spec.format, spec.nchannels))
             .setMipLevels(mipLevels)
             .setArrayLayers(layerCount)
-            .addUsage(gfx::Image::Usage::eTransferSrc)
-            .addUsage(gfx::Image::Usage::eTransferDst)
+            .addUsage(kor::Image::Usage::eTransferSrc)
+            .addUsage(kor::Image::Usage::eTransferDst)
             .build();
 
         for (glm::u32 layer = 0; layer < layerCount; layer++) {
@@ -156,14 +156,14 @@ namespace gfx
                     }
                 }
 
-                const auto stagingBuffer = gfx::Buffer::Builder<unsigned char>()
+                const auto stagingBuffer = kor::Buffer::Builder<unsigned char>()
                     .setDataView(data)
-                    .setUsage(gfx::Buffer::Usage::eTransferSrc)
-                    .setType(gfx::Buffer::Type::eStaging)
+                    .setUsage(kor::Buffer::Usage::eTransferSrc)
+                    .setType(kor::Buffer::Type::eStaging)
                     .build();
 
                 CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                    commandBuffer.CopyBufferToImage(stagingBuffer, image, gfx::Copy {
+                    commandBuffer.CopyBufferToImage(stagingBuffer, image, kor::Copy {
                         .imageOffset = { 0, 0, 0 },
                         .imageExtent = { mipSpec.width, mipSpec.height, mipSpec.depth },
                         .imageBaseArrayLayer = layer,
@@ -201,24 +201,24 @@ namespace gfx
         }
     };
 
-    gfx::Image::Format GetFormatFromGl(const ktx_uint32_t glInternalFormat) {
+    kor::Image::Format GetFormatFromGl(const ktx_uint32_t glInternalFormat) {
         switch (glInternalFormat) {
-            case GL_R8: return gfx::Image::Format::eR8_UNORM;
-            case GL_RG8: return gfx::Image::Format::eRG8_UNORM;
-            case GL_RGBA8: return gfx::Image::Format::eRGBA8_UNORM;
-            case GL_SRGB8_ALPHA8: return gfx::Image::Format::eRGBA8_SRGB;
+            case GL_R8: return kor::Image::Format::eR8_UNORM;
+            case GL_RG8: return kor::Image::Format::eRG8_UNORM;
+            case GL_RGBA8: return kor::Image::Format::eRGBA8_UNORM;
+            case GL_SRGB8_ALPHA8: return kor::Image::Format::eRGBA8_SRGB;
 
-            case GL_R16: return gfx::Image::Format::eR16_UNORM;
-            case GL_RG16: return gfx::Image::Format::eRG16_UNORM;
-            case GL_RGBA16: return gfx::Image::Format::eRGBA16_UNORM;
-            case GL_RGBA16F: return gfx::Image::Format::eRGBA16_SFLOAT;
+            case GL_R16: return kor::Image::Format::eR16_UNORM;
+            case GL_RG16: return kor::Image::Format::eRG16_UNORM;
+            case GL_RGBA16: return kor::Image::Format::eRGBA16_UNORM;
+            case GL_RGBA16F: return kor::Image::Format::eRGBA16_SFLOAT;
 
-            case GL_R32F: return gfx::Image::Format::eR32_SFLOAT;
-            case GL_RG32F: return gfx::Image::Format::eRG32_SFLOAT;
-            case GL_RGBA32F: return gfx::Image::Format::eRGBA32_SFLOAT;
+            case GL_R32F: return kor::Image::Format::eR32_SFLOAT;
+            case GL_RG32F: return kor::Image::Format::eRG32_SFLOAT;
+            case GL_RGBA32F: return kor::Image::Format::eRGBA32_SFLOAT;
 
-            case GL_COMPRESSED_RGBA_BPTC_UNORM_ARB: return gfx::Image::Format::eBC7_UNORM;
-            case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB: return gfx::Image::Format::eBC7_SRGB;
+            case GL_COMPRESSED_RGBA_BPTC_UNORM_ARB: return kor::Image::Format::eBC7_UNORM;
+            case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB: return kor::Image::Format::eBC7_SRGB;
 
             default: {
                 std::cerr << "Unknown format: " << glInternalFormat << std::endl;
@@ -227,24 +227,24 @@ namespace gfx
         }
     }
 
-    gfx::Image::Format GetFormatFromVk(const ktx_uint32_t vkFormat) {
+    kor::Image::Format GetFormatFromVk(const ktx_uint32_t vkFormat) {
         switch (vkFormat) {
-            case VK_FORMAT_R8_UNORM: return gfx::Image::Format::eR8_UNORM;
-            case VK_FORMAT_R8G8_UNORM: return gfx::Image::Format::eRG8_UNORM;
-            case VK_FORMAT_R8G8B8A8_UNORM: return gfx::Image::Format::eRGBA8_UNORM;
-            case VK_FORMAT_R8G8B8A8_SRGB: return gfx::Image::Format::eRGBA8_SRGB;
+            case VK_FORMAT_R8_UNORM: return kor::Image::Format::eR8_UNORM;
+            case VK_FORMAT_R8G8_UNORM: return kor::Image::Format::eRG8_UNORM;
+            case VK_FORMAT_R8G8B8A8_UNORM: return kor::Image::Format::eRGBA8_UNORM;
+            case VK_FORMAT_R8G8B8A8_SRGB: return kor::Image::Format::eRGBA8_SRGB;
 
-            case VK_FORMAT_R16_UNORM: return gfx::Image::Format::eR16_UNORM;
-            case VK_FORMAT_R16G16_UNORM: return gfx::Image::Format::eRG16_UNORM;
-            case VK_FORMAT_R16G16B16A16_UNORM: return gfx::Image::Format::eRGBA16_UNORM;
-            case VK_FORMAT_R16G16B16A16_SFLOAT: return gfx::Image::Format::eRGBA16_SFLOAT;
+            case VK_FORMAT_R16_UNORM: return kor::Image::Format::eR16_UNORM;
+            case VK_FORMAT_R16G16_UNORM: return kor::Image::Format::eRG16_UNORM;
+            case VK_FORMAT_R16G16B16A16_UNORM: return kor::Image::Format::eRGBA16_UNORM;
+            case VK_FORMAT_R16G16B16A16_SFLOAT: return kor::Image::Format::eRGBA16_SFLOAT;
 
-            case VK_FORMAT_R32_SFLOAT: return gfx::Image::Format::eR32_SFLOAT;
-            case VK_FORMAT_R32G32_SFLOAT: return gfx::Image::Format::eRG32_SFLOAT;
-            case VK_FORMAT_R32G32B32A32_SFLOAT: return gfx::Image::Format::eRGBA32_SFLOAT;
+            case VK_FORMAT_R32_SFLOAT: return kor::Image::Format::eR32_SFLOAT;
+            case VK_FORMAT_R32G32_SFLOAT: return kor::Image::Format::eRG32_SFLOAT;
+            case VK_FORMAT_R32G32B32A32_SFLOAT: return kor::Image::Format::eRGBA32_SFLOAT;
 
-            case VK_FORMAT_BC7_UNORM_BLOCK: return gfx::Image::Format::eBC7_UNORM;
-            case VK_FORMAT_BC7_SRGB_BLOCK: return gfx::Image::Format::eBC7_SRGB;
+            case VK_FORMAT_BC7_UNORM_BLOCK: return kor::Image::Format::eBC7_UNORM;
+            case VK_FORMAT_BC7_SRGB_BLOCK: return kor::Image::Format::eBC7_SRGB;
 
             default: {
                 std::cerr << "Unknown format: " << vkFormat << std::endl;
@@ -253,10 +253,10 @@ namespace gfx
         }
     }
 
-    gfx::Image::Type GetImageTypeFromKtx(const ktxTexture* tex) {
-        if (tex->baseDepth > 1) return gfx::Image::Type::e3D;
-        if (tex->baseHeight > 1) return gfx::Image::Type::e2D;
-        return gfx::Image::Type::e1D;
+    kor::Image::Type GetImageTypeFromKtx(const ktxTexture* tex) {
+        if (tex->baseDepth > 1) return kor::Image::Type::e3D;
+        if (tex->baseHeight > 1) return kor::Image::Type::e2D;
+        return kor::Image::Type::e1D;
     }
 
     Task<Resource<Image>> LoadKTXAsync(const std::filesystem::path path, const bool generateMipmaps) {
@@ -349,7 +349,7 @@ namespace gfx
                 .setType(Buffer::Type::eStaging)
                 .build();
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                commandBuffer.CopyBufferToImage(stagingBuffer, imageRef, gfx::Copy {
+                commandBuffer.CopyBufferToImage(stagingBuffer, imageRef, kor::Copy {
                     .imageOffset = { 0, 0, 0 },
                     .imageExtent = {
                         std::max(1u, baseW >> mip),
@@ -420,7 +420,7 @@ namespace gfx
                 .setType(Buffer::Type::eStaging)
                 .build();
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-            commandBuffer.CopyBufferToImage(stagingBuffer, imageRef, gfx::Copy {
+            commandBuffer.CopyBufferToImage(stagingBuffer, imageRef, kor::Copy {
                 .imageOffset = { 0, 0, 0 },
                 .imageExtent = { spec.width, spec.height, spec.depth },
                 .imageBaseArrayLayer = 0,
@@ -447,7 +447,7 @@ namespace gfx
         return LoadRegularImageAsync(path, generateMipmaps);
     }
 
-    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, gfx::ResourceRef<const Image> image) {
+    void Importer::SaveImage(const std::filesystem::path &path, const std::string& name, FileFormat fileFormat, kor::ResourceRef<const Image> image) {
         const auto imageOutput = OIIO::ImageOutput::create(path.string());
         if (!imageOutput) {
             throw std::runtime_error("Could not create image file: " + path.string() + "\nError: " + OIIO::geterror());
@@ -469,7 +469,7 @@ namespace gfx
         // it back — SingleTimeCommand begins/submits/fences the copy, unlike a bare
         // Run() which would leave the buffer empty.
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-            commandBuffer.CopyImageToBuffer(image, stagingBuffer, gfx::Copy {
+            commandBuffer.CopyImageToBuffer(image, stagingBuffer, kor::Copy {
                 .imageOffset = { 0, 0, 0 },
                 .imageExtent = image->getExtent(),
                 .imageBaseArrayLayer = 0,

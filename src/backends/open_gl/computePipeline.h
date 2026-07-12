@@ -7,13 +7,13 @@
 #include <computePipeline.h>
 
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    class ComputePipeline final : public gfx::ComputePipeline {
+    class ComputePipeline final : public kor::ComputePipeline {
     public:
         explicit ComputePipeline(const Builder& createInfo);
         ~ComputePipeline() override;
-        void Bind(const gfx::CommandBuffer& commandBuffer) const override;
+        void Bind(const kor::CommandBuffer& commandBuffer) const override;
         void Unbind() const override;
 
         const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& getSetAndBindingToBindingPointMap() const {

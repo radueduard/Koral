@@ -15,7 +15,7 @@
 #include "shader.h"
 #include "../../include/window.h"
 
-namespace gfx
+namespace kor
 {
     ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(ResourceRef<const Shader> computeShader)
     {
@@ -23,7 +23,7 @@ namespace gfx
         return *this;
     }
 
-    gfx::Result<std::unique_ptr<ComputePipeline>> ComputePipeline::Builder::create() const
+    kor::Result<std::unique_ptr<ComputePipeline>> ComputePipeline::Builder::create() const
     {
         beginAttempt();
         if (computeShader) adopt(*computeShader, "compute shader");
@@ -36,12 +36,12 @@ namespace gfx
 
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<ComputePipeline> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<ComputePipeline, vk::ComputePipeline>(*this)
-                : gfx::MakeBackendPtr<ComputePipeline, ogl::ComputePipeline>(*this);
+                ? kor::MakeBackendPtr<ComputePipeline, vk::ComputePipeline>(*this)
+                : kor::MakeBackendPtr<ComputePipeline, ogl::ComputePipeline>(*this);
         });
     }
 
-    gfx::Resource<ComputePipeline> ComputePipeline::Builder::build() const
+    kor::Resource<ComputePipeline> ComputePipeline::Builder::build() const
     {
         auto pipeline = materialize<ComputePipeline>(*this, "ComputePipeline");
         // Registered even when poisoned: the Repository is what drives the retry that brings it
@@ -55,7 +55,7 @@ namespace gfx
         if (_shader.has_value()) unsubscribeReload(*_shader);
     }
 
-    void ComputePipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    void ComputePipeline::Bind(const kor::CommandBuffer& commandBuffer) const
     {
         _bound = true;
     }

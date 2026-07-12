@@ -7,9 +7,9 @@
 #include "device.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    Shader::Shader(const Builder& createInfo): gfx::Shader(createInfo)
+    Shader::Shader(const Builder& createInfo): kor::Shader(createInfo)
     {
         const auto shaderModuleCreateInfo = ::vk::ShaderModuleCreateInfo()
             .setCode(_spirvCode);
@@ -25,7 +25,7 @@ namespace gfx::vk
 
     void Shader::OnReload()
     {
-        gfx::Shader::OnReload();
+        kor::Shader::OnReload();
         if (_handle) {
             Context::Device()->destroyShaderModule(_handle);
         }

@@ -37,19 +37,19 @@
 namespace {
 
 // Repairable: a failure here is fixed by editing a source file, and the builder is cheap to keep.
-static_assert(gfx::Shader::Builder::Recoverable);
-static_assert(gfx::ComputePipeline::Builder::Recoverable);
-static_assert(gfx::GraphicsPipeline::Builder::Recoverable);
-static_assert(gfx::RayTracingPipeline::Builder::Recoverable);
+static_assert(kor::Shader::Builder::Recoverable);
+static_assert(kor::ComputePipeline::Builder::Recoverable);
+static_assert(kor::GraphicsPipeline::Builder::Recoverable);
+static_assert(kor::RayTracingPipeline::Builder::Recoverable);
 
 // Not repairable, and expensive or unsafe to retain. These must never keep their builder.
-static_assert(!gfx::Buffer::RawBuilder::Recoverable);
-static_assert(!gfx::Buffer::Builder<std::byte>::Recoverable);  // owns a copy of the buffer's data
-static_assert(!gfx::Image::Builder::Recoverable);              // owns a copy of the texture's pixels
-static_assert(!gfx::ImageView::Builder::Recoverable);
-static_assert(!gfx::Sampler::Builder::Recoverable);
-static_assert(!gfx::Framebuffer::Builder::Recoverable);        // holds raw refs to its attachments
-static_assert(!gfx::DescriptorSet::Builder::Recoverable);      // holds a raw ref to its layout
+static_assert(!kor::Buffer::RawBuilder::Recoverable);
+static_assert(!kor::Buffer::Builder<std::byte>::Recoverable);  // owns a copy of the buffer's data
+static_assert(!kor::Image::Builder::Recoverable);              // owns a copy of the texture's pixels
+static_assert(!kor::ImageView::Builder::Recoverable);
+static_assert(!kor::Sampler::Builder::Recoverable);
+static_assert(!kor::Framebuffer::Builder::Recoverable);        // holds raw refs to its attachments
+static_assert(!kor::DescriptorSet::Builder::Recoverable);      // holds a raw ref to its layout
 
 TEST(BuilderRecoverable, SplitIsEnforcedAtCompileTime) {
     SUCCEED();  // the static_asserts above are the test
@@ -62,10 +62,10 @@ TEST(BuilderRecoverable, SplitIsEnforcedAtCompileTime) {
 TEST(BufferBuilder, CopyDoesNotAliasTheSourcesData) {
     const std::vector<std::uint32_t> data{1, 2, 3, 4};
 
-    auto original = std::make_unique<gfx::Buffer::Builder<std::uint32_t>>();
+    auto original = std::make_unique<kor::Buffer::Builder<std::uint32_t>>();
     original->setData(data);  // copies the data in; the view must point at *our* copy
 
-    const gfx::Buffer::Builder<std::uint32_t> copy = *original;
+    const kor::Buffer::Builder<std::uint32_t> copy = *original;
 
     // Kill the source. A stored span would now dangle.
     original.reset();
@@ -79,10 +79,10 @@ TEST(BufferBuilder, CopyDoesNotAliasTheSourcesData) {
 TEST(BufferBuilder, ExternalViewSurvivesACopyAndStillAliasesTheCaller) {
     std::vector<std::uint32_t> data{7, 8, 9};
 
-    gfx::Buffer::Builder<std::uint32_t> original;
+    kor::Buffer::Builder<std::uint32_t> original;
     original.setDataView(std::span<const std::uint32_t>(data));
 
-    const gfx::Buffer::Builder<std::uint32_t> copy = original;
+    const kor::Buffer::Builder<std::uint32_t> copy = original;
 
     ASSERT_EQ(copy.dataView().size(), data.size());
     EXPECT_EQ(copy.dataView().data(), data.data());  // still the caller's memory, not a copy

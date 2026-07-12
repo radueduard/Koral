@@ -1,0 +1,26 @@
+# Build trees
+/build/
+/cmake-build-*/
+/stage/
+
+# vcpkg's installed tree — ~1 GB of third-party binaries, rebuilt from vcpkg.json on any
+# machine. The manifest is the source of truth; this directory is its output.
+/vcpkg_installed/
+
+# Generated CMake package config. Written at configure time by the export block in
+# CMakeLists.txt (KORAL_CMAKE_OUTPUT_BASE_DIR), so it is build output, not source.
+/cmake/
+
+# Test + coverage output
+/Testing/
+/coverage/
+*.gcda
+*.gcno
+
+# IDE
+/.idea/
+/.vs/
+/.vscode/
+
+# Dear ImGui dumps its window layout next to the working directory at exit.
+imgui.ini

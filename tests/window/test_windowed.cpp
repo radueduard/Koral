@@ -30,35 +30,35 @@ namespace {
 // A scene that draws a cleared default framebuffer plus an ImGui overlay and a
 // GUI_Image, so a single frame drives the scheduler, the swap chain and the whole
 // ImGui-on-Vulkan path (GUI_Image blit helper, textured widget, font access).
-class OverlayScene : public gfx::Scene {
+class OverlayScene : public kor::Scene {
 public:
     void Initialize() override {
         // A small sampled image to feed a GUI_Image (its contents are irrelevant to
         // coverage; the point is to drive the blit/upload/descriptor plumbing).
-        _image = gfx::Image::Builder{}
-                     .setType(gfx::Image::Type::e2D)
-                     .setFormat(gfx::Image::Format::eRGBA8_UNORM)
+        _image = kor::Image::Builder{}
+                     .setType(kor::Image::Type::e2D)
+                     .setFormat(kor::Image::Format::eRGBA8_UNORM)
                      .setExtent(glm::uvec2{16, 16})
-                     .addUsage(gfx::Image::Usage::eTransferSrc)
-                     .addUsage(gfx::Image::Usage::eTransferDst)
-                     .addUsage(gfx::Image::Usage::eSampled)
+                     .addUsage(kor::Image::Usage::eTransferSrc)
+                     .addUsage(kor::Image::Usage::eTransferDst)
+                     .addUsage(kor::Image::Usage::eSampled)
                      .build();
-        gfx::CommandBuffer::SingleTimeCommand([&](gfx::CommandBuffer& cb) {
-            cb.ClearColorImage(gfx::ResourceRef<const gfx::Image>(_image), glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
-        }, gfx::CommandBuffer::Usage::eGraphics);
-        _guiImage = gfx::GUI_Image::Create(gfx::ResourceRef<const gfx::Image>(_image));
+        kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
+            cb.ClearColorImage(kor::ResourceRef<const kor::Image>(_image), glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
+        }, kor::CommandBuffer::Usage::eGraphics);
+        _guiImage = kor::GUI_Image::Create(kor::ResourceRef<const kor::Image>(_image));
     }
 
     void Update() override { ++updates; }
 
-    void Render(gfx::CommandBuffer& cb) override {
+    void Render(kor::CommandBuffer& cb) override {
         cb.BeginRendering();   // default framebuffer: clears the swap-chain image
         cb.EndRendering();
     }
 
     void RenderUI(ImGuiContext* context) override {
         ImGui::SetCurrentContext(context);
-        ImGui::Begin("gfx test overlay");
+        ImGui::Begin("Koral test overlay");
         ImGui::Text("frame %d", updates);
         ImGui::SliderFloat("slider", &_slider, 0.f, 1.f);
         if (_guiImage) {
@@ -74,29 +74,29 @@ public:
 
 private:
     float _slider = 0.5f;
-    gfx::Resource<gfx::Image> _image;
-    gfx::Resource<gfx::GUI_Image> _guiImage;
+    kor::Resource<kor::Image> _image;
+    kor::Resource<kor::GUI_Image> _guiImage;
 };
 
 // Drives one engine-style frame through the scheduler.
-void drawFrame(gfx::Scene& scene) {
+void drawFrame(kor::Scene& scene) {
     glfwPollEvents();
-    gfx::Context::DrainMainThread();
-    gfx::Context::Scheduler().Draw([&](gfx::CommandBuffer& cb) {
-        gfx::Context::Repository().update();
+    kor::Context::DrainMainThread();
+    kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
+        kor::Context::Repository().update();
         scene.Update();
         scene.Render(cb);
-        gfx::GUI::Render(cb, scene);
+        kor::GUI::Render(cb, scene);
     });
 }
 
-std::unique_ptr<gfx::Window> buildWindow(std::unique_ptr<gfx::Scene> scene, const char* title) {
-    return gfx::Window::Builder(std::move(scene))
+std::unique_ptr<kor::Window> buildWindow(std::unique_ptr<kor::Scene> scene, const char* title) {
+    return kor::Window::Builder(std::move(scene))
         .setTitle(title)
         .setExtent({320, 240})
         .setResizable(true)
         .setVSync(false)
-        .setAPI(gfx::API::eVulkan)
+        .setAPI(kor::API::eVulkan)
         .build();
 }
 
@@ -112,16 +112,16 @@ TEST(WindowedTest, RenderResizeAndPresent) {
     auto scenePtr = std::make_unique<OverlayScene>();
     auto* scene = scenePtr.get();
 
-    std::unique_ptr<gfx::Window> window;
+    std::unique_ptr<kor::Window> window;
     try {
-        window = buildWindow(std::move(scenePtr), "gfx windowed test");
+        window = buildWindow(std::move(scenePtr), "Koral windowed test");
     } catch (const std::exception& e) {
         GTEST_SKIP() << "windowed context unavailable: " << e.what();
     }
     ASSERT_NE(window, nullptr);
 
     // Touch the font accessor (pure gui.cpp coverage, harmless if null).
-    (void)gfx::GUI::GetFont(gfx::Font::Regular);
+    (void)kor::GUI::GetFont(kor::Font::Regular);
 
     // Phase 1: render enough frames to cycle every in-flight frame slot twice.
     for (int i = 0; i < 8 && !window->shouldClose(); ++i) {

@@ -9,7 +9,7 @@
 #include "context.h"
 #include "window.h"
 
-namespace gfx
+namespace kor
 {
     AccelerationStructure::Builder& AccelerationStructure::Builder::addMesh(ResourceRef<const Mesh> mesh)
     {
@@ -28,7 +28,7 @@ namespace gfx
         return *this;
     }
 
-    gfx::Result<std::unique_ptr<AccelerationStructure>> AccelerationStructure::Builder::create() const
+    kor::Result<std::unique_ptr<AccelerationStructure>> AccelerationStructure::Builder::create() const
     {
         beginAttempt();
 
@@ -48,11 +48,11 @@ namespace gfx
             return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<AccelerationStructure> {
-            return gfx::MakeBackendPtr<AccelerationStructure, vk::AccelerationStructure>(*this);
+            return kor::MakeBackendPtr<AccelerationStructure, vk::AccelerationStructure>(*this);
         });
     }
 
-    gfx::Resource<AccelerationStructure> AccelerationStructure::Builder::build() const
+    kor::Resource<AccelerationStructure> AccelerationStructure::Builder::build() const
     {
         return materialize<AccelerationStructure>(*this, "AccelerationStructure");
     }

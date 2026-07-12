@@ -5,9 +5,9 @@
 #pragma once
 #include <descriptorSet.h>
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    class DescriptorSet final : public gfx::DescriptorSet
+    class DescriptorSet final : public kor::DescriptorSet
     {
     public:
         explicit DescriptorSet(const Builder& builder);

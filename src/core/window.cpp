@@ -20,7 +20,7 @@
 #include "../executor/MainThreadExecutor.h"
 #include "../executor/BackgroundExecutor.h"
 
-namespace gfx {
+namespace kor {
     Window::Window(Builder& createInfo) :
         _title(createInfo.title),
         _extent(createInfo.extent),
@@ -156,17 +156,17 @@ namespace gfx {
                     + reinterpret_cast<const char*>(glewGetErrorString(result)));
             }
         } else if (_api == API::eVulkan) {
-            gfx::vk::Context::Init();
+            kor::vk::Context::Init();
         }
 
-        _surface = gfx::Surface::Create(*this);
+        _surface = kor::Surface::Create(*this);
         Context::_scheduler = Scheduler::Builder()
             .setMinImageCount(2)
             .setImageCount(3)
             .build();
         Context::_scheduler->Initialize();
         _framebuffer = Framebuffer::CreateDefault();
-        gfx::GUI::Init();
+        kor::GUI::Init();
 
         // Register input callbacks AFTER GUI::Init() so that our callbacks can
         // safely forward events to ImGui. We use install_callbacks=false in

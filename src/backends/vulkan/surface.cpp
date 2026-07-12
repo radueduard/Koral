@@ -16,9 +16,9 @@
 #include <GLFW/glfw3.h>
 
 
-namespace gfx::vk
+namespace kor::vk
 {
-    Surface::Surface(const gfx::Window& window) : gfx::Surface(window)
+    Surface::Surface(const kor::Window& window) : kor::Surface(window)
     {
         const auto instance = Context::Runtime().getInstance();
         const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
@@ -28,7 +28,7 @@ namespace gfx::vk
             // surface. Fail fast with a clear message instead of continuing with a
             // null handle (which later trips validation and crashes).
             const auto msg = "Failed to create window surface: " + ::vk::to_string(static_cast<::vk::Result>(result));
-            gfx::log::error("[vulkan] {}", msg);
+            kor::log::error("[vulkan] {}", msg);
             throw std::runtime_error(msg);
         }
         _handle = surface;

@@ -31,7 +31,7 @@
 #include "paths.h"
 
 
-namespace gfx {
+namespace kor {
     namespace {
         // Per-shader hot-reload watch state, owned by the Shader via an opaque shared_ptr<void>
         // (Shader::_watchContext). `watched` is the set of files already registered with the
@@ -54,15 +54,15 @@ namespace gfx {
             return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // Construction compiles the shader; a compile/parse failure throws and is
-        // surfaced as a gfx::Error (eShaderCompileFailed unless a more specific cause).
+        // surfaced as a kor::Error (eShaderCompileFailed unless a more specific cause).
         return guard(ErrorCode::eShaderCompileFailed, [&]() -> std::unique_ptr<Shader> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<Shader, vk::Shader>(*this)
-                : gfx::MakeBackendPtr<Shader, ogl::Shader>(*this);
+                ? kor::MakeBackendPtr<Shader, vk::Shader>(*this)
+                : kor::MakeBackendPtr<Shader, ogl::Shader>(*this);
         });
     }
 
-    gfx::Resource<Shader> Shader::Builder::build() const
+    kor::Resource<Shader> Shader::Builder::build() const
     {
         // Name it after whatever identifies the source, so a compile failure reads as
         // "shaders/forward.frag.glsl" rather than "Shader".
@@ -170,11 +170,11 @@ namespace gfx {
 
     static std::vector<std::filesystem::path>& shaderSearchPathsStorage()
     {
-        // Seeded with wherever gfx's own shaders/ actually landed — beside the installed library, or
+        // Seeded with wherever Koral's own shaders/ actually landed — beside the installed library, or
         // in the source tree for a dev build. Never a bare compile-time absolute path: that would be
         // the build machine's, and meaningless on a user's. Projects add their roots via addSearchPath.
         static std::vector<std::filesystem::path> paths =
-            detail::dataRoots("shaders", "GFX_SHADERS_DIR", SHADERS_PATH);
+            detail::dataRoots("shaders", "KORAL_SHADERS_DIR", SHADERS_PATH);
         return paths;
     }
 
@@ -513,7 +513,7 @@ namespace gfx {
 
     void Shader::OnReload()
     {
-    	gfx::log::info("Reloading shader: {}", _path.string());
+    	kor::log::info("Reloading shader: {}", _path.string());
 
     	_modified = true;
 
@@ -529,11 +529,11 @@ namespace gfx {
     		Compile();
     		fetchMemoryLayout();
     	} catch (const BackendException& e) {
-    		gfx::log::error("Reload of '{}' failed; keeping the last working version:\n{}",
+    		kor::log::error("Reload of '{}' failed; keeping the last working version:\n{}",
     		                _path.string(), e.error.history());
     		_modified = true; // still stale, so the next save retries
     	} catch (const std::exception& e) {
-    		gfx::log::error("Reload of '{}' failed; keeping the last working version: {}",
+    		kor::log::error("Reload of '{}' failed; keeping the last working version: {}",
     		                _path.string(), e.what());
     		_modified = true;
     	}

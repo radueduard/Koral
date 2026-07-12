@@ -8,9 +8,9 @@
 #include <vulkan/vulkan.hpp>
 #include "vk_wrapper.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class Sampler final : public gfx::Sampler, public vk::Wrapper<::vk::Sampler>
+    class Sampler final : public kor::Sampler, public vk::Wrapper<::vk::Sampler>
     {
     public:
         explicit Sampler(const Builder& builder);

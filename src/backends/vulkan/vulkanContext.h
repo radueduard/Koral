@@ -7,14 +7,14 @@
 
 #include <api.h>
 
-namespace gfx
+namespace kor
 {
     class Engine;
     class Context;
     class Window;
 }
 
-namespace gfx::vk
+namespace kor::vk
 {
     class Surface;
     class Scheduler;
@@ -23,25 +23,25 @@ namespace gfx::vk
     class Runtime;
     class Device;
 
-    class GFX_API Context
+    class KORAL_API Context
     {
-        friend class gfx::Window;
-        friend class gfx::Engine;
-        friend class gfx::Context;
+        friend class kor::Window;
+        friend class kor::Engine;
+        friend class kor::Context;
     public:
-        static const gfx::vk::Runtime& Runtime();
-        static const gfx::vk::Device& Device();
-        static const gfx::vk::Allocator& Allocator();
-        static const gfx::vk::DescriptorPool& DescriptorPool();
+        static const kor::vk::Runtime& Runtime();
+        static const kor::vk::Device& Device();
+        static const kor::vk::Allocator& Allocator();
+        static const kor::vk::DescriptorPool& DescriptorPool();
 
     private:
         static void Init();
         static void Destroy();
 
-        inline static gfx::vk::Runtime* _runtime = nullptr;
-        inline static gfx::vk::Device* _device = nullptr;
-        inline static gfx::vk::Allocator* _allocator = nullptr;
-        inline static gfx::vk::DescriptorPool* _descriptorPool = nullptr;
+        inline static kor::vk::Runtime* _runtime = nullptr;
+        inline static kor::vk::Device* _device = nullptr;
+        inline static kor::vk::Allocator* _allocator = nullptr;
+        inline static kor::vk::DescriptorPool* _descriptorPool = nullptr;
 
     };
 }

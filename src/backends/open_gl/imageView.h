@@ -7,9 +7,9 @@
 
 #include <imageView.h>
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    class ImageView : public gfx::ImageView
+    class ImageView : public kor::ImageView
     {
     public:
         explicit ImageView(const Builder& createInfo);

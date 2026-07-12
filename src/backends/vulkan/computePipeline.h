@@ -11,20 +11,20 @@
 #include "vk_wrapper.h"
 
 
-namespace gfx
+namespace kor
 {
     class CommandBuffer;
 }
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class ComputePipeline final : public gfx::ComputePipeline, Wrapper<::vk::Pipeline>
+    class ComputePipeline final : public kor::ComputePipeline, Wrapper<::vk::Pipeline>
     {
     public:
         explicit ComputePipeline(const Builder& createInfo);
 
         ~ComputePipeline() override;
-        void Bind(const gfx::CommandBuffer& commandBuffer) const override;
+        void Bind(const kor::CommandBuffer& commandBuffer) const override;
 
         ::vk::PipelineLayout getPipelineLayout() const { return _pipelineLayout; }
 

@@ -7,9 +7,9 @@
 #include <descriptorSet.h>
 #include <vulkan/vulkan.hpp>
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class DescriptorSet final : public gfx::DescriptorSet
+    class DescriptorSet final : public kor::DescriptorSet
     {
     public:
 

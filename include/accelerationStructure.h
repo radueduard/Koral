@@ -22,11 +22,11 @@
 #include "resource.h"
 #include "error.h"
 
-namespace gfx
+namespace kor
 {
     class Mesh;
 
-    class GFX_API AccelerationStructure
+    class KORAL_API AccelerationStructure
     {
     public:
         enum class Type
@@ -36,7 +36,7 @@ namespace gfx
         };
 
         /** @brief A placed instance of a bottom-level structure inside a top-level one. */
-        struct GFX_API Instance
+        struct KORAL_API Instance
         {
             ResourceRef<const AccelerationStructure> blas;
             glm::mat4 transform = glm::mat4(1.0f);
@@ -52,7 +52,7 @@ namespace gfx
          * the range covered by its `Allocation` so a single heap can back many BLAS
          * geometries without duplicating buffers.
          */
-        struct GFX_API Geometry
+        struct KORAL_API Geometry
         {
             ResourceRef<const Mesh> mesh;   ///< Source of the vertex/index buffers and position attribute.
             glm::u64 firstVertex = 0;       ///< First vertex (element offset) covered by this geometry.
@@ -61,7 +61,7 @@ namespace gfx
             glm::u64 indexCount  = 0;       ///< Number of indices; 0 means "all of the mesh's indices".
         };
 
-        struct GFX_API Builder : ::Builder
+        struct KORAL_API Builder : ::Builder
         {
             std::vector<Geometry> geometries = {};  ///< Geometry for a bottom-level structure.
             std::vector<Instance> instances = {};   ///< Instances for a top-level structure.
@@ -102,7 +102,7 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<AccelerationStructure>> create() const;
-            [[nodiscard]] gfx::Resource<AccelerationStructure> build() const;
+            [[nodiscard]] kor::Resource<AccelerationStructure> build() const;
         };
 
         virtual ~AccelerationStructure();

@@ -13,14 +13,14 @@ struct ImGuiContext;
 class MainThreadExecutor;
 class BackgroundExecutor;
 
-namespace gfx {
+namespace kor {
     class GUI;
     class Scheduler;
     class Framebuffer;
     class Window;
 
-    GFX_API std::filesystem::path assetPath(const std::filesystem::path& relativePath);
-    GFX_API std::filesystem::path shaderPath(const std::filesystem::path& relativePath);
+    KORAL_API std::filesystem::path assetPath(const std::filesystem::path& relativePath);
+    KORAL_API std::filesystem::path shaderPath(const std::filesystem::path& relativePath);
 
     enum class API {
         eOpenGL,
@@ -29,12 +29,12 @@ namespace gfx {
 
     class Context
     {
-        friend class gfx::Window;
-        friend class gfx::Scheduler;
-        friend class gfx::GUI;
+        friend class kor::Window;
+        friend class kor::Scheduler;
+        friend class kor::GUI;
     public:
-        static GFX_API gfx::Window& Window();
-        static GFX_API const gfx::Scheduler& Scheduler();
+        static KORAL_API kor::Window& Window();
+        static KORAL_API const kor::Scheduler& Scheduler();
 
         /**
          * @brief The active graphics backend.
@@ -43,7 +43,7 @@ namespace gfx {
          * across the API keys off this rather than the window, so device-only
          * (headless) sessions work without one.
          */
-        static GFX_API API activeAPI();
+        static KORAL_API API activeAPI();
 
         /**
          * @brief Create a device-only context with no window, surface or swap chain.
@@ -55,26 +55,26 @@ namespace gfx {
          * rendering, the GUI, per-frame resources) is unavailable. Pair with
          * @ref ShutdownHeadless. Not valid while a window exists.
          */
-        static GFX_API void InitHeadless(API api = API::eVulkan);
+        static KORAL_API void InitHeadless(API api = API::eVulkan);
 
         /** @brief Tear down a headless context created by @ref InitHeadless. */
-        static GFX_API void ShutdownHeadless();
+        static KORAL_API void ShutdownHeadless();
 
         /** @brief Whether a headless (device-only) context is currently active. */
-        static GFX_API bool IsHeadless();
+        static KORAL_API bool IsHeadless();
 
-        static GFX_API gfx::ResourceRef<const gfx::Framebuffer> DefaultFramebuffer();
-        static GFX_API ImGuiContext* GetCurrentImGuiContext();
+        static KORAL_API kor::ResourceRef<const kor::Framebuffer> DefaultFramebuffer();
+        static KORAL_API ImGuiContext* GetCurrentImGuiContext();
 
-        static GFX_API gfx::SwitchAwaiter SwitchToMainThread();
-        static GFX_API gfx::SwitchAwaiter SwitchToBackgroundThread();
-        static GFX_API void DrainMainThread();
+        static KORAL_API kor::SwitchAwaiter SwitchToMainThread();
+        static KORAL_API kor::SwitchAwaiter SwitchToBackgroundThread();
+        static KORAL_API void DrainMainThread();
 
-        static GFX_API gfx::Repository& Repository();
+        static KORAL_API kor::Repository& Repository();
 
     private:
-        inline static gfx::Window* _window = nullptr;
-        inline static gfx::Scheduler* _scheduler = nullptr;
+        inline static kor::Window* _window = nullptr;
+        inline static kor::Scheduler* _scheduler = nullptr;
         inline static ImGuiContext* _imguiContext = nullptr;
 
         inline static API _activeAPI = API::eVulkan;
@@ -83,6 +83,6 @@ namespace gfx {
         inline static MainThreadExecutor* _mainThreadExecutor = nullptr;
         inline static BackgroundExecutor* _backgroundExecutor   = nullptr;
 
-        inline static gfx::Repository* _repository = nullptr;
+        inline static kor::Repository* _repository = nullptr;
     };
 }

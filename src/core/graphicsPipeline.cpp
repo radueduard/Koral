@@ -15,7 +15,7 @@
 #include "meshLayout.h"
 #include "shader.h"
 
-namespace gfx
+namespace kor
 {
     GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader) {
         this->vertexShader = shader;
@@ -84,13 +84,13 @@ namespace gfx
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(gfx::ResourceRef<gfx::Framebuffer> framebuffer)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(kor::ResourceRef<kor::Framebuffer> framebuffer)
     {
         this->framebuffer = framebuffer;
         return *this;
     }
 
-    gfx::Result<std::unique_ptr<GraphicsPipeline>> GraphicsPipeline::Builder::create() const
+    kor::Result<std::unique_ptr<GraphicsPipeline>> GraphicsPipeline::Builder::create() const
     {
         beginAttempt();
 
@@ -115,15 +115,15 @@ namespace gfx
             return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // Construction runs Validate() (which may throw BackendException with a specific
-        // code) and the backend Setup(); guard() turns any escape into a gfx::Error.
+        // code) and the backend Setup(); guard() turns any escape into a kor::Error.
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<GraphicsPipeline> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(*this)
-                : gfx::MakeBackendPtr<GraphicsPipeline, ogl::GraphicsPipeline>(*this);
+                ? kor::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(*this)
+                : kor::MakeBackendPtr<GraphicsPipeline, ogl::GraphicsPipeline>(*this);
         });
     }
 
-    gfx::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build() const
+    kor::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build() const
     {
         auto pipeline = materialize<GraphicsPipeline>(*this, "GraphicsPipeline");
         // Registered even when poisoned: the Repository is what drives the retry that brings it
@@ -187,7 +187,7 @@ namespace gfx
         if (!_meshShader.has_value() && _taskShader.has_value())
             return fail(ErrorCode::eShaderStageMismatch, "Task shader requires a mesh shader.");
 
-        std::vector<gfx::ResourceRef<const Shader>> shaders;
+        std::vector<kor::ResourceRef<const Shader>> shaders;
         if (_vertexShader.has_value()) shaders.push_back(*_vertexShader);
         if (_tessellationState.has_value()) {
             shaders.push_back(_tessellationState->controlShader);

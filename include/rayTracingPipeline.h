@@ -24,12 +24,12 @@
 #include "resource.h"
 #include "shader.h"
 
-namespace gfx
+namespace kor
 {
     class Shader;
     class CommandBuffer;
 
-    class GFX_API RayTracingPipeline : public Pipeline
+    class KORAL_API RayTracingPipeline : public Pipeline
     {
     public:
         /**
@@ -38,14 +38,14 @@ namespace gfx
          * For triangle geometry provide a closest-hit (and optionally any-hit)
          * shader. For procedural geometry also provide an intersection shader.
          */
-        struct GFX_API HitGroup
+        struct KORAL_API HitGroup
         {
             std::optional<ResourceRef<const Shader>> closestHitShader = std::nullopt;
             std::optional<ResourceRef<const Shader>> anyHitShader = std::nullopt;
             std::optional<ResourceRef<const Shader>> intersectionShader = std::nullopt;
         };
 
-        struct GFX_API Builder : ::Builder
+        struct KORAL_API Builder : ::Builder
         {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
@@ -65,7 +65,7 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<RayTracingPipeline>> create() const;
-            [[nodiscard]] gfx::Resource<RayTracingPipeline> build() const;
+            [[nodiscard]] kor::Resource<RayTracingPipeline> build() const;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */

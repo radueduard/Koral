@@ -1,4 +1,4 @@
-// Unit tests for gfx::TLSFAllocator — a pure CPU-side two-level segregated-fit
+// Unit tests for kor::TLSFAllocator — a pure CPU-side two-level segregated-fit
 // allocator working in abstract element units. No GPU involved.
 
 #include <gtest/gtest.h>
@@ -9,8 +9,8 @@
 
 #include "tlsfAllocator.h"
 
-using gfx::TLSFAllocator;
-using gfx::TLSFAllocation;
+using kor::TLSFAllocator;
+using kor::TLSFAllocation;
 
 namespace {
 

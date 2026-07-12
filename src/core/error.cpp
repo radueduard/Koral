@@ -6,7 +6,7 @@
 
 #include <format>
 
-namespace gfx
+namespace kor
 {
     // Symbolic name of a code, for logs / toString(). Kept next to describe() so
     // both are updated together when ErrorCode grows.
@@ -89,7 +89,7 @@ namespace gfx
 
     std::string Error::toString() const
     {
-        return std::format("gfx::Error({}): {} [{}:{}]",
+        return std::format("kor::Error({}): {} [{}:{}]",
                            name(code), message, where.file_name(), where.line());
     }
 

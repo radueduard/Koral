@@ -9,7 +9,7 @@
 #include "flags.h"
 #include "api.h"
 
-namespace gfx
+namespace kor
 {
     /**
      * @brief The type of vertex input pipe channels. Used to define the format of vertex attributes in the graphics pipeline.
@@ -88,7 +88,7 @@ namespace gfx
     /**
      * @brief Description of a vertex input attribute. Used to define the format of vertex attributes in the graphics pipeline.
      */
-    struct GFX_API VertexInputAttributeDescription
+    struct KORAL_API VertexInputAttributeDescription
     {
         glm::u32 location;          ///< The location of the vertex attribute in the shader. Must match the location specified in the shader code.
         glm::u32 binding;           ///< The binding index of the vertex buffer that contains this attribute. Must match the binding index specified in the vertex input binding description.
@@ -100,7 +100,7 @@ namespace gfx
     /**
      * @brief Description of a vertex input binding. Used to define the format of vertex buffers in the graphics pipeline.
      */
-    struct GFX_API VertexInputBindingDescription
+    struct KORAL_API VertexInputBindingDescription
     {
         glm::u32 binding;   ///< The binding index of the vertex buffer. Must match the binding index specified in the vertex input attribute descriptions that reference this binding.
         glm::u32 stride;    ///< The byte stride between consecutive vertices in the vertex buffer. For example, if the vertex struct has
@@ -151,7 +151,7 @@ namespace gfx
     /**
      * @brief Description of the input assembly state. Used to define how the vertices are assembled into primitives in the graphics pipeline.
      */
-    struct GFX_API InputAssemblyState
+    struct KORAL_API InputAssemblyState
     {
         Topology topology = Topology::eTriangleList;    ///< The type of primitive topology. For example, if the topology is eTriangleList, every three vertices will form a separate triangle.
         bool primitiveRestartEnable = false;            ///< Whether primitive restart is enabled. If true, a special index value (the maximum value of the index type - 0xFFFFFFFF for 32-bit indices) can be used in the index buffer to indicate that the current primitive should be restarted, and a new primitive should
@@ -190,7 +190,7 @@ namespace gfx
     /**
      * @brief Description of the rasterization state. Used to define how polygons are rasterized in the graphics pipeline.
      */
-    struct GFX_API RasterizationState
+    struct KORAL_API RasterizationState
     {
         bool depthClampEnable = false;                          ///< If true, fragments that are outside the near and far planes will be clamped to the respective plane instead of being discarded. This can be useful for rendering shadow maps or for rendering objects that are partially behind the camera.
         bool rasterizerDiscardEnable = false;                   ///< If true, primitives will be discarded before the rasterization stage, meaning that no fragments will be generated. This can be useful for rendering techniques that only need to process vertex data without actually drawing anything, such as occlusion culling or transform feedback.
@@ -221,7 +221,7 @@ namespace gfx
     /**
      * @brief Description of the multisampling state. Used to define the multisampling settings for multisampled images and framebuffers in the graphics pipeline.
      */
-    struct GFX_API MultisampleState
+    struct KORAL_API MultisampleState
     {
         SampleCount sampleCount = SampleCount::e1;      ///< The number of samples per pixel. For example, if the sample count is e4, each pixel will have 4 samples, which can be used for anti-aliasing or for rendering to multisampled framebuffers.
         bool sampleShadingEnable = false;               ///< If true, sample shading will be enabled, meaning that the fragment shader will be executed for each sample instead of once per pixel. This can be useful for improving the quality of anti-aliasing when using multisampling, as it allows for more accurate shading of edges and fine details.
@@ -261,7 +261,7 @@ namespace gfx
     /**
      * @brief Description of the stencil operation state. Used to define the operations that are performed on the stencil buffer during stencil testing in the graphics pipeline.
      */
-    struct GFX_API StencilOpState
+    struct KORAL_API StencilOpState
     {
         StencilOp failOp = StencilOp::eKeep;        ///< The operation to perform when the stencil test fails. For example, if the fail operation is eReplace, the stencil value will be replaced with the reference value specified in the stencil state when the stencil test fails.
         StencilOp passOp = StencilOp::eKeep;        ///< The operation to perform when the stencil test passes. For example, if the pass operation is eIncrementAndClamp, the stencil value will be incremented by one (and clamped to the maximum representable value) when the stencil test passes.
@@ -275,7 +275,7 @@ namespace gfx
     /**
      * @brief Description of the depth and stencil state. Used to define the depth testing and stencil testing settings in the graphics pipeline.
      */
-    struct GFX_API DepthStencilState
+    struct KORAL_API DepthStencilState
     {
         // Depth settings
         bool depthTestEnable = true;                    ///< If true, depth testing will be enabled, meaning that fragments will be tested against the existing depth values in the depth buffer to determine whether they should be drawn. This is the default setting and is commonly used for rendering solid objects.
@@ -384,7 +384,7 @@ namespace gfx
     /**
      * @brief Description of an indirect draw command.
      */
-    struct GFX_API IndirectDrawCommand
+    struct KORAL_API IndirectDrawCommand
     {
         uint32_t vertexCount;
         uint32_t instanceCount;
@@ -395,7 +395,7 @@ namespace gfx
     /**
      * @brief Description of an indirect indexed draw command.
      */
-    struct GFX_API IndirectDrawIndexedCommand
+    struct KORAL_API IndirectDrawIndexedCommand
     {
         uint32_t indexCount;
         uint32_t instanceCount;
@@ -407,7 +407,7 @@ namespace gfx
     /**
      * @brief Description of an indirect draw command for mesh tasks.
      */
-    struct GFX_API IndirectDrawMeshTasksCommand
+    struct KORAL_API IndirectDrawMeshTasksCommand
     {
         uint32_t taskCountX;
         uint32_t taskCountY;

@@ -11,11 +11,11 @@
 #include "resource.h"
 #include "error.h"
 
-namespace gfx
+namespace kor
 {
     class Image;
 
-    class GFX_API ImageView {
+    class KORAL_API ImageView {
     public:
         enum class Type {
             e1D,
@@ -37,7 +37,7 @@ namespace gfx
             eA
         };
 
-        struct GFX_API ComponentMapping {
+        struct KORAL_API ComponentMapping {
             Swizzle r = Swizzle::eIdentity;
             Swizzle g = Swizzle::eIdentity;
             Swizzle b = Swizzle::eIdentity;
@@ -61,8 +61,8 @@ namespace gfx
             }
         };
 
-        struct GFX_API Builder : ::Builder {
-            gfx::ResourceRef<const Image> image;
+        struct KORAL_API Builder : ::Builder {
+            kor::ResourceRef<const Image> image;
             Type type = Type::e2D;
             glm::u32 baseMipLevel = 0;
             glm::u32 mipLevelCount = 1;
@@ -70,7 +70,7 @@ namespace gfx
             glm::u32 arrayLayerCount = 1;
             ComponentMapping componentMapping = {};
 
-            explicit Builder(gfx::ResourceRef<const Image> image);
+            explicit Builder(kor::ResourceRef<const Image> image);
 
             Builder& setViewType(Type viewType) {
                 this->type = viewType;
@@ -104,12 +104,12 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<ImageView>> create() const;
-            [[nodiscard]] gfx::Resource<ImageView> build() const;
+            [[nodiscard]] kor::Resource<ImageView> build() const;
         };
 
         virtual ~ImageView() = default;
 
-        [[nodiscard]] gfx::ResourceRef<const Image> getImage() const { return _image; }
+        [[nodiscard]] kor::ResourceRef<const Image> getImage() const { return _image; }
         [[nodiscard]] Type getViewType() const { return _viewType; }
         [[nodiscard]] glm::u32 getBaseMipLevel() const { return _baseMipLevel; }
         [[nodiscard]] glm::u32 getMipLevelCount() const { return _mipLevelCount; }
@@ -121,7 +121,7 @@ namespace gfx
 
     protected:
         explicit ImageView(const Builder& createInfo);
-        gfx::ResourceRef<const Image> _image;
+        kor::ResourceRef<const Image> _image;
         bool _isPerFrame = false;
         Type _viewType;
         glm::u32 _baseMipLevel;

@@ -9,9 +9,9 @@
 #include <vulkan/vulkan.hpp>
 
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class Shader final : public gfx::Shader, public Wrapper<::vk::ShaderModule>
+    class Shader final : public kor::Shader, public Wrapper<::vk::ShaderModule>
     {
     public:
         explicit Shader(const Builder& createInfo);

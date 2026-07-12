@@ -6,12 +6,12 @@
 #include <GL/glew.h>
 #include <framebuffer.h>
 
-namespace gfx::ogl {
-    class Framebuffer final : public gfx::Framebuffer {
+namespace kor::ogl {
+    class Framebuffer final : public kor::Framebuffer {
     public:
         Framebuffer();
 
-        explicit Framebuffer(const gfx::Framebuffer::Builder& createInfo);
+        explicit Framebuffer(const kor::Framebuffer::Builder& createInfo);
         ~Framebuffer() override;
 
         GLuint operator*() const;

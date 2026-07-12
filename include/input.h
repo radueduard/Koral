@@ -11,7 +11,7 @@ struct GLFWwindow;
 
 #include "api.h"
 
-namespace gfx {
+namespace kor {
     class Window;
     class Engine;
 
@@ -170,7 +170,7 @@ namespace gfx {
 
 
 
-    class GFX_API Input {
+    class KORAL_API Input {
     	friend class Window;
     	friend class Engine;
     public:
@@ -196,7 +196,7 @@ namespace gfx {
         static void setup(GLFWwindow* window);
         static void update();
 
-    	struct GFX_API Callbacks {
+    	struct KORAL_API Callbacks {
     		static void keyCallback(GLFWwindow*, int, int, int, int);
     		static void mouseMoveCallback(GLFWwindow*, double, double);
     		static void mouseButtonCallback(GLFWwindow*, int, int, int);

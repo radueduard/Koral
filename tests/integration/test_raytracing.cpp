@@ -28,22 +28,22 @@
 #include "rayTracingPipeline.h"
 #include "shader.h"
 
-using gfx::AccelerationStructure;
-using gfx::Buffer;
-using gfx::CommandBuffer;
-using gfx::Descriptor;
-using gfx::DescriptorSet;
-using gfx::Image;
-using gfx::ImageView;
-using gfx::RayTracingPipeline;
-using gfx::ResourceRef;
-using gfx::Shader;
+using kor::AccelerationStructure;
+using kor::Buffer;
+using kor::CommandBuffer;
+using kor::Descriptor;
+using kor::DescriptorSet;
+using kor::Image;
+using kor::ImageView;
+using kor::RayTracingPipeline;
+using kor::ResourceRef;
+using kor::Shader;
 
 namespace {
 
 using Pixel = glm::u8vec4;
-using PosVertex = gfx::ParamVertex<gfx::Position>;
-using PosMesh = gfx::ParamMesh<PosVertex>;
+using PosVertex = kor::ParamVertex<kor::Position>;
+using PosMesh = kor::ParamMesh<PosVertex>;
 
 constexpr std::uint32_t kW = 16;
 constexpr std::uint32_t kH = 16;
@@ -61,7 +61,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
 
     // --- BLAS + TLAS ------------------------------------------------------
     auto blas = AccelerationStructure::Builder{}
-                    .addMesh(ResourceRef<const gfx::Mesh>(mesh))
+                    .addMesh(ResourceRef<const kor::Mesh>(mesh))
                     .build();
     ASSERT_EQ(blas->getType(), AccelerationStructure::Type::eBottomLevel);
 
@@ -85,11 +85,11 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
 
     // --- ray-tracing pipeline --------------------------------------------
     const auto raygen = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eRaygen)
-        .setPath(gfx::shaderPath("simpleRT.rgen.glsl")).getOrBuild("test.rt.rgen");
+        .setPath(kor::shaderPath("simpleRT.rgen.glsl")).getOrBuild("test.rt.rgen");
     const auto miss = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eMiss)
-        .setPath(gfx::shaderPath("simpleRT.rmiss.glsl")).getOrBuild("test.rt.rmiss");
+        .setPath(kor::shaderPath("simpleRT.rmiss.glsl")).getOrBuild("test.rt.rmiss");
     const auto chit = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eClosestHit)
-        .setPath(gfx::shaderPath("simpleRT.rchit.glsl")).getOrBuild("test.rt.rchit");
+        .setPath(kor::shaderPath("simpleRT.rchit.glsl")).getOrBuild("test.rt.rchit");
 
     auto pipeline = RayTracingPipeline::Builder{}
                         .setRaygenShader(raygen)
@@ -100,7 +100,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     ASSERT_TRUE(static_cast<bool>(pipeline));
 
     // --- descriptor set: TLAS at 0, storage image at 1 -------------------
-    auto descriptorSet = DescriptorSet::Builder(gfx::ResourceRef<const gfx::Pipeline>(pipeline), 0)
+    auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
                              .write(0, Descriptor(ResourceRef<const AccelerationStructure>(tlas)))
                              .write(1, Descriptor(ResourceRef<const ImageView>(outView)))
                              .build();
@@ -109,7 +109,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BindRayTracingPipeline(ResourceRef<const RayTracingPipeline>(pipeline));
         cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
-        cb.ImageBarrier(gfx::ImageBarrier(ResourceRef<const Image>(outImage), gfx::ResourceAccess::AllShaderWrite));
+        cb.ImageBarrier(kor::ImageBarrier(ResourceRef<const Image>(outImage), kor::ResourceAccess::AllShaderWrite));
         cb.TraceRays(kW, kH, 1);
     }, CommandBuffer::Usage::eCompute);
 

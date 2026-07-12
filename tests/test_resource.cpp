@@ -1,4 +1,4 @@
-// Unit tests for gfx::Resource<T> / gfx::ResourceRef<T> — the move-only owning
+// Unit tests for kor::Resource<T> / kor::ResourceRef<T> — the move-only owning
 // handle and its lifetime-tracked, dangling-detecting reference. Pure CPU logic.
 
 #include <gtest/gtest.h>
@@ -7,7 +7,7 @@
 
 #include "resource.h"
 
-using namespace gfx;
+using namespace kor;
 
 namespace {
 

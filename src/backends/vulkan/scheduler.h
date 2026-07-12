@@ -9,9 +9,9 @@
 #include "swapChain.h"
 #include "../../../include/scheduler.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-	class Frame final : public gfx::Frame
+	class Frame final : public kor::Frame
 	{
 	public:
 		explicit Frame(glm::u32 imageIndex, const Queue& queue);
@@ -41,7 +41,7 @@ namespace gfx::vk
         ::vk::Fence fence = nullptr;
     };
 
-    class Scheduler final : public gfx::Scheduler {
+    class Scheduler final : public kor::Scheduler {
     public:
     	explicit Scheduler(const Builder &createInfo);
     	void Initialize() override;
@@ -50,15 +50,15 @@ namespace gfx::vk
     	Scheduler(const Scheduler &) = delete;
     	Scheduler &operator=(const Scheduler &) = delete;
 
-    	void Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const override;
+    	void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const override;
 
-    	[[nodiscard]] const gfx::vk::SwapChain &getSwapChain() const { return *_swapChain; }
+    	[[nodiscard]] const kor::vk::SwapChain &getSwapChain() const { return *_swapChain; }
     	[[nodiscard]] bool isResized() const { return _resized; }
 		glm::u32 getCurrentImageIndex() const override { return _swapChain->getCurrentImageIndex(); }
 
 
     private:
-    	std::unique_ptr<gfx::vk::SwapChain> _swapChain;
+    	std::unique_ptr<kor::vk::SwapChain> _swapChain;
 
     	void createFrames() override;
 

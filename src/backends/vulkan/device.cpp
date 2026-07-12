@@ -20,7 +20,7 @@
 #include "surface.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk {
+namespace kor::vk {
     Queue::Family::Family(const glm::u32 index, const ::vk::QueueFamilyProperties &properties) :
         _index(index),
         _properties(properties) {
@@ -35,7 +35,7 @@ namespace gfx::vk {
         }
     }
 
-    std::unique_ptr<Queue> Queue::Family::RequestPresentQueue(const gfx::vk::Surface &surface) {
+    std::unique_ptr<Queue> Queue::Family::RequestPresentQueue(const kor::vk::Surface &surface) {
         const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
 
         if (physicalDevice->getSurfaceSupportKHR(_index, *surface)) {
@@ -50,14 +50,14 @@ namespace gfx::vk {
         }
         _index = _family._properties.queueCount - _family._remainingQueues--;
         _identifier = _family.getIndex() << 16 | _index;
-        _handle = gfx::vk::Context::Device()->getQueue(_family.getIndex(), _index);
+        _handle = kor::vk::Context::Device()->getQueue(_family.getIndex(), _index);
     }
 
     Queue::~Queue() {
         _family._remainingQueues++;
     }
 
-    bool Queue::canPresent(const gfx::vk::Surface &surface) const {
+    bool Queue::canPresent(const kor::vk::Surface &surface) const {
         const auto& physicalDevice = Context::Runtime().getPhysicalDevice();
         return physicalDevice->getSurfaceSupportKHR(_family.getIndex(), *surface);
     }
@@ -209,7 +209,7 @@ namespace gfx::vk {
                 // destroyed here and *queueRef returned as a dangling reference (the
                 // Queue holds the vk::Queue handle, so the next submit would segfault).
                 // Masked in the windowed path because requestPresentQueue() populates
-                // _queuesInUse first with a family that also handles gfx/compute/transfer.
+                // _queuesInUse first with a family that also handles Koral/compute/transfer.
                 _queuesInUse.emplace_back(std::move(queue));
                 _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
                     .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
@@ -220,7 +220,7 @@ namespace gfx::vk {
         throw std::runtime_error("Device::RequestQueue: Failed to find a queue with this type!");
     }
 
-    const Queue& Device::requestPresentQueue(const gfx::vk::Surface& surface) const {
+    const Queue& Device::requestPresentQueue(const kor::vk::Surface& surface) const {
         for (const auto& queue : _queuesInUse)
         {
             if ((queue->canPresent(surface))) {
@@ -251,7 +251,7 @@ namespace gfx::vk {
          _queuesInUse.clear();
     }
 
-    std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const gfx::vk::Queue& queue, const glm::u32 thread) const {
+    std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const kor::vk::Queue& queue, const glm::u32 thread) const {
         const auto& commandPool = _commandPools.at(queue.getIdentifier());
         const auto commandBufferAllocInfo = ::vk::CommandBufferAllocateInfo()
             .setCommandPool(commandPool)
@@ -265,7 +265,7 @@ namespace gfx::vk {
         _handle.freeCommandBuffers(commandBuffer.getParentPool(), *commandBuffer);
     }
 
-    void Device::runSingleTimeCommand(const std::function<void(gfx::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags,
+    void Device::runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags,
         const ::vk::Fence fence, ::vk::Semaphore waitSemaphore, ::vk::Semaphore signalSemaphore, const bool wait) const
     {
         const auto& queue = requestQueue(requiredFlags);

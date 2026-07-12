@@ -6,9 +6,9 @@
 #include <iostream>
 #include "ogl_err_handling.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    Buffer::Buffer(const gfx::Buffer::RawBuilder& createInfo) : gfx::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo._usage))
+    Buffer::Buffer(const kor::Buffer::RawBuilder& createInfo) : kor::Buffer(createInfo), _defaultTarget(GetTargetFromUsage(createInfo._usage))
     {
         glCreateBuffers(1, &_id);
         glCheckError();
@@ -26,7 +26,7 @@ namespace gfx::ogl
             glCreateBuffers(1, &_id);
             glNamedBufferStorage(_id, createInfo._size, nullptr, storageFlags | GL_CLIENT_STORAGE_BIT);
             if (glGetError() != GL_NO_ERROR)
-                gfx::log::error("[buffer] failed to allocate {} bytes even from host storage", createInfo._size);
+                kor::log::error("[buffer] failed to allocate {} bytes even from host storage", createInfo._size);
         }
     }
 
@@ -39,7 +39,7 @@ namespace gfx::ogl
     void Buffer::Map() const
     {
         if (_type == Type::eDeviceLocal) {
-            gfx::log::error("Attempted to map a device-local buffer! Buffer ID: {}. Device-local buffers are not mappable, as they reside in GPU-only memory. Please use a staging buffer for data transfer to or from device-local buffers.", _id);
+            kor::log::error("Attempted to map a device-local buffer! Buffer ID: {}. Device-local buffers are not mappable, as they reside in GPU-only memory. Please use a staging buffer for data transfer to or from device-local buffers.", _id);
             return;
         }
 
@@ -110,7 +110,7 @@ namespace gfx::ogl
         }
     }
 
-    GLenum Buffer::GetTargetFromUsage(Flags<gfx::Buffer::Usage> usage)
+    GLenum Buffer::GetTargetFromUsage(Flags<kor::Buffer::Usage> usage)
     {
         if (usage & Usage::eStorage) {
             return GL_SHADER_STORAGE_BUFFER;
@@ -136,7 +136,7 @@ namespace gfx::ogl
         if (usage & Usage::eTexel) {
             return GL_TEXTURE_BUFFER;
         }
-        gfx::log::error("Unknown buffer usage flags specified! Defaulting to GL_ARRAY_BUFFER. Usage value: {}", static_cast<int>(usage));
+        kor::log::error("Unknown buffer usage flags specified! Defaulting to GL_ARRAY_BUFFER. Usage value: {}", static_cast<int>(usage));
         return GL_ARRAY_BUFFER;
     }
 
@@ -151,7 +151,7 @@ namespace gfx::ogl
             case Type::eDynamic:
                 return GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
             default:
-                gfx::log::error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
+                kor::log::error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
                 return GL_DYNAMIC_STORAGE_BIT;
         }
     }

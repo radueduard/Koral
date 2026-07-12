@@ -7,7 +7,7 @@
 
 #include "mesh.h"
 
-namespace gfx {
+namespace kor {
     template<typename T>
     struct VertexAttribute
     {
@@ -96,7 +96,7 @@ namespace gfx {
         else return StorageGet<I - 1>(storage.tail);
     }
 
-    class GFX_API DefaultMeshRegistry
+    class KORAL_API DefaultMeshRegistry
     {
     public:
         using BindingGetter = const std::vector<VertexInputBindingDescription>& (*)();
@@ -249,7 +249,7 @@ namespace gfx {
             (appendStream<Streams>(binding++, location), ...);
         }
 
-    static gfx::Resource<Self> Create(std::span<const Streams>... streams)
+    static kor::Resource<Self> Create(std::span<const Streams>... streams)
     {
         Builder builder;
         setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
@@ -257,7 +257,7 @@ namespace gfx {
     }
 
     template<typename IndexT> requires std::is_integral_v<IndexT>
-    static gfx::Resource<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
+    static kor::Resource<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
     {
         Builder builder;
         setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
@@ -272,26 +272,26 @@ namespace gfx {
     }
 
     // Convenience: vectors
-    static gfx::Resource<Self> Create(const std::vector<Streams>&... streams)
+    static kor::Resource<Self> Create(const std::vector<Streams>&... streams)
     {
         return Create(std::span<const Streams>(streams)...);
     }
 
     template<typename IndexT>
-    static gfx::Resource<Self> Create(const std::vector<Streams>&... streams, const std::vector<IndexT>& indices)
+    static kor::Resource<Self> Create(const std::vector<Streams>&... streams, const std::vector<IndexT>& indices)
     {
         return Create(std::span<const Streams>(streams)..., std::span<const IndexT>(indices));
     }
 
     // Convenience: arrays
     template<std::size_t... N>
-    static gfx::Resource<Self> Create(const std::array<Streams, N>&... streams)
+    static kor::Resource<Self> Create(const std::array<Streams, N>&... streams)
     {
         return Create(std::span<const Streams>(streams)...);
     }
 
     template<typename IndexT, std::size_t... N, std::size_t NI>
-    static gfx::Resource<Self> Create(const std::array<Streams, N>&... streams, const std::array<IndexT, NI>& indices)
+    static kor::Resource<Self> Create(const std::array<Streams, N>&... streams, const std::array<IndexT, NI>& indices)
     {
         return Create(std::span<const Streams>(streams)..., std::span<const IndexT>(indices));
     }

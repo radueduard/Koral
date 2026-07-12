@@ -11,21 +11,21 @@
 #include <image.h>
 
 
-namespace gfx::vk
+namespace kor::vk
 {
 	class ImageView;
 
-	class Image final : public gfx::Image {
-    	friend class gfx::vk::ImageView;
+	class Image final : public kor::Image {
+    	friend class kor::vk::ImageView;
     public:
 
-        explicit Image(const gfx::Image::Builder& builder);
+        explicit Image(const kor::Image::Builder& builder);
         ~Image() override;
 
         Image(const Image&) = delete;
         Image& operator=(const Image&) = delete;
 
-    	void Clear(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const;
+    	void Clear(const kor::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const;
     	void Clear(const ::vk::ClearValue& clearValue) const;
 
     	void Resize(const glm::uvec3& extent) override;

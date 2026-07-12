@@ -6,9 +6,9 @@
 
 #include "ogl_err_handling.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    Sampler::Sampler(const gfx::Sampler::Builder& createInfo) : gfx::Sampler(createInfo)
+    Sampler::Sampler(const kor::Sampler::Builder& createInfo) : kor::Sampler(createInfo)
     {
         glCreateSamplers(1, &_id);
         glCheckError();

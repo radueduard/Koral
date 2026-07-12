@@ -10,25 +10,25 @@
 #include "image.h"
 #include <gui.h>
 
-namespace gfx::vk
+namespace kor::vk
 {
     class DescriptorPool;
 
-    class GFX_API GUI_Image final : public gfx::GUI_Image
+    class KORAL_API GUI_Image final : public kor::GUI_Image
     {
     public:
-        explicit GUI_Image(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level);
+        explicit GUI_Image(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
         ~GUI_Image() override;
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(gfx::ResourceRef<const gfx::Image> image) override;
+        void setImage(kor::ResourceRef<const kor::Image> image) override;
 
         ImTextureID operator*() const override;
 
     private:
-        gfx::ResourceRef<const gfx::Image> _image;
-        gfx::Resource<gfx::Image> _helperImage;
-        gfx::Resource<gfx::ImageView> _helperImageView;
-        gfx::Resource<gfx::Sampler> _helperSampler;
+        kor::ResourceRef<const kor::Image> _image;
+        kor::Resource<kor::Image> _helperImage;
+        kor::Resource<kor::ImageView> _helperImageView;
+        kor::Resource<kor::Sampler> _helperSampler;
 
         std::vector<VkDescriptorSet> _descriptorSets;
     };
@@ -38,10 +38,10 @@ namespace gfx::vk
     public:
         static void Init();
         static void NewFrame();
-        static void Render(gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data);
+        static void Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data);
         static void Shutdown();
 
     private:
-        static gfx::vk::DescriptorPool* _descriptorPool;
+        static kor::vk::DescriptorPool* _descriptorPool;
     };
 }

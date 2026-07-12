@@ -50,20 +50,20 @@
 #include "shader.h"
 #include "window.h"
 
-using gfx::Buffer;
-using gfx::CommandBuffer;
-using gfx::ComputePipeline;
-using gfx::Descriptor;
-using gfx::DescriptorSet;
-using gfx::DescriptorSetLayout;
-using gfx::DescriptorType;
-using gfx::Framebuffer;
-using gfx::GraphicsPipeline;
-using gfx::Image;
-using gfx::ImageView;
-using gfx::ResourceRef;
-using gfx::Sampler;
-using gfx::Shader;
+using kor::Buffer;
+using kor::CommandBuffer;
+using kor::ComputePipeline;
+using kor::Descriptor;
+using kor::DescriptorSet;
+using kor::DescriptorSetLayout;
+using kor::DescriptorType;
+using kor::Framebuffer;
+using kor::GraphicsPipeline;
+using kor::Image;
+using kor::ImageView;
+using kor::ResourceRef;
+using kor::Sampler;
+using kor::Shader;
 
 namespace {
 
@@ -74,7 +74,7 @@ constexpr std::uint32_t kH = 16;
 
 // Minimal scene: clears the default framebuffer and draws an ImGui overlay with a
 // GUI_Image, driving the GL presentation + ImGui + GUI_Image blit paths per frame.
-class GlOverlayScene : public gfx::Scene {
+class GlOverlayScene : public kor::Scene {
 public:
     void Initialize() override {
         _image = Image::Builder{}
@@ -88,7 +88,7 @@ public:
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.ClearColorImage(ResourceRef<const Image>(_image), glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
         }, CommandBuffer::Usage::eGraphics);
-        _guiImage = gfx::GUI_Image::Create(ResourceRef<const Image>(_image));
+        _guiImage = kor::GUI_Image::Create(ResourceRef<const Image>(_image));
     }
 
     void Update() override { ++updates; }
@@ -100,7 +100,7 @@ public:
 
     void RenderUI(ImGuiContext* context) override {
         ImGui::SetCurrentContext(context);
-        ImGui::Begin("gfx GL test overlay");
+        ImGui::Begin("Koral GL test overlay");
         ImGui::Text("frame %d", updates);
         if (_guiImage) {
             ImGui::Image(**_guiImage, ImVec2(64, 64));
@@ -114,18 +114,18 @@ public:
     glm::uvec2 lastResize{0, 0};
 
 private:
-    gfx::Resource<gfx::Image> _image;
-    gfx::Resource<gfx::GUI_Image> _guiImage;
+    kor::Resource<kor::Image> _image;
+    kor::Resource<kor::GUI_Image> _guiImage;
 };
 
-void drawFrame(gfx::Scene& scene) {
+void drawFrame(kor::Scene& scene) {
     glfwPollEvents();
-    gfx::Context::DrainMainThread();
-    gfx::Context::Scheduler().Draw([&](CommandBuffer& cb) {
-        gfx::Context::Repository().update();
+    kor::Context::DrainMainThread();
+    kor::Context::Scheduler().Draw([&](CommandBuffer& cb) {
+        kor::Context::Repository().update();
         scene.Update();
         scene.Render(cb);
-        gfx::GUI::Render(cb, scene);
+        kor::GUI::Render(cb, scene);
     });
 }
 
@@ -142,12 +142,12 @@ public:
         auto scenePtr = std::make_unique<GlOverlayScene>();
         s_scene = scenePtr.get();
         try {
-            s_window = gfx::Window::Builder(std::move(scenePtr))
-                           .setTitle("gfx GL windowed test")
+            s_window = kor::Window::Builder(std::move(scenePtr))
+                           .setTitle("Koral GL windowed test")
                            .setExtent({320, 240})
                            .setResizable(true)
                            .setVSync(false)
-                           .setAPI(gfx::API::eOpenGL)
+                           .setAPI(kor::API::eOpenGL)
                            .build();
         } catch (const std::exception& e) {
             s_reason = e.what();
@@ -158,7 +158,7 @@ public:
 
     void TearDown() override {
         if (s_window) {
-            gfx::Context::DrainMainThread();
+            kor::Context::DrainMainThread();
             s_window.reset();
         }
         s_scene = nullptr;
@@ -166,16 +166,16 @@ public:
 
     static bool ready() { return s_window != nullptr; }
     static const std::string& reason() { return s_reason; }
-    static gfx::Window& window() { return *s_window; }
+    static kor::Window& window() { return *s_window; }
     static GlOverlayScene& scene() { return *s_scene; }
 
 private:
-    static std::unique_ptr<gfx::Window> s_window;
+    static std::unique_ptr<kor::Window> s_window;
     static GlOverlayScene* s_scene;
     static std::string s_reason;
 };
 
-std::unique_ptr<gfx::Window> GlEnvironment::s_window;
+std::unique_ptr<kor::Window> GlEnvironment::s_window;
 GlOverlayScene* GlEnvironment::s_scene = nullptr;
 std::string GlEnvironment::s_reason = "no display";
 
@@ -185,16 +185,16 @@ protected:
         if (!GlEnvironment::ready()) {
             GTEST_SKIP() << "windowed OpenGL context unavailable: " << GlEnvironment::reason();
         }
-        EXPECT_EQ(gfx::Context::activeAPI(), gfx::API::eOpenGL);
+        EXPECT_EQ(kor::Context::activeAPI(), kor::API::eOpenGL);
     }
 };
 
 // ---- shared offscreen helpers ------------------------------------------------
 
 struct OffscreenTarget {
-    gfx::Resource<Image> image;
-    gfx::Resource<ImageView> view;
-    gfx::Resource<Framebuffer> framebuffer;
+    kor::Resource<Image> image;
+    kor::Resource<ImageView> view;
+    kor::Resource<Framebuffer> framebuffer;
 };
 
 OffscreenTarget makeTarget(const glm::vec4 clearColor) {
@@ -217,11 +217,11 @@ ResourceRef<const Shader> loadShader(const char* file, const Shader::Stage stage
     return Shader::Builder{}
         .setLang<Shader::Lang::eGLSL>()
         .setStage(stage)
-        .setPath(gfx::shaderPath(file))
+        .setPath(kor::shaderPath(file))
         .getOrBuild(key);
 }
 
-std::vector<Pixel> readbackImage(const gfx::Resource<Image>& image) {
+std::vector<Pixel> readbackImage(const kor::Resource<Image>& image) {
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
       .addUsage(Buffer::Usage::eTransferDst)
@@ -233,7 +233,7 @@ std::vector<Pixel> readbackImage(const gfx::Resource<Image>& image) {
     return readback->Read<Pixel>();
 }
 
-gfx::Resource<Image> makeImage(gfx::Flags<Image::Usage> usage,
+kor::Resource<Image> makeImage(kor::Flags<Image::Usage> usage,
                                Image::Format format = Image::Format::eRGBA8_UNORM) {
     return Image::Builder{}
         .setType(Image::Type::e2D)
@@ -325,11 +325,11 @@ TEST_F(GlTest, RenderParity) {
         const auto vert = loadShader("flatTriangle.vert.glsl", Shader::Stage::eVertex, "glt.flat.vert");
         const auto frag = loadShader("pushColor.frag.glsl", Shader::Stage::eFragment, "glt.push.frag");
 
-        gfx::ColorBlendState blend;
-        blend.attachments.push_back(gfx::ColorBlendState::AttachmentState{
+        kor::ColorBlendState blend;
+        blend.attachments.push_back(kor::ColorBlendState::AttachmentState{
             .blendEnable = true,
-            .srcColorBlendFactor = gfx::BlendFactor::eSrcAlpha,
-            .dstColorBlendFactor = gfx::BlendFactor::eOneMinusSrcAlpha,
+            .srcColorBlendFactor = kor::BlendFactor::eSrcAlpha,
+            .dstColorBlendFactor = kor::BlendFactor::eOneMinusSrcAlpha,
         });
         auto pipeline = GraphicsPipeline::Builder{}
                             .setVertexShader(vert)
@@ -381,7 +381,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetViewport(0, 0, kW, kH);
             cb.SetScissor(kSx, kSy, kSw, kSh);
             // dynamic-state overrides must record and not disturb the draw
-            cb.SetFrontFace(gfx::FrontFace::eCounterClockwise);
+            cb.SetFrontFace(kor::FrontFace::eCounterClockwise);
             cb.SetDepthTestEnable(false);
             cb.SetDepthWriteEnable(false);
             cb.SetRasterizerDiscardEnable(false);
@@ -406,8 +406,8 @@ TEST_F(GlTest, RenderParity) {
 
     // ---- Phase 6: indexed mesh draw ---------------------------------------
     {
-        using PosVertex = gfx::ParamVertex<gfx::Position>;
-        using PosMesh = gfx::ParamMesh<PosVertex>;
+        using PosVertex = kor::ParamVertex<kor::Position>;
+        using PosMesh = kor::ParamMesh<PosVertex>;
 
         std::vector<PosVertex> verts = {
             PosVertex{ glm::vec3{-1.0f, -1.0f, 0.0f} },
@@ -432,7 +432,7 @@ TEST_F(GlTest, RenderParity) {
             cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
             cb.SetViewport(0, 0, kW, kH);
             cb.SetScissor(0, 0, kW, kH);
-            cb.BindMesh(ResourceRef<const gfx::Mesh>(mesh));
+            cb.BindMesh(ResourceRef<const kor::Mesh>(mesh));
             cb.DrawIndexed(); // index count resolved from the bound mesh
             cb.EndRendering();
         }, CommandBuffer::Usage::eGraphics);
@@ -476,7 +476,7 @@ TEST_F(GlTest, ComputeDispatch) {
     const auto shader = loadShader("doubleValues.comp.glsl", Shader::Stage::eCompute, "glt.doubleValues");
     auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
 
-    auto descriptorSet = DescriptorSet::Builder(gfx::ResourceRef<const gfx::Pipeline>(pipeline), 0)
+    auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
                              .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
                              .build();
 
@@ -484,9 +484,9 @@ TEST_F(GlTest, ComputeDispatch) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
         cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
-        cb.BufferBarrier(gfx::BufferBarrier(bufRef, gfx::ResourceAccess::ComputeReadWrite));
+        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::ComputeReadWrite));
         cb.Dispatch(kCount / kLocalSize, 1, 1);
-        cb.BufferBarrier(gfx::BufferBarrier(bufRef, gfx::ResourceAccess::TransferSrc));
+        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::TransferSrc));
     }, CommandBuffer::Usage::eCompute);
 
     const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
@@ -502,8 +502,8 @@ TEST_F(GlTest, ComputeDispatch) {
 // -----------------------------------------------------------------------------
 TEST_F(GlTest, SamplersAndDescriptors) {
     auto linear = Sampler::Builder{}
-                      .setMinFilter(gfx::Filter::eLinear)
-                      .setMagFilter(gfx::Filter::eLinear)
+                      .setMinFilter(kor::Filter::eLinear)
+                      .setMagFilter(kor::Filter::eLinear)
                       .setMipmapMode(Sampler::MipmapMode::eLinear)
                       .setAddressModeU(Sampler::AddressMode::eRepeat)
                       .setAddressModeV(Sampler::AddressMode::eMirroredRepeat)
@@ -513,15 +513,15 @@ TEST_F(GlTest, SamplersAndDescriptors) {
     ASSERT_TRUE(static_cast<bool>(linear));
 
     auto nearest = Sampler::Builder{}
-                       .setMinFilter(gfx::Filter::eNearest)
-                       .setMagFilter(gfx::Filter::eNearest)
+                       .setMinFilter(kor::Filter::eNearest)
+                       .setMagFilter(kor::Filter::eNearest)
                        .setMipmapMode(Sampler::MipmapMode::eNearest)
                        .setAddressModeU(Sampler::AddressMode::eClampToBorder)
                        .build();
     ASSERT_TRUE(static_cast<bool>(nearest));
 
-    auto sampledImg = makeImage(gfx::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
-    auto storageImg = makeImage(gfx::Flags(Image::Usage::eStorage) | Image::Usage::eTransferDst);
+    auto sampledImg = makeImage(kor::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
+    auto storageImg = makeImage(kor::Flags(Image::Usage::eStorage) | Image::Usage::eTransferDst);
     auto sampledView = ImageView::Builder(ResourceRef<const Image>(sampledImg)).build();
     auto storageView = ImageView::Builder(ResourceRef<const Image>(storageImg)).build();
     auto sampler = Sampler::Builder{}.build();
@@ -593,7 +593,7 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
                       .build();
 
     // Blit (down-scale) between two images.
-    auto blitSrc = makeImage(gfx::Flags(Image::Usage::eTransferSrc) | Image::Usage::eTransferDst);
+    auto blitSrc = makeImage(kor::Flags(Image::Usage::eTransferSrc) | Image::Usage::eTransferDst);
     auto blitDst = Image::Builder{}
                        .setType(Image::Type::e2D)
                        .setFormat(Image::Format::eRGBA8_UNORM)
@@ -606,10 +606,10 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
         cb.ClearColorImage(ResourceRef<const Image>(mipped), glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
         cb.GenerateMipmaps(ResourceRef<const Image>(mipped));
         cb.ClearColorImage(ResourceRef<const Image>(blitSrc), glm::vec4{1.f, 1.f, 0.f, 1.f});
-        cb.Blit(ResourceRef<const Image>(blitSrc), ResourceRef<const Image>(blitDst), gfx::Blit{
+        cb.Blit(ResourceRef<const Image>(blitSrc), ResourceRef<const Image>(blitDst), kor::Blit{
             .srcExtent = {8, 8, 1},
             .dstExtent = {4, 4, 1},
-            .filtering = gfx::Filter::eLinear,
+            .filtering = kor::Filter::eLinear,
         });
     }, CommandBuffer::Usage::eGraphics);
 
@@ -649,15 +649,15 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
 // -----------------------------------------------------------------------------
 TEST_F(GlTest, TexturedDraw) {
     // Source texture, cleared to a known color and sampled by the fragment shader.
-    auto texture = makeImage(gfx::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
+    auto texture = makeImage(kor::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
     const glm::vec4 texColor{0.2f, 0.4f, 0.8f, 1.f};
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(ResourceRef<const Image>(texture), texColor);
     }, CommandBuffer::Usage::eGraphics);
     auto texView = ImageView::Builder(ResourceRef<const Image>(texture)).build();
     auto sampler = Sampler::Builder{}
-                       .setMinFilter(gfx::Filter::eNearest)
-                       .setMagFilter(gfx::Filter::eNearest)
+                       .setMinFilter(kor::Filter::eNearest)
+                       .setMagFilter(kor::Filter::eNearest)
                        .build();
 
     auto target = makeTarget({0.f, 0.f, 0.f, 1.f});
@@ -669,7 +669,7 @@ TEST_F(GlTest, TexturedDraw) {
                         .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
                         .build();
 
-    auto set = DescriptorSet::Builder(gfx::ResourceRef<const gfx::Pipeline>(pipeline), 0)
+    auto set = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
                    .write(0, Descriptor(ResourceRef<const ImageView>(texView), ResourceRef<const Sampler>(sampler)))
                    .build();
 
@@ -698,7 +698,7 @@ TEST_F(GlTest, TexturedDraw) {
 // they still record and must not fail the command buffer.
 // -----------------------------------------------------------------------------
 TEST_F(GlTest, DebugLabels) {
-    auto image = makeImage(gfx::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
+    auto image = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginDebugLabel("outer", glm::vec4{1.f, 0.f, 0.f, 1.f});
         cb.InsertDebugLabel("marker");

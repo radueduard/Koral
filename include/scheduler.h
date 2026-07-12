@@ -11,7 +11,7 @@
 
 #include "commandBuffer.h"
 
-namespace gfx
+namespace kor
 {
     enum class MSAA;
 
@@ -25,10 +25,10 @@ namespace gfx
         Frame& operator=(const Frame&) = delete;
 
 		[[nodiscard]] glm::u32 getImageIndex() const { return _imageIndex; }
-		[[nodiscard]] gfx::CommandBuffer& getCommandBuffer() const { return *_commandBuffer; }
+		[[nodiscard]] kor::CommandBuffer& getCommandBuffer() const { return *_commandBuffer; }
     protected:
         glm::u32 _imageIndex;
-		std::unique_ptr<gfx::CommandBuffer> _commandBuffer;
+		std::unique_ptr<kor::CommandBuffer> _commandBuffer;
     };
 
     class Scheduler
@@ -48,8 +48,8 @@ namespace gfx
 
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
     	[[nodiscard]] virtual glm::u32 getCurrentImageIndex() const { return _currentFrame; }
-        [[nodiscard]] const gfx::Frame &getCurrentFrame() const { return *_frames.at(_currentFrame); }
-        [[nodiscard]] const gfx::Frame &getNextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
+        [[nodiscard]] const kor::Frame &getCurrentFrame() const { return *_frames.at(_currentFrame); }
+        [[nodiscard]] const kor::Frame &getNextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
 
     	void advanceFrame() const { _currentFrame = (_currentFrame + 1) % _imageCount; }
 
@@ -62,7 +62,7 @@ namespace gfx
 			return frames;
         }
 
-        virtual void Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const { _started = true; }
+        virtual void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const { _started = true; }
 
     	[[nodiscard]] bool hasStarted() const { return _started; }
     	virtual void WaitIdle() const = 0;

@@ -16,7 +16,7 @@
 #include "resource.h"
 
 
-namespace gfx
+namespace kor
 {
     template<typename Attr>
     struct AssimpAttributeTraits
@@ -196,28 +196,28 @@ namespace gfx
 
         // Upload a CPU vertex vector to a device-local vertex buffer.
         template<typename StreamT>
-        gfx::Resource<gfx::Buffer> uploadVertexBuffer(const std::vector<StreamT>& vertices)
+        kor::Resource<kor::Buffer> uploadVertexBuffer(const std::vector<StreamT>& vertices)
         {
-            return gfx::Buffer::Builder<StreamT>()
+            return kor::Buffer::Builder<StreamT>()
                 .setDataView(std::span<const StreamT>(vertices))
-                .addUsage(gfx::Buffer::Usage::eVertex)
-                .addUsage(gfx::Buffer::Usage::eTransferDst)
-                .addUsage(gfx::Buffer::Usage::eTransferSrc)
-                .addUsage(gfx::Buffer::Usage::eStorage)
-                .setType(gfx::Buffer::Type::eDeviceLocal)
+                .addUsage(kor::Buffer::Usage::eVertex)
+                .addUsage(kor::Buffer::Usage::eTransferDst)
+                .addUsage(kor::Buffer::Usage::eTransferSrc)
+                .addUsage(kor::Buffer::Usage::eStorage)
+                .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }
 
         // Upload a CPU index vector to a device-local index buffer.
-        inline gfx::Resource<gfx::Buffer> uploadIndexBuffer(const std::vector<glm::u32>& indices)
+        inline kor::Resource<kor::Buffer> uploadIndexBuffer(const std::vector<glm::u32>& indices)
         {
-            return gfx::Buffer::Builder<glm::u32>()
+            return kor::Buffer::Builder<glm::u32>()
                 .setDataView(std::span<const glm::u32>(indices))
-                .addUsage(gfx::Buffer::Usage::eIndex)
-                .addUsage(gfx::Buffer::Usage::eTransferDst)
-                .addUsage(gfx::Buffer::Usage::eTransferSrc)
-                .addUsage(gfx::Buffer::Usage::eStorage)
-                .setType(gfx::Buffer::Type::eDeviceLocal)
+                .addUsage(kor::Buffer::Usage::eIndex)
+                .addUsage(kor::Buffer::Usage::eTransferDst)
+                .addUsage(kor::Buffer::Usage::eTransferSrc)
+                .addUsage(kor::Buffer::Usage::eStorage)
+                .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }
     } // namespace detail
@@ -228,7 +228,7 @@ namespace gfx
     //   MeshT must be ParamMesh<Stream0, Stream1, ...>.
     // -------------------------------------------------------------------------
     template<typename MeshT>
-    gfx::Resource<MeshT> LoadMesh(const aiMesh& mesh)
+    kor::Resource<MeshT> LoadMesh(const aiMesh& mesh)
     {
         typename MeshT::Builder builder;
 
@@ -245,7 +245,7 @@ namespace gfx
         if (mesh.HasFaces())
         {
             auto indices = detail::buildIndices(mesh);
-            builder.SetIndexBuffer(detail::uploadIndexBuffer(indices), gfx::ChannelType::eUInt);
+            builder.SetIndexBuffer(detail::uploadIndexBuffer(indices), kor::ChannelType::eUInt);
         }
 
         return builder.Build();
@@ -279,5 +279,5 @@ namespace gfx
         }(std::index_sequence_for<Streams...>{});
     }
 
-} // namespace gfx
+} // namespace kor
 

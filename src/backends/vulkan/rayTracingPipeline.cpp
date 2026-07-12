@@ -17,7 +17,7 @@
 #include "vk_enum_conversions.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     namespace
     {
@@ -36,7 +36,7 @@ namespace gfx::vk
         }
     }
 
-    RayTracingPipeline::RayTracingPipeline(const Builder& createInfo) : gfx::RayTracingPipeline(createInfo)
+    RayTracingPipeline::RayTracingPipeline(const Builder& createInfo) : kor::RayTracingPipeline(createInfo)
     {
         Setup();
     }
@@ -46,7 +46,7 @@ namespace gfx::vk
         Teardown();
     }
 
-    void RayTracingPipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    void RayTracingPipeline::Bind(const kor::CommandBuffer& commandBuffer) const
     {
         const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
         vkCommandBuffer->bindPipeline(::vk::PipelineBindPoint::eRayTracingKHR, _handle);
@@ -81,7 +81,7 @@ namespace gfx::vk
         std::vector<::vk::PipelineShaderStageCreateInfo> shaderStages;
         std::vector<::vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups;
 
-        auto addStage = [&](const ResourceRef<const gfx::Shader>& shaderRef, const ::vk::ShaderStageFlagBits stage) {
+        auto addStage = [&](const ResourceRef<const kor::Shader>& shaderRef, const ::vk::ShaderStageFlagBits stage) {
             const auto& shader = dynamic_cast<const vk::Shader&>(*shaderRef);
             const auto index = static_cast<glm::u32>(shaderStages.size());
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()

@@ -11,9 +11,9 @@
 #include <framebuffer.h>
 #include <surface.h>
 
-namespace gfx
+namespace kor
 {
-    gfx::Result<std::unique_ptr<Sampler>> Sampler::Builder::create() const
+    kor::Result<std::unique_ptr<Sampler>> Sampler::Builder::create() const
     {
         beginAttempt();
 
@@ -25,12 +25,12 @@ namespace gfx
 
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Sampler> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<Sampler, vk::Sampler>(*this)
-                : gfx::MakeBackendPtr<Sampler, ogl::Sampler>(*this);
+                ? kor::MakeBackendPtr<Sampler, vk::Sampler>(*this)
+                : kor::MakeBackendPtr<Sampler, ogl::Sampler>(*this);
         });
     }
 
-    gfx::Resource<Sampler> Sampler::Builder::build() const
+    kor::Resource<Sampler> Sampler::Builder::build() const
     {
         return materialize<Sampler>(*this, "Sampler");
     }

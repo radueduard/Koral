@@ -17,7 +17,7 @@
 #include "meshHeap.h"
 #include "buffer.h"
 
-namespace gfx
+namespace kor
 {
     class Image;
 
@@ -33,15 +33,15 @@ namespace gfx
         eTIF,
     };
 
-    struct GFX_API AABB {
+    struct KORAL_API AABB {
         glm::vec3 min;
         glm::vec3 max;
     };
 
-    class GFX_API Importer
+    class KORAL_API Importer
     {
     public:
-        struct GFX_API Material {
+        struct KORAL_API Material {
             std::string name;
 
             float alphaCutoff = 1.f;
@@ -68,7 +68,7 @@ namespace gfx
             std::optional<std::filesystem::path> heightTexturePath;
         };
 
-        struct GFX_API Mesh {
+        struct KORAL_API Mesh {
             std::string name;
 
             std::vector<glm::vec3> positions;
@@ -81,7 +81,7 @@ namespace gfx
             std::optional<std::vector<glm::u32>> indices;
         };
 
-        struct GFX_API Node {
+        struct KORAL_API Node {
             glm::i32 id = -1;
             std::string name;
             std::vector<glm::u32> childIndices;
@@ -95,7 +95,7 @@ namespace gfx
             AABB aabb;
         };
 
-        struct GFX_API Light {
+        struct KORAL_API Light {
             enum class Type { ePoint, eDirectional, eSpot };
 
             std::string name;
@@ -109,7 +109,7 @@ namespace gfx
             float     outerConeAngle = 0.0f;  // radians (spot)
         };
 
-        struct GFX_API Scene {
+        struct KORAL_API Scene {
             std::vector<Mesh> meshes;
             std::vector<Material> materials;
             std::vector<Node> nodes;
@@ -118,7 +118,7 @@ namespace gfx
 
         virtual ~Importer() = default;
 
-        static gfx::Resource<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
+        static kor::Resource<Image> LoadImage(const std::filesystem::path& path, bool generateMipmaps = false);
         // Returns the image directly via the awaited task. All CPU work runs on background
         // threads; GPU uploads are chunked so the main/render thread is never held for long.
         static Task<Resource<Image>> LoadImageAsync(const std::filesystem::path& path, bool generateMipmaps = false);
@@ -144,7 +144,7 @@ namespace gfx
         // Build a standalone ParamMesh from scene mesh data.
         // MeshT must be a ParamMesh<Stream0, ...>; specify it explicitly.
         template<typename MeshT>
-        gfx::Resource<MeshT> LoadMesh(const Mesh& mesh);
+        kor::Resource<MeshT> LoadMesh(const Mesh& mesh);
 
         // Suballocate into a MeshHeap. Streams are deduced from the heap type.
         template<typename... Streams>
@@ -168,14 +168,14 @@ namespace gfx
     protected:
         std::filesystem::path _path;
     };
-} // namespace gfx
+} // namespace kor
 
 // =============================================================================
 // ImporterAttributeTraits<Attr>
 //   Maps each VertexAttributeType to the corresponding field in Importer::Mesh.
 //   Specialise this for any custom attribute tags.
 // =============================================================================
-namespace gfx
+namespace kor
 {
     template<typename Attr>
     struct ImporterAttributeTraits
@@ -299,36 +299,36 @@ namespace gfx
         }
 
         template<typename StreamT>
-        gfx::Resource<gfx::Buffer> uploadVertexBuffer(const std::vector<StreamT>& vertices)
+        kor::Resource<kor::Buffer> uploadVertexBuffer(const std::vector<StreamT>& vertices)
         {
-            return gfx::Buffer::Builder<StreamT>()
+            return kor::Buffer::Builder<StreamT>()
                 .setDataView(std::span<const StreamT>(vertices))
-                .addUsage(gfx::Buffer::Usage::eVertex)
-                .addUsage(gfx::Buffer::Usage::eTransferDst)
-                .addUsage(gfx::Buffer::Usage::eTransferSrc)
-                .addUsage(gfx::Buffer::Usage::eStorage)
+                .addUsage(kor::Buffer::Usage::eVertex)
+                .addUsage(kor::Buffer::Usage::eTransferDst)
+                .addUsage(kor::Buffer::Usage::eTransferSrc)
+                .addUsage(kor::Buffer::Usage::eStorage)
                 // Needed so the buffer's GPU address can be queried — both for
                 // ray-tracing acceleration structure builds and for buffer_reference
                 // access in shaders.
-                .addUsage(gfx::Buffer::Usage::eShaderDeviceAddress)
-                .addUsage(gfx::Buffer::Usage::eAccelerationStructureInput)
-                .setType(gfx::Buffer::Type::eDeviceLocal)
+                .addUsage(kor::Buffer::Usage::eShaderDeviceAddress)
+                .addUsage(kor::Buffer::Usage::eAccelerationStructureInput)
+                .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }
 
-        inline gfx::Resource<gfx::Buffer> uploadIndexBuffer(const std::vector<glm::u32>& indices)
+        inline kor::Resource<kor::Buffer> uploadIndexBuffer(const std::vector<glm::u32>& indices)
         {
-            return gfx::Buffer::Builder<glm::u32>()
+            return kor::Buffer::Builder<glm::u32>()
                 .setDataView(std::span(indices))
-                .addUsage(gfx::Buffer::Usage::eIndex)
-                .addUsage(gfx::Buffer::Usage::eTransferDst)
-                .addUsage(gfx::Buffer::Usage::eTransferSrc)
-                .addUsage(gfx::Buffer::Usage::eStorage)
+                .addUsage(kor::Buffer::Usage::eIndex)
+                .addUsage(kor::Buffer::Usage::eTransferDst)
+                .addUsage(kor::Buffer::Usage::eTransferSrc)
+                .addUsage(kor::Buffer::Usage::eStorage)
                 // See uploadVertexBuffer: address-queryable for acceleration structure
                 // builds and buffer_reference access.
-                .addUsage(gfx::Buffer::Usage::eShaderDeviceAddress)
-                .addUsage(gfx::Buffer::Usage::eAccelerationStructureInput)
-                .setType(gfx::Buffer::Type::eDeviceLocal)
+                .addUsage(kor::Buffer::Usage::eShaderDeviceAddress)
+                .addUsage(kor::Buffer::Usage::eAccelerationStructureInput)
+                .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }
     } // namespace importer_detail
@@ -338,7 +338,7 @@ namespace gfx
     // =============================================================================
 
     template<typename MeshT>
-    gfx::Resource<MeshT> Importer::LoadMesh(const Mesh& mesh)
+    kor::Resource<MeshT> Importer::LoadMesh(const Mesh& mesh)
     {
         typename MeshT::Builder builder;
 
@@ -357,7 +357,7 @@ namespace gfx
         if (mesh.indices.has_value())
             builder.SetIndexBuffer(
                 importer_detail::uploadIndexBuffer(*mesh.indices),
-                gfx::ChannelType::eUInt
+                kor::ChannelType::eUInt
             );
 
         return builder.Build();
@@ -385,7 +385,7 @@ namespace gfx
     }
 
     template<typename... Streams>
-    gfx::Task<std::optional<typename MeshHeap<Streams...>::Allocation>>
+    kor::Task<std::optional<typename MeshHeap<Streams...>::Allocation>>
     Importer::LoadMeshIntoHeapAsync(const Mesh& mesh, const MeshHeap<Streams...>& heap)
     {
         Context::SwitchToBackgroundThread();
@@ -409,5 +409,5 @@ namespace gfx
         co_return std::move(allocation);
     }
 
-} // namespace gfx
+} // namespace kor
 

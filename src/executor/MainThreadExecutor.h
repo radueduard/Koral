@@ -11,7 +11,7 @@
 
 #include "task.h"
 
-class MainThreadExecutor : public gfx::Executor {
+class MainThreadExecutor : public kor::Executor {
 public:
     MainThreadExecutor() : mainThreadId_(std::this_thread::get_id()) {}
 
@@ -38,14 +38,14 @@ public:
         }
     }
 
-    struct SwitchAwaiter : gfx::SwitchAwaiter {
-        explicit SwitchAwaiter(MainThreadExecutor* executor) noexcept : gfx::SwitchAwaiter(executor) {}
+    struct SwitchAwaiter : kor::SwitchAwaiter {
+        explicit SwitchAwaiter(MainThreadExecutor* executor) noexcept : kor::SwitchAwaiter(executor) {}
         bool await_ready()  const noexcept override { return exec->IsMainThread(); }
         void await_resume() const noexcept override {}
     };
 
-    gfx::SwitchAwaiter SwitchToMainThread() noexcept {
-        return static_cast<gfx::SwitchAwaiter>(SwitchAwaiter(this));
+    kor::SwitchAwaiter SwitchToMainThread() noexcept {
+        return static_cast<kor::SwitchAwaiter>(SwitchAwaiter(this));
     }
 
 private:

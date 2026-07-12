@@ -9,7 +9,7 @@
 
 #include "physicalDevice.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     struct DeviceFeatures
     {
@@ -72,6 +72,6 @@ namespace gfx::vk
 
         ::vk::DebugUtilsMessengerEXT _debugMessenger;
 
-        std::unique_ptr<gfx::vk::PhysicalDevice> _physicalDevice = nullptr;
+        std::unique_ptr<kor::vk::PhysicalDevice> _physicalDevice = nullptr;
     };
 }

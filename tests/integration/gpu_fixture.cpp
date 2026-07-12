@@ -14,20 +14,20 @@ void GpuEnvironment::SetUp() {
     // just enough to allocate buffers and run compute/transfer commands. This
     // works anywhere a Vulkan device exists — no display required.
     try {
-        gfx::Context::InitHeadless(gfx::API::eVulkan);
+        kor::Context::InitHeadless(kor::API::eVulkan);
         g_ready = true;
     } catch (const std::exception& e) {
-        gfx::log::error("GPU integration harness: headless device init failed: {}", e.what());
+        kor::log::error("GPU integration harness: headless device init failed: {}", e.what());
         g_ready = false;
     } catch (...) {
-        gfx::log::error("GPU integration harness: headless device init failed (unknown exception)");
+        kor::log::error("GPU integration harness: headless device init failed (unknown exception)");
         g_ready = false;
     }
 }
 
 void GpuEnvironment::TearDown() {
     if (g_ready) {
-        gfx::Context::ShutdownHeadless();
+        kor::Context::ShutdownHeadless();
         g_ready = false;
     }
 }

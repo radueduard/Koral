@@ -11,19 +11,19 @@
 #include "context.h"
 #include "vk_enum_conversions.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    ImageView::ImageView(const Builder& builder) : gfx::ImageView(builder)
+    ImageView::ImageView(const Builder& builder) : kor::ImageView(builder)
     {
         ::vk::ImageAspectFlags aspectMask = ::vk::ImageAspectFlagBits::eColor;
-        if (gfx::IsDepthStencilFormat(_image->getFormat())) {
+        if (kor::IsDepthStencilFormat(_image->getFormat())) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (gfx::IsStencilFormat(_image->getFormat())) {
+            if (kor::IsStencilFormat(_image->getFormat())) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         }
 
-        const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*_image);
+        const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*_image);
         for (const auto& image : vkImage._images) {
             auto viewInfo = ::vk::ImageViewCreateInfo()
                 .setImage(image)
@@ -53,7 +53,7 @@ namespace gfx::vk
 
     ::vk::ImageView ImageView::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         return _imageViews[currentFrame];
     }
 

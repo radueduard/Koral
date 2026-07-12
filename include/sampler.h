@@ -11,7 +11,7 @@
 #include "resource.h"
 #include "error.h"
 
-namespace gfx
+namespace kor
 {
     enum class Filter
     {
@@ -19,7 +19,7 @@ namespace gfx
         eLinear,
     };
 
-    class GFX_API Sampler
+    class KORAL_API Sampler
     {
     public:
         enum class MipmapMode {
@@ -34,7 +34,7 @@ namespace gfx
             eClampToBorder
         };
 
-        struct GFX_API Builder : ::Builder
+        struct KORAL_API Builder : ::Builder
         {
             Filter minFilter = Filter::eLinear;
             Filter magFilter = Filter::eLinear;
@@ -123,7 +123,7 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Sampler>> create() const;
-            [[nodiscard]] gfx::Resource<Sampler> build() const;
+            [[nodiscard]] kor::Resource<Sampler> build() const;
         };
 
         virtual ~Sampler() = default;

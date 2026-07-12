@@ -5,20 +5,20 @@
 #pragma once
 #include "../../../include/scheduler.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    class Frame final : public gfx::Frame {
+    class Frame final : public kor::Frame {
     public:
         explicit Frame(const glm::u32 imageIndex)
-            : gfx::Frame(imageIndex) {};
+            : kor::Frame(imageIndex) {};
     };
 
-    class Scheduler final : public gfx::Scheduler
+    class Scheduler final : public kor::Scheduler
     {
     public:
         explicit Scheduler(const Builder& createInfo);
         void Initialize() override;
-        void Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const override;
+        void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const override;
 
     protected:
         void createFrames() override;

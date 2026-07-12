@@ -1,5 +1,5 @@
-// Sample Slang module shipped with the gfx API. A single module exposes multiple entry
-// points; the stage of each is taken from its [shader("...")] attribute, so the gfx
+// Sample Slang module shipped with the Koral API. A single module exposes multiple entry
+// points; the stage of each is taken from its [shader("...")] attribute, so the Koral
 // SlangBuilder needs only the module + entry point name:
 //
 //   Shader::Builder().setLang<Shader::Lang::eSlang>()

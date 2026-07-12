@@ -9,7 +9,7 @@
 #include "device.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     Allocator::Allocator()
     {

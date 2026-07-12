@@ -11,21 +11,21 @@
 
 #include "vk_wrapper.h"
 
-namespace gfx
+namespace kor
 {
     class CommandBuffer;
 }
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class RayTracingPipeline final : public gfx::RayTracingPipeline, public Wrapper<::vk::Pipeline>
+    class RayTracingPipeline final : public kor::RayTracingPipeline, public Wrapper<::vk::Pipeline>
     {
     public:
         explicit RayTracingPipeline(const Builder& createInfo);
 
         ~RayTracingPipeline() override;
 
-        void Bind(const gfx::CommandBuffer& commandBuffer) const override;
+        void Bind(const kor::CommandBuffer& commandBuffer) const override;
         void Unbind() const override {}
 
         [[nodiscard]] const ::vk::PipelineLayout& getPipelineLayout() const { return _pipelineLayout; }

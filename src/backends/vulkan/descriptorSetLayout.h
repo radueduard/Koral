@@ -9,9 +9,9 @@
 #include "vk_wrapper.h"
 #include <vulkan/vulkan.hpp>
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class DescriptorSetLayout final : public gfx::DescriptorSetLayout, public Wrapper<::vk::DescriptorSetLayout>
+    class DescriptorSetLayout final : public kor::DescriptorSetLayout, public Wrapper<::vk::DescriptorSetLayout>
     {
     public:
         explicit DescriptorSetLayout(const Builder& builder);

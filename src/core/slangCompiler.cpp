@@ -12,7 +12,7 @@
 #include "error.h"
 #include "log.h"
 
-namespace gfx
+namespace kor
 {
     using Slang::ComPtr;
 

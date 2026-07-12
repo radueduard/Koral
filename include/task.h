@@ -11,7 +11,7 @@
 #include <utility>
 #include <string>
 
-namespace gfx {
+namespace kor {
     struct Executor {
         virtual ~Executor() = default;
         virtual bool IsMainThread() const noexcept { return false; }

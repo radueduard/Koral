@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace gfx
+namespace kor
 {
     template<typename Derived>
     concept MeshType = requires {

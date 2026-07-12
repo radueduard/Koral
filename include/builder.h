@@ -4,11 +4,11 @@
 
 /**
  * @file builder.h
- * @brief Common base for every gfx builder: diagnostics, input adoption, and materialization.
+ * @brief Common base for every Koral builder: diagnostics, input adoption, and materialization.
  *
  * A builder collects problems as it is configured (@ref Builder::addError from a setter) and
  * as it is built (@ref Builder::adopt on each resource input), then turns itself into a
- * @ref gfx::Resource that is either valid or *poisoned* — carrying the reason it could not be
+ * @ref kor::Resource that is either valid or *poisoned* — carrying the reason it could not be
  * built rather than throwing.
  *
  * Builders are values, and @ref Builder::materialize captures a copy of the builder inside the
@@ -57,10 +57,10 @@ protected:
 
     struct Diagnostic {
         Severity severity;
-        gfx::ErrorCode code;
+        kor::ErrorCode code;
         std::string message;
         std::stacktrace trace;
-        std::shared_ptr<const gfx::Error> cause;  ///< The input error responsible, if any.
+        std::shared_ptr<const kor::Error> cause;  ///< The input error responsible, if any.
     };
 
     mutable std::vector<Diagnostic> _diagnostics{};
@@ -68,16 +68,16 @@ protected:
     // The resource inputs this attempt consumed, each paired with the generation it had when we
     // read it. A poisoned resource is only worth retrying once one of these has moved on, which
     // is what stops a broken pipeline from rebuilding itself every frame while you edit a shader.
-    mutable std::vector<std::pair<std::weak_ptr<gfx::ResourceStateBase>, std::uint64_t>> _deps{};
+    mutable std::vector<std::pair<std::weak_ptr<kor::ResourceStateBase>, std::uint64_t>> _deps{};
 
-    void addError(const gfx::ErrorCode code, std::string message,
-                  std::shared_ptr<const gfx::Error> cause = nullptr) const {
+    void addError(const kor::ErrorCode code, std::string message,
+                  std::shared_ptr<const kor::Error> cause = nullptr) const {
         _diagnostics.push_back({Severity::Error, code, std::move(message),
                                 std::stacktrace::current(2), std::move(cause)});
     }
 
     void warn(std::string message) const {
-        _diagnostics.push_back({Severity::Warning, gfx::ErrorCode::eNone, std::move(message),
+        _diagnostics.push_back({Severity::Warning, kor::ErrorCode::eNone, std::move(message),
                                 std::stacktrace::current(2), nullptr});
     }
 
@@ -103,9 +103,9 @@ protected:
     // the pipeline that could not be assembled from it. The input's generation is recorded
     // either way, so that a later repair can be noticed.
     template<typename T>
-    void adopt(const gfx::ResourceRef<T>& input, const std::string_view what) const {
+    void adopt(const kor::ResourceRef<T>& input, const std::string_view what) const {
         if (!input.alive()) {
-            addError(gfx::ErrorCode::eInvalidArgument, std::format("{} has been destroyed.", what));
+            addError(kor::ErrorCode::eInvalidArgument, std::format("{} has been destroyed.", what));
             return;
         }
         if (input.poisoned()) {
@@ -118,26 +118,26 @@ protected:
     }
 
     template<typename T>
-    void adopt(const gfx::Resource<T>& input, const std::string_view what) const {
-        adopt(gfx::ResourceRef<const T>(input), what);
+    void adopt(const kor::Resource<T>& input, const std::string_view what) const {
+        adopt(kor::ResourceRef<const T>(input), what);
     }
 
     // Logs warnings and returns the first error, with its cause chain attached. Errors are not
     // logged here: they end up poisoning the resource, and materialize() prints the complete
     // history in one piece rather than a line per level.
-    [[nodiscard]] gfx::VoidResult validate() const {
-        std::optional<gfx::Error> firstError;
+    [[nodiscard]] kor::VoidResult validate() const {
+        std::optional<kor::Error> firstError;
         for (const auto& [severity, code, message, trace, cause] : _diagnostics) {
             if (severity == Severity::Error) {
                 if (!firstError) {
-                    firstError = gfx::Error{
+                    firstError = kor::Error{
                         .code = code,
                         .message = std::format("{}\n{}", message, formatTrace(trace)),
                         .cause = cause,
                     };
                 }
             } else {
-                gfx::log::warn("[builder] {}\n{}", message, formatTrace(trace));
+                kor::log::warn("[builder] {}\n{}", message, formatTrace(trace));
             }
         }
 
@@ -148,7 +148,7 @@ protected:
     /**
      * @brief Turn a builder into a Resource<T>: valid on success, poisoned on failure.
      *
-     * @p SelfBuilder must expose `gfx::Result<std::unique_ptr<T>> create() const`, which performs
+     * @p SelfBuilder must expose `kor::Result<std::unique_ptr<T>> create() const`, which performs
      * one build attempt. A copy of the builder is stored inside the resource so that a poisoned
      * resource can be rebuilt later from the same configuration, once whatever broke it is fixed.
      *
@@ -156,8 +156,8 @@ protected:
      * identity, so refs taken from it stay valid and come good if it is ever repaired.
      */
     template<typename T, typename SelfBuilder>
-    [[nodiscard]] gfx::Resource<T> materialize(const SelfBuilder& self, std::string name) const {
-        gfx::Resource<T> resource;
+    [[nodiscard]] kor::Resource<T> materialize(const SelfBuilder& self, std::string name) const {
+        kor::Resource<T> resource;
 
         if constexpr (SelfBuilder::Recoverable) {
             // Attempt on a copy, and keep it: a retry must be independent of the caller's builder
@@ -168,8 +168,8 @@ protected:
             auto created = attempt->create();
 
             resource = created
-                ? gfx::Resource<T>(std::move(*created), name)
-                : gfx::Resource<T>::failed(std::move(created.error()), name);
+                ? kor::Resource<T>(std::move(*created), name)
+                : kor::Resource<T>::failed(std::move(created.error()), name);
 
             for (const auto& [state, generation] : attempt->_deps) {
                 resource.addDependency(state.lock(), generation);
@@ -186,8 +186,8 @@ protected:
             auto created = self.create();
 
             resource = created
-                ? gfx::Resource<T>(std::move(*created), name)
-                : gfx::Resource<T>::failed(std::move(created.error()), name);
+                ? kor::Resource<T>(std::move(*created), name)
+                : kor::Resource<T>::failed(std::move(created.error()), name);
 
             for (const auto& [state, generation] : self._deps) {
                 resource.addDependency(state.lock(), generation);
@@ -198,7 +198,7 @@ protected:
         // the root cause they have to go and fix. Retries are gated on a dependency actually
         // changing, so this does not become per-frame spam.
         if (resource.poisoned()) {
-            gfx::log::error("Could not build {}:\n{}", name, resource.error()->history());
+            kor::log::error("Could not build {}:\n{}", name, resource.error()->history());
         }
 
         return resource;

@@ -15,7 +15,7 @@
 #include "context.h"
 #include "../../include/window.h"
 
-namespace gfx
+namespace kor
 {
     DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::addBinding(glm::u32 binding, DescriptorType type,
         glm::u32 count)
@@ -47,12 +47,12 @@ namespace gfx
 
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<DescriptorSetLayout> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<DescriptorSetLayout, vk::DescriptorSetLayout>(*this)
+                ? kor::MakeBackendPtr<DescriptorSetLayout, vk::DescriptorSetLayout>(*this)
                 : std::unique_ptr<DescriptorSetLayout>(std::make_unique<DescriptorSetLayout>(*this));
         });
     }
 
-    gfx::Resource<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const
+    kor::Resource<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const
     {
         return materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout");
     }

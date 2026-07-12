@@ -22,10 +22,10 @@
 #include "../backends/vulkan/vulkanContext.h"
 
 
-std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
+std::filesystem::path kor::assetPath(const std::filesystem::path& relativePath)
 {
     // Resolved once, relative to the installed library rather than to whatever machine built it.
-    static const auto roots = detail::dataRoots("assets", "GFX_ASSETS_DIR", ASSETS_PATH);
+    static const auto roots = detail::dataRoots("assets", "KORAL_ASSETS_DIR", ASSETS_PATH);
 
     for (const auto& root : roots) {
         std::error_code ec;
@@ -38,7 +38,7 @@ std::filesystem::path gfx::assetPath(const std::filesystem::path& relativePath)
     return roots.empty() ? relativePath : roots.front() / relativePath;
 }
 
-std::filesystem::path gfx::shaderPath(const std::filesystem::path& relativePath)
+std::filesystem::path kor::shaderPath(const std::filesystem::path& relativePath)
 {
     // Resolve across the registered shader roots (the install roots below, plus any the project
     // added via Shader::addSearchPath); first existing wins.
@@ -52,7 +52,7 @@ std::filesystem::path gfx::shaderPath(const std::filesystem::path& relativePath)
     return roots.empty() ? relativePath : roots.front() / relativePath;
 }
 
-gfx::Window& gfx::Context::Window()
+kor::Window& kor::Context::Window()
 {
     if (_window == nullptr) {
         throw std::runtime_error("No window is linked to the current thread!");
@@ -60,7 +60,7 @@ gfx::Window& gfx::Context::Window()
     return *_window;
 }
 
-const gfx::Scheduler& gfx::Context::Scheduler()
+const kor::Scheduler& kor::Context::Scheduler()
 {
     if (_scheduler == nullptr) {
         throw std::runtime_error("No scheduler is linked to the current thread!");
@@ -68,7 +68,7 @@ const gfx::Scheduler& gfx::Context::Scheduler()
     return *_scheduler;
 }
 
-gfx::ResourceRef<const gfx::Framebuffer> gfx::Context::DefaultFramebuffer()
+kor::ResourceRef<const kor::Framebuffer> kor::Context::DefaultFramebuffer()
 {
     if (_window == nullptr)
     {
@@ -77,7 +77,7 @@ gfx::ResourceRef<const gfx::Framebuffer> gfx::Context::DefaultFramebuffer()
     return _window->getFramebuffer();
 }
 
-ImGuiContext* gfx::Context::GetCurrentImGuiContext()
+ImGuiContext* kor::Context::GetCurrentImGuiContext()
 {
     if (_imguiContext == nullptr) {
         throw std::runtime_error("ImGui context is not initialized for this thread");
@@ -85,45 +85,45 @@ ImGuiContext* gfx::Context::GetCurrentImGuiContext()
     return _imguiContext;
 }
 
-gfx::SwitchAwaiter gfx::Context::SwitchToMainThread() {
+kor::SwitchAwaiter kor::Context::SwitchToMainThread() {
     if (!_mainThreadExecutor) {
         throw std::runtime_error("Main thread executor is not initialized for this thread!");
     }
     return _mainThreadExecutor->SwitchToMainThread();
 }
 
-gfx::SwitchAwaiter gfx::Context::SwitchToBackgroundThread() {
+kor::SwitchAwaiter kor::Context::SwitchToBackgroundThread() {
     if (!_backgroundExecutor) {
         throw std::runtime_error("Background thread executor is not initialized for this thread!");
     }
     return _backgroundExecutor->SwitchToBackground();
 }
 
-void gfx::Context::DrainMainThread() {
+void kor::Context::DrainMainThread() {
     if (!_mainThreadExecutor) {
         throw std::runtime_error("Main thread executor is not initialized for this thread!");
     }
     _mainThreadExecutor->Drain();
 }
 
-gfx::Repository & gfx::Context::Repository() {
+kor::Repository & kor::Context::Repository() {
     if (!_repository) {
         throw std::runtime_error("Resource repository is not initialized for this thread!");
     }
     return *_repository;
 }
 
-gfx::API gfx::Context::activeAPI()
+kor::API kor::Context::activeAPI()
 {
     return _activeAPI;
 }
 
-bool gfx::Context::IsHeadless()
+bool kor::Context::IsHeadless()
 {
     return _headless;
 }
 
-void gfx::Context::InitHeadless(const API api)
+void kor::Context::InitHeadless(const API api)
 {
     if (_window != nullptr)
         throw std::runtime_error("Context::InitHeadless: a window is already active; headless mode is mutually exclusive with a window.");
@@ -139,19 +139,19 @@ void gfx::Context::InitHeadless(const API api)
     // compute/transfer-only instance does not require the WSI surface extensions.
     glfwInit();
 
-    gfx::vk::Context::Init();            // instance + physical/logical device + allocator + descriptor pool
+    kor::vk::Context::Init();            // instance + physical/logical device + allocator + descriptor pool
 
     // Same async machinery as a window: a Job's Initialize() returns a Task and
     // may co_await background work, so the executors must exist even headless.
     _mainThreadExecutor = new MainThreadExecutor();
     _backgroundExecutor = new BackgroundExecutor();
 
-    _repository = new gfx::Repository(); // pipelines register themselves here on build
+    _repository = new kor::Repository(); // pipelines register themselves here on build
                                          // (qualified: Context::Repository() the method shadows the type here)
     _headless = true;
 }
 
-void gfx::Context::ShutdownHeadless()
+void kor::Context::ShutdownHeadless()
 {
     if (!_headless) return;
 
@@ -166,7 +166,7 @@ void gfx::Context::ShutdownHeadless()
     delete _backgroundExecutor;
     _backgroundExecutor = nullptr;
 
-    gfx::vk::Context::Destroy();
+    kor::vk::Context::Destroy();
     glfwTerminate();
     _headless = false;
 }

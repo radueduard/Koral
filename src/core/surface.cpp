@@ -11,11 +11,11 @@
 #include <memory>
 
 
-namespace gfx {
-    std::unique_ptr<gfx::Surface> Surface::Create(const gfx::Window& window) {
+namespace kor {
+    std::unique_ptr<kor::Surface> Surface::Create(const kor::Window& window) {
         switch (window.getAPI()) {
-            case API::eOpenGL: return std::make_unique<gfx::Surface>(window);
-            case API::eVulkan: return std::make_unique<gfx::vk::Surface>(window);
+            case API::eOpenGL: return std::make_unique<kor::Surface>(window);
+            case API::eVulkan: return std::make_unique<kor::vk::Surface>(window);
             default: throw std::runtime_error("Unknown API");
         }
     }

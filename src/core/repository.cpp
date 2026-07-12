@@ -9,7 +9,7 @@
 
 #include "fileWatcher.h"
 
-namespace gfx
+namespace kor
 {
     // Out of line so that resource.h — a public header — does not have to include fileWatcher.h,
     // which is internal. A shipped SDK has no src/ tree, so a public header that reaches into one

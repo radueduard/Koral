@@ -18,9 +18,9 @@
 
 #include "ogl_err_handling.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    DescriptorSet::DescriptorSet(const Builder& builder): gfx::DescriptorSet(builder) {}
+    DescriptorSet::DescriptorSet(const Builder& builder): kor::DescriptorSet(builder) {}
 
     void DescriptorSet::Write(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index) {
         // GL has no persistent descriptor objects: bind() re-issues every write each
@@ -57,7 +57,7 @@ namespace gfx::ogl
         }
     }
 
-    void DescriptorSet::bind(const gfx::CommandBuffer& commandBuffer, glm::u32 index) const
+    void DescriptorSet::bind(const kor::CommandBuffer& commandBuffer, glm::u32 index) const
     {
         const auto& oglCommandBuffer = dynamic_cast<const CommandBuffer&>(commandBuffer);
         const auto& layoutRemappings =  oglCommandBuffer.getRemappingTableForBoundPipeline();

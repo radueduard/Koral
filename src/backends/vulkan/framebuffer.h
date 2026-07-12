@@ -5,9 +5,9 @@
 #pragma once
 #include "../../../include/framebuffer.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class Framebuffer final : public gfx::Framebuffer {
+    class Framebuffer final : public kor::Framebuffer {
     public:
         void Bind() const override;
         void Unbind() const override;

@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace gfx::vk
+namespace kor::vk
 {
 	template <typename U>
 	class Wrapper {

@@ -6,12 +6,12 @@
 #include "image.h"
 #include <imageView.h>
 
-namespace gfx::vk
+namespace kor::vk
 {
     class DescriptorSet;
 
-    class ImageView final : public gfx::ImageView {
-        friend class gfx::vk::DescriptorSet;
+    class ImageView final : public kor::ImageView {
+        friend class kor::vk::DescriptorSet;
     public:
         explicit ImageView(const Builder& builder);
         ~ImageView() override;

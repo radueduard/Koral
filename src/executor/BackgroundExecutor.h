@@ -11,7 +11,7 @@
 
 #include "task.h"
 
-class BackgroundExecutor : public gfx::Executor {
+class BackgroundExecutor : public kor::Executor {
 public:
     explicit BackgroundExecutor(size_t threadCount = std::thread::hardware_concurrency())
         : pool_(threadCount == 0 ? 1 : threadCount) {}
@@ -26,14 +26,14 @@ public:
         pool_.join();   // waits for all pending work and stops worker threads
     }
 
-    struct SwitchAwaiter : gfx::SwitchAwaiter {
-        explicit SwitchAwaiter(BackgroundExecutor* executor) : gfx::SwitchAwaiter(executor) {}
+    struct SwitchAwaiter : kor::SwitchAwaiter {
+        explicit SwitchAwaiter(BackgroundExecutor* executor) : kor::SwitchAwaiter(executor) {}
         bool await_ready()  const noexcept override { return false; }
         void await_resume() const noexcept override {}
     };
 
-    gfx::SwitchAwaiter SwitchToBackground() noexcept {
-        return static_cast<gfx::SwitchAwaiter>(SwitchAwaiter(this));
+    kor::SwitchAwaiter SwitchToBackground() noexcept {
+        return static_cast<kor::SwitchAwaiter>(SwitchAwaiter(this));
     }
 
 private:

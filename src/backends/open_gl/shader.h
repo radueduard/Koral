@@ -12,7 +12,7 @@
 
 #include "../../../include/shader.h"
 
-namespace gfx::ogl {
+namespace kor::ogl {
     // A bindless material-texture array (Vulkan descriptor-indexed `sampler2D[]`).
     // OpenGL can't bind hundreds of textures to units, so these are emitted as
     // GL_ARB_bindless_texture arrays and driven by sampler handles instead. One is
@@ -28,9 +28,9 @@ namespace gfx::ogl {
         GLint location = -1;       // resolved by the pipeline after link (glGetUniformLocation)
     };
 
-    class Shader final : public gfx::Shader {
+    class Shader final : public kor::Shader {
     public:
-        explicit Shader(const gfx::Shader::Builder& createInfo);
+        explicit Shader(const kor::Shader::Builder& createInfo);
         ~Shader() override;
 
         // `pushConstantBinding`, when set, is the UBO binding point the pipeline has

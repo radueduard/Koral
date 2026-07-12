@@ -16,7 +16,7 @@
 #include "resource.h"
 #include "error.h"
 
-namespace gfx
+namespace kor
 {
     class Buffer;
     class FramebufferImage;
@@ -30,7 +30,7 @@ namespace gfx
         e16x = 16,
     };
 
-    class GFX_API Image
+    class KORAL_API Image
     {
     public:
         enum class Type
@@ -149,7 +149,7 @@ namespace gfx
             eDepthStencilAttachment = 1 << 5,
         };
 
-        struct GFX_API Builder : ::Builder {
+        struct KORAL_API Builder : ::Builder {
             bool isPerFrame = false;
             Type type = Type::e2D;
             Format format = Format::eRGBA8_UNORM;
@@ -254,7 +254,7 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Image>> create() const;
-            [[nodiscard]] gfx::Resource<Image> build() const;
+            [[nodiscard]] kor::Resource<Image> build() const;
         };
 
         virtual ~Image() = default;
@@ -281,8 +281,8 @@ namespace gfx
         [[nodiscard]] glm::u32 getMipLevels() const { return _mipLevels; }
         [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }
 
-        [[nodiscard]] static glm::u32 ChannelSizeFromImageFormat(gfx::Image::Format format);
-        [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(gfx::Image::Format format);
+        [[nodiscard]] static glm::u32 ChannelSizeFromImageFormat(kor::Image::Format format);
+        [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(kor::Image::Format format);
 
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
 

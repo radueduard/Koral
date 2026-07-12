@@ -12,7 +12,7 @@
 
 #include "shader.h"
 
-namespace gfx
+namespace kor
 {
     Pipeline::~Pipeline() = default;
 
@@ -56,7 +56,7 @@ namespace gfx
                         auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
                         if (existingDescriptor != descriptor)
                         {
-                            gfx::log::error("Descriptor set layout conflict between shaders in pipeline! Set: {}, Binding: {}, Existing: {{ Type: {}, Name: {}, Count: {} }}, New: {{ Type: {}, Name: {}, Count: {} }}",
+                            kor::log::error("Descriptor set layout conflict between shaders in pipeline! Set: {}, Binding: {}, Existing: {{ Type: {}, Name: {}, Count: {} }}, New: {{ Type: {}, Name: {}, Count: {} }}",
                                 setIndex, binding,
                                 static_cast<glm::u32>(existingDescriptor.type), existingDescriptor.name, existingDescriptor.count,
                                 static_cast<glm::u32>(descriptor.type), descriptor.name, descriptor.count);
@@ -144,7 +144,7 @@ namespace gfx
         if (!_shouldReload) return;
         _shouldReload = false;
         if (auto v = Validate(); !v) {
-            gfx::log::error("Pipeline validation failed during reload: {}", v.error().toString());
+            kor::log::error("Pipeline validation failed during reload: {}", v.error().toString());
             return;
         }
         Teardown();

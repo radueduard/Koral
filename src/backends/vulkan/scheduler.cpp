@@ -15,9 +15,9 @@
 #include "window.h"
 
 
-namespace gfx::vk
+namespace kor::vk
 {
-    Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : gfx::Frame(imageIndex), _queue(queue)
+    Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : kor::Frame(imageIndex), _queue(queue)
     {
         _commandBuffer = Context::Device().requestCommandBuffer(_queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
         _imageAvailable = vk::Context::Device()->createSemaphore({});
@@ -34,11 +34,11 @@ namespace gfx::vk
         _imageAvailable = vk::Context::Device()->createSemaphore({});
     }
 
-    Scheduler::Scheduler(const Builder& createInfo) : gfx::Scheduler(createInfo) {}
+    Scheduler::Scheduler(const Builder& createInfo) : kor::Scheduler(createInfo) {}
 
     void Scheduler::Initialize()
     {
-        _swapChain = gfx::vk::SwapChain::Builder(dynamic_cast<const gfx::vk::Surface&>(gfx::Context::Window().getSurface()))
+        _swapChain = kor::vk::SwapChain::Builder(dynamic_cast<const kor::vk::Surface&>(kor::Context::Window().getSurface()))
             .setMinImageCount(_minImageCount)
             .setImageCount(_imageCount)
             .setMSAA(MSAA::eNone)
@@ -53,9 +53,9 @@ namespace gfx::vk
         Context::Device().freeQueues();
     }
 
-    void Scheduler::Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const {
-        gfx::Scheduler::Draw(renderFunc);
-        const auto& frame = dynamic_cast<const gfx::vk::Frame&>(getCurrentFrame());
+    void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const {
+        kor::Scheduler::Draw(renderFunc);
+        const auto& frame = dynamic_cast<const kor::vk::Frame&>(getCurrentFrame());
 
         const auto& fence = frame.getInFlightFence();
         if (const auto result = Context::Device()->waitForFences(1, &fence, ::vk::True, UINT64_MAX); result != ::vk::Result::eSuccess) {
@@ -66,7 +66,7 @@ namespace gfx::vk
             auto result = _swapChain->Acquire(frame);
             if (result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
                 _started = false;
-                _swapChain->Resize(gfx::Context::Window().getExtent());
+                _swapChain->Resize(kor::Context::Window().getExtent());
                 _started = true;
                 // recreate the semaphore
                 frame.ResetSemaphore();
@@ -80,14 +80,14 @@ namespace gfx::vk
         }
 
         auto& commandBuffer = frame.getCommandBuffer();
-        const auto& vkCommandBuffer = dynamic_cast<gfx::vk::CommandBuffer&>(commandBuffer);
+        const auto& vkCommandBuffer = dynamic_cast<kor::vk::CommandBuffer&>(commandBuffer);
         commandBuffer.Reset();
         commandBuffer.Begin();
         renderFunc(commandBuffer);
         commandBuffer.End();
 
         const SubmitInfo submitInfo {
-            .commandBuffer = dynamic_cast<const gfx::vk::CommandBuffer&>(commandBuffer),
+            .commandBuffer = dynamic_cast<const kor::vk::CommandBuffer&>(commandBuffer),
             .waitSemaphores = { frame.getImageAvailableSemaphore() },
             .waitStages = { ::vk::PipelineStageFlagBits::eColorAttachmentOutput },
             .signalSemaphores = { _swapChain->getCurrentRenderFinishedSemaphore() },
@@ -99,7 +99,7 @@ namespace gfx::vk
         if (const auto result = _swapChain->Present(frame);
             result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
             _started = false;
-            _swapChain->Resize(gfx::Context::Window().getExtent());
+            _swapChain->Resize(kor::Context::Window().getExtent());
             _started = true;
             return;
         }

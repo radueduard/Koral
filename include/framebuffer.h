@@ -15,7 +15,7 @@
 #include "structs.h"
 #include "error.h"
 
-namespace gfx
+namespace kor
 {
     class ImageView;
 
@@ -34,13 +34,13 @@ namespace gfx
         glm::uvec4
     >;
 
-    class GFX_API Framebuffer {
+    class KORAL_API Framebuffer {
     public:
         virtual void Bind() const = 0;
         virtual void Unbind() const = 0;
         [[nodiscard]] bool IsDefault() const { return _isDefault; }
 
-        struct GFX_API ClearValues
+        struct KORAL_API ClearValues
         {
             // One entry per color attachment, appended by addColorAttachment. Starts
             // empty: pre-seeding an entry here shifted every user-supplied clear color
@@ -50,7 +50,7 @@ namespace gfx
             glm::i32 clearStencil = 0;
         };
 
-        struct GFX_API Builder : ::Builder {
+        struct KORAL_API Builder : ::Builder {
             std::vector<std::reference_wrapper<const ImageView>> colorAttachments {};
             std::optional<std::vector<std::reference_wrapper<const ImageView>>> colorResolveAttachments = std::nullopt;
             std::optional<std::reference_wrapper<const ImageView>> depthAttachment = std::nullopt;
@@ -77,7 +77,7 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Framebuffer>> create() const;
-            [[nodiscard]] gfx::Resource<Framebuffer> build() const;
+            [[nodiscard]] kor::Resource<Framebuffer> build() const;
         };
 
         virtual ~Framebuffer() = default;

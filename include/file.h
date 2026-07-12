@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <glm/fwd.hpp>
 
-namespace gfx::utils
+namespace kor::utils
 {
     inline std::string ReadFileAsString(const std::filesystem::path& filePath)
     {

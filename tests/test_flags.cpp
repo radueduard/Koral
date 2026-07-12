@@ -1,10 +1,10 @@
-// Unit tests for gfx::Flags<Enum> — a small type-safe bitset over a scoped enum.
+// Unit tests for kor::Flags<Enum> — a small type-safe bitset over a scoped enum.
 
 #include <gtest/gtest.h>
 
 #include "flags.h"
 
-using gfx::Flags;
+using kor::Flags;
 
 namespace {
 

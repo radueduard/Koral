@@ -12,12 +12,12 @@
 
 #include "vk_wrapper.h"
 
-namespace gfx
+namespace kor
 {
     enum class DescriptorType;
 }
 
-namespace gfx::vk
+namespace kor::vk
 {
     class DescriptorSetLayout;
 
@@ -42,8 +42,8 @@ namespace gfx::vk
         DescriptorPool(const DescriptorPool &) = delete;
         DescriptorPool &operator=(const DescriptorPool &) = delete;
 
-        [[nodiscard]] ::vk::DescriptorSet Allocate(const gfx::vk::DescriptorSetLayout &layout) const;
-        [[nodiscard]] std::vector<::vk::DescriptorSet> Allocate(const std::vector<gfx::vk::DescriptorSetLayout> &layouts) const;
+        [[nodiscard]] ::vk::DescriptorSet Allocate(const kor::vk::DescriptorSetLayout &layout) const;
+        [[nodiscard]] std::vector<::vk::DescriptorSet> Allocate(const std::vector<kor::vk::DescriptorSetLayout> &layouts) const;
         void Free(const ::vk::DescriptorSet &descriptorSet) const;
         void Free(const std::vector<::vk::DescriptorSet> &descriptorSets) const;
         void Reset() const;

@@ -14,7 +14,7 @@
 #include "scheduler.h"
 #include "shader.h"
 
-namespace gfx
+namespace kor
 {
     class Engine
     {

@@ -23,16 +23,16 @@
 #include "imageView.h"
 #include "sampler.h"
 
-using gfx::Buffer;
-using gfx::CommandBuffer;
-using gfx::Descriptor;
-using gfx::DescriptorSet;
-using gfx::DescriptorSetLayout;
-using gfx::DescriptorType;
-using gfx::Image;
-using gfx::ImageView;
-using gfx::ResourceRef;
-using gfx::Sampler;
+using kor::Buffer;
+using kor::CommandBuffer;
+using kor::Descriptor;
+using kor::DescriptorSet;
+using kor::DescriptorSetLayout;
+using kor::DescriptorType;
+using kor::Image;
+using kor::ImageView;
+using kor::ResourceRef;
+using kor::Sampler;
 
 namespace {
 
@@ -41,8 +41,8 @@ namespace {
 TEST_F(GpuTest, SamplerBuildVariants) {
     auto linear =
         Sampler::Builder{}
-            .setMinFilter(gfx::Filter::eLinear)
-            .setMagFilter(gfx::Filter::eLinear)
+            .setMinFilter(kor::Filter::eLinear)
+            .setMagFilter(kor::Filter::eLinear)
             .setMipmapMode(Sampler::MipmapMode::eLinear)
             .setAddressModeU(Sampler::AddressMode::eRepeat)
             .setAddressModeV(Sampler::AddressMode::eMirroredRepeat)
@@ -53,18 +53,18 @@ TEST_F(GpuTest, SamplerBuildVariants) {
 
     auto nearest =
         Sampler::Builder{}
-            .setMinFilter(gfx::Filter::eNearest)
-            .setMagFilter(gfx::Filter::eNearest)
+            .setMinFilter(kor::Filter::eNearest)
+            .setMagFilter(kor::Filter::eNearest)
             .setMipmapMode(Sampler::MipmapMode::eNearest)
             .setAddressModeU(Sampler::AddressMode::eClampToBorder)
             .setCompareEnable(true)
-            .setCompareOp(gfx::CompareOp::eLess)
+            .setCompareOp(kor::CompareOp::eLess)
             .build();
     ASSERT_TRUE(static_cast<bool>(nearest));
 }
 
 // Helper: an 8x8 image with the given usage, plus a default 2D view.
-gfx::Resource<Image> makeImage(gfx::Flags<Image::Usage> usage,
+kor::Resource<Image> makeImage(kor::Flags<Image::Usage> usage,
                                Image::Format format = Image::Format::eRGBA8_UNORM) {
     return Image::Builder{}
         .setType(Image::Type::e2D)
@@ -79,8 +79,8 @@ gfx::Resource<Image> makeImage(gfx::Flags<Image::Usage> usage,
 // arms of the descriptor-set constructor switch, which the compute test (storage
 // buffer only) leaves uncovered.
 TEST_F(GpuTest, DescriptorTypesBuild) {
-    auto sampledImg = makeImage(gfx::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
-    auto storageImg = makeImage(gfx::Flags(Image::Usage::eStorage) | Image::Usage::eTransferDst);
+    auto sampledImg = makeImage(kor::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
+    auto storageImg = makeImage(kor::Flags(Image::Usage::eStorage) | Image::Usage::eTransferDst);
     auto sampledView = ImageView::Builder(ResourceRef<const Image>(sampledImg)).build();
     auto storageView = ImageView::Builder(ResourceRef<const Image>(storageImg)).build();
 
@@ -140,7 +140,7 @@ TEST_F(GpuTest, DescriptorTypesBuild) {
 // at build time), which is a second, separate switch in the backend.
 TEST_F(GpuTest, DescriptorRuntimeWrite) {
     auto sampler = Sampler::Builder{}.build();
-    auto img = makeImage(gfx::Flags(Image::Usage::eStorage) | Image::Usage::eSampled | Image::Usage::eTransferDst);
+    auto img = makeImage(kor::Flags(Image::Usage::eStorage) | Image::Usage::eSampled | Image::Usage::eTransferDst);
     auto view = ImageView::Builder(ResourceRef<const Image>(img)).build();
 
     Buffer::RawBuilder sb;
@@ -240,7 +240,7 @@ TEST_F(GpuTest, GenerateMipmapsRuns) {
 
 // Image-to-image blit (down-scale) between two separate images.
 TEST_F(GpuTest, BlitBetweenImages) {
-    auto src = makeImage(gfx::Flags(Image::Usage::eTransferSrc) | Image::Usage::eTransferDst);
+    auto src = makeImage(kor::Flags(Image::Usage::eTransferSrc) | Image::Usage::eTransferDst);
     auto dst = Image::Builder{}
                    .setType(Image::Type::e2D)
                    .setFormat(Image::Format::eRGBA8_UNORM)
@@ -251,10 +251,10 @@ TEST_F(GpuTest, BlitBetweenImages) {
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(ResourceRef<const Image>(src), glm::vec4{1.f, 1.f, 0.f, 1.f});
-        cb.Blit(ResourceRef<const Image>(src), ResourceRef<const Image>(dst), gfx::Blit{
+        cb.Blit(ResourceRef<const Image>(src), ResourceRef<const Image>(dst), kor::Blit{
             .srcExtent = {8, 8, 1},
             .dstExtent = {4, 4, 1},
-            .filtering = gfx::Filter::eLinear,
+            .filtering = kor::Filter::eLinear,
         });
     }, CommandBuffer::Usage::eGraphics);
     SUCCEED();
@@ -296,21 +296,21 @@ TEST_F(GpuTest, ResolveMultisampleToSingle) {
                     .setType(Image::Type::e2D)
                     .setFormat(Image::Format::eRGBA8_UNORM)
                     .setExtent(glm::uvec2{8, 8})
-                    .setSampleCount(gfx::SampleCount::e4)
+                    .setSampleCount(kor::SampleCount::e4)
                     .addUsage(Image::Usage::eColorAttachment)
                     .addUsage(Image::Usage::eTransferSrc)
                     .build();
     ASSERT_TRUE(static_cast<bool>(msaa));
 
-    auto single = makeImage(gfx::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
+    auto single = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         // Give the MSAA image a defined layout/content via a render clear.
         auto view = ImageView::Builder(ResourceRef<const Image>(msaa)).build();
-        auto fb = gfx::Framebuffer::Builder{}
+        auto fb = kor::Framebuffer::Builder{}
                       .addColorAttachment(ResourceRef<const ImageView>(view), glm::vec4{0.2f, 0.4f, 0.6f, 1.f})
                       .build();
-        cb.BeginRendering(ResourceRef<const gfx::Framebuffer>(fb));
+        cb.BeginRendering(ResourceRef<const kor::Framebuffer>(fb));
         cb.EndRendering();
         cb.Resolve(ResourceRef<const Image>(msaa), ResourceRef<const Image>(single));
     }, CommandBuffer::Usage::eGraphics);
@@ -347,26 +347,26 @@ TEST_F(GpuTest, CopyValidationBranches) {
 
     // mip level out of range
     expectReject([&](CommandBuffer& cb) {
-        cb.CopyBufferToImage(ResourceRef<const Buffer>(buf), ResourceRef<const Image>(image), gfx::Copy{ .imageMipLevel = 5 });
+        cb.CopyBufferToImage(ResourceRef<const Buffer>(buf), ResourceRef<const Image>(image), kor::Copy{ .imageMipLevel = 5 });
     });
     // base array layer out of range
     expectReject([&](CommandBuffer& cb) {
-        cb.CopyBufferToImage(ResourceRef<const Buffer>(buf), ResourceRef<const Image>(image), gfx::Copy{ .imageBaseArrayLayer = 4 });
+        cb.CopyBufferToImage(ResourceRef<const Buffer>(buf), ResourceRef<const Image>(image), kor::Copy{ .imageBaseArrayLayer = 4 });
     });
     // buffer row length smaller than the image extent
     expectReject([&](CommandBuffer& cb) {
-        cb.CopyBufferToImage(ResourceRef<const Buffer>(buf), ResourceRef<const Image>(image), gfx::Copy{ .bufferRowLength = 2, .imageExtent = {8, 8, 1} });
+        cb.CopyBufferToImage(ResourceRef<const Buffer>(buf), ResourceRef<const Image>(image), kor::Copy{ .bufferRowLength = 2, .imageExtent = {8, 8, 1} });
     });
     // buffer offset past the end of the buffer
     expectReject([&](CommandBuffer& cb) {
-        cb.CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(buf), gfx::Copy{ .bufferOffset = 999999 });
+        cb.CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(buf), kor::Copy{ .bufferOffset = 999999 });
     });
 }
 
 // Debug-label commands (scoped + single markers). No-ops without a debugger, but
 // they still record and must not fail the command buffer.
 TEST_F(GpuTest, DebugLabelsRecord) {
-    auto image = makeImage(gfx::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
+    auto image = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginDebugLabel("outer", glm::vec4{1.f, 0.f, 0.f, 1.f});
         cb.InsertDebugLabel("marker");

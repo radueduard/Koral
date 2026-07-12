@@ -31,22 +31,22 @@
 #include "pipeline.h"
 #include "shader.h"
 
-namespace gfx
+namespace kor
 {
     class Framebuffer;
     class Shader;
     class CommandBuffer;
 
-    struct GFX_API TessellationState
+    struct KORAL_API TessellationState
     {
-        gfx::ResourceRef<const Shader> controlShader;
-        gfx::ResourceRef<const Shader> evalShader;
+        kor::ResourceRef<const Shader> controlShader;
+        kor::ResourceRef<const Shader> evalShader;
         glm::u32 patchControlPoints = 3;
     };
 
-    struct GFX_API ColorBlendState
+    struct KORAL_API ColorBlendState
     {
-        struct GFX_API AttachmentState
+        struct KORAL_API AttachmentState
         {
             bool blendEnable = false;
             BlendFactor srcColorBlendFactor = BlendFactor::eOne;
@@ -64,21 +64,21 @@ namespace gfx
         float blendConstants[4] = { 0.f, 0.f, 0.f, 0.f };
     };
 
-    class GFX_API GraphicsPipeline : public Pipeline
+    class KORAL_API GraphicsPipeline : public Pipeline
     {
     public:
-        struct GFX_API Builder : ::Builder {
+        struct KORAL_API Builder : ::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
 
-            std::optional<gfx::ResourceRef<const Shader>> vertexShader = std::nullopt;
+            std::optional<kor::ResourceRef<const Shader>> vertexShader = std::nullopt;
             std::optional<TessellationState> tessellationState = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> geometryShader = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> fragmentShader = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> taskShader = std::nullopt;
-            std::optional<gfx::ResourceRef<const Shader>> meshShader = std::nullopt;
-            std::optional<gfx::ResourceRef<Framebuffer>> framebuffer = std::nullopt;
+            std::optional<kor::ResourceRef<const Shader>> geometryShader = std::nullopt;
+            std::optional<kor::ResourceRef<const Shader>> fragmentShader = std::nullopt;
+            std::optional<kor::ResourceRef<const Shader>> taskShader = std::nullopt;
+            std::optional<kor::ResourceRef<const Shader>> meshShader = std::nullopt;
+            std::optional<kor::ResourceRef<Framebuffer>> framebuffer = std::nullopt;
             std::vector<VertexInputAttributeDescription> vertexAttributeDescriptions = {};
             std::vector<VertexInputBindingDescription> vertexBindingDescriptions = {};
             InputAssemblyState inputAssemblyState = {};
@@ -89,7 +89,7 @@ namespace gfx
 
             Builder& setVertexShader(ResourceRef<const Shader> shader);
 
-            template <gfx::MeshType T>
+            template <kor::MeshType T>
             Builder& setVertexShader(ResourceRef<const Shader> shader)
             {
                 this->vertexShader = shader;
@@ -108,7 +108,7 @@ namespace gfx
             Builder& setMultisampleState(const MultisampleState& multisampleState);
             Builder& setDepthStencilState(const DepthStencilState& depthStencilState);
             Builder& setColorBlendState(const ColorBlendState& colorBlendState);
-            Builder& setFramebuffer(gfx::ResourceRef<Framebuffer> framebuffer);
+            Builder& setFramebuffer(kor::ResourceRef<Framebuffer> framebuffer);
 
             // Bakes a specialization constant into every shader stage of this pipeline.
             // Mirrors ComputePipeline::Builder: stages that don't declare a constant with
@@ -130,7 +130,7 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<GraphicsPipeline>> create() const;
-            [[nodiscard]] gfx::Resource<GraphicsPipeline> build() const;
+            [[nodiscard]] kor::Resource<GraphicsPipeline> build() const;
 
         private:
             glm::u32 currentSpecConstantSize = 0;
@@ -169,15 +169,15 @@ namespace gfx
 
         VoidResult Validate() override;
 
-        std::optional<gfx::ResourceRef<const Shader>> _vertexShader;
+        std::optional<kor::ResourceRef<const Shader>> _vertexShader;
         std::optional<TessellationState> _tessellationState;
-        std::optional<gfx::ResourceRef<const Shader>> _geometryShader;
-        std::optional<gfx::ResourceRef<const Shader>> _fragmentShader;
+        std::optional<kor::ResourceRef<const Shader>> _geometryShader;
+        std::optional<kor::ResourceRef<const Shader>> _fragmentShader;
 
-        std::optional<gfx::ResourceRef<const Shader>> _taskShader;
-        std::optional<gfx::ResourceRef<const Shader>> _meshShader;
+        std::optional<kor::ResourceRef<const Shader>> _taskShader;
+        std::optional<kor::ResourceRef<const Shader>> _meshShader;
 
-        gfx::ResourceRef<const Framebuffer> _framebuffer;
+        kor::ResourceRef<const Framebuffer> _framebuffer;
 
         InputAssemblyState _inputAssemblyState;
         RasterizationState _rasterizationState;

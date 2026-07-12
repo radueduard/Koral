@@ -14,19 +14,19 @@
 #include "error.h"
 #include "builder.h"
 
-namespace gfx
+namespace kor
 {
-    class GFX_API DescriptorSetLayout
+    class KORAL_API DescriptorSetLayout
     {
     public:
-        class GFX_API Builder : public ::Builder
+        class KORAL_API Builder : public ::Builder
         {
             friend class DescriptorSetLayout;
         public:
             Builder& addBinding(glm::u32 binding, DescriptorType type, glm::u32 count = 1);
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<DescriptorSetLayout>> create() const;
-            [[nodiscard]] gfx::Resource<DescriptorSetLayout> build() const;
+            [[nodiscard]] kor::Resource<DescriptorSetLayout> build() const;
         private:
             std::map<glm::u32, std::pair<DescriptorType, glm::u32>> _bindings;
             std::optional<Error> _error;

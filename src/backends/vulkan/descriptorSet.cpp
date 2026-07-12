@@ -20,11 +20,11 @@
 #include <descriptorSetLayout.h>
 #include <scheduler.h>
 
-namespace gfx::vk
+namespace kor::vk
 {
-    DescriptorSet::DescriptorSet(const Builder& builder) : gfx::DescriptorSet(builder)
+    DescriptorSet::DescriptorSet(const Builder& builder) : kor::DescriptorSet(builder)
     {
-        const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+        const auto frameCount = _isPerFrame ? kor::Context::Scheduler().getImageCount() : 1;
         for (size_t i = 0; i < frameCount; ++i) {
             _descriptorSets.emplace_back(Context::DescriptorPool().Allocate(dynamic_cast<const DescriptorSetLayout&>(*_layout)));
         }
@@ -56,7 +56,7 @@ namespace gfx::vk
                     switch (type) {
                     case DescriptorType::eUniformBuffer:
                         {
-                            const auto& vkBuffer = dynamic_cast<const gfx::vk::Buffer&>(descriptor.getBuffer());
+                            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(descriptor.getBuffer());
                             const auto& bufferHandle = vkBuffer.isPerFrame() ? vkBuffer[frame] : vkBuffer[0];
                             const auto& bufferInfo = bufferInfos.emplace_back()
                                 .setBuffer(bufferHandle)
@@ -186,7 +186,7 @@ namespace gfx::vk
 
     void DescriptorSet::Write(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index)
     {
-        const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+        const auto frameCount = _isPerFrame ? kor::Context::Scheduler().getImageCount() : 1;
         for (int frame = 0; frame < frameCount; ++frame) {
             const auto type = _layout->getBindingType(binding);
             std::vector<::vk::WriteDescriptorSet> writes;
@@ -308,14 +308,14 @@ namespace gfx::vk
     }
 
     void DescriptorSet::DebugPrint() const {
-        gfx::DescriptorSet::DebugPrint();
-        const auto frame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        kor::DescriptorSet::DebugPrint();
+        const auto frame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         std::cout << "Current Vulkan descriptor set handle: " << _descriptorSets[frame] << std::endl;
     }
 
     ::vk::DescriptorSet DescriptorSet::operator*() const
     {
-        const auto frameIndex = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto frameIndex = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         return _descriptorSets[frameIndex];
     }
 }

@@ -19,14 +19,14 @@
 #include "resource.h"
 #include "shader.h"
 
-namespace gfx
+namespace kor
 {
     class Shader;
     class CommandBuffer;
 
-    class GFX_API ComputePipeline : public Pipeline {
+    class KORAL_API ComputePipeline : public Pipeline {
     public:
-        struct GFX_API Builder : ::Builder {
+        struct KORAL_API Builder : ::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
@@ -48,7 +48,7 @@ namespace gfx
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<ComputePipeline>> create() const;
-            [[nodiscard]] gfx::Resource<ComputePipeline> build() const;
+            [[nodiscard]] kor::Resource<ComputePipeline> build() const;
 
             std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));

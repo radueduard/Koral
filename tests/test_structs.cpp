@@ -5,7 +5,7 @@
 
 #include "structs.h"
 
-using namespace gfx;
+using namespace kor;
 
 namespace {
 

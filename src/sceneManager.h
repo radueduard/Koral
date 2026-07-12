@@ -21,11 +21,11 @@
 #endif
 
 
-using CreateSceneFn = gfx::Scene*(*)();
-using CreateJobFn = gfx::Job*(*)();
-using CreateConfigFn = gfx::ProjectConfig*(*)();
+using CreateSceneFn = kor::Scene*(*)();
+using CreateJobFn = kor::Job*(*)();
+using CreateConfigFn = kor::ProjectConfig*(*)();
 
-namespace gfx
+namespace kor
 {
     class SceneManager
     {

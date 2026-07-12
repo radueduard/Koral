@@ -12,27 +12,27 @@
 #include "buffer.h"
 #include "ogl_err_handling.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    GLenum GetTargetFromImageType(const gfx::Image::Type type, const gfx::MSAA msaa, const glm::u32 arrayLayers)
+    GLenum GetTargetFromImageType(const kor::Image::Type type, const kor::MSAA msaa, const glm::u32 arrayLayers)
     {
         switch (type) {
-        case gfx::Image::Type::e1D:
+        case kor::Image::Type::e1D:
             return arrayLayers == 1 ? GL_TEXTURE_1D : GL_TEXTURE_1D_ARRAY;
-        case gfx::Image::Type::e2D:
+        case kor::Image::Type::e2D:
             if (arrayLayers == 1) {
-                return msaa == gfx::MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
+                return msaa == kor::MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
             } else {
-                return msaa == gfx::MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+                return msaa == kor::MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
             }
-        case gfx::Image::Type::e3D:
+        case kor::Image::Type::e3D:
             return GL_TEXTURE_3D;
         default:
             throw std::runtime_error("Unsupported image type!");
         }
     }
 
-    Image::Image(const gfx::Image::Builder& createInfo) : gfx::Image(createInfo)
+    Image::Image(const kor::Image::Builder& createInfo) : kor::Image(createInfo)
     {
         if (createInfo.msaa != MSAA::eNone && createInfo.type != Type::e2D) {
             std::cerr << "Error: Multisampled images are only supported for 2D images! Attempting to create a multisampled image with type " << magic_enum::enum_name(createInfo.type) << std::endl;
@@ -78,23 +78,23 @@ namespace gfx::ogl
         // Set image format
         const GLenum internalFormat = InternalFormatFromImageFormat(createInfo.format);
 
-        if (createInfo.type == gfx::Image::Type::e1D && createInfo.arrayLayers == 1) {
+        if (createInfo.type == kor::Image::Type::e1D && createInfo.arrayLayers == 1) {
             glTexStorage1D(target, _mipLevels, internalFormat, createInfo.extent.x);
-        } else if (createInfo.type == gfx::Image::Type::e1D && createInfo.arrayLayers > 1) {
+        } else if (createInfo.type == kor::Image::Type::e1D && createInfo.arrayLayers > 1) {
             glTexStorage2D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.arrayLayers);
-        } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers == 1) {
-            if (createInfo.msaa == gfx::MSAA::eNone) {
+        } else if (createInfo.type == kor::Image::Type::e2D && createInfo.arrayLayers == 1) {
+            if (createInfo.msaa == kor::MSAA::eNone) {
                 glTexStorage2D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y);
             } else {
                 glTexStorage2DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, GL_TRUE);
             }
-        } else if (createInfo.type == gfx::Image::Type::e2D && createInfo.arrayLayers > 1) {
-            if (createInfo.msaa == gfx::MSAA::eNone) {
+        } else if (createInfo.type == kor::Image::Type::e2D && createInfo.arrayLayers > 1) {
+            if (createInfo.msaa == kor::MSAA::eNone) {
                 glTexStorage3D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers);
             } else {
                 glTexStorage3DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers, GL_TRUE);
             }
-        } else if (createInfo.type == gfx::Image::Type::e3D) {
+        } else if (createInfo.type == kor::Image::Type::e3D) {
             glTexStorage3D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.extent.z);
         }
 
@@ -152,7 +152,7 @@ namespace gfx::ogl
         }
     }
 
-    GLenum Image::InternalFormatFromImageFormat(const gfx::Image::Format format)
+    GLenum Image::InternalFormatFromImageFormat(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -294,7 +294,7 @@ namespace gfx::ogl
         }
     }
 
-    GLenum Image::DataTypeFromImageFormat(gfx::Image::Format format)
+    GLenum Image::DataTypeFromImageFormat(kor::Image::Format format)
     {
         switch (format)
         {

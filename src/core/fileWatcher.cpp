@@ -8,9 +8,9 @@
 
 #include "context.h"
 
-gfx::Task<void> gfx::FileWatcher::Run()
+kor::Task<void> kor::FileWatcher::Run()
 {
-    co_await gfx::Context::SwitchToBackgroundThread();
+    co_await kor::Context::SwitchToBackgroundThread();
     co_return []
     {
         while (!_stopped)
@@ -47,7 +47,7 @@ gfx::Task<void> gfx::FileWatcher::Run()
     } ();
 }
 
-void gfx::FileWatcher::Stop()
+void kor::FileWatcher::Stop()
 {
     _stopped = true;
     for (const auto trackedFiles = _trackedFiles; const auto& filePath : trackedFiles)
@@ -56,7 +56,7 @@ void gfx::FileWatcher::Stop()
     }
 }
 
-void gfx::FileWatcher::TrackFile(const std::filesystem::path& filePath, const std::function<void()>& callback)
+void kor::FileWatcher::TrackFile(const std::filesystem::path& filePath, const std::function<void()>& callback)
 {
     std::error_code ec;
     const auto lastWriteTime = std::filesystem::last_write_time(filePath, ec);
@@ -67,7 +67,7 @@ void gfx::FileWatcher::TrackFile(const std::filesystem::path& filePath, const st
     _callbacks[filePath].push_back(callback);
 }
 
-void gfx::FileWatcher::UntrackFile(const std::filesystem::path& filePath)
+void kor::FileWatcher::UntrackFile(const std::filesystem::path& filePath)
 {
     std::scoped_lock lock(_mutex);
     _trackedFiles.erase(filePath);

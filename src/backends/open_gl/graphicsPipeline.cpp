@@ -12,7 +12,7 @@
 #include "ogl_err_handling.h"
 #include "shader.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
     GLenum toGLPolygonMode(const PolygonMode mode) {
         switch (mode) {
@@ -103,7 +103,7 @@ namespace gfx::ogl
         }
     }
 
-    GraphicsPipeline::GraphicsPipeline(const Builder& createInfo): gfx::GraphicsPipeline(createInfo)
+    GraphicsPipeline::GraphicsPipeline(const Builder& createInfo): kor::GraphicsPipeline(createInfo)
     {
         Setup();
     }
@@ -113,7 +113,7 @@ namespace gfx::ogl
         Teardown();
     }
 
-    void GraphicsPipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    void GraphicsPipeline::Bind(const kor::CommandBuffer& commandBuffer) const
     {
         glUseProgram(_id);
         glCheckError();

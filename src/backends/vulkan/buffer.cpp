@@ -14,7 +14,7 @@
 #include "vk_enum_conversions.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
 	// static ::vk::DeviceSize GetAlignment(const ::vk::DeviceSize size, const ::vk::DeviceSize alignment) {
 	// 	if (alignment > 0) {
@@ -23,7 +23,7 @@ namespace gfx::vk
 	// 	return size;
 	// }
 
-	Buffer::Buffer(const RawBuilder& builder) : gfx::Buffer(builder) {
+	Buffer::Buffer(const RawBuilder& builder) : kor::Buffer(builder) {
 		VmaMemoryUsage memoryUsage = VMA_MEMORY_USAGE_UNKNOWN;
 		VmaAllocationCreateFlags flags = 0;
 		switch (_type) {
@@ -50,7 +50,7 @@ namespace gfx::vk
 			.setSharingMode(::vk::SharingMode::eExclusive);
 
 
-		const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+		const auto frameCount = _isPerFrame ? kor::Context::Scheduler().getImageCount() : 1;
 		for (int i = 0; i < frameCount; ++i)
 		{
 			auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
@@ -95,7 +95,7 @@ namespace gfx::vk
 
 	::vk::Buffer Buffer::operator*() const
 	{
-		return _buffers[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
+		return _buffers[_isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
 
 	glm::u64 Buffer::getDeviceAddress() const
@@ -105,12 +105,12 @@ namespace gfx::vk
 	}
 
 	::vk::AccessFlags Buffer::getAccessMask() const {
-		const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
 		return _accessFlags[currentFrame];
 	}
 
 	void Buffer::setAccessMask(const ::vk::AccessFlags access) const {
-		const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
 		_accessFlags[currentFrame] = access;
 	}
 
@@ -123,7 +123,7 @@ namespace gfx::vk
 
 	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
 	void Buffer::automaticUpdate() {
-		const auto currentFrame = gfx::Context::Scheduler().getCurrentImageIndex();
+		const auto currentFrame = kor::Context::Scheduler().getCurrentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
 
@@ -149,7 +149,7 @@ namespace gfx::vk
 		}
 
 		auto dstBuffer = _buffers[currentFrame];
-		Context::Device().runSingleTimeCommand([dstBuffer, &copyRegionsPerBuffer](const gfx::vk::CommandBuffer& commandBuffer) {
+		Context::Device().runSingleTimeCommand([dstBuffer, &copyRegionsPerBuffer](const kor::vk::CommandBuffer& commandBuffer) {
 			for (const auto&[srcBuffer, copyRegions] : copyRegionsPerBuffer) {
 				commandBuffer->copyBuffer(srcBuffer, dstBuffer, static_cast<uint32_t>(copyRegions.size()), copyRegions.data());
 			}
@@ -157,6 +157,6 @@ namespace gfx::vk
 	}
 
 	VmaAllocation Buffer::getAllocation() const {
-		return  _allocations[_isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0];
+		return  _allocations[_isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0];
 	}
 }

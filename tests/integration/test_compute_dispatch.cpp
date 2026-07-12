@@ -21,13 +21,13 @@
 #include "descriptorSet.h"
 #include "shader.h"
 
-using gfx::Buffer;
-using gfx::CommandBuffer;
-using gfx::ComputePipeline;
-using gfx::Descriptor;
-using gfx::DescriptorSet;
-using gfx::ResourceRef;
-using gfx::Shader;
+using kor::Buffer;
+using kor::CommandBuffer;
+using kor::ComputePipeline;
+using kor::Descriptor;
+using kor::DescriptorSet;
+using kor::ResourceRef;
+using kor::Shader;
 
 namespace {
 
@@ -53,7 +53,7 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
         Shader::Builder{}
             .setLang<Shader::Lang::eGLSL>()
             .setStage(Shader::Stage::eCompute)
-            .setPath(gfx::shaderPath("doubleValues.comp.glsl"))
+            .setPath(kor::shaderPath("doubleValues.comp.glsl"))
             .getOrBuild("test.doubleValues");
 
     ComputePipeline::Builder pipeBuilder;
@@ -62,7 +62,7 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
 
     // --- descriptor set: bind the storage buffer at set 0, binding 0 ------
     auto descriptorSet =
-        DescriptorSet::Builder(gfx::ResourceRef<const gfx::Pipeline>(pipeline), 0)
+        DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
             .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
             .build();
 
@@ -72,10 +72,10 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
         cb.BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
         cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
         // Make the uploaded data visible to the compute shader...
-        cb.BufferBarrier(gfx::BufferBarrier(bufRef, gfx::ResourceAccess::ComputeReadWrite));
+        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::ComputeReadWrite));
         cb.Dispatch(kCount / kLocalSize, 1, 1);
         // ...and make the shader's writes available to the subsequent readback copy.
-        cb.BufferBarrier(gfx::BufferBarrier(bufRef, gfx::ResourceAccess::TransferSrc));
+        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::TransferSrc));
     }, CommandBuffer::Usage::eCompute);
 
     // --- verify -----------------------------------------------------------

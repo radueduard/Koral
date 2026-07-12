@@ -14,9 +14,9 @@
 
 #include "context.h"
 
-namespace gfx
+namespace kor
 {
-    gfx::Result<std::unique_ptr<Image>> Image::Builder::create() const
+    kor::Result<std::unique_ptr<Image>> Image::Builder::create() const
     {
         beginAttempt();
 
@@ -27,24 +27,24 @@ namespace gfx
             return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // Construct and (optionally) upload inside guard(): any backend exception becomes a
-        // gfx::Error, and a staging-buffer failure is re-thrown with its own cause attached.
+        // kor::Error, and a staging-buffer failure is re-thrown with its own cause attached.
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Image> {
         // The object, not a Resource: materialize() builds the owning Resource around it. The
         // upload below needs a ResourceRef, so it takes an unsafe (untracked) one — sound here
         // because the image cannot outlive this scope before we hand it over.
         std::unique_ptr<Image> image = (api == API::eVulkan)
-            ? gfx::MakeBackendPtr<Image, vk::Image>(*this)
-            : gfx::MakeBackendPtr<Image, ogl::Image>(*this);
+            ? kor::MakeBackendPtr<Image, vk::Image>(*this)
+            : kor::MakeBackendPtr<Image, ogl::Image>(*this);
 
         const auto imageRef = ResourceRef<const Image>(image.get());
 
         // Upload initial pixel data, if any was supplied via setData(). Uses the same
         // staging-buffer + copy path as the importer, so it works on both backends.
         if (!data.empty()) {
-            const auto staging = gfx::Buffer::Builder<std::byte>()
+            const auto staging = kor::Buffer::Builder<std::byte>()
                 .setDataView(std::span<const std::byte>(data))
-                .setUsage(gfx::Buffer::Usage::eTransferSrc)
-                .setType(gfx::Buffer::Type::eStaging)
+                .setUsage(kor::Buffer::Usage::eTransferSrc)
+                .setType(kor::Buffer::Type::eStaging)
                 .build();
 
             // The staging buffer is an internal detail of the upload, so its failure is *our*
@@ -57,7 +57,7 @@ namespace gfx
             }
 
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                commandBuffer.CopyBufferToImage(staging, imageRef, gfx::Copy {
+                commandBuffer.CopyBufferToImage(staging, imageRef, kor::Copy {
                     .imageBaseArrayLayer = 0,
                     .imageLayerCount = image->getArrayLayers(),
                     .imageMipLevel = 0,
@@ -82,12 +82,12 @@ namespace gfx
     }
 
 
-    gfx::Resource<Image> Image::Builder::build() const
+    kor::Resource<Image> Image::Builder::build() const
     {
         return materialize<Image>(*this, "Image");
     }
 
-    glm::u32 Image::ChannelSizeFromImageFormat(const gfx::Image::Format format)
+    glm::u32 Image::ChannelSizeFromImageFormat(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -165,7 +165,7 @@ namespace gfx
         }
     }
 
-    glm::u32 Image::ChannelCountFromImageFormat(const gfx::Image::Format format)
+    glm::u32 Image::ChannelCountFromImageFormat(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -272,4 +272,4 @@ namespace gfx
             return false;
         }
     }
-} // gfx
+} // Koral

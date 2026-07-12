@@ -2,7 +2,7 @@
 // Created by radue on 28.06.2026.
 //
 
-// Umbrella header for the gfx framework: including this pulls in the whole
+// Umbrella header for the Koral framework: including this pulls in the whole
 // public API. Individual headers can still be included directly if you prefer
 // to keep translation units lean.
 

@@ -14,7 +14,7 @@
 
 #include "task.h"
 
-namespace gfx
+namespace kor
 {
 
     class FileWatcher

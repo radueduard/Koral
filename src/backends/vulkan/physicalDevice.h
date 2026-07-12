@@ -7,9 +7,9 @@
 #include "vk_wrapper.h"
 #include <vulkan/vulkan.hpp>
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class PhysicalDevice final : public gfx::vk::Wrapper<::vk::PhysicalDevice>
+    class PhysicalDevice final : public kor::vk::Wrapper<::vk::PhysicalDevice>
     {
     public:
         explicit PhysicalDevice(::vk::PhysicalDevice physicalDevice);

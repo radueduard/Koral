@@ -8,8 +8,8 @@ for CI and fast (<1s).
 
 | File                       | Unit under test        | Focus |
 |----------------------------|------------------------|-------|
-| `test_tlsf_allocator.cpp`  | `gfx::TLSFAllocator`   | alloc/free, splitting, coalescing, accounting, OOM, a randomized no-overlap stress test |
-| `test_flags.cpp`           | `gfx::Flags<Enum>`     | bit set/test/combine/mask, equality, conversions |
+| `test_tlsf_allocator.cpp`  | `kor::TLSFAllocator`   | alloc/free, splitting, coalescing, accounting, OOM, a randomized no-overlap stress test |
+| `test_flags.cpp`           | `kor::Flags<Enum>`     | bit set/test/combine/mask, equality, conversions |
 | `test_error.cpp`           | `error.h` / `error.cpp`| `describe()` completeness, `Error::toString()`, `fail()`, `guard()`, `Result::valueOrThrow`, cause chains (`history()`, `root()`, `causedBy()`) |
 | `test_structs.cpp`         | `structs.h`            | `sizeofChannelType()`, default pipeline-state values |
 | `test_mesh_layout.cpp`     | `meshLayout.h`         | std430 alignment, `ParamVertex` stride/offsets, `FindPositionAttribute` |
@@ -21,16 +21,16 @@ for CI and fast (<1s).
 Tests build by default. Disable with `-DGFX_BUILD_TESTS=OFF`.
 
 ```sh
-cmake --build cmake-build-debug --target gfx_tests
+cmake --build cmake-build-debug --target koral_tests
 ctest --test-dir cmake-build-debug            # or:
-./cmake-build-debug/tests/gfx_tests           # gtest runner directly
+./cmake-build-debug/tests/koral_tests           # gtest runner directly
 ```
 
 ## GPU integration tests (`integration/`)
 
-A second binary, `gfx_integration_tests`, exercises the real GPU paths (VMA
+A second binary, `koral_integration_tests`, exercises the real GPU paths (VMA
 allocation, staging, transfer/compute queues, `SingleTimeCommand` submit/fence).
-It brings up a **device-only headless context** via `gfx::Context::InitHeadless()`
+It brings up a **device-only headless context** via `kor::Context::InitHeadless()`
 — no window, surface or swap chain — so it runs anywhere a Vulkan device exists,
 **no display required** (CI-friendly). The harness (`GpuEnvironment`) inits once
 for the whole binary; tests derive from `GpuTest`, which **skips** them if no

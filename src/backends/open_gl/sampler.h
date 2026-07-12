@@ -7,12 +7,12 @@
 
 #include <sampler.h>
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    class Sampler final : public gfx::Sampler
+    class Sampler final : public kor::Sampler
     {
     public:
-        explicit Sampler(const gfx::Sampler::Builder& createInfo);
+        explicit Sampler(const kor::Sampler::Builder& createInfo);
         ~Sampler() override;
 
         GLuint operator*() const { return _id; }

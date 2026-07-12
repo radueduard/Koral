@@ -9,7 +9,7 @@
 #include <framebuffer.h>
 #include <surface.h>
 
-namespace gfx::vk
+namespace kor::vk
 {
     void Framebuffer::Bind() const
     {
@@ -22,10 +22,10 @@ namespace gfx::vk
     Framebuffer::Framebuffer()
     {
         _isDefault = true;
-        _extent = gfx::Context::Window().getExtent();
+        _extent = kor::Context::Window().getExtent();
 
         // Default framebuffer has one color attachment which is the swap chain image, and one depth stencil attachment which is the depth image of the swap chain.
-        const auto& scheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
+        const auto& scheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
 
         auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
         auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
@@ -38,16 +38,16 @@ namespace gfx::vk
         _clearValues.clearStencil = 0;
     }
 
-    Framebuffer::Framebuffer(const Framebuffer::Builder& builder) : gfx::Framebuffer(builder) {}
+    Framebuffer::Framebuffer(const Framebuffer::Builder& builder) : kor::Framebuffer(builder) {}
     Framebuffer::~Framebuffer() = default;
 
     void Framebuffer::Resize(const glm::uvec2& newExtent) const
     {
-        gfx::Framebuffer::Resize(newExtent);
+        kor::Framebuffer::Resize(newExtent);
 
         if (_isDefault)
         {
-            const auto& scheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
+            const auto& scheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
             auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
             auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
 

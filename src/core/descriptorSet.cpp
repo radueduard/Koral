@@ -21,7 +21,7 @@
 #include "imageView.h"
 
 
-namespace gfx
+namespace kor
 {
     // The constructors no longer throw: an invalid input flips `valid` to false and
     // records the reason in `_error`, which DescriptorSet::Builder::build() surfaces.
@@ -94,11 +94,11 @@ namespace gfx
 
     const Buffer & Descriptor::getBuffer() const {
         if (!valid) {
-            gfx::log::error("Attempted to get buffer from an invalid descriptor!");
+            kor::log::error("Attempted to get buffer from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         if (!std::holds_alternative<BufferDescriptor>(_descriptor)) {
-            gfx::log::error("Attempted to get buffer from a descriptor that does not hold a buffer!");
+            kor::log::error("Attempted to get buffer from a descriptor that does not hold a buffer!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         return *std::get<BufferDescriptor>(_descriptor)._buffer;
@@ -106,11 +106,11 @@ namespace gfx
 
     glm::i64 Descriptor::getOffset() const {
         if (!valid) {
-            gfx::log::error("Attempted to get offset from an invalid descriptor!");
+            kor::log::error("Attempted to get offset from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         if (!std::holds_alternative<BufferDescriptor>(_descriptor)) {
-            gfx::log::error("Attempted to get offset from a descriptor that does not hold a buffer!");
+            kor::log::error("Attempted to get offset from a descriptor that does not hold a buffer!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         return std::get<BufferDescriptor>(_descriptor)._offset;
@@ -118,11 +118,11 @@ namespace gfx
 
     glm::i64 Descriptor::getRange() const {
         if (!valid) {
-            gfx::log::error("Attempted to get range from an invalid descriptor!");
+            kor::log::error("Attempted to get range from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         if (!std::holds_alternative<BufferDescriptor>(_descriptor)) {
-            gfx::log::error("Attempted to get range from a descriptor that does not hold a buffer!");
+            kor::log::error("Attempted to get range from a descriptor that does not hold a buffer!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         return std::get<BufferDescriptor>(_descriptor)._range;
@@ -130,7 +130,7 @@ namespace gfx
 
     const ImageView & Descriptor::getImageView() const {
         if (!valid) {
-            gfx::log::error("Attempted to get image view from an invalid descriptor!");
+            kor::log::error("Attempted to get image view from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         if (std::holds_alternative<ImageDescriptor>(_descriptor)) {
@@ -139,13 +139,13 @@ namespace gfx
         if (std::holds_alternative<CombinedImageSamplerDescriptor>(_descriptor)) {
             return *std::get<CombinedImageSamplerDescriptor>(_descriptor)._imageView;
         }
-        gfx::log::error("Attempted to get image view from a descriptor that does not hold an image view!");
+        kor::log::error("Attempted to get image view from a descriptor that does not hold an image view!");
         throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor does not hold an image view." });
     }
 
     const Sampler & Descriptor::getSampler() const {
         if (!valid) {
-            gfx::log::error("Attempted to get sampler from an invalid descriptor!");
+            kor::log::error("Attempted to get sampler from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         if (std::holds_alternative<SamplerDescriptor>(_descriptor)) {
@@ -154,17 +154,17 @@ namespace gfx
         if (std::holds_alternative<CombinedImageSamplerDescriptor>(_descriptor)) {
             return *std::get<CombinedImageSamplerDescriptor>(_descriptor)._sampler;
         }
-        gfx::log::error("Attempted to get sampler from a descriptor that does not hold a sampler!");
+        kor::log::error("Attempted to get sampler from a descriptor that does not hold a sampler!");
         throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor does not hold a sampler." });
     }
 
     const AccelerationStructure & Descriptor::getAccelerationStructure() const {
         if (!valid) {
-            gfx::log::error("Attempted to get acceleration structure from an invalid descriptor!");
+            kor::log::error("Attempted to get acceleration structure from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         if (!std::holds_alternative<AccelerationStructureDescriptor>(_descriptor)) {
-            gfx::log::error("Attempted to get acceleration structure from a descriptor that does not hold one!");
+            kor::log::error("Attempted to get acceleration structure from a descriptor that does not hold one!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
         }
         return *std::get<AccelerationStructureDescriptor>(_descriptor)._accelerationStructure;
@@ -275,7 +275,7 @@ namespace gfx
         return *this;
     }
 
-    gfx::Result<std::unique_ptr<DescriptorSet>> DescriptorSet::Builder::create() const
+    kor::Result<std::unique_ptr<DescriptorSet>> DescriptorSet::Builder::create() const
     {
         beginAttempt();
 
@@ -288,12 +288,12 @@ namespace gfx
 
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<DescriptorSet> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<DescriptorSet, vk::DescriptorSet>(*this)
-                : gfx::MakeBackendPtr<DescriptorSet, ogl::DescriptorSet>(*this);
+                ? kor::MakeBackendPtr<DescriptorSet, vk::DescriptorSet>(*this)
+                : kor::MakeBackendPtr<DescriptorSet, ogl::DescriptorSet>(*this);
         });
     }
 
-    gfx::Resource<DescriptorSet> DescriptorSet::Builder::build() const
+    kor::Resource<DescriptorSet> DescriptorSet::Builder::build() const
     {
         return materialize<DescriptorSet>(*this, "DescriptorSet");
     }

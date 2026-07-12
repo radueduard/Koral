@@ -187,7 +187,7 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
             -DGFX_BUILD_TESTS=OFF \
             -DGFX_EMBED_SOURCE_PATHS=OFF
-        # GFX_EMBED_SOURCE_PATHS=OFF is the one flag that must never be dropped from a release
+        # KORAL_EMBED_SOURCE_PATHS=OFF is the one flag that must never be dropped from a release
         # build. With it ON, the shipped binary keeps this runner's source path as a fallback for
         # locating shaders and assets — an absolute path that names nothing on a user's machine.
         # See src/core/paths.cpp.
@@ -209,17 +209,17 @@ jobs:
 
           # Runtime: what you double-click. Executable, the library, its bundled deps, and the
           # shaders/assets it loads at startup.
-          runtime="gfx-runtime-${version}-${{ matrix.name }}"
+          runtime="koral-runtime-${version}-${{ matrix.name }}"
           mkdir -p "$runtime"
           cp -r stage/bin "$runtime/"
           cp -r stage/lib "$runtime/"
           cp -r stage/share "$runtime/"
-          rm -rf "$runtime/lib/cmake" "$runtime/lib/gfx-vendor"   # SDK-only, dead weight here
+          rm -rf "$runtime/lib/cmake" "$runtime/lib/koral-vendor"   # SDK-only, dead weight here
 
           # SDK: what you build against. Everything, including the headers, the CMake package and
           # the vendored public dependencies (glm/spdlog/imgui) so a project needs no package
           # manager of its own.
-          sdk="gfx-sdk-${version}-${{ matrix.name }}"
+          sdk="koral-sdk-${version}-${{ matrix.name }}"
           cp -r stage "$sdk"
 
           if [ "${{ runner.os }}" = "Windows" ]; then
@@ -244,11 +244,11 @@ jobs:
           project(consumercheck CXX)
           set(CMAKE_CXX_STANDARD 23)
           set(CMAKE_CXX_STANDARD_REQUIRED ON)
-          find_package(GFX_RELOADED REQUIRED)
+          find_package(Koral REQUIRED)
           add_executable(consumercheck main.cpp)
-          target_link_libraries(consumercheck PRIVATE GFX_RELOADED::GFX_RELOADED)
+          target_link_libraries(consumercheck PRIVATE Koral::Koral)
           EOF
-          # Touches every third-party type that leaks through gfx's public headers.
+          # Touches every third-party type that leaks through Koral's public headers.
           cat > main.cpp <<'EOF'
           #include <cstdio>
           #include "context.h"
@@ -256,11 +256,11 @@ jobs:
           #include "gui.h"
           #include "structs.h"
           int main() {
-              gfx::log::info("ok");
+              kor::log::info("ok");
               const glm::vec3 v{1.f, 2.f, 3.f};
               const ImVec2 p{4.f, 5.f};
               std::printf("%.1f %.1f %s\n", v.x, p.y,
-                          gfx::shaderPath("doubleValues.comp.glsl").string().c_str());
+                          kor::shaderPath("doubleValues.comp.glsl").string().c_str());
               return 0;
           }
           EOF

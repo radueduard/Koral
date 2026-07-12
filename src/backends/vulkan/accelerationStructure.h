@@ -11,9 +11,9 @@
 
 #include "vk_wrapper.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    class AccelerationStructure final : public gfx::AccelerationStructure, public Wrapper<::vk::AccelerationStructureKHR>
+    class AccelerationStructure final : public kor::AccelerationStructure, public Wrapper<::vk::AccelerationStructureKHR>
     {
     public:
         explicit AccelerationStructure(const Builder& createInfo);

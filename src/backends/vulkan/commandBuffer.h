@@ -10,89 +10,89 @@
 
 #include <commandBuffer.h>
 
-namespace gfx::vk
+namespace kor::vk
 {
     class Queue;
 
-    class CommandBuffer : public gfx::CommandBuffer, public gfx::vk::Wrapper<::vk::CommandBuffer> {
+    class CommandBuffer : public kor::CommandBuffer, public kor::vk::Wrapper<::vk::CommandBuffer> {
     public:
-        CommandBuffer(const gfx::vk::Queue& queue, ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool& parentCommandPool);
+        CommandBuffer(const kor::vk::Queue& queue, ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool& parentCommandPool);
         ~CommandBuffer() override;
-        void Run(const std::function<void(const gfx::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore = nullptr) const;
+        void Run(const std::function<void(const kor::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore = nullptr) const;
 
         [[nodiscard]] const ::vk::CommandPool& getParentPool() const { return _parentPool; }
         [[nodiscard]] const ::vk::Semaphore& getSignalSemaphore() const { return _signalSemaphore; }
         [[nodiscard]] const ::vk::Fence& getFence() const { return _fence; }
-        [[nodiscard]] const gfx::vk::Queue& getQueue() const { return _queue; }
+        [[nodiscard]] const kor::vk::Queue& getQueue() const { return _queue; }
 
-        gfx::CommandBuffer& Begin() override;
+        kor::CommandBuffer& Begin() override;
         void End() override;
-        gfx::CommandBuffer& BeginRendering(RenderParameters renderParameters) override;
-        gfx::CommandBuffer& doBeginRendering(gfx::ResourceRef<const gfx::Framebuffer> framebuffer, RenderParameters renderParameters) override;
-        gfx::CommandBuffer& EndRendering() override;
-        gfx::CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
-        gfx::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
-        gfx::CommandBuffer& SetLineWidth(float lineWidth) override;
-        gfx::CommandBuffer& SetDepthBias(float constantFactor, float clamp, float slopeFactor) override;
-        gfx::CommandBuffer& SetBlendConstants(glm::vec4 constants) override;
-        gfx::CommandBuffer& SetStencilCompareMask(StencilFace face, glm::u32 compareMask) override;
-        gfx::CommandBuffer& SetStencilWriteMask(StencilFace face, glm::u32 writeMask) override;
-        gfx::CommandBuffer& SetStencilReference(StencilFace face, glm::u32 reference) override;
-        gfx::CommandBuffer& SetCullMode(Flags<CullMode> cullMode) override;
-        gfx::CommandBuffer& SetFrontFace(FrontFace frontFace) override;
-        gfx::CommandBuffer& SetDepthTestEnable(bool enable) override;
-        gfx::CommandBuffer& SetDepthWriteEnable(bool enable) override;
-        gfx::CommandBuffer& SetDepthCompareOp(CompareOp compareOp) override;
-        gfx::CommandBuffer& SetStencilTestEnable(bool enable) override;
-        gfx::CommandBuffer& SetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp) override;
-        gfx::CommandBuffer& SetDepthBiasEnable(bool enable) override;
-        gfx::CommandBuffer& SetRasterizerDiscardEnable(bool enable) override;
-        gfx::CommandBuffer& SetPrimitiveRestartEnable(bool enable) override;
-        gfx::CommandBuffer& doBindComputePipeline(gfx::ResourceRef<const gfx::ComputePipeline> pipeline) override;
-        gfx::CommandBuffer& doBindGraphicsPipeline(gfx::ResourceRef<const gfx::GraphicsPipeline> pipeline) override;
-        gfx::CommandBuffer& doBindRayTracingPipeline(gfx::ResourceRef<const gfx::RayTracingPipeline> pipeline) override;
-        gfx::CommandBuffer& doBindDescriptorSet(glm::u32 index, gfx::ResourceRef<const gfx::DescriptorSet> set, bool debug) override;
-        gfx::CommandBuffer& doBindMesh(gfx::ResourceRef<const Mesh> mesh) override;
-        gfx::CommandBuffer& doBarrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers) override;
-        gfx::CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color) override;
-        gfx::CommandBuffer& EndDebugLabel() override;
-        gfx::CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color) override;
-        gfx::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
-        gfx::CommandBuffer& doDispatchIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset) override;
-        gfx::CommandBuffer& TraceRays(glm::u32 width, glm::u32 height, glm::u32 depth) override;
-        gfx::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
-        gfx::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) override;
-        gfx::CommandBuffer& DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ) override;
-        gfx::CommandBuffer& doDrawIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
-        gfx::CommandBuffer& doDrawIndexedIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
-        gfx::CommandBuffer& doDrawMeshTasksIndirect(gfx::ResourceRef<const gfx::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
+        kor::CommandBuffer& BeginRendering(RenderParameters renderParameters) override;
+        kor::CommandBuffer& doBeginRendering(kor::ResourceRef<const kor::Framebuffer> framebuffer, RenderParameters renderParameters) override;
+        kor::CommandBuffer& EndRendering() override;
+        kor::CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
+        kor::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
+        kor::CommandBuffer& SetLineWidth(float lineWidth) override;
+        kor::CommandBuffer& SetDepthBias(float constantFactor, float clamp, float slopeFactor) override;
+        kor::CommandBuffer& SetBlendConstants(glm::vec4 constants) override;
+        kor::CommandBuffer& SetStencilCompareMask(StencilFace face, glm::u32 compareMask) override;
+        kor::CommandBuffer& SetStencilWriteMask(StencilFace face, glm::u32 writeMask) override;
+        kor::CommandBuffer& SetStencilReference(StencilFace face, glm::u32 reference) override;
+        kor::CommandBuffer& SetCullMode(Flags<CullMode> cullMode) override;
+        kor::CommandBuffer& SetFrontFace(FrontFace frontFace) override;
+        kor::CommandBuffer& SetDepthTestEnable(bool enable) override;
+        kor::CommandBuffer& SetDepthWriteEnable(bool enable) override;
+        kor::CommandBuffer& SetDepthCompareOp(CompareOp compareOp) override;
+        kor::CommandBuffer& SetStencilTestEnable(bool enable) override;
+        kor::CommandBuffer& SetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp) override;
+        kor::CommandBuffer& SetDepthBiasEnable(bool enable) override;
+        kor::CommandBuffer& SetRasterizerDiscardEnable(bool enable) override;
+        kor::CommandBuffer& SetPrimitiveRestartEnable(bool enable) override;
+        kor::CommandBuffer& doBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline) override;
+        kor::CommandBuffer& doBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline) override;
+        kor::CommandBuffer& doBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline) override;
+        kor::CommandBuffer& doBindDescriptorSet(glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set, bool debug) override;
+        kor::CommandBuffer& doBindMesh(kor::ResourceRef<const Mesh> mesh) override;
+        kor::CommandBuffer& doBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) override;
+        kor::CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color) override;
+        kor::CommandBuffer& EndDebugLabel() override;
+        kor::CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color) override;
+        kor::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
+        kor::CommandBuffer& doDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) override;
+        kor::CommandBuffer& TraceRays(glm::u32 width, glm::u32 height, glm::u32 depth) override;
+        kor::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
+        kor::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) override;
+        kor::CommandBuffer& DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ) override;
+        kor::CommandBuffer& doDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
+        kor::CommandBuffer& doDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
+        kor::CommandBuffer& doDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
 
-        gfx::CommandBuffer& doClearBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, glm::u64 offset, glm::u64 size) override;
-        gfx::CommandBuffer& doClearColorImage(gfx::ResourceRef<const gfx::Image> image, glm::vec4 color) override;
-        gfx::CommandBuffer& doFillBuffer(gfx::ResourceRef<const gfx::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) override;
-        gfx::CommandBuffer& doCopyBuffer(ResourceRef<const gfx::Buffer> srcBuffer, ResourceRef<const gfx::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) override;
+        kor::CommandBuffer& doClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset, glm::u64 size) override;
+        kor::CommandBuffer& doClearColorImage(kor::ResourceRef<const kor::Image> image, glm::vec4 color) override;
+        kor::CommandBuffer& doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) override;
+        kor::CommandBuffer& doCopyBuffer(ResourceRef<const kor::Buffer> srcBuffer, ResourceRef<const kor::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) override;
 
-        gfx::CommandBuffer& doBlit(ResourceRef<const Image> srcImage, gfx::Blit blitInfo) override;
-        gfx::CommandBuffer& doBlit(gfx::ResourceRef<const gfx::Image> srcImage, gfx::ResourceRef<const gfx::Image> dstImage, gfx::Blit blitInfo) override;
-        gfx::CommandBuffer& doResolve(ResourceRef<const Image> srcImage, gfx::Resolve resolveInfo) override;
-        gfx::CommandBuffer& doResolve(gfx::ResourceRef<const Image> srcImage, gfx::ResourceRef<const Image> dstImage, gfx::Resolve resolveInfo) override;
+        kor::CommandBuffer& doBlit(ResourceRef<const Image> srcImage, kor::Blit blitInfo) override;
+        kor::CommandBuffer& doBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo) override;
+        kor::CommandBuffer& doResolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) override;
+        kor::CommandBuffer& doResolve(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) override;
 
-        gfx::CommandBuffer& doCopyBufferToImage(ResourceRef<const gfx::Buffer> buffer, ResourceRef<const gfx::Image> image, gfx::Copy copyInfo) override;
-        gfx::CommandBuffer& doCopyImageToBuffer(ResourceRef<const gfx::Image> image, ResourceRef<const gfx::Buffer> buffer, gfx::Copy copyInfo) override;
+        kor::CommandBuffer& doCopyBufferToImage(ResourceRef<const kor::Buffer> buffer, ResourceRef<const kor::Image> image, kor::Copy copyInfo) override;
+        kor::CommandBuffer& doCopyImageToBuffer(ResourceRef<const kor::Image> image, ResourceRef<const kor::Buffer> buffer, kor::Copy copyInfo) override;
 
-        gfx::CommandBuffer& Run(const std::function<void(gfx::CommandBuffer&)>& command) override;
+        kor::CommandBuffer& Run(const std::function<void(kor::CommandBuffer&)>& command) override;
 
-        gfx::VoidResult Submit() override;
+        kor::VoidResult Submit() override;
         void Reset() override;
 
         void WaitForFence() const override;
 
     protected:
-        gfx::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
-        gfx::Resource<gfx::Image> _resolveHelperImage;
+        kor::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
+        kor::Resource<kor::Image> _resolveHelperImage;
 
     private:
-        const gfx::vk::Queue& _queue;
+        const kor::vk::Queue& _queue;
         const ::vk::CommandPool& _parentPool;
         ::vk::Semaphore _signalSemaphore = nullptr;
         ::vk::Fence _fence = nullptr;

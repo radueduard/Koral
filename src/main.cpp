@@ -4,7 +4,7 @@
 
 #include "context.h"
 
-namespace gfx
+namespace kor
 {
     class Engine
     {
@@ -41,6 +41,6 @@ int main(const int argc, char **argv)
 #ifdef _WIN32
     enableANSI();
 #endif
-    gfx::Engine::Run(argc, argv);
+    kor::Engine::Run(argc, argv);
     return EXIT_SUCCESS;
 }

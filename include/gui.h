@@ -14,21 +14,21 @@ struct ImGui_ImplVulkan_InitInfo;
 
 struct GLFWwindow;
 
-namespace gfx
+namespace kor
 {
     class Scene;
 
-    class GFX_API GUI_Image
+    class KORAL_API GUI_Image
     {
     public:
         virtual ~GUI_Image() = default;
 
         virtual void setLayerAndLevel(glm::u32 layer, glm::u32 level) = 0;
-        virtual void setImage(gfx::ResourceRef<const Image> image) = 0;
+        virtual void setImage(kor::ResourceRef<const Image> image) = 0;
 
         virtual ImTextureID operator*() const = 0;
 
-        static gfx::Resource<GUI_Image> Create(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer = 0, glm::u32 level = 0);
+        static kor::Resource<GUI_Image> Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer = 0, glm::u32 level = 0);
     };
 
     enum class Font
@@ -44,10 +44,10 @@ namespace gfx
     {
     public:
         static void Init();
-        GFX_API static void Render(gfx::CommandBuffer& commandBuffer, Scene& scene);
+        KORAL_API static void Render(kor::CommandBuffer& commandBuffer, Scene& scene);
         static void Shutdown();
 
-        GFX_API static ImFont* GetFont(Font font);
+        KORAL_API static ImFont* GetFont(Font font);
 
     private:
         static void DefineStyle();

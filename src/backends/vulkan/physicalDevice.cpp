@@ -11,7 +11,7 @@
 #include "runtime.h"
 #include "vulkanContext.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     PhysicalDevice::PhysicalDevice(::vk::PhysicalDevice physicalDevice)
     {
@@ -24,8 +24,8 @@ namespace gfx::vk
     }
 
     bool PhysicalDevice::isSuitable() const {
-        return hasRequiredQueueFamilies(gfx::vk::Context::Runtime().getRequiredQueueFamilies())
-            && hasRequiredExtensions(gfx::vk::Context::Runtime().getDeviceExtensions())
+        return hasRequiredQueueFamilies(kor::vk::Context::Runtime().getRequiredQueueFamilies())
+            && hasRequiredExtensions(kor::vk::Context::Runtime().getDeviceExtensions())
             && hasRequiredFeatures(_features);
     }
 

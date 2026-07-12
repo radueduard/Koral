@@ -17,7 +17,7 @@
 #include "vk_enum_conversions.h"
 #include "window.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     ::vk::SurfaceFormatKHR SwapChain::ChooseSurfaceFormat(const std::vector<::vk::SurfaceFormatKHR> &availableFormats) {
         for (const auto &availableFormat : availableFormats) {
@@ -33,7 +33,7 @@ namespace gfx::vk
     }
 
     ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes) {
-        if (!gfx::Context::Window().isVSync()) {
+        if (!kor::Context::Window().isVSync()) {
             // VSync off: present uncapped. Prefer immediate (may tear); Fifo is the
             // guaranteed-available fallback if the driver lacks an immediate mode.
             for (const auto &availablePresentMode : availablePresentModes) {
@@ -64,7 +64,7 @@ namespace gfx::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
-        _extent(gfx::Context::Window().getExtent()),
+        _extent(kor::Context::Window().getExtent()),
         _msaa(createInfo.msaa),
         _minImageCount(createInfo.minImageCount),
         _imageCount(createInfo.imageCount),
@@ -91,7 +91,7 @@ namespace gfx::vk
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
 
-        const auto compositeAlpha = gfx::Context::Window().isFramebufferTransparent() ?
+        const auto compositeAlpha = kor::Context::Window().isFramebufferTransparent() ?
 #ifdef _WIN32
         ::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
 #elifdef __APPLE__
@@ -123,22 +123,22 @@ namespace gfx::vk
         }
 
         const auto swapChainImageHandles = Context::Device()->getSwapchainImagesKHR(_handle);
-        _swapChainImages = Resource<gfx::Image>(std::make_unique<gfx::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa));
+        _swapChainImages = Resource<kor::Image>(std::make_unique<kor::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa));
 
         _depthImages = Image::Builder()
             .setIsPerFrame(true)
             .setExtent(_extent)
-            .setFormat(gfx::Image::Format::eD32_SFLOAT_S8_UINT)
-            .setType(gfx::Image::Type::e2D)
-            .addUsage(gfx::Image::Usage::eDepthStencilAttachment)
+            .setFormat(kor::Image::Format::eD32_SFLOAT_S8_UINT)
+            .setType(kor::Image::Type::e2D)
+            .addUsage(kor::Image::Usage::eDepthStencilAttachment)
             .setMSAA(_msaa)
             .build();
 
-        _swapChainImageViews = gfx::ImageView::Builder(_swapChainImages)
-            .setViewType(gfx::ImageView::Type::e2D)
+        _swapChainImageViews = kor::ImageView::Builder(_swapChainImages)
+            .setViewType(kor::ImageView::Type::e2D)
             .build();
         _depthImageViews = ImageView::Builder(_depthImages)
-            .setViewType(gfx::ImageView::Type::e2D)
+            .setViewType(kor::ImageView::Type::e2D)
             .build();
     }
 
@@ -155,11 +155,11 @@ namespace gfx::vk
         _extent = newSize;
         Context::Device()->waitIdle();
         CreateSwapChain();
-        gfx::Context::DefaultFramebuffer()->Resize(_swapChainImages->getExtent());
+        kor::Context::DefaultFramebuffer()->Resize(_swapChainImages->getExtent());
 
     }
 
-    ::vk::Result SwapChain::Acquire(const gfx::vk::Frame &frame) {
+    ::vk::Result SwapChain::Acquire(const kor::vk::Frame &frame) {
         try {
             const auto result = Context::Device()->acquireNextImageKHR(
                 _handle,
@@ -173,7 +173,7 @@ namespace gfx::vk
         }
     }
 
-    ::vk::Result SwapChain::Present(const gfx::vk::Frame &frame) {
+    ::vk::Result SwapChain::Present(const kor::vk::Frame &frame) {
         std::array waitSemaphores = {
         	_renderFinishedSemaphores[_imageIndex]
         };

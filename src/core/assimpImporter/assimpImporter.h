@@ -17,7 +17,7 @@
 #include <assimp/postprocess.h>
 #include <assimp/GltfMaterial.h>
 
-namespace gfx {
+namespace kor {
     class AssimpImporter : public Importer {
     public:
         explicit AssimpImporter(const std::filesystem::path &path);
@@ -39,21 +39,21 @@ namespace gfx {
         // MeshT must be a ParamMesh<Stream0, ...>.
         // -----------------------------------------------------------------
         template<typename MeshT>
-        gfx::Resource<MeshT> LoadMesh(const std::string& meshName)
+        kor::Resource<MeshT> LoadMesh(const std::string& meshName)
         {
             const auto it = _meshNameToIndex.find(meshName);
             if (it == _meshNameToIndex.end())
                 throw std::runtime_error("Mesh not found: " + meshName);
-            return gfx::LoadMesh<MeshT>(*_scene->mMeshes[it->second]);
+            return kor::LoadMesh<MeshT>(*_scene->mMeshes[it->second]);
         }
 
         // Overload: load by index.
         template<typename MeshT>
-        gfx::Resource<MeshT> LoadMesh(glm::u32 index)
+        kor::Resource<MeshT> LoadMesh(glm::u32 index)
         {
             if (index >= _scene->mNumMeshes)
                 throw std::out_of_range("Mesh index out of range: " + std::to_string(index));
-            return gfx::LoadMesh<MeshT>(*_scene->mMeshes[index]);
+            return kor::LoadMesh<MeshT>(*_scene->mMeshes[index]);
         }
 
         // -----------------------------------------------------------------
@@ -67,7 +67,7 @@ namespace gfx {
             const auto it = _meshNameToIndex.find(meshName);
             if (it == _meshNameToIndex.end())
                 throw std::runtime_error("Mesh not found: " + meshName);
-            return gfx::LoadMeshIntoHeap(heap, *_scene->mMeshes[it->second]);
+            return kor::LoadMeshIntoHeap(heap, *_scene->mMeshes[it->second]);
         }
 
         // Overload: load by index.
@@ -77,7 +77,7 @@ namespace gfx {
         {
             if (index >= _scene->mNumMeshes)
                 throw std::out_of_range("Mesh index out of range: " + std::to_string(index));
-            return gfx::LoadMeshIntoHeap(heap, *_scene->mMeshes[index]);
+            return kor::LoadMeshIntoHeap(heap, *_scene->mMeshes[index]);
         }
 
     private:

@@ -17,9 +17,9 @@
 #include "resource.h"
 #include "error.h"
 
-namespace gfx
+namespace kor
 {
-    class GFX_API Shader {
+    class KORAL_API Shader {
     public:
         enum class Stage {
             // VTG Graphics Pipeline
@@ -53,7 +53,7 @@ namespace gfx
             eSPIRV,
         };
 
-        struct GFX_API InputOutput
+        struct KORAL_API InputOutput
         {
             glm::u32 startingLocation;
             glm::u32 locationSpan;
@@ -66,7 +66,7 @@ namespace gfx
             }
         };
 
-        struct GFX_API Descriptor {
+        struct KORAL_API Descriptor {
             DescriptorType type;
             std::string name;
             glm::u32 count;
@@ -81,12 +81,12 @@ namespace gfx
             }
         };
 
-        struct GFX_API DescriptorSet
+        struct KORAL_API DescriptorSet
         {
             std::map<glm::u32, Descriptor> descriptors;
         };
 
-        struct GFX_API PushConstant {
+        struct KORAL_API PushConstant {
             std::string name;
             glm::u32 size;
             glm::u32 offset;
@@ -100,7 +100,7 @@ namespace gfx
             }
         };
 
-        struct GFX_API MemoryLayout
+        struct KORAL_API MemoryLayout
         {
             std::set<InputOutput> inputs;
             std::set<InputOutput> outputs;
@@ -112,7 +112,7 @@ namespace gfx
         // below; the backends construct a Shader from this. Build it via the fluent
         // Shader::Builder API: pick the language with setLang<L>(), which returns the
         // matching language-specific builder.
-        struct GFX_API Builder : ::Builder {
+        struct KORAL_API Builder : ::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
@@ -135,7 +135,7 @@ namespace gfx
 
             /** @brief One compile attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Shader>> create() const;
-            [[nodiscard]] gfx::Resource<Shader> build() const;
+            [[nodiscard]] kor::Resource<Shader> build() const;
 
             // Get-or-build: returns the shader registered under `identifier`, building and
             // registering it (with hot-reload tracking) on first use. Subsequent calls with
@@ -149,26 +149,26 @@ namespace gfx
         };
 
         // GLSL source referenced by file path.
-        struct GFX_API GLSLBuilder {
+        struct KORAL_API GLSLBuilder {
             Builder _b;
             GLSLBuilder& setStage(const Stage stage) { _b.stage = stage; return *this; }
             GLSLBuilder& setPath(std::filesystem::path path) { _b.path = std::move(path); return *this; }
-            [[nodiscard]] gfx::Resource<Shader> build() const { return _b.build(); }
+            [[nodiscard]] kor::Resource<Shader> build() const { return _b.build(); }
             [[nodiscard]] ResourceRef<const Shader> getOrBuild(const std::string& identifier) const { return _b.getOrBuild(identifier); }
         };
 
         // Precompiled SPIR-V referenced by file path.
-        struct GFX_API SPIRVBuilder {
+        struct KORAL_API SPIRVBuilder {
             Builder _b;
             SPIRVBuilder& setStage(const Stage stage) { _b.stage = stage; return *this; }
             SPIRVBuilder& setPath(std::filesystem::path path) { _b.path = std::move(path); return *this; }
-            [[nodiscard]] gfx::Resource<Shader> build() const { return _b.build(); }
+            [[nodiscard]] kor::Resource<Shader> build() const { return _b.build(); }
             [[nodiscard]] ResourceRef<const Shader> getOrBuild(const std::string& identifier) const { return _b.getOrBuild(identifier); }
         };
 
         // Slang referenced by module + entry point; the stage is auto-detected from the
         // entry point's [shader("...")] attribute (override with setStage).
-        struct GFX_API SlangBuilder {
+        struct KORAL_API SlangBuilder {
             Builder _b;
             SlangBuilder& setStage(const Stage stage) { _b.stage = stage; return *this; }
             SlangBuilder& setEntryPoint(std::string module, std::string entry) {
@@ -176,7 +176,7 @@ namespace gfx
                 _b.entry = std::move(entry);
                 return *this;
             }
-            [[nodiscard]] gfx::Resource<Shader> build() const { return _b.build(); }
+            [[nodiscard]] kor::Resource<Shader> build() const { return _b.build(); }
             // Identifier defaults to "module:entry" when omitted.
             [[nodiscard]] ResourceRef<const Shader> getOrBuild(std::string identifier = {}) const {
                 return _b.getOrBuild(identifier.empty() ? _b.module + ":" + _b.entry : identifier);

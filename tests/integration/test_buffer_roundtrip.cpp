@@ -1,4 +1,4 @@
-// Integration tests for gfx::Buffer against a real Vulkan device. These exercise
+// Integration tests for kor::Buffer against a real Vulkan device. These exercise
 // VMA allocation, staging buffers, the transfer queue and SingleTimeCommand
 // submit/fence-wait — i.e. the actual GPU upload/readback paths.
 
@@ -9,7 +9,7 @@
 
 #include "buffer.h"
 
-using gfx::Buffer;
+using kor::Buffer;
 
 namespace {
 

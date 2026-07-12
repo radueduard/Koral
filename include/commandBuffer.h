@@ -22,7 +22,7 @@
 #include "sampler.h"
 #include "structs.h"
 
-namespace gfx
+namespace kor
 {
     enum class Filter;
     class Buffer;
@@ -97,37 +97,37 @@ namespace gfx
         Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
     };
 
-    class GFX_API BufferBarrier {
+    class KORAL_API BufferBarrier {
     public:
         BufferBarrier(
-            const gfx::ResourceRef<const gfx::Buffer> &buffer,
+            const kor::ResourceRef<const kor::Buffer> &buffer,
             ResourceAccess dstAccess,
             glm::u64 offset = 0,
             glm::u64 size = UINT64_MAX);
 
-        [[nodiscard]] gfx::ResourceRef<const gfx::Buffer> getBuffer() const { return _buffer; }
+        [[nodiscard]] kor::ResourceRef<const kor::Buffer> getBuffer() const { return _buffer; }
         [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
         [[nodiscard]] glm::u64 getOffset() const { return _offset; }
         [[nodiscard]] glm::u64 getSize() const { return _size; }
 
     private:
-        gfx::ResourceRef<const gfx::Buffer> _buffer;
+        kor::ResourceRef<const kor::Buffer> _buffer;
         ResourceAccess _dstAccess;
         glm::u64 _offset;
         glm::u64 _size;
     };
 
-    class GFX_API ImageBarrier {
+    class KORAL_API ImageBarrier {
     public:
         ImageBarrier(
-            const gfx::ResourceRef<const gfx::Image> &image,
+            const kor::ResourceRef<const kor::Image> &image,
             ResourceAccess dstAccess,
             std::optional<glm::u32> baseMipLevel = std::nullopt,
             std::optional<glm::u32> levelCount = std::nullopt,
             std::optional<glm::u32> baseArrayLayer = std::nullopt,
             std::optional<glm::u32> layerCount = std::nullopt);
 
-        [[nodiscard]] gfx::ResourceRef<const gfx::Image> getImage() const { return _image; }
+        [[nodiscard]] kor::ResourceRef<const kor::Image> getImage() const { return _image; }
         [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
         [[nodiscard]] std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
         [[nodiscard]] std::optional<glm::u32> getLevelCount() const { return _levelCount; }
@@ -135,7 +135,7 @@ namespace gfx
         [[nodiscard]] std::optional<glm::u32> getLayerCount() const { return _layerCount; }
 
     private:
-        gfx::ResourceRef<const gfx::Image> _image;
+        kor::ResourceRef<const kor::Image> _image;
         ResourceAccess _dstAccess;
         std::optional<glm::u32> _baseMipLevel;
         std::optional<glm::u32> _levelCount;
@@ -143,7 +143,7 @@ namespace gfx
         std::optional<glm::u32> _layerCount;
     };
 
-    class GFX_API Blit {
+    class KORAL_API Blit {
     public:
         glm::ivec3 srcOffset = { 0, 0, 0 };
         glm::ivec3 srcExtent = { -1, -1, -1 };
@@ -154,10 +154,10 @@ namespace gfx
         glm::u32 layerCount = 1;
         glm::u32 srcMipLevel = 0;
         glm::u32 dstMipLevel = 0;
-        gfx::Filter filtering = gfx::Filter::eNearest;
+        kor::Filter filtering = kor::Filter::eNearest;
     };
 
-    class GFX_API Resolve {
+    class KORAL_API Resolve {
     public:
         glm::ivec3 srcOffset = { 0, 0, 0 };
         glm::ivec3 srcExtent = { -1, -1, -1 };
@@ -170,7 +170,7 @@ namespace gfx
         glm::u32 dstMipLevel = 0;
     };
 
-    class GFX_API Copy {
+    class KORAL_API Copy {
     public:
         glm::u64 bufferOffset = 0;
         glm::u64 bufferRowLength = 0;
@@ -193,15 +193,15 @@ namespace gfx
         eDontCare
     };
 
-    class GFX_API RenderParameters {
+    class KORAL_API RenderParameters {
     public:
-        gfx::LoadOperation colorLoadOperation = gfx::LoadOperation::eClear;
-        gfx::LoadOperation depthLoadOperation = gfx::LoadOperation::eClear;
-        gfx::LoadOperation stencilLoadOperation = gfx::LoadOperation::eClear;
+        kor::LoadOperation colorLoadOperation = kor::LoadOperation::eClear;
+        kor::LoadOperation depthLoadOperation = kor::LoadOperation::eClear;
+        kor::LoadOperation stencilLoadOperation = kor::LoadOperation::eClear;
 
-        gfx::StoreOperation colorStoreOperation = gfx::StoreOperation::eStore;
-        gfx::StoreOperation depthStoreOperation = gfx::StoreOperation::eStore;
-        gfx::StoreOperation stencilStoreOperation = gfx::StoreOperation::eStore;
+        kor::StoreOperation colorStoreOperation = kor::StoreOperation::eStore;
+        kor::StoreOperation depthStoreOperation = kor::StoreOperation::eStore;
+        kor::StoreOperation stencilStoreOperation = kor::StoreOperation::eStore;
     };
 
     // Per-command GPU timing accumulated by a statistics-collecting command buffer.
@@ -245,7 +245,7 @@ namespace gfx
         ePrimitiveRestartEnable = 1 << 15,
     };
 
-    class GFX_API CommandBuffer
+    class KORAL_API CommandBuffer
     {
     public:
         virtual ~CommandBuffer() = default;
@@ -353,15 +353,15 @@ namespace gfx
         CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX);
         CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size = UINT64_MAX, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0);
 
-        CommandBuffer& Blit(ResourceRef<const Image> srcImage, gfx::Blit blitInfo = {});
-        CommandBuffer& Blit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Blit blitInfo = {});
-        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, gfx::Resolve resolveInfo = {});
-        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Resolve resolveInfo = {});
+        CommandBuffer& Blit(ResourceRef<const Image> srcImage, kor::Blit blitInfo = {});
+        CommandBuffer& Blit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo = {});
+        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo = {});
+        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo = {});
 
         CommandBuffer& GenerateMipmaps(ResourceRef<const Image> image);
 
-        CommandBuffer& CopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, gfx::Copy copyInfo = {});
-        CommandBuffer& CopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, gfx::Copy copyInfo = {});
+        CommandBuffer& CopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo = {});
+        CommandBuffer& CopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo = {});
 
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 
@@ -408,7 +408,7 @@ namespace gfx
             return *this;
         }
 
-        static void SingleTimeCommand(const std::function<void(gfx::CommandBuffer&)>& command, Usage usage = Usage::eGraphics);
+        static void SingleTimeCommand(const std::function<void(kor::CommandBuffer&)>& command, Usage usage = Usage::eGraphics);
 
         virtual VoidResult Submit() = 0;
         virtual void Reset() = 0;
@@ -425,15 +425,15 @@ namespace gfx
 
     protected:
         struct {
-            std::optional<gfx::ResourceRef<const Framebuffer>> boundFramebuffer = std::nullopt;
-            std::optional<gfx::ResourceRef<const ComputePipeline>> boundComputePipeline = std::nullopt;
-            std::optional<gfx::ResourceRef<const GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
-            std::optional<gfx::ResourceRef<const RayTracingPipeline>> boundRayTracingPipeline = std::nullopt;
-            std::optional<gfx::ResourceRef<const Mesh>> boundMesh = std::nullopt;
+            std::optional<kor::ResourceRef<const Framebuffer>> boundFramebuffer = std::nullopt;
+            std::optional<kor::ResourceRef<const ComputePipeline>> boundComputePipeline = std::nullopt;
+            std::optional<kor::ResourceRef<const GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
+            std::optional<kor::ResourceRef<const RayTracingPipeline>> boundRayTracingPipeline = std::nullopt;
+            std::optional<kor::ResourceRef<const Mesh>> boundMesh = std::nullopt;
 
-            std::map<glm::u32, gfx::ResourceRef<const DescriptorSet>> boundGraphicsDescriptorSets;
-            std::map<glm::u32, gfx::ResourceRef<const DescriptorSet>> boundComputeDescriptorSets;
-            std::map<glm::u32, gfx::ResourceRef<const DescriptorSet>> boundRayTracingDescriptorSets;
+            std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundGraphicsDescriptorSets;
+            std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundComputeDescriptorSets;
+            std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundRayTracingDescriptorSets;
 
             bool viewportSet = false;
             bool scissorSet = false;
@@ -511,7 +511,7 @@ namespace gfx
         virtual CommandBuffer& doBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
         virtual CommandBuffer& doBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet, bool debug) = 0;
         virtual CommandBuffer& doBindMesh(ResourceRef<const Mesh> mesh) = 0;
-        virtual CommandBuffer& doBarrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers) = 0;
+        virtual CommandBuffer& doBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;
         virtual CommandBuffer& doDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
         virtual CommandBuffer& doDrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
         virtual CommandBuffer& doDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
@@ -522,12 +522,12 @@ namespace gfx
         virtual CommandBuffer& doFillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset, glm::u64 size) = 0;
         virtual CommandBuffer& doCopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) = 0;
         virtual CommandBuffer& doGenerateMipmaps(ResourceRef<const Image> image);
-        virtual CommandBuffer& doCopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, gfx::Copy copyInfo) = 0;
-        virtual CommandBuffer& doCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, gfx::Copy copyInfo) = 0;
-        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, gfx::Blit blitInfo) = 0;
-        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Blit blitInfo) = 0;
-        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, gfx::Resolve resolveInfo) = 0;
-        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, gfx::Resolve resolveInfo) = 0;
+        virtual CommandBuffer& doCopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo) = 0;
+        virtual CommandBuffer& doCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo) = 0;
+        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, kor::Blit blitInfo) = 0;
+        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo) = 0;
+        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) = 0;
+        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) = 0;
 
         std::vector<Error> _errors;
         bool _failed = false;

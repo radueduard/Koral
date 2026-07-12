@@ -14,7 +14,7 @@
 #include <vulkan/vulkan.hpp>
 
 
-namespace gfx
+namespace kor
 {
     inline ::vk::AttachmentLoadOp getVkLoadOp(const LoadOperation loadOperation) {
         switch (loadOperation)
@@ -274,7 +274,7 @@ namespace gfx
         }
     }
 
-    inline ::vk::DescriptorType getVkDescriptorType(const gfx::DescriptorType type)
+    inline ::vk::DescriptorType getVkDescriptorType(const kor::DescriptorType type)
     {
         switch (type)
         {
@@ -420,7 +420,7 @@ namespace gfx
         }
     }
 
-    inline gfx::Image::Format getFormat(const ::vk::Format format)
+    inline kor::Image::Format getFormat(const ::vk::Format format)
     {
         switch (format)
         {
@@ -485,58 +485,58 @@ namespace gfx
         }
     }
 
-    inline ::vk::ImageType getVkImageType(const gfx::Image::Type type)
+    inline ::vk::ImageType getVkImageType(const kor::Image::Type type)
     {
         switch (type) {
-        case gfx::Image::Type::e1D: return ::vk::ImageType::e1D;
-        case gfx::Image::Type::e2D: return ::vk::ImageType::e2D;
-        case gfx::Image::Type::e3D: return ::vk::ImageType::e3D;
+        case kor::Image::Type::e1D: return ::vk::ImageType::e1D;
+        case kor::Image::Type::e2D: return ::vk::ImageType::e2D;
+        case kor::Image::Type::e3D: return ::vk::ImageType::e3D;
         default: throw std::runtime_error("Unknown image type");
         }
     }
 
-    inline ::vk::ImageViewType getVkImageViewType(const gfx::ImageView::Type type)
+    inline ::vk::ImageViewType getVkImageViewType(const kor::ImageView::Type type)
     {
         switch (type) {
-        case gfx::ImageView::Type::e1D: return ::vk::ImageViewType::e1D;
-        case gfx::ImageView::Type::e2D: return ::vk::ImageViewType::e2D;
-        case gfx::ImageView::Type::e3D: return ::vk::ImageViewType::e3D;
-        case gfx::ImageView::Type::eCube: return ::vk::ImageViewType::eCube;
-        case gfx::ImageView::Type::e1DArray: return ::vk::ImageViewType::e1DArray;
-        case gfx::ImageView::Type::e2DArray: return ::vk::ImageViewType::e2DArray;
-        case gfx::ImageView::Type::eCubeArray: return ::vk::ImageViewType::eCubeArray;
+        case kor::ImageView::Type::e1D: return ::vk::ImageViewType::e1D;
+        case kor::ImageView::Type::e2D: return ::vk::ImageViewType::e2D;
+        case kor::ImageView::Type::e3D: return ::vk::ImageViewType::e3D;
+        case kor::ImageView::Type::eCube: return ::vk::ImageViewType::eCube;
+        case kor::ImageView::Type::e1DArray: return ::vk::ImageViewType::e1DArray;
+        case kor::ImageView::Type::e2DArray: return ::vk::ImageViewType::e2DArray;
+        case kor::ImageView::Type::eCubeArray: return ::vk::ImageViewType::eCubeArray;
         default: throw std::runtime_error("Unknown image type");
         }
     }
 
-    inline ::vk::ComponentSwizzle getVkComponentSwizzle(const gfx::ImageView::Swizzle swizzle)
+    inline ::vk::ComponentSwizzle getVkComponentSwizzle(const kor::ImageView::Swizzle swizzle)
     {
         switch (swizzle)
         {
-        case gfx::ImageView::Swizzle::eIdentity: return ::vk::ComponentSwizzle::eIdentity;
-        case gfx::ImageView::Swizzle::eZero: return ::vk::ComponentSwizzle::eZero;
-        case gfx::ImageView::Swizzle::eOne: return ::vk::ComponentSwizzle::eOne;
-        case gfx::ImageView::Swizzle::eR: return ::vk::ComponentSwizzle::eR;
-        case gfx::ImageView::Swizzle::eG: return ::vk::ComponentSwizzle::eG;
-        case gfx::ImageView::Swizzle::eB: return ::vk::ComponentSwizzle::eB;
-        case gfx::ImageView::Swizzle::eA: return ::vk::ComponentSwizzle::eA;
+        case kor::ImageView::Swizzle::eIdentity: return ::vk::ComponentSwizzle::eIdentity;
+        case kor::ImageView::Swizzle::eZero: return ::vk::ComponentSwizzle::eZero;
+        case kor::ImageView::Swizzle::eOne: return ::vk::ComponentSwizzle::eOne;
+        case kor::ImageView::Swizzle::eR: return ::vk::ComponentSwizzle::eR;
+        case kor::ImageView::Swizzle::eG: return ::vk::ComponentSwizzle::eG;
+        case kor::ImageView::Swizzle::eB: return ::vk::ComponentSwizzle::eB;
+        case kor::ImageView::Swizzle::eA: return ::vk::ComponentSwizzle::eA;
         default: throw std::runtime_error("Unknown component swizzle!");
         }
     }
 
-    inline ::vk::ImageUsageFlags getVkUsage(const Flags<gfx::Image::Usage> usage)
+    inline ::vk::ImageUsageFlags getVkUsage(const Flags<kor::Image::Usage> usage)
     {
         ::vk::ImageUsageFlags usageFlags = ::vk::ImageUsageFlags();
-        if (usage & gfx::Image::Usage::eTransferSrc) usageFlags |= ::vk::ImageUsageFlagBits::eTransferSrc;
-        if (usage & gfx::Image::Usage::eTransferDst) usageFlags |= ::vk::ImageUsageFlagBits::eTransferDst;
-        if (usage & gfx::Image::Usage::eSampled) usageFlags |= ::vk::ImageUsageFlagBits::eSampled;
-        if (usage & gfx::Image::Usage::eStorage) usageFlags |= ::vk::ImageUsageFlagBits::eStorage;
-        if (usage & gfx::Image::Usage::eColorAttachment) usageFlags |= ::vk::ImageUsageFlagBits::eColorAttachment;
-        if (usage & gfx::Image::Usage::eDepthStencilAttachment) usageFlags |= ::vk::ImageUsageFlagBits::eDepthStencilAttachment;
+        if (usage & kor::Image::Usage::eTransferSrc) usageFlags |= ::vk::ImageUsageFlagBits::eTransferSrc;
+        if (usage & kor::Image::Usage::eTransferDst) usageFlags |= ::vk::ImageUsageFlagBits::eTransferDst;
+        if (usage & kor::Image::Usage::eSampled) usageFlags |= ::vk::ImageUsageFlagBits::eSampled;
+        if (usage & kor::Image::Usage::eStorage) usageFlags |= ::vk::ImageUsageFlagBits::eStorage;
+        if (usage & kor::Image::Usage::eColorAttachment) usageFlags |= ::vk::ImageUsageFlagBits::eColorAttachment;
+        if (usage & kor::Image::Usage::eDepthStencilAttachment) usageFlags |= ::vk::ImageUsageFlagBits::eDepthStencilAttachment;
         return usageFlags;
     }
 
-    inline ::vk::BufferUsageFlags getVkBufferUsageFlags(const gfx::Flags<Buffer::Usage> usage)
+    inline ::vk::BufferUsageFlags getVkBufferUsageFlags(const kor::Flags<Buffer::Usage> usage)
     {
         auto vkUsage = ::vk::BufferUsageFlags();
         if (usage & Buffer::Usage::eVertex)
@@ -574,150 +574,150 @@ namespace gfx
         }
     }
 
-    inline ::vk::Filter getVkFilter(const gfx::Filter filter)
+    inline ::vk::Filter getVkFilter(const kor::Filter filter)
     {
         switch (filter) {
-        case gfx::Filter::eNearest: return ::vk::Filter::eNearest;
-        case gfx::Filter::eLinear: return ::vk::Filter::eLinear;
+        case kor::Filter::eNearest: return ::vk::Filter::eNearest;
+        case kor::Filter::eLinear: return ::vk::Filter::eLinear;
         default: throw std::runtime_error("Unknown filter type");
         }
     }
 
-    inline ::vk::SamplerMipmapMode getVkMipmapMode(const gfx::Sampler::MipmapMode mode)
+    inline ::vk::SamplerMipmapMode getVkMipmapMode(const kor::Sampler::MipmapMode mode)
     {
         switch (mode) {
-        case gfx::Sampler::MipmapMode::eNearest: return ::vk::SamplerMipmapMode::eNearest;
-        case gfx::Sampler::MipmapMode::eLinear: return ::vk::SamplerMipmapMode::eLinear;
+        case kor::Sampler::MipmapMode::eNearest: return ::vk::SamplerMipmapMode::eNearest;
+        case kor::Sampler::MipmapMode::eLinear: return ::vk::SamplerMipmapMode::eLinear;
         default: throw std::runtime_error("Unknown mipmap mode");
         }
     }
 
-    inline ::vk::SamplerAddressMode getVkSamplerAddressMode(const gfx::Sampler::AddressMode mode)
+    inline ::vk::SamplerAddressMode getVkSamplerAddressMode(const kor::Sampler::AddressMode mode)
     {
         switch (mode) {
-        case gfx::Sampler::AddressMode::eRepeat: return ::vk::SamplerAddressMode::eRepeat;
-        case gfx::Sampler::AddressMode::eMirroredRepeat: return ::vk::SamplerAddressMode::eMirroredRepeat;
-        case gfx::Sampler::AddressMode::eClampToEdge: return ::vk::SamplerAddressMode::eClampToEdge;
-        case gfx::Sampler::AddressMode::eClampToBorder: return ::vk::SamplerAddressMode::eClampToBorder;
+        case kor::Sampler::AddressMode::eRepeat: return ::vk::SamplerAddressMode::eRepeat;
+        case kor::Sampler::AddressMode::eMirroredRepeat: return ::vk::SamplerAddressMode::eMirroredRepeat;
+        case kor::Sampler::AddressMode::eClampToEdge: return ::vk::SamplerAddressMode::eClampToEdge;
+        case kor::Sampler::AddressMode::eClampToBorder: return ::vk::SamplerAddressMode::eClampToBorder;
         default: throw std::runtime_error("Unknown address mode");
         }
     }
 
-    inline ::vk::CompareOp getVkCompareOp(const gfx::CompareOp op)
+    inline ::vk::CompareOp getVkCompareOp(const kor::CompareOp op)
     {
         switch (op) {
-        case gfx::CompareOp::eNever: return ::vk::CompareOp::eNever;
-        case gfx::CompareOp::eLess: return ::vk::CompareOp::eLess;
-        case gfx::CompareOp::eEqual: return ::vk::CompareOp::eEqual;
-        case gfx::CompareOp::eLessOrEqual: return ::vk::CompareOp::eLessOrEqual;
-        case gfx::CompareOp::eGreater: return ::vk::CompareOp::eGreater;
-        case gfx::CompareOp::eNotEqual: return ::vk::CompareOp::eNotEqual;
-        case gfx::CompareOp::eGreaterOrEqual: return ::vk::CompareOp::eGreaterOrEqual;
-        case gfx::CompareOp::eAlways: return ::vk::CompareOp::eAlways;
+        case kor::CompareOp::eNever: return ::vk::CompareOp::eNever;
+        case kor::CompareOp::eLess: return ::vk::CompareOp::eLess;
+        case kor::CompareOp::eEqual: return ::vk::CompareOp::eEqual;
+        case kor::CompareOp::eLessOrEqual: return ::vk::CompareOp::eLessOrEqual;
+        case kor::CompareOp::eGreater: return ::vk::CompareOp::eGreater;
+        case kor::CompareOp::eNotEqual: return ::vk::CompareOp::eNotEqual;
+        case kor::CompareOp::eGreaterOrEqual: return ::vk::CompareOp::eGreaterOrEqual;
+        case kor::CompareOp::eAlways: return ::vk::CompareOp::eAlways;
         default: throw std::runtime_error("Unknown compare operation");
         }
     }
 
-    inline ::vk::StencilOp getVkStencilOp(const gfx::StencilOp op)
+    inline ::vk::StencilOp getVkStencilOp(const kor::StencilOp op)
     {
         switch (op) {
-        case gfx::StencilOp::eKeep: return ::vk::StencilOp::eKeep;
-        case gfx::StencilOp::eZero: return ::vk::StencilOp::eZero;
-        case gfx::StencilOp::eReplace: return ::vk::StencilOp::eReplace;
-        case gfx::StencilOp::eIncrementAndClamp: return ::vk::StencilOp::eIncrementAndClamp;
-        case gfx::StencilOp::eDecrementAndClamp: return ::vk::StencilOp::eDecrementAndClamp;
-        case gfx::StencilOp::eInvert: return ::vk::StencilOp::eInvert;
-        case gfx::StencilOp::eIncrementAndWrap: return ::vk::StencilOp::eIncrementAndWrap;
-        case gfx::StencilOp::eDecrementAndWrap: return ::vk::StencilOp::eDecrementAndWrap;
+        case kor::StencilOp::eKeep: return ::vk::StencilOp::eKeep;
+        case kor::StencilOp::eZero: return ::vk::StencilOp::eZero;
+        case kor::StencilOp::eReplace: return ::vk::StencilOp::eReplace;
+        case kor::StencilOp::eIncrementAndClamp: return ::vk::StencilOp::eIncrementAndClamp;
+        case kor::StencilOp::eDecrementAndClamp: return ::vk::StencilOp::eDecrementAndClamp;
+        case kor::StencilOp::eInvert: return ::vk::StencilOp::eInvert;
+        case kor::StencilOp::eIncrementAndWrap: return ::vk::StencilOp::eIncrementAndWrap;
+        case kor::StencilOp::eDecrementAndWrap: return ::vk::StencilOp::eDecrementAndWrap;
         default: throw std::runtime_error("Unknown stencil operation");
         }
     }
 
-    inline ::vk::StencilFaceFlags getVkStencilFace(const gfx::StencilFace face)
+    inline ::vk::StencilFaceFlags getVkStencilFace(const kor::StencilFace face)
     {
         switch (face) {
-        case gfx::StencilFace::eFront: return ::vk::StencilFaceFlagBits::eFront;
-        case gfx::StencilFace::eBack: return ::vk::StencilFaceFlagBits::eBack;
-        case gfx::StencilFace::eFrontAndBack: return ::vk::StencilFaceFlagBits::eFrontAndBack;
+        case kor::StencilFace::eFront: return ::vk::StencilFaceFlagBits::eFront;
+        case kor::StencilFace::eBack: return ::vk::StencilFaceFlagBits::eBack;
+        case kor::StencilFace::eFrontAndBack: return ::vk::StencilFaceFlagBits::eFrontAndBack;
         default: throw std::runtime_error("Unknown stencil face");
         }
     }
 
-    inline ::vk::SamplerMipmapMode getVkSamplerMipmapMode(const gfx::Sampler::MipmapMode mode)
+    inline ::vk::SamplerMipmapMode getVkSamplerMipmapMode(const kor::Sampler::MipmapMode mode)
     {
         switch (mode) {
-        case gfx::Sampler::MipmapMode::eNearest: return ::vk::SamplerMipmapMode::eNearest;
-        case gfx::Sampler::MipmapMode::eLinear: return ::vk::SamplerMipmapMode::eLinear;
+        case kor::Sampler::MipmapMode::eNearest: return ::vk::SamplerMipmapMode::eNearest;
+        case kor::Sampler::MipmapMode::eLinear: return ::vk::SamplerMipmapMode::eLinear;
         default: throw std::runtime_error("Unknown mipmap mode");
         }
     }
 
-    inline ::vk::LogicOp getVkLogicOp(const gfx::LogicOp op)
+    inline ::vk::LogicOp getVkLogicOp(const kor::LogicOp op)
     {
         switch (op) {
-        case gfx::LogicOp::eClear: return ::vk::LogicOp::eClear;
-        case gfx::LogicOp::eAnd: return ::vk::LogicOp::eAnd;
-        case gfx::LogicOp::eAndReverse: return ::vk::LogicOp::eAndReverse;
-        case gfx::LogicOp::eCopy: return ::vk::LogicOp::eCopy;
-        case gfx::LogicOp::eAndInverted: return ::vk::LogicOp::eAndInverted;
-        case gfx::LogicOp::eNoOp: return ::vk::LogicOp::eNoOp;
-        case gfx::LogicOp::eXor: return ::vk::LogicOp::eXor;
-        case gfx::LogicOp::eOr: return ::vk::LogicOp::eOr;
-        case gfx::LogicOp::eNor: return ::vk::LogicOp::eNor;
-        case gfx::LogicOp::eEquivalent: return ::vk::LogicOp::eEquivalent;
-        case gfx::LogicOp::eInvert: return ::vk::LogicOp::eInvert;
-        case gfx::LogicOp::eOrReverse: return ::vk::LogicOp::eOrReverse;
-        case gfx::LogicOp::eCopyInverted: return ::vk::LogicOp::eCopyInverted;
-        case gfx::LogicOp::eOrInverted: return ::vk::LogicOp::eOrInverted;
-        case gfx::LogicOp::eNand: return ::vk::LogicOp::eNand;
-        case gfx::LogicOp::eSet: return ::vk::LogicOp::eSet;
+        case kor::LogicOp::eClear: return ::vk::LogicOp::eClear;
+        case kor::LogicOp::eAnd: return ::vk::LogicOp::eAnd;
+        case kor::LogicOp::eAndReverse: return ::vk::LogicOp::eAndReverse;
+        case kor::LogicOp::eCopy: return ::vk::LogicOp::eCopy;
+        case kor::LogicOp::eAndInverted: return ::vk::LogicOp::eAndInverted;
+        case kor::LogicOp::eNoOp: return ::vk::LogicOp::eNoOp;
+        case kor::LogicOp::eXor: return ::vk::LogicOp::eXor;
+        case kor::LogicOp::eOr: return ::vk::LogicOp::eOr;
+        case kor::LogicOp::eNor: return ::vk::LogicOp::eNor;
+        case kor::LogicOp::eEquivalent: return ::vk::LogicOp::eEquivalent;
+        case kor::LogicOp::eInvert: return ::vk::LogicOp::eInvert;
+        case kor::LogicOp::eOrReverse: return ::vk::LogicOp::eOrReverse;
+        case kor::LogicOp::eCopyInverted: return ::vk::LogicOp::eCopyInverted;
+        case kor::LogicOp::eOrInverted: return ::vk::LogicOp::eOrInverted;
+        case kor::LogicOp::eNand: return ::vk::LogicOp::eNand;
+        case kor::LogicOp::eSet: return ::vk::LogicOp::eSet;
         default: throw std::runtime_error("Unknown logic operation");
         }
     }
 
-    inline ::vk::BlendFactor getVkBlendFactor(const gfx::BlendFactor factor)
+    inline ::vk::BlendFactor getVkBlendFactor(const kor::BlendFactor factor)
     {
         switch (factor) {
-        case gfx::BlendFactor::eZero: return ::vk::BlendFactor::eZero;
-        case gfx::BlendFactor::eOne: return ::vk::BlendFactor::eOne;
-        case gfx::BlendFactor::eSrcColor: return ::vk::BlendFactor::eSrcColor;
-        case gfx::BlendFactor::eOneMinusSrcColor: return ::vk::BlendFactor::eOneMinusSrcColor;
-        case gfx::BlendFactor::eDstColor: return ::vk::BlendFactor::eDstColor;
-        case gfx::BlendFactor::eOneMinusDstColor: return ::vk::BlendFactor::eOneMinusDstColor;
-        case gfx::BlendFactor::eSrcAlpha: return ::vk::BlendFactor::eSrcAlpha;
-        case gfx::BlendFactor::eOneMinusSrcAlpha: return ::vk::BlendFactor::eOneMinusSrcAlpha;
-        case gfx::BlendFactor::eDstAlpha: return ::vk::BlendFactor::eDstAlpha;
-        case gfx::BlendFactor::eOneMinusDstAlpha: return ::vk::BlendFactor::eOneMinusDstAlpha;
-        case gfx::BlendFactor::eConstantColor: return ::vk::BlendFactor::eConstantColor;
-        case gfx::BlendFactor::eOneMinusConstantColor: return ::vk::BlendFactor::eOneMinusConstantColor;
-        case gfx::BlendFactor::eSrcAlphaSaturate: return ::vk::BlendFactor::eSrcAlphaSaturate;
+        case kor::BlendFactor::eZero: return ::vk::BlendFactor::eZero;
+        case kor::BlendFactor::eOne: return ::vk::BlendFactor::eOne;
+        case kor::BlendFactor::eSrcColor: return ::vk::BlendFactor::eSrcColor;
+        case kor::BlendFactor::eOneMinusSrcColor: return ::vk::BlendFactor::eOneMinusSrcColor;
+        case kor::BlendFactor::eDstColor: return ::vk::BlendFactor::eDstColor;
+        case kor::BlendFactor::eOneMinusDstColor: return ::vk::BlendFactor::eOneMinusDstColor;
+        case kor::BlendFactor::eSrcAlpha: return ::vk::BlendFactor::eSrcAlpha;
+        case kor::BlendFactor::eOneMinusSrcAlpha: return ::vk::BlendFactor::eOneMinusSrcAlpha;
+        case kor::BlendFactor::eDstAlpha: return ::vk::BlendFactor::eDstAlpha;
+        case kor::BlendFactor::eOneMinusDstAlpha: return ::vk::BlendFactor::eOneMinusDstAlpha;
+        case kor::BlendFactor::eConstantColor: return ::vk::BlendFactor::eConstantColor;
+        case kor::BlendFactor::eOneMinusConstantColor: return ::vk::BlendFactor::eOneMinusConstantColor;
+        case kor::BlendFactor::eSrcAlphaSaturate: return ::vk::BlendFactor::eSrcAlphaSaturate;
         default: throw std::runtime_error("Unknown blend factor");
         }
     }
 
-    inline ::vk::BlendOp getVkBlendOp(const gfx::BlendOp op)
+    inline ::vk::BlendOp getVkBlendOp(const kor::BlendOp op)
     {
         switch (op) {
-        case gfx::BlendOp::eAdd: return ::vk::BlendOp::eAdd;
-        case gfx::BlendOp::eSubtract: return ::vk::BlendOp::eSubtract;
-        case gfx::BlendOp::eReverseSubtract: return ::vk::BlendOp::eReverseSubtract;
-        case gfx::BlendOp::eMin: return ::vk::BlendOp::eMin;
-        case gfx::BlendOp::eMax: return ::vk::BlendOp::eMax;
+        case kor::BlendOp::eAdd: return ::vk::BlendOp::eAdd;
+        case kor::BlendOp::eSubtract: return ::vk::BlendOp::eSubtract;
+        case kor::BlendOp::eReverseSubtract: return ::vk::BlendOp::eReverseSubtract;
+        case kor::BlendOp::eMin: return ::vk::BlendOp::eMin;
+        case kor::BlendOp::eMax: return ::vk::BlendOp::eMax;
         default: throw std::runtime_error("Unknown blend operation");
         }
     }
 
-    inline ::vk::ColorComponentFlags getVkColorComponentFlags(const Flags<gfx::ColorComponent> flags)
+    inline ::vk::ColorComponentFlags getVkColorComponentFlags(const Flags<kor::ColorComponent> flags)
     {
         auto vkFlags = ::vk::ColorComponentFlags();
-        if (flags & gfx::ColorComponent::eR) vkFlags |= ::vk::ColorComponentFlagBits::eR;
-        if (flags & gfx::ColorComponent::eG) vkFlags |= ::vk::ColorComponentFlagBits::eG;
-        if (flags & gfx::ColorComponent::eB) vkFlags |= ::vk::ColorComponentFlagBits::eB;
-        if (flags & gfx::ColorComponent::eA) vkFlags |= ::vk::ColorComponentFlagBits::eA;
+        if (flags & kor::ColorComponent::eR) vkFlags |= ::vk::ColorComponentFlagBits::eR;
+        if (flags & kor::ColorComponent::eG) vkFlags |= ::vk::ColorComponentFlagBits::eG;
+        if (flags & kor::ColorComponent::eB) vkFlags |= ::vk::ColorComponentFlagBits::eB;
+        if (flags & kor::ColorComponent::eA) vkFlags |= ::vk::ColorComponentFlagBits::eA;
         return vkFlags;
     }
 
-    inline ::vk::ClearValue getVkClearValue(const gfx::ClearColor& clearValue)
+    inline ::vk::ClearValue getVkClearValue(const kor::ClearColor& clearValue)
     {
         return std::visit([](auto&& value) -> ::vk::ClearValue {
             using T = std::decay_t<decltype(value)>;

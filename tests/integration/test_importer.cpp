@@ -16,13 +16,13 @@
 #include "mesh.h"
 #include "meshLayout.h"
 
-using gfx::Importer;
-using gfx::ResourceRef;
+using kor::Importer;
+using kor::ResourceRef;
 
 namespace {
 
 std::filesystem::path helmetPath() {
-    return gfx::assetPath("DamagedHelmet/DamagedHelmet.gltf");
+    return kor::assetPath("DamagedHelmet/DamagedHelmet.gltf");
 }
 
 // Load the glTF scene and walk the mesh/material/node metadata the importer
@@ -66,8 +66,8 @@ TEST_F(GpuTest, ImporterLoadsGltfSceneMetadata) {
 // driving importer_detail::buildVertices/uploadVertexBuffer for a multi-attribute
 // vertex (position + normal + uv), all of which the helmet provides.
 TEST_F(GpuTest, ImporterUploadsMeshToGpu) {
-    using Vertex = gfx::ParamVertex<gfx::Position, gfx::Normal, gfx::UV>;
-    using Mesh = gfx::ParamMesh<Vertex>;
+    using Vertex = kor::ParamVertex<kor::Position, kor::Normal, kor::UV>;
+    using Mesh = kor::ParamMesh<Vertex>;
 
     auto importer = Importer::Load(helmetPath());
     ASSERT_NE(importer, nullptr);
@@ -81,7 +81,7 @@ TEST_F(GpuTest, ImporterUploadsMeshToGpu) {
 // Decode one of the helmet's textures off disk and upload it, with and without
 // a generated mip chain — exercises Importer::LoadImage end to end.
 TEST_F(GpuTest, ImporterLoadsImageFromDisk) {
-    const auto path = gfx::assetPath("DamagedHelmet/Default_albedo.jpg");
+    const auto path = kor::assetPath("DamagedHelmet/Default_albedo.jpg");
 
     auto image = Importer::LoadImage(path);
     ASSERT_TRUE(static_cast<bool>(image));
@@ -98,9 +98,9 @@ TEST_F(GpuTest, ImporterLoadsImageFromDisk) {
 // round-trip. Drives Importer::SaveImage (CopyImageToBuffer + OIIO encode) and
 // the decode path again on a file this test produced.
 TEST_F(GpuTest, ImporterSaveImageRoundTrips) {
-    using gfx::Buffer;
-    using gfx::CommandBuffer;
-    using gfx::Image;
+    using kor::Buffer;
+    using kor::CommandBuffer;
+    using kor::Image;
 
     constexpr std::uint32_t kSize = 8;
     auto image = Image::Builder{}
@@ -116,10 +116,10 @@ TEST_F(GpuTest, ImporterSaveImageRoundTrips) {
         cb.ClearColorImage(ResourceRef<const Image>(image), glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
     }, CommandBuffer::Usage::eGraphics);
 
-    const auto outPath = std::filesystem::temp_directory_path() / "gfx_importer_roundtrip.png";
+    const auto outPath = std::filesystem::temp_directory_path() / "koral_importer_roundtrip.png";
     std::error_code ec;
     std::filesystem::remove(outPath, ec);
-    Importer::SaveImage(outPath, "roundtrip", gfx::FileFormat::ePNG, ResourceRef<const Image>(image));
+    Importer::SaveImage(outPath, "roundtrip", kor::FileFormat::ePNG, ResourceRef<const Image>(image));
     ASSERT_TRUE(std::filesystem::exists(outPath));
 
     auto reloaded = Importer::LoadImage(outPath);

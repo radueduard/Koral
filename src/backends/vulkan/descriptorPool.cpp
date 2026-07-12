@@ -11,7 +11,7 @@
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
     DescriptorPool::Builder & DescriptorPool::Builder::addPoolSize(const ::vk::DescriptorType type, const glm::u32 count) {
         const auto DescriptorPoolSize = ::vk::DescriptorPoolSize()
@@ -56,7 +56,7 @@ namespace gfx::vk
         Context::Device()->destroyDescriptorPool(_handle);
     }
 
-    ::vk::DescriptorSet DescriptorPool::Allocate(const gfx::vk::DescriptorSetLayout& layout) const
+    ::vk::DescriptorSet DescriptorPool::Allocate(const kor::vk::DescriptorSetLayout& layout) const
     {
         const auto layoutHandle = *layout;
 
@@ -89,7 +89,7 @@ namespace gfx::vk
         return allocatedSets[0];
     }
 
-    std::vector<::vk::DescriptorSet> DescriptorPool::Allocate(const std::vector<gfx::vk::DescriptorSetLayout>& layouts) const
+    std::vector<::vk::DescriptorSet> DescriptorPool::Allocate(const std::vector<kor::vk::DescriptorSetLayout>& layouts) const
     {
         auto layoutHandles = std::vector<::vk::DescriptorSetLayout>();
         for (const auto &layout: layouts) {

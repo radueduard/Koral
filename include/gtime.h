@@ -6,11 +6,11 @@
 
 #include "api.h"
 
-namespace gfx {
+namespace kor {
 	class Window;
 	class Engine;
 
-	class GFX_API Time {
+	class KORAL_API Time {
 	public:
 		static float FrameTime();
 		static float FixedDeltaTime();

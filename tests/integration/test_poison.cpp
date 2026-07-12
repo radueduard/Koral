@@ -19,11 +19,11 @@
 #include "file.h"
 #include "shader.h"
 
-using gfx::CommandBuffer;
-using gfx::ComputePipeline;
-using gfx::ErrorCode;
-using gfx::GraphicsPipeline;
-using gfx::Shader;
+using kor::CommandBuffer;
+using kor::ComputePipeline;
+using kor::ErrorCode;
+using kor::GraphicsPipeline;
+using kor::Shader;
 
 namespace {
 
@@ -52,9 +52,9 @@ void main() {
 
 // A shader whose source does not compile must come back poisoned, not thrown and not empty.
 TEST_F(GpuTest, BrokenShaderIsPoisonedNotThrown) {
-    const auto path = writeBrokenShader("gfx_broken.comp.glsl", kBrokenCompute);
+    const auto path = writeBrokenShader("koral_broken.comp.glsl", kBrokenCompute);
 
-    gfx::Resource<Shader> shader;
+    kor::Resource<Shader> shader;
     ASSERT_NO_THROW({
         shader = Shader::Builder{}
                      .setLang<Shader::Lang::eGLSL>()
@@ -76,7 +76,7 @@ TEST_F(GpuTest, BrokenShaderIsPoisonedNotThrown) {
 // The motivating case. A pipeline built from a shader that failed to compile is itself unusable,
 // and says *why*: the compile error is the root of its cause chain, not a separate error.
 TEST_F(GpuTest, PoisonedShaderPoisonsThePipelineWithACauseChain) {
-    const auto path = writeBrokenShader("gfx_broken2.comp.glsl", kBrokenCompute);
+    const auto path = writeBrokenShader("koral_broken2.comp.glsl", kBrokenCompute);
 
     const auto shader = Shader::Builder{}
                             .setLang<Shader::Lang::eGLSL>()
@@ -85,10 +85,10 @@ TEST_F(GpuTest, PoisonedShaderPoisonsThePipelineWithACauseChain) {
                             .build();
     ASSERT_TRUE(shader.poisoned());
 
-    gfx::Resource<ComputePipeline> pipeline;
+    kor::Resource<ComputePipeline> pipeline;
     ASSERT_NO_THROW({
         pipeline = ComputePipeline::Builder{}
-                       .setComputeShader(gfx::ResourceRef<const Shader>(shader))
+                       .setComputeShader(kor::ResourceRef<const Shader>(shader))
                        .build();
     });
 
@@ -111,7 +111,7 @@ TEST_F(GpuTest, PoisonedShaderPoisonsThePipelineWithACauseChain) {
 // Recording with a poisoned pipeline fails the command buffer instead of throwing or, worse,
 // dereferencing a pipeline that does not exist.
 TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowing) {
-    const auto path = writeBrokenShader("gfx_broken3.comp.glsl", kBrokenCompute);
+    const auto path = writeBrokenShader("koral_broken3.comp.glsl", kBrokenCompute);
 
     const auto shader = Shader::Builder{}
                             .setLang<Shader::Lang::eGLSL>()
@@ -119,7 +119,7 @@ TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowi
                             .setPath(path)
                             .build();
     const auto pipeline = ComputePipeline::Builder{}
-                              .setComputeShader(gfx::ResourceRef<const Shader>(shader))
+                              .setComputeShader(kor::ResourceRef<const Shader>(shader))
                               .build();
     ASSERT_TRUE(pipeline.poisoned());
 
@@ -127,7 +127,7 @@ TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowi
 
     ASSERT_NO_THROW({
         cb->Begin()
-           .BindComputePipeline(gfx::ResourceRef<const ComputePipeline>(pipeline))
+           .BindComputePipeline(kor::ResourceRef<const ComputePipeline>(pipeline))
            .Dispatch(1, 1, 1);
         cb->End();
     });
@@ -145,7 +145,7 @@ TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowi
 // the refs handed out while it was broken must see the repaired pipeline without being re-issued.
 // ---------------------------------------------------------------------------------------------
 TEST_F(GpuTest, FixingTheShaderBringsThePipelineBack) {
-    const auto path = writeBrokenShader("gfx_recover.comp.glsl", kBrokenCompute);
+    const auto path = writeBrokenShader("koral_recover.comp.glsl", kBrokenCompute);
 
     // getOrBuild registers the shader (poisoned) so it is watched and can be repaired.
     const auto shader = Shader::Builder{}
@@ -159,7 +159,7 @@ TEST_F(GpuTest, FixingTheShaderBringsThePipelineBack) {
     ASSERT_TRUE(pipeline.poisoned());
 
     // Hand a ref out *while the pipeline is broken*, as a renderer or scene would.
-    const gfx::ResourceRef<const ComputePipeline> ref = pipeline;
+    const kor::ResourceRef<const ComputePipeline> ref = pipeline;
     ASSERT_FALSE(ref.valid());
 
     // The user fixes the shader. (Driving requestRepair directly rather than waiting on the file
@@ -169,7 +169,7 @@ TEST_F(GpuTest, FixingTheShaderBringsThePipelineBack) {
 
     // One frame's worth of repository maintenance: the shader recompiles, and the pipeline — whose
     // only problem was that shader — is rebuilt behind it in the same pass.
-    gfx::Context::Repository().update();
+    kor::Context::Repository().update();
 
     EXPECT_TRUE(shader.valid()) << "the shader should have recompiled";
     EXPECT_TRUE(pipeline.valid())
@@ -185,7 +185,7 @@ TEST_F(GpuTest, FixingTheShaderBringsThePipelineBack) {
 // A repair that does not help must not spin: a still-broken pipeline may not rebuild itself on
 // every frame, or a broken shader would peg the CPU recompiling for as long as it stays broken.
 TEST_F(GpuTest, RepairDoesNotSpinWhileStillBroken) {
-    const auto path = writeBrokenShader("gfx_nospin.comp.glsl", kBrokenCompute);
+    const auto path = writeBrokenShader("koral_nospin.comp.glsl", kBrokenCompute);
 
     const auto shader = Shader::Builder{}
                             .setLang<Shader::Lang::eGLSL>()
@@ -198,7 +198,7 @@ TEST_F(GpuTest, RepairDoesNotSpinWhileStillBroken) {
     const auto generationBefore = pipeline.generation();
 
     // No edit, no repair request: several frames must change nothing at all.
-    for (int frame = 0; frame < 5; ++frame) gfx::Context::Repository().update();
+    for (int frame = 0; frame < 5; ++frame) kor::Context::Repository().update();
 
     EXPECT_TRUE(pipeline.poisoned());
     EXPECT_EQ(pipeline.generation(), generationBefore) << "a hopeless repair must not be retried";
@@ -210,12 +210,12 @@ TEST_F(GpuTest, GoodShaderYieldsAUsablePipeline) {
     const auto shader = Shader::Builder{}
                             .setLang<Shader::Lang::eGLSL>()
                             .setStage(Shader::Stage::eCompute)
-                            .setPath(gfx::shaderPath("doubleValues.comp.glsl"))
+                            .setPath(kor::shaderPath("doubleValues.comp.glsl"))
                             .build();
     ASSERT_TRUE(shader.valid()) << shader.error()->history();
 
     const auto pipeline = ComputePipeline::Builder{}
-                              .setComputeShader(gfx::ResourceRef<const Shader>(shader))
+                              .setComputeShader(kor::ResourceRef<const Shader>(shader))
                               .build();
     EXPECT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
     EXPECT_FALSE(pipeline.poisoned());

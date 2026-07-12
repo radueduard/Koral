@@ -12,14 +12,14 @@
 #include <framebuffer.h>
 #include <surface.h>
 
-namespace gfx
+namespace kor
 {
-    ImageView::Builder::Builder(gfx::ResourceRef<const Image> image) : image(image) {
+    ImageView::Builder::Builder(kor::ResourceRef<const Image> image) : image(image) {
         arrayLayerCount = image->getArrayLayers();
         mipLevelCount = image->getMipLevels();
     }
 
-    gfx::Result<std::unique_ptr<ImageView>> ImageView::Builder::create() const
+    kor::Result<std::unique_ptr<ImageView>> ImageView::Builder::create() const
     {
         beginAttempt();
         adopt(image, "image view's image");
@@ -32,12 +32,12 @@ namespace gfx
 
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<ImageView> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<ImageView, vk::ImageView>(*this)
-                : gfx::MakeBackendPtr<ImageView, ogl::ImageView>(*this);
+                ? kor::MakeBackendPtr<ImageView, vk::ImageView>(*this)
+                : kor::MakeBackendPtr<ImageView, ogl::ImageView>(*this);
         });
     }
 
-    gfx::Resource<ImageView> ImageView::Builder::build() const
+    kor::Resource<ImageView> ImageView::Builder::build() const
     {
         return materialize<ImageView>(*this, "ImageView");
     }

@@ -9,7 +9,7 @@
 #include "shader.h"
 
 
-namespace gfx::ogl
+namespace kor::ogl
 {
     inline GLenum toGLChannelType(const ChannelType channelType) {
         switch (channelType) {
@@ -25,13 +25,13 @@ namespace gfx::ogl
         }
     }
 
-    class GraphicsPipeline final : public gfx::GraphicsPipeline
+    class GraphicsPipeline final : public kor::GraphicsPipeline
     {
     public:
         explicit GraphicsPipeline(const Builder& createInfo);
         ~GraphicsPipeline() override;
 
-        void Bind(const gfx::CommandBuffer& commandBuffer) const override;
+        void Bind(const kor::CommandBuffer& commandBuffer) const override;
         void Unbind() const override;
 
         GLenum getMode() const;

@@ -18,9 +18,9 @@
 #include "commandBuffer.h"
 #include "gui.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    Scheduler::Scheduler(const Builder& createInfo): gfx::Scheduler(createInfo) {}
+    Scheduler::Scheduler(const Builder& createInfo): kor::Scheduler(createInfo) {}
     void Scheduler::Initialize()
     {
         glewInit();
@@ -43,22 +43,22 @@ namespace gfx::ogl
         createFrames();
     }
 
-    void Scheduler::Draw(const std::function<void(gfx::CommandBuffer&)>& renderFunc) const
+    void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const
     {
-        gfx::Scheduler::Draw(renderFunc);
+        kor::Scheduler::Draw(renderFunc);
         const auto& currentFrame = getCurrentFrame();
         auto& commandBuffer = currentFrame.getCommandBuffer();
         commandBuffer.Reset();
         renderFunc(commandBuffer.Begin());
         commandBuffer.End();
         if (const auto submitted = commandBuffer.Submit(); !submitted) {
-            gfx::log::error("[scheduler] frame submit failed: {}", submitted.error().toString());
+            kor::log::error("[scheduler] frame submit failed: {}", submitted.error().toString());
         }
 
         // Debug: dump the final default-framebuffer image to a PPM after N frames.
-        // GFX_SCREENSHOT=<path>[:frame]. Lets us verify rendered output when a live
+        // KORAL_SCREENSHOT=<path>[:frame]. Lets us verify rendered output when a live
         // window can't be screen-grabbed (XWayland compositing shows a black root).
-        if (const char* env = std::getenv("GFX_SCREENSHOT")) {
+        if (const char* env = std::getenv("KORAL_SCREENSHOT")) {
             static int frame = 0;
             std::string spec = env;
             std::string path = spec; int want = 90;
@@ -76,7 +76,7 @@ namespace gfx::ogl
                     for (glm::i32 y = static_cast<glm::i32>(ext.y) - 1; y >= 0; --y) // GL origin bottom-left → flip
                         std::fwrite(px.data() + static_cast<size_t>(y) * ext.x * 3, 1, static_cast<size_t>(ext.x) * 3, f);
                     std::fclose(f);
-                    gfx::log::info("[screenshot] wrote {} ({}x{})", path, ext.x, ext.y);
+                    kor::log::info("[screenshot] wrote {} ({}x{})", path, ext.x, ext.y);
                 }
             }
         }

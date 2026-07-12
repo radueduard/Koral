@@ -7,7 +7,7 @@
 #include "api.h"
 #include "task.h"
 
-namespace gfx
+namespace kor
 {
     /**
      * @brief A windowless app: initialize, run to completion, terminate.
@@ -27,10 +27,10 @@ namespace gfx
      * the windowed path or `CreateJob` for this one. The engine picks the path by
      * which symbol it finds, so a Job never opens a window.
      */
-    class GFX_API Job {
+    class KORAL_API Job {
     public:
         virtual ~Job() = default;
 
-        virtual gfx::Task<void> Run() = 0;
+        virtual kor::Task<void> Run() = 0;
     };
 }

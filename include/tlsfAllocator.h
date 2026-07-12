@@ -16,7 +16,7 @@
 #include <stdexcept>
 #include <vector>
 
-namespace gfx
+namespace kor
 {
     // -------------------------------------------------------------------------
     // TLSFAllocation
@@ -335,4 +335,4 @@ namespace gfx
         }
     };
 
-} // namespace gfx
+} // namespace kor

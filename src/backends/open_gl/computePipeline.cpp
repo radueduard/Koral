@@ -10,9 +10,9 @@
 #include "shader.h"
 #include "ogl_err_handling.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
-    ComputePipeline::ComputePipeline(const Builder& createInfo) : gfx::ComputePipeline(createInfo) {
+    ComputePipeline::ComputePipeline(const Builder& createInfo) : kor::ComputePipeline(createInfo) {
         Setup();
     }
 
@@ -94,16 +94,16 @@ namespace gfx::ogl
         glCheckError();
     }
 
-    void ComputePipeline::Bind(const gfx::CommandBuffer& commandBuffer) const
+    void ComputePipeline::Bind(const kor::CommandBuffer& commandBuffer) const
     {
-        gfx::ComputePipeline::Bind(commandBuffer);
+        kor::ComputePipeline::Bind(commandBuffer);
         glUseProgram(_id);
         glCheckError();
     }
 
     void ComputePipeline::Unbind() const
     {
-        gfx::ComputePipeline::Unbind();
+        kor::ComputePipeline::Unbind();
         glUseProgram(0);
         glCheckError();
     }

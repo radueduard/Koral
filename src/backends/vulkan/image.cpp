@@ -15,9 +15,9 @@
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    Image::Image(const Builder &builder) : gfx::Image(builder) {
+    Image::Image(const Builder &builder) : kor::Image(builder) {
         auto imageCreateFlags = ::vk::ImageCreateFlags();
         // if (_type == Type::e3D) imageCreateFlags |= ::vk::ImageCreateFlagBits::e2DArrayCompatibleKHR;
         if (_arrayLayers == 6 && _type == Type::e2D) imageCreateFlags |= ::vk::ImageCreateFlagBits::eCubeCompatible;
@@ -52,7 +52,7 @@ namespace gfx::vk
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(imageCreateFlags);
 
-        const auto frameCount = _isPerFrame ? gfx::Context::Scheduler().getImageCount() : 1;
+        const auto frameCount = _isPerFrame ? kor::Context::Scheduler().getImageCount() : 1;
         for (uint32_t i = 0; i < frameCount; i++)
         {
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
@@ -77,7 +77,7 @@ namespace gfx::vk
     }
 
     Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const MSAA msaa)
-        : gfx::Image(Builder()
+        : kor::Image(Builder()
             .setIsPerFrame(true)
             .setType(Type::e2D)
             .setExtent(extent)
@@ -100,26 +100,26 @@ namespace gfx::vk
 
     ::vk::ImageLayout Image::getImageLayout(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _layouts[key];
     }
 
     ::vk::AccessFlags Image::getAccessMask(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _accessMasks[key];
     }
 
     void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
             _layouts[key] = newLayout;
         }
     }
 
     void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         if (const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _accessMasks[key] != newAccessMask) {
             _accessMasks[key] = newAccessMask;
         }
@@ -140,17 +140,17 @@ namespace gfx::vk
 
     ::vk::Image Image::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         return _images[currentFrame];
     }
 
     VmaAllocation Image::getAllocation() const
     {
-        const auto currentFrame = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         return _allocations[currentFrame];
     }
 
-    void Image::Clear(const gfx::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const {
+    void Image::Clear(const kor::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const {
         const auto _layout = getImageLayout();
         const auto _handle = **this;
 
@@ -185,7 +185,7 @@ namespace gfx::vk
     }
 
     void Image::Clear(const ::vk::ClearValue& clearValue) const {
-        Context::Device().runSingleTimeCommand([this, clearValue](const gfx::vk::CommandBuffer& commandBuffer) {
+        Context::Device().runSingleTimeCommand([this, clearValue](const kor::vk::CommandBuffer& commandBuffer) {
             Clear(commandBuffer, clearValue);
         }, ::vk::QueueFlagBits::eGraphics);
     }
@@ -213,7 +213,7 @@ namespace gfx::vk
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(_arrayLayers == 6 ? ::vk::ImageCreateFlagBits::eCubeCompatible : ::vk::ImageCreateFlags());
 
-        const auto frameIndex = _isPerFrame ? gfx::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto frameIndex = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
         auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
         _images[frameIndex] = image;
         _allocations[frameIndex] = allocation;

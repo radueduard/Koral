@@ -12,7 +12,7 @@
 
 #include "error.h"
 
-using namespace gfx;
+using namespace kor;
 
 namespace {
 

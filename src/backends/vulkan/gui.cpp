@@ -22,11 +22,11 @@
 #include <imgui_impl_vulkan.h>
 #include <scheduler.h>
 
-gfx::vk::DescriptorPool* gfx::vk::GUI::_descriptorPool = nullptr;
+kor::vk::DescriptorPool* kor::vk::GUI::_descriptorPool = nullptr;
 
-namespace gfx::vk
+namespace kor::vk
 {
-    GUI_Image::GUI_Image(gfx::ResourceRef<const gfx::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    GUI_Image::GUI_Image(kor::ResourceRef<const kor::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         _helperSampler = Sampler::Builder()
             .setMagFilter(Filter::eNearest)
@@ -38,7 +38,7 @@ namespace gfx::vk
 
     GUI_Image::~GUI_Image()
     {
-        ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
+        ImGui::SetCurrentContext(kor::Context::GetCurrentImGuiContext());
         for (const auto& descriptorSet : _descriptorSets) {
             ImGui_ImplVulkan_RemoveTexture(descriptorSet);
         }
@@ -48,14 +48,14 @@ namespace gfx::vk
     {
         Context::Device().runSingleTimeCommand([&](CommandBuffer& commandBuffer)
             {
-                const auto& vkImage = dynamic_cast<const gfx::vk::Image&>(*_image);
-                const auto& vkHelperImage = dynamic_cast<const gfx::vk::Image&>(*_helperImage);
+                const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*_image);
+                const auto& vkHelperImage = dynamic_cast<const kor::vk::Image&>(*_helperImage);
 
                 const auto imageType = vkImage.getType();
 
                 commandBuffer.Blit(
                     _image, _helperImage,
-                    gfx::Blit {
+                    kor::Blit {
                         .srcOffset = { 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
                         .srcExtent = {
                             static_cast<glm::i32>(vkImage.getExtent().x),
@@ -69,24 +69,24 @@ namespace gfx::vk
                         .layerCount = 1,
                         .srcMipLevel = level,
                         .dstMipLevel = 0,
-                        .filtering = gfx::Filter::eNearest
+                        .filtering = kor::Filter::eNearest
                     });
 
                 commandBuffer.ImageBarrier({ _helperImage, ResourceAccess::FragmentShaderRead });
             }, ::vk::QueueFlagBits::eGraphics);
     }
 
-    void GUI_Image::setImage(gfx::ResourceRef<const gfx::Image> image)
+    void GUI_Image::setImage(kor::ResourceRef<const kor::Image> image)
     {
         Context::Device()->waitIdle();
-        ImGui::SetCurrentContext(gfx::Context::GetCurrentImGuiContext());
+        ImGui::SetCurrentContext(kor::Context::GetCurrentImGuiContext());
         for (const auto& descriptorSet : _descriptorSets) {
             ImGui_ImplVulkan_RemoveTexture(descriptorSet);
         }
         _descriptorSets.clear();
 
         _image = image;
-        _helperImage = gfx::Image::Builder()
+        _helperImage = kor::Image::Builder()
             .setIsPerFrame(_image->isPerFrame())
             .setType(Image::Type::e2D)
             .setFormat(image->getFormat())
@@ -96,23 +96,23 @@ namespace gfx::vk
             .addUsage(Image::Usage::eSampled)
             .build();
 
-        auto components = gfx::ImageView::ComponentMapping();
+        auto components = kor::ImageView::ComponentMapping();
         if (image->getFormat() == Image::Format::eR8_UNORM) {
-            components.r = gfx::ImageView::Swizzle::eR;
-            components.g = gfx::ImageView::Swizzle::eR;
-            components.b = gfx::ImageView::Swizzle::eR;
-            components.a = gfx::ImageView::Swizzle::eR;
+            components.r = kor::ImageView::Swizzle::eR;
+            components.g = kor::ImageView::Swizzle::eR;
+            components.b = kor::ImageView::Swizzle::eR;
+            components.a = kor::ImageView::Swizzle::eR;
         }
 
-        _helperImageView = gfx::ImageView::Builder(_helperImage)
+        _helperImageView = kor::ImageView::Builder(_helperImage)
             .setViewType(ImageView::Type::e2D)
             .setComponentMapping(components)
             .build();
 
-        for (int frame = 0; frame < gfx::Context::Scheduler().getImageCount(); ++frame) {
+        for (int frame = 0; frame < kor::Context::Scheduler().getImageCount(); ++frame) {
             _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
-                *dynamic_cast<const gfx::vk::Sampler&>(*_helperSampler),
-                dynamic_cast<const gfx::vk::ImageView&>(*_helperImageView)[frame],
+                *dynamic_cast<const kor::vk::Sampler&>(*_helperSampler),
+                dynamic_cast<const kor::vk::ImageView&>(*_helperImageView)[frame],
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
         }
 
@@ -120,13 +120,13 @@ namespace gfx::vk
     }
 
     ImTextureID GUI_Image::operator*() const {
-        const auto frameIndex = gfx::Context::Scheduler().getCurrentImageIndex();
+        const auto frameIndex = kor::Context::Scheduler().getCurrentImageIndex();
         return reinterpret_cast<ImTextureID>(_descriptorSets[frameIndex]);
     }
 
     void GUI::Init()
     {
-        _descriptorPool = gfx::vk::DescriptorPool::Builder()
+        _descriptorPool = kor::vk::DescriptorPool::Builder()
             .addPoolSize(::vk::DescriptorType::eSampler, 1000)
             .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
             .addPoolSize(::vk::DescriptorType::eSampledImage, 1000)
@@ -139,13 +139,13 @@ namespace gfx::vk
             .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
             .build();
 
-        if (!ImGui_ImplGlfw_InitForVulkan(*gfx::Context::Window(), false)) {
+        if (!ImGui_ImplGlfw_InitForVulkan(*kor::Context::Window(), false)) {
             throw std::runtime_error("Failed to initialize ImGui for GLFW");
         }
 
         const auto& queue = vk::Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
 
-        const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(gfx::Context::Scheduler());
+        const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
         static std::vector colorAttachmentFormats = {
             static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().getImage()->getFormat()))
         };
@@ -194,10 +194,10 @@ namespace gfx::vk
         ImGui_ImplVulkan_NewFrame();
     }
 
-    void GUI::Render(gfx::CommandBuffer& commandBuffer, ImDrawData* draw_data)
+    void GUI::Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
         const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
-        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*gfx::Context::DefaultFramebuffer());
+        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*kor::Context::DefaultFramebuffer());
         const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(vkFramebuffer.getColorAttachments()[0].get());
         const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.getImage());
 

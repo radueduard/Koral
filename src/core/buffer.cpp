@@ -10,9 +10,9 @@
 #include <framebuffer.h>
 #include <surface.h>
 
-namespace gfx
+namespace kor
 {
-    gfx::Result<std::unique_ptr<Buffer>> Buffer::RawBuilder::create() const
+    kor::Result<std::unique_ptr<Buffer>> Buffer::RawBuilder::create() const
     {
         beginAttempt();
 
@@ -21,7 +21,7 @@ namespace gfx
                      std::format("Uniform buffer size of {} bytes exceeds the maximum allowed size of 65536 bytes!", _size));
         }
 
-        // Logs all warnings/errors with call sites; returns the first error as a gfx::Error.
+        // Logs all warnings/errors with call sites; returns the first error as a kor::Error.
         if (auto v = validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::activeAPI();
@@ -29,15 +29,15 @@ namespace gfx
             return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
         }
 
-        // Backend allocation/creation may throw; convert any escape into a gfx::Error.
+        // Backend allocation/creation may throw; convert any escape into a kor::Error.
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Buffer> {
             return (api == API::eVulkan)
-                ? gfx::MakeBackendPtr<Buffer, vk::Buffer>(*this)
-                : gfx::MakeBackendPtr<Buffer, ogl::Buffer>(*this);
+                ? kor::MakeBackendPtr<Buffer, vk::Buffer>(*this)
+                : kor::MakeBackendPtr<Buffer, ogl::Buffer>(*this);
         });
     }
 
-    gfx::Resource<Buffer> Buffer::RawBuilder::build() const
+    kor::Resource<Buffer> Buffer::RawBuilder::build() const
     {
         auto buffer = materialize<Buffer>(*this, "Buffer");
         Context::Repository().addRef(ResourceRef<const Buffer>(buffer));

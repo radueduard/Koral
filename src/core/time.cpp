@@ -5,7 +5,7 @@
 #include <chrono>
 #include "gtime.h"
 
-namespace gfx
+namespace kor
 {
     namespace {
         // Process-wide time state: there is only ever one window, so this need not

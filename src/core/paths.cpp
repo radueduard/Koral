@@ -14,12 +14,12 @@
 #  include <dlfcn.h>
 #endif
 
-namespace gfx::detail
+namespace kor::detail
 {
     std::filesystem::path moduleDirectory()
     {
-        // Deliberately the *library's* location, not the executable's: gfx's shaders and assets are
-        // installed alongside gfx, and an application linking it should not have to know that.
+        // Deliberately the *library's* location, not the executable's: Koral's shaders and assets are
+        // installed alongside Koral, and an application linking it should not have to know that.
         // Both branches ask the loader "which module is this function in?", which is the only way to
         // get an answer that survives being installed anywhere.
 #if defined(_WIN32)
@@ -74,12 +74,12 @@ namespace gfx::detail
             // 2. Beside the library — a portable/zip layout, everything in one directory.
             add(libraryDir / kind);
             // 3. The GNU install layout, where the library lands in lib/ and its data in share/.
-            add(libraryDir.parent_path() / "share" / "GFX_RELOADED" / kind);
+            add(libraryDir.parent_path() / "share" / "Koral" / kind);
         }
 
         // 4. The source tree. Last, and only when it is still there: on the machine that built this
         //    it is exactly right, and on any other machine it is an absolute path into nothing.
-        //    A distributable build leaves this empty entirely (GFX_EMBED_SOURCE_PATHS=OFF).
+        //    A distributable build leaves this empty entirely (KORAL_EMBED_SOURCE_PATHS=OFF).
         if (!buildPath.empty()) add(std::filesystem::path(buildPath));
 
         return roots;

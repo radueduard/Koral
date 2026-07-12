@@ -15,16 +15,16 @@
 
 #include "../../../include/log.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    ::vk::SurfaceKHR CreateSurface(const ::vk::Instance& instance, const gfx::Window& window) {
+    ::vk::SurfaceKHR CreateSurface(const ::vk::Instance& instance, const kor::Window& window) {
         VkSurfaceKHR surface = VK_NULL_HANDLE;
         if (const auto result = glfwCreateWindowSurface(instance, *window, nullptr, &surface); result != VK_SUCCESS) {
             // A null/garbage surface is unrecoverable — everything downstream (swap
             // chain, present) needs it — so fail fast with a clear message rather
             // than returning an uninitialized handle and crashing later.
             const auto msg = "Failed to create window surface: " + ::vk::to_string(static_cast<::vk::Result>(result));
-            gfx::log::error("[vulkan] {}", msg);
+            kor::log::error("[vulkan] {}", msg);
             throw std::runtime_error(msg);
         }
         return { surface };
@@ -38,17 +38,17 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
         switch (messageSeverity) {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-                gfx::log::info("[vulkan] {}", pCallbackData->pMessage);
+                kor::log::info("[vulkan] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-                gfx::log::info("[vulkan] {}", pCallbackData->pMessage);
+                kor::log::info("[vulkan] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-                gfx::log::warn("[vulkan] {}", pCallbackData->pMessage);
+                kor::log::warn("[vulkan] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-                gfx::log::error("[vulkan] {}", pCallbackData->pMessage);
-                // GFX_BREAK();
+                kor::log::error("[vulkan] {}", pCallbackData->pMessage);
+                // KORAL_BREAK();
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
                 break;
@@ -74,11 +74,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         // Point the vcpkg Vulkan-Loader at the bundled validation layers (and, on
         // macOS, the molten-vk ICD) so they resolve with no system Vulkan SDK present.
         // VK_ADD_* are additive, so the user's own layers/drivers still load too.
-#ifdef GFX_VK_LAYER_PATH
-        addLoaderSearchPath("VK_ADD_LAYER_PATH", GFX_VK_LAYER_PATH);
+#ifdef KORAL_VK_LAYER_PATH
+        addLoaderSearchPath("VK_ADD_LAYER_PATH", KORAL_VK_LAYER_PATH);
 #endif
-#ifdef GFX_VK_ICD_PATH
-        addLoaderSearchPath("VK_ADD_DRIVER_FILES", GFX_VK_ICD_PATH);
+#ifdef KORAL_VK_ICD_PATH
+        addLoaderSearchPath("VK_ADD_DRIVER_FILES", KORAL_VK_ICD_PATH);
 #endif
 
         constexpr auto applicationInfo = ::vk::ApplicationInfo()
@@ -93,11 +93,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
-            gfx::log::info("[vulkan] {}", glfwExtensions[i]);
+            kor::log::info("[vulkan] {}", glfwExtensions[i]);
         }
 
         if (glfwExtensions == nullptr || glfwExtensionCount == 0) {
-            gfx::log::warn("[vulkan] glfwGetRequiredInstanceExtensions returned null — platform surface extension may be missing.");
+            kor::log::warn("[vulkan] glfwGetRequiredInstanceExtensions returned null — platform surface extension may be missing.");
         } else {
             for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
                 // Deduplicate (VK_KHR_surface is already in the hardcoded list)
@@ -105,7 +105,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 const bool already = std::ranges::any_of(_instanceExtensions,
                     [&](const char* e){ return std::string_view(e) == ext; });
                 if (!already) {
-                    gfx::log::info("[vulkan] Adding GLFW platform extension: {}", glfwExtensions[i]);
+                    kor::log::info("[vulkan] Adding GLFW platform extension: {}", glfwExtensions[i]);
                     _instanceExtensions.emplace_back(glfwExtensions[i]);
                 }
             }
@@ -123,12 +123,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 return std::ranges::any_of(platformExts, [&](const char* p){ return std::string_view(e) == p; });
             });
             if (!hasPlatformExt) {
-                gfx::log::warn("[vulkan] No platform surface extension from GLFW — probing available WSI extensions.");
+                kor::log::warn("[vulkan] No platform surface extension from GLFW — probing available WSI extensions.");
                 const auto availableExts = ::vk::enumerateInstanceExtensionProperties();
                 for (const char* candidate : platformExts) {
                     for (const auto& avail : availableExts) {
                         if (std::string_view(avail.extensionName) == candidate) {
-                            gfx::log::info("[vulkan] Adding fallback platform extension: {}", candidate);
+                            kor::log::info("[vulkan] Adding fallback platform extension: {}", candidate);
                             _instanceExtensions.push_back(candidate);
                             break;
                         }
@@ -146,7 +146,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 for (const auto& avail : availableLayers)
                     if (std::string_view(avail.layerName) == req) { found = true; break; }
                 if (found) supported.push_back(req);
-                else gfx::log::warn("[vulkan] Layer '{}' not available, skipping.", req);
+                else kor::log::warn("[vulkan] Layer '{}' not available, skipping.", req);
             }
             _instanceLayers = supported;
         }
@@ -175,20 +175,20 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                         debugUtilsEnabled = true;
                     _instanceExtensions.push_back(req);
                 } else {
-                    gfx::log::warn("[vulkan] Optional extension '{}' not available, skipping.", req);
+                    kor::log::warn("[vulkan] Optional extension '{}' not available, skipping.", req);
                 }
             }
         }
 
-        gfx::log::info("[vulkan] Final instance extensions ({}):", _instanceExtensions.size());
+        kor::log::info("[vulkan] Final instance extensions ({}):", _instanceExtensions.size());
         for (const auto& ext : _instanceExtensions)
-            gfx::log::info("[vulkan]   [ext] {}", ext);
+            kor::log::info("[vulkan]   [ext] {}", ext);
 
         // DebugPrintf GPU-assisted instrumentation is opt-in: it instruments every
         // shader and crashes the validation layer at queue submit on some drivers
-        // (seen on NVIDIA 610 / RTX 50-series). Enable only when GFX_DEBUG_PRINTF is
+        // (seen on NVIDIA 610 / RTX 50-series). Enable only when KORAL_DEBUG_PRINTF is
         // set in the environment (and the shaders actually use debugPrintfEXT).
-        const bool enableDebugPrintf = hasValidation && std::getenv("GFX_DEBUG_PRINTF") != nullptr;
+        const bool enableDebugPrintf = hasValidation && std::getenv("KORAL_DEBUG_PRINTF") != nullptr;
 
         constexpr std::array<uint32_t, 1> bufferSize = { 1024 * 1024 };
         const auto validationLayerSetting = ::vk::LayerSettingEXT()
@@ -240,7 +240,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         if (debugUtilsEnabled && VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateDebugUtilsMessengerEXT) {
             _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
         } else if (hasValidation) {
-            gfx::log::warn("[vulkan] VK_EXT_debug_utils unavailable — debug messenger disabled.");
+            kor::log::warn("[vulkan] VK_EXT_debug_utils unavailable — debug messenger disabled.");
         }
     }
 

@@ -10,15 +10,15 @@
 #include <glm/glm.hpp>
 
 #include "api.h"
-#include "context.h" // gfx::API
+#include "context.h" // kor::API
 
-namespace gfx
+namespace kor
 {
     // Startup configuration a project hands to the engine. A project's shared library may
-    // export `extern "C" gfx::ProjectConfig* CreateProjectConfig()` (separate from
+    // export `extern "C" kor::ProjectConfig* CreateProjectConfig()` (separate from
     // CreateScene); the engine reads it before creating the Window. These values are
     // defaults — any matching command-line flag overrides them.
-    struct GFX_API ProjectConfig
+    struct KORAL_API ProjectConfig
     {
         // The project's shaders/ folder. Added to the shader search roots (alongside the
         // API's own), so Slang modules and GLSL/SPIR-V paths resolve against it.

@@ -11,7 +11,7 @@
 #include "../backends/open_gl/scheduler.h"
 #include "../backends/vulkan/scheduler.h"
 
-namespace gfx
+namespace kor
 {
     Frame::Frame(const glm::u32 imageIndex) : _imageIndex(imageIndex)
     {

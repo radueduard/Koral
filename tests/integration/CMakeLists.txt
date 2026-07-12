@@ -1,5 +1,5 @@
 # GPU integration tests — boot a real Vulkan device and exercise GPU paths.
-add_executable(gfx_integration_tests
+add_executable(koral_integration_tests
         gpu_fixture.cpp
         test_buffer_roundtrip.cpp
         test_compute_dispatch.cpp
@@ -12,8 +12,8 @@ add_executable(gfx_integration_tests
         test_poison.cpp
 )
 
-target_link_libraries(gfx_integration_tests PRIVATE
-        GFX_RELOADED
+target_link_libraries(koral_integration_tests PRIVATE
+        Koral
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum
@@ -24,7 +24,7 @@ target_link_libraries(gfx_integration_tests PRIVATE
         glfw
 )
 
-target_include_directories(gfx_integration_tests PRIVATE
+target_include_directories(koral_integration_tests PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
         ${CMAKE_SOURCE_DIR})
@@ -32,4 +32,4 @@ target_include_directories(gfx_integration_tests PRIVATE
 include(GoogleTest)
 # DISCOVERY_MODE PRE_TEST: enumerate tests at run time, not build time, so a build
 # host without a GPU/display never has to launch the binary just to list tests.
-gtest_discover_tests(gfx_integration_tests DISCOVERY_MODE PRE_TEST)
+gtest_discover_tests(koral_integration_tests DISCOVERY_MODE PRE_TEST)

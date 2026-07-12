@@ -10,7 +10,7 @@
 #include "image.h"
 #include <gui.h>
 
-namespace gfx::ogl
+namespace kor::ogl
 {
     class GUI
     {
@@ -21,19 +21,19 @@ namespace gfx::ogl
         static void Shutdown();
     };
 
-    class GUI_Image final : public gfx::GUI_Image
+    class GUI_Image final : public kor::GUI_Image
     {
     public:
-        explicit GUI_Image(gfx::ResourceRef<const gfx::Image> image, glm::u32 layer, glm::u32 level);
+        explicit GUI_Image(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
         ~GUI_Image() override;
 
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(gfx::ResourceRef<const gfx::Image> image) override;
+        void setImage(kor::ResourceRef<const kor::Image> image) override;
 
         ImTextureID operator*() const override;
 
     private:
         GLint _id;
-        gfx::ResourceRef<const gfx::Image> _image;
+        kor::ResourceRef<const kor::Image> _image;
     };
 }

@@ -8,9 +8,9 @@
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    Sampler::Sampler(const Builder& builder) : gfx::Sampler(builder)
+    Sampler::Sampler(const Builder& builder) : kor::Sampler(builder)
     {
         const auto samplerInfo = ::vk::SamplerCreateInfo()
             .setMagFilter(getVkFilter(_magFilter))

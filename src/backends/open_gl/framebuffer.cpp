@@ -10,7 +10,7 @@
 #include "imageView.h"
 #include "ogl_err_handling.h"
 
-namespace gfx::ogl
+namespace kor::ogl
 {
     Framebuffer::Framebuffer() : _id(0)
     {
@@ -18,7 +18,7 @@ namespace gfx::ogl
         _clearValues.clearColor.emplace_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
     }
 
-    Framebuffer::Framebuffer(const gfx::Framebuffer::Builder& createInfo) : gfx::Framebuffer(createInfo) {
+    Framebuffer::Framebuffer(const kor::Framebuffer::Builder& createInfo) : kor::Framebuffer(createInfo) {
         glCreateFramebuffers(1, &_id);
         glCheckError();
 
@@ -74,6 +74,6 @@ namespace gfx::ogl
 
     bool Framebuffer::hasDepthStencilAttachment() const
     {
-        return gfx::Framebuffer::hasDepthAttachment() || _id == 0;
+        return kor::Framebuffer::hasDepthAttachment() || _id == 0;
     }
 }

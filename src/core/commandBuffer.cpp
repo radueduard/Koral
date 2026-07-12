@@ -17,7 +17,7 @@
 #include "../backends/vulkan/vulkanContext.h"
 #include "../../include/window.h"
 
-namespace gfx
+namespace kor
 {
     ::vk::QueueFlags getQueueFlagsFromUsage(const Flags<CommandBuffer::Usage> usage)
     {
@@ -32,13 +32,13 @@ namespace gfx
     }
 
     BufferBarrier::BufferBarrier(
-        const gfx::ResourceRef<const gfx::Buffer> &buffer, const ResourceAccess dstAccess,
+        const kor::ResourceRef<const kor::Buffer> &buffer, const ResourceAccess dstAccess,
         const glm::u64 offset, const glm::u64 size)
       : _buffer(buffer), _dstAccess(dstAccess),
         _offset(offset), _size(size) {}
 
     ImageBarrier::ImageBarrier(
-        const gfx::ResourceRef<const gfx::Image> &image,
+        const kor::ResourceRef<const kor::Image> &image,
         const ResourceAccess dstAccess,
         const std::optional<glm::u32> baseMipLevel, const std::optional<glm::u32> levelCount,
         const std::optional<glm::u32> baseArrayLayer, const std::optional<glm::u32> layerCount)
@@ -57,7 +57,7 @@ namespace gfx
         // history() rather than toString(): when a command fails because a resource is unusable,
         // the line the user needs is the root cause (the shader that would not compile), not the
         // symptom (the pipeline that could not be bound).
-        gfx::log::error("[command] {}", error.history());
+        kor::log::error("[command] {}", error.history());
         _errors.push_back(std::move(error));
         _failed = true;
         return *this;
@@ -79,7 +79,7 @@ namespace gfx
         return *this;
     }
 
-    void CommandBuffer::stateBeginRendering(const gfx::ResourceRef<const Framebuffer>& framebuffer)
+    void CommandBuffer::stateBeginRendering(const kor::ResourceRef<const Framebuffer>& framebuffer)
     {
         _state.boundFramebuffer = framebuffer;
         _state.boundComputePipeline = std::nullopt;
@@ -89,7 +89,7 @@ namespace gfx
         _state.scissorSet = false;
     }
 
-    CommandBuffer& CommandBuffer::BeginRendering(gfx::ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters)
+    CommandBuffer& CommandBuffer::BeginRendering(kor::ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters)
     {
         if (_failed) return *this;
         if (reject(framebuffer, "framebuffer")) return *this;
@@ -126,61 +126,61 @@ namespace gfx
     // The base implementations only validate and record intent (which state the
     // caller has established); backends override to emit the GPU command and then
     // chain up to these to mark the tracking bit.
-#define GFX_DYNAMIC_STATE_SETTER_GUARD(bit, name)                                            \
+#define KORAL_DYNAMIC_STATE_SETTER_GUARD(bit, name)                                            \
         if (!_state.boundGraphicsPipeline.has_value())                                       \
             return record(ErrorCode::eNoGraphicsPipelineBound,                               \
                 "Cannot set " name " without a graphics pipeline bound.");                   \
         _state.dynamicStateSet |= DynamicState::bit;
 
     CommandBuffer& CommandBuffer::SetLineWidth(float)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eLineWidth, "line width") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eLineWidth, "line width") return *this; }
 
     CommandBuffer& CommandBuffer::SetDepthBias(float, float, float)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return *this; }
 
     CommandBuffer& CommandBuffer::SetBlendConstants(glm::vec4)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return *this; }
 
     CommandBuffer& CommandBuffer::SetStencilCompareMask(StencilFace, glm::u32)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return *this; }
 
     CommandBuffer& CommandBuffer::SetStencilWriteMask(StencilFace, glm::u32)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return *this; }
 
     CommandBuffer& CommandBuffer::SetStencilReference(StencilFace, glm::u32)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return *this; }
 
     CommandBuffer& CommandBuffer::SetCullMode(Flags<CullMode>)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eCullMode, "cull mode") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eCullMode, "cull mode") return *this; }
 
     CommandBuffer& CommandBuffer::SetFrontFace(FrontFace)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eFrontFace, "front face") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eFrontFace, "front face") return *this; }
 
     CommandBuffer& CommandBuffer::SetDepthTestEnable(bool)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthTestEnable, "depth test enable") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthTestEnable, "depth test enable") return *this; }
 
     CommandBuffer& CommandBuffer::SetDepthWriteEnable(bool)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthWriteEnable, "depth write enable") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthWriteEnable, "depth write enable") return *this; }
 
     CommandBuffer& CommandBuffer::SetDepthCompareOp(CompareOp)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthCompareOp, "depth compare op") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthCompareOp, "depth compare op") return *this; }
 
     CommandBuffer& CommandBuffer::SetStencilTestEnable(bool)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilTestEnable, "stencil test enable") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilTestEnable, "stencil test enable") return *this; }
 
     CommandBuffer& CommandBuffer::SetStencilOp(StencilFace, StencilOp, StencilOp, StencilOp, CompareOp)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eStencilOp, "stencil op") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilOp, "stencil op") return *this; }
 
     CommandBuffer& CommandBuffer::SetDepthBiasEnable(bool)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eDepthBiasEnable, "depth bias enable") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBiasEnable, "depth bias enable") return *this; }
 
     CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(bool)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(eRasterizerDiscardEnable, "rasterizer discard enable") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eRasterizerDiscardEnable, "rasterizer discard enable") return *this; }
 
     CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(bool)
-    { GFX_DYNAMIC_STATE_SETTER_GUARD(ePrimitiveRestartEnable, "primitive restart enable") return *this; }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(ePrimitiveRestartEnable, "primitive restart enable") return *this; }
 
-#undef GFX_DYNAMIC_STATE_SETTER_GUARD
+#undef KORAL_DYNAMIC_STATE_SETTER_GUARD
 
     void CommandBuffer::applyDynamicDefaults()
     {
@@ -237,7 +237,7 @@ namespace gfx
             SetPrimitiveRestartEnable(ia.primitiveRestartEnable);
     }
 
-    void CommandBuffer::stateBindComputePipeline(const gfx::ResourceRef<const ComputePipeline>& pipeline)
+    void CommandBuffer::stateBindComputePipeline(const kor::ResourceRef<const ComputePipeline>& pipeline)
     {
         // get(), not &*: comparing identity must not dereference.
         if (!_state.boundComputePipeline.has_value() || _state.boundComputePipeline->get() != pipeline.get())
@@ -247,7 +247,7 @@ namespace gfx
         _state.boundRayTracingPipeline = std::nullopt;
     }
 
-    CommandBuffer& CommandBuffer::BindComputePipeline(gfx::ResourceRef<const ComputePipeline> pipeline)
+    CommandBuffer& CommandBuffer::BindComputePipeline(kor::ResourceRef<const ComputePipeline> pipeline)
     {
         if (_failed) return *this;
         if (reject(pipeline, "compute pipeline")) return *this;
@@ -255,7 +255,7 @@ namespace gfx
         return doBindComputePipeline(pipeline);
     }
 
-    void CommandBuffer::stateBindGraphicsPipeline(const gfx::ResourceRef<const GraphicsPipeline>& pipeline)
+    void CommandBuffer::stateBindGraphicsPipeline(const kor::ResourceRef<const GraphicsPipeline>& pipeline)
     {
         // get(), not &*: comparing identity must not dereference.
         if (!_state.boundGraphicsPipeline.has_value() || _state.boundGraphicsPipeline->get() != pipeline.get())
@@ -268,7 +268,7 @@ namespace gfx
         _state.dynamicStateSet = Flags<DynamicState>{};
     }
 
-    CommandBuffer& CommandBuffer::BindGraphicsPipeline(gfx::ResourceRef<const GraphicsPipeline> pipeline)
+    CommandBuffer& CommandBuffer::BindGraphicsPipeline(kor::ResourceRef<const GraphicsPipeline> pipeline)
     {
         if (_failed) return *this;
         if (reject(pipeline, "graphics pipeline")) return *this;
@@ -276,7 +276,7 @@ namespace gfx
         return doBindGraphicsPipeline(pipeline);
     }
 
-    void CommandBuffer::stateBindRayTracingPipeline(const gfx::ResourceRef<const RayTracingPipeline>& pipeline)
+    void CommandBuffer::stateBindRayTracingPipeline(const kor::ResourceRef<const RayTracingPipeline>& pipeline)
     {
         // get(), not &*: comparing identity must not dereference.
         if (!_state.boundRayTracingPipeline.has_value() || _state.boundRayTracingPipeline->get() != pipeline.get())
@@ -286,7 +286,7 @@ namespace gfx
         _state.boundGraphicsPipeline = std::nullopt;
     }
 
-    CommandBuffer& CommandBuffer::BindRayTracingPipeline(gfx::ResourceRef<const RayTracingPipeline> pipeline)
+    CommandBuffer& CommandBuffer::BindRayTracingPipeline(kor::ResourceRef<const RayTracingPipeline> pipeline)
     {
         if (_failed) return *this;
         if (reject(pipeline, "ray tracing pipeline")) return *this;
@@ -299,7 +299,7 @@ namespace gfx
         return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
     }
 
-    CommandBuffer& CommandBuffer::doBindRayTracingPipeline(gfx::ResourceRef<const RayTracingPipeline>)
+    CommandBuffer& CommandBuffer::doBindRayTracingPipeline(kor::ResourceRef<const RayTracingPipeline>)
     {
         return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
     }
@@ -309,12 +309,12 @@ namespace gfx
     CommandBuffer& CommandBuffer::EndDebugLabel() { return *this; }
     CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string&, glm::vec4) { return *this; }
 
-    void CommandBuffer::stateBindMesh(const gfx::ResourceRef<const Mesh>& mesh)
+    void CommandBuffer::stateBindMesh(const kor::ResourceRef<const Mesh>& mesh)
     {
         _state.boundMesh = mesh;
     }
 
-    CommandBuffer& CommandBuffer::BindMesh(gfx::ResourceRef<const Mesh> mesh) {
+    CommandBuffer& CommandBuffer::BindMesh(kor::ResourceRef<const Mesh> mesh) {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot bind a mesh without a graphics pipeline bound.");
@@ -363,7 +363,7 @@ namespace gfx
     }
 
 
-    CommandBuffer& CommandBuffer::GenerateMipmaps(gfx::ResourceRef<const Image> image)
+    CommandBuffer& CommandBuffer::GenerateMipmaps(kor::ResourceRef<const Image> image)
     {
         if (_failed) return *this;
         if (reject(image, "image")) return *this;
@@ -384,7 +384,7 @@ namespace gfx
         for (uint32_t i = 1; i < mipLevels; i++) {
             Blit(
                 image, image,
-                gfx::Blit {
+                kor::Blit {
                     .srcOffset = { 0, 0, 0 },
                     .srcExtent = { mipWidth, mipHeight, mipDepth },
                     .dstOffset = { 0, 0, 0 },
@@ -407,18 +407,18 @@ namespace gfx
         return *this;
     }
 
-    void CommandBuffer::SingleTimeCommand(const std::function<void(gfx::CommandBuffer &)> &command, const Usage usage) {
+    void CommandBuffer::SingleTimeCommand(const std::function<void(kor::CommandBuffer &)> &command, const Usage usage) {
         const auto commandBuffer = Create(usage);
         commandBuffer->Begin();
         command(*commandBuffer);
         commandBuffer->End();
         if (auto submitted = commandBuffer->Submit(); !submitted) {
-            gfx::log::error("[command] single-time command failed: {}", submitted.error().toString());
+            kor::log::error("[command] single-time command failed: {}", submitted.error().toString());
         }
         commandBuffer->WaitForFence();
     }
 
-    CommandBuffer& CommandBuffer::DrawMesh(gfx::ResourceRef<const Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
+    CommandBuffer& CommandBuffer::DrawMesh(kor::ResourceRef<const Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
     {
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
@@ -433,7 +433,7 @@ namespace gfx
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::DrawSubMesh(gfx::ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
+    CommandBuffer & CommandBuffer::DrawSubMesh(kor::ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
@@ -467,14 +467,14 @@ namespace gfx
     // The do* implementations below them may assume every resource they receive is alive and
     // usable — which is what the dynamic_cast at every backend deref has always assumed.
 
-    CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, gfx::ResourceRef<const DescriptorSet> descriptorSet, const bool debug)
+    CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, kor::ResourceRef<const DescriptorSet> descriptorSet, const bool debug)
     {
         if (_failed) return *this;
         if (reject(descriptorSet, "descriptor set")) return *this;
         return doBindDescriptorSet(index, descriptorSet, debug);
     }
 
-    CommandBuffer& CommandBuffer::Barrier(std::vector<gfx::BufferBarrier> bufferBarriers, std::vector<gfx::ImageBarrier> imageBarriers)
+    CommandBuffer& CommandBuffer::Barrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers)
     {
         if (_failed) return *this;
         for (const auto& barrier : bufferBarriers)
@@ -484,7 +484,7 @@ namespace gfx
         return doBarrier(std::move(bufferBarriers), std::move(imageBarriers));
     }
 
-    CommandBuffer& CommandBuffer::DispatchIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset)
+    CommandBuffer& CommandBuffer::DispatchIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset)
     {
         if (_failed) return *this;
         if (!_state.boundComputePipeline.has_value())
@@ -493,7 +493,7 @@ namespace gfx
         return doDispatchIndirect(indirectBuffer, offset);
     }
 
-    CommandBuffer& CommandBuffer::DrawIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
+    CommandBuffer& CommandBuffer::DrawIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
@@ -507,7 +507,7 @@ namespace gfx
         return doDrawIndirect(indirectBuffer, offset, drawCount, stride);
     }
 
-    CommandBuffer& CommandBuffer::DrawIndexedIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
+    CommandBuffer& CommandBuffer::DrawIndexedIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
@@ -523,7 +523,7 @@ namespace gfx
         return doDrawIndexedIndirect(indirectBuffer, offset, drawCount, stride);
     }
 
-    CommandBuffer& CommandBuffer::DrawMeshTasksIndirect(gfx::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
+    CommandBuffer& CommandBuffer::DrawMeshTasksIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride)
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
@@ -537,28 +537,28 @@ namespace gfx
         return doDrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride);
     }
 
-    CommandBuffer& CommandBuffer::ClearBuffer(gfx::ResourceRef<const Buffer> buffer, const glm::u64 offset, const glm::u64 size)
+    CommandBuffer& CommandBuffer::ClearBuffer(kor::ResourceRef<const Buffer> buffer, const glm::u64 offset, const glm::u64 size)
     {
         if (_failed) return *this;
         if (reject(buffer, "buffer")) return *this;
         return doClearBuffer(buffer, offset, size);
     }
 
-    CommandBuffer& CommandBuffer::ClearColorImage(gfx::ResourceRef<const Image> image, const glm::vec4 color)
+    CommandBuffer& CommandBuffer::ClearColorImage(kor::ResourceRef<const Image> image, const glm::vec4 color)
     {
         if (_failed) return *this;
         if (reject(image, "image")) return *this;
         return doClearColorImage(image, color);
     }
 
-    CommandBuffer& CommandBuffer::FillBuffer(gfx::ResourceRef<const Buffer> buffer, void* data, const glm::u64 offset, const glm::u64 size)
+    CommandBuffer& CommandBuffer::FillBuffer(kor::ResourceRef<const Buffer> buffer, void* data, const glm::u64 offset, const glm::u64 size)
     {
         if (_failed) return *this;
         if (reject(buffer, "buffer")) return *this;
         return doFillBuffer(buffer, data, offset, size);
     }
 
-    CommandBuffer& CommandBuffer::CopyBuffer(gfx::ResourceRef<const Buffer> srcBuffer, gfx::ResourceRef<const Buffer> dstBuffer, const glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset)
+    CommandBuffer& CommandBuffer::CopyBuffer(kor::ResourceRef<const Buffer> srcBuffer, kor::ResourceRef<const Buffer> dstBuffer, const glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset)
     {
         if (_failed) return *this;
         if (reject(srcBuffer, "copy source buffer")) return *this;
@@ -566,7 +566,7 @@ namespace gfx
         return doCopyBuffer(srcBuffer, dstBuffer, size, srcOffset, dstOffset);
     }
 
-    CommandBuffer& CommandBuffer::CopyBufferToImage(gfx::ResourceRef<const Buffer> buffer, gfx::ResourceRef<const Image> image, const gfx::Copy copyInfo)
+    CommandBuffer& CommandBuffer::CopyBufferToImage(kor::ResourceRef<const Buffer> buffer, kor::ResourceRef<const Image> image, const kor::Copy copyInfo)
     {
         if (_failed) return *this;
         if (reject(buffer, "copy source buffer")) return *this;
@@ -574,7 +574,7 @@ namespace gfx
         return doCopyBufferToImage(buffer, image, copyInfo);
     }
 
-    CommandBuffer& CommandBuffer::CopyImageToBuffer(gfx::ResourceRef<const Image> image, gfx::ResourceRef<const Buffer> buffer, const gfx::Copy copyInfo)
+    CommandBuffer& CommandBuffer::CopyImageToBuffer(kor::ResourceRef<const Image> image, kor::ResourceRef<const Buffer> buffer, const kor::Copy copyInfo)
     {
         if (_failed) return *this;
         if (reject(image, "copy source image")) return *this;
@@ -582,14 +582,14 @@ namespace gfx
         return doCopyImageToBuffer(image, buffer, copyInfo);
     }
 
-    CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const Image> srcImage, const gfx::Blit blitInfo)
+    CommandBuffer& CommandBuffer::Blit(kor::ResourceRef<const Image> srcImage, const kor::Blit blitInfo)
     {
         if (_failed) return *this;
         if (reject(srcImage, "blit source image")) return *this;
         return doBlit(srcImage, blitInfo);
     }
 
-    CommandBuffer& CommandBuffer::Blit(gfx::ResourceRef<const Image> srcImage, gfx::ResourceRef<const Image> dstImage, const gfx::Blit blitInfo)
+    CommandBuffer& CommandBuffer::Blit(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Blit blitInfo)
     {
         if (_failed) return *this;
         if (reject(srcImage, "blit source image")) return *this;
@@ -597,14 +597,14 @@ namespace gfx
         return doBlit(srcImage, dstImage, blitInfo);
     }
 
-    CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<const Image> srcImage, const gfx::Resolve resolveInfo)
+    CommandBuffer& CommandBuffer::Resolve(kor::ResourceRef<const Image> srcImage, const kor::Resolve resolveInfo)
     {
         if (_failed) return *this;
         if (reject(srcImage, "resolve source image")) return *this;
         return doResolve(srcImage, resolveInfo);
     }
 
-    CommandBuffer& CommandBuffer::Resolve(gfx::ResourceRef<const Image> srcImage, gfx::ResourceRef<const Image> dstImage, const gfx::Resolve resolveInfo)
+    CommandBuffer& CommandBuffer::Resolve(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Resolve resolveInfo)
     {
         if (_failed) return *this;
         if (reject(srcImage, "resolve source image")) return *this;

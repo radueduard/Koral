@@ -9,9 +9,9 @@
 
 #include "vk_enum_conversions.h"
 
-namespace gfx::vk
+namespace kor::vk
 {
-    DescriptorSetLayout::DescriptorSetLayout(const Builder& builder): gfx::DescriptorSetLayout(builder)
+    DescriptorSetLayout::DescriptorSetLayout(const Builder& builder): kor::DescriptorSetLayout(builder)
     {
         auto flags = std::vector<::vk::DescriptorBindingFlags>(_bindings.size());
         bool anyUpdateAfterBind = false;

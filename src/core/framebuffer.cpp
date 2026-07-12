@@ -14,7 +14,7 @@
 #include "image.h"
 #include "imageView.h"
 
-namespace gfx {
+namespace kor {
     Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(ResourceRef<const ImageView> imageView, ClearColor clearColor)
     {
         colorAttachments.emplace_back(*imageView);
@@ -121,17 +121,17 @@ namespace gfx {
         });
     }
 
-    gfx::Resource<Framebuffer> Framebuffer::Builder::build() const
+    kor::Resource<Framebuffer> Framebuffer::Builder::build() const
     {
         return materialize<Framebuffer>(*this, "Framebuffer");
     }
 
-    gfx::Resource<Framebuffer> Framebuffer::CreateDefault() {
+    kor::Resource<Framebuffer> Framebuffer::CreateDefault() {
         switch (Context::activeAPI()) {
         case API::eOpenGL:
-            return gfx::MakeBackendResource<Framebuffer, ogl::Framebuffer>();
+            return kor::MakeBackendResource<Framebuffer, ogl::Framebuffer>();
         case API::eVulkan:
-            return gfx::MakeBackendResource<Framebuffer, vk::Framebuffer>();
+            return kor::MakeBackendResource<Framebuffer, vk::Framebuffer>();
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

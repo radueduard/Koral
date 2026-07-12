@@ -15,7 +15,7 @@
 #include "api.h"
 #include "scene.h"
 
-namespace gfx
+namespace kor
 {
     class Surface;
     class Framebuffer;
@@ -27,14 +27,14 @@ struct GLFWwindow;
 struct GLFWimage;
 struct GLFWvidmode;
 
-namespace gfx {
-    class GFX_API Window {
+namespace kor {
+    class KORAL_API Window {
         friend class Input;
         friend class Input::Callbacks;
-        friend class gfx::Engine;
+        friend class kor::Engine;
         friend class Time;
     public:
-        struct GFX_API Builder {
+        struct KORAL_API Builder {
             std::string title = "GFXFramework";
             glm::uvec2 extent = { 1280, 720 };
             bool resizable = true;
@@ -122,9 +122,9 @@ namespace gfx {
 
         [[nodiscard]] API getAPI() const { return _api; }
         [[nodiscard]] const std::string& getTitle() const { return _title; }
-        [[nodiscard]] gfx::ResourceRef<gfx::Framebuffer> getFramebuffer() const { return _framebuffer; }
+        [[nodiscard]] kor::ResourceRef<kor::Framebuffer> getFramebuffer() const { return _framebuffer; }
         [[nodiscard]] bool hasResized() const { return _hasResized; }
-        [[nodiscard]] const gfx::Surface& getSurface() const { return *_surface; }
+        [[nodiscard]] const kor::Surface& getSurface() const { return *_surface; }
 
         void setIcon(const std::filesystem::path& iconPath);
 
@@ -139,7 +139,7 @@ namespace gfx {
         GLFWmonitor* _monitor = nullptr;
         GLFWimage* _icon = nullptr;
         const GLFWvidmode *_videoMode = nullptr;
-        std::unique_ptr<gfx::Surface> _surface;
+        std::unique_ptr<kor::Surface> _surface;
 
         std::string _title;
         glm::uvec2 _extent;
@@ -150,7 +150,7 @@ namespace gfx {
         bool _vsync;
         API _api;
 
-        gfx::Resource<gfx::Framebuffer> _framebuffer;
+        kor::Resource<kor::Framebuffer> _framebuffer;
 
         std::unique_ptr<Scene> _scene;
 

@@ -1,4 +1,4 @@
-// Integration tests for gfx::Image against a real Vulkan device. These exercise
+// Integration tests for kor::Image against a real Vulkan device. These exercise
 // the image upload path (staging buffer -> vkCmdCopyBufferToImage during build),
 // image layout transitions (the automatic barrier inside CopyImageToBuffer),
 // vkCmdClearColorImage, and image->buffer readback.
@@ -21,10 +21,10 @@
 #include "error.h"
 #include "image.h"
 
-using gfx::Buffer;
-using gfx::CommandBuffer;
-using gfx::Image;
-using gfx::ResourceRef;
+using kor::Buffer;
+using kor::CommandBuffer;
+using kor::Image;
+using kor::ResourceRef;
 
 namespace {
 
@@ -34,7 +34,7 @@ constexpr std::uint32_t kW = 8;
 constexpr std::uint32_t kH = 8;
 
 // Copies a whole RGBA8 image into a fresh readback buffer and returns its pixels.
-std::vector<Pixel> readbackPixels(const gfx::Resource<Image>& image, std::uint32_t w, std::uint32_t h) {
+std::vector<Pixel> readbackPixels(const kor::Resource<Image>& image, std::uint32_t w, std::uint32_t h) {
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(w) * h * sizeof(Pixel))
       .addUsage(Buffer::Usage::eTransferDst)
@@ -149,7 +149,7 @@ TEST_F(GpuTest, SubRegionReadback) {
     auto readback = rb.build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(readback), gfx::Copy{
+        cb.CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(readback), kor::Copy{
             .imageOffset = { static_cast<int>(kOffX), static_cast<int>(kOffY), 0 },
             .imageExtent = { static_cast<int>(kSubW), static_cast<int>(kSubH), 1 },
         });
@@ -199,7 +199,7 @@ TEST_F(GpuTest, PartialUploadIntoSubRegion) {
     auto staging = sb.build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.CopyBufferToImage(ResourceRef<const Buffer>(staging), ResourceRef<const Image>(image), gfx::Copy{
+        cb.CopyBufferToImage(ResourceRef<const Buffer>(staging), ResourceRef<const Image>(image), kor::Copy{
             .imageOffset = { static_cast<int>(kOffX), static_cast<int>(kOffY), 0 },
             .imageExtent = { static_cast<int>(kSubW), static_cast<int>(kSubH), 1 },
         });
@@ -221,7 +221,7 @@ TEST_F(GpuTest, PartialUploadIntoSubRegion) {
 }
 
 // Regression guard for the whole-system GPU hang: a copy whose requested extent
-// overruns the destination buffer must be rejected on the CPU (as a gfx::Error)
+// overruns the destination buffer must be rejected on the CPU (as a kor::Error)
 // and must NEVER be handed to vkCmdCopyImageToBuffer. We record the copy on a
 // command buffer and inspect ok()/errors() without ever submitting it, so even a
 // still-broken build fails as a normal assertion instead of freezing the machine.
@@ -243,14 +243,14 @@ TEST_F(GpuTest, OversizeCopyRejectedNotSubmitted) {
 
     auto cb = CommandBuffer::Create(CommandBuffer::Usage::eTransfer);
     cb->Begin();
-    cb->CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(readback), gfx::Copy{
+    cb->CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(readback), kor::Copy{
         .imageExtent = { 100000, 100000, 1 }, // gigantic on purpose
     });
     cb->End();
 
     EXPECT_FALSE(cb->ok()) << "an oversize copy must be recorded as a failure";
     ASSERT_FALSE(cb->errors().empty());
-    EXPECT_EQ(cb->errors().front().code, gfx::ErrorCode::eCopySizeExceedsBuffer);
+    EXPECT_EQ(cb->errors().front().code, kor::ErrorCode::eCopySizeExceedsBuffer);
     // Intentionally never Submit()/WaitForFence(): the bad copy was rejected at
     // record time, so there is nothing safe or useful to send to the GPU.
 }
@@ -281,7 +281,7 @@ TEST_F(GpuTest, ByteSizedGuardRejectsLargeFormatOverflow) {
 
     EXPECT_FALSE(cb->ok()) << "a byte-overflowing copy must be recorded as a failure";
     ASSERT_FALSE(cb->errors().empty());
-    EXPECT_EQ(cb->errors().front().code, gfx::ErrorCode::eCopySizeExceedsBuffer);
+    EXPECT_EQ(cb->errors().front().code, kor::ErrorCode::eCopySizeExceedsBuffer);
 }
 
 } // namespace

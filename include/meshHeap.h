@@ -19,7 +19,7 @@
 #include "buffer.h"
 #include "structs.h"
 
-namespace gfx
+namespace kor
 {
     template<typename... Streams>
     class MeshHeap : public Mesh

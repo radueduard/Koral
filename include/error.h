@@ -4,15 +4,15 @@
 
 /**
  * @file error.h
- * @brief Structured, functional error handling for the gfx API.
+ * @brief Structured, functional error handling for the Koral API.
  *
  * The public API reports failures as values, not exceptions: builders return
- * @ref gfx::Result and the command buffer accumulates @ref gfx::Error using a
- * railway model. Every error carries a documented @ref gfx::ErrorCode so users
- * get an actionable gfx error instead of a raw backend (Vulkan) one.
+ * @ref kor::Result and the command buffer accumulates @ref kor::Error using a
+ * railway model. Every error carries a documented @ref kor::ErrorCode so users
+ * get an actionable Koral error instead of a raw backend (Vulkan) one.
  *
- * Backends still throw internally; @ref gfx::guard converts any escaping
- * exception into a gfx::Error at the API boundary.
+ * Backends still throw internally; @ref kor::guard converts any escaping
+ * exception into a kor::Error at the API boundary.
  */
 
 #pragma once
@@ -29,10 +29,10 @@
 
 #include "api.h"
 
-namespace gfx
+namespace kor
 {
     /**
-     * @brief Documented error codes returned across the gfx API.
+     * @brief Documented error codes returned across the Koral API.
      *
      * Each code maps to a stable one-line description via @ref describe, which is
      * also the source of truth for docs/errors.md. Codes are grouped by domain.
@@ -71,7 +71,7 @@ namespace gfx
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */
-    [[nodiscard]] GFX_API std::string_view describe(ErrorCode code);
+    [[nodiscard]] KORAL_API std::string_view describe(ErrorCode code);
 
     /**
      * @brief A structured API error: a documented code, a human message, an origin,
@@ -85,14 +85,14 @@ namespace gfx
      * The cause is shared, not owned: one broken shader typically poisons several
      * pipelines, and they all point at the same root error rather than copying it.
      */
-    struct GFX_API Error
+    struct KORAL_API Error
     {
         ErrorCode code = ErrorCode::eNone;
         std::string message;
         std::source_location where = std::source_location::current();
         std::shared_ptr<const Error> cause;  ///< The error that made our input unusable, if any.
 
-        /** @brief Format this error alone as "gfx::Error(code): message [file:line]". */
+        /** @brief Format this error alone as "kor::Error(code): message [file:line]". */
         [[nodiscard]] std::string toString() const;
 
         /**
@@ -111,16 +111,16 @@ namespace gfx
     };
 
     /** @brief Copy @p e with @p cause linked beneath it. */
-    [[nodiscard]] GFX_API Error causedBy(Error e, std::shared_ptr<const Error> cause);
+    [[nodiscard]] KORAL_API Error causedBy(Error e, std::shared_ptr<const Error> cause);
 
     /**
-     * @brief Exception carrying a gfx::Error, thrown by backends and unwrapped at the API boundary.
+     * @brief Exception carrying a kor::Error, thrown by backends and unwrapped at the API boundary.
      *
      * Backend code that can identify an actionable cause throws this so the specific
-     * gfx::Error survives; @ref guard converts everything else into ErrorCode::eBackend.
+     * kor::Error survives; @ref guard converts everything else into ErrorCode::eBackend.
      * It is also what @ref Result::valueOrThrow re-throws.
      */
-    struct GFX_API BackendException : std::runtime_error
+    struct KORAL_API BackendException : std::runtime_error
     {
         Error error;
         explicit BackendException(Error e)
@@ -128,7 +128,7 @@ namespace gfx
     };
 
     /**
-     * @brief Result of a fallible API call: a value on success, a gfx::Error on failure.
+     * @brief Result of a fallible API call: a value on success, a kor::Error on failure.
      *
      * A thin extension of std::expected: all of its operations remain available
      * (operator bool, value(), error(), and_then/or_else/transform). It adds
@@ -157,7 +157,7 @@ namespace gfx
     using VoidResult = std::expected<void, Error>;
 
     /**
-     * @brief Build an `unexpected` gfx::Error with a formatted message in one line.
+     * @brief Build an `unexpected` kor::Error with a formatted message in one line.
      *
      * Usage: `return fail(ErrorCode::eUniformBufferTooLarge, "size {} > 65536", n);`
      */
@@ -167,14 +167,14 @@ namespace gfx
         return std::unexpected(Error{ .code = code, .message = std::format(fmt, std::forward<A>(a)...) });
     }
 
-    /** @brief Build an `unexpected` gfx::Error using the code's standard description. */
+    /** @brief Build an `unexpected` kor::Error using the code's standard description. */
     [[nodiscard]] inline std::unexpected<Error> fail(const ErrorCode code)
     {
         return std::unexpected(Error{ .code = code, .message = std::string(describe(code)) });
     }
 
     /**
-     * @brief Build an `unexpected` gfx::Error that links @p cause beneath it.
+     * @brief Build an `unexpected` kor::Error that links @p cause beneath it.
      *
      * Used when a failure is a consequence of an unusable input rather than an
      * independent problem, so the user is shown the root cause and not just the symptom.
@@ -191,7 +191,7 @@ namespace gfx
     }
 
     /**
-     * @brief Run @p f, converting any escaping exception into a gfx::Error.
+     * @brief Run @p f, converting any escaping exception into a kor::Error.
      *
      * A thrown @ref BackendException keeps its embedded Error; any other
      * std::exception collapses to @p fallback with the original `what()` message.
