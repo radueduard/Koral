@@ -12,24 +12,45 @@ on:
 permissions:
   contents: write   # required to create the release
 
-env:
-  # Store vcpkg's built packages in the GitHub Actions cache. "clear" drops the default
-  # (files-based) source, which would be thrown away with the runner.
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-
 jobs:
   build:
     name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
+    env:
+      VCPKG_BINARY_SOURCES: ${{ matrix.binary_cache }}
     strategy:
       fail-fast: false   # one platform breaking should not hide the other's result
       matrix:
         include:
           - name: linux-x64
-            os: ubuntu-24.04
+            # A self-hosted runner on radue's own box (see docs/self-hosted-runner.md to set one
+            # up). Worth it because vcpkg builds openimageio/assimp/slang/validation-layers from
+            # source: GitHub's free Linux runner gives 4 vCPU and discards everything afterwards,
+            # while the local machine has 32 and keeps a warm cache between runs.
+            #
+            # To fall back to GitHub's runner — if the machine is off, or to prove the build does
+            # not secretly depend on something only installed locally — swap this one line for
+            # `runner: ubuntu-24.04` and set binary_cache to the x-gha line below. Nothing else in
+            # this file needs to change; the steps key off `runner.environment`.
+            runner: gfx-linux
             triplet: x64-linux
+            # Ninja, not CMake's Linux default of "Unix Makefiles" — which is what this job used
+            # until now, silently, while local development used Ninja. Same generator as the dev
+            # build is the point: a release should not be the one configuration nobody ever builds.
+            generator: Ninja
+            # The default files-based cache (~/.cache/vcpkg/archives) persists across runs on a
+            # machine that is not destroyed afterwards, so use it rather than the Actions cache.
+            # It is the *same* cache your local builds populate, since the runner runs as you.
+            #
+            # "default" is the provider name for that location. Not "files" — that one takes a
+            # mandatory absolute path (files,<abs-path>[,readwrite]) and errors out without one.
+            binary_cache: "clear;default,readwrite"
+
           - name: windows-x64
-            os: windows-2022
+            # Stays on GitHub's runner: a self-hosted job runs *natively*, so building for Windows
+            # needs an actual Windows machine. With x-gha caching below, only the first run (and
+            # any dependency bump) pays the from-source build cost.
+            runner: windows-2022
             # static-md, not the default x64-windows. The default is a *dynamic* triplet, which
             # would make spdlog/fmt/imgui DLLs — and those three are the ones the SDK vendors for
             # consumers, so they must be static archives exactly as they are on Linux, or the
@@ -37,6 +58,14 @@ jobs:
             # default), so this is only about vcpkg's own libraries. slang and the Vulkan loader
             # stay DLLs regardless — they are bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
             triplet: x64-windows-static-md
+            # Deliberately NOT Ninja here. Ninja on Windows needs cl.exe on PATH, which means
+            # running vcvars first (an extra action); the Visual Studio generator finds the
+            # toolchain by itself. This is also already the default on windows-2022 — it is spelled
+            # out only so the generator is stated, not inherited, on both platforms.
+            generator: Visual Studio 17 2022
+            # Store vcpkg's built packages in the GitHub Actions cache. "clear" drops the default
+            # files-based source, which would be thrown away with the runner.
+            binary_cache: "clear;x-gha,readwrite"
 
           # Not yet built, deliberately:
           #
@@ -57,8 +86,14 @@ jobs:
       # GLFW/GLEW/the Vulkan loader need the X11 and Wayland development headers to build from
       # source. They are not on the runner image, and vcpkg's error when they are missing names the
       # header, not the package, so it is worth being explicit here.
+      #
+      # Hosted runners only: this is apt, and a self-hosted runner is not necessarily Debian (the
+      # one this repo uses is Arch). A self-hosted machine is expected to have these already — it is
+      # a machine the project is developed on. If vcpkg fails there complaining about a missing
+      # header, install the distro's equivalent of the package below and it is a one-time fix, not a
+      # per-run cost. See docs/self-hosted-runner.md.
       - name: Install X11/Wayland development packages
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -68,9 +103,13 @@ jobs:
             libltdl-dev nasm
 
       # vcpkg builds openimageio, assimp, slang and the validation layers from source — the better
-      # part of an hour per platform. Cache the built packages in the Actions cache so only the
-      # first run (and any dependency bump) pays for it.
+      # part of an hour. The x-gha binary-cache backend needs these two variables, which are in the
+      # runner's environment but not exported to steps by default.
+      #
+      # Hosted runners only. A self-hosted runner uses the files cache under ~/.cache/vcpkg
+      # (see binary_cache in the matrix), which survives because the machine does.
       - name: Enable vcpkg binary caching
+        if: runner.environment == 'github-hosted'
         uses: actions/github-script@v7
         with:
           script: |
@@ -95,6 +134,7 @@ jobs:
         shell: bash
         run: |
           cmake -S . -B build \
+            -G "${{ matrix.generator }}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
