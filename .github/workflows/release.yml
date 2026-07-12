@@ -6,11 +6,25 @@ name: Release
 # how you should test changes to this file.
 on:
   push:
-    tags: ['v*']
+    branches: [master]      # every push to master gets built — it runs on our own machine
+    tags: ['v*']            # ...but only a tag drafts an actual release (see the `release` job)
+    paths-ignore:
+      - '**.md'             # a docs-only push does not need a 20-minute release build
+      - 'docs/**'
+      - '.gitignore'
   workflow_dispatch:
 
 permissions:
   contents: write   # required to create the release
+
+# There is exactly one self-hosted Linux runner, so runs execute strictly one at a time. Without
+# this, three pushes in quick succession queue three full builds and you wait for all of them.
+# Superseding a branch build with the newer commit is almost always what you want.
+#
+# Tags are exempt: a release build must never be cancelled by whatever lands next.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
   build:
@@ -46,26 +60,42 @@ jobs:
             # mandatory absolute path (files,<abs-path>[,readwrite]) and errors out without one.
             binary_cache: "clear;default,readwrite"
 
-          - name: windows-x64
-            # Stays on GitHub's runner: a self-hosted job runs *natively*, so building for Windows
-            # needs an actual Windows machine. With x-gha caching below, only the first run (and
-            # any dependency bump) pays the from-source build cost.
-            runner: windows-2022
-            # static-md, not the default x64-windows. The default is a *dynamic* triplet, which
-            # would make spdlog/fmt/imgui DLLs — and those three are the ones the SDK vendors for
-            # consumers, so they must be static archives exactly as they are on Linux, or the
-            # vendoring silently ships nothing linkable. "-md" keeps the CRT dynamic (CMake's
-            # default), so this is only about vcpkg's own libraries. slang and the Vulkan loader
-            # stay DLLs regardless — they are bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
-            triplet: x64-windows-static-md
-            # Deliberately NOT Ninja here. Ninja on Windows needs cl.exe on PATH, which means
-            # running vcvars first (an extra action); the Visual Studio generator finds the
-            # toolchain by itself. This is also already the default on windows-2022 — it is spelled
-            # out only so the generator is stated, not inherited, on both platforms.
-            generator: Visual Studio 17 2022
-            # Store vcpkg's built packages in the GitHub Actions cache. "clear" drops the default
-            # files-based source, which would be thrown away with the runner.
-            binary_cache: "clear;x-gha,readwrite"
+          # ---------------------------------------------------------------------------------------
+          # windows-x64 — DISABLED, pending a self-hosted Windows runner.
+          #
+          # It works on GitHub's hosted runner, but vcpkg has to build openimageio, assimp, slang
+          # and the validation layers from source under MSVC on 4 vCPU, and the Actions cache starts
+          # cold, so the first green run costs the better part of an hour. Not worth paying that on
+          # every iteration while the Linux side is still being shaken out.
+          #
+          # To re-enable: uncomment the block below. If you point it at a self-hosted Windows box,
+          # change `runner:` to that machine's label and switch `binary_cache` to
+          # "clear;default,readwrite" so it uses the persistent on-disk cache like Linux does.
+          # Nothing else needs to change — the apt and Actions-cache steps key off
+          # `runner.environment` and turn themselves on and off accordingly.
+          #
+          # Until this is back, releases are Linux-only. The `release` job will happily draft a
+          # release from a single platform's artifacts, so a tag pushed now yields a Linux-only
+          # release — bear that in mind before tagging v0.0.1.
+          #
+          # - name: windows-x64
+          #   runner: windows-2022
+          #   # static-md, not the default x64-windows. The default is a *dynamic* triplet, which
+          #   # would make spdlog/fmt/imgui DLLs — and those three are the ones the SDK vendors for
+          #   # consumers, so they must be static archives exactly as they are on Linux, or the
+          #   # vendoring silently ships nothing linkable. "-md" keeps the CRT dynamic (CMake's
+          #   # default), so this is only about vcpkg's own libraries. slang and the Vulkan loader
+          #   # stay DLLs regardless — bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
+          #   triplet: x64-windows-static-md
+          #   # Deliberately NOT Ninja. Ninja on Windows needs cl.exe on PATH, which means running
+          #   # vcvars first (an extra action); the Visual Studio generator finds the toolchain by
+          #   # itself. Also already the default on windows-2022 — spelled out so the generator is
+          #   # stated rather than inherited.
+          #   generator: Visual Studio 17 2022
+          #   # Store vcpkg's built packages in the GitHub Actions cache. "clear" drops the default
+          #   # files-based source, which would be thrown away with the runner.
+          #   binary_cache: "clear;x-gha,readwrite"
+          # ---------------------------------------------------------------------------------------
 
           # Not yet built, deliberately:
           #
@@ -133,8 +163,24 @@ jobs:
       - name: Configure
         shell: bash
         run: |
+          # actions/checkout wipes the workspace (git clean -ffdx) at the start of every run, so the
+          # build tree never survives and every source file is recompiled from scratch. vcpkg does
+          # not care — it restores from its own cache in seconds — but our own sources do.
+          #
+          # ccache fixes that without giving up a clean tree: it is keyed on preprocessed source, so
+          # an unchanged translation unit is a cache hit no matter which directory it was compiled
+          # in. Optional — if ccache is not installed, this is simply a full rebuild, not an error.
+          launcher=()
+          if command -v ccache >/dev/null 2>&1; then
+            launcher=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+            echo "ccache: $(ccache --version | head -1)"
+          else
+            echo "ccache: not installed — full rebuild (pacman -S ccache to speed this up)"
+          fi
+
           cmake -S . -B build \
             -G "${{ matrix.generator }}" \
+            "${launcher[@]}" \
             -DCMAKE_BUILD_TYPE=Release \
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
