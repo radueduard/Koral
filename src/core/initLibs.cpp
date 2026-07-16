@@ -30,13 +30,18 @@ void initDispatcher()
     // name only (resolved via the @rpath load command), so on any other machine the dlopen
     // finds nothing and aborts with "Failed to load vulkan library!".
     VULKAN_HPP_DEFAULT_DISPATCHER.init( vkGetInstanceProcAddr );
+}
 
-    // GLFW's Vulkan support has the same problem: it lazily dlopen()s the loader by
-    // unversioned name on its first Vulkan call, and when that fails it reports Vulkan as
-    // unsupported — glfwGetRequiredInstanceExtensions returns null, no platform surface
-    // extension gets enabled, and window surface creation fails with
-    // ErrorInitializationFailed. Hand GLFW the linked loader instead. This must happen
-    // before GLFW's first Vulkan call (the instance-extension query in the Vulkan runtime),
-    // which is the case here: initDispatcher runs at the top of vk::Context::Init.
+// GLFW's Vulkan support has the same problem as the dispatcher above: it lazily dlopen()s
+// the loader by unversioned name on its first Vulkan call, and when that fails it reports
+// Vulkan as unsupported — glfwGetRequiredInstanceExtensions returns null and window surface
+// creation fails with ErrorInitializationFailed (GLFW_API_UNAVAILABLE) even when the metal
+// surface extension was enabled on the instance. Hand GLFW the linked loader instead.
+//
+// glfwInitVulkanLoader is an *init hint*: glfwInit() snapshots the hint values, so calling
+// this after glfwInit has no effect. It must run before glfwInit in every init path (the
+// Window constructor and Context::InitHeadless) — NOT from initDispatcher, which runs after.
+void initGlfwVulkanLoader()
+{
     glfwInitVulkanLoader( vkGetInstanceProcAddr );
 }

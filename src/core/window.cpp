@@ -20,6 +20,9 @@
 #include "../executor/MainThreadExecutor.h"
 #include "../executor/BackgroundExecutor.h"
 
+// initLibs.cpp — seeds GLFW's Vulkan loader; must run before glfwInit().
+void initGlfwVulkanLoader();
+
 namespace kor {
     Window::Window(Builder& createInfo) :
         _title(createInfo.title),
@@ -42,6 +45,13 @@ namespace kor {
         // (To force a platform manually, hint it here BEFORE glfwInit().)
         if (createInfo.api == API::eOpenGL && glfwPlatformSupported(GLFW_PLATFORM_X11)) {
             glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+        }
+
+        // Point GLFW's Vulkan support at the loader Koral links and ships, instead of its own
+        // dlopen-by-name (which fails on installed builds — see initLibs.cpp). Init hint: must
+        // precede glfwInit(), which snapshots hint values.
+        if (createInfo.api == API::eVulkan) {
+            initGlfwVulkanLoader();
         }
 
         if (const auto result = glfwInit(); result != GLFW_TRUE) {

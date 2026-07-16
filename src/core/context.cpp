@@ -24,6 +24,9 @@
 #include "../backends/vulkan/device.h"
 #include "../backends/vulkan/vulkanContext.h"
 
+// initLibs.cpp — seeds GLFW's Vulkan loader; must run before glfwInit().
+void initGlfwVulkanLoader();
+
 
 namespace {
     // Resolve a relative path against a list of roots, first existing wins.
@@ -183,6 +186,7 @@ void kor::Context::InitHeadless(const API api)
     // GLFW is initialized so the Vulkan runtime can query platform instance
     // extensions; no window is created. A failure here is non-fatal — a
     // compute/transfer-only instance does not require the WSI surface extensions.
+    initGlfwVulkanLoader(); // init hint — must precede glfwInit() (see initLibs.cpp)
     glfwInit();
 
     kor::vk::Context::Init();            // instance + physical/logical device + allocator + descriptor pool
