@@ -12,6 +12,7 @@
 #include "meshType.h"
 #include "structs.h"
 #include "buffer.h"
+#include "context.h"
 #include "api.h"
 
 namespace kor
@@ -69,13 +70,18 @@ namespace kor
         template<typename T>
         static kor::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
         {
-            // Keep final buffers transfer-capable as requested, and usable as
-            // ray-tracing acceleration structure build input (implies device address).
-            const auto finalUsage = usage
+            // Keep final buffers transfer-capable as requested, and usable as ray-tracing
+            // acceleration structure build input (implies device address) -- but only when the
+            // device actually supports ray tracing (see Context::SupportsRayTracing): not every
+            // GPU does, and requesting a buffer usage tied to an extension that was never enabled
+            // is itself a Vulkan validation error.
+            auto finalUsage = usage
                 | Buffer::Usage::eTransferDst
                 | Buffer::Usage::eTransferSrc
-                | Buffer::Usage::eStorage
-                | Buffer::Usage::eAccelerationStructureInput;
+                | Buffer::Usage::eStorage;
+            if (kor::Context::SupportsRayTracing()) {
+                finalUsage |= Buffer::Usage::eAccelerationStructureInput;
+            }
 
             return Buffer::Builder<T>()
                 .setDataView(data)

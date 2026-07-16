@@ -21,6 +21,7 @@
 #include "resource.h"
 #include "../executor/BackgroundExecutor.h"
 #include "../executor/MainThreadExecutor.h"
+#include "../backends/vulkan/device.h"
 #include "../backends/vulkan/vulkanContext.h"
 
 
@@ -159,6 +160,13 @@ kor::API kor::Context::activeAPI()
 bool kor::Context::IsHeadless()
 {
     return _headless;
+}
+
+bool kor::Context::SupportsRayTracing()
+{
+    if (_activeAPI != API::eVulkan) return false;
+    if (_window == nullptr && !_headless) return false;
+    return kor::vk::Context::Device().supportsRayTracing();
 }
 
 void kor::Context::InitHeadless(const API api)

@@ -47,6 +47,15 @@ namespace kor::vk
 
     AccelerationStructure::AccelerationStructure(const Builder& createInfo) : kor::AccelerationStructure(createInfo)
     {
+        // Not every device advertises the ray tracing extensions (see runtime.h); on one that
+        // doesn't, vkCreateAccelerationStructureKHR was never resolved by the loader, so calling it
+        // below would be a null function pointer rather than a clean Vulkan error.
+        if (!Context::Device().supportsRayTracing()) {
+            throw std::runtime_error("Cannot build an acceleration structure: this device has no "
+                                      "ray tracing support (VK_KHR_acceleration_structure is not "
+                                      "available).");
+        }
+
         if (_type == Type::eBottomLevel) {
             buildBottomLevel(createInfo);
         } else {

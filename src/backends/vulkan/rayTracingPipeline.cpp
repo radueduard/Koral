@@ -54,6 +54,15 @@ namespace kor::vk
 
     void RayTracingPipeline::Setup()
     {
+        // Not every device advertises the ray tracing extensions (see runtime.h); on one that
+        // doesn't, vkCreateRayTracingPipelinesKHR was never resolved by the loader, so calling it
+        // below would be a null function pointer rather than a clean Vulkan error.
+        if (!Context::Device().supportsRayTracing()) {
+            throw std::runtime_error("Cannot create a ray tracing pipeline: this device has no "
+                                      "ray tracing support (VK_KHR_ray_tracing_pipeline / "
+                                      "VK_KHR_acceleration_structure are not available).");
+        }
+
         // Pipeline layout from the merged descriptor set layouts and push constants.
         std::vector<::vk::DescriptorSetLayout> setLayouts;
         if (!_setLayouts.empty()) {

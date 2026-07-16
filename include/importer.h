@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "api.h"
+#include "context.h"
 #include "task.h"
 #include "meshLayout.h"
 #include "meshHeap.h"
@@ -319,7 +320,13 @@ namespace kor
                 // ray-tracing acceleration structure builds and for buffer_reference
                 // access in shaders.
                 .addUsage(kor::Buffer::Usage::eShaderDeviceAddress)
-                .addUsage(kor::Buffer::Usage::eAccelerationStructureInput)
+                // Not every device supports ray tracing (see Context::SupportsRayTracing) — asking
+                // for a buffer usage tied to an extension that was never enabled is itself a
+                // Vulkan validation error, so this is skipped (eNone is a no-op) rather than
+                // requested unconditionally.
+                .addUsage(kor::Context::SupportsRayTracing()
+                    ? kor::Buffer::Usage::eAccelerationStructureInput
+                    : kor::Buffer::Usage::eNone)
                 .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }
@@ -335,7 +342,9 @@ namespace kor
                 // See uploadVertexBuffer: address-queryable for acceleration structure
                 // builds and buffer_reference access.
                 .addUsage(kor::Buffer::Usage::eShaderDeviceAddress)
-                .addUsage(kor::Buffer::Usage::eAccelerationStructureInput)
+                .addUsage(kor::Context::SupportsRayTracing()
+                    ? kor::Buffer::Usage::eAccelerationStructureInput
+                    : kor::Buffer::Usage::eNone)
                 .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }

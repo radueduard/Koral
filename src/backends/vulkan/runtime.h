@@ -25,14 +25,16 @@ namespace kor::vk
         void selectPhysicalDevice();
 
         [[nodiscard]] const ::vk::QueueFlags& getRequiredQueueFamilies() const { return _requiredQueues; }
-        [[nodiscard]] std::vector<const char*> getDeviceExtensions() const
-        {
-            std::vector<const char*> extensions {};
-            for (const auto& extension : _deviceExtensions) {
-                extensions.push_back(extension);
-            }
-            return extensions;
-        }
+
+        // What a physical device must support to be considered at all (see PhysicalDevice::isSuitable).
+        [[nodiscard]] const std::vector<const char*>& getRequiredDeviceExtensions() const { return _requiredDeviceExtensions; }
+
+        // Not universally supported — ray tracing being the obvious example: plenty of real
+        // hardware (older/integrated GPUs, MoltenVK on macOS) has no acceleration-structure or
+        // ray-tracing-pipeline support at all. A device is not rejected for lacking these; they
+        // are only requested from vk::DeviceCreateInfo when the selected device actually has them
+        // (see Device::Device(), which filters this list through PhysicalDevice::supportsExtension).
+        [[nodiscard]] const std::vector<const char*>& getOptionalDeviceExtensions() const { return _optionalDeviceExtensions; }
 
         [[nodiscard]] ::vk::Instance getInstance() const { return _instance; }
         [[nodiscard]] const PhysicalDevice& getPhysicalDevice() const { return *_physicalDevice; }
@@ -50,7 +52,7 @@ namespace kor::vk
             VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
 #endif
         };
-        std::vector<const char*> _deviceExtensions {
+        std::vector<const char*> _requiredDeviceExtensions {
             VK_KHR_SWAPCHAIN_EXTENSION_NAME,
             VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
 #ifdef __APPLE__
@@ -58,11 +60,13 @@ namespace kor::vk
 #endif
             VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME,
             VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
-            // Ray tracing
+            // VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME
+        };
+        std::vector<const char*> _optionalDeviceExtensions {
+            // Ray tracing. All three or none: they only mean anything as a group.
             VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
             VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
             VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
-            // VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME
         };
 
         ::vk::QueueFlags _requiredQueues = ::vk::QueueFlags()

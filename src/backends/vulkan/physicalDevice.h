@@ -5,6 +5,7 @@
 #pragma once
 
 #include "vk_wrapper.h"
+#include <string_view>
 #include <vulkan/vulkan.hpp>
 
 namespace kor::vk
@@ -19,6 +20,11 @@ namespace kor::vk
 
         [[nodiscard]] bool isSuitable() const;
         [[nodiscard]] const std::vector<::vk::QueueFamilyProperties>& getQueueFamilyProperties() const { return _queueFamilyProperties; }
+
+        // Whether this physical device advertises a given extension. Used to enable optional
+        // extensions (ray tracing, ...) only where they actually exist, instead of demanding them
+        // up front and rejecting every device that lacks them.
+        [[nodiscard]] bool supportsExtension(std::string_view name) const;
 
     	[[nodiscard]] const ::vk::PhysicalDeviceProperties& getProperties() const { return _properties; }
 		[[nodiscard]] const ::vk::PhysicalDeviceFeatures& getFeatures() const { return _features; }

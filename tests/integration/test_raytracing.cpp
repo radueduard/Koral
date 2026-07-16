@@ -4,9 +4,11 @@
 // ray per pixel into a storage image, and reads the result back. This is the only
 // test that exercises accelerationStructure.cpp and rayTracingPipeline.cpp.
 //
-// The ray-tracing device features are enabled unconditionally by the backend, so
-// this runs on any RT-capable GPU; it is skipped by the fixture when no device is
-// available at all.
+// The ray-tracing extensions are only enabled when the selected device actually
+// advertises them (not every GPU does -- older/integrated GPUs and MoltenVK on
+// macOS commonly do not), so this test additionally skips itself via
+// kor::Context::SupportsRayTracing() on top of the fixture's own "no device at
+// all" skip.
 
 #include "gpu_fixture.h"
 
@@ -49,6 +51,10 @@ constexpr std::uint32_t kW = 16;
 constexpr std::uint32_t kH = 16;
 
 TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
+    if (!kor::Context::SupportsRayTracing()) {
+        GTEST_SKIP() << "Device has no ray tracing support; skipping.";
+    }
+
     // --- triangle mesh (position-only) -----------------------------------
     std::vector<PosVertex> verts = {
         PosVertex{ glm::vec3{-0.8f, -0.8f, 0.0f} },

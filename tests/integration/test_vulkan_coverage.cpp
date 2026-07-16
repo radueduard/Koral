@@ -304,12 +304,17 @@ TEST_F(GpuTest, ResolveMultisampleToSingle) {
 
     auto single = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
 
+    // The view/framebuffer must outlive queue submission, not just recording:
+    // Vulkan forbids destroying objects a pending command buffer references, and
+    // MoltenVK's deferred encoding only dereferences the VkImageView at submit
+    // time (it segfaults if these are locals inside the recording lambda).
+    auto view = ImageView::Builder(ResourceRef<const Image>(msaa)).build();
+    auto fb = kor::Framebuffer::Builder{}
+                  .addColorAttachment(ResourceRef<const ImageView>(view), glm::vec4{0.2f, 0.4f, 0.6f, 1.f})
+                  .build();
+
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         // Give the MSAA image a defined layout/content via a render clear.
-        auto view = ImageView::Builder(ResourceRef<const Image>(msaa)).build();
-        auto fb = kor::Framebuffer::Builder{}
-                      .addColorAttachment(ResourceRef<const ImageView>(view), glm::vec4{0.2f, 0.4f, 0.6f, 1.f})
-                      .build();
         cb.BeginRendering(ResourceRef<const kor::Framebuffer>(fb));
         cb.EndRendering();
         cb.Resolve(ResourceRef<const Image>(msaa), ResourceRef<const Image>(single));

@@ -82,9 +82,17 @@ namespace kor::vk {
         void runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, ::vk::QueueFlags requiredFlags,
             ::vk::Fence fence = nullptr, ::vk::Semaphore waitSemaphore = nullptr, ::vk::Semaphore signalSemaphore = nullptr, bool wait = true) const;
 
+        // Whether the physical device this Device was created on actually supports ray tracing
+        // (acceleration structures + the ray tracing pipeline) — not every GPU does. Resources that
+        // depend on it (RayTracingPipeline, AccelerationStructure) check this before calling into
+        // functions that would otherwise be null (the loader never resolves them for a device the
+        // extension was not enabled on).
+        [[nodiscard]] bool supportsRayTracing() const { return _supportsRayTracing; }
+
     private:
         mutable std::vector<Queue::Family> _queueFamilies {};
         mutable std::vector<std::unique_ptr<Queue>> _queuesInUse {};
         mutable std::map<glm::u32, ::vk::CommandPool> _commandPools {};
+        bool _supportsRayTracing = false;
     };
 }

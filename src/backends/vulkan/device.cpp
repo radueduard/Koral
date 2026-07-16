@@ -159,15 +159,34 @@ namespace kor::vk {
             .setPNext(&accelerationStructureFeatures)
             .setRayTracingPipeline(true);
 
-        auto deviceExtensions = Context::Runtime().getDeviceExtensions();
+        // Required extensions plus whichever optional ones (ray tracing, ...) this specific
+        // physical device actually advertises — never assumed, since they are not universal.
+        auto deviceExtensions = Context::Runtime().getRequiredDeviceExtensions();
+        for (const auto* optional : Context::Runtime().getOptionalDeviceExtensions()) {
+            if (physicalDevice.supportsExtension(optional)) {
+                deviceExtensions.push_back(optional);
+            }
+        }
+
+        _supportsRayTracing = physicalDevice.supportsExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+            && physicalDevice.supportsExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
+            && physicalDevice.supportsExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
 
         auto features = Context::Runtime().getPhysicalDevice().getFeatures();
 
-        const auto deviceCreateInfo = ::vk::DeviceCreateInfo()
+        auto deviceCreateInfo = ::vk::DeviceCreateInfo()
             .setQueueCreateInfos(queueCreateInfos)
             .setPEnabledFeatures(&features)
-            .setPNext(&rayTracingPipelineFeatures)
             .setPEnabledExtensionNames(deviceExtensions);
+
+        // The ray tracing feature structs must not be chained in at all unless the corresponding
+        // extensions were just enabled above — each one is only meaningful (and, per spec, only
+        // valid to pass) together with its extension.
+        if (_supportsRayTracing) {
+            deviceCreateInfo.setPNext(&rayTracingPipelineFeatures);
+        } else {
+            deviceCreateInfo.setPNext(&maintenance9);
+        }
 
         _handle = physicalDevice->createDevice(deviceCreateInfo);
     	VULKAN_HPP_DEFAULT_DISPATCHER.init(_handle);

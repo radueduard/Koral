@@ -14,6 +14,7 @@
 #include <glm/glm.hpp>
 
 #include "tlsfAllocator.h"
+#include "context.h"
 #include "mesh.h"
 #include "meshLayout.h"
 #include "buffer.h"
@@ -98,15 +99,22 @@ namespace kor
 
             // Request eAccelerationStructureInput (implies device address) so a heap
             // suballocation can directly back a ray-tracing BLAS; the empty-buffer
-            // makeBuffer overload otherwise omits it.
+            // makeBuffer overload otherwise omits it. Only when the device actually supports ray
+            // tracing, though — not every GPU does (see Context::SupportsRayTracing), and asking
+            // for a buffer usage tied to an extension that was never enabled is itself a Vulkan
+            // validation error, on every mesh buffer this heap ever allocates.
+            const auto rtInputUsage = kor::Context::SupportsRayTracing()
+                ? Flags<Buffer::Usage>(Buffer::Usage::eAccelerationStructureInput)
+                : Flags<Buffer::Usage>{};
+
             _vertexBuffers.reserve(sizeof...(Streams));
             (_vertexBuffers.emplace_back(
                 makeBuffer<Streams>(vertexCapacity,
-                    Flags<Buffer::Usage>(Buffer::Usage::eVertex) | Buffer::Usage::eAccelerationStructureInput)), ...);
+                    Flags<Buffer::Usage>(Buffer::Usage::eVertex) | rtInputUsage)), ...);
 
             if (indexCapacity.has_value()) {
                 _indexBuffer = makeBuffer<glm::u32>(*indexCapacity,
-                    Flags<Buffer::Usage>(Buffer::Usage::eIndex) | Buffer::Usage::eAccelerationStructureInput);
+                    Flags<Buffer::Usage>(Buffer::Usage::eIndex) | rtInputUsage);
                 _indexType   = ChannelType::eUInt;
             }
 

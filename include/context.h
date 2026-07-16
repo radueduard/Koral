@@ -88,6 +88,18 @@ namespace kor {
         /** @brief Whether a headless (device-only) context is currently active. */
         static KORAL_API bool IsHeadless();
 
+        /**
+         * @brief Whether the active device supports ray tracing (acceleration structures + the
+         *        ray tracing pipeline).
+         *
+         * Not every GPU does -- older/integrated GPUs and MoltenVK (macOS) commonly lack it. Check
+         * this before building an AccelerationStructure or RayTracingPipeline: on a device without
+         * support they still build cleanly into a poisoned resource with a clear error rather than
+         * crashing, but this lets a caller decide not to attempt ray tracing at all. False under
+         * the OpenGL backend, and before any window/headless context exists.
+         */
+        static KORAL_API bool SupportsRayTracing();
+
         static KORAL_API kor::ResourceRef<const kor::Framebuffer> DefaultFramebuffer();
         static KORAL_API ImGuiContext* GetCurrentImGuiContext();
 

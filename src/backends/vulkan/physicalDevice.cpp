@@ -4,6 +4,7 @@
 
 #include "physicalDevice.h"
 
+#include <algorithm>
 #include <iostream>
 #include <unordered_set>
 #include <glm/fwd.hpp>
@@ -25,8 +26,14 @@ namespace kor::vk
 
     bool PhysicalDevice::isSuitable() const {
         return hasRequiredQueueFamilies(kor::vk::Context::Runtime().getRequiredQueueFamilies())
-            && hasRequiredExtensions(kor::vk::Context::Runtime().getDeviceExtensions())
+            && hasRequiredExtensions(kor::vk::Context::Runtime().getRequiredDeviceExtensions())
             && hasRequiredFeatures(_features);
+    }
+
+    bool PhysicalDevice::supportsExtension(const std::string_view name) const {
+        return std::ranges::any_of(_extensionProperties, [name](const ::vk::ExtensionProperties& extension) {
+            return name == std::string_view(extension.extensionName.data());
+        });
     }
 
     bool PhysicalDevice::hasRequiredQueueFamilies(const ::vk::QueueFlags& requiredQueueFamilies) const {

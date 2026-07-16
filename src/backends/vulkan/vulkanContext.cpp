@@ -48,7 +48,7 @@ void kor::vk::Context::Init()
     _runtime->selectPhysicalDevice();
     _device = new kor::vk::Device;
     _allocator = new kor::vk::Allocator;
-    _descriptorPool = kor::vk::DescriptorPool::Builder()
+    auto descriptorPoolBuilder = kor::vk::DescriptorPool::Builder()
         .setMaxSets(1000)
         .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
         .addPoolSize(::vk::DescriptorType::eUniformBuffer, 1000)
@@ -56,9 +56,14 @@ void kor::vk::Context::Init()
         .addPoolSize(::vk::DescriptorType::eStorageBuffer, 1000)
         .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
         .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)
-        .addPoolSize(::vk::DescriptorType::eSampler, 1000)
-        .addPoolSize(::vk::DescriptorType::eAccelerationStructureKHR, 1000)
-        .build();
+        .addPoolSize(::vk::DescriptorType::eSampler, 1000);
+    // A pool size for a descriptor type Vulkan does not know about (because its extension was
+    // never enabled — see Device::supportsRayTracing) is itself a validation error, not just a
+    // wasted reservation.
+    if (_device->supportsRayTracing()) {
+        descriptorPoolBuilder.addPoolSize(::vk::DescriptorType::eAccelerationStructureKHR, 1000);
+    }
+    _descriptorPool = descriptorPoolBuilder.build();
 }
 
 void kor::vk::Context::Destroy()
