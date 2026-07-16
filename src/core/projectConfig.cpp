@@ -19,20 +19,25 @@
 
 namespace kor
 {
-    namespace
+    // The wire format of koral.json. This is the Hub's project file — the Hub writes it, we
+    // read it, and neither of us reads the other's anything. The schema is the whole contract
+    // between the two, so it is mirrored here exactly as the Hub's `model.rs` declares it, and
+    // changing one side without the other silently breaks every project the Hub launches.
+    //
+    // Every field is optional, and that is the point: a key the document does not mention must
+    // leave the value beneath it alone, or the file could not act as a *layer* over the
+    // project's compiled-in defaults — it would reset every option the user did not spell out.
+    //
+    // The Hub's own keys that mean nothing to us (color, frameworkVersion, kind, libraries) are
+    // simply not declared: unknown keys are ignored, which is also what lets a config written by
+    // a newer Hub still load in an older runtime.
+    //
+    // These live in a named (not anonymous) namespace on purpose: reflect-cpp's field-counting
+    // trick instantiates a function template with the type as an argument, which under recent
+    // Clang requires that type to have external linkage — a type from an anonymous namespace
+    // does not qualify and fails to compile ("used but not defined in this translation unit").
+    namespace koral_json
     {
-        // The wire format of koral.json. This is the Hub's project file — the Hub writes it, we
-        // read it, and neither of us reads the other's anything. The schema is the whole contract
-        // between the two, so it is mirrored here exactly as the Hub's `model.rs` declares it, and
-        // changing one side without the other silently breaks every project the Hub launches.
-        //
-        // Every field is optional, and that is the point: a key the document does not mention must
-        // leave the value beneath it alone, or the file could not act as a *layer* over the
-        // project's compiled-in defaults — it would reset every option the user did not spell out.
-        //
-        // The Hub's own keys that mean nothing to us (color, frameworkVersion, kind, libraries) are
-        // simply not declared: unknown keys are ignored, which is also what lets a config written by
-        // a newer Hub still load in an older runtime.
         struct WindowDocument
         {
             std::optional<std::string> title;   // not written by the Hub; `name` is the default
@@ -69,6 +74,11 @@ namespace kor
             std::optional<RenderingDocument> rendering;
             std::optional<PathsDocument> paths;
         };
+    }
+
+    namespace
+    {
+        using namespace koral_json;
 
         std::optional<API> parseApi(std::string_view name)
         {

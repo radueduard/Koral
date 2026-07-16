@@ -1,4 +1,10 @@
 cmake_minimum_required(VERSION 3.28)
+
+# vcpkg-overlay-ports/kubazip renames the mz_* symbol namespace of kubazip's vendored copy of
+# miniz.h, so it no longer collides with minizip-ng (pulled in transitively via OpenColorIO) at
+# link time. Must be set before project() -- that is when the vcpkg toolchain reads it.
+list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-ports")
+
 project(Koral VERSION 0.0.1 LANGUAGES C CXX)
 include(GenerateExportHeader)
 include(CMakePackageConfigHelpers)
@@ -62,16 +68,51 @@ message(STATUS "Using Vulkan loader:  ${Vulkan_LIBRARIES}")
 # Runtime Vulkan loader.
 #
 # We link and ship the vcpkg-built Vulkan-Loader. The manifest requests its WSI
-# features (Wayland + XCB + Xlib on Linux, Win32 is always built, Metal on macOS
-# via molten-vk), so this one loader creates surfaces on every platform and still
-# discovers the user's installed ICDs/drivers and layers through the standard
-# search paths + env vars. No system loader or LD_LIBRARY_PATH override needed.
+# features (Wayland + XCB + Xlib on Linux, Win32 is always built; macOS needs no
+# loader feature — MoltenVK supplies its own Metal surface extension as an ICD),
+# so this one loader creates surfaces on every platform and still discovers the
+# user's installed ICDs/drivers and layers through the standard search paths +
+# env vars. No system loader or LD_LIBRARY_PATH override needed.
 #
-# Bundled layers/ICD manifest dirs (from vcpkg) are handed to the runtime as
-# compile definitions below so it can add them to the loader's search paths at
-# startup — this makes validation (and MoltenVK on macOS) work with no system SDK.
+# Bundled layer manifest dir (from vcpkg) is handed to the runtime as a compile
+# definition below so it can add it to the loader's search paths at startup —
+# this makes validation available with no system SDK.
 # ---------------------------------------------------------------------------
 set(KORAL_VK_SHARE_DIR "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+
+# MoltenVK has no vcpkg port — it has never existed in the vcpkg registry (checked the
+# full port list and history), which is what produced the "baseline does not contain an
+# entry for port molten-vk" configure error this replaces. Homebrew is the source of
+# truth instead: its formula ships the dylib alongside an ICD manifest whose library_path
+# is already relative to itself, so both files can be copied as a pair with no rewriting.
+if(APPLE)
+    find_program(KORAL_BREW_EXECUTABLE brew)
+    if(KORAL_BREW_EXECUTABLE)
+        execute_process(
+                COMMAND "${KORAL_BREW_EXECUTABLE}" --prefix molten-vk
+                OUTPUT_VARIABLE KORAL_MOLTENVK_PREFIX
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+                RESULT_VARIABLE KORAL_BREW_PREFIX_RESULT)
+    endif()
+
+    set(KORAL_MOLTENVK_DYLIB "KORAL_MOLTENVK_DYLIB-NOTFOUND")
+    set(KORAL_MOLTENVK_ICD_JSON "KORAL_MOLTENVK_ICD_JSON-NOTFOUND")
+    if(KORAL_MOLTENVK_PREFIX AND KORAL_BREW_PREFIX_RESULT EQUAL 0)
+        find_file(KORAL_MOLTENVK_DYLIB NAMES libMoltenVK.dylib
+                PATHS "${KORAL_MOLTENVK_PREFIX}/lib" NO_DEFAULT_PATH)
+        find_file(KORAL_MOLTENVK_ICD_JSON NAMES MoltenVK_icd.json
+                PATHS "${KORAL_MOLTENVK_PREFIX}/etc/vulkan/icd.d" NO_DEFAULT_PATH)
+    endif()
+
+    if(KORAL_MOLTENVK_DYLIB AND KORAL_MOLTENVK_ICD_JSON)
+        message(STATUS "Found MoltenVK via Homebrew: ${KORAL_MOLTENVK_DYLIB}")
+    else()
+        message(WARNING "MoltenVK not found ('brew --prefix molten-vk' failed or its files are "
+                "missing). Vulkan will have no driver on macOS until you run "
+                "'brew install molten-vk' and reconfigure.")
+    endif()
+endif()
 
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 find_package(glslang CONFIG REQUIRED)
@@ -138,19 +179,6 @@ else()
             "portable validation will be unavailable (loader still finds a system SDK if present).")
 endif()
 
-if(APPLE)
-    file(GLOB_RECURSE KORAL_VK_ICD_MANIFEST
-            "${KORAL_VK_SHARE_DIR}/share/vulkan/icd.d/MoltenVK_icd.json"
-            "${KORAL_VK_SHARE_DIR}/bin/MoltenVK_icd.json")
-    if(KORAL_VK_ICD_MANIFEST)
-        list(GET KORAL_VK_ICD_MANIFEST 0 KORAL_VK_ICD_MANIFEST0)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE KORAL_VK_ICD_PATH="${KORAL_VK_ICD_MANIFEST0}")
-        message(STATUS "Bundled MoltenVK ICD: ${KORAL_VK_ICD_MANIFEST0}")
-    else()
-        message(WARNING "molten-vk ICD manifest not found under ${KORAL_VK_SHARE_DIR}.")
-    endif()
-endif()
-
 target_link_libraries(${PROJECT_NAME} PRIVATE
         glslang::glslang
         glslang::MachineIndependent
@@ -199,6 +227,19 @@ if(KORAL_EMBED_SOURCE_PATHS)
 else()
     set(KORAL_ASSETS_PATH "")
     set(KORAL_SHADERS_PATH "")
+endif()
+
+# Same dev-fallback deal as assets/shaders above, for the Homebrew MoltenVK ICD manifest
+# found earlier: an absolute path into this machine's Homebrew cellar, so it's only baked
+# in for dev builds. A distribution build instead relies on the copy installed alongside
+# Koral (see the "Bundle MoltenVK" install step below), found at runtime via paths.cpp.
+if(APPLE)
+    if(KORAL_EMBED_SOURCE_PATHS AND KORAL_MOLTENVK_ICD_JSON)
+        get_filename_component(KORAL_VK_ICD_DEV_PATH "${KORAL_MOLTENVK_ICD_JSON}" DIRECTORY)
+    else()
+        set(KORAL_VK_ICD_DEV_PATH "")
+    endif()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE KORAL_VK_ICD_DEV_PATH="${KORAL_VK_ICD_DEV_PATH}")
 endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -291,6 +332,20 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/shaders/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/shaders)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/assets)
+
+# Bundle MoltenVK itself — it's a runtime-loaded Vulkan driver (dlopen'd by the loader via
+# its ICD manifest), not something Koral links, so file(GET_RUNTIME_DEPENDENCIES) below
+# never sees it. Installed under the same share/Koral/<kind> layout paths.cpp already
+# knows how to find, as a pair: the dylib plus its ICD manifest, exactly as Homebrew laid
+# them out, since the manifest's library_path is relative to itself
+# (../../../lib/libMoltenVK.dylib) and only resolves correctly if that relative structure
+# is preserved.
+if(APPLE AND KORAL_MOLTENVK_DYLIB AND KORAL_MOLTENVK_ICD_JSON)
+    install(FILES "${KORAL_MOLTENVK_DYLIB}"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/moltenvk/lib)
+    install(FILES "${KORAL_MOLTENVK_ICD_JSON}"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/moltenvk/etc/vulkan/icd.d)
+endif()
 
 # ---------------------------------------------------------------------------
 # Bundled runtime dependencies

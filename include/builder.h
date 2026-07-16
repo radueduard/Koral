@@ -22,7 +22,6 @@
 #include <format>
 #include <memory>
 #include <optional>
-#include <stacktrace>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -31,6 +30,7 @@
 #include "error.h"
 #include "log.h"
 #include "resource.h"
+#include "stacktrace.h"
 
 struct Builder {
     virtual ~Builder() = default;
@@ -59,7 +59,7 @@ protected:
         Severity severity;
         kor::ErrorCode code;
         std::string message;
-        std::stacktrace trace;
+        kor::Stacktrace trace;
         std::shared_ptr<const kor::Error> cause;  ///< The input error responsible, if any.
     };
 
@@ -73,12 +73,12 @@ protected:
     void addError(const kor::ErrorCode code, std::string message,
                   std::shared_ptr<const kor::Error> cause = nullptr) const {
         _diagnostics.push_back({Severity::Error, code, std::move(message),
-                                std::stacktrace::current(2), std::move(cause)});
+                                kor::Stacktrace::current(2), std::move(cause)});
     }
 
     void warn(std::string message) const {
         _diagnostics.push_back({Severity::Warning, kor::ErrorCode::eNone, std::move(message),
-                                std::stacktrace::current(2), nullptr});
+                                kor::Stacktrace::current(2), nullptr});
     }
 
     // Start a build attempt: forget everything the *previous attempt* discovered, keeping what the
@@ -208,7 +208,7 @@ private:
     mutable std::optional<std::size_t> _configWatermark;  ///< #diagnostics produced by setters.
     mutable std::optional<std::size_t> _depWatermark;     ///< #dependencies adopted by setters.
 
-    static std::string formatTrace(const std::stacktrace& trace) {
+    static std::string formatTrace(const kor::Stacktrace& trace) {
         std::string out;
         for (const auto& frame : trace) {
             out += std::format("    at {} ({}:{})\n",

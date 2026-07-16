@@ -14,6 +14,7 @@
 #include <GLFW/glfw3.h>
 
 #include "../../../include/log.h"
+#include "../../core/paths.h"
 
 namespace kor::vk
 {
@@ -71,14 +72,31 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
     Runtime::Runtime()
     {
-        // Point the vcpkg Vulkan-Loader at the bundled validation layers (and, on
-        // macOS, the molten-vk ICD) so they resolve with no system Vulkan SDK present.
-        // VK_ADD_* are additive, so the user's own layers/drivers still load too.
+        // Point the vcpkg Vulkan-Loader at the bundled validation layers so they resolve
+        // with no system Vulkan SDK present. VK_ADD_* are additive, so the user's own
+        // layers/drivers still load too.
 #ifdef KORAL_VK_LAYER_PATH
         addLoaderSearchPath("VK_ADD_LAYER_PATH", KORAL_VK_LAYER_PATH);
 #endif
-#ifdef KORAL_VK_ICD_PATH
-        addLoaderSearchPath("VK_ADD_DRIVER_FILES", KORAL_VK_ICD_PATH);
+
+        // macOS has no native Vulkan driver — MoltenVK supplies one as an ICD, found the same
+        // way shaders/assets are (see paths.cpp): beside the library, under the GNU install
+        // layout, or — dev builds only — the Homebrew cellar this was configured against.
+#if defined(__APPLE__)
+        if (const auto icdManifest = kor::detail::dataFile(
+                "moltenvk/etc/vulkan/icd.d", "MoltenVK_icd.json", "KORAL_VK_ICD_DIR",
+#ifdef KORAL_VK_ICD_DEV_PATH
+                KORAL_VK_ICD_DEV_PATH
+#else
+                ""
+#endif
+                ); !icdManifest.empty()) {
+            addLoaderSearchPath("VK_ADD_DRIVER_FILES", icdManifest.c_str());
+        } else {
+            kor::log::warn("[vulkan] MoltenVK ICD manifest not found; Vulkan will have no "
+                            "driver unless a system Vulkan SDK is installed. Run "
+                            "'brew install molten-vk' and reconfigure.");
+        }
 #endif
 
         constexpr auto applicationInfo = ::vk::ApplicationInfo()

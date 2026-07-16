@@ -84,4 +84,17 @@ namespace kor::detail
 
         return roots;
     }
+
+    std::filesystem::path dataFile(
+        const std::string_view kind, const std::string_view filename,
+        const char* envVar, const std::string_view buildPath)
+    {
+        for (const auto& root : dataRoots(kind, envVar, buildPath)) {
+            std::error_code ec;
+            if (auto candidate = root / filename; std::filesystem::is_regular_file(candidate, ec)) {
+                return candidate;
+            }
+        }
+        return {};
+    }
 }

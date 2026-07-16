@@ -42,4 +42,11 @@ namespace kor::detail
      */
     [[nodiscard]] std::vector<std::filesystem::path> dataRoots(
         std::string_view kind, const char* envVar, std::string_view buildPath);
+
+    /**
+     * @brief The first existing @p filename found under any of @c dataRoots(kind, envVar, buildPath),
+     *        searched in the same most-specific-first order. Empty if none of the roots contain it.
+     */
+    [[nodiscard]] std::filesystem::path dataFile(
+        std::string_view kind, std::string_view filename, const char* envVar, std::string_view buildPath);
 }
