@@ -34,23 +34,28 @@ jobs:
       fail-fast: false   # one platform breaking should not hide the other's result
       matrix:
         include:
-          - name: linux-x64
-            # A self-hosted runner on radue's own box (see docs/self-hosted-runner.md to set one
-            # up). Worth it because vcpkg builds openimageio/assimp/slang/validation-layers from
-            # source: GitHub's free Linux runner gives 4 vCPU and discards everything afterwards,
-            # while the local machine has 32 and keeps a warm cache between runs.
-            #
-            # To fall back to GitHub's runner — if the machine is off, or to prove the build does
-            # not secretly depend on something only installed locally — swap this one line for
-            # `runner: ubuntu-24.04`. Nothing else in this file needs to change: every step that
-            # differs between a persistent machine and a disposable one (apt, the binary cache)
-            # keys off `runner.environment` and switches itself over.
-            runner: gfx-linux
-            triplet: x64-linux
-            # Ninja, not CMake's Linux default of "Unix Makefiles" — which is what this job used
-            # until now, silently, while local development used Ninja. Same generator as the dev
-            # build is the point: a release should not be the one configuration nobody ever builds.
-            generator: Ninja
+          # linux-x64 — DISABLED for this release only: gfx-linux (radue's desktop) is offline, and
+          # the release job waits on every matrix leg before it will draft anything, so a queued
+          # linux-x64 job would block the macOS artifacts from ever being published. Re-enable by
+          # uncommenting once that machine (or `runner: ubuntu-24.04` as a hosted fallback) is back.
+          #
+          # - name: linux-x64
+          #   # A self-hosted runner on radue's own box (see docs/self-hosted-runner.md to set one
+          #   # up). Worth it because vcpkg builds openimageio/assimp/slang/validation-layers from
+          #   # source: GitHub's free Linux runner gives 4 vCPU and discards everything afterwards,
+          #   # while the local machine has 32 and keeps a warm cache between runs.
+          #   #
+          #   # To fall back to GitHub's runner — if the machine is off, or to prove the build does
+          #   # not secretly depend on something only installed locally — swap this one line for
+          #   # `runner: ubuntu-24.04`. Nothing else in this file needs to change: every step that
+          #   # differs between a persistent machine and a disposable one (apt, the binary cache)
+          #   # keys off `runner.environment` and switches itself over.
+          #   runner: gfx-linux
+          #   triplet: x64-linux
+          #   # Ninja, not CMake's Linux default of "Unix Makefiles" — which is what this job used
+          #   # until now, silently, while local development used Ninja. Same generator as the dev
+          #   # build is the point: a release should not be the one configuration nobody ever builds.
+          #   generator: Ninja
 
           # ---------------------------------------------------------------------------------------
           # windows-x64 — DISABLED, pending a self-hosted Windows runner.
