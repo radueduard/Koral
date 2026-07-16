@@ -86,18 +86,36 @@ jobs:
           #   generator: Visual Studio 17 2022
           # ---------------------------------------------------------------------------------------
 
+          - name: macos-arm64
+            # Self-hosted on radue's own Mac (see docs/self-hosted-runner.md) — same reasoning as
+            # linux-x64: vcpkg builds openimageio/assimp/slang/validation-layers from source, and
+            # a disposable hosted macOS runner is both slow (cold cache every run) and billed at a
+            # steep multiplier since this repo is private.
+            #
+            # Previously blocked here on std::stacktrace: used in the public builder.h, but
+            # Apple's libc++ does not ship <stacktrace> at all. Fixed by kor::Stacktrace
+            # (include/stacktrace.h), which falls back to backtrace_symbols(3) when the standard
+            # header is unavailable. A second, unrelated snag on the way here: assimp vendors its
+            # own copy of miniz.h (via kubazip), whose mz_* symbols collide with minizip-ng
+            # (pulled in transitively via OpenColorIO) — a hard duplicate-symbol error on Apple's
+            # linker. Fixed with the vcpkg-overlay-ports/kubazip overlay, which renames kubazip's
+            # vendored mz_* namespace at build time.
+            #
+            # The OpenGL backend still compiles and ships here, but is not fully functional: macOS
+            # caps at GL 4.1, so no compute shaders and no bindless. Vulkan-via-MoltenVK is the
+            # only backend to rely on for macOS builds.
+            runner: gfx-macos
+            triplet: arm64-osx
+            generator: Ninja
+
           # Not yet built, deliberately:
           #
-          # arm64 — GitHub's hosted ARM runners (ubuntu-24.04-arm, windows-11-arm) are free only
-          #   for *public* repositories; this repo is private, so they bill as larger runners.
-          #   Adding them is two lines here (name/os/triplet: arm64-linux, arm64-windows) once
-          #   that changes — but vcpkg resolving shader-slang, openimageio, assimp and ktx for an
-          #   arm64 triplet is unverified, so expect that to be the real work, not the YAML.
-          #
-          # macOS — blocked on two things, not just packaging. std::stacktrace is used in the
-          #   public builder.h and libc++ does not have it (needs a __cpp_lib_stacktrace guard),
-          #   and the OpenGL backend cannot work there at all: macOS caps at GL 4.1, so no compute
-          #   shaders and no bindless. Vulkan-via-MoltenVK only. Deferred to a later release.
+          # arm64 (Linux/Windows) — GitHub's hosted ARM runners (ubuntu-24.04-arm,
+          #   windows-11-arm) are free only for *public* repositories; this repo is private, so
+          #   they bill as larger runners. Adding them is two lines here (name/os/triplet:
+          #   arm64-linux, arm64-windows) once that changes — but vcpkg resolving shader-slang,
+          #   openimageio, assimp and ktx for an arm64 triplet is unverified, so expect that to be
+          #   the real work, not the YAML.
 
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +138,14 @@ jobs:
             libxext-dev libxfixes-dev libxrender-dev libxkbcommon-dev \
             libwayland-dev wayland-protocols libgl1-mesa-dev libglu1-mesa-dev \
             libltdl-dev nasm
+
+      # There is no vcpkg port for MoltenVK (it has never existed in the registry), so it is not
+      # something the vcpkg install step below can restore from cache — CMakeLists.txt shells out
+      # to `brew --prefix molten-vk` at configure time and bundles the dylib + ICD manifest it
+      # finds there. Idempotent: a no-op in a few seconds if the self-hosted runner already has it.
+      - name: Install MoltenVK (Homebrew)
+        if: runner.os == 'macOS'
+        run: brew install molten-vk
 
       # vcpkg builds openimageio, assimp, slang and the validation layers from source — the better
       # part of an hour. The x-gha binary-cache backend needs these two variables, which are in the
@@ -209,8 +235,8 @@ jobs:
             -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
             -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
             -DCMAKE_INSTALL_PREFIX="$PWD/stage" \
-            -DGFX_BUILD_TESTS=OFF \
-            -DGFX_EMBED_SOURCE_PATHS=OFF
+            -DKORAL_BUILD_TESTS=OFF \
+            -DKORAL_EMBED_SOURCE_PATHS=OFF
         # KORAL_EMBED_SOURCE_PATHS=OFF is the one flag that must never be dropped from a release
         # build. With it ON, the shipped binary keeps this runner's source path as a fallback for
         # locating shaders and assets — an absolute path that names nothing on a user's machine.
