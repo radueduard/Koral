@@ -136,6 +136,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             constexpr std::array platformExts = {
                 "VK_KHR_wayland_surface",
                 "VK_KHR_xcb_surface",
+                "VK_EXT_metal_surface", // macOS — exposed by the MoltenVK ICD
+                "VK_KHR_win32_surface",
             };
             const bool hasPlatformExt = std::ranges::any_of(_instanceExtensions, [&](const char* e) {
                 return std::ranges::any_of(platformExts, [&](const char* p){ return std::string_view(e) == p; });
