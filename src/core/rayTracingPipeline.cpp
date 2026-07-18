@@ -70,9 +70,9 @@ namespace kor
         });
     }
 
-    kor::Resource<RayTracingPipeline> RayTracingPipeline::Builder::build() const
+    kor::Resource<RayTracingPipeline> RayTracingPipeline::Builder::build(const std::source_location where) const
     {
-        auto pipeline = materialize<RayTracingPipeline>(*this, "RayTracingPipeline");
+        auto pipeline = materialize<RayTracingPipeline>(*this, "RayTracingPipeline", where);
         Context::Repository().addRef(ResourceRef<const RayTracingPipeline>(pipeline));
         return pipeline;
     }

@@ -155,9 +155,20 @@ protected:
      * Never throws and never returns nothing: a failure is a poisoned resource that keeps its
      * identity, so refs taken from it stay valid and come good if it is ever repaired.
      */
+    // @p where is the caller's build() site, defaulted at that call so it names the project's
+    // file and line rather than somewhere inside Koral. Every build() takes it and forwards it
+    // here; without that the location would be whichever library .cpp constructed the Error.
     template<typename T, typename SelfBuilder>
-    [[nodiscard]] kor::Resource<T> materialize(const SelfBuilder& self, std::string name) const {
+    [[nodiscard]] kor::Resource<T> materialize(const SelfBuilder& self, std::string name,
+                                               const std::source_location where = std::source_location::current()) const {
         kor::Resource<T> resource;
+
+        // Re-stamp only the symptom. Causes keep the location they were raised at — which is the
+        // caller's build() site for the input that actually broke, and that is the line to fix.
+        const auto attribute = [where](kor::Error e) {
+            e.where = where;
+            return e;
+        };
 
         if constexpr (SelfBuilder::Recoverable) {
             // Attempt on a copy, and keep it: a retry must be independent of the caller's builder
@@ -169,7 +180,7 @@ protected:
 
             resource = created
                 ? kor::Resource<T>(std::move(*created), name)
-                : kor::Resource<T>::failed(std::move(created.error()), name);
+                : kor::Resource<T>::failed(attribute(std::move(created.error())), name);
 
             for (const auto& [state, generation] : attempt->_deps) {
                 resource.addDependency(state.lock(), generation);
@@ -187,7 +198,7 @@ protected:
 
             resource = created
                 ? kor::Resource<T>(std::move(*created), name)
-                : kor::Resource<T>::failed(std::move(created.error()), name);
+                : kor::Resource<T>::failed(attribute(std::move(created.error())), name);
 
             for (const auto& [state, generation] : self._deps) {
                 resource.addDependency(state.lock(), generation);
@@ -208,12 +219,46 @@ private:
     mutable std::optional<std::size_t> _configWatermark;  ///< #diagnostics produced by setters.
     mutable std::optional<std::size_t> _depWatermark;     ///< #dependencies adopted by setters.
 
+    // Koral's own frames are noise here: the reader cannot act on them, and there are enough of
+    // them (builder -> materialize -> create -> backend) to push the one line that matters — their
+    // own call site — off the top of the report. So drop the library's frames and show the
+    // caller's, capped so a deep call chain cannot flood the log either.
+    // Matched against the symbol only, never the file path: a user whose project lives in a
+    // directory called "Koral" (this repository's own tests, for one) would otherwise have every
+    // one of their frames classified as library code and filtered away.
+    //   "kor::"     — demangled frames, which is what std::stacktrace yields.
+    //   "_ZN3kor"   — the same namespace still mangled, which is what backtrace_symbols(3) yields.
+    //   "libKoral"  — the module name that prefixes each backtrace_symbols line.
+    static bool isLibraryFrame(const kor::Stacktrace::value_type& frame) {
+        const auto symbol = frame.description();
+        for (const std::string_view marker : {"kor::", "_ZN3kor", "libKoral"}) {
+            if (symbol.find(marker) != std::string::npos) return true;
+        }
+        return false;
+    }
+
     static std::string formatTrace(const kor::Stacktrace& trace) {
+        constexpr std::size_t maxFrames = 10;
+
         std::string out;
+        std::size_t shown = 0;
         for (const auto& frame : trace) {
+            if (isLibraryFrame(frame)) continue;         // the caller's code is what they can fix
             out += std::format("    at {} ({}:{})\n",
                                frame.description(), frame.source_file(), frame.source_line());
+            if (++shown == maxFrames) break;
             if (frame.description().find("main") != std::string::npos) break;
+        }
+        // Every frame looked like library code (a failure raised from inside Koral's own startup,
+        // or a build where the symbols carry no usable names). An empty trace tells the reader
+        // nothing, so fall back to the raw one rather than dropping it.
+        if (out.empty()) {
+            for (const auto& frame : trace) {
+                out += std::format("    at {} ({}:{})\n",
+                                   frame.description(), frame.source_file(), frame.source_line());
+                if (++shown == maxFrames) break;
+                if (frame.description().find("main") != std::string::npos) break;
+            }
         }
         return out;
     }

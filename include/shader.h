@@ -12,6 +12,8 @@
 #include <glm/fwd.hpp>
 #include <string>
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "structs.h"
 #include "resource.h"
@@ -108,10 +110,21 @@ namespace kor
             std::map<glm::u32, PushConstant> pushConstants;
         };
 
-        // Unified shader descriptor and convergence point of the language-specific builders
-        // below; the backends construct a Shader from this. Build it via the fluent
-        // Shader::Builder API: pick the language with setLang<L>(), which returns the
-        // matching language-specific builder.
+        // The one shader builder, identical for every language. A shader is always named by
+        // its source file and (optionally) an entry point:
+        //
+        //     Shader::Builder{}.setPath("flatTriangle.vert.glsl").getOrBuild();
+        //     Shader::Builder{}.setPath("sample.slang").setEntryPoint("vertexMain").getOrBuild();
+        //
+        // Everything that used to differ per language is now inferred, and every inference has
+        // an explicit setter that overrides it:
+        //
+        //   language   — from the file extension (.slang / .spv / anything else = GLSL); setLang().
+        //   stage      — Slang reads its entry point's [shader("...")] attribute; GLSL and SPIR-V
+        //                read the filename's stage tag ("x.vert.glsl", "x.comp.glsl"); setStage().
+        //   path       — a relative path is resolved against the shader search roots, so callers
+        //                do not have to wrap it in kor::shaderPath() themselves.
+        //   identifier — getOrBuild() defaults it to "path" or "path:entry".
         struct KORAL_API Builder : ::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
@@ -119,23 +132,59 @@ namespace kor
 
             Stage stage = Stage::eCompute;
             Lang lang = Lang::eGLSL;
-            std::filesystem::path path = std::filesystem::path(); // GLSL / SPIR-V source
-            std::string module;                                   // Slang module name
-            std::string entry;                                    // Slang entry point name
+            std::filesystem::path path = std::filesystem::path(); // source file, any language
+            std::string module;                                   // Slang module name (defaults to path stem)
+            std::string entry;                                    // entry point ("main" for GLSL)
+
+            // Whether the corresponding field was set explicitly rather than inferred. Inference
+            // only fills in what the caller left alone.
+            bool stageExplicit = false;
+            bool langExplicit  = false;
 
             Builder& setStage(const Stage stage) {
                 this->stage = stage;
+                this->stageExplicit = true;
                 return *this;
             }
 
-            // Language divergence: returns the builder for language L (GLSLBuilder /
-            // SPIRVBuilder expose setPath; SlangBuilder exposes setEntryPoint). Returns by
-            // value since the type changes. Defined out of line below the class.
-            template<Lang L> auto setLang() const;
+            Builder& setPath(std::filesystem::path path) {
+                this->path = std::move(path);
+                return *this;
+            }
+
+            // The entry point to compile. Slang modules have many; GLSL has one, "main".
+            Builder& setEntryPoint(std::string entry) {
+                this->entry = std::move(entry);
+                return *this;
+            }
+
+            // Slang's module + entry form. Equivalent to setPath(module).setEntryPoint(entry):
+            // the module is resolved by name across the shader search roots either way.
+            Builder& setEntryPoint(std::string module, std::string entry) {
+                this->module = std::move(module);
+                this->entry = std::move(entry);
+                return *this;
+            }
+
+            Builder& setLang(const Lang lang) {
+                this->lang = lang;
+                this->langExplicit = true;
+                return *this;
+            }
+
+            template<Lang L> Builder& setLang() { return setLang(L); }
+
+            // Fill in whatever the caller left to inference (language, Slang module name, entry
+            // point, stage) and resolve a relative path against the search roots. Idempotent.
+            // Applied by create(); exposed because getOrBuild() needs the resolved identifier.
+            [[nodiscard]] Builder resolved() const;
+
+            // The cache key getOrBuild() uses when none is given: "path" or "path:entry".
+            [[nodiscard]] std::string defaultIdentifier() const;
 
             /** @brief One compile attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Shader>> create() const;
-            [[nodiscard]] kor::Resource<Shader> build() const;
+            [[nodiscard]] kor::Resource<Shader> build(std::source_location where = std::source_location::current()) const;
 
             // Get-or-build: returns the shader registered under `identifier`, building and
             // registering it (with hot-reload tracking) on first use. Subsequent calls with
@@ -145,42 +194,11 @@ namespace kor
             // still watched. That is what makes recovery possible at all: an unregistered failure
             // would be invisible to the file watcher, so fixing the source could never bring it
             // (or the pipelines built from it) back.
-            [[nodiscard]] ResourceRef<const Shader> getOrBuild(const std::string& identifier) const;
-        };
-
-        // GLSL source referenced by file path.
-        struct KORAL_API GLSLBuilder {
-            Builder _b;
-            GLSLBuilder& setStage(const Stage stage) { _b.stage = stage; return *this; }
-            GLSLBuilder& setPath(std::filesystem::path path) { _b.path = std::move(path); return *this; }
-            [[nodiscard]] kor::Resource<Shader> build() const { return _b.build(); }
-            [[nodiscard]] ResourceRef<const Shader> getOrBuild(const std::string& identifier) const { return _b.getOrBuild(identifier); }
-        };
-
-        // Precompiled SPIR-V referenced by file path.
-        struct KORAL_API SPIRVBuilder {
-            Builder _b;
-            SPIRVBuilder& setStage(const Stage stage) { _b.stage = stage; return *this; }
-            SPIRVBuilder& setPath(std::filesystem::path path) { _b.path = std::move(path); return *this; }
-            [[nodiscard]] kor::Resource<Shader> build() const { return _b.build(); }
-            [[nodiscard]] ResourceRef<const Shader> getOrBuild(const std::string& identifier) const { return _b.getOrBuild(identifier); }
-        };
-
-        // Slang referenced by module + entry point; the stage is auto-detected from the
-        // entry point's [shader("...")] attribute (override with setStage).
-        struct KORAL_API SlangBuilder {
-            Builder _b;
-            SlangBuilder& setStage(const Stage stage) { _b.stage = stage; return *this; }
-            SlangBuilder& setEntryPoint(std::string module, std::string entry) {
-                _b.module = std::move(module);
-                _b.entry = std::move(entry);
-                return *this;
-            }
-            [[nodiscard]] kor::Resource<Shader> build() const { return _b.build(); }
-            // Identifier defaults to "module:entry" when omitted.
-            [[nodiscard]] ResourceRef<const Shader> getOrBuild(std::string identifier = {}) const {
-                return _b.getOrBuild(identifier.empty() ? _b.module + ":" + _b.entry : identifier);
-            }
+            // Identifier defaults to defaultIdentifier() ("path" / "path:entry") when omitted.
+            // `where` is defaulted at the call site so a compile failure is reported against the
+            // caller's line rather than against shader.cpp; see Builder::materialize.
+            [[nodiscard]] ResourceRef<const Shader> getOrBuild(std::string identifier = {},
+                                                              std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~Shader() = default;
@@ -249,14 +267,4 @@ namespace kor
         bool _valid = false;
         bool _modified = true;
     };
-
-    template<Shader::Lang L>
-    auto Shader::Builder::setLang() const
-    {
-        Builder copy = *this;
-        copy.lang = L;
-        if constexpr (L == Lang::eSlang)       return SlangBuilder{ copy };
-        else if constexpr (L == Lang::eSPIRV)  return SPIRVBuilder{ copy };
-        else                                   return GLSLBuilder{ copy };
-    }
 }

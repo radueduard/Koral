@@ -37,9 +37,9 @@ namespace kor
         });
     }
 
-    kor::Resource<Buffer> Buffer::RawBuilder::build() const
+    kor::Resource<Buffer> Buffer::RawBuilder::build(const std::source_location where) const
     {
-        auto buffer = materialize<Buffer>(*this, "Buffer");
+        auto buffer = materialize<Buffer>(*this, "Buffer", where);
         Context::Repository().addRef(ResourceRef<const Buffer>(buffer));
         return buffer;
     }

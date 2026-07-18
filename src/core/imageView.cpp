@@ -37,9 +37,9 @@ namespace kor
         });
     }
 
-    kor::Resource<ImageView> ImageView::Builder::build() const
+    kor::Resource<ImageView> ImageView::Builder::build(const std::source_location where) const
     {
-        return materialize<ImageView>(*this, "ImageView");
+        return materialize<ImageView>(*this, "ImageView", where);
     }
 
     ImageView::ImageView(const Builder& createInfo) :

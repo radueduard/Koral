@@ -560,10 +560,11 @@ namespace kor::ogl
             if (!_state.boundFramebuffer.has_value())
                 throw std::runtime_error("You can't set viewport without a framebuffer!");
             _state.viewportSet = true;
-            // GL-native bottom-left origin: the app's viewport coordinates are authored
-            // for OpenGL's Y (the depth convention is unified via glClipControl, the Y is
-            // not — see Scheduler::Initialize).
-            glViewport(x, y, width, height);
+            // Viewport rects are given in the canonical (Vulkan) top-left origin. glClipControl
+            // does not move GL's window-space origin — it only negates NDC Y — so the rect
+            // itself still has to be converted to GL's bottom-left. See Scheduler::Initialize.
+            const glm::u32 glY = currentFramebufferExtent().y - y - height;
+            glViewport(x, glY, width, height);
             glCheckError();
         });
         return *this;
@@ -578,9 +579,10 @@ namespace kor::ogl
                 throw std::runtime_error("You can't set scissor without a framebuffer!");
             _state.scissorSet = true;
             // Vulkan's scissor always clips; GL needs the scissor test explicitly on.
-            // GL-native bottom-left origin (Y is not remapped — see the viewport above).
+            // Top-left origin converted to GL's bottom-left, as for the viewport above.
+            const glm::u32 glY = currentFramebufferExtent().y - y - height;
             glEnable(GL_SCISSOR_TEST);
-            glScissor(x, y, width, height);
+            glScissor(x, glY, width, height);
             glCheckError();
         });
         return *this;

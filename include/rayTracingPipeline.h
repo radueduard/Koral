@@ -19,6 +19,8 @@
 #include <glm/fwd.hpp>
 
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "pipeline.h"
 #include "resource.h"
@@ -65,7 +67,7 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<RayTracingPipeline>> create() const;
-            [[nodiscard]] kor::Resource<RayTracingPipeline> build() const;
+            [[nodiscard]] kor::Resource<RayTracingPipeline> build(std::source_location where = std::source_location::current()) const;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */

@@ -123,9 +123,9 @@ namespace kor
         });
     }
 
-    kor::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build() const
+    kor::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build(const std::source_location where) const
     {
-        auto pipeline = materialize<GraphicsPipeline>(*this, "GraphicsPipeline");
+        auto pipeline = materialize<GraphicsPipeline>(*this, "GraphicsPipeline", where);
         // Registered even when poisoned: the Repository is what drives the retry that brings it
         // back once its shaders compile again.
         Context::Repository().addRef(ResourceRef<const GraphicsPipeline>(pipeline));

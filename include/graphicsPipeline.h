@@ -27,6 +27,8 @@
 #include "descriptorSetLayout.h"
 #include "mesh.h"
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "pipeline.h"
 #include "shader.h"
@@ -130,7 +132,7 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<GraphicsPipeline>> create() const;
-            [[nodiscard]] kor::Resource<GraphicsPipeline> build() const;
+            [[nodiscard]] kor::Resource<GraphicsPipeline> build(std::source_location where = std::source_location::current()) const;
 
         private:
             glm::u32 currentSpecConstantSize = 0;

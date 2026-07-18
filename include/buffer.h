@@ -17,6 +17,8 @@
 
 #include "flags.h"
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "log.h"
 #include "context.h"
@@ -132,7 +134,7 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] virtual Result<std::unique_ptr<Buffer>> create() const;
-            [[nodiscard]] virtual Resource<Buffer> build() const;
+            [[nodiscard]] virtual Resource<Buffer> build(std::source_location where = std::source_location::current()) const;
 
         protected:
             bool _usageTouched = false; ///< tracks explicit usage edits so setUsage can warn on overwrite
@@ -260,8 +262,8 @@ namespace kor
                 return buffer;
             }
 
-            [[nodiscard]] Resource<Buffer> build() const override {
-                auto buffer = materialize<Buffer>(*this, "Buffer");
+            [[nodiscard]] Resource<Buffer> build(std::source_location where = std::source_location::current()) const override {
+                auto buffer = materialize<Buffer>(*this, "Buffer", where);
                 Context::Repository().addRef(ResourceRef<const Buffer>(buffer));
                 return buffer;
             }

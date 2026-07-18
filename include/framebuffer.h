@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "resource.h"
 #include "structs.h"
@@ -77,7 +79,7 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Framebuffer>> create() const;
-            [[nodiscard]] kor::Resource<Framebuffer> build() const;
+            [[nodiscard]] kor::Resource<Framebuffer> build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~Framebuffer() = default;

@@ -52,9 +52,9 @@ namespace kor
         });
     }
 
-    kor::Resource<DescriptorSetLayout> DescriptorSetLayout::Builder::build() const
+    kor::Resource<DescriptorSetLayout> DescriptorSetLayout::Builder::build(const std::source_location where) const
     {
-        return materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout");
+        return materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout", where);
     }
 
     std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> DescriptorSetLayout::getBindings() const

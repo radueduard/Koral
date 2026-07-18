@@ -46,6 +46,8 @@ namespace kor
             [[nodiscard]] static std::size_t source_line() noexcept { return 0; }
         };
 
+        using value_type = Frame;   // matches std::stacktrace, so callers can name the frame type
+
         Stacktrace() = default;
 
         [[nodiscard]] static Stacktrace current(unsigned skip = 0);

@@ -215,18 +215,14 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         kor::CommandBuffer::SetViewport(x, y, width, height);
-        // The app authors its geometry, texture sampling and gl_FragCoord conventions for
-        // OpenGL's Y-up window origin; only the depth convention is shared (both use
-        // GLM_FORCE_DEPTH_ZERO_TO_ONE). Present the default (swapchain) framebuffer through
-        // a negative-height viewport so Vulkan's Y-down framebuffer matches OpenGL's Y-up
-        // result on screen. Offscreen targets are sampled with the same convention on both
-        // backends, so they use a straight viewport.
-        const bool isDefaultFramebuffer = _state.boundFramebuffer.value()->IsDefault();
+        // Koral's canonical clip space is Vulkan's own, so the viewport is passed straight
+        // through for every framebuffer — no negative height, no default/offscreen split.
+        // OpenGL is what adapts (see ogl Scheduler::Initialize).
         const ::vk::Viewport viewport = ::vk::Viewport()
             .setX(static_cast<float>(x))
-            .setY(static_cast<float>(y) + (isDefaultFramebuffer ? static_cast<float>(height) : 0.f))
+            .setY(static_cast<float>(y))
             .setWidth(static_cast<float>(width))
-            .setHeight(static_cast<float>(height) * (isDefaultFramebuffer ? -1.f : 1.f))
+            .setHeight(static_cast<float>(height))
             .setMinDepth(0.f)
             .setMaxDepth(1.f);
         _handle.setViewport(0, viewport);
@@ -296,16 +292,10 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::SetFrontFace(const FrontFace frontFace)
     {
         kor::CommandBuffer::SetFrontFace(frontFace);
-        // The front face is authored for OpenGL's Y-up window space. Offscreen targets
-        // render with Vulkan's Y-down (straight) viewport, which reverses triangle winding
-        // relative to that authoring, so invert the front face there. The default
-        // framebuffer uses a negative-height (flipped) viewport (see SetViewport), which
-        // restores the original winding, so it takes the winding as-is.
-        const bool isDefaultFramebuffer = _state.boundFramebuffer.has_value() && _state.boundFramebuffer.value()->IsDefault();
-        _handle.setFrontFace(isDefaultFramebuffer ? frontFace == kor::FrontFace::eClockwise ? ::vk::FrontFace::eClockwise
-                                                                                            : ::vk::FrontFace::eCounterClockwise
-                                                  : frontFace == kor::FrontFace::eClockwise ? ::vk::FrontFace::eCounterClockwise
-                                                                                            : ::vk::FrontFace::eClockwise);
+        // Winding is canonical (Vulkan) too, so this is a plain pass-through. GL agrees
+        // because GL_UPPER_LEFT negates NDC Y, which flips its window-space winding to
+        // match — see ogl Scheduler::Initialize.
+        _handle.setFrontFace(getVkFrontFace(frontFace));
         return *this;
     }
 

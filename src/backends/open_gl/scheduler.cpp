@@ -25,17 +25,36 @@ namespace kor::ogl
     {
         glewInit();
 
-        // Unify only the DEPTH convention with Vulkan. The app builds its projections
-        // with GLM_FORCE_DEPTH_ZERO_TO_ONE (clip z in [0,w]), so on stock OpenGL — whose
-        // NDC depth is [-1,1] — the depth buffer is compressed into [0.5,1], which breaks
-        // the depth buffer, depth testing and the compute frustum/Hi-Z culling. Requesting
-        // GL_ZERO_TO_ONE makes GL interpret [0,1] clip depth like Vulkan and fixes all of
-        // that. We keep GL_LOWER_LEFT (GL's native Y-up window origin): the app's geometry,
-        // texture-sampling and gl_FragCoord conventions are authored for OpenGL's Y, and the
-        // Vulkan backend already flips to match (see vk SetViewport/SetFrontFace) — so the Y
-        // axis must stay untouched here. Core in GL 4.5 / ARB_clip_control.
-        if (GLEW_VERSION_4_5 || GLEW_ARB_clip_control)
-            glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+        // Koral's canonical clip space is Vulkan's: Y points down in NDC (-1 is the top of
+        // the image) and depth is [0,1]. GL is configured once, here, to rasterize that same
+        // space; nothing downstream compensates per-draw. This is the whole reason the
+        // backends no longer carry viewport/front-face fixups.
+        //
+        //   GL_ZERO_TO_ONE  — stock GL maps NDC depth [-1,1], which squashes a [0,1] clip
+        //                     depth into [0.5,1] and wrecks depth testing and the compute
+        //                     frustum/Hi-Z culling.
+        //   GL_UPPER_LEFT   — negates NDC Y in the viewport transform. That lands Y-down clip
+        //                     content right side up on screen AND flips window-space triangle
+        //                     winding to agree with Vulkan, so front faces need no inversion.
+        //
+        // Two things ARB_clip_control does NOT cover, handled elsewhere:
+        //   * Viewport/scissor rects stay in GL's bottom-left window space, so the top-left
+        //     rects the API takes are converted in CommandBuffer::SetViewport/SetScissor.
+        //   * gl_FragCoord.y still counts from the bottom; a shader that reads it needs
+        //     `layout(origin_upper_left) in vec4 gl_FragCoord;` to match Vulkan.
+        //
+        // Consequence worth knowing: an offscreen target's rows land in memory bottom-up
+        // relative to Vulkan's. That is invisible to a render→sample→present chain (every
+        // stage is mirrored alike) but it is visible to host readback and to shaders that
+        // mix a rendered target with a disk-loaded texture at the same UV.
+        //
+        // Core in GL 4.5 / ARB_clip_control. There is no fallback path: without it GL cannot
+        // rasterize the canonical space at all, so fail loudly rather than render garbage.
+        if (!GLEW_VERSION_4_5 && !GLEW_ARB_clip_control)
+            throw std::runtime_error(
+                "OpenGL 4.5 or ARB_clip_control is required: Koral's clip space (Y-down, depth [0,1]) "
+                "cannot be expressed without glClipControl.");
+        glClipControl(GL_UPPER_LEFT, GL_ZERO_TO_ONE);
 
         auto globalVAO = 0u;
         glGenVertexArrays(1, &globalVAO);

@@ -12,6 +12,8 @@
 #include "resource.h"
 #include "descriptor.h"
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "error.h"
 #include <optional>
@@ -46,7 +48,7 @@ namespace kor
             Builder& write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index = 0);
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<DescriptorSet>> create() const;
-            [[nodiscard]] kor::Resource<DescriptorSet> build() const;
+            [[nodiscard]] kor::Resource<DescriptorSet> build(std::source_location where = std::source_location::current()) const;
 
         private:
             void initWrites();

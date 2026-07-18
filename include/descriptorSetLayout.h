@@ -12,6 +12,8 @@
 
 #include "api.h"
 #include "error.h"
+#include <source_location>
+
 #include "builder.h"
 
 namespace kor
@@ -26,7 +28,7 @@ namespace kor
             Builder& addBinding(glm::u32 binding, DescriptorType type, glm::u32 count = 1);
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<DescriptorSetLayout>> create() const;
-            [[nodiscard]] kor::Resource<DescriptorSetLayout> build() const;
+            [[nodiscard]] kor::Resource<DescriptorSetLayout> build(std::source_location where = std::source_location::current()) const;
         private:
             std::map<glm::u32, std::pair<DescriptorType, glm::u32>> _bindings;
             std::optional<Error> _error;

@@ -52,9 +52,9 @@ namespace kor
         });
     }
 
-    kor::Resource<AccelerationStructure> AccelerationStructure::Builder::build() const
+    kor::Resource<AccelerationStructure> AccelerationStructure::Builder::build(const std::source_location where) const
     {
-        return materialize<AccelerationStructure>(*this, "AccelerationStructure");
+        return materialize<AccelerationStructure>(*this, "AccelerationStructure", where);
     }
 
     AccelerationStructure::AccelerationStructure(const Builder& createInfo)

@@ -20,6 +20,7 @@ add_executable(koral_tests
         test_tlsf_allocator.cpp
         test_flags.cpp
         test_error.cpp
+        test_log_repeat.cpp
         test_structs.cpp
         test_mesh_layout.cpp
         test_resource.cpp

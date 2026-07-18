@@ -121,9 +121,9 @@ namespace kor {
         });
     }
 
-    kor::Resource<Framebuffer> Framebuffer::Builder::build() const
+    kor::Resource<Framebuffer> Framebuffer::Builder::build(const std::source_location where) const
     {
-        return materialize<Framebuffer>(*this, "Framebuffer");
+        return materialize<Framebuffer>(*this, "Framebuffer", where);
     }
 
     kor::Resource<Framebuffer> Framebuffer::CreateDefault() {

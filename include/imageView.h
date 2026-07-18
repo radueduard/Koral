@@ -7,6 +7,8 @@
 #include <glm/fwd.hpp>
 
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "resource.h"
 #include "error.h"
@@ -104,7 +106,7 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<ImageView>> create() const;
-            [[nodiscard]] kor::Resource<ImageView> build() const;
+            [[nodiscard]] kor::Resource<ImageView> build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~ImageView() = default;

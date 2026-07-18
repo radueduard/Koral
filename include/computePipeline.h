@@ -13,6 +13,8 @@
 #include <glm/fwd.hpp>
 
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "descriptorSetLayout.h"
 #include "pipeline.h"
@@ -48,7 +50,7 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<ComputePipeline>> create() const;
-            [[nodiscard]] kor::Resource<ComputePipeline> build() const;
+            [[nodiscard]] kor::Resource<ComputePipeline> build(std::source_location where = std::source_location::current()) const;
 
             std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));

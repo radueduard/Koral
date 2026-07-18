@@ -30,9 +30,9 @@ namespace kor
         });
     }
 
-    kor::Resource<Sampler> Sampler::Builder::build() const
+    kor::Resource<Sampler> Sampler::Builder::build(const std::source_location where) const
     {
-        return materialize<Sampler>(*this, "Sampler");
+        return materialize<Sampler>(*this, "Sampler", where);
     }
 
     Sampler::Sampler(const Builder& builder) :

@@ -222,3 +222,21 @@ TEST_F(GpuTest, GoodShaderYieldsAUsablePipeline) {
 }
 
 } // namespace
+
+// The error a user reads must point at *their* line, not at a file inside Koral. Without the
+// source_location threaded through build(), `where` names whichever library .cpp happened to
+// construct the Error, which tells the reader nothing they can act on.
+TEST_F(GpuTest, ErrorLocationPointsAtTheCallerNotTheLibrary) {
+    const auto path = writeBrokenShader("koral_broken_loc.comp.glsl", kBrokenCompute);
+
+    const auto expectedLine = __LINE__ + 1;
+    const auto shader = Shader::Builder{}.setPath(path).build();
+
+    ASSERT_TRUE(shader.poisoned());
+    ASSERT_NE(shader.error(), nullptr);
+
+    const std::string file = shader.error()->where.file_name();
+    EXPECT_NE(file.find("test_poison.cpp"), std::string::npos)
+        << "error points into the library instead of the caller: " << file;
+    EXPECT_EQ(shader.error()->where.line(), expectedLine);
+}

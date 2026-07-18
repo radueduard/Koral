@@ -293,9 +293,9 @@ namespace kor
         });
     }
 
-    kor::Resource<DescriptorSet> DescriptorSet::Builder::build() const
+    kor::Resource<DescriptorSet> DescriptorSet::Builder::build(const std::source_location where) const
     {
-        return materialize<DescriptorSet>(*this, "DescriptorSet");
+        return materialize<DescriptorSet>(*this, "DescriptorSet", where);
     }
 
     DescriptorSet::DescriptorSet(const Builder& builder) : _layout(builder.layout), _writes(builder.writes)

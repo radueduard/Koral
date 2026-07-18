@@ -7,6 +7,8 @@
 
 #include "structs.h"
 #include "api.h"
+#include <source_location>
+
 #include "builder.h"
 #include "resource.h"
 #include "error.h"
@@ -123,7 +125,7 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Sampler>> create() const;
-            [[nodiscard]] kor::Resource<Sampler> build() const;
+            [[nodiscard]] kor::Resource<Sampler> build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~Sampler() = default;

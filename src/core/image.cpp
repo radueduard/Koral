@@ -82,9 +82,9 @@ namespace kor
     }
 
 
-    kor::Resource<Image> Image::Builder::build() const
+    kor::Resource<Image> Image::Builder::build(const std::source_location where) const
     {
-        return materialize<Image>(*this, "Image");
+        return materialize<Image>(*this, "Image", where);
     }
 
     glm::u32 Image::ChannelSizeFromImageFormat(const kor::Image::Format format)

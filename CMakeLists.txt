@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.28)
 # link time. Must be set before project() -- that is when the vcpkg toolchain reads it.
 list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-ports")
 
-project(Koral VERSION 0.0.1 LANGUAGES C CXX)
+project(Koral VERSION 0.0.4 LANGUAGES C CXX)
 include(GenerateExportHeader)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)

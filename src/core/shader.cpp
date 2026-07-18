@@ -16,6 +16,8 @@
 #include <algorithm>
 #include <cstring>
 #include <iterator>
+#include <optional>
+#include <unordered_map>
 #include <unordered_set>
 
 #include <spirv_cross.hpp>
@@ -43,11 +45,108 @@ namespace kor {
         };
     }
 
+    namespace {
+        // The stage tag in a shader filename, e.g. "geometryPass.vert.glsl" -> eVertex. Looks at
+        // every extension so both "x.vert" and "x.vert.glsl" resolve. Used for GLSL and SPIR-V,
+        // where the stage cannot be recovered from the source the way Slang recovers it from
+        // [shader("...")]; nullopt means "no recognisable tag", which is a build error unless the
+        // caller set the stage explicitly.
+        std::optional<Shader::Stage> stageFromFilename(const std::filesystem::path& path)
+        {
+            static const std::unordered_map<std::string, Shader::Stage> tags = {
+                {"vert", Shader::Stage::eVertex},
+                {"tesc", Shader::Stage::eTessellationControl},
+                {"tese", Shader::Stage::eTessellationEvaluation},
+                {"geom", Shader::Stage::eGeometry},
+                {"frag", Shader::Stage::eFragment},
+                {"comp", Shader::Stage::eCompute},
+                {"task", Shader::Stage::eTask},
+                {"mesh", Shader::Stage::eMesh},
+                {"rgen", Shader::Stage::eRaygen},
+                {"rahit", Shader::Stage::eAnyHit},
+                {"rchit", Shader::Stage::eClosestHit},
+                {"rmiss", Shader::Stage::eMiss},
+                {"rint", Shader::Stage::eIntersection},
+                {"rcall", Shader::Stage::eCallable},
+            };
+
+            for (auto stem = path.filename(); stem.has_extension(); stem = stem.stem()) {
+                auto ext = stem.extension().string();
+                if (!ext.empty() && ext.front() == '.') ext.erase(0, 1);
+                if (const auto it = tags.find(ext); it != tags.end()) return it->second;
+            }
+            return std::nullopt;
+        }
+
+        Shader::Lang langFromFilename(const std::filesystem::path& path)
+        {
+            const auto ext = path.extension().string();
+            if (ext == ".slang") return Shader::Lang::eSlang;
+            if (ext == ".spv")   return Shader::Lang::eSPIRV;
+            return Shader::Lang::eGLSL;
+        }
+    }
+
+    Shader::Builder Shader::Builder::resolved() const
+    {
+        Builder b = *this;
+
+        // Slang's module+entry form names the source by module rather than by path; treat the
+        // module as the path so one set of rules covers both spellings.
+        if (b.path.empty() && !b.module.empty()) b.path = b.module;
+
+        if (!b.langExplicit && !b.path.empty()) b.lang = langFromFilename(b.path);
+
+        // A Slang module is resolved by name, so it keeps the bare stem; every other language
+        // needs a real file, resolved against the shader search roots.
+        if (b.lang == Lang::eSlang) {
+            if (b.module.empty()) b.module = b.path.stem().string();
+        } else if (!b.path.empty() && b.path.is_relative()) {
+            b.path = kor::shaderPath(b.path);
+        }
+
+        if (b.entry.empty() && b.lang != Lang::eSlang) b.entry = "main";
+
+        // Slang recovers the stage from the entry point at compile time, so leave it alone there.
+        if (!b.stageExplicit && b.lang != Lang::eSlang) {
+            if (const auto inferred = stageFromFilename(b.path)) b.stage = *inferred;
+        }
+
+        return b;
+    }
+
+    std::string Shader::Builder::defaultIdentifier() const
+    {
+        const Builder b = resolved();
+        const std::string source = b.lang == Lang::eSlang ? b.module : b.path.string();
+        // GLSL's entry is always "main", so it adds nothing to the key; Slang's distinguishes the
+        // several shaders that share one module.
+        return b.lang == Lang::eSlang ? std::format("{}:{}", source, b.entry) : source;
+    }
+
     Result<std::unique_ptr<Shader>> Shader::Builder::create() const
     {
         beginAttempt();
 
         if (auto v = validate(); !v) return std::unexpected(v.error());
+
+        const Builder b = resolved();
+
+        if (b.path.empty())
+            return fail(ErrorCode::eInvalidArgument,
+                        "No shader source: call setPath(\"file.glsl\") (or setEntryPoint(module, entry) for Slang).");
+
+        if (b.lang == Lang::eSlang && b.entry.empty())
+            return fail(ErrorCode::eInvalidArgument,
+                        "Slang module '{}' needs an entry point: call setEntryPoint(\"name\").", b.module);
+
+        // GLSL and SPIR-V cannot report their own stage, so an un-inferrable filename is fatal
+        // rather than silently compiling as the eCompute default.
+        if (b.lang != Lang::eSlang && !b.stageExplicit && !stageFromFilename(b.path))
+            return fail(ErrorCode::eInvalidArgument,
+                        "Cannot infer the shader stage from '{}': name it '<name>.vert.glsl' (vert/frag/comp/geom/"
+                        "tesc/tese/task/mesh/rgen/rahit/rchit/rmiss/rint/rcall) or call setStage() explicitly.",
+                        b.path.string());
 
         const auto api = Context::activeAPI();
         if (api != API::eOpenGL && api != API::eVulkan)
@@ -55,23 +154,26 @@ namespace kor {
 
         // Construction compiles the shader; a compile/parse failure throws and is
         // surfaced as a kor::Error (eShaderCompileFailed unless a more specific cause).
+        // The backends read the builder's fields directly, so they must see the resolved one.
         return guard(ErrorCode::eShaderCompileFailed, [&]() -> std::unique_ptr<Shader> {
             return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<Shader, vk::Shader>(*this)
-                : kor::MakeBackendPtr<Shader, ogl::Shader>(*this);
+                ? kor::MakeBackendPtr<Shader, vk::Shader>(b)
+                : kor::MakeBackendPtr<Shader, ogl::Shader>(b);
         });
     }
 
-    kor::Resource<Shader> Shader::Builder::build() const
+    kor::Resource<Shader> Shader::Builder::build(const std::source_location where) const
     {
         // Name it after whatever identifies the source, so a compile failure reads as
         // "shaders/forward.frag.glsl" rather than "Shader".
-        std::string name = path.empty() ? std::format("{}:{}", module, entry) : path.string();
-        return materialize<Shader>(*this, std::move(name));
+        return materialize<Shader>(*this, defaultIdentifier(), where);
     }
 
-    ResourceRef<const Shader> Shader::Builder::getOrBuild(const std::string& identifier) const
+    ResourceRef<const Shader> Shader::Builder::getOrBuild(std::string identifierOrEmpty,
+                                                          const std::source_location where) const
     {
+        const std::string identifier = identifierOrEmpty.empty() ? defaultIdentifier() : std::move(identifierOrEmpty);
+
         // Get-or-create: a shader already registered under this identifier is reused as-is.
         // Rebuilding would recompile the shader (wasted work) and double-register its file
         // watcher; the identifier is the cache key and the file path drives hot-reload.
@@ -86,7 +188,7 @@ namespace kor {
         // alive, registered and watched — otherwise the file watcher never learns about the
         // file, fixing the source raises no event, and neither the shader nor anything built
         // from it could ever recover. The poisoned resource is the recovery mechanism.
-        ResourceRef<Shader> shaderRef = Context::Repository().add(identifier, build());
+        ResourceRef<Shader> shaderRef = Context::Repository().add(identifier, build(where));
 
         auto ctx = std::make_shared<WatchContext>();
         std::weak_ptr<WatchContext> weakCtx = ctx;
@@ -98,7 +200,7 @@ namespace kor {
         // A shader that failed to compile reports no dependencies (there was no successful
         // parse), so fall back to its declared source path — which is the very file the user
         // is about to fix, and thus the one event we cannot afford to miss.
-        auto resync = [shaderRef, weakCtx, fallback = path] () mutable
+        auto resync = [shaderRef, weakCtx, fallback = resolved().path] () mutable
         {
             const auto ctx = weakCtx.lock();
             if (!ctx || !shaderRef.alive()) return;
