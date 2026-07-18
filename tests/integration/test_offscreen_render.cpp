@@ -345,4 +345,93 @@ TEST_F(GpuTest, MeshIndexedDraw) {
     EXPECT_GT(green, 0) << "the mesh triangle should have covered some pixels";
 }
 
+// Pins the canonical clip-space orientation: Y points down in NDC, so clip y = -1 is the TOP of
+// the image and must land in memory row 0. Everything downstream depends on this — the swapchain
+// blit presents row 0 at the top of the window without flipping anything.
+//
+// The geometry is deliberately asymmetric in Y: a quad covering the top half of clip space only.
+// A full-screen triangle cannot detect a flip (it is symmetric), which is why the older
+// ScissorAndDynamicStateClipDraw and a scissor-only check both pass even with an inverted
+// viewport. Reintroduce a negative-height viewport and this test fails.
+TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
+    using PosVertex = kor::ParamVertex<kor::Position>;
+    using PosMesh = kor::ParamMesh<PosVertex>;
+
+    // Clip y in [-1, 0] = the top half under a Y-down NDC; full width.
+    std::vector<PosVertex> verts = {
+        PosVertex{ glm::vec3{-1.0f, -1.0f, 0.0f} },
+        PosVertex{ glm::vec3{ 1.0f, -1.0f, 0.0f} },
+        PosVertex{ glm::vec3{ 1.0f,  0.0f, 0.0f} },
+        PosVertex{ glm::vec3{-1.0f,  0.0f, 0.0f} },
+    };
+    std::vector<std::uint32_t> indices = {0, 1, 2, 0, 2, 3};
+    auto mesh = PosMesh::Create(verts, indices);
+    ASSERT_TRUE(static_cast<bool>(mesh));
+
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("meshTriangle.vert.glsl").getOrBuild("orient.meshTriangle.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("flatTriangle.frag.glsl").getOrBuild("orient.flatTriangle.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader<PosMesh>(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();   // culling is off by default, so winding cannot mask the result
+    ASSERT_TRUE(pipeline.valid()) << pipeline.error()->history();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.BindMesh(ResourceRef<const kor::Mesh>(mesh));
+        cb.DrawIndexed();
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eTransfer);
+
+    const std::vector<Pixel> out = readback->Read<Pixel>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+
+    // Sanity: the draw must have covered something, or the assertions below pass vacuously.
+    int green = 0;
+    for (const auto& p : out) if (p.g == 255) ++green;
+    ASSERT_GT(green, 0) << "the quad covered nothing; the orientation check would be vacuous";
+
+    for (std::uint32_t y = 0; y < kH; ++y) {
+        for (std::uint32_t x = 0; x < kW; ++x) {
+            const Pixel& got = out[y * kW + x];
+            if (y < kH / 2) {
+                EXPECT_EQ(got.g, 255)
+                    << "row " << y << " is in the top half of clip space and must be green; "
+                       "green in the bottom rows instead means Y is inverted";
+            } else {
+                EXPECT_EQ(got.g, 0) << "row " << y << " is below the quad and must stay black";
+            }
+        }
+    }
+}
+
 } // namespace
+

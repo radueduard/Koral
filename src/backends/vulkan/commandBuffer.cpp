@@ -697,9 +697,14 @@ namespace kor::vk
                     .setMipLevel(blitInfo.dstMipLevel)
                     .setBaseArrayLayer(blitInfo.dstBaseArrayLayer)
                     .setLayerCount(blitInfo.layerCount))
+                // Straight, like every other blit. This one used to invert Y (dstOffset.y + extent
+                // as the first corner) because offscreen targets were rendered for OpenGL's Y-up
+                // window origin, which left them stored upside down with respect to the swapchain.
+                // Rendering is canonical now — scene-top is row 0 in both the source image and the
+                // swapchain — so the inversion would flip a correct image.
                 .setDstOffsets({
-                    ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y +  blitInfo.dstExtent.y, blitInfo.dstOffset.z },
-                    ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y, blitInfo.dstOffset.z + blitInfo.dstExtent.z }
+                    ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.z },
+                    ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y, blitInfo.dstOffset.z + blitInfo.dstExtent.z }
                 }),
             ::vk::Filter::eNearest);
 
