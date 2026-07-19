@@ -205,9 +205,17 @@ jobs:
       # The key covers everything that invalidates a built package — the manifest, the vcpkg commit
       # (which pins the port versions) and the triplet. restore-keys lets a changed manifest start
       # from the previous cache and rebuild only what actually moved, rather than from nothing.
+      # Split restore/save rather than plain actions/cache, because actions/cache's built-in
+      # post-step is gated on success(). A job that fails for *any* reason therefore saves nothing —
+      # and this one has failed at Configure on a flaky KTX download, at Build on an MSVC error, and
+      # at Install on a policy error, each time throwing away the better part of an hour of built
+      # dependencies and starting the next attempt cold. The save below runs with always(), so a run
+      # that dies at minute 50 still banks everything vcpkg produced up to that point and the next
+      # attempt picks up from there. See the save step after Configure.
       - name: Restore the vcpkg binary cache
         if: runner.environment == 'github-hosted'
-        uses: actions/cache@v4
+        id: vcpkg-cache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/vcpkg-cache
           key: vcpkg-${{ matrix.name }}-${{ hashFiles('vcpkg.json') }}-b216ddff25
@@ -319,6 +327,17 @@ jobs:
         # build. With it ON, the shipped binary keeps this runner's source path as a fallback for
         # locating shaders and assets — an absolute path that names nothing on a user's machine.
         # See src/core/paths.cpp.
+
+      # Immediately after Configure, because Configure is where vcpkg builds the dependencies and is
+      # itself the step most likely to fail — always() means even a Configure that died halfway
+      # banks what it managed to build. Skipped on an exact key hit, where there is nothing new to
+      # store.
+      - name: Save the vcpkg binary cache
+        if: always() && runner.environment == 'github-hosted' && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
       - name: Build
         run: cmake --build build --config Release -j
