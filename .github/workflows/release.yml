@@ -27,69 +27,100 @@ concurrency:
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
+  # The Linux leg builds inside a pinned container (see docker/linux-release.Dockerfile for why).
+  # A job-level `container:` is resolved by pulling, not by looking for a local image, so the image
+  # has to exist in a registry before the build job starts — hence this job.
+  #
+  # It runs on a *hosted* runner on purpose: building the image here means the self-hosted box only
+  # ever has to pull and run it, so it needs a working docker daemon but not a build toolchain of
+  # its own. Layers are cached in the Actions cache, so an unchanged Dockerfile is a few seconds.
+  linux-image:
+    name: Linux build image
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # GHCR rejects uppercase in image names and the owner is not guaranteed to be lowercase.
+      - id: meta
+        shell: bash
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${owner}/koral-linux-release:latest" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/linux-release.Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   build:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
+    needs: linux-image
+    # Empty for every leg except linux-x64, which means "no container" — macOS and Windows build
+    # directly on their runner as before.
+    container: ${{ matrix.name == 'linux-x64' && needs.linux-image.outputs.image || '' }}
     strategy:
       fail-fast: false   # one platform breaking should not hide the other's result
       matrix:
         include:
-          # linux-x64 — DISABLED for this release only: gfx-linux (radue's desktop) is offline, and
-          # the release job waits on every matrix leg before it will draft anything, so a queued
-          # linux-x64 job would block the macOS artifacts from ever being published. Re-enable by
-          # uncommenting once that machine (or `runner: ubuntu-24.04` as a hosted fallback) is back.
-          #
-          # - name: linux-x64
-          #   # A self-hosted runner on radue's own box (see docs/self-hosted-runner.md to set one
-          #   # up). Worth it because vcpkg builds openimageio/assimp/slang/validation-layers from
-          #   # source: GitHub's free Linux runner gives 4 vCPU and discards everything afterwards,
-          #   # while the local machine has 32 and keeps a warm cache between runs.
-          #   #
-          #   # To fall back to GitHub's runner — if the machine is off, or to prove the build does
-          #   # not secretly depend on something only installed locally — swap this one line for
-          #   # `runner: ubuntu-24.04`. Nothing else in this file needs to change: every step that
-          #   # differs between a persistent machine and a disposable one (apt, the binary cache)
-          #   # keys off `runner.environment` and switches itself over.
-          #   runner: gfx-linux
-          #   triplet: x64-linux
-          #   # Ninja, not CMake's Linux default of "Unix Makefiles" — which is what this job used
-          #   # until now, silently, while local development used Ninja. Same generator as the dev
-          #   # build is the point: a release should not be the one configuration nobody ever builds.
-          #   generator: Ninja
+          - name: linux-x64
+            # A self-hosted runner on radue's own box (see docs/self-hosted-runner.md to set one
+            # up). Worth it because vcpkg builds openimageio/assimp/slang/validation-layers from
+            # source: GitHub's free Linux runner gives 4 vCPU and discards everything afterwards,
+            # while the local machine has 32 and keeps a warm cache between runs.
+            runner: gfx-linux
+            triplet: x64-linux
+            # Ninja, not CMake's Linux default of "Unix Makefiles" — which is what this job used
+            # until now, silently, while local development used Ninja. Same generator as the dev
+            # build is the point: a release should not be the one configuration nobody ever builds.
+            generator: Ninja
+            # THE ONE THING THAT MUST NOT BE DROPPED FROM THE LINUX LEG.
+            #
+            # The host is CachyOS: bleeding-edge glibc and, because the cachyos-znver4 repos are
+            # enabled, a libstdc++ compiled -march=znver4. Building directly on it produced the
+            # v0.0.3 artifact, which required GLIBC_2.43 (so it would not load on any mainstream
+            # distro) and carried unguarded AVX-512 inside std::to_chars via stdc++exp (so it would
+            # have SIGILL'd on any pre-AVX-512 CPU even if it had loaded).
+            #
+            # Building inside this container instead pins both: glibc 2.35 and a stock generic-x86
+            # GCC 14. See docker/linux-release.Dockerfile for the full reasoning, and the
+            # job-level `container:` above for how the image is selected.
 
-          # ---------------------------------------------------------------------------------------
-          # windows-x64 — DISABLED, pending a self-hosted Windows runner.
-          #
-          # It works on GitHub's hosted runner, but vcpkg has to build openimageio, assimp, slang
-          # and the validation layers from source under MSVC on 4 vCPU, and the Actions cache starts
-          # cold, so the first green run costs the better part of an hour. Not worth paying that on
-          # every iteration while the Linux side is still being shaken out.
-          #
-          # To re-enable: uncomment the block below. If you point it at a self-hosted Windows box,
-          # change `runner:` to that machine's label. Nothing else needs to change — the apt step
-          # and the binary-cache step both key off `runner.environment`, so a self-hosted box picks
-          # up the persistent on-disk cache and a hosted one picks up the Actions cache, with no
-          # per-platform configuration.
-          #
-          # Until this is back, releases are Linux-only. The `release` job will happily draft a
-          # release from a single platform's artifacts, so a tag pushed now yields a Linux-only
-          # release — bear that in mind before tagging v0.0.1.
-          #
-          # - name: windows-x64
-          #   runner: windows-2022
-          #   # static-md, not the default x64-windows. The default is a *dynamic* triplet, which
-          #   # would make spdlog/fmt/imgui DLLs — and those three are the ones the SDK vendors for
-          #   # consumers, so they must be static archives exactly as they are on Linux, or the
-          #   # vendoring silently ships nothing linkable. "-md" keeps the CRT dynamic (CMake's
-          #   # default), so this is only about vcpkg's own libraries. slang and the Vulkan loader
-          #   # stay DLLs regardless — bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
-          #   triplet: x64-windows-static-md
-          #   # Deliberately NOT Ninja. Ninja on Windows needs cl.exe on PATH, which means running
-          #   # vcvars first (an extra action); the Visual Studio generator finds the toolchain by
-          #   # itself. Also already the default on windows-2022 — spelled out so the generator is
-          #   # stated rather than inherited.
-          #   generator: Visual Studio 17 2022
-          # ---------------------------------------------------------------------------------------
+          - name: windows-x64
+            # GitHub's hosted runner: there is no self-hosted Windows box. The cost is real and
+            # worth stating — vcpkg builds openimageio, assimp, slang and the validation layers
+            # from source under MSVC on 4 vCPU, so the first run after a dependency bump is close
+            # to an hour, and a private repo bills Windows minutes at 2x. Subsequent runs hit the
+            # Actions binary cache (see the cache step below, which switches backend on
+            # runner.environment) and are much cheaper.
+            runner: windows-2022
+            # static-md, not the default x64-windows. The default is a *dynamic* triplet, which
+            # would make spdlog/fmt/imgui DLLs — and those three are the ones the SDK vendors for
+            # consumers, so they must be static archives exactly as they are on Linux, or the
+            # vendoring silently ships nothing linkable. "-md" keeps the CRT dynamic (CMake's
+            # default), so this is only about vcpkg's own libraries. slang and the Vulkan loader
+            # stay DLLs regardless — bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
+            triplet: x64-windows-static-md
+            # Deliberately NOT Ninja. Ninja on Windows needs cl.exe on PATH, which means running
+            # vcvars first (an extra action); the Visual Studio generator finds the toolchain by
+            # itself. Also already the default on windows-2022 — spelled out so the generator is
+            # stated rather than inherited.
+            generator: Visual Studio 17 2022
 
           - name: macos-arm64
             # Self-hosted on radue's own Mac (see docs/self-hosted-runner.md) — same reasoning as
@@ -180,11 +211,17 @@ jobs:
       #
       # Set from a step, not the job's `env:`, because a job-level `env:` would override this on
       # every subsequent step and put us right back where we started.
+      # The path deliberately lives under the runner's *tool cache* rather than $HOME. $HOME was
+      # fine while the Linux job ran directly on the host, but the job now runs inside a container
+      # where $HOME is the container's /root and evaporates with it. The tool cache is one of the
+      # few directories the runner bind-mounts into a container job (as /__t) and keeps between
+      # runs, so the same path works whether or not there is a container — which is why vcpkg
+      # itself is already installed there.
       - name: Point vcpkg at a binary cache that survives the run
         shell: bash
         run: |
           if [ "${{ runner.environment }}" = "self-hosted" ]; then
-            cache="$HOME/.cache/vcpkg/archives"
+            cache="${RUNNER_TOOL_CACHE}/vcpkg-cache"
             mkdir -p "$cache"
             echo "VCPKG_BINARY_SOURCES=clear;files,$cache,readwrite" >> "$GITHUB_ENV"
             echo "binary cache: $cache ($(du -sh "$cache" 2>/dev/null | cut -f1) already there)"
@@ -261,6 +298,9 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           [ "$GITHUB_REF_TYPE" = tag ] || version="dev-${GITHUB_SHA::7}"
           mkdir -p dist
+          # Later steps need the same string; recomputing it there would be a second place to get
+          # the tag-vs-branch rule wrong.
+          echo "KORAL_VERSION=$version" >> "$GITHUB_ENV"
 
           # Runtime: what you double-click. Executable, the library, its bundled deps, and the
           # shaders/assets it loads at startup.
@@ -270,6 +310,30 @@ jobs:
           cp -r stage/lib "$runtime/"
           cp -r stage/share "$runtime/"
           rm -rf "$runtime/lib/cmake" "$runtime/lib/koral-vendor"   # SDK-only, dead weight here
+
+          # Linux only: ship the C++ runtime alongside the binary.
+          #
+          # The container builds with GCC 14, so the library needs GLIBCXX_3.4.33. glibc 2.35 is
+          # old enough for Ubuntu 22.04 — but that distro's *system* libstdc++ comes from GCC 12
+          # and only goes up to GLIBCXX_3.4.30, so without this the runtime archive would still
+          # refuse to start there for the C++ runtime rather than for libc. Bundling closes the
+          # gap; the binaries already resolve $ORIGIN/../lib first, which is how the Vulkan loader
+          # and slang get picked up.
+          #
+          # Only the runtime archive gets this. The SDK deliberately does not: anyone compiling
+          # against Koral needs a C++23 compiler anyway, so their libstdc++ is already new enough,
+          # and dropping ours into their link line would be an ODR hazard rather than a service.
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            for lib in libstdc++.so.6 libgcc_s.so.1; do
+              src=$(g++ -print-file-name=$lib)
+              if [ -f "$src" ]; then
+                cp -L "$src" "$runtime/lib/"
+                echo "bundled $lib from $src"
+              else
+                echo "WARNING: $lib not found; runtime archive may not start on older distros"
+              fi
+            done
+          fi
 
           # SDK: what you build against. Everything, including the headers, the CMake package and
           # the vendored public dependencies (glm/spdlog/imgui) so a project needs no package
@@ -285,6 +349,20 @@ jobs:
             tar czf "dist/${sdk}.tar.gz"     "$sdk"
           fi
           ls -la dist
+
+      # Catches the failure mode that produced an unusable v0.0.3: an artifact that is fine on the
+      # machine that built it and refuses to load, or dies with SIGILL, on the hardware this
+      # release actually targets. Neither shows up in a build log, so it is asserted here.
+      #
+      # The floor is 2.35 to match the container's Ubuntu 22.04 base — if the container base is
+      # ever bumped, this number moves with it, and that should be a deliberate decision rather
+      # than something noticed by a user.
+      - name: Verify the Linux artifact's portability floor
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          chmod +x scripts/check-linux-portability.sh
+          ./scripts/check-linux-portability.sh "koral-runtime-${KORAL_VERSION}-${{ matrix.name }}" 2.35
 
       # Proves the archive is usable *before* anyone downloads it: configure and link a project
       # against the packaged SDK with no vcpkg and no toolchain file, exactly as a launcher-
