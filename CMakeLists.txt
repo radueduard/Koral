@@ -26,6 +26,51 @@ if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     set(CMAKE_OSX_SYSROOT ${CMAKE_OSX_SYSROOT} CACHE PATH "macOS SDK path")
 endif()
 
+# Oldest macOS a shipped binary must run on. Without this the deployment target floats to whatever
+# the build machine happens to be, so a release built on a freshly updated Mac silently refuses to
+# launch on anything older. 12.0 is the floor for Apple Silicon in practice: 11.0 was the first
+# arm64 release, but MoltenVK's own minimum is 12.0.
+if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
+endif()
+
+# The x86-64 instruction-set floor for shipped binaries.
+#
+# This exists because a release built on a machine running CachyOS's znver4 package set picked up
+# AVX-512 it never asked for: our own code compiles at GCC's default x86-64 baseline, but the
+# *prebuilt static* libstdc++ archives on such a system are themselves -march=znver4, and linking
+# them (stdc++exp, for std::stacktrace) drags unguarded AVX-512 into std::to_chars and friends.
+# The binary then dies with SIGILL on anything without AVX-512 — which is every Intel CPU a normal
+# person owns.
+#
+# Stating the floor here does not fix that on its own (the fix is building in a container with a
+# stock toolchain — see docker/linux-release.Dockerfile), but it makes the contract explicit and
+# stops a future -march=native or an optimised distro from quietly raising it.
+#
+# x86-64-v2 is SSE4.2/POPCNT — Nehalem (2008) and later, so it comfortably covers the Intel 8th gen
+# floor including the low-end Coffee Lake/Gemini Lake parts that have no AVX2. Nothing here is
+# CPU-SIMD bound (the work is on the GPU), so a higher level would buy nothing measurable while
+# excluding real hardware.
+option(KORAL_SET_ISA_BASELINE "Pin the x86-64 instruction-set baseline for portable binaries" ON)
+
+if(KORAL_SET_ISA_BASELINE AND NOT APPLE)
+    include(CheckCXXCompilerFlag)
+    if(MSVC)
+        # MSVC has no x86-64-v2 switch. Its default is already SSE2-only, and /arch:AVX or higher
+        # is what would break us, so the correct action is simply not to raise it.
+        set(KORAL_ISA_FLAG "")
+    else()
+        check_cxx_compiler_flag("-march=x86-64-v2" KORAL_HAS_MARCH_V2)
+        if(KORAL_HAS_MARCH_V2)
+            set(KORAL_ISA_FLAG "-march=x86-64-v2;-mtune=generic")
+        endif()
+    endif()
+    if(KORAL_ISA_FLAG)
+        add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:${KORAL_ISA_FLAG}>")
+        message(STATUS "ISA baseline: x86-64-v2 (SSE4.2/POPCNT, Nehalem and later)")
+    endif()
+endif()
+
 find_package(TIFF REQUIRED)
 find_package(JPEG REQUIRED)
 find_package(ZLIB REQUIRED)

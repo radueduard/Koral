@@ -67,6 +67,11 @@ namespace kor::vk
             VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
             VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
             VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+
+            // Mesh/task shaders — Turing and later only. Optional because they are an opt-in
+            // pipeline option (GraphicsPipeline::Builder::setMeshShader) that no default render
+            // path uses; requiring them turned away every pre-RTX card for nothing.
+            VK_EXT_MESH_SHADER_EXTENSION_NAME,
         };
 
         ::vk::QueueFlags _requiredQueues = ::vk::QueueFlags()

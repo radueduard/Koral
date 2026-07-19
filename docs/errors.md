@@ -80,3 +80,4 @@ This table is kept in sync with `gfx::describe()` in `src/core/error.cpp`.
 | `eShaderStageMismatch` | A shader was supplied for the wrong pipeline stage. | Pass a shader whose stage matches the slot. |
 | `eDescriptorConflict` | Descriptor declarations conflict across the pipeline's shader stages. | Align (set, binding) declarations across stages. |
 | `eShaderCompileFailed` | Shader compilation or linking failed. | See the message for the compiler diagnostics. |
+| `eConfigInvalid` | The `koral.json` config file is malformed, or a key has the wrong type. | Fix the JSON; see [configuration.md](configuration.md) for the schema. |

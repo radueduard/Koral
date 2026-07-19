@@ -110,6 +110,43 @@ namespace kor::vk {
             .setImageViewFormatSwizzle(true);
 #endif
 
+        // Feature negotiation. vkCreateDevice does not degrade gracefully: request a single
+        // feature the device lacks and the whole call fails with VK_ERROR_FEATURE_NOT_PRESENT,
+        // taking the engine down on hardware that could otherwise have run it. This used to ask
+        // unconditionally for mesh shaders (Turing and later), Vulkan 1.4 and maintenance9, which
+        // turned away everything older than an RTX 20-series card — including for features the
+        // engine never actually used. So: nothing is requested here that is not either genuinely
+        // required or confirmed present.
+        //
+        // Deliberately no longer requested, because nothing in the engine or the shaders uses
+        // them and each one silently narrowed the supported hardware: maintenance9,
+        // indexTypeUint8 (and with it the whole Vulkan 1.4 requirement), vulkanMemoryModel,
+        // storageBuffer8BitAccess/storageBuffer16BitAccess and shaderInt8.
+        const auto supportedFeatures = physicalDevice->template getFeatures2<
+            ::vk::PhysicalDeviceFeatures2,
+            ::vk::PhysicalDeviceVulkan11Features,
+            ::vk::PhysicalDeviceVulkan12Features,
+            ::vk::PhysicalDeviceVulkan13Features>();
+
+        const auto& supported11 = supportedFeatures.get<::vk::PhysicalDeviceVulkan11Features>();
+        const auto& supported12 = supportedFeatures.get<::vk::PhysicalDeviceVulkan12Features>();
+        const auto& supported13 = supportedFeatures.get<::vk::PhysicalDeviceVulkan13Features>();
+
+        // Collects anything missing so device creation fails naming the feature, rather than with
+        // an opaque VK_ERROR_FEATURE_NOT_PRESENT that says nothing about which one was at fault.
+        std::vector<std::string_view> missingFeatures;
+        const auto require = [&missingFeatures](const ::vk::Bool32 supported, const std::string_view name) {
+            if (!supported) missingFeatures.emplace_back(name);
+            return supported;
+        };
+
+        // Mesh/task shaders are an opt-in pipeline option (GraphicsPipeline::Builder::setMeshShader),
+        // never used by a default render path — so they are gated on the extension rather than
+        // required. Note the feature struct is only legal to chain in when the extension itself is
+        // enabled, which it previously was not.
+        const bool meshShaderSupported =
+            physicalDevice.supportsExtension(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+
         auto deviceMeshShaderFeatures = ::vk::PhysicalDeviceMeshShaderFeaturesEXT()
 #ifdef __APPLE__
             .setPNext(&portabilityFeatures)
@@ -117,42 +154,48 @@ namespace kor::vk {
             .setTaskShader(true)
             .setMeshShader(true);
 
-        auto vk11Features = ::vk::PhysicalDeviceVulkan11Features()
-            .setShaderDrawParameters(true)
-            .setStorageBuffer16BitAccess(true)
-            .setPNext(&deviceMeshShaderFeatures);
+        auto vk13Features = ::vk::PhysicalDeviceVulkan13Features()
+            .setShaderDemoteToHelperInvocation(require(supported13.shaderDemoteToHelperInvocation, "shaderDemoteToHelperInvocation"))
+            .setDynamicRendering(require(supported13.dynamicRendering, "dynamicRendering"));
+
+        if (meshShaderSupported) {
+            vk13Features.setPNext(&deviceMeshShaderFeatures);
+        }
+#ifdef __APPLE__
+        else {
+            vk13Features.setPNext(&portabilityFeatures);
+        }
+#endif
 
     	auto vk12Features = ::vk::PhysicalDeviceVulkan12Features()
-			.setShaderInt8(true)
-    		.setRuntimeDescriptorArray(true)
-    		.setTimelineSemaphore(true)
-            .setBufferDeviceAddress(true)
-            .setVulkanMemoryModel(true)
-            .setVulkanMemoryModelDeviceScope(true)
-            .setScalarBlockLayout(true)
-            .setStorageBuffer8BitAccess(true)
-            .setShaderSampledImageArrayNonUniformIndexing(true)
-            .setDescriptorBindingSampledImageUpdateAfterBind(true)
-            .setDescriptorBindingPartiallyBound(true)
-            .setDescriptorBindingVariableDescriptorCount(true)
-            .setDescriptorIndexing(true)
-			.setPNext(&vk11Features);
+    		.setRuntimeDescriptorArray(require(supported12.runtimeDescriptorArray, "runtimeDescriptorArray"))
+    		.setTimelineSemaphore(require(supported12.timelineSemaphore, "timelineSemaphore"))
+            .setBufferDeviceAddress(require(supported12.bufferDeviceAddress, "bufferDeviceAddress"))
+            .setScalarBlockLayout(require(supported12.scalarBlockLayout, "scalarBlockLayout"))
+            .setShaderSampledImageArrayNonUniformIndexing(require(supported12.shaderSampledImageArrayNonUniformIndexing, "shaderSampledImageArrayNonUniformIndexing"))
+            .setDescriptorBindingSampledImageUpdateAfterBind(require(supported12.descriptorBindingSampledImageUpdateAfterBind, "descriptorBindingSampledImageUpdateAfterBind"))
+            .setDescriptorBindingPartiallyBound(require(supported12.descriptorBindingPartiallyBound, "descriptorBindingPartiallyBound"))
+            .setDescriptorBindingVariableDescriptorCount(require(supported12.descriptorBindingVariableDescriptorCount, "descriptorBindingVariableDescriptorCount"))
+            .setDescriptorIndexing(require(supported12.descriptorIndexing, "descriptorIndexing"))
+			.setPNext(&vk13Features);
 
-        auto vk13Features = ::vk::PhysicalDeviceVulkan13Features()
-            .setShaderDemoteToHelperInvocation(true)
-            .setDynamicRendering(true)
+        auto vk11Features = ::vk::PhysicalDeviceVulkan11Features()
+            .setShaderDrawParameters(require(supported11.shaderDrawParameters, "shaderDrawParameters"))
             .setPNext(&vk12Features);
 
-        auto vk14Features = ::vk::PhysicalDeviceVulkan14Features()
-            .setPNext(&vk13Features)
-            .setIndexTypeUint8(true);
-
-        auto maintenance9 = ::vk::PhysicalDeviceMaintenance9FeaturesKHR()
-            .setPNext(&vk14Features)
-            .setMaintenance9(true);
+        if (!missingFeatures.empty()) {
+            std::string names;
+            for (const auto& name : missingFeatures) {
+                if (!names.empty()) names += ", ";
+                names += name;
+            }
+            throw std::runtime_error(
+                "Device::Device : GPU '" + std::string(physicalDevice.getProperties().deviceName.data()) +
+                "' is missing required Vulkan features: " + names);
+        }
 
         auto accelerationStructureFeatures = ::vk::PhysicalDeviceAccelerationStructureFeaturesKHR()
-            .setPNext(&maintenance9)
+            .setPNext(&vk11Features)
             .setAccelerationStructure(true);
 
         auto rayTracingPipelineFeatures = ::vk::PhysicalDeviceRayTracingPipelineFeaturesKHR()
@@ -185,7 +228,7 @@ namespace kor::vk {
         if (_supportsRayTracing) {
             deviceCreateInfo.setPNext(&rayTracingPipelineFeatures);
         } else {
-            deviceCreateInfo.setPNext(&maintenance9);
+            deviceCreateInfo.setPNext(&vk11Features);
         }
 
         _handle = physicalDevice->createDevice(deviceCreateInfo);
