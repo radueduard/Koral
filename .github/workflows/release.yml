@@ -64,6 +64,11 @@ jobs:
           echo "image=ghcr.io/${owner}/koral-linux-release:latest" >> "$GITHUB_OUTPUT"
 
       - uses: docker/build-push-action@v6
+        env:
+          # Stops the action uploading a .dockerbuild build-record artifact into the run. It is of
+          # no use here, and being an artifact of the run it got swept up by the release job's
+          # download step — see the pattern there. Belt and braces: either fix alone is sufficient.
+          DOCKER_BUILD_SUMMARY: false
         with:
           context: .
           file: docker/linux-release.Dockerfile
@@ -467,9 +472,11 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$PWD/../stage"
           cmake --build build --config Release
 
+      # Prefixed so the release job can ask for exactly these by pattern. Naming them after the
+      # platform alone worked only while they were the sole artifacts in the run.
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}
+          name: dist-${{ matrix.name }}
           path: dist/*
 
   release:
@@ -478,8 +485,14 @@ jobs:
     if: github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     steps:
+      # `pattern` is not optional tidiness — without it this downloads *every* artifact in the run,
+      # and the linux-image job's docker/build-push-action quietly uploads a .dockerbuild build
+      # record alongside ours. That blob failed to extract, download-artifact failed the step after
+      # 5 retries, and v0.0.5 produced three good platform archives and no release. The three real
+      # artifacts had already downloaded successfully; the job died on the one nobody wanted.
       - uses: actions/download-artifact@v4
         with:
+          pattern: dist-*
           path: dist
           merge-multiple: true
 
