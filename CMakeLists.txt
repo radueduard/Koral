@@ -317,6 +317,21 @@ if(WIN32)
     target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
+# /utf-8 is PUBLIC because it is a requirement we impose on consumers, not a preference of ours.
+#
+# fmt hard-fails with static_assert("Unicode support requires compiling with /utf-8") unless MSVC is
+# told its sources are UTF-8, and fmt reaches consumers through our public headers (log.h pulls in
+# spdlog, which pulls in fmt). Our own build never noticed: the vcpkg toolchain passes /utf-8
+# already. A project doing find_package(Koral) with no vcpkg gets no such help and fails to compile
+# against a perfectly good SDK.
+#
+# Caught by the "Verify the SDK links standalone" step, which builds exactly that project. Worth
+# keeping in mind that anything leaking out of the public headers becomes a consumer's problem —
+# the same reason the SDK vendors glm/spdlog/fmt/imgui in the first place.
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PUBLIC /utf-8)
+endif()
+
 target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)
 
 # std::stacktrace support (GCC libstdc++). fail()/warn() in builder.h capture a
