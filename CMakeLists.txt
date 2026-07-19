@@ -460,7 +460,14 @@ install(CODE [[
 
     foreach(dep IN LISTS KORAL_RESOLVED_DEPS)
         get_filename_component(depName "${dep}" NAME)
-        if(depName IN_LIST KORAL_OWN_BINARIES)
+        # list(FIND) rather than the tidier `if(depName IN_LIST ...)`, because this runs inside the
+        # generated cmake_install.cmake, which carries no cmake_policy() call and therefore executes
+        # with whatever the *running* cmake defaults to. if(IN_LIST) needs CMP0057 NEW; under CMake
+        # 4.x it works because the OLD behaviour of policies that old was removed outright, but
+        # under 3.x it is unset and the install dies with "Unknown arguments specified". list(FIND)
+        # depends on no policy and behaves the same everywhere.
+        list(FIND KORAL_OWN_BINARIES "${depName}" KORAL_OWN_INDEX)
+        if(NOT KORAL_OWN_INDEX EQUAL -1)
             continue()
         endif()
         message(STATUS "Bundling runtime dependency: ${depName}")
