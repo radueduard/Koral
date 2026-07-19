@@ -189,15 +189,30 @@ jobs:
         run: brew install molten-vk
 
       # vcpkg builds openimageio, assimp, slang and the validation layers from source — the better
-      # part of an hour. The x-gha binary-cache backend needs these two variables, which are in the
-      # runner's environment but not exported to steps by default. Hosted runners only.
-      - name: Enable vcpkg binary caching
+      # part of an hour, and vulkan-validationlayers alone is 16 minutes of it. A disposable runner
+      # therefore needs somewhere off-machine to keep the results.
+      #
+      # This used to be vcpkg's own `x-gha` backend, fed by exporting ACTIONS_CACHE_URL and
+      # ACTIONS_RUNTIME_TOKEN. That silently stopped working: x-gha talks to the legacy
+      # artifactcache endpoint, which GitHub retired with Actions Cache v1. The variables were
+      # present and correct, VCPKG_BINARY_SOURCES was set, vcpkg reported no error — and stored
+      # exactly zero packages, while the self-hosted Linux leg stored 84 to its files cache. Every
+      # Windows run was paying full price for a cache that was quietly doing nothing.
+      #
+      # actions/cache speaks the current service, so this pairs it with vcpkg's plain `files`
+      # backend: the action moves the directory in and out, vcpkg just reads and writes a folder.
+      #
+      # The key covers everything that invalidates a built package — the manifest, the vcpkg commit
+      # (which pins the port versions) and the triplet. restore-keys lets a changed manifest start
+      # from the previous cache and rebuild only what actually moved, rather than from nothing.
+      - name: Restore the vcpkg binary cache
         if: runner.environment == 'github-hosted'
-        uses: actions/github-script@v7
+        uses: actions/cache@v4
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-${{ matrix.name }}-${{ hashFiles('vcpkg.json') }}-b216ddff25
+          restore-keys: |
+            vcpkg-${{ matrix.name }}-
 
       # Where vcpkg looks for prebuilt packages, and the difference between a 1-minute Configure and
       # a 9-minute one.
@@ -216,23 +231,39 @@ jobs:
       #
       # Set from a step, not the job's `env:`, because a job-level `env:` would override this on
       # every subsequent step and put us right back where we started.
-      # The path deliberately lives under the runner's *tool cache* rather than $HOME. $HOME was
-      # fine while the Linux job ran directly on the host, but the job now runs inside a container
-      # where $HOME is the container's /root and evaporates with it. The tool cache is one of the
-      # few directories the runner bind-mounts into a container job (as /__t) and keeps between
-      # runs, so the same path works whether or not there is a container — which is why vcpkg
-      # itself is already installed there.
+      # Every leg ends up on vcpkg's `files` backend; only the directory differs, and each choice is
+      # load-bearing:
+      #
+      #   hosted (Windows) — the directory actions/cache just restored above. Nothing on the machine
+      #     survives, so the cache has to travel with the job.
+      #
+      #   self-hosted in a container (Linux) — $HOME is the container's /root and dies with it, so
+      #     this uses the tool cache, one of the few paths the runner bind-mounts back to the host
+      #     and keeps between runs. It is also where vcpkg itself is installed, for the same reason.
+      #
+      #   self-hosted, no container (macOS) — $HOME/.cache/vcpkg/archives, which is the *same* cache
+      #     local development populates. A dependency already built at the desk is then never
+      #     rebuilt in CI. An earlier version of this sent every self-hosted leg to the tool cache,
+      #     which quietly orphaned that warm cache and made the mac start from "0B already there".
       - name: Point vcpkg at a binary cache that survives the run
         shell: bash
         run: |
-          if [ "${{ runner.environment }}" = "self-hosted" ]; then
+          if [ "${{ runner.environment }}" != "self-hosted" ]; then
+            cache="${RUNNER_TEMP}/vcpkg-cache"
+          elif [ -f /.dockerenv ]; then
             cache="${RUNNER_TOOL_CACHE}/vcpkg-cache"
-            mkdir -p "$cache"
-            echo "VCPKG_BINARY_SOURCES=clear;files,$cache,readwrite" >> "$GITHUB_ENV"
-            echo "binary cache: $cache ($(du -sh "$cache" 2>/dev/null | cut -f1) already there)"
           else
-            echo "VCPKG_BINARY_SOURCES=clear;x-gha,readwrite" >> "$GITHUB_ENV"
-            echo "binary cache: GitHub Actions cache (runner is disposable)"
+            cache="$HOME/.cache/vcpkg/archives"
+          fi
+          mkdir -p "$cache"
+          echo "VCPKG_BINARY_SOURCES=clear;files,$cache,readwrite" >> "$GITHUB_ENV"
+          echo "binary cache: $cache ($(du -sh "$cache" 2>/dev/null | cut -f1) already there)"
+
+          # ccache has exactly the same ephemeral-$HOME problem inside the container, and without
+          # this the Linux leg recompiles every Koral source file from scratch on every run even
+          # though ccache is installed and apparently working.
+          if [ -f /.dockerenv ]; then
+            echo "CCACHE_DIR=${RUNNER_TOOL_CACHE}/ccache" >> "$GITHUB_ENV"
           fi
 
       - name: Set up vcpkg

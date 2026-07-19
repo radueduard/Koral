@@ -12,15 +12,19 @@ list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-ports
 # begin with, and the resulting build declared minos 26.0 — the runner's own OS — which is exactly
 # the failure this is here to prevent. If you move it, move it up, never down.
 #
-# 12.0 is the practical floor for Apple Silicon: 11.0 was the first arm64 release, but MoltenVK's
-# own minimum is 12.0, and Vulkan-via-MoltenVK is the only backend worth relying on here.
+# 13.3 is not a taste call, it is the lowest value that actually compiles. Apple's libc++ marks the
+# floating-point std::to_chars overloads as availability("introduced in macOS 13.3"), and
+# std::format of any float goes straight through them — so 12.0 (MoltenVK's own minimum, and the
+# obvious first guess) fails the build outright with "'to_chars' is unavailable". Raising this floor
+# is the only fix short of giving up std::format; lower it again and the build breaks, it does not
+# silently degrade.
 #
 # VCPKG_OSX_DEPLOYMENT_TARGET matters just as much as the CMake one. Without it vcpkg builds every
 # dependency against the build machine's OS, and a binary is only as portable as the newest thing
 # it links.
 if(APPLE)
     if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version" FORCE)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "Minimum macOS version" FORCE)
     endif()
     if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
         set(ENV{MACOSX_DEPLOYMENT_TARGET} "${CMAKE_OSX_DEPLOYMENT_TARGET}")
