@@ -46,12 +46,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-14 100 \
     && rm -rf /var/lib/apt/lists/*
 
-# Build tooling. CMake and Ninja come from Kitware/pip rather than jammy's apt, which has CMake
-# 3.22 — below the 3.28 this project requires.
+# Build tooling. CMake comes from pip rather than jammy's apt, which has 3.22 — below the 3.28
+# this project requires.
+#
+# Two things here are load-bearing and easy to lose:
+#
+#   make. Koral itself builds with Ninja, so it is tempting to install only ninja-build — but vcpkg
+#   ports do not all use CMake. OpenSSL drives its own Configure/make build and fails the whole
+#   dependency install with "Could not find make" without it.
+#
+#   linux-libc-dev. OpenSSL also wants the kernel headers, and says so as a warning immediately
+#   before failing for the unrelated reason above, which makes it easy to fix one and not the other.
+#
+# CMake is held below 4.x deliberately. CMake 4 dropped compatibility with
+# cmake_minimum_required(<3.5), which a good number of vcpkg ports still declare; picking up 4.x
+# here would trade this failure for a longer, less obvious tail of port build failures.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        curl zip unzip tar git pkg-config ninja-build python3 python3-pip \
+        curl zip unzip tar git pkg-config ninja-build make python3 python3-pip \
+        linux-libc-dev libc6-dev \
         autoconf automake libtool m4 bison flex nasm ccache \
-    && pip3 install --no-cache-dir "cmake>=3.28" \
+    && pip3 install --no-cache-dir "cmake>=3.28,<4" \
     && rm -rf /var/lib/apt/lists/*
 
 # The X11/Wayland development headers GLFW, GLEW and the Vulkan loader build against. Same list the
