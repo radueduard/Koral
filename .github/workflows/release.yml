@@ -429,7 +429,7 @@ jobs:
         shell: bash
         run: |
           chmod +x scripts/check-macos-portability.sh
-          ./scripts/check-macos-portability.sh "koral-runtime-${KORAL_VERSION}-${{ matrix.name }}" 13.3
+          ./scripts/check-macos-portability.sh "koral-runtime-${KORAL_VERSION}-${{ matrix.name }}" 15.0
 
       # Proves the archive is usable *before* anyone downloads it: configure and link a project
       # against the packaged SDK with no vcpkg and no toolchain file, exactly as a launcher-

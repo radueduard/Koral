@@ -19,19 +19,29 @@ list(APPEND VCPKG_OVERLAY_TRIPLETS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-tr
 # begin with, and the resulting build declared minos 26.0 — the runner's own OS — which is exactly
 # the failure this is here to prevent. If you move it, move it up, never down.
 #
-# 13.3 is not a taste call, it is the lowest value that actually compiles. Apple's libc++ marks the
-# floating-point std::to_chars overloads as availability("introduced in macOS 13.3"), and
-# std::format of any float goes straight through them — so 12.0 (MoltenVK's own minimum, and the
-# obvious first guess) fails the build outright with "'to_chars' is unavailable". Raising this floor
-# is the only fix short of giving up std::format; lower it again and the build breaks, it does not
-# silently degrade.
+# 15.0, and neither of the two things forcing it upwards is ours to choose:
+#
+#   13.3 is the floor imposed by the toolchain. Apple's libc++ marks the floating-point
+#   std::to_chars overloads as availability("introduced in macOS 13.3"), and std::format of any
+#   float goes straight through them, so 12.0 — MoltenVK's own minimum, and the obvious first
+#   guess — fails the build outright with "'to_chars' is unavailable".
+#
+#   15.0 is the floor imposed by Slang, and it is the binding one. vcpkg's shader-slang port does
+#   not build from source; it downloads Slang's official release binaries. So
+#   VCPKG_OSX_DEPLOYMENT_TARGET has no effect on libslang-compiler.dylib, which ships built for
+#   macOS 15.0, and a runtime archive bundling it needs 15.0 no matter what everything beside it
+#   says. This was found by check-macos-portability.sh, which failed the build rather than let a
+#   green job ship an artifact that would not launch.
+#
+# Lowering this below 15.0 therefore requires building Slang from source via an overlay port, not
+# just editing this number — the check will simply fail again.
 #
 # VCPKG_OSX_DEPLOYMENT_TARGET matters just as much as the CMake one. Without it vcpkg builds every
 # dependency against the build machine's OS, and a binary is only as portable as the newest thing
 # it links.
 if(APPLE)
     if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
-        set(CMAKE_OSX_DEPLOYMENT_TARGET "13.3" CACHE STRING "Minimum macOS version" FORCE)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum macOS version" FORCE)
     endif()
     if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
         set(ENV{MACOSX_DEPLOYMENT_TARGET} "${CMAKE_OSX_DEPLOYMENT_TARGET}")
@@ -274,6 +284,25 @@ target_link_libraries(${PROJECT_NAME} PRIVATE OpenImageIO::OpenImageIO)
 if(UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GLX)
     target_link_options(${PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
+endif()
+
+# The MSVC counterpart of the --allow-multiple-definition above, and it is there for the same
+# reason: fmt ends up in the link twice.
+#
+# OpenImageIO links fmt::fmt-header-only, which propagates FMT_HEADER_ONLY=1 into every one of our
+# translation units and bakes inline fmt definitions into our objects and into OpenImageIO's own
+# static library. spdlog::spdlog, meanwhile, links the *compiled* fmt::fmt, whose fmt.lib exports
+# the same symbols as strong definitions. GNU ld is told to tolerate that; MSVC instead fails the
+# link with a wall of LNK2005 "already defined in OpenImageIO.lib".
+#
+# This is a band-aid, exactly as the Linux flag is. The real fix is to stop mixing header-only and
+# compiled fmt, which is not simply a matter of switching to spdlog::spdlog_header_only -- that
+# target links fmt::fmt as well, so it would have to be done by overriding an imported target's
+# link interface, and doing that blind would risk the two platforms that currently build. Worth
+# revisiting once the release is out; the duplicate definitions are identical code, so picking the
+# first is safe in practice.
+if(MSVC)
+    target_link_options(${PROJECT_NAME} PRIVATE /FORCE:MULTIPLE /IGNORE:4006 /IGNORE:4088)
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)

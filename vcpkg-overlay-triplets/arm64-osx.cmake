@@ -15,12 +15,15 @@
 # A runtime archive bundling all three needs macOS 26 no matter what our own library says, and
 # nothing in the build reports this — the job is green and the artifact is unusable.
 #
-# Keep this value in step with CMAKE_OSX_DEPLOYMENT_TARGET in CMakeLists.txt. 13.3 is not arbitrary:
-# it is the lowest version whose libc++ has the floating-point std::to_chars that std::format needs.
+# Keep this value in step with CMAKE_OSX_DEPLOYMENT_TARGET in CMakeLists.txt, which explains where
+# 15.0 comes from. Short version: 13.3 is the toolchain's floor (libc++ availability on the
+# floating-point std::to_chars that std::format needs), but Slang binds it higher — vcpkg's
+# shader-slang port downloads official prebuilt binaries rather than building from source, so this
+# variable cannot reach libslang-compiler.dylib, and that ships targeting 15.0.
 set(VCPKG_TARGET_ARCHITECTURE arm64)
 set(VCPKG_CRT_LINKAGE dynamic)
 set(VCPKG_LIBRARY_LINKAGE static)
 
 set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
 set(VCPKG_OSX_ARCHITECTURES arm64)
-set(VCPKG_OSX_DEPLOYMENT_TARGET 13.3)
+set(VCPKG_OSX_DEPLOYMENT_TARGET 15.0)
