@@ -206,6 +206,11 @@ namespace kor {
         return std::make_unique<Window>(*this);
     }
 
+    // Defaulted here rather than in the header: kor::Surface is only forward-declared there, and
+    // both of these have to be able to destroy the std::unique_ptr<Surface> member. See window.h.
+    Window::Window(Window &&) = default;
+    Window &Window::operator=(Window &&) = default;
+
     Window::~Window() {
         Context::Scheduler().WaitIdle();
         _scene.reset();

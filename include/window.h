@@ -99,8 +99,20 @@ namespace kor {
         Window(const Window &) = delete;
         Window &operator=(const Window &) = delete;
 
-        Window(Window &&) = default;
-        Window &operator=(Window &&) = default;
+        // Declared here, defaulted in window.cpp — deliberately not `= default` inline.
+        //
+        // _surface is a std::unique_ptr to a forward-declared kor::Surface, so anything that has to
+        // destroy it needs the complete type. Move-assignment destroys the object being overwritten,
+        // and the move constructor needs the destructor available for unwinding, so defaulting
+        // either one *here* instantiates std::default_delete<Surface> against an incomplete type.
+        // The constructor and destructor above are already out-of-line for exactly this reason;
+        // these two were the ones left behind.
+        //
+        // GCC and Clang happened not to instantiate the deleter for these and compiled fine, so
+        // this only ever surfaced on MSVC ("can't delete an incomplete type"), the first time the
+        // Windows leg of the release was run.
+        Window(Window &&);
+        Window &operator=(Window &&);
 
         [[nodiscard]] bool shouldClose() const;
         void close();
