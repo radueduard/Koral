@@ -305,6 +305,18 @@ if(MSVC)
     target_link_options(${PROJECT_NAME} PRIVATE /FORCE:MULTIPLE /IGNORE:4006 /IGNORE:4088)
 endif()
 
+# <windows.h> defines min() and max() as function-like macros, which collide with
+# std::numeric_limits<T>::max() and friends and produce a baffling C2589 rather than anything that
+# names the real problem. NOMINMAX suppresses them; WIN32_LEAN_AND_MEAN keeps the rest of the Win32
+# surface out of every translation unit while we are here.
+#
+# PUBLIC so a consumer building against the SDK gets the same treatment. That is a convenience, not
+# the fix: the public headers themselves spell max as (std::numeric_limits<T>::max)(), which blocks
+# the macro whatever the consumer defines. Anything added to include/ should keep doing that.
+if(WIN32)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
 target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)
 
 # std::stacktrace support (GCC libstdc++). fail()/warn() in builder.h capture a

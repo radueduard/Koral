@@ -232,7 +232,11 @@ namespace kor
         glm::u64 RegisterReloadCallback(const std::function<void()>& callback) {
             static std::random_device rd;
             static std::mt19937_64 gen(rd());
-            static std::uniform_int_distribution<glm::u64> dis(1, std::numeric_limits<glm::u64>::max());
+            // The parentheses around the name are not noise: <windows.h> defines max() as a
+            // function-like macro, which eats `numeric_limits<T>::max()` and yields an unreadable
+            // C2589 at the point of use. Wrapping the name blocks macro expansion. This header ships
+            // in the SDK, so it cannot rely on the consumer defining NOMINMAX.
+            static std::uniform_int_distribution<glm::u64> dis(1, (std::numeric_limits<glm::u64>::max)());
 
             const glm::u64 callbackId = dis(gen);
             _reloadCallbacks[callbackId] = callback;

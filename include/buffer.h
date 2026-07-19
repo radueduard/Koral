@@ -691,7 +691,7 @@ namespace kor
         explicit Buffer(const RawBuilder& createInfo);
 
         [[nodiscard]] static glm::i64 toBuilderSize(const glm::u64 bytes, const char* op) {
-            if (constexpr auto maxI64 = static_cast<glm::u64>(std::numeric_limits<glm::i64>::max()); bytes > maxI64) {
+            if (constexpr auto maxI64 = static_cast<glm::u64>((std::numeric_limits<glm::i64>::max)()); bytes > maxI64) {
                 kor::log::error("{}: requested byte size {} exceeds glm::i64 max {}", op, bytes, maxI64);
                 throw std::out_of_range("Byte size exceeds RawBuilder::size range");
             }
@@ -702,7 +702,7 @@ namespace kor
         [[nodiscard]] static glm::u64 checkedByteSize(const glm::u64 countElements, const char* op) {
             static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
             constexpr auto elemBytes = sizeof(T);
-            if (countElements > (std::numeric_limits<glm::u64>::max() / elemBytes)) {
+            if (countElements > ((std::numeric_limits<glm::u64>::max)() / elemBytes)) {
                 kor::log::error("{}: element count {} overflows byte size for sizeof(T)={}", op, countElements, elemBytes);
                 throw std::out_of_range("Element byte size overflow");
             }
