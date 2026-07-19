@@ -5,6 +5,28 @@ cmake_minimum_required(VERSION 3.28)
 # link time. Must be set before project() -- that is when the vcpkg toolchain reads it.
 list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-ports")
 
+# Oldest macOS a shipped binary must run on.
+#
+# Like VCPKG_OVERLAY_PORTS above, this MUST be set before project(): that is when CMake fixes the
+# deployment target, and setting it afterwards is silently ignored. It was set after project() to
+# begin with, and the resulting build declared minos 26.0 — the runner's own OS — which is exactly
+# the failure this is here to prevent. If you move it, move it up, never down.
+#
+# 12.0 is the practical floor for Apple Silicon: 11.0 was the first arm64 release, but MoltenVK's
+# own minimum is 12.0, and Vulkan-via-MoltenVK is the only backend worth relying on here.
+#
+# VCPKG_OSX_DEPLOYMENT_TARGET matters just as much as the CMake one. Without it vcpkg builds every
+# dependency against the build machine's OS, and a binary is only as portable as the newest thing
+# it links.
+if(APPLE)
+    if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version" FORCE)
+    endif()
+    if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
+        set(ENV{MACOSX_DEPLOYMENT_TARGET} "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    endif()
+endif()
+
 project(Koral VERSION 0.0.4 LANGUAGES C CXX)
 include(GenerateExportHeader)
 include(CMakePackageConfigHelpers)
@@ -24,14 +46,6 @@ if(APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
             OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     set(CMAKE_OSX_SYSROOT ${CMAKE_OSX_SYSROOT} CACHE PATH "macOS SDK path")
-endif()
-
-# Oldest macOS a shipped binary must run on. Without this the deployment target floats to whatever
-# the build machine happens to be, so a release built on a freshly updated Mac silently refuses to
-# launch on anything older. 12.0 is the floor for Apple Silicon in practice: 11.0 was the first
-# arm64 release, but MoltenVK's own minimum is 12.0.
-if(APPLE AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum macOS version")
 endif()
 
 # The x86-64 instruction-set floor for shipped binaries.
