@@ -419,6 +419,18 @@ jobs:
           chmod +x scripts/check-linux-portability.sh
           ./scripts/check-linux-portability.sh "koral-runtime-${KORAL_VERSION}-${{ matrix.name }}" 2.35
 
+      # Same job as the Linux check above, for the same reason. A macOS build has already shipped
+      # green twice while being unrunnable on the floor it claimed: once declaring minos 26.0
+      # because the deployment target was set after project(), and once with our own library
+      # correctly at 13.3 while the vcpkg-built dylibs bundled next to it needed 26.0 and 15.0.
+      # Neither produced a warning, let alone a build failure.
+      - name: Verify the macOS artifact's portability floor
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          chmod +x scripts/check-macos-portability.sh
+          ./scripts/check-macos-portability.sh "koral-runtime-${KORAL_VERSION}-${{ matrix.name }}" 13.3
+
       # Proves the archive is usable *before* anyone downloads it: configure and link a project
       # against the packaged SDK with no vcpkg and no toolchain file, exactly as a launcher-
       # generated project would. This is what catches an unshipped header or an unbundled .so —

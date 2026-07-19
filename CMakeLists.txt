@@ -5,6 +5,13 @@ cmake_minimum_required(VERSION 3.28)
 # link time. Must be set before project() -- that is when the vcpkg toolchain reads it.
 list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-ports")
 
+# vcpkg-overlay-triplets/arm64-osx.cmake adds VCPKG_OSX_DEPLOYMENT_TARGET to the stock arm64-osx
+# triplet. Setting CMAKE_OSX_DEPLOYMENT_TARGET below only covers Koral's own binaries; vcpkg builds
+# each port in its own CMake invocation that never sees it, so without this the bundled dylibs are
+# built against the build machine's OS and drag the whole artifact's floor up with them. Same
+# before-project() rule as the overlay ports above.
+list(APPEND VCPKG_OVERLAY_TRIPLETS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-triplets")
+
 # Oldest macOS a shipped binary must run on.
 #
 # Like VCPKG_OVERLAY_PORTS above, this MUST be set before project(): that is when CMake fixes the
