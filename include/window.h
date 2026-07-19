@@ -134,7 +134,11 @@ namespace kor {
 
         [[nodiscard]] API getAPI() const { return _api; }
         [[nodiscard]] const std::string& getTitle() const { return _title; }
-        [[nodiscard]] kor::ResourceRef<kor::Framebuffer> getFramebuffer() const { return _framebuffer; }
+        // Defined in window.cpp, not inline: kor::Framebuffer is only forward-declared here (see
+        // context.h), and returning a ResourceRef<Framebuffer> by value instantiates that type's
+        // destructor, which needs it complete. Same incomplete-type trap as the move operations
+        // below, and likewise only MSVC diagnoses it.
+        [[nodiscard]] kor::ResourceRef<kor::Framebuffer> getFramebuffer() const;
         [[nodiscard]] bool hasResized() const { return _hasResized; }
         [[nodiscard]] const kor::Surface& getSurface() const { return *_surface; }
 

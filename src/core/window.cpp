@@ -211,6 +211,12 @@ namespace kor {
     Window::Window(Window &&) = default;
     Window &Window::operator=(Window &&) = default;
 
+    // Out of line for the same reason, but for kor::Framebuffer: returning the ResourceRef by value
+    // needs the complete type, which this file has via <framebuffer.h> and the header does not.
+    ResourceRef<Framebuffer> Window::getFramebuffer() const {
+        return _framebuffer;
+    }
+
     Window::~Window() {
         Context::Scheduler().WaitIdle();
         _scene.reset();
