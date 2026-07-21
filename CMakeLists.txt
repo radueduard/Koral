@@ -661,6 +661,36 @@ set_property(TARGET Koral::${PROJECT_NAME} APPEND PROPERTY
 ")
 endif()
 
+# Runtime DLL placement for consumers (Windows).
+#
+# Windows has no RPATH: an executable resolves its DLLs from its own directory or PATH, nowhere
+# else. Koral is a DLL and pulls in more that must sit beside the consumer's binary at load time —
+# the Vulkan loader, slang, and (because they carry process-global state that cannot be shared
+# across a static link on Windows, see the overlay triplet) imgui and glfw3. All are installed into
+# <prefix>/bin by the GET_RUNTIME_DEPENDENCIES step above. A consumer's freshly built .exe sits in
+# its own build tree with none of them beside it, so it links against the import libs and then
+# fails to start. In our own build vcpkg's applocal deploy copies these automatically; a consumer
+# using the packaged SDK with no vcpkg toolchain gets no such help, which is what this is for.
+#
+# This is deliberately a function the consumer calls, not something bolted onto Koral::Koral's
+# interface: copying DLLs into every target that merely links Koral would be surprising, and a
+# consumer may want them somewhere other than each target's own directory. A no-op off Windows,
+# where the installed libraries carry an $ORIGIN / @loader_path RPATH and find each other unaided.
+file(APPEND "${KORAL_INSTALL_CONFIG}"
+"
+function(koral_copy_runtime_dlls target)
+    if(NOT WIN32)
+        return()
+    endif()
+    file(GLOB _koral_runtime_dlls \"\${KORAL_RELOADED_PREFIX}/${CMAKE_INSTALL_BINDIR}/*.dll\")
+    foreach(_dll IN LISTS _koral_runtime_dlls)
+        add_custom_command(TARGET \${target} POST_BUILD
+                COMMAND \${CMAKE_COMMAND} -E copy_if_different \"\${_dll}\" \"\$<TARGET_FILE_DIR:\${target}>\"
+                VERBATIM)
+    endforeach()
+endfunction()
+")
+
 install(FILES
         "${KORAL_INSTALL_CONFIG}"
         "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"

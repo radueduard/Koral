@@ -120,11 +120,17 @@ jobs:
             # runner.environment) and are much cheaper.
             runner: windows-2022
             # static-md, not the default x64-windows. The default is a *dynamic* triplet, which
-            # would make spdlog/fmt/imgui DLLs — and those three are the ones the SDK vendors for
-            # consumers, so they must be static archives exactly as they are on Linux, or the
-            # vendoring silently ships nothing linkable. "-md" keeps the CRT dynamic (CMake's
-            # default), so this is only about vcpkg's own libraries. slang and the Vulkan loader
-            # stay DLLs regardless — bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
+            # would make every vcpkg lib a DLL; spdlog and fmt in particular are vendored into the
+            # SDK for consumers and must stay static archives, exactly as on Linux, or the vendoring
+            # silently ships nothing linkable. "-md" keeps the CRT dynamic (CMake's default), so this
+            # is only about vcpkg's own libraries. slang and the Vulkan loader stay DLLs regardless —
+            # bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
+            #
+            # imgui (and its GLFW backend dependency glfw3) are the deliberate exceptions: the
+            # overlay triplet vcpkg-overlay-triplets/x64-windows-static-md.cmake forces those two
+            # dynamic, because ImGui's process-global state can't be shared across the DLL boundary
+            # when statically linked on Windows. See that file for the full reasoning. They ship as
+            # DLLs beside the exe via GET_RUNTIME_DEPENDENCIES, same as slang.
             triplet: x64-windows-static-md
             # Deliberately NOT Ninja. Ninja on Windows needs cl.exe on PATH, which means running
             # vcvars first (an extra action); the Visual Studio generator finds the toolchain by
@@ -452,6 +458,10 @@ jobs:
           find_package(Koral REQUIRED)
           add_executable(consumercheck main.cpp)
           target_link_libraries(consumercheck PRIVATE Koral::Koral)
+          # Exercises the runtime-DLL helper the SDK ships (see koral_copy_runtime_dlls in the root
+          # CMakeLists): a no-op off Windows, a real post-build copy of Koral's DLLs on it. Catches a
+          # syntax error in the generated function here rather than in a consumer's project.
+          koral_copy_runtime_dlls(consumercheck)
           EOF
           # Touches every third-party type that leaks through Koral's public headers.
           cat > main.cpp <<'EOF'
