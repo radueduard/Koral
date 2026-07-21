@@ -6,8 +6,8 @@ name: Release
 # how you should test changes to this file.
 on:
   push:
-    branches: [master]      # every push to master gets built — it runs on our own machine
-    tags: ['v*']            # ...but only a tag drafts an actual release (see the `release` job)
+    branches: ['release/**'] # release branches get built/verified; master does not (dev churn)
+    tags: ['v*']            # ...and only a tag drafts an actual release (see the `release` job)
     paths-ignore:
       - '**.md'             # a docs-only push does not need a 20-minute release build
       - 'docs/**'
