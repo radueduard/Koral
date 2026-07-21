@@ -12,9 +12,42 @@
 
 #include <spirv_cross/spirv_glsl.hpp>
 
+#include <log.h>
+
 namespace kor::ogl
 {
     namespace {
+        // GL images are addressed bottom-left; Koral's canonical space is Vulkan's top-left.
+        // glClipControl reconciles the *rasterizer*, but it never touches a compute imageStore /
+        // imageLoad — so a compute-written image comes out vertically flipped relative to a
+        // rasterized one (and to Vulkan). Normalize it at the source: redefine the storage-image
+        // access built-ins to flip Y (imageSize(img).y - 1 - y). Each built-in name reappears
+        // inside its own macro body but is NOT re-expanded (the preprocessor's "blue paint" rule),
+        // so every call site is rewritten exactly once. Only 2D, non-arrayed, single-sample storage
+        // images are handled — their coordinate is a plain ivec2; a shader that also uses
+        // 3D/array/MS storage images is left in GL's native orientation with a warning, since a
+        // single macro cannot cover the differing coordinate shapes.
+        void injectStorageImageYFlip(spirv_cross::CompilerGLSL& compiler)
+        {
+            const spirv_cross::ShaderResources resources = compiler.get_shader_resources();
+            if (resources.storage_images.empty())
+                return;
+
+            for (const auto& image : resources.storage_images) {
+                const spirv_cross::SPIRType& type = compiler.get_type(image.type_id);
+                if (type.image.dim != spv::Dim2D || type.image.arrayed || type.image.ms || !type.array.empty()) {
+                    kor::log::warn("[gl] shader uses a non-2D storage image; its Y orientation is left "
+                                   "in GL's native (bottom-left) space rather than Vulkan's top-left.");
+                    return;
+                }
+            }
+
+            compiler.add_header_line(
+                "#define imageStore(_kImg,_kC,_kD) imageStore(_kImg, ivec2((_kC).x, imageSize(_kImg).y - 1 - (_kC).y), _kD)");
+            compiler.add_header_line(
+                "#define imageLoad(_kImg,_kC) imageLoad(_kImg, ivec2((_kC).x, imageSize(_kImg).y - 1 - (_kC).y))");
+        }
+
         // Vulkan bindless shaders declare descriptor arrays with no size
         // (`uniform texture2D maps[]`, an OpTypeRuntimeArray). OpenGL GLSL has no
         // runtime descriptor arrays, so spirv-cross throws when targeting GL. The
@@ -235,8 +268,7 @@ namespace kor::ogl
         options.emit_uniform_buffer_as_plain_uniforms = false;
         compiler.set_common_options(options);
 
-        // Handle shader inputs, outputs, and uniforms as needed
-        // For example, you can remap resource bindings here if necessary
+        injectStorageImageYFlip(compiler);
 
         return compiler.compile();
     }
@@ -341,8 +373,7 @@ namespace kor::ogl
         options.emit_uniform_buffer_as_plain_uniforms = false;
         compiler.set_common_options(options);
 
-        // Handle shader inputs, outputs, and uniforms as needed
-        // For example, you can remap resource bindings here if necessary
+        injectStorageImageYFlip(compiler);
 
         auto shaderCode = compiler.compile();
 
