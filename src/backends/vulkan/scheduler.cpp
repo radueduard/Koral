@@ -5,6 +5,7 @@
 #include "scheduler.h"
 #include <framebuffer.h>
 #include <surface.h>
+#include <log.h>
 
 #include <iostream>
 
@@ -17,6 +18,22 @@
 
 namespace kor::vk
 {
+    namespace
+    {
+        // A lost device is unrecoverable here: the engine has no path to tear down and rebuild the
+        // whole Vulkan context, so every subsequent frame would deadlock or fault. Turn it into a
+        // clear, immediate failure instead of the silent freeze it otherwise becomes — a
+        // waitForFences on a lost device blocks for the driver's TDR timeout and the window just
+        // stops responding with nothing logged.
+        [[noreturn]] void reportDeviceLost(const char* where)
+        {
+            kor::log::error("[vulkan] device lost during {} — the GPU stopped responding (driver "
+                            "reset / TDR, or a command the driver refused). Unrecoverable; aborting.",
+                            where);
+            throw std::runtime_error(std::string("Vulkan device lost during ") + where);
+        }
+    }
+
     Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : kor::Frame(imageIndex), _queue(queue)
     {
         _commandBuffer = Context::Device().requestCommandBuffer(_queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
@@ -58,12 +75,23 @@ namespace kor::vk
         const auto& frame = dynamic_cast<const kor::vk::Frame&>(getCurrentFrame());
 
         const auto& fence = frame.getInFlightFence();
-        if (const auto result = Context::Device()->waitForFences(1, &fence, ::vk::True, UINT64_MAX); result != ::vk::Result::eSuccess) {
-            throw std::runtime_error("Failed to wait fence: " + ::vk::to_string(result));
+        // vulkan-hpp throws on error codes rather than returning them, so a lost device surfaces
+        // here as an exception, not a non-success Result.
+        ::vk::Result waitResult;
+        try {
+            waitResult = Context::Device()->waitForFences(1, &fence, ::vk::True, UINT64_MAX);
+        } catch (const ::vk::DeviceLostError &) {
+            reportDeviceLost("fence wait");
+        }
+        if (waitResult != ::vk::Result::eSuccess) {
+            throw std::runtime_error("Failed to wait fence: " + ::vk::to_string(waitResult));
         }
 
         while (true) {
             auto result = _swapChain->Acquire(frame);
+            if (result == ::vk::Result::eErrorDeviceLost) {
+                reportDeviceLost("swapchain image acquire");
+            }
             if (result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
                 _started = false;
                 _swapChain->Resize(kor::Context::Window().getExtent());
@@ -96,8 +124,11 @@ namespace kor::vk
 
         vkCommandBuffer.getQueue().Submit(submitInfo);
 
-        if (const auto result = _swapChain->Present(frame);
-            result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
+        const auto presentResult = _swapChain->Present(frame);
+        if (presentResult == ::vk::Result::eErrorDeviceLost) {
+            reportDeviceLost("present");
+        }
+        if (presentResult == ::vk::Result::eErrorOutOfDateKHR || presentResult == ::vk::Result::eSuboptimalKHR) {
             _started = false;
             _swapChain->Resize(kor::Context::Window().getExtent());
             _started = true;

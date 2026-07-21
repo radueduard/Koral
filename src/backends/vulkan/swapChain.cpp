@@ -170,6 +170,10 @@ namespace kor::vk
             return result.result;
         } catch (const ::vk::OutOfDateKHRError &) {
             return ::vk::Result::eErrorOutOfDateKHR;
+        } catch (const ::vk::DeviceLostError &) {
+            // vulkan-hpp throws on error codes; hand it back as a result so the scheduler can
+            // report it once, uniformly, instead of it escaping as an opaque SystemError.
+            return ::vk::Result::eErrorDeviceLost;
         }
     }
 
@@ -190,6 +194,8 @@ namespace kor::vk
         	return _presentQueue->presentKHR(presentInfo);
         } catch (const ::vk::OutOfDateKHRError &) {
             return ::vk::Result::eErrorOutOfDateKHR;
+        } catch (const ::vk::DeviceLostError &) {
+            return ::vk::Result::eErrorDeviceLost;
         }
     }
 }
