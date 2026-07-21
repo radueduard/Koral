@@ -9,8 +9,6 @@
 
 #include "api.h"
 
-struct ImGuiContext;
-
 namespace kor
 {
     class CommandBuffer;
@@ -22,7 +20,7 @@ namespace kor
         virtual void Initialize() = 0;
         virtual void Update() {}
         virtual void Render(kor::CommandBuffer& commandBuffer) = 0;
-        virtual void RenderUI(ImGuiContext* context) {}
+        virtual void RenderUI() {}
 
         // Window framebuffer was resized. Dispatched once per frame after a change.
         // Other input (keys, mouse, scroll) is available through kor::Input.

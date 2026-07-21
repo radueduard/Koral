@@ -10,7 +10,6 @@
 #include "task.h"
 #include "resource.h"
 
-struct ImGuiContext;
 class MainThreadExecutor;
 class BackgroundExecutor;
 
@@ -56,7 +55,6 @@ namespace kor {
     {
         friend class kor::Window;
         friend class kor::Scheduler;
-        friend class kor::GUI;
     public:
         static KORAL_API kor::Window& Window();
         static KORAL_API const kor::Scheduler& Scheduler();
@@ -101,7 +99,6 @@ namespace kor {
         static KORAL_API bool SupportsRayTracing();
 
         static KORAL_API kor::ResourceRef<const kor::Framebuffer> DefaultFramebuffer();
-        static KORAL_API ImGuiContext* GetCurrentImGuiContext();
 
         static KORAL_API kor::SwitchAwaiter SwitchToMainThread();
         static KORAL_API kor::SwitchAwaiter SwitchToBackgroundThread();
@@ -112,7 +109,6 @@ namespace kor {
     private:
         inline static kor::Window* _window = nullptr;
         inline static kor::Scheduler* _scheduler = nullptr;
-        inline static ImGuiContext* _imguiContext = nullptr;
 
         inline static API _activeAPI = API::eVulkan;
         inline static bool _headless = false;

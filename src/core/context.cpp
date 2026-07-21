@@ -119,14 +119,6 @@ kor::ResourceRef<const kor::Framebuffer> kor::Context::DefaultFramebuffer()
     return _window->getFramebuffer();
 }
 
-ImGuiContext* kor::Context::GetCurrentImGuiContext()
-{
-    if (_imguiContext == nullptr) {
-        throw std::runtime_error("ImGui context is not initialized for this thread");
-    }
-    return _imguiContext;
-}
-
 kor::SwitchAwaiter kor::Context::SwitchToMainThread() {
     if (!_mainThreadExecutor) {
         throw std::runtime_error("Main thread executor is not initialized for this thread!");

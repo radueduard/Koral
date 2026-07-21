@@ -50,6 +50,8 @@
 #include "shader.h"
 #include "window.h"
 
+#include "orientation_shared.h"
+
 using kor::Buffer;
 using kor::CommandBuffer;
 using kor::ComputePipeline;
@@ -98,8 +100,7 @@ public:
         cb.EndRendering();
     }
 
-    void RenderUI(ImGuiContext* context) override {
-        ImGui::SetCurrentContext(context);
+    void RenderUI() override {
         ImGui::Begin("Koral GL test overlay");
         ImGui::Text("frame %d", updates);
         if (_guiImage) {
@@ -708,6 +709,24 @@ TEST_F(GlTest, DebugLabels) {
         cb.EndDebugLabel();
     }, CommandBuffer::Usage::eGraphics);
     SUCCEED();
+}
+
+// -----------------------------------------------------------------------------
+// Y-orientation parity (see orientation_shared.h): a top-half quad drawn by the
+// rasterizer and the same pattern written by a compute imageStore must land in
+// the same place, and both are blit to the screen. The compute case is the one
+// that fails on GL without the imageStore Y-flip in the transpiler.
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, RasterTriangleOrientationToScreen) {
+    auto r = orient::rasterTopHalf();
+    orient::expectHalfSplit(r.pixels);
+    orient::blitToScreen(r.image);
+}
+
+TEST_F(GlTest, ComputeTriangleOrientationToScreen) {
+    auto r = orient::computeTopHalf();
+    orient::expectHalfSplit(r.pixels);
+    orient::blitToScreen(r.image);
 }
 
 } // namespace

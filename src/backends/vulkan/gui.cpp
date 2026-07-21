@@ -38,7 +38,6 @@ namespace kor::vk
 
     GUI_Image::~GUI_Image()
     {
-        ImGui::SetCurrentContext(kor::Context::GetCurrentImGuiContext());
         for (const auto& descriptorSet : _descriptorSets) {
             ImGui_ImplVulkan_RemoveTexture(descriptorSet);
         }
@@ -79,7 +78,6 @@ namespace kor::vk
     void GUI_Image::setImage(kor::ResourceRef<const kor::Image> image)
     {
         Context::Device()->waitIdle();
-        ImGui::SetCurrentContext(kor::Context::GetCurrentImGuiContext());
         for (const auto& descriptorSet : _descriptorSets) {
             ImGui_ImplVulkan_RemoveTexture(descriptorSet);
         }

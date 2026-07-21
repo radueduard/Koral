@@ -145,8 +145,8 @@ kor::Resource<kor::GUI_Image> kor::GUI_Image::Create(kor::ResourceRef<const kor:
 
 void kor::GUI::Init()
 {
-    Context::_imguiContext = ImGui::CreateContext();
-    // ImGuizmo::SetImGuiContext(Context::_imguiContext);
+    ImGui::CreateContext();
+    // ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -173,8 +173,6 @@ void kor::GUI::Init()
 
 void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
 {
-    auto* context = Context::GetCurrentImGuiContext();
-
     switch (Context::activeAPI())
     {
     case API::eOpenGL:
@@ -187,7 +185,6 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
         throw std::runtime_error("Unsupported graphics API");
     }
 
-    ImGui::SetCurrentContext(context);
     ImGui::NewFrame();
     // ImGuizmo::BeginFrame();
     constexpr ImGuiDockNodeFlags dockSpaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
@@ -320,7 +317,7 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
     const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
     ImGui::DockSpace(dockSpaceId, ImVec2(0.0f, 0.0f), dockSpaceFlags);
 
-    scene.RenderUI(context);
+    scene.RenderUI();
 
     ImGui::End();
     ImGui::Render();
