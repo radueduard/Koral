@@ -297,6 +297,8 @@ namespace kor
                     ConstMapping<T> mapping = this->Map<T>(1, index);
                     return mapping[0];
                 }
+                default:
+                    throw std::runtime_error("Unknown buffer type");
             }
         }
 
