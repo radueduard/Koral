@@ -28,10 +28,12 @@
  *   "name": "My Game",
  *   "rendering": {
  *     "api": "Vulkan",
+ *     "platform": "auto",
  *     "window": {
  *       "width": 1280, "height": 720,
  *       "resizable": true, "fullscreen": false, "borderless": false,
- *       "transparent": false, "vsync": true
+ *       "transparent": false, "vsync": true,
+ *       "imguiIni": "imgui.ini"
  *     }
  *   },
  *   "paths": {
@@ -99,11 +101,22 @@ namespace kor
         std::string title;                  // empty => engine falls back to the scene name
         glm::uvec2 extent = { 1280, 720 };
         API api = API::eVulkan;
+        WindowPlatform platform = WindowPlatform::eAuto;  // Linux windowing system; ignored elsewhere
         bool fullscreen = false;
         bool resizable = false;
         bool decorated = true;
         bool transparentFramebuffer = false;
         bool vsync = true;
+
+        /**
+         * @brief Where Dear ImGui persists its layout (window positions, docking). Empty until a
+         * config file is loaded, at which point it defaults to `imgui.ini` beside the config so the
+         * layout travels with the project rather than landing in whatever directory the runtime was
+         * launched from. `rendering.window.imguiIni` (or `--imgui-ini`) overrides it; a relative
+         * override resolves against the config's directory (against the working directory for the
+         * flag). When still empty — no config file at all — ImGui keeps its own default.
+         */
+        std::filesystem::path imguiIni;
 
         /**
          * @brief Overlay a config document onto this config.
@@ -123,10 +136,11 @@ namespace kor
          * @brief Overlay command-line overrides onto this config.
          *
          * @p args are the arguments alone — no program name, no scene library. Recognised flags:
-         * `--width N`, `--height N`, `--title S`, `--api Vulkan|OpenGL`, `--assets DIR`,
-         * `--shaders DIR` (both repeatable, both prepended so the last one given is searched
-         * first), and the booleans `--fullscreen`, `--resizable`, `--borderless`, `--transparent`,
-         * `--vsync` with their counterparts (`--no-fullscreen`, `--no-resizable`, `--decorated`,
+         * `--width N`, `--height N`, `--title S`, `--api Vulkan|OpenGL`,
+         * `--platform auto|x11|wayland` (Linux only), `--imgui-ini FILE`, `--assets DIR`,
+         * `--shaders DIR` (both repeatable, both prepended so the last one given is searched first),
+         * and the booleans `--fullscreen`, `--resizable`, `--borderless`, `--transparent`, `--vsync`
+         * with their counterparts (`--no-fullscreen`, `--no-resizable`, `--decorated`,
          * `--no-transparent`, `--no-vsync`).
          *
          * `--config FILE` is consumed by the runtime before this is called, and is skipped here.

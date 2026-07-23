@@ -48,11 +48,13 @@ namespace kor
             std::optional<bool> borderless;     // the inverse of our `decorated`
             std::optional<bool> transparent;
             std::optional<bool> vsync;
+            std::optional<std::string> imguiIni;   // where ImGui persists its layout
         };
 
         struct RenderingDocument
         {
             std::optional<std::string> api;
+            std::optional<std::string> platform;   // Linux windowing system: "auto" | "x11" | "wayland"
             std::optional<WindowDocument> window;
         };
 
@@ -95,6 +97,24 @@ namespace kor
 
             if (equalsIgnoringCase("vulkan")) return API::eVulkan;
             if (equalsIgnoringCase("opengl")) return API::eOpenGL;
+            return std::nullopt;
+        }
+
+        std::optional<WindowPlatform> parsePlatform(std::string_view name)
+        {
+            // Accept the enumerator spelling too ("eWayland"), matching parseApi.
+            if (name.starts_with('e') || name.starts_with('E')) name.remove_prefix(1);
+
+            const auto equalsIgnoringCase = [name](const std::string_view other) {
+                return std::ranges::equal(name, other, [](const char a, const char b) {
+                    return std::tolower(static_cast<unsigned char>(a)) ==
+                           std::tolower(static_cast<unsigned char>(b));
+                });
+            };
+
+            if (equalsIgnoringCase("auto"))    return WindowPlatform::eAuto;
+            if (equalsIgnoringCase("x11"))     return WindowPlatform::eX11;
+            if (equalsIgnoringCase("wayland")) return WindowPlatform::eWayland;
             return std::nullopt;
         }
 
@@ -149,6 +169,13 @@ namespace kor
                     config.api = *parsed;
                 }
 
+                if (r.platform) {
+                    const auto parsed = parsePlatform(*r.platform);
+                    if (!parsed)
+                        return invalid(std::format("'rendering.platform' is '{}'; expected 'auto', 'x11' or 'wayland'", *r.platform));
+                    config.platform = *parsed;
+                }
+
                 if (r.window) {
                     const auto& w = *r.window;
                     if (w.title)       config.title = *w.title;
@@ -159,6 +186,10 @@ namespace kor
                     if (w.borderless)  config.decorated = !*w.borderless;
                     if (w.transparent) config.transparentFramebuffer = *w.transparent;
                     if (w.vsync)       config.vsync = *w.vsync;
+                    // Like the asset/shader directories, a relative ini path means what it means
+                    // *at the config* — it travels with the project — so it resolves against the
+                    // config's directory, not the working directory.
+                    if (w.imguiIni)    config.imguiIni = resolveAgainst(baseDirectory, *w.imguiIni);
                 }
             }
 
@@ -274,6 +305,24 @@ namespace kor
                     return invalid(std::format("--api expects 'Vulkan' or 'OpenGL', got '{}'", text));
                 api = *parsed;
             }
+            else if (arg == "--platform") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --platform");
+                const auto parsed = parsePlatform(text);
+                if (!parsed)
+                    return invalid(std::format("--platform expects 'auto', 'x11' or 'wayland', got '{}'", text));
+                platform = *parsed;
+            }
+            else if (arg == "--imgui-ini") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --imgui-ini");
+                // A path typed on the command line resolves against the working directory, unlike
+                // the config's, which resolves against the config file — same rule as --assets.
+                std::error_code ec;
+                const auto file = std::filesystem::absolute(std::filesystem::path(text), ec);
+                if (ec) return invalid(std::format("--imgui-ini '{}' is not a usable path", text));
+                imguiIni = file.lexically_normal();
+            }
             else if (arg == "--assets" || arg == "--shaders") {
                 std::string_view text;
                 if (!value(text)) return invalid(std::format("missing value for {}", arg));
@@ -348,6 +397,8 @@ namespace kor
             "  --width <n>         Window width\n"
             "  --height <n>        Window height\n"
             "  --api <name>        Graphics backend: Vulkan or OpenGL\n"
+            "  --platform <name>   Linux windowing system: auto, x11 or wayland\n"
+            "  --imgui-ini <file>  Where ImGui saves its layout (default: beside koral.json)\n"
             "  --fullscreen        Open fullscreen             (--no-fullscreen)\n"
             "  --resizable         Allow the window to resize  (--no-resizable)\n"
             "  --borderless        Drop the window decorations (--decorated)\n"

@@ -43,6 +43,8 @@ namespace kor {
             bool transparentFramebuffer = false;
             bool vsync = true;
             API api = API::eVulkan;
+            WindowPlatform platform = WindowPlatform::eAuto;
+            std::filesystem::path imguiIni;   // empty => ImGui's own default (imgui.ini in the CWD)
             std::unique_ptr<Scene> scene = nullptr;
 
             explicit Builder(std::unique_ptr<Scene> scene) : scene(std::move(scene)) {}
@@ -90,6 +92,20 @@ namespace kor {
                 return *this;
             }
 
+            // Linux windowing system to open on (X11 or Wayland); ignored on other platforms.
+            // See kor::WindowPlatform. OpenGL always resolves to X11 regardless of this.
+            Builder& setPlatform(WindowPlatform platform) {
+                this->platform = platform;
+                return *this;
+            }
+
+            // File Dear ImGui persists its layout to. Empty keeps ImGui's default (imgui.ini in the
+            // working directory); a path redirects it, and its parent directory is created if needed.
+            Builder& setImguiIni(std::filesystem::path imguiIni) {
+                this->imguiIni = std::move(imguiIni);
+                return *this;
+            }
+
             std::unique_ptr<Window> build();
         };
 
@@ -134,6 +150,9 @@ namespace kor {
 
         [[nodiscard]] API getAPI() const { return _api; }
         [[nodiscard]] const std::string& getTitle() const { return _title; }
+        // The file ImGui persists its layout to, or empty for ImGui's own default. Backs
+        // io.IniFilename (which stores the pointer, not a copy), so it lives as long as the window.
+        [[nodiscard]] const std::string& getImguiIniPath() const { return _imguiIni; }
         // Defined in window.cpp, not inline: kor::Framebuffer is only forward-declared here (see
         // context.h), and returning a ResourceRef<Framebuffer> by value instantiates that type's
         // destructor, which needs it complete. Same incomplete-type trap as the move operations
@@ -165,6 +184,7 @@ namespace kor {
         bool _transparentFramebuffer;
         bool _vsync;
         API _api;
+        std::string _imguiIni;   // backing store for ImGui's io.IniFilename; must outlive the context
 
         kor::Resource<kor::Framebuffer> _framebuffer;
 

@@ -102,6 +102,13 @@ namespace kor
             return EXIT_FAILURE;
         }
 
+        // If nothing set an ImGui layout path (neither the config file nor a flag), default it to
+        // sit beside the config file, so each project keeps its own layout and it is found again no
+        // matter which directory the runtime was launched from. With no config file at all there is
+        // no project directory to anchor to, so ImGui keeps its own default (imgui.ini in the CWD).
+        if (config.imguiIni.empty() && *configFile)
+            config.imguiIni = (*configFile)->parent_path() / "imgui.ini";
+
         // Before anything is loaded: every relative texture, model and shader path from here on is
         // resolved against these roots.
         config.registerSearchPaths();
@@ -136,6 +143,8 @@ namespace kor
             .setTransparentFramebuffer(config.transparentFramebuffer)
             .setVSync(config.vsync)
             .setAPI(config.api)
+            .setPlatform(config.platform)
+            .setImguiIni(config.imguiIni)
             .build();
 
         while (!window->shouldClose()) {

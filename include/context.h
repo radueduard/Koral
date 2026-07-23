@@ -51,6 +51,21 @@ namespace kor {
         eVulkan,
     };
 
+    /**
+     * @brief Which windowing system to open the window on. Linux only; ignored elsewhere.
+     *
+     * On Linux a GLFW build can target both X11 and Wayland, and picks one automatically at startup.
+     * eAuto keeps that automatic choice (with one exception: OpenGL is always pinned to X11, because
+     * GLEW resolves entry points through GLX and cannot drive a Wayland/EGL context). eX11 and
+     * eWayland force the respective platform when the GLFW build and the running session support it,
+     * falling back to automatic selection with a warning when they do not.
+     */
+    enum class WindowPlatform {
+        eAuto,
+        eX11,
+        eWayland,
+    };
+
     class Context
     {
         friend class kor::Window;

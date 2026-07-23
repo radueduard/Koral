@@ -14,6 +14,7 @@ share no code: this schema is the whole contract between them.
   "name": "My Game",
   "rendering": {
     "api": "Vulkan",
+    "platform": "auto",
     "window": {
       "width": 1280,
       "height": 720,
@@ -21,7 +22,8 @@ share no code: this schema is the whole contract between them.
       "fullscreen": false,
       "borderless": false,
       "transparent": false,
-      "vsync": true
+      "vsync": true,
+      "imguiIni": "imgui.ini"
     }
   },
   "paths": {
@@ -132,20 +134,22 @@ For compatibility, the original singular form is still read:
 
 ## Flags
 
-| Flag | Effect |
-|------|--------|
-| `--config <file>` | Config file to read. |
-| `--assets <dir>` | Prepend an asset search directory. Repeatable; the last one given is searched first. |
-| `--shaders <dir>` | Prepend a shader search directory. Repeatable. |
-| `--title <text>` | Window title. |
-| `--width <n>`, `--height <n>` | Window size. |
-| `--api <name>` | `Vulkan` or `OpenGL`. |
-| `--fullscreen` / `--no-fullscreen` | Open fullscreen. |
-| `--resizable` / `--no-resizable` | Allow the window to be resized. |
-| `--borderless` / `--decorated` | Drop or keep the window decorations. |
-| `--transparent` / `--no-transparent` | Transparent framebuffer. |
-| `--vsync` / `--no-vsync` | Wait for vertical blank. |
-| `--help` | Print the above. |
+| Flag                                 | Effect                                                                               |
+|--------------------------------------|--------------------------------------------------------------------------------------|
+| `--config <file>`                    | Config file to read.                                                                 |
+| `--assets <dir>`                     | Prepend an asset search directory. Repeatable; the last one given is searched first. |
+| `--shaders <dir>`                    | Prepend a shader search directory. Repeatable.                                       |
+| `--title <text>`                     | Window title.                                                                        |
+| `--width <n>`, `--height <n>`        | Window size.                                                                         |
+| `--api <name>`                       | `Vulkan` or `OpenGL`.                                                                |
+| `--platform <name>`                  | Linux windowing system: `auto`, `x11` or `wayland` (ignored elsewhere).             |
+| `--imgui-ini <file>`                 | Where ImGui saves its layout (default: beside `koral.json`).                         |
+| `--fullscreen` / `--no-fullscreen`   | Open fullscreen.                                                                     |
+| `--resizable` / `--no-resizable`     | Allow the window to be resized.                                                      |
+| `--borderless` / `--decorated`       | Drop or keep the window decorations.                                                 |
+| `--transparent` / `--no-transparent` | Transparent framebuffer.                                                             |
+| `--vsync` / `--no-vsync`             | Wait for vertical blank.                                                             |
+| `--help`                             | Print the above.                                                                     |
 
 Flags are for a one-off run, not for wiring a project up — that is what the file is for.
 
@@ -154,6 +158,32 @@ directory**: a path typed at a shell prompt means what it means there.
 
 An unknown flag is an error and the runtime stops. Ignoring it would mean watching a setting fail to
 take effect with no clue as to why.
+
+## Windowing platform (Linux)
+
+`rendering.platform` (or `--platform`) picks the windowing system a Linux build opens on: `x11`,
+`wayland`, or `auto`. `auto` (the default) lets GLFW choose — normally Wayland when a Wayland session
+is present, X11 otherwise. It is ignored on Windows and macOS, and a request for a platform this GLFW
+build or session cannot provide falls back to automatic selection with a warning.
+
+One exception: **OpenGL always runs on X11/XWayland**, because the OpenGL loader resolves entry points
+through GLX and cannot drive a Wayland/EGL context. Selecting `wayland` together with the OpenGL
+backend is ignored (with a warning); use Vulkan for a native Wayland window.
+
+The platform also decides **ImGui multi-viewport** (dragging panels out into their own OS windows). It
+is enabled everywhere *except* Wayland: viewports need the app to place a window at an absolute screen
+position, and Wayland deliberately withholds global coordinates (GLFW reports the operation as
+unavailable), so detached panels could not be placed. This is a positioning limit, not something a
+borderless or transparent window works around — run on `x11` if you want viewports under Linux.
+
+## ImGui layout file
+
+`rendering.window.imguiIni` (or `--imgui-ini`) is where Dear ImGui persists its layout — window
+positions and docking. Left unset, it defaults to `imgui.ini` **beside `koral.json`**, so each project
+keeps its own layout and it is found again whatever directory you launch from — rather than ImGui's
+default of dropping `imgui.ini` into the working directory. A relative path in the file resolves
+against the config's directory (against the working directory for the flag), and any missing parent
+directories are created. With no config file at all, ImGui keeps its own default.
 
 ## Compatibility
 

@@ -127,6 +127,17 @@ void kor::GUI::DefineStyle()
 
     io.FontDefault = _fonts[Font::Regular];
     io.FontGlobalScale = .55f;
+
+    // When panels can detach into their own OS windows, those windows are real, opaque top-level
+    // windows the compositor draws directly — a rounded, semi-transparent window body that looks
+    // fine docked reads as a rendering glitch out on the desktop. ImGui's own recommendation for
+    // enabling viewports: square the corners and force the window background fully opaque. Left as
+    // the docked look when viewports are off (e.g. under Wayland).
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+    }
 }
 
 
@@ -151,10 +162,32 @@ void kor::GUI::Init()
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    // if (!Context::Window().isFullscreen())
-    // {
-        // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    // }
+    // Point ImGui at the layout file the config resolved (by default beside koral.json). io.IniFilename
+    // holds the pointer rather than copying, so it must reference storage that outlives the context —
+    // the window's own string does. An empty path leaves ImGui's default (imgui.ini in the CWD) in
+    // place. ImGui will not create missing directories itself, so make the parent before it saves.
+    if (const std::string& iniPath = Context::Window().getImguiIniPath(); !iniPath.empty()) {
+        if (const auto parent = std::filesystem::path(iniPath).parent_path(); !parent.empty()) {
+            std::error_code ec;
+            std::filesystem::create_directories(parent, ec);
+        }
+        io.IniFilename = iniPath.c_str();
+    }
+
+    // Multi-viewport: let panels be dragged out of the main window into their own OS windows.
+    // Enabled on every platform except Wayland, and set *before* the backend Init below so the
+    // GLFW/Vulkan/GL backends install their viewport hooks (they check this flag at init time).
+    //
+    // Wayland is the exception, and it is not a matter of decorations or a transparent framebuffer:
+    // ImGui viewports require the platform to place a window at an absolute screen position
+    // (Platform_SetWindowPos), and Wayland deliberately denies clients any global coordinate — GLFW's
+    // Wayland backend returns GLFW_FEATURE_UNAVAILABLE from glfwSetWindowPos (the same reason the
+    // custom title-bar drag in Render() cannot move the window there). Secondary viewports would all
+    // pile up wherever the compositor decides, so under Wayland they stay off and panels dock inside
+    // the main window as before. Switch the window to X11/XWayland (--platform x11) to get viewports.
+    const bool viewportsSupported = glfwGetPlatform() != GLFW_PLATFORM_WAYLAND;
+    if (viewportsSupported)
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     switch (Context::activeAPI())
     {

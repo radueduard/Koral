@@ -44,10 +44,12 @@ TEST(ProjectConfig, ReadsEveryKey)
         "name": "My Game",
         "rendering": {
             "api": "OpenGL",
+            "platform": "wayland",
             "window": {
                 "width": 1600, "height": 900,
                 "resizable": true, "fullscreen": true, "borderless": true,
-                "transparent": true, "vsync": false
+                "transparent": true, "vsync": false,
+                "imguiIni": "state/imgui.ini"
             }
         },
         "paths": {
@@ -66,6 +68,8 @@ TEST(ProjectConfig, ReadsEveryKey)
     EXPECT_FALSE(config.decorated);
     EXPECT_TRUE(config.transparentFramebuffer);
     EXPECT_FALSE(config.vsync);
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
+    EXPECT_EQ(config.imguiIni, std::filesystem::path("/projects/game/state/imgui.ini"));
 
     ASSERT_EQ(config.assetDirectories.size(), 2u);
     EXPECT_EQ(config.assetDirectories[0], "/projects/game/assets");
@@ -172,6 +176,108 @@ TEST(ProjectConfig, ApiNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)
             std::string(R"({ "rendering": { "api": ")") + name + R"(" } })", kBase)) << name;
         EXPECT_EQ(config.api, API::eVulkan) << name;
     }
+}
+
+TEST(ProjectConfig, ReadsTheWindowingPlatform)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "platform": "wayland" } })", kBase));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
+}
+
+TEST(ProjectConfig, PlatformDefaultsToAutoAndIsLeftAloneWhenAbsent)
+{
+    ProjectConfig config;                              // default
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eAuto);
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eAuto) << "an absent key must not reset it";
+}
+
+TEST(ProjectConfig, PlatformNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)
+{
+    for (const auto* name : { "x11", "X11", "eX11" }) {
+        ProjectConfig config;
+        ASSERT_TRUE(config.merge(
+            std::string(R"({ "rendering": { "platform": ")") + name + R"(" } })", kBase)) << name;
+        EXPECT_EQ(config.platform, kor::WindowPlatform::eX11) << name;
+    }
+}
+
+TEST(ProjectConfig, UnknownPlatformIsAnErrorAndNamesTheOffendingValue)
+{
+    ProjectConfig config;
+    const auto result = config.merge(R"({ "rendering": { "platform": "mir" } })", kBase);
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eConfigInvalid);
+    EXPECT_NE(result.error().message.find("mir"), std::string::npos);
+}
+
+TEST(ProjectConfig, PlatformFlagOverridesTheFile)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "platform": "x11" } })", kBase));
+    ASSERT_TRUE(override_(config, { "--platform", "wayland" }));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
+}
+
+TEST(ProjectConfig, UnknownPlatformFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--platform", "mir" });
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
+    EXPECT_NE(result.error().message.find("mir"), std::string::npos);
+}
+
+TEST(ProjectConfig, ImguiIniResolvesAgainstTheConfigDirectory)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "layout/imgui.ini" } } })", kBase));
+    EXPECT_EQ(config.imguiIni, std::filesystem::path("/projects/game/layout/imgui.ini"));
+}
+
+TEST(ProjectConfig, AbsoluteImguiIniIsLeftAlone)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "/var/state/imgui.ini" } } })", kBase));
+    EXPECT_EQ(config.imguiIni, std::filesystem::path("/var/state/imgui.ini"));
+}
+
+TEST(ProjectConfig, ImguiIniIsEmptyByDefault)
+{
+    // The "beside koral.json" default is applied by the runtime once it knows the config file's
+    // location; the config object itself leaves it empty until something sets it.
+    ProjectConfig config;
+    EXPECT_TRUE(config.imguiIni.empty());
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    EXPECT_TRUE(config.imguiIni.empty()) << "an absent key must not invent a path";
+}
+
+TEST(ProjectConfig, ImguiIniFlagResolvesAgainstTheWorkingDirectory)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(override_(config, { "--imgui-ini", "state/ui.ini" }));
+    EXPECT_TRUE(config.imguiIni.is_absolute()) << "a command-line path is made absolute against the cwd";
+    EXPECT_EQ(config.imguiIni.filename(), "ui.ini");
+}
+
+TEST(ProjectConfig, ImguiIniFlagOverridesTheFile)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "from-file.ini" } } })", kBase));
+    ASSERT_TRUE(override_(config, { "--imgui-ini", "from-flag.ini" }));
+    EXPECT_EQ(config.imguiIni.filename(), "from-flag.ini");
+}
+
+TEST(ProjectConfig, MissingImguiIniFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--imgui-ini" });
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
 }
 
 // koral.json IS the Hub's project file. The Hub writes it, we read it, and the two share no code —
