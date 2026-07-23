@@ -71,11 +71,6 @@ namespace kor::vk
         _surface(createInfo.surface),
         _presentQueue(Context::Device().requestPresentQueue(_surface))
     {
-        for (glm::u32 i = 0; i < _imageCount; i++)
-        {
-            _renderFinishedSemaphores.push_back(Context::Device()->createSemaphore({}));
-        }
-
         vk::Context::Device()->waitIdle();
 
         CreateSwapChain();
@@ -87,6 +82,15 @@ namespace kor::vk
         _surfaceFormat = ChooseSurfaceFormat(_surface.get().getFormats());
         _presentMode = ChoosePresentMode(_surface.get().getPresentModes());
         _extent = ChooseExtent(surfaceCapabilities, _extent);
+
+        // Request at least what the surface demands. minImageCount is our preferred floor, but the
+        // surface can require more (3 is common) — asking for fewer is a spec violation the validation
+        // layer flags, so clamp up. maxImageCount == 0 means "no upper bound"; when it is set, stay
+        // within it. The driver may still hand out more than requested; that actual count is adopted
+        // from getSwapchainImagesKHR below.
+        glm::u32 requestedImageCount = std::max(_minImageCount, surfaceCapabilities.minImageCount);
+        if (surfaceCapabilities.maxImageCount > 0)
+            requestedImageCount = std::min(requestedImageCount, surfaceCapabilities.maxImageCount);
 
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
@@ -103,7 +107,10 @@ namespace kor::vk
 
         const auto createInfo = ::vk::SwapchainCreateInfoKHR()
             .setSurface(*_surface.get())
-            .setMinImageCount(_imageCount)
+            // Request the stable, surface-clamped floor computed above — never the (possibly grown)
+            // actual _imageCount, or a driver that hands out minImageCount+1 would ratchet the count
+            // up on every Resize.
+            .setMinImageCount(requestedImageCount)
             .setImageFormat(_surfaceFormat.format)
             .setImageColorSpace(_surfaceFormat.colorSpace)
             .setImageExtent({ _extent.x, _extent.y })
@@ -123,6 +130,30 @@ namespace kor::vk
         }
 
         const auto swapChainImageHandles = Context::Device()->getSwapchainImagesKHR(_handle);
+
+        // setMinImageCount is a floor, not an exact request: the driver is free to allocate more
+        // images than asked for, and getSwapchainImagesKHR reports how many it actually made. Adopt
+        // that real count as _imageCount from here on, because everything downstream (the scheduler's
+        // frame/resource sizing, the per-image semaphores below) has to be sized to the number of
+        // images the acquire index can actually reach — not the number we requested.
+        _imageCount = static_cast<glm::u32>(swapChainImageHandles.size());
+
+        // The render-finished semaphore is per *swapchain image*: it is signalled by the submit that
+        // renders into the acquired image and waited on by that image's present, and indexed by the
+        // image index acquireNextImageKHR hands back. setMinImageCount is only a floor, so a driver
+        // may hand out more images than requested (3-4 is common) — sizing this to the requested
+        // count instead of getSwapchainImagesKHR's actual count let `_renderFinishedSemaphores[_imageIndex]`
+        // read out of bounds on those drivers, which is what crashed the submit/present path on other
+        // GPUs while working here. Size to the real image count, and rebuild across Resize.
+        for (const auto& semaphore : _renderFinishedSemaphores) {
+            Context::Device()->destroySemaphore(semaphore);
+        }
+        _renderFinishedSemaphores.clear();
+        _renderFinishedSemaphores.reserve(swapChainImageHandles.size());
+        for (size_t i = 0; i < swapChainImageHandles.size(); i++) {
+            _renderFinishedSemaphores.push_back(Context::Device()->createSemaphore({}));
+        }
+
         _swapChainImages = Resource<kor::Image>(std::make_unique<kor::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa));
 
         _depthImages = Image::Builder()

@@ -60,6 +60,15 @@ namespace kor::vk
             .setImageCount(_imageCount)
             .setMSAA(MSAA::eNone)
             .build();
+
+        // Adopt the swapchain's *actual* image count before anything is sized to it. getCurrentImageIndex()
+        // returns the driver-acquired image index (0..actualCount-1), and every per-frame resource — the
+        // frames created just below, and every user Buffer/Image/ImageView/DescriptorSet built later off
+        // getImageCount() — is indexed by it. Leaving _imageCount at the requested value while the driver
+        // hands out more images made all of those read out of bounds on other GPUs (the render-loop
+        // segfault); keeping the two in step is what makes the acquire index always land in range.
+        _imageCount = _swapChain->getImageCount();
+
         createFrames();
     }
 
