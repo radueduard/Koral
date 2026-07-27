@@ -1028,8 +1028,18 @@ namespace kor::vk
 
     kor::CommandBuffer& CommandBuffer::Run(const std::function<void(kor::CommandBuffer&)>& command)
     {
-        command(*this);
-        return *this;
+        // Deferred like everything else, and for the same reason. The point of Run is to reach
+        // the raw VkCommandBuffer — the ImGui backend records its own draws through it — and
+        // running the lambda here would emit those calls at *record* time, ahead of the entire
+        // recorded frame, instead of at the position they were written. That is what stopped the
+        // GUI appearing: it drew first and the scene then painted over it.
+        //
+        // The OpenGL backend's Run has always enqueued, so this also makes the two agree.
+        // Koral commands recorded from inside the lambda still work: enqueue() sees _emitting
+        // and runs them in place, preserving order. They are past barrier resolution by then,
+        // though, so anything needing synchronisation must say so with an explicit Barrier() —
+        // which is exactly what GUI::Render does.
+        return defer("Run", [this, command] { command(*this); });
     }
 
     kor::VoidResult CommandBuffer::Submit()

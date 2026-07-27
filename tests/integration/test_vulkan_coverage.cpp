@@ -38,6 +38,30 @@ namespace {
 
 // Build samplers across the filter/address/mip/compare permutations so the
 // sampler builder and its enum-conversion helpers are all exercised.
+// Run() must park its lambda in the recorded stream, not execute it on the spot.
+//
+// It is the one way into the raw backend command buffer — the ImGui backend records its own
+// draws through it — and commands are emitted at End(), not as they are called. A Run that
+// fired immediately would put those raw calls ahead of the entire recorded frame instead of
+// where they were written, which is exactly what stopped the GUI from appearing in 0.0.8: it
+// drew first and the scene painted over it. The Vulkan backend ran the lambda inline while the
+// OpenGL one had always enqueued, so this also pins the two to the same behaviour.
+TEST_F(GpuTest, RunIsDeferredUntilEnd) {
+    int ranAt = 0;      // 0 = not yet, 1 = during recording, 2 = during End()
+    int phase = 1;
+
+    const auto cb = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eGraphics);
+    cb->Begin();
+    cb->Run([&](kor::CommandBuffer&) { ranAt = phase; });
+
+    EXPECT_EQ(ranAt, 0) << "Run executed while the frame was still being recorded";
+
+    phase = 2;
+    cb->End();
+
+    EXPECT_EQ(ranAt, 2) << "Run never executed, or executed outside End()";
+}
+
 TEST_F(GpuTest, SamplerBuildVariants) {
     auto linear =
         Sampler::Builder{}

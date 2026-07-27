@@ -194,37 +194,51 @@ namespace kor::vk
 
     void GUI::Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
-        const auto& vkCommandBuffer = dynamic_cast<const vk::CommandBuffer&>(commandBuffer);
         const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*kor::Context::DefaultFramebuffer());
         const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(vkFramebuffer.getColorAttachments()[0].get());
         const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.getImage());
-
-        auto colorAttachment = ::vk::RenderingAttachmentInfo()
-            .setImageView(*vkColorImageView)
-            .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-            .setLoadOp(::vk::AttachmentLoadOp::eLoad)
-            .setStoreOp(::vk::AttachmentStoreOp::eStore);
-
-        const auto renderingInfo = ::vk::RenderingInfo()
-            .setRenderArea(::vk::Rect2D()
-                .setOffset({ 0, 0 })
-                .setExtent({ vkImage.getExtent().x, vkImage.getExtent().y }))
-            .setColorAttachments(colorAttachment)
-            .setViewMask(0)
-            .setLayerCount(1);
 
         commandBuffer.ImageBarrier({
             vkColorImageView.getImage(),
             ResourceAccess::ColorAttachment
         });
 
-        vkCommandBuffer->beginRendering(renderingInfo);
+        // Through Run, not straight at the handle. Commands are recorded and emitted at End(),
+        // so a raw beginRendering/RenderDrawData here would execute while the frame was still
+        // being recorded — ahead of every scene command — and the scene would paint over the
+        // GUI. Run parks it in the same stream, between the two barriers either side.
+        //
+        // The attachment info is built *inside* the closure on purpose: RenderingInfo holds a
+        // pointer to the RenderingAttachmentInfo, so building it out here and capturing it would
+        // leave that pointer dangling by the time this runs. Only handles and plain values are
+        // captured, all of which outlive the frame.
+        const ::vk::ImageView colorView = *vkColorImageView;
+        const auto extent = vkImage.getExtent();
+        commandBuffer.Run([colorView, extent, draw_data](kor::CommandBuffer& cb) {
+            const auto& raw = dynamic_cast<const vk::CommandBuffer&>(cb);
 
-        if (const bool main_is_minimized = draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f; !main_is_minimized) {
-            ImGui_ImplVulkan_RenderDrawData(draw_data, *vkCommandBuffer);
-        }
+            auto colorAttachment = ::vk::RenderingAttachmentInfo()
+                .setImageView(colorView)
+                .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
+                .setLoadOp(::vk::AttachmentLoadOp::eLoad)
+                .setStoreOp(::vk::AttachmentStoreOp::eStore);
 
-        vkCommandBuffer->endRendering();
+            const auto renderingInfo = ::vk::RenderingInfo()
+                .setRenderArea(::vk::Rect2D()
+                    .setOffset({ 0, 0 })
+                    .setExtent({ extent.x, extent.y }))
+                .setColorAttachments(colorAttachment)
+                .setViewMask(0)
+                .setLayerCount(1);
+
+            raw->beginRendering(renderingInfo);
+
+            if (const bool main_is_minimized = draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f; !main_is_minimized) {
+                ImGui_ImplVulkan_RenderDrawData(draw_data, *raw);
+            }
+
+            raw->endRendering();
+        });
 
         commandBuffer.ImageBarrier({
             vkColorImageView.getImage(),
