@@ -469,8 +469,16 @@ jobs:
             7z a -tzip "dist/${runtime}.zip" "./${runtime}/*"
             7z a -tzip "dist/${sdk}.zip"     "./${sdk}/*"
           else
-            tar czf "dist/${runtime}.tar.gz" "$runtime"
-            tar czf "dist/${sdk}.tar.gz"     "$sdk"
+            # COPYFILE_DISABLE=1 is macOS-only in effect and not optional there. Apple's tar
+            # writes a sidecar entry for every file carrying an extended attribute, and macOS
+            # stamps com.apple.provenance on essentially everything the build produces — so the
+            # 0.0.8 macOS tarballs held 57 and 673 `._*` entries respectively, exactly doubling
+            # the entry count and, worse, putting a second entry at the *top level* beside the
+            # real directory. Anything that unwraps the archive by checking for a single root
+            # then decides the tree is already flat and leaves every path one directory deep,
+            # which is what broke the Hub. Linux tar ignores the variable.
+            COPYFILE_DISABLE=1 tar czf "dist/${runtime}.tar.gz" "$runtime"
+            COPYFILE_DISABLE=1 tar czf "dist/${sdk}.tar.gz"     "$sdk"
           fi
           ls -la dist
 
