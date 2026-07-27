@@ -48,7 +48,7 @@ if(APPLE)
     endif()
 endif()
 
-project(Koral VERSION 0.0.7 LANGUAGES C CXX)
+project(Koral VERSION 0.0.8 LANGUAGES C CXX)
 include(GenerateExportHeader)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
