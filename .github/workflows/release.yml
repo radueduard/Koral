@@ -223,14 +223,30 @@ jobs:
       # dependencies and starting the next attempt cold. The save below runs with always(), so a run
       # that dies at minute 50 still banks everything vcpkg produced up to that point and the next
       # attempt picks up from there. See the save step after Configure.
+      #
+      # The primary key ends in the run id so it is *never* an exact hit, and that is the whole
+      # point. GitHub's caches are immutable: a key that already exists cannot be written again.
+      # With a stable key, the first run to save one wins forever — `cache-hit` is true on every
+      # later run, the save below is skipped, and anything vcpkg rebuilt in the meantime is thrown
+      # away at the end of the job. That is exactly what happened here: one entry created
+      # 2026-07-19 served 0.0.6, 0.0.7 and 0.0.8 unchanged while every run rebuilt whatever it was
+      # missing from source and banked none of it.
+      #
+      # A unique key per run plus prefix restore-keys is the rolling-cache pattern: the restore
+      # falls back to the newest entry sharing the prefix, and the save always writes a fresh
+      # entry containing whatever that run ended up with. The union grows until it is complete, so
+      # a partial cache heals itself over one run instead of being frozen, and old entries age out
+      # by LRU. The manifest hash and pin stay in the prefix so a dependency change still starts
+      # from the previous cache rather than from nothing.
       - name: Restore the vcpkg binary cache
         if: runner.environment == 'github-hosted'
         id: vcpkg-cache
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/vcpkg-cache
-          key: vcpkg-${{ matrix.name }}-${{ hashFiles('vcpkg.json') }}-b216ddff25
+          key: vcpkg-${{ matrix.name }}-${{ hashFiles('vcpkg.json') }}-b216ddff25-${{ github.run_id }}
           restore-keys: |
+            vcpkg-${{ matrix.name }}-${{ hashFiles('vcpkg.json') }}-b216ddff25-
             vcpkg-${{ matrix.name }}-
 
       # Where vcpkg looks for prebuilt packages, and the difference between a 1-minute Configure and
@@ -343,8 +359,10 @@ jobs:
       # itself the step most likely to fail — always() means even a Configure that died halfway
       # banks what it managed to build. Skipped on an exact key hit, where there is nothing new to
       # store.
+      # No cache-hit guard: the primary key carries the run id, so it never hits exactly and this
+      # always has a new key to write. Skipping on a hit is what froze the old entry in place.
       - name: Save the vcpkg binary cache
-        if: always() && runner.environment == 'github-hosted' && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        if: always() && runner.environment == 'github-hosted'
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/vcpkg-cache
