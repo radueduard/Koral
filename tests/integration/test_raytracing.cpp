@@ -115,7 +115,8 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BindRayTracingPipeline(ResourceRef<const RayTracingPipeline>(pipeline));
         cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
-        cb.ImageBarrier(kor::ImageBarrier(ResourceRef<const Image>(outImage), kor::ResourceAccess::AllShaderWrite));
+        // No barrier: the storage image is bound at set 0 binding 1, so the engine transitions
+        // it to the layout the raygen shader writes through.
         cb.TraceRays(kW, kH, 1);
     }, CommandBuffer::Usage::eCompute);
 

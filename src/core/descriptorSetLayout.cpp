@@ -18,7 +18,7 @@
 namespace kor
 {
     DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::addBinding(glm::u32 binding, DescriptorType type,
-        glm::u32 count)
+        glm::u32 count, Shader::AccessKind access, Flags<Shader::Stage> stages, bool active)
     {
         // Defer the failure to build() (which returns a Result) rather than throwing here.
         if (_bindings.contains(binding)) {
@@ -26,7 +26,7 @@ namespace kor
                 .message = std::format("Binding {} already exists in the layout.", binding) };
             return *this;
         }
-        _bindings[binding] = { type, count };
+        _bindings[binding] = { type, count, access, stages, active };
         return *this;
     }
 
@@ -60,9 +60,8 @@ namespace kor
     std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> DescriptorSetLayout::getBindings() const
     {
         std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> bindings;
-        for (const auto& [binding, typeAndCount] : _bindings) {
-            const auto& [type, count] = typeAndCount;
-            bindings.emplace_back(binding, type, count);
+        for (const auto& [binding, description] : _bindings) {
+            bindings.emplace_back(binding, description.type, description.count);
         }
         return bindings;
     }
@@ -72,7 +71,7 @@ namespace kor
         if (!_bindings.contains(binding)) {
             throw std::runtime_error("Binding " + std::to_string(binding) + " does not exist in the layout!");
         }
-        return _bindings.at(binding).first;
+        return _bindings.at(binding).type;
     }
 
     DescriptorSetLayout::DescriptorSetLayout(const Builder& builder) : _bindings(builder._bindings)

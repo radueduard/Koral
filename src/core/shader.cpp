@@ -484,6 +484,23 @@ namespace kor {
     	return count;
     }
 
+	// Read/write intent for a resource that can be written, from the NonReadable/NonWritable
+	// decorations. `flags` must come from get_buffer_block_flags for a storage *buffer* (the
+	// decorations sit on the block's members and have to be aggregated) and from
+	// get_decoration_bitset for a storage *image* (they sit on the variable itself).
+	//
+	// SPIR-V does not require either decoration, so an absent pair means "assume both", which
+	// over-synchronises rather than under-synchronises. Slang and GLSL both emit them for the
+	// declarations you would actually write (StructuredBuffer vs RWStructuredBuffer, readonly
+	// vs writeonly), so hand-written SPIR-V is the only realistic source of a miss.
+	Shader::AccessKind AccessFrom(const spirv_cross::Bitset& flags) {
+		const bool readable = !flags.get(spv::DecorationNonReadable);
+		const bool writable = !flags.get(spv::DecorationNonWritable);
+		if (readable && writable) return Shader::AccessKind::eReadWrite;
+		if (writable)             return Shader::AccessKind::eWrite;
+		return Shader::AccessKind::eRead;
+	}
+
 	Shader::Stage StageFrom(const spv::ExecutionModel executionModel) {
 	    switch (executionModel) {
 	    	case spv::ExecutionModelVertex: return Shader::Stage::eVertex;
@@ -512,6 +529,22 @@ namespace kor {
         const auto resources = module.get_shader_resources();
     	const auto stage = StageFrom(module.get_execution_model());
 
+    	// Which globals the entry point actually reaches. Recorded per descriptor rather than
+    	// used to filter: an unused binding must stay in the layout (see Descriptor::active).
+    	const auto activeVariables = module.get_active_interface_variables();
+    	const auto isActive = [&](const spirv_cross::Resource& resource) {
+    		return activeVariables.contains(resource.id);
+    	};
+
+    	// Raw-pointer access, which reflection can detect but never attribute to a buffer.
+    	_usesDeviceAddresses = false;
+    	for (const auto capability : module.get_declared_capabilities()) {
+    		if (capability == spv::CapabilityPhysicalStorageBufferAddresses) {
+    			_usesDeviceAddresses = true;
+    			break;
+    		}
+    	}
+
     	MemoryLayout memoryLayout;
 
         for (const auto& input : resources.stage_inputs) {
@@ -538,18 +571,19 @@ namespace kor {
 			const uint32_t count = GetCount(module.get_type(sampler.type_id));
 			const auto& name = module.get_name(sampler.id);
 
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampler, name, count, stage });
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampler, name, count, stage, AccessKind::eRead, isActive(sampler) });
 		} // eSampler
 		for (const auto& sampledImage : resources.separate_images) {
 			const uint32_t set = module.get_decoration(sampledImage.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
+
 			if (module.get_type(sampledImage.type_id).image.dim == spv::DimBuffer) {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformTexelBuffer, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformTexelBuffer, name, count, stage, AccessKind::eRead, isActive(sampledImage) });
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage, AccessKind::eRead, isActive(sampledImage) });
 			}
 		} // eSampledImage and eUniformTexelBuffer
     	for (const auto& sampledImage : resources.sampled_images) {
@@ -557,18 +591,22 @@ namespace kor {
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eCombinedImageSampler, name, count, stage });
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eCombinedImageSampler, name, count, stage, AccessKind::eRead, isActive(sampledImage) });
 		} // eCombinedImageSampler
 		for (const auto& image : resources.storage_images) {
 			const uint32_t set = module.get_decoration(image.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(image.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(image.type_id));
 			const auto& name = module.get_name(image.id);
+			// The variable's own decorations here, unlike storage buffers: an image is not a
+			// block, so readonly/writeonly are attached directly to it.
+			const auto access = AccessFrom(module.get_decoration_bitset(image.id));
+			const bool active = isActive(image);
 			if (module.get_type(image.type_id).image.dim == spv::DimBuffer) {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageTexelBuffer, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageTexelBuffer, name, count, stage, access, active });
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage, access, active });
 			}
 		} // eStorageImage and eStorageTexelBuffer
 		for (const auto& buffer : resources.uniform_buffers) {
@@ -576,21 +614,23 @@ namespace kor {
 			const uint32_t binding = module.get_decoration(buffer.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformBuffer, name, count, stage });
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformBuffer, name, count, stage, AccessKind::eRead, isActive(buffer) });
 		} // eUniformBuffer
 		for (const auto& buffer : resources.storage_buffers) {
 			const uint32_t set = module.get_decoration(buffer.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(buffer.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageBuffer, name, count, stage });
+			// Block flags, not the variable's: NonWritable/NonReadable land on the members.
+			const auto access = AccessFrom(module.get_buffer_block_flags(buffer.id));
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) });
 		} // eStorageBuffer
 		for (const auto& accelerationStructure : resources.acceleration_structures) {
 			const uint32_t set = module.get_decoration(accelerationStructure.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(accelerationStructure.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(accelerationStructure.type_id));
 			const auto& name = module.get_name(accelerationStructure.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eAccelerationStructure, name, count, stage });
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eAccelerationStructure, name, count, stage, AccessKind::eRead, isActive(accelerationStructure) });
 		} // eAccelerationStructure
 
     	for (const auto& pushConstant : resources.push_constant_buffers) {

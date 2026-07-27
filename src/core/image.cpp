@@ -16,6 +16,18 @@
 
 namespace kor
 {
+    std::optional<ResourceAccess> Image::getTrackedAccess(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    {
+        const auto tracked = _trackedAccess.find(trackingKey(mipLevel, arrayLayer));
+        if (tracked == _trackedAccess.end()) return std::nullopt;
+        return tracked->second;
+    }
+
+    void Image::setTrackedAccess(const ResourceAccess access, const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    {
+        _trackedAccess[trackingKey(mipLevel, arrayLayer)] = access;
+    }
+
     kor::Result<std::unique_ptr<Image>> Image::Builder::create() const
     {
         beginAttempt();

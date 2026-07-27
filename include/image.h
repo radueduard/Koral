@@ -7,6 +7,8 @@
 #include <span>
 #include <vector>
 #include <cstddef>
+#include <optional>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "flags.h"
@@ -288,7 +290,29 @@ namespace kor
 
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
 
+        // ---- Automatic barriers ---------------------------------------------
+        // The access each subresource was last synchronised for. Lives here, in the core,
+        // rather than in a backend so the resolver and both backends share one notion of
+        // current state, and persists between command buffers because the resource's state
+        // does: what one frame leaves behind is what the next starts from.
+        //
+        // This is sound only because a frame records and submits exactly one command buffer
+        // (Scheduler::Draw), so record order is execute order. Should that become several
+        // buffers, or several threads, the resolver needs per-buffer entry/exit states
+        // reconciled at submit instead of a single value read at record time.
+        //
+        // nullopt means never synchronised — an image in undefined layout — which always
+        // needs a barrier before first use.
+        [[nodiscard]] std::optional<ResourceAccess> getTrackedAccess(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+        void setTrackedAccess(ResourceAccess access, glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+
     protected:
+        // Subresource key, matching the backends' own flattening of (mip, layer).
+        [[nodiscard]] glm::u64 trackingKey(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
+            return static_cast<glm::u64>(mipLevel) << 32 | arrayLayer;
+        }
+        mutable std::unordered_map<glm::u64, ResourceAccess> _trackedAccess;
+
         explicit Image(const Builder&);
         bool _isPerFrame = false;
         Type _type;

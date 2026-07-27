@@ -62,6 +62,15 @@ namespace kor
 
         virtual void DebugPrint() const {};
 
+        // What this set holds, for the automatic barrier resolver: the layout says what each
+        // binding is and what shaders do with it, the writes say which resources are actually
+        // in it. Bindless arrays are enumerable through the same pair — the resolver cannot
+        // know which index a draw will pick, but it does not need to: requiring the declared
+        // access on every member is correct, and converges to no barriers at all once they
+        // are all in that state.
+        [[nodiscard]] ResourceRef<const DescriptorSetLayout> getLayout() const { return _layout; }
+        [[nodiscard]] const std::map<glm::u32, std::vector<Descriptor>>& getWrites() const { return _writes; }
+
     protected:
         explicit DescriptorSet(const Builder &builder);
         bool _isPerFrame = false;

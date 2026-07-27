@@ -63,6 +63,12 @@ namespace kor
                             valid = false;
                         }
                         existingDescriptor.stages |= descriptor.stages;
+                        // Union the accesses too: a buffer a vertex shader only reads but a
+                        // fragment shader writes has to be synchronised as read-write for the
+                        // pipeline as a whole. Same for activity — reached by any stage counts.
+                        if (existingDescriptor.access != descriptor.access)
+                            existingDescriptor.access = Shader::AccessKind::eReadWrite;
+                        existingDescriptor.active = existingDescriptor.active || descriptor.active;
                     } else
                     {
                         mergedSetLayouts[setIndex][binding] = descriptor;
@@ -79,6 +85,12 @@ namespace kor
             }
         }
 
+        _usesDeviceAddresses = false;
+        for (const auto& shader : shaders) {
+            if (shader.alive() && !shader.poisoned() && shader->usesDeviceAddresses())
+                _usesDeviceAddresses = true;
+        }
+
         _pushConstantRanges.clear();
 
         // Rebuild only the sets whose *interface* actually changed. A shader edit usually changes
@@ -91,8 +103,8 @@ namespace kor
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription)
             {
-                const auto& [type, name, count, _] = descriptor;
-                builder.addBinding(binding, type, count);
+                builder.addBinding(binding, descriptor.type, descriptor.count,
+                                   descriptor.access, descriptor.stages, descriptor.active);
             }
 
             if (const auto existing = _setLayouts.find(setIndex);

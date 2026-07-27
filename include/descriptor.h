@@ -68,6 +68,13 @@ namespace kor
         [[nodiscard]] const Sampler& getSampler() const;
         [[nodiscard]] const AccelerationStructure& getAccelerationStructure() const;
 
+        // Non-throwing counterparts for the automatic barrier resolver, which walks whole
+        // descriptor sets and must tolerate slots that hold something else, or nothing at all
+        // (a bindless array is routinely sparse). An empty ref answers "not this kind"; the
+        // accessors above keep throwing, since a caller naming one field means to get it.
+        [[nodiscard]] ResourceRef<const Buffer> getBufferRef() const;
+        [[nodiscard]] ResourceRef<const ImageView> getImageViewRef() const;
+
     protected:
         bool valid = false;
         std::optional<Error> _error;

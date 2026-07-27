@@ -71,6 +71,15 @@ namespace kor
         /** @brief Repository-driven hot reload hook. */
         void automaticUpdate() override;
 
+        /**
+         * @brief Whether any shader in this pipeline reaches buffers through raw device addresses.
+         *
+         * Unioned across stages. When true the automatic barrier resolver cannot see which
+         * buffers a draw or dispatch touches, so it reports an unguarded write instead of
+         * quietly under-synchronising. See Shader::usesDeviceAddresses.
+         */
+        [[nodiscard]] bool usesDeviceAddresses() const { return _usesDeviceAddresses; }
+
     protected:
         Pipeline() = default;
 
@@ -114,5 +123,6 @@ namespace kor
 
         std::map<glm::u32, Resource<DescriptorSetLayout>> _setLayouts;
         std::map<glm::u32, Shader::PushConstant> _pushConstantRanges;
+        bool _usesDeviceAddresses = false;
     };
 }

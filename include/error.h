@@ -62,6 +62,7 @@ namespace kor
         eImageSubresourceOutOfRange, ///< A copy referenced a mip level / array layer outside the image.
         eResolveRequiresMultisample, ///< Resolve requires a multisampled source and single-sampled destination.
         eRayTracingUnsupported,      ///< Ray tracing is not supported on this backend.
+        eMissingBarrier,             ///< A hazard the engine cannot synchronise on its own was left unguarded (see Barrier).
 
         // --- pipeline / shader (populated in later phases) ---
         eMissingShaderStage,   ///< A pipeline is missing a required shader stage.

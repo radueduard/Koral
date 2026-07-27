@@ -89,10 +89,10 @@ namespace kor::ogl
 
     void CommandBuffer::CheckRecording() const
     {
-        // _executing: a command is being recorded from inside another command's replay
+        // _emitting: a command is being recorded from inside another command's replay
         // (e.g. a Run lambda calling Dispatch); that is legal — enqueue() runs it in
         // place rather than appending. Only reject recording on a genuinely idle buffer.
-        if (!_recording && !_executing)
+        if (!_recording && !_emitting)
         {
             throw std::runtime_error("You can't submit commands while not recording!");
         }
@@ -104,6 +104,7 @@ namespace kor::ogl
     {
         if (_filled) throw std::runtime_error("CommandBuffer has already been recorded! You must reset it first!");
         resetErrors();
+        clearRecords();
         _recording = true;
 
         return *this;
@@ -115,6 +116,10 @@ namespace kor::ogl
 
         _recording = false;
         _filled = true;
+
+        // Same two-phase finish as Vulkan: with the whole sequence recorded, work out where the
+        // barriers belong. They are emitted at Submit, when the GL context actually runs them.
+        resolveBarriers();
     }
 
     kor::CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, glm::vec4)
@@ -384,7 +389,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ)
+    kor::CommandBuffer& CommandBuffer::Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, const std::source_location where)
     {
         CheckRecording();
         enqueue([this, groupCountX, groupCountY, groupCountZ] () {
@@ -501,7 +506,7 @@ namespace kor::ogl
         glCheckError();
     }
 
-    kor::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance)
+    kor::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, const std::source_location where)
     {
         CheckRecording();
         enqueue([this, vertexCount, instanceCount, firstVertex, firstInstance] () mutable
@@ -522,7 +527,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) {
+    kor::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, const std::source_location where) {
         CheckRecording();
         enqueue([this, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance] () mutable {
             if (!_state.boundGraphicsPipeline.has_value())
@@ -1152,13 +1157,9 @@ namespace kor::ogl
         if (_submitted)
             return std::unexpected(Error{ .code = ErrorCode::eInvalidArgument, .message = "This command buffer has already been submitted; reset it before re-submitting." });
 
-        // Replay. _executing lets commands recorded from within a Run lambda execute
-        // in place (see enqueue / CheckRecording) instead of appending to _commands
-        // while we iterate it.
-        _executing = true;
-        for (size_t i = 0; i < _commands.size(); ++i)
-            _commands[i]();
-        _executing = false;
+        // Replay. emitRecords sets the core's _emitting flag, which lets commands recorded
+        // from within a Run lambda execute in place instead of appending mid-walk.
+        emitRecords();
         _submitted = true;
         return result();
     }
@@ -1167,7 +1168,7 @@ namespace kor::ogl
     {
         _filled = false;
         _submitted = false;
-        _commands.clear();
+        clearRecords();
     }
 
     const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& CommandBuffer::getRemappingTableForBoundPipeline() const

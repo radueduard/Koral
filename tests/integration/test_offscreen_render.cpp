@@ -26,6 +26,9 @@
 #include "mesh.h"
 #include "meshLayout.h"
 #include "shader.h"
+#include "sampler.h"
+#include "descriptor.h"
+#include "descriptorSet.h"
 
 using kor::Buffer;
 using kor::CommandBuffer;
@@ -35,6 +38,9 @@ using kor::Image;
 using kor::ImageView;
 using kor::ResourceRef;
 using kor::Shader;
+using kor::Sampler;
+using kor::Descriptor;
+using kor::DescriptorSet;
 
 namespace {
 
@@ -431,6 +437,80 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
             }
         }
     }
+}
+
+
+// A hazard that no amount of barrier placement can fix: a draw samples the very image the
+// open render pass is rendering into. The transition it needs cannot go inside the pass
+// (Vulkan forbids it) and cannot go in front of the pass either, because that is before the
+// write it would have to wait on. The engine has to say so rather than emit a barrier
+// somewhere harmless-looking, which is what it used to do.
+TEST_F(GpuTest, FeedbackLoopInsideRenderPassIsReported) {
+    constexpr glm::u32 kSize = 16;
+
+    Image::Builder ib;
+    ib.setFormat(Image::Format::eRGBA8_UNORM)
+      .setExtent(glm::uvec2{kSize, kSize})
+      .addUsage(Image::Usage::eColorAttachment)
+      .addUsage(Image::Usage::eSampled);
+    auto colorImage = ib.build();
+    ASSERT_TRUE(colorImage.valid());
+
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(colorImage)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                           .build();
+    auto sampler = Sampler::Builder{}.build();
+    ASSERT_TRUE(sampler.valid());
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eVertex)
+            .setPath(kor::shaderPath("sampleTexture.vert.glsl")).getOrBuild("test.feedback.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eFragment)
+            .setPath(kor::shaderPath("sampleTexture.frag.glsl")).getOrBuild("test.feedback.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid());
+
+    // The attachment, bound as a texture to the pipeline drawing into it.
+    auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
+                             .write(0, Descriptor(ResourceRef<const ImageView>(colorView),
+                                                  ResourceRef<const Sampler>(sampler)))
+                             .build();
+    ASSERT_TRUE(descriptorSet.valid());
+
+    const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    cb->Begin();
+    cb->BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+    cb->BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+    cb->SetViewport(0, 0, kSize, kSize);
+    cb->SetScissor(0, 0, kSize, kSize);
+    cb->BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
+    cb->Draw(3);
+    cb->EndRendering();
+    cb->End();   // resolution, and therefore the diagnostic, happens here
+
+    bool reported = false;
+    std::string message;
+    for (const auto& error : cb->errors()) {
+        if (error.code == kor::ErrorCode::eMissingBarrier) {
+            reported = true;
+            message = error.message;
+        }
+    }
+
+    ASSERT_TRUE(reported) << "the engine hoisted a barrier that synchronises nothing "
+                             "instead of reporting an unplaceable one";
+    EXPECT_NE(message.find("BeginRendering"), std::string::npos) << message;
+    EXPECT_NE(message.find("Draw"), std::string::npos) << message;
+    // Named as the feedback loop it is, rather than as a barrier-placement problem: there is
+    // no ordering that makes sampling the attachment you are rendering into legal.
+    EXPECT_NE(message.find("rendering into it"), std::string::npos) << message;
 }
 
 } // namespace

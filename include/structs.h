@@ -31,6 +31,69 @@ namespace kor
      *
      * @note The exact meaning of each descriptor type may vary depending on the graphics API being used, but in general they can be categorized as follows:
      */
+    enum class PipelineStage {
+        // Compute
+        Compute = 1 << 0,
+
+        // Vertex pipeline
+        VertexInput = 1 << 1,
+        VertexShader = 1 << 2,
+        FragmentShader = 1 << 3,
+        EarlyFragmentTests = 1 << 4,
+        LateFragmentTests = 1 << 5,
+        ColorAttachmentOutput = 1 << 6,
+
+        // Transfer
+        Transfer = 1 << 7,
+
+        // Bottom and top of pipe
+        TopOfPipe = 1 << 8,
+        BottomOfPipe = 1 << 9
+    };
+
+    enum class ResourceAccess {
+        // Compute
+        ComputeRead,         // COMPUTE_SHADER + SHADER_READ
+        ComputeWrite,        // COMPUTE_SHADER + SHADER_WRITE
+        ComputeReadWrite,    // COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
+
+        // Vertex pipeline
+        VertexBuffer,        // VERTEX_INPUT + VERTEX_ATTRIBUTE_READ
+        IndexBuffer,         // VERTEX_INPUT + INDEX_READ
+        IndirectBuffer,      // DRAW_INDIRECT + INDIRECT_COMMAND_READ
+
+        // Vertex shader
+        VertexShaderRead,    // VERTEX_SHADER + SHADER_READ
+        VertexShaderWrite,   // VERTEX_SHADER + SHADER_WRITE
+        VertexShaderReadWrite, // VERTEX_SHADER + SHADER_READ | SHADER_WRITE
+
+        // Fragment shader
+        FragmentShaderRead,  // FRAGMENT_SHADER + SHADER_READ
+        FragmentShaderWrite, // FRAGMENT_SHADER + SHADER_WRITE
+        FragmentShaderReadWrite, // FRAGMENT_SHADER + SHADER_READ | SHADER_WRITE
+
+        // Attachments
+        ColorAttachment,         // COLOR_ATTACHMENT_OUTPUT + COLOR_ATTACHMENT_WRITE
+        DepthStencilAttachment,  // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
+        DepthStencilRead,        // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
+        DepthAttachment,         // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
+        DepthRead,               // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
+        StencilAttachment,       // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
+        StencilRead,             // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
+
+        // Transfer
+        TransferSrc,         // TRANSFER + TRANSFER_READ
+        TransferDst,         // TRANSFER + TRANSFER_WRITE
+
+        // General
+        AllShaderRead,          // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ
+        AllShaderWrite,         // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_WRITE
+        AllShaderReadWrite,     // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
+
+        // Present
+        Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
+    };
+
     enum class DescriptorType {
         eUniformBuffer,             ///< This type of descriptor is used to bind a buffer that contains uniform data,
                                     ///< which is read-only data that is accessed by shaders. Uniform buffers are

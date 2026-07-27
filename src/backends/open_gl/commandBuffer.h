@@ -37,10 +37,10 @@ namespace kor::ogl
         kor::CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color) override;
         kor::CommandBuffer& EndDebugLabel() override;
         kor::CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color) override;
-        kor::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
+        kor::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) override;
         kor::CommandBuffer& doDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) override;
-        kor::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
-        kor::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) override;
+        kor::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) override;
+        kor::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) override;
         kor::CommandBuffer& doDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
         kor::CommandBuffer& doDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
 
@@ -125,16 +125,18 @@ namespace kor::ogl
         // happens (_executing) there is no more recording to do — the surrounding
         // replay is already running — so the operation executes in place, preserving
         // order and avoiding mutation of _commands mid-iteration.
+        // Hand the operation to the core's record list rather than keeping a second one.
+        // Everything the core records — barriers the resolver inserted, and the commands whose
+        // gate lives in the base class — has to interleave with these in call order, which only
+        // works if there is a single list. The core's enqueue keeps the reentrancy behaviour
+        // this used to implement locally: recorded from inside a replay, it runs in place.
         void enqueue(std::function<void()> op) {
-            if (_executing) op();
-            else _commands.emplace_back(std::move(op));
+            kor::CommandBuffer::enqueue("", std::source_location::current(), {}, PassEdge::eNone, std::move(op));
         }
 
         bool _recording = false;
         bool _filled = false;
         bool _submitted = false;
-        bool _executing = false; // true while Submit is replaying _commands
-        std::vector<std::function<void()>> _commands = {};
     };
 }
 

@@ -48,6 +48,29 @@ Enable/disable with `-DGFX_BUILD_INTEGRATION_TESTS=ON|OFF` (default ON). These
 require a desktop session with a Vulkan-capable GPU; in a headless/CI shell they
 skip. Good next target: image upload/readback (sampled + storage images).
 
+### Checking the automatic barriers
+
+Barriers are inserted by the engine rather than written by hand, so the tests
+record no `Barrier()` calls of their own. Ordinary validation will not tell you
+whether that is working: it catches a resource used in the wrong *layout*, but a
+read-after-write or write-after-write on a resource already in a legal layout is
+invisible to it. That needs **synchronization validation**, which is off by
+default because it is expensive:
+
+```sh
+printf 'khronos_validation.validate_sync = true\n' > /tmp/vk_layer_settings.txt
+VK_LAYER_SETTINGS_PATH=/tmp/vk_layer_settings.txt ./tests/integration/koral_integration_tests
+```
+
+Any `SYNC-HAZARD-*` message is a barrier the resolver failed to insert.
+
+`BackToBackDispatchesAreSynchronised` in `test_compute_dispatch.cpp` is the test
+that actually exercises this: two dispatches read and write the same storage
+buffer with nothing between them, so only an engine-inserted barrier makes the
+second observe the first. It fails with wrong values if barrier resolution is
+disabled, whereas the single-dispatch test passes either way (the upload and
+readback paths carry their own synchronisation).
+
 ## Scope / not covered (unit suite)
 
 The pure-logic unit suite deliberately excludes anything needing a live GPU —

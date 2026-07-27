@@ -18,7 +18,7 @@ namespace kor::vk
         for (size_t i = 0; i < _bindings.size(); i++) {
             // if the count is unknown at pipeline creation time, we need to set the variable descriptor count flag
             flags[i] = ::vk::DescriptorBindingFlags();
-            if (_bindings[i].second == 0) {
+            if (_bindings[i].count == 0) {
                 flags[i] |= ::vk::DescriptorBindingFlagBits::eVariableDescriptorCount
                     | ::vk::DescriptorBindingFlagBits::ePartiallyBound
                     | ::vk::DescriptorBindingFlagBits::eUpdateAfterBind;
@@ -31,12 +31,11 @@ namespace kor::vk
             .setBindingFlags(flags);
 
         std::vector<::vk::DescriptorSetLayoutBinding> bindings(_bindings.size());
-        for (auto [binding, typeAndCount] : _bindings) {
-            const auto& [type, count] = typeAndCount;
+        for (const auto& [binding, description] : _bindings) {
             bindings[binding] = ::vk::DescriptorSetLayoutBinding()
                 .setBinding(binding)
-                .setDescriptorType(getVkDescriptorType(type))
-                .setDescriptorCount(count == 0 ? 256 : count)
+                .setDescriptorType(getVkDescriptorType(description.type))
+                .setDescriptorCount(description.count == 0 ? 256 : description.count)
                 .setStageFlags(::vk::ShaderStageFlagBits::eAll);
         }
 

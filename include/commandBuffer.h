@@ -13,6 +13,7 @@
 #include <string>
 #include <map>
 #include <unordered_map>
+#include <source_location>
 #include "flags.h"
 #include "api.h"
 #include "error.h"
@@ -33,69 +34,6 @@ namespace kor
     class RayTracingPipeline;
     class Framebuffer;
     class Mesh;
-
-    enum class PipelineStage {
-        // Compute
-        Compute = 1 << 0,
-
-        // Vertex pipeline
-        VertexInput = 1 << 1,
-        VertexShader = 1 << 2,
-        FragmentShader = 1 << 3,
-        EarlyFragmentTests = 1 << 4,
-        LateFragmentTests = 1 << 5,
-        ColorAttachmentOutput = 1 << 6,
-
-        // Transfer
-        Transfer = 1 << 7,
-
-        // Bottom and top of pipe
-        TopOfPipe = 1 << 8,
-        BottomOfPipe = 1 << 9
-    };
-
-    enum class ResourceAccess {
-        // Compute
-        ComputeRead,         // COMPUTE_SHADER + SHADER_READ
-        ComputeWrite,        // COMPUTE_SHADER + SHADER_WRITE
-        ComputeReadWrite,    // COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
-
-        // Vertex pipeline
-        VertexBuffer,        // VERTEX_INPUT + VERTEX_ATTRIBUTE_READ
-        IndexBuffer,         // VERTEX_INPUT + INDEX_READ
-        IndirectBuffer,      // DRAW_INDIRECT + INDIRECT_COMMAND_READ
-
-        // Vertex shader
-        VertexShaderRead,    // VERTEX_SHADER + SHADER_READ
-        VertexShaderWrite,   // VERTEX_SHADER + SHADER_WRITE
-        VertexShaderReadWrite, // VERTEX_SHADER + SHADER_READ | SHADER_WRITE
-
-        // Fragment shader
-        FragmentShaderRead,  // FRAGMENT_SHADER + SHADER_READ
-        FragmentShaderWrite, // FRAGMENT_SHADER + SHADER_WRITE
-        FragmentShaderReadWrite, // FRAGMENT_SHADER + SHADER_READ | SHADER_WRITE
-
-        // Attachments
-        ColorAttachment,         // COLOR_ATTACHMENT_OUTPUT + COLOR_ATTACHMENT_WRITE
-        DepthStencilAttachment,  // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
-        DepthStencilRead,        // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
-        DepthAttachment,         // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
-        DepthRead,               // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
-        StencilAttachment,       // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
-        StencilRead,             // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
-
-        // Transfer
-        TransferSrc,         // TRANSFER + TRANSFER_READ
-        TransferDst,         // TRANSFER + TRANSFER_WRITE
-
-        // General
-        AllShaderRead,          // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ
-        AllShaderWrite,         // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_WRITE
-        AllShaderReadWrite,     // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
-
-        // Present
-        Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
-    };
 
     class KORAL_API BufferBarrier {
     public:
@@ -282,7 +220,8 @@ namespace kor
         virtual void End() = 0;
 
         virtual CommandBuffer& BeginRendering(RenderParameters renderParameters = {});
-        CommandBuffer& BeginRendering(ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters = {});
+        CommandBuffer& BeginRendering(ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters = {},
+                                      std::source_location where = std::source_location::current());
         virtual CommandBuffer& EndRendering();
         virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
         virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
@@ -311,18 +250,20 @@ namespace kor
         virtual CommandBuffer& SetDepthBiasEnable(bool enable);
         virtual CommandBuffer& SetRasterizerDiscardEnable(bool enable);
         virtual CommandBuffer& SetPrimitiveRestartEnable(bool enable);
-        CommandBuffer& BindComputePipeline(ResourceRef<const ComputePipeline> pipeline);
-        CommandBuffer& BindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline);
-        CommandBuffer& BindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
-        CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet, bool debug = false);
-        CommandBuffer& BindMesh(ResourceRef<const Mesh> mesh);
+        CommandBuffer& BindComputePipeline(ResourceRef<const ComputePipeline> pipeline, std::source_location where = std::source_location::current());
+        CommandBuffer& BindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline, std::source_location where = std::source_location::current());
+        CommandBuffer& BindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline, std::source_location where = std::source_location::current());
+        CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet, bool debug = false,
+                                         std::source_location where = std::source_location::current());
+        CommandBuffer& BindMesh(ResourceRef<const Mesh> mesh, std::source_location where = std::source_location::current());
 
         template<typename T> requires std::is_trivially_copyable_v<T>
         CommandBuffer& PushConstants(const T& data, const glm::u32 offset = 0) {
             return PushConstants(&data, sizeof(T), offset);
         }
 
-        CommandBuffer& Barrier(std::vector<BufferBarrier> bufferBarriers = {}, std::vector<ImageBarrier> imageBarriers = {});
+        CommandBuffer& Barrier(std::vector<BufferBarrier> bufferBarriers = {}, std::vector<ImageBarrier> imageBarriers = {},
+                               std::source_location where = std::source_location::current());
 
         // ---- Debug labels -------------------------------------------------
         // Named regions and single markers surfaced in GPU debuggers (RenderDoc,
@@ -332,36 +273,53 @@ namespace kor
         virtual CommandBuffer& EndDebugLabel();
         virtual CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
 
-        virtual CommandBuffer& Dispatch(glm::u32 groupCountX = 1, glm::u32 groupCountY = 1, glm::u32 groupCountZ = 1) = 0;
-        CommandBuffer& DispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0);
+        virtual CommandBuffer& Dispatch(glm::u32 groupCountX = 1, glm::u32 groupCountY = 1, glm::u32 groupCountZ = 1,
+                                        std::source_location where = std::source_location::current()) = 0;
+        CommandBuffer& DispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0,
+                                        std::source_location where = std::source_location::current());
 
-        virtual CommandBuffer& TraceRays(glm::u32 width = 1, glm::u32 height = 1, glm::u32 depth = 1);
+        virtual CommandBuffer& TraceRays(glm::u32 width = 1, glm::u32 height = 1, glm::u32 depth = 1,
+                                         std::source_location where = std::source_location::current());
 
-        virtual CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0);
-        virtual CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0);
-        virtual CommandBuffer& DrawMeshTasks(glm::u32 taskCountX = 1, glm::u32 taskCountY = 1, glm::u32 taskCountZ = 1);
+        virtual CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0,
+                                    std::source_location where = std::source_location::current());
+        virtual CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0,
+                                           std::source_location where = std::source_location::current());
+        virtual CommandBuffer& DrawMeshTasks(glm::u32 taskCountX = 1, glm::u32 taskCountY = 1, glm::u32 taskCountZ = 1,
+                                             std::source_location where = std::source_location::current());
 
-        CommandBuffer& DrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
-        CommandBuffer& DrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
-        CommandBuffer& DrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0);
+        CommandBuffer& DrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0,
+                                    std::source_location where = std::source_location::current());
+        CommandBuffer& DrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0,
+                                           std::source_location where = std::source_location::current());
+        CommandBuffer& DrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0,
+                                             std::source_location where = std::source_location::current());
 
-        CommandBuffer& ClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX);
+        CommandBuffer& ClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX,
+                                   std::source_location where = std::source_location::current());
         // Clears every mip/array level of a color image to a constant value. The image is
         // transitioned to a transfer-destination state automatically; a follow-up barrier
         // is still needed before sampling/rendering with it again.
-        CommandBuffer& ClearColorImage(ResourceRef<const Image> image, glm::vec4 color = { 0.f, 0.f, 0.f, 1.f });
-        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX);
-        CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size = UINT64_MAX, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0);
+        CommandBuffer& ClearColorImage(ResourceRef<const Image> image, glm::vec4 color = { 0.f, 0.f, 0.f, 1.f },
+                                       std::source_location where = std::source_location::current());
+        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX,
+                                  std::source_location where = std::source_location::current());
+        CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size = UINT64_MAX, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0,
+                                  std::source_location where = std::source_location::current());
 
-        CommandBuffer& Blit(ResourceRef<const Image> srcImage, kor::Blit blitInfo = {});
-        CommandBuffer& Blit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo = {});
-        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo = {});
-        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo = {});
+        CommandBuffer& Blit(ResourceRef<const Image> srcImage, kor::Blit blitInfo = {}, std::source_location where = std::source_location::current());
+        CommandBuffer& Blit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo = {},
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo = {}, std::source_location where = std::source_location::current());
+        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo = {},
+                               std::source_location where = std::source_location::current());
 
         CommandBuffer& GenerateMipmaps(ResourceRef<const Image> image);
 
-        CommandBuffer& CopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo = {});
-        CommandBuffer& CopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo = {});
+        CommandBuffer& CopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo = {},
+                                         std::source_location where = std::source_location::current());
+        CommandBuffer& CopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo = {},
+                                         std::source_location where = std::source_location::current());
 
         virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
 
@@ -486,6 +444,104 @@ namespace kor
             return false;
         }
 
+        // ---- Deferred recording ---------------------------------------------
+        // A command does not reach the backend when it is called. It validates immediately —
+        // so a destroyed or poisoned resource still fails at the caller's line — and then parks
+        // an emit closure together with the set of resources it touches. End() walks that list
+        // twice: once to work out where barriers belong, once to emit everything in order.
+        //
+        // The lookahead is the whole point. A transition a draw needs often has to be emitted
+        // *before* the render pass containing that draw was opened (sample a shadow map that was
+        // rendered earlier in the frame), and Vulkan forbids a layout transition inside a render
+        // pass. Holding the commands lets the resolver insert the barrier at a legal point
+        // instead of breaking the pass apart.
+
+        // Where a command sits relative to a render pass, so the resolver knows which barriers
+        // have to be hoisted ahead of the record that opens one.
+        enum class PassEdge : glm::u8 { eNone, eOpens, eCloses };
+
+        // One resource a command touches, and how. Exactly one of buffer/image is set; the
+        // other is left default-constructed, for which alive() is false.
+        struct ResourceUse {
+            kor::ResourceRef<const Buffer> buffer;
+            kor::ResourceRef<const Image>  image;
+            ResourceAccess access = ResourceAccess::AllShaderRead;
+
+            // Image subresource range; nullopt means the whole image, matching ImageBarrier.
+            std::optional<glm::u32> baseMipLevel;
+            std::optional<glm::u32> levelCount;
+            std::optional<glm::u32> baseArrayLayer;
+            std::optional<glm::u32> layerCount;
+
+            // Buffer range.
+            glm::u64 offset = 0;
+            glm::u64 size = UINT64_MAX;
+        };
+
+        struct Record {
+            std::function<void()> emit;
+            std::vector<ResourceUse> uses;
+            PassEdge pass = PassEdge::eNone;
+            const char* command = "";
+            std::source_location where;
+            // This record *is* a barrier: its uses describe the state it establishes rather
+            // than state it requires. The resolver advances its tracking past them but emits
+            // nothing, which is what lets a hand-written Barrier() suppress the automatic one
+            // instead of doubling it.
+            bool transitions = false;
+            // This record runs shaders that dereference raw device addresses, so its `uses` are
+            // known to be incomplete: any buffer reached through a pointer is missing from them.
+            bool dereferencesDeviceAddresses = false;
+        };
+
+        /**
+         * @brief Park a command until End().
+         *
+         * While End() is emitting, the command runs in place instead. A command can be recorded
+         * from inside another command's emit — Run()'s lambda calls straight back into the API,
+         * and applyDynamicDefaults() reaches back through the virtual Set* overrides — and by
+         * then there is no recording left to join. Appending to _records mid-walk would also
+         * invalidate the walk. This mirrors the OpenGL backend's own `_executing` guard.
+         */
+        CommandBuffer& enqueue(const char* command, std::source_location where,
+                               std::vector<ResourceUse> uses, PassEdge pass,
+                               std::function<void()> emit, bool transitions = false,
+                               bool dereferencesDeviceAddresses = false);
+
+        /** @brief Whether the currently bound pipeline reaches buffers through device addresses. */
+        [[nodiscard]] bool boundPipelineUsesDeviceAddresses() const;
+
+        /**
+         * @brief Everything the currently bound descriptor sets and mesh will be touched for.
+         *
+         * Built at record time, when the bindings are known, and attached to the draw/dispatch
+         * record so the resolver can synchronise them. Bindings the entry point never reaches
+         * are skipped (Shader::Descriptor::active), as are samplers and acceleration
+         * structures, which name nothing an image or buffer barrier applies to.
+         */
+        [[nodiscard]] std::vector<ResourceUse> usesForBoundResources(bool includeMesh) const;
+
+        /** @brief Insert the barriers the recorded commands imply. Called by End(). */
+        void resolveBarriers();
+        /** @brief Run every record's emit closure in order. Called by End() after resolving. */
+        void emitRecords();
+        /** @brief Drop the recorded commands (called by Begin()/Reset()). */
+        void clearRecords() { _records.clear(); _emitting = false; resetTrackedState(); }
+
+        /**
+         * @brief Return the mirrored pipeline/binding state to where recording began.
+         *
+         * The backends advance _state from inside their do* implementations so their own
+         * emit-time decisions (which bind point a descriptor set belongs to, which dynamic
+         * states a draw still needs defaults for) see the values in force at *that* point in
+         * the sequence rather than at the end of recording. That replay only lands correctly
+         * if it starts from the same blank slate recording did.
+         */
+        void resetTrackedState();
+
+        std::vector<Record> _records;
+        bool _emitting = false;  // true while End() is walking _records
+
         // ---- Tracked-state updates ------------------------------------------
         // The state mutations the gated commands perform, split out from the gate itself so the
         // OpenGL backend can re-apply them at *replay* time as well as record time (it defers its
@@ -496,6 +552,11 @@ namespace kor
         void stateBindGraphicsPipeline(const ResourceRef<const GraphicsPipeline>& pipeline);
         void stateBindRayTracingPipeline(const ResourceRef<const RayTracingPipeline>& pipeline);
         void stateBindMesh(const ResourceRef<const Mesh>& mesh);
+        // Which set is bound where, for whichever pipeline type is currently bound. The
+        // backends record this too (inside their doBindDescriptorSet, so their own replay
+        // stays consistent); the core needs it at *record* time to know which resources a
+        // later draw will touch. Both are insert_or_assign, so applying twice is harmless.
+        void stateBindDescriptorSet(glm::u32 index, const ResourceRef<const DescriptorSet>& descriptorSet);
 
         // ---- Backend commands (non-virtual interface) -----------------------
         // Every command above that takes a resource is a non-virtual wrapper in the core: it

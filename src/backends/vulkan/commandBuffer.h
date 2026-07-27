@@ -57,12 +57,12 @@ namespace kor::vk
         kor::CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color) override;
         kor::CommandBuffer& EndDebugLabel() override;
         kor::CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color) override;
-        kor::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ) override;
+        kor::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) override;
         kor::CommandBuffer& doDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) override;
-        kor::CommandBuffer& TraceRays(glm::u32 width, glm::u32 height, glm::u32 depth) override;
-        kor::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance) override;
-        kor::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance) override;
-        kor::CommandBuffer& DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ) override;
+        kor::CommandBuffer& TraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where) override;
+        kor::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) override;
+        kor::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) override;
+        kor::CommandBuffer& DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) override;
         kor::CommandBuffer& doDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
         kor::CommandBuffer& doDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
         kor::CommandBuffer& doDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
@@ -86,6 +86,33 @@ namespace kor::vk
         void Reset() override;
 
         void WaitForFence() const override;
+
+    private:
+        // Park an emit closure as a core Record. Every override that talks to _handle goes
+        // through this: the base class has already validated and advanced its tracked state by
+        // the time we get here, and what remains is the GPU call itself, which must not happen
+        // until End() has worked out where the barriers belong.
+        // As defer(), but with the *caller's* source location rather than this header's.
+        // The device-address diagnostic quotes the file and line of the command it blames, so
+        // for anything that can appear in that report the location has to come from the user's
+        // call site, not from wherever the emit closure happened to be parked.
+        template<typename F>
+        kor::CommandBuffer& deferAt(const char* name, const std::source_location where, F&& emit,
+                                    const PassEdge pass = PassEdge::eNone,
+                                    std::vector<ResourceUse> uses = {},
+                                    const bool dereferencesDeviceAddresses = false) {
+            return enqueue(name, where, std::move(uses), pass, std::forward<F>(emit),
+                           /*transitions=*/false, dereferencesDeviceAddresses);
+        }
+
+        template<typename F>
+        kor::CommandBuffer& defer(const char* name, F&& emit,
+                                  const PassEdge pass = PassEdge::eNone,
+                                  std::vector<ResourceUse> uses = {},
+                                  const bool dereferencesDeviceAddresses = false) {
+            return enqueue(name, std::source_location::current(), std::move(uses), pass,
+                           std::forward<F>(emit), /*transitions=*/false, dereferencesDeviceAddresses);
+        }
 
     protected:
         kor::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;

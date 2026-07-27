@@ -656,6 +656,13 @@ namespace kor
          };
 
         [[nodiscard]] glm::u64 getSize() const { return _size; }
+
+        // ---- Automatic barriers ---------------------------------------------
+        // The access this buffer was last synchronised for; see Image::getTrackedAccess for
+        // why it lives in the core and how long it is valid. nullopt means never
+        // synchronised, so the first use always emits a barrier.
+        [[nodiscard]] std::optional<ResourceAccess> getTrackedAccess() const { return _trackedAccess; }
+        void setTrackedAccess(const ResourceAccess access) const { _trackedAccess = access; }
         [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
         [[nodiscard]] Type getType() const { return _type; }
 
@@ -690,6 +697,8 @@ namespace kor
         }
 
     protected:
+        mutable std::optional<ResourceAccess> _trackedAccess;
+
         explicit Buffer(const RawBuilder& createInfo);
 
         [[nodiscard]] static glm::i64 toBuilderSize(const glm::u64 bytes, const char* op) {

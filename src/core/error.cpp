@@ -30,6 +30,7 @@ namespace kor
         case ErrorCode::eImageSubresourceOutOfRange: return "eImageSubresourceOutOfRange";
         case ErrorCode::eResolveRequiresMultisample: return "eResolveRequiresMultisample";
         case ErrorCode::eRayTracingUnsupported:      return "eRayTracingUnsupported";
+        case ErrorCode::eMissingBarrier:             return "eMissingBarrier";
         case ErrorCode::eMissingShaderStage:         return "eMissingShaderStage";
         case ErrorCode::eShaderStageMismatch:        return "eShaderStageMismatch";
         case ErrorCode::eDescriptorConflict:         return "eDescriptorConflict";
@@ -76,6 +77,8 @@ namespace kor
             return "Resolve needs a multisampled source and a single-sampled destination.";
         case ErrorCode::eRayTracingUnsupported:
             return "Ray tracing is not supported on the active backend.";
+        case ErrorCode::eMissingBarrier:
+            return "A hazard the engine cannot see was left unguarded; add an explicit Barrier().";
         case ErrorCode::eMissingShaderStage:
             return "The pipeline is missing a required shader stage.";
         case ErrorCode::eShaderStageMismatch:

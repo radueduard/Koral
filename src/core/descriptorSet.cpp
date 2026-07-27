@@ -92,6 +92,19 @@ namespace kor
         }
     }
 
+    ResourceRef<const Buffer> Descriptor::getBufferRef() const {
+        if (!valid) return {};
+        if (const auto* buffer = std::get_if<BufferDescriptor>(&_descriptor)) return buffer->_buffer;
+        return {};
+    }
+
+    ResourceRef<const ImageView> Descriptor::getImageViewRef() const {
+        if (!valid) return {};
+        if (const auto* image = std::get_if<ImageDescriptor>(&_descriptor)) return image->_imageView;
+        if (const auto* combined = std::get_if<CombinedImageSamplerDescriptor>(&_descriptor)) return combined->_imageView;
+        return {};
+    }
+
     const Buffer & Descriptor::getBuffer() const {
         if (!valid) {
             kor::log::error("Attempted to get buffer from an invalid descriptor!");

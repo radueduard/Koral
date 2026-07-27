@@ -68,12 +68,35 @@ namespace kor
             }
         };
 
+        // How a shader reaches a descriptor's resource. Uniform buffers, sampled images and
+        // acceleration structures are read-only by construction; only storage buffers and
+        // storage images can be written, and which of the three they are is carried by the
+        // NonReadable/NonWritable decorations SPIR-V puts on them. A producer is allowed to
+        // omit those decorations, in which case we read eReadWrite: conservative, so the
+        // barrier that comes out is stronger than necessary but never weaker.
+        enum class AccessKind : glm::u8 {
+            eRead,
+            eWrite,
+            eReadWrite,
+        };
+
         struct KORAL_API Descriptor {
             DescriptorType type;
             std::string name;
             glm::u32 count;
             Flags<Stage> stages;
+            AccessKind access = AccessKind::eRead;
+            // Whether the entry point actually reaches this binding. A declared-but-unused
+            // binding still belongs in the layout — pruning it would change the descriptor
+            // set layout and orphan any set that writes to it — but it needs no barrier,
+            // so the resolver skips it.
+            bool active = true;
 
+            // Identity is the *interface* only: type, name, count. Access is a function of
+            // the type and adds nothing to compare, and stages are unioned across shaders
+            // rather than compared. Keeping this narrow is what lets Pipeline::buildLayouts
+            // recognise an unchanged set across a shader reload and keep the existing
+            // layout object alive, along with every descriptor set built from it.
             auto operator<=>(const Descriptor& other) const {
                 return std::tie(type, name, count) <=> std::tie(other.type, other.name, other.count);
             }
@@ -229,6 +252,17 @@ namespace kor
 
         const MemoryLayout& getMemoryLayout() const { return _memoryLayout; }
 
+        /**
+         * @brief Whether this shader reaches buffers through raw device addresses.
+         *
+         * Declared via SPIR-V's PhysicalStorageBufferAddresses capability, which is what a
+         * buffer_reference / BufferPointer in the source compiles to. Reflection can say that
+         * such dereferences happen but not *which* buffer any of them lands on, so the engine
+         * cannot synchronise them: this flag is what lets it say so out loud instead of
+         * silently under-synchronising. See CommandBuffer::resolveBarriers.
+         */
+        [[nodiscard]] bool usesDeviceAddresses() const { return _usesDeviceAddresses; }
+
         glm::u64 RegisterReloadCallback(const std::function<void()>& callback) {
             static std::random_device rd;
             static std::mt19937_64 gen(rd());
@@ -262,6 +296,7 @@ namespace kor
 
         std::vector<glm::u32> _spirvCode;
         MemoryLayout _memoryLayout;
+        bool _usesDeviceAddresses = false;
 
         // Opaque hot-reload watch state (its concrete type lives in core/shader.cpp). Held here
         // so it shares the shader's lifetime: when the shader dies, the watch state dies with it
