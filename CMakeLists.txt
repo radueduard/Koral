@@ -147,20 +147,30 @@ message(STATUS "Using Vulkan loader:  ${Vulkan_LIBRARIES}")
 # ---------------------------------------------------------------------------
 # Runtime Vulkan loader.
 #
-# We *link* the vcpkg-built Vulkan-Loader; we do not ship it. The manifest requests
-# its WSI features (Wayland + XCB + Xlib on Linux, Win32 is always built; macOS needs
-# no loader feature — MoltenVK supplies its own Metal surface extension as an ICD),
-# so builds and tests create surfaces on every platform with no system SDK installed.
+# We link the vcpkg-built Vulkan-Loader. The manifest requests its WSI features
+# (Wayland + XCB + Xlib on Linux, Win32 is always built; macOS needs no loader
+# feature — MoltenVK supplies its own Metal surface extension as an ICD), so builds
+# and tests create surfaces on every platform with no system SDK installed.
 #
-# Shipping it is a different question, and the answer is no. A loader has to match the
-# machine it runs on — its ICD manifests, its driver interface version, and above all
-# its *implicit* layers (Steam overlay, gamescope WSI, …), which were built against
-# whatever loader that machine has. Ours, given priority by the $ORIGIN RPATH, made
-# packages that ran perfectly on the build box segfault inside libvulkan elsewhere.
-# The install step therefore excludes it (see POST_EXCLUDE_REGEXES further down) and
-# the shipped binary resolves the system loader by SONAME, like every other Vulkan
-# application. macOS is the one exception — there is no system loader there, so
-# MoltenVK is installed deliberately rather than swept in.
+# Whether it gets *shipped* depends on which archive, and the two answers differ:
+#
+#   SDK      — yes. libKoral.so carries DT_NEEDED libvulkan.so.1, so anyone linking
+#              against it needs the loader resolvable at link time. Dropping it from
+#              the install tree broke the standalone-consumer check outright: the
+#              release container has no system loader, so ld had nothing to resolve
+#              vkCreateInstance and its ~40 friends against.
+#
+#   runtime  — no, on Linux and Windows. A loader has to match the machine it runs on:
+#              its ICD manifests, its driver interface version, and above all its
+#              *implicit* layers (Steam overlay, gamescope WSI, …), which were built
+#              against whatever loader that machine ships. Ours, given priority by the
+#              $ORIGIN RPATH, is how a package that runs perfectly on the build box
+#              segfaults inside libvulkan on someone else's desktop. The Package step
+#              in .github/workflows/release.yml strips it from the runtime archive;
+#              both loaders have SONAME libvulkan.so.1 and the loader ABI is stable, so
+#              the binary then resolves the system one like every other Vulkan app.
+#              macOS is exempt — there is no system loader there, so the runtime archive
+#              keeps it alongside the MoltenVK ICD installed below.
 #
 # Bundled layer manifest dir (from vcpkg) is handed to the runtime as a compile
 # definition below so it can add it to the loader's search paths at startup —
@@ -535,21 +545,6 @@ install(CODE [[
                 "^/(usr|lib|lib32|lib64)/"          # Linux system libraries
                 "^/System/Library/" "^/usr/lib/"    # macOS system libraries
                 "[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\]" # Windows system DLLs
-                # The Vulkan loader is the user's, never ours. We link the vcpkg copy so the
-                # build and the tests get WSI and bundled validation layers with no system SDK
-                # installed, but that is a *build-tree* convenience: at runtime the loader has to
-                # be the one that matches the machine's ICD manifests, driver interface version,
-                # and — the part that actually bites — its implicit layers (Steam overlay,
-                # gamescope WSI, and friends), which were built against *that* loader. Shipping
-                # ours next to libKoral, where $ORIGIN gives it priority, is how a package that
-                # runs perfectly here segfaults inside libvulkan on someone else's desktop.
-                #
-                # Dropping it is safe and needs no other change: both loaders have SONAME
-                # libvulkan.so.1 and the loader ABI is stable and backward compatible, so the
-                # binary simply resolves the system one, exactly like every other Vulkan app.
-                # macOS is the exception — there is no system loader, so MoltenVK is installed
-                # deliberately further up rather than swept in here.
-                "libvulkan\\.so" "vulkan-1\\.dll"
     )
 
     # Koral_Runtime links libKoral, so Koral resolves as a dependency of itself. install(TARGETS)

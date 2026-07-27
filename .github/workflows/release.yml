@@ -377,6 +377,24 @@ jobs:
           cp -r stage/share "$runtime/"
           rm -rf "$runtime/lib/cmake" "$runtime/lib/koral-vendor"   # SDK-only, dead weight here
 
+          # Drop the Vulkan loader from the *runtime* archive — but not the SDK, which needs it
+          # to link (libKoral carries DT_NEEDED libvulkan.so.1, and a consumer's machine may have
+          # no Vulkan SDK; the release container itself does not).
+          #
+          # A loader has to match the machine it runs on: its ICD manifests, its driver interface
+          # version, and above all its implicit layers — Steam overlay, gamescope WSI — which were
+          # built against whatever loader that machine ships. Ours, sitting beside libKoral where
+          # the $ORIGIN RPATH gives it priority, is why binaries built on one desktop segfaulted
+          # inside libvulkan on others while building from source on those machines was fine.
+          # Both loaders have SONAME libvulkan.so.1 and the loader ABI is stable, so removing ours
+          # just makes the binary resolve the system one.
+          #
+          # macOS is exempt on purpose: there is no system loader there, so the runtime archive
+          # has to carry it next to the MoltenVK ICD or nothing starts.
+          if [ "${{ runner.os }}" != "macOS" ]; then
+            rm -f "$runtime"/lib/libvulkan.so* "$runtime"/bin/vulkan-1.dll "$runtime"/lib/vulkan-1.dll
+          fi
+
           # Linux only: ship the C++ runtime alongside the binary.
           #
           # The container builds with GCC 14, so the library needs GLIBCXX_3.4.33. glibc 2.35 is
