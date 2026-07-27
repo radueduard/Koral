@@ -147,12 +147,20 @@ message(STATUS "Using Vulkan loader:  ${Vulkan_LIBRARIES}")
 # ---------------------------------------------------------------------------
 # Runtime Vulkan loader.
 #
-# We link and ship the vcpkg-built Vulkan-Loader. The manifest requests its WSI
-# features (Wayland + XCB + Xlib on Linux, Win32 is always built; macOS needs no
-# loader feature — MoltenVK supplies its own Metal surface extension as an ICD),
-# so this one loader creates surfaces on every platform and still discovers the
-# user's installed ICDs/drivers and layers through the standard search paths +
-# env vars. No system loader or LD_LIBRARY_PATH override needed.
+# We *link* the vcpkg-built Vulkan-Loader; we do not ship it. The manifest requests
+# its WSI features (Wayland + XCB + Xlib on Linux, Win32 is always built; macOS needs
+# no loader feature — MoltenVK supplies its own Metal surface extension as an ICD),
+# so builds and tests create surfaces on every platform with no system SDK installed.
+#
+# Shipping it is a different question, and the answer is no. A loader has to match the
+# machine it runs on — its ICD manifests, its driver interface version, and above all
+# its *implicit* layers (Steam overlay, gamescope WSI, …), which were built against
+# whatever loader that machine has. Ours, given priority by the $ORIGIN RPATH, made
+# packages that ran perfectly on the build box segfault inside libvulkan elsewhere.
+# The install step therefore excludes it (see POST_EXCLUDE_REGEXES further down) and
+# the shipped binary resolves the system loader by SONAME, like every other Vulkan
+# application. macOS is the one exception — there is no system loader there, so
+# MoltenVK is installed deliberately rather than swept in.
 #
 # Bundled layer manifest dir (from vcpkg) is handed to the runtime as a compile
 # definition below so it can add it to the loader's search paths at startup —
@@ -240,6 +248,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
 target_link_libraries(${PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
 
+# Declared here rather than beside the shader/asset paths it was written for, because the
+# validation-layer path just below is the same kind of dev-only absolute path and needs to test
+# it. An option() has to precede every use: read before its declaration it is simply empty, which
+# would silently take the distribution branch in a development build.
+option(KORAL_EMBED_SOURCE_PATHS
+       "Bake the source-tree shader/asset paths in as a development fallback (OFF for distribution)" ON)
+
 # Hand the vcpkg-bundled layer/ICD manifest dirs to the runtime so it can add them
 # to the loader's search paths at startup (see runtime.cpp). This makes validation
 # available with no system Vulkan SDK; on macOS it also points the loader at the
@@ -252,8 +267,18 @@ file(GLOB_RECURSE KORAL_VK_LAYER_MANIFEST
 if(KORAL_VK_LAYER_MANIFEST)
     list(GET KORAL_VK_LAYER_MANIFEST 0 KORAL_VK_LAYER_MANIFEST0)
     get_filename_component(KORAL_VK_LAYER_DIR "${KORAL_VK_LAYER_MANIFEST0}" DIRECTORY)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE KORAL_VK_LAYER_PATH="${KORAL_VK_LAYER_DIR}")
-    message(STATUS "Bundled Vulkan validation layers: ${KORAL_VK_LAYER_DIR}")
+    # Dev builds only — same reasoning as KORAL_EMBED_SOURCE_PATHS below, and the same failure
+    # mode: this is an absolute path into *this* machine's build tree, which on a user's machine
+    # names nothing. Harmless there (VK_ADD_LAYER_PATH pointing at a missing directory is
+    # ignored), but a shipped binary should not carry the build machine's filesystem layout, and
+    # a distribution build gets its validation layers from the user's own Vulkan SDK if they
+    # have one.
+    if(KORAL_EMBED_SOURCE_PATHS)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE KORAL_VK_LAYER_PATH="${KORAL_VK_LAYER_DIR}")
+        message(STATUS "Bundled Vulkan validation layers: ${KORAL_VK_LAYER_DIR}")
+    else()
+        message(STATUS "Distribution build: not baking in the bundled validation-layer path")
+    endif()
 else()
     message(WARNING "vcpkg validation-layer manifest not found under ${KORAL_VK_SHARE_DIR}; "
             "portable validation will be unavailable (loader still finds a system SDK if present).")
@@ -344,8 +369,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC $<$<CXX_COMPILER_ID:GNU>:stdc++exp>
 # and wrong for a shipped one: it is an absolute path on the machine that compiled the binary, which
 # on a user's machine names nothing. Release/CI builds turn it off, and then the only way Koral finds
 # its data is the install layout — which is exactly what we want to be testing.
-option(KORAL_EMBED_SOURCE_PATHS
-       "Bake the source-tree shader/asset paths in as a development fallback (OFF for distribution)" ON)
 
 if(KORAL_EMBED_SOURCE_PATHS)
     set(KORAL_ASSETS_PATH "${CMAKE_SOURCE_DIR}/assets/")
@@ -512,6 +535,21 @@ install(CODE [[
                 "^/(usr|lib|lib32|lib64)/"          # Linux system libraries
                 "^/System/Library/" "^/usr/lib/"    # macOS system libraries
                 "[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\]" # Windows system DLLs
+                # The Vulkan loader is the user's, never ours. We link the vcpkg copy so the
+                # build and the tests get WSI and bundled validation layers with no system SDK
+                # installed, but that is a *build-tree* convenience: at runtime the loader has to
+                # be the one that matches the machine's ICD manifests, driver interface version,
+                # and — the part that actually bites — its implicit layers (Steam overlay,
+                # gamescope WSI, and friends), which were built against *that* loader. Shipping
+                # ours next to libKoral, where $ORIGIN gives it priority, is how a package that
+                # runs perfectly here segfaults inside libvulkan on someone else's desktop.
+                #
+                # Dropping it is safe and needs no other change: both loaders have SONAME
+                # libvulkan.so.1 and the loader ABI is stable and backward compatible, so the
+                # binary simply resolves the system one, exactly like every other Vulkan app.
+                # macOS is the exception — there is no system loader, so MoltenVK is installed
+                # deliberately further up rather than swept in here.
+                "libvulkan\\.so" "vulkan-1\\.dll"
     )
 
     # Koral_Runtime links libKoral, so Koral resolves as a dependency of itself. install(TARGETS)
