@@ -55,6 +55,7 @@ namespace kor
         {
             std::optional<std::string> api;
             std::optional<std::string> platform;   // Linux windowing system: "auto" | "x11" | "wayland"
+            std::optional<std::string> gpu;        // device index or name substring; Vulkan only
             std::optional<WindowDocument> window;
         };
 
@@ -175,6 +176,11 @@ namespace kor
                         return invalid(std::format("'rendering.platform' is '{}'; expected 'auto', 'x11' or 'wayland'", *r.platform));
                     config.platform = *parsed;
                 }
+
+                // Not validated here: whether it names a real device is only knowable once the
+                // Vulkan instance exists, and an unmatched preference falls back to the automatic
+                // choice there rather than stopping the run.
+                if (r.gpu) config.gpu = *r.gpu;
 
                 if (r.window) {
                     const auto& w = *r.window;
@@ -313,6 +319,11 @@ namespace kor
                     return invalid(std::format("--platform expects 'auto', 'x11' or 'wayland', got '{}'", text));
                 platform = *parsed;
             }
+            else if (arg == "--gpu") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --gpu");
+                gpu = text;
+            }
             else if (arg == "--imgui-ini") {
                 std::string_view text;
                 if (!value(text)) return invalid("missing value for --imgui-ini");
@@ -398,6 +409,7 @@ namespace kor
             "  --height <n>        Window height\n"
             "  --api <name>        Graphics backend: Vulkan or OpenGL\n"
             "  --platform <name>   Linux windowing system: auto, x11 or wayland\n"
+            "  --gpu <which>       GPU to use: an index from the startup listing, or part of a device name (Vulkan only)\n"
             "  --imgui-ini <file>  Where ImGui saves its layout (default: beside koral.json)\n"
             "  --fullscreen        Open fullscreen             (--no-fullscreen)\n"
             "  --resizable         Allow the window to resize  (--no-resizable)\n"

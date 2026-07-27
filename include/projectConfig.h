@@ -29,6 +29,7 @@
  *   "rendering": {
  *     "api": "Vulkan",
  *     "platform": "auto",
+ *     "gpu": "radeon",
  *     "window": {
  *       "width": 1280, "height": 720,
  *       "resizable": true, "fullscreen": false, "borderless": false,
@@ -102,6 +103,15 @@ namespace kor
         glm::uvec2 extent = { 1280, 720 };
         API api = API::eVulkan;
         WindowPlatform platform = WindowPlatform::eAuto;  // Linux windowing system; ignored elsewhere
+
+        /**
+         * @brief Which GPU the Vulkan backend should use. Empty (the default) keeps the automatic
+         * choice — the best suitable device, discrete first. Otherwise an index into the device
+         * list the runtime logs at startup, or a case-insensitive substring of a device name
+         * ("radeon", "GeForce RTX 4070"). A preference that matches nothing falls back to the
+         * automatic choice with a warning. The OpenGL backend cannot choose a device; ignored there.
+         */
+        std::string gpu;
         bool fullscreen = false;
         bool resizable = false;
         bool decorated = true;
@@ -137,7 +147,8 @@ namespace kor
          *
          * @p args are the arguments alone — no program name, no scene library. Recognised flags:
          * `--width N`, `--height N`, `--title S`, `--api Vulkan|OpenGL`,
-         * `--platform auto|x11|wayland` (Linux only), `--imgui-ini FILE`, `--assets DIR`,
+         * `--platform auto|x11|wayland` (Linux only), `--gpu INDEX|NAME` (Vulkan only),
+         * `--imgui-ini FILE`, `--assets DIR`,
          * `--shaders DIR` (both repeatable, both prepended so the last one given is searched first),
          * and the booleans `--fullscreen`, `--resizable`, `--borderless`, `--transparent`, `--vsync`
          * with their counterparts (`--no-fullscreen`, `--no-resizable`, `--decorated`,

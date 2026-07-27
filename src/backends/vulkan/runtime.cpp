@@ -3,9 +3,13 @@
 //
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "runtime.h"
+#include <context.h>
 #include <framebuffer.h>
 #include <surface.h>
 
+#include <algorithm>
+#include <cctype>
+#include <charconv>
 #include <cstdlib>
 #include <iostream>
 #include <ranges>
@@ -300,18 +304,77 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             return false;
         });
 
+        std::vector<std::unique_ptr<PhysicalDevice>> candidates;
+        candidates.reserve(physicalDevices.size());
         for (const auto& physicalDeviceCandidate : physicalDevices) {
-            if (auto physicalDevice = std::make_unique<PhysicalDevice>(physicalDeviceCandidate); physicalDevice->isSuitable())
-            {
-                std::cout << "Selected physical device: " << physicalDevice->getProperties().deviceName << std::endl;
-                std::cout << "Device type: " << ::vk::to_string(physicalDevice->getProperties().deviceType) << std::endl;
+            candidates.push_back(std::make_unique<PhysicalDevice>(physicalDeviceCandidate));
+        }
 
-                _physicalDevice = std::move(physicalDevice);
+        // The list the user picks from: --gpu / rendering.gpu by index means an index into
+        // exactly this listing, so it is always printed, preference or not.
+        for (std::size_t i = 0; i < candidates.size(); ++i) {
+            const auto& properties = candidates[i]->getProperties();
+            kor::log::info("[vulkan] GPU {}: {} ({}){}", i,
+                           std::string_view(properties.deviceName.data()),
+                           ::vk::to_string(properties.deviceType),
+                           candidates[i]->isSuitable() ? "" : " — missing required capabilities");
+        }
+
+        const auto select = [this] (std::unique_ptr<PhysicalDevice>& candidate) {
+            const auto& properties = candidate->getProperties();
+            kor::log::info("[vulkan] Selected physical device: {} ({})",
+                           std::string_view(properties.deviceName.data()),
+                           ::vk::to_string(properties.deviceType));
+            _physicalDevice = std::move(candidate);
+        };
+
+        // An explicit preference (koral.json rendering.gpu, --gpu, or kor::setPreferredGpu):
+        // an index into the listing above, or a case-insensitive substring of a device name.
+        // A preference that cannot be honoured falls back to the automatic choice rather than
+        // refusing to start — it is reported loudly instead.
+        if (const std::string& preference = kor::preferredGpu(); !preference.empty()) {
+            std::size_t index = 0;
+            const auto [end, ec] = std::from_chars(preference.data(), preference.data() + preference.size(), index);
+            if (ec == std::errc{} && end == preference.data() + preference.size()) {
+                if (index >= candidates.size()) {
+                    kor::log::warn("[vulkan] GPU index {} is out of range ({} device{} present) — falling back to automatic selection.",
+                                   index, candidates.size(), candidates.size() == 1 ? "" : "s");
+                } else if (!candidates[index]->isSuitable()) {
+                    kor::log::warn("[vulkan] GPU {} ({}) is missing required capabilities — falling back to automatic selection.",
+                                   index, std::string_view(candidates[index]->getProperties().deviceName.data()));
+                } else {
+                    select(candidates[index]);
+                    return;
+                }
+            } else {
+                const auto containsIgnoringCase = [] (const std::string_view haystack, const std::string_view needle) {
+                    return !std::ranges::search(haystack, needle, [] (const char a, const char b) {
+                        return std::tolower(static_cast<unsigned char>(a)) ==
+                               std::tolower(static_cast<unsigned char>(b));
+                    }).empty();
+                };
+
+                bool matchedUnsuitable = false;
+                for (auto& candidate : candidates) {
+                    const std::string_view name(candidate->getProperties().deviceName.data());
+                    if (!containsIgnoringCase(name, preference)) continue;
+                    if (!candidate->isSuitable()) { matchedUnsuitable = true; continue; }
+                    select(candidate);
+                    return;
+                }
+                if (matchedUnsuitable)
+                    kor::log::warn("[vulkan] Every GPU matching '{}' is missing required capabilities — falling back to automatic selection.", preference);
+                else
+                    kor::log::warn("[vulkan] No GPU matches '{}' — falling back to automatic selection.", preference);
+            }
+        }
+
+        for (auto& candidate : candidates) {
+            if (candidate->isSuitable()) {
+                select(candidate);
                 return;
             }
         }
-        if (!_physicalDevice) {
-            throw std::runtime_error("Failed to find a suitable physical device!");
-        }
+        throw std::runtime_error("Failed to find a suitable physical device!");
     }
 }

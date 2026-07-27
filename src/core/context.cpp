@@ -54,6 +54,15 @@ namespace {
     }
 
     // Process-wide, and deliberately not an inline static in the header: the executable and the
+    // shared library would then each get their own copy, and a preference set by one would be
+    // invisible to the other. Same rule as assetSearchPathsStorage below.
+    std::string& preferredGpuStorage()
+    {
+        static std::string preference;
+        return preference;
+    }
+
+    // Process-wide, and deliberately not an inline static in the header: the executable and the
     // shared library would then each get their own copy, and a root registered by one would be
     // invisible to the other.
     std::vector<std::filesystem::path>& assetSearchPathsStorage()
@@ -64,6 +73,16 @@ namespace {
             kor::detail::dataRoots("assets", "KORAL_ASSETS_DIR", ASSETS_PATH);
         return paths;
     }
+}
+
+void kor::setPreferredGpu(const std::string_view preference)
+{
+    preferredGpuStorage() = preference;
+}
+
+const std::string& kor::preferredGpu()
+{
+    return preferredGpuStorage();
 }
 
 void kor::addAssetSearchPath(const std::filesystem::path& dir, const bool front)

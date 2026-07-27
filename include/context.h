@@ -5,6 +5,8 @@
 #pragma once
 #include "api.h"
 #include <filesystem>
+#include <string>
+#include <string_view>
 #include <vector>
 
 #include "task.h"
@@ -45,6 +47,26 @@ namespace kor {
 
     /** @brief The asset search roots, in the order assetPath() consults them. */
     KORAL_API const std::vector<std::filesystem::path>& assetSearchPaths();
+
+    /**
+     * @brief Which GPU the Vulkan backend should pick, instead of its automatic choice.
+     *
+     * @p preference is either an index into the list the runtime logs at startup
+     * ("[vulkan] GPU 0: ..."), or a case-insensitive substring of a device name ("radeon",
+     * "GeForce RTX 4070"). Empty restores the automatic choice (best suitable device,
+     * discrete first). A preference that matches nothing, or matches a device missing a
+     * required capability, is reported and the automatic choice is used instead — it never
+     * turns a startable run into a failed one.
+     *
+     * Must be set before the device exists — i.e. before the window is built or
+     * Context::InitHeadless runs. The runtime sets this from `rendering.gpu` in koral.json
+     * or the `--gpu` flag; call it directly only when embedding Koral without the runtime.
+     * The OpenGL backend cannot choose a device and ignores this.
+     */
+    KORAL_API void setPreferredGpu(std::string_view preference);
+
+    /** @brief The preference set by @ref setPreferredGpu; empty means automatic. */
+    KORAL_API const std::string& preferredGpu();
 
     enum class API {
         eOpenGL,

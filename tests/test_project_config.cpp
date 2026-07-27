@@ -231,6 +231,40 @@ TEST(ProjectConfig, UnknownPlatformFlagValueIsAnError)
     EXPECT_NE(result.error().message.find("mir"), std::string::npos);
 }
 
+TEST(ProjectConfig, ReadsTheGpuPreference)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
+    EXPECT_EQ(config.gpu, "radeon");
+}
+
+TEST(ProjectConfig, GpuDefaultsToEmptyAndIsLeftAloneWhenAbsent)
+{
+    ProjectConfig config;                              // default
+    EXPECT_TRUE(config.gpu.empty());
+    config.gpu = "radeon";
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    EXPECT_EQ(config.gpu, "radeon") << "an absent key must not reset it";
+}
+
+TEST(ProjectConfig, GpuFlagOverridesTheFile)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
+    ASSERT_TRUE(override_(config, { "--gpu", "1" }));
+    EXPECT_EQ(config.gpu, "1");
+}
+
+TEST(ProjectConfig, MissingGpuFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--gpu" });
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
+    EXPECT_NE(result.error().message.find("--gpu"), std::string::npos);
+}
+
 TEST(ProjectConfig, ImguiIniResolvesAgainstTheConfigDirectory)
 {
     ProjectConfig config;
