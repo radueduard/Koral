@@ -5,6 +5,7 @@
 #include "gui.h"
 
 #include "context.h"
+#include "scene.h"
 #include "window.h"
 #include "framebuffer.h"
 #include "surface.h"
@@ -15,11 +16,104 @@
 #include <imgui.h>
 // #include <imguizmo.h>
 
+#include <algorithm>
 #include <iostream>
+#include <optional>
+#include <string_view>
+#include <vector>
 #include <GLFW/glfw3.h>
 
 #include "commandBuffer.h"
+#include "input.h"
+#include "log.h"
+#include "module.h"
 #include <IconsFontAwesome6.h>
+
+namespace
+{
+    // Every module that includes gui.h registers its copy of ImGui here as it loads — Koral itself,
+    // the runtime, and above all the scene library. See the header for why this exists.
+    //
+    // The entries hold function pointers *into* those modules, so they are only valid while the
+    // module is loaded. Nothing unloads a scene today (LoadLibrary/dlopen hand out a handle that is
+    // never closed), and a scene that could be unloaded would have to deregister here first.
+    std::vector<kor::detail::ImGuiModule>& imguiModules()
+    {
+        static std::vector<kor::detail::ImGuiModule> modules;
+        return modules;
+    }
+
+    // Sharing one ImGuiContext between two separately compiled copies of ImGui is only safe if both
+    // agree on its layout. The version string alone does not prove that: the docking branch Koral
+    // builds against reports the same "1.91.9" as the stock one while laying ImGuiIO out
+    // differently, so a scene that found its own imgui through its own vcpkg would silently scribble
+    // over the context. The struct sizes catch that; they are what IMGUI_CHECKVERSION() compares.
+    bool layoutMatches(const kor::detail::ImGuiModule& imguiModule)
+    {
+        return std::string_view(imguiModule.version) == IMGUI_VERSION
+            && imguiModule.sizeOfIO == sizeof(ImGuiIO)
+            && imguiModule.sizeOfStyle == sizeof(ImGuiStyle)
+            && imguiModule.sizeOfVec2 == sizeof(ImVec2)
+            && imguiModule.sizeOfVec4 == sizeof(ImVec4)
+            && imguiModule.sizeOfDrawVert == sizeof(ImDrawVert)
+            && imguiModule.sizeOfDrawIdx == sizeof(ImDrawIdx);
+    }
+
+    // Point one module's ImGui globals at our context and allocators. Passing a null context is how
+    // Shutdown() takes it back, so nothing keeps a dangling pointer to a destroyed context.
+    void bindImGuiModule(const kor::detail::ImGuiModule& imguiModule, ImGuiContext* context)
+    {
+        if (context)
+        {
+            if (!layoutMatches(imguiModule))
+            {
+                kor::log::error("[gui] a loaded library was built against a different ImGui than Koral "
+                                "(it reports {}, ImGuiIO {} bytes; Koral has {}, {} bytes). Its ImGui "
+                                "calls are left unbound rather than share a context that would be read "
+                                "as a different layout. Build the scene against the ImGui the SDK "
+                                "ships (same version *and* the docking feature) and it will bind.",
+                                imguiModule.version, imguiModule.sizeOfIO, IMGUI_VERSION, sizeof(ImGuiIO));
+                return;
+            }
+
+            // Allocators first: from here on the module allocates ImGui objects through the same
+            // functions we free them with. Both sides use the process CRT today, so a mismatch is
+            // survivable, but only by accident — SetAllocatorFunctions is the guarantee.
+            ImGuiMemAllocFunc allocFunc = nullptr;
+            ImGuiMemFreeFunc freeFunc = nullptr;
+            void* userData = nullptr;
+            ImGui::GetAllocatorFunctions(&allocFunc, &freeFunc, &userData);
+            imguiModule.setAllocatorFunctions(allocFunc, freeFunc, userData);
+        }
+
+        imguiModule.setCurrentContext(context);
+    }
+
+    void bindImGuiModules(ImGuiContext* context)
+    {
+        for (const auto& imguiModule : imguiModules())
+            bindImGuiModule(imguiModule, context);
+    }
+}
+
+void kor::detail::registerImGuiModule(const ImGuiModule& imguiModule)
+{
+    auto& modules = imguiModules();
+
+    // The registrar is an inline variable, so it is constructed once per module — but a module that
+    // shares Koral's ImGui (every ELF/Mach-O one) reports the identical pointers, and registering
+    // it twice would leave a duplicate entry to bind on every future load.
+    const auto sameCopy = [&](const ImGuiModule& known) { return known.setCurrentContext == imguiModule.setCurrentContext; };
+    if (std::ranges::any_of(modules, sameCopy))
+        return;
+
+    modules.push_back(imguiModule);
+
+    // Registration normally happens while the module loads, long before there is a context to hand
+    // out; GUI::Init() picks these up. A module that arrives after the GUI is up is bound here.
+    if (ImGui::GetCurrentContext())
+        bindImGuiModule(imguiModule, ImGui::GetCurrentContext());
+}
 
 ImFont* AddFont(const std::filesystem::path& path, const float size)
 {
@@ -141,23 +235,79 @@ void kor::GUI::DefineStyle()
 }
 
 
+namespace
+{
+    // Every handle that has been made and not yet destroyed.
+    //
+    // Refs, not owners: a handle belongs to whoever created it, and one that is dropped disappears
+    // from here on the next frame. Process-wide and in this translation unit rather than inline in
+    // the header, so a handle created by a scene or a module lands in the same list the GUI walks.
+    // @see kor::GUI_Image::refresh
+    std::vector<kor::ResourceRef<kor::GUI_Image>>& liveImages()
+    {
+        static std::vector<kor::ResourceRef<kor::GUI_Image>> images;
+        return images;
+    }
+
+    /**
+     * @brief Stops the interface chasing a pointer that is not moving.
+     *
+     * A captured cursor is parked: the OS pointer does not move and only the movement is reported.
+     * GLFW still delivers a position, though — an ever-growing virtual one — and the ImGui backend
+     * takes it at face value, so within a few frames of aiming a camera the interface believes the
+     * pointer has slid off the screen. Whatever the scene keyed on hovering, including the viewport
+     * that captured the mouse in the first place, then stops being hovered and hands the cursor
+     * back: the capture lets go by itself, and the faster the mouse moves the sooner it happens.
+     *
+     * So while the cursor is captured the interface is told, once per frame, that the pointer is
+     * exactly where it was when the capture began. Queued as an event rather than written to
+     * io.MousePos, so ImGui's own NewFrame derives a zero delta from it as it would from any other.
+     */
+    void freezePointerWhileCaptured()
+    {
+        // Where the pointer was when the capture began; empty while nothing is captured.
+        static std::optional<ImVec2> parked;
+
+        ImGuiIO& io = ImGui::GetIO();
+        if (kor::Input::getCursorMode() != kor::Input::CursorMode::eCaptured) {
+            parked.reset();
+            return;
+        }
+
+        if (!parked) parked = io.MousePos;
+        io.AddMousePosEvent(parked->x, parked->y);
+    }
+}
+
 kor::Resource<kor::GUI_Image> kor::GUI_Image::Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level)
 {
-    switch (Context::activeAPI())
-    {
+    auto handle = [&] {
+        switch (Context::activeAPI())
+        {
         case API::eOpenGL:
-        return kor::MakeBackendResource<kor::GUI_Image, kor::ogl::GUI_Image>(image, layer, level);
-    case API::eVulkan:
-        return kor::MakeBackendResource<kor::GUI_Image, kor::vk::GUI_Image>(image, layer, level);
-    default:
-        throw std::runtime_error("Unsupported graphics API");
-    }
+            return kor::MakeBackendResource<kor::GUI_Image, kor::ogl::GUI_Image>(image, layer, level);
+        case API::eVulkan:
+            return kor::MakeBackendResource<kor::GUI_Image, kor::vk::GUI_Image>(image, layer, level);
+        default:
+            throw std::runtime_error("Unsupported graphics API");
+        }
+    }();
+
+    // Registered so the GUI can bring it up to date each frame. Without this a handle shows whatever
+    // its image held at this moment, for ever.
+    if (handle) liveImages().emplace_back(kor::ResourceRef<kor::GUI_Image>(handle));
+    return handle;
 }
 
 void kor::GUI::Init()
 {
     ImGui::CreateContext();
     // ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+
+    // Before anything else touches ImGui: hand the context and its allocators to every module that
+    // registered a copy of ImGui as it loaded — the scene library above all, which on Windows has
+    // its own null GImGui until this runs. See the block comment in gui.h.
+    bindImGuiModules(ImGui::GetCurrentContext());
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -218,6 +368,8 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
         throw std::runtime_error("Unsupported graphics API");
     }
 
+    freezePointerWhileCaptured();
+
     ImGui::NewFrame();
     // ImGuizmo::BeginFrame();
     constexpr ImGuiDockNodeFlags dockSpaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
@@ -228,132 +380,45 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    window_flags |= ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoBackground;
+    // The host window is a container for the dock space and nothing else, so it has no chrome of its
+    // own: no title bar, no border, and no padding — padding here would inset every docked window from
+    // the edges of the screen and leave a frame of background around the whole interface.
+    //
+    // No title bar even when the window is undecorated. An undecorated window used to get a *drawn*
+    // one here, with its own close/maximise/minimise buttons and drag handling; that is gone, so an
+    // undecorated window is exactly what it says — bare. Moving and closing it is then the
+    // application's business (kor::Window::close, glfwSetWindowPos), which is where those decisions
+    // belong.
+    window_flags |= ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize
+                  | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar;
 
-    if (Context::Window().isDecorated())
-    {
-        window_flags |= ImGuiWindowFlags_NoTitleBar;
-    }
-
-    ImGui::PushFont(GetFont(Font::Bold));
-
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
     ImGui::Begin(Context::Window().getTitle().c_str(), nullptr, window_flags);
-
-    if (!Context::Window().isDecorated())
-    {
-        ImVec2 windowPos = ImGui::GetWindowPos();
-        float titleBarHeight = ImGui::GetFrameHeight();
-        float buttonSize = titleBarHeight - 8.0f;
-        float padding = 4.0f;
-        float buttonY = windowPos.y + padding;
-
-        ImDrawList* drawList = ImGui::GetForegroundDrawList();
-
-        struct TitleButton {
-            ImVec2 min, max;
-            const char* label;
-            ImU32 hoverColor;
-        };
-
-        float closeX    = windowPos.x + ImGui::GetWindowWidth() - buttonSize - padding;
-        float maximizeX = closeX - buttonSize - padding;
-        float minimizeX = maximizeX - buttonSize - padding;
-
-        TitleButton buttons[] = {
-            { ImVec2(closeX,    buttonY), ImVec2(closeX    + buttonSize, buttonY + buttonSize), ICON_FA_X,  IM_COL32(220, 50,  50,  255) },
-            { ImVec2(maximizeX, buttonY), ImVec2(maximizeX + buttonSize, buttonY + buttonSize), ICON_FA_SQUARE,  IM_COL32(80,  80,  80,  255) },
-            { ImVec2(minimizeX, buttonY), ImVec2(minimizeX + buttonSize, buttonY + buttonSize), ICON_FA_MINUS, IM_COL32(80,  80,  80,  255) }
-        };
-
-        for (auto& btn : buttons)
-        {
-            bool isHovered = ImGui::IsMouseHoveringRect(btn.min, btn.max, false);
-            bool isClicked = isHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
-
-            ImU32 bgColor = isHovered ? btn.hoverColor : IM_COL32(0, 0, 0, 0);
-            drawList->AddRectFilled(btn.min, btn.max, bgColor, buttonSize * 0.5f);
-
-            ImVec2 textSize = ImGui::CalcTextSize(btn.label);
-            ImVec2 btnCenter = ImVec2(
-                btn.min.x + buttonSize * 0.5f,
-                btn.min.y + buttonSize * 0.5f
-            );
-            auto textPos = ImVec2(
-                btnCenter.x - textSize.x * 0.5f + 0.5f,  // +0.5 for pixel alignment
-                btnCenter.y - textSize.y * 0.5f - 0.5f
-            );
-            drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), btn.label);
-
-            if (isClicked)
-            {
-                if (btn.label[0] == 'X')
-                {
-                    Context::Window().close();
-                }
-                else if (btn.label[0] == ICON_FA_SQUARE[0] && btn.label[1] == ICON_FA_SQUARE[1])
-                {
-                    GLFWwindow* win = *Context::Window();
-                    if (glfwGetWindowAttrib(win, GLFW_MAXIMIZED))
-                        glfwRestoreWindow(win);
-                    else
-                        glfwMaximizeWindow(win);
-                }
-                else if (btn.label[0] == ICON_FA_MINUS[0] && btn.label[1] == ICON_FA_MINUS[1])
-                {
-                    glfwIconifyWindow(*Context::Window());
-                }
-            }
-        }
-    }
-    ImGui::PopFont();
-
-    if (!Context::Window().isDecorated())
-    {
-        const ImVec2 windowPos = ImGui::GetWindowPos();
-        const ImVec2 titleBarMin = windowPos;
-        const auto titleBarMax = ImVec2(windowPos.x + ImGui::GetWindowWidth(),
-                                    windowPos.y + ImGui::GetFrameHeight());
-
-        static bool isDragging = false;
-        static ImVec2 dragStartMousePos;
-        static ImVec2 dragStartWindowPos;
-
-        if (bool isHoveringTitleBar = ImGui::IsMouseHoveringRect(titleBarMin, titleBarMax, false); isHoveringTitleBar && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-        {
-            isDragging = true;
-            dragStartMousePos = ImGui::GetMousePos();
-            int wx, wy;
-            glfwGetWindowPos(*Context::Window(), &wx, &wy);
-            dragStartWindowPos = ImVec2(static_cast<float>(wx), static_cast<float>(wy));
-        }
-
-        if (ImGui::IsMouseReleased(ImGuiMouseButton_Left))
-        {
-            isDragging = false;
-        }
-
-        if (isDragging && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f))
-        {
-            const ImVec2 currentMousePos = ImGui::GetMousePos();
-            const float dx = currentMousePos.x - dragStartMousePos.x;
-            const float dy = currentMousePos.y - dragStartMousePos.y;
-
-            glfwSetWindowPos(
-                *Context::Window(),
-                static_cast<int>(dragStartWindowPos.x + dx),
-                static_cast<int>(dragStartWindowPos.y + dy)
-            );
-        }
-    }
-
+    ImGui::PopStyleVar(2);
 
     const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
     ImGui::DockSpace(dockSpaceId, ImVec2(0.0f, 0.0f), dockSpaceFlags);
 
     scene.RenderUI();
+    // After the scene's, so a module's own panels (a camera inspector, a physics debug window)
+    // layer over the project's interface rather than under it.
+    ModuleHost::RenderUI();
 
     ImGui::End();
     ImGui::Render();
+
+    // Every handle that ImGui may sample, brought up to date in *this* frame's commands: after the
+    // interface has been built (so a handle created during RenderUI is included) and before the draws
+    // that read it are recorded. Recorded rather than submitted separately, which is what lets the
+    // engine's barrier resolution see the read and transition the image the handle copies from.
+    //
+    // Dead handles are dropped here rather than anywhere else — nothing else walks this list, and a
+    // scene that creates and drops handles as it runs would otherwise grow it without bound.
+    std::erase_if(liveImages(), [](const ResourceRef<GUI_Image>& handle) { return !handle.alive(); });
+    for (const auto& handle : liveImages()) {
+        if (handle.valid()) const_cast<GUI_Image&>(*handle).refresh(commandBuffer);
+    }
 
     ImDrawData* draw_data = ImGui::GetDrawData();
     switch (Context::activeAPI())
@@ -368,13 +433,75 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
         throw std::runtime_error("Unsupported graphics API");
     }
 
-    if (const ImGuiIO& io = ImGui::GetIO(); io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    // The secondary platform windows are deliberately *not* rendered here. @see RenderPlatformWindows
+}
+
+namespace
+{
+    // Which of ImGui's windows Input has been told about, so each is attached once.
+    std::vector<GLFWwindow*> g_attachedPlatformWindows;
+
+    void attachPlatformWindowsToInput()
     {
-        GLFWwindow* backup_ctx = glfwGetCurrentContext();
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(backup_ctx);
+        const ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
+
+        std::vector<GLFWwindow*> present;
+        for (ImGuiViewport* viewport : platformIO.Viewports) {
+            // The main viewport's window is the engine's own, already attached.
+            if (viewport->Flags & ImGuiViewportFlags_IsPlatformWindow && viewport->PlatformHandle != nullptr) {
+                auto* window = static_cast<GLFWwindow*>(viewport->PlatformHandle);
+                if (window == *kor::Context::Window()) continue;
+                present.push_back(window);
+            }
+        }
+
+        for (auto* window : present) {
+            if (std::ranges::find(g_attachedPlatformWindows, window) == g_attachedPlatformWindows.end()) {
+                kor::Input::attachTo(window);
+                g_attachedPlatformWindows.push_back(window);
+            }
+        }
+
+        // Gone: a panel redocked or closed. Told to Input before ImGui destroys the window.
+        std::erase_if(g_attachedPlatformWindows, [&present](GLFWwindow* window) {
+            if (std::ranges::find(present, window) != present.end()) return false;
+            kor::Input::detachFrom(window);
+            return true;
+        });
     }
+}
+
+void kor::GUI::RenderPlatformWindows()
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    if (!(io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)) return;
+
+    // Called after the frame's command buffer has been submitted, and that is the whole point of it
+    // being a separate function.
+    //
+    // ImGui::RenderPlatformWindowsDefault() does not record into our command buffer — it builds command
+    // buffers of its own, for each undocked window's own swap chain, and *submits them there and then*.
+    // Called from inside Render() it therefore ran before the frame's barriers had even been emitted
+    // (they are resolved at CommandBuffer::End(), after the recording callback returns), so a panel
+    // floating outside the main window sampled an image that nothing had transitioned yet: the layout
+    // was still eUndefined and every frame of a drag produced a validation error and a grey window.
+    //
+    // Nothing about a docked panel showed the problem, because a docked one is drawn by the main
+    // window's own draw list — inside our command buffer, after our barriers, in order.
+    GLFWwindow* backup_ctx = glfwGetCurrentContext();
+    ImGui::UpdatePlatformWindows();
+
+    // The windows ImGui just created or destroyed, handed to Input.
+    //
+    // An undocked panel is a *separate OS window*, and GLFW delivers events to the window they happen
+    // over — so without this the pointer moving across an undocked viewport reaches ImGui (which
+    // installs its own callbacks on those windows) but never reaches kor::Input, and a camera driven
+    // by the mouse simply stops responding the moment its viewport is floating. Done right after
+    // UpdatePlatformWindows, which is what creates and destroys them.
+    attachPlatformWindowsToInput();
+
+    ImGui::RenderPlatformWindowsDefault();
+    glfwMakeContextCurrent(backup_ctx);
 }
 
 void kor::GUI::Shutdown()
@@ -390,7 +517,14 @@ void kor::GUI::Shutdown()
     default:
         throw std::runtime_error("Unsupported graphics API");
     }
-    ImGui::DestroyContext();
+
+    // Take the context back before destroying it, so no module is left holding a pointer to freed
+    // memory. A scene's RenderUI() is not called after shutdown, but its destructor still runs.
+    // Named explicitly in the call below because clearing it includes clearing our own GImGui, and
+    // the no-argument DestroyContext() destroys whatever that points at.
+    ImGuiContext* context = ImGui::GetCurrentContext();
+    bindImGuiModules(nullptr);
+    ImGui::DestroyContext(context);
 }
 
 ImFont* kor::GUI::GetFont(const Font font)

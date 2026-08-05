@@ -53,6 +53,7 @@ namespace kor
 
     ogl::GUI_Image::GUI_Image(kor::ResourceRef<const kor::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
+        _generation = image->generation();
         setImage(image);
         setLayerAndLevel(layer, level);
     }
@@ -63,8 +64,28 @@ namespace kor
         glCheckError();
     }
 
+    void ogl::GUI_Image::refresh(kor::CommandBuffer&)
+    {
+        // No command buffer is used: unlike Vulkan, where the blit has to be recorded into the
+        // frame so the engine's barriers can see the read, GL's blit is immediate.
+        if (const auto generation = _image->generation(); generation != _generation)
+        {
+            // The source was recreated at a new extent (@see Image::doResize). This handle's copy
+            // has immutable storage at the old one, so it has to be reallocated before the blit —
+            // otherwise the viewport keeps showing a copy the size the window used to be.
+            _generation = generation;
+            const auto layer = _layer, level = _level;
+            setImage(_image);
+            setLayerAndLevel(layer, level);
+            return;
+        }
+        setLayerAndLevel(_layer, _level);
+    }
+
     void ogl::GUI_Image::setLayerAndLevel(glm::u32 layer, glm::u32 level)
     {
+        _layer = layer;
+        _level = level;
         const auto& oglImage = dynamic_cast<const kor::ogl::Image&>(*_image);
 
         GLuint srcFramebuffer, dstFramebuffer;

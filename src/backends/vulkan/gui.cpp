@@ -26,14 +26,48 @@ kor::vk::DescriptorPool* kor::vk::GUI::_descriptorPool = nullptr;
 
 namespace kor::vk
 {
+    namespace
+    {
+        /**
+         * @brief Whether ImGui can sample this image as it is, with no copy in between.
+         *
+         * The copy exists to give ImGui something it can always take: one 2D image, four channels in
+         * the order it expects. Most of that an *image view* can do on its own — one mip of one array
+         * layer of a 2D image is a view, not a copy — so what is left needing the helper is only what
+         * a view cannot express:
+         *
+         *  - a **3D** image, whose "layer" is a z slice and has to be blitted out;
+         *  - a **multisampled** image, which cannot be sampled at all;
+         *  - **eR8_UNORM**, which is shown as grey through a channel swizzle the helper applies;
+         *  - an image that is not **sampleable**, which is the one case there is nothing to be done
+         *    about but copy.
+         *
+         * Everything else — a viewport's colour target above all — is bound directly, which saves a
+         * full-image blit every frame and asks nothing of the image but eSampled.
+         */
+        bool canSampleDirectly(const kor::Image& image, const glm::u32 layer, const glm::u32 level)
+        {
+            return image.getType() == kor::Image::Type::e2D
+                && image.getMSAA() == kor::MSAA::eNone
+                && image.getFormat() != kor::Image::Format::eR8_UNORM
+                && (image.getUsage() & kor::Image::Usage::eSampled)
+                && layer < image.getArrayLayers()
+                && level < image.getMipLevels();
+        }
+    }
+
     GUI_Image::GUI_Image(kor::ResourceRef<const kor::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         _helperSampler = Sampler::Builder()
             .setMagFilter(Filter::eNearest)
             .setMinFilter(Filter::eNearest)
             .build();
+
+        // Before setImage, not after: which layer and level is shown decides how the image is bound —
+        // a view on the direct path — so binding first would build the wrong one and then rebuild it.
+        _layer = layer;
+        _level = level;
         setImage(image);
-        setLayerAndLevel(layer, level);
     }
 
     GUI_Image::~GUI_Image()
@@ -45,34 +79,76 @@ namespace kor::vk
 
     void GUI_Image::setLayerAndLevel(const glm::u32 layer, const glm::u32 level)
     {
-        Context::Device().runSingleTimeCommand([&](CommandBuffer& commandBuffer)
-            {
-                const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*_image);
-                const auto& vkHelperImage = dynamic_cast<const kor::vk::Image&>(*_helperImage);
+        if (_layer == layer && _level == level && !_descriptorSets.empty()) return;
 
-                const auto imageType = vkImage.getType();
+        _layer = layer;
+        _level = level;
 
-                commandBuffer.Blit(
-                    _image, _helperImage,
-                    kor::Blit {
-                        .srcOffset = { 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(layer) : 0 },
-                        .srcExtent = {
-                            static_cast<glm::i32>(vkImage.getExtent().x),
-                            static_cast<glm::i32>(vkImage.getExtent().y),
-                            1
-                        },
-                        .dstOffset = { 0, 0, 0 },
-                        .dstExtent = { (vkHelperImage.getExtent().x), (vkHelperImage.getExtent().y), 1 },
-                        .srcBaseArrayLayer = imageType == Image::Type::e3D ? 0 : layer,
-                        .dstBaseArrayLayer = 0,
-                        .layerCount = 1,
-                        .srcMipLevel = level,
-                        .dstMipLevel = 0,
-                        .filtering = kor::Filter::eNearest
-                    });
+        // Which layer and level is shown decides the binding itself, not just what is copied: on the
+        // direct path it *is* the view. So both paths rebind, which setImage does for either.
+        if (_image.valid()) setImage(_image);
+    }
 
-                commandBuffer.ImageBarrier({ _helperImage, ResourceAccess::FragmentShaderRead });
-            }, ::vk::QueueFlagBits::eGraphics);
+    void GUI_Image::refresh(kor::CommandBuffer& commandBuffer)
+    {
+        // A resized image is a *different* image: its views are rebuilt lazily, but the descriptor
+        // ImGui samples through was written with the old view and has to be written again. Caught here
+        // rather than left to whoever owns the handle — a viewport following a window being dragged
+        // resizes every frame, and the frame it forgets is a frame ImGui samples a freed view.
+        if (_image.valid() && _boundGeneration != _image->generation()) {
+            setImage(_image);
+        }
+
+        // Two things at once, and both matter:
+        //
+        //  - the helper is brought up to date, so a viewport shows what was rendered *this* frame
+        //    rather than what the image held when the handle was made;
+        //  - this frame's copy of the helper is written at all. A per-frame image has one copy per
+        //    swap-chain image, and the blit in setLayerAndLevel only ever touched the copy that was
+        //    current then. The others stayed in VK_IMAGE_LAYOUT_UNDEFINED, and ImGui sampling one of
+        //    those is a validation error the moment the swap chain comes round to it.
+        recordBlit(commandBuffer);
+    }
+
+    void GUI_Image::recordBlit(kor::CommandBuffer& commandBuffer) const
+    {
+        if (!_image.valid()) return;
+
+        // Nothing to copy: ImGui reads the image itself, and all it needs is to find it in the layout
+        // the descriptor was written with.
+        if (_direct) {
+            commandBuffer.ImageBarrier({ _image, ResourceAccess::FragmentShaderRead });
+            return;
+        }
+
+        if (!_helperImage) return;
+
+        const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*_image);
+        const auto& vkHelperImage = dynamic_cast<const kor::vk::Image&>(*_helperImage);
+
+        const auto imageType = vkImage.getType();
+
+        commandBuffer.Blit(
+            _image, _helperImage,
+            kor::Blit {
+                .srcOffset = { 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(_layer) : 0 },
+                .srcExtent = {
+                    static_cast<glm::i32>(vkImage.getExtent().x),
+                    static_cast<glm::i32>(vkImage.getExtent().y),
+                    1
+                },
+                .dstOffset = { 0, 0, 0 },
+                .dstExtent = { (vkHelperImage.getExtent().x), (vkHelperImage.getExtent().y), 1 },
+                .srcBaseArrayLayer = imageType == Image::Type::e3D ? 0 : _layer,
+                .dstBaseArrayLayer = 0,
+                .layerCount = 1,
+                .srcMipLevel = _level,
+                .dstMipLevel = 0,
+                .filtering = kor::Filter::eNearest
+            });
+
+        // The layout the descriptor was written with. @see ImGui_ImplVulkan_AddTexture above.
+        commandBuffer.ImageBarrier({ _helperImage, ResourceAccess::FragmentShaderRead });
     }
 
     void GUI_Image::setImage(kor::ResourceRef<const kor::Image> image)
@@ -84,6 +160,43 @@ namespace kor::vk
         _descriptorSets.clear();
 
         _image = image;
+        _boundGeneration = image.valid() ? image->generation() : 0;
+
+        // The direct path: ImGui samples the image itself. No helper, no blit, and — the part a caller
+        // notices — no eTransferSrc usage required of an image that only ever wanted to be looked at.
+        _direct = canSampleDirectly(*image, _layer, _level);
+        if (_direct) {
+            _helperImage = {};
+            // One layer, one level, seen as a plain 2D image: this is the whole of what the helper was
+            // copying for, expressed as a view instead.
+            _helperImageView = kor::ImageView::Builder(image)
+                .setViewType(ImageView::Type::e2D)
+                .setBaseArrayLayer(_layer)
+                .setArrayLayerCount(1)
+                .setBaseMipLevel(_level)
+                .setMipLevelCount(1)
+                .build();
+
+            for (int frame = 0; frame < kor::Context::Scheduler().getImageCount(); ++frame) {
+                _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
+                    *dynamic_cast<const kor::vk::Sampler&>(*_helperSampler),
+                    dynamic_cast<const kor::vk::ImageView&>(*_helperImageView)[frame],
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+            }
+            return;
+        }
+
+        // The copying path needs to *read* the image, which an image created without eTransferSrc
+        // cannot do. Said once, here, rather than left to the validation layer: the failure is a
+        // missing usage flag at creation, and that is not something the messages point at.
+        if (!(image->getUsage() & kor::Image::Usage::eTransferSrc)) {
+            throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message =
+                "This image cannot be shown in the GUI. Showing a 3D image, a multisampled one, a "
+                "single-channel one, or one that is not sampleable copies from the image, so it has to "
+                "be created with Image::Usage::eTransferSrc. An ordinary 2D sampled image — including "
+                "one mip or one array layer of it — needs no copy and no such flag." });
+        }
+
         _helperImage = kor::Image::Builder()
             .setIsPerFrame(_image->isPerFrame())
             .setType(Image::Type::e2D)
@@ -114,7 +227,12 @@ namespace kor::vk
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
         }
 
-        setLayerAndLevel(0, 0);
+        // Filled once, now, on its own submit: there may be no frame in progress — a scene creating a
+        // handle in Initialize is the ordinary case — and a handle should show something immediately
+        // rather than a frame later. Every frame after this, refresh() records the same blit.
+        Context::Device().runSingleTimeCommand([this](CommandBuffer& commandBuffer) {
+            recordBlit(commandBuffer);
+        }, ::vk::QueueFlagBits::eGraphics);
     }
 
     ImTextureID GUI_Image::operator*() const {
