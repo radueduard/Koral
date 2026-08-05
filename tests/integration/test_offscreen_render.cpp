@@ -24,7 +24,7 @@
 #include "image.h"
 #include "imageView.h"
 #include "mesh.h"
-#include "meshLayout.h"
+#include <koralMesh.h>
 #include "shader.h"
 #include "sampler.h"
 #include "descriptor.h"
@@ -288,8 +288,8 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
 // pipeline's vertex binding/attribute path plus BindMesh + DrawIndexed and the
 // buffer vertex/index barrier paths, none of which the vertex-index-only tests hit.
 TEST_F(GpuTest, MeshIndexedDraw) {
-    using PosVertex = kor::ParamVertex<kor::Position>;
-    using PosMesh = kor::ParamMesh<PosVertex>;
+    using PosVertex = kmesh::ParamVertex<kmesh::Position>;
+    using PosMesh = kmesh::ParamMesh<PosVertex>;
 
     std::vector<PosVertex> verts = {
         PosVertex{ glm::vec3{-1.0f, -1.0f, 0.0f} },
@@ -320,7 +320,7 @@ TEST_F(GpuTest, MeshIndexedDraw) {
             .setPath(kor::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
 
     auto pipeline = GraphicsPipeline::Builder{}
-                        .setVertexShader<PosMesh>(vert) // vertex-input state from the mesh layout
+                        .setVertexShader(vert, PosMesh::Layout()) // vertex-input state from the mesh layout
                         .setFragmentShader(frag)
                         .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
                         .build();
@@ -360,8 +360,8 @@ TEST_F(GpuTest, MeshIndexedDraw) {
 // ScissorAndDynamicStateClipDraw and a scissor-only check both pass even with an inverted
 // viewport. Reintroduce a negative-height viewport and this test fails.
 TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
-    using PosVertex = kor::ParamVertex<kor::Position>;
-    using PosMesh = kor::ParamMesh<PosVertex>;
+    using PosVertex = kmesh::ParamVertex<kmesh::Position>;
+    using PosMesh = kmesh::ParamMesh<PosVertex>;
 
     // Clip y in [-1, 0] = the top half under a Y-down NDC; full width.
     std::vector<PosVertex> verts = {
@@ -392,7 +392,7 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
         Shader::Builder{}.setPath("flatTriangle.frag.glsl").getOrBuild("orient.flatTriangle.frag");
 
     auto pipeline = GraphicsPipeline::Builder{}
-                        .setVertexShader<PosMesh>(vert)
+                        .setVertexShader(vert, PosMesh::Layout())
                         .setFragmentShader(frag)
                         .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
                         .build();   // culling is off by default, so winding cannot mask the result
@@ -511,6 +511,152 @@ TEST_F(GpuTest, FeedbackLoopInsideRenderPassIsReported) {
     // Named as the feedback loop it is, rather than as a barrier-placement problem: there is
     // no ordering that makes sampling the attachment you are rendering into legal.
     EXPECT_NE(message.find("rendering into it"), std::string::npos) << message;
+}
+
+
+// A draw with no viewport set covers the framebuffer it renders into — *not* the window.
+//
+// The default used to be the window's extent, so a pass rendering into a target of its own was
+// rasterised for a surface it was not: inside a small target you saw a crop of a picture drawn at
+// window scale, and the target's size appeared to do nothing. Checked by rendering a full-screen
+// triangle into a target much smaller than the window and requiring it to cover every texel.
+TEST_F(GpuTest, ADrawWithNoViewportCoversItsOwnFramebuffer) {
+    // Deliberately far from any plausible window size, so a window-derived viewport would show.
+    constexpr std::uint32_t kSize = 37;
+
+    auto color = Image::Builder{}
+        .setType(Image::Type::e2D)
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{kSize, kSize})
+        .addUsage(Image::Usage::eColorAttachment)
+        .addUsage(Image::Usage::eTransferSrc)
+        .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+        .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+        .build();
+
+    const ResourceRef<const Shader> vert = Shader::Builder{}
+        .setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eVertex)
+        .setPath(kor::shaderPath("flatTriangle.vert.glsl")).getOrBuild("test.flatTriangle.vert");
+    const ResourceRef<const Shader> frag = Shader::Builder{}
+        .setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eFragment)
+        .setPath(kor::shaderPath("flatTriangle.frag.glsl")).getOrBuild("test.flatTriangle.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+        .setVertexShader(vert)
+        .setFragmentShader(frag)
+        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+        .build();
+    ASSERT_TRUE(static_cast<bool>(pipeline)) << (pipeline.error() ? pipeline.error()->message : "");
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kSize) * kSize * 4)
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<Framebuffer>(framebuffer))
+          .BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline))
+          // No SetViewport, no SetScissor: that is the case under test.
+          .Draw(3)
+          .EndRendering();
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eGraphics);
+
+    const auto texels = readback->Read<glm::u8vec4>();
+    ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSize) * kSize);
+
+    // The shader paints the whole clip volume, so every texel of *this* target must be painted. With a
+    // window-sized viewport only the top-left corner of the triangle would land here, leaving the far
+    // side of the image at the clear colour.
+    std::size_t painted = 0;
+    for (const auto& texel : texels) if (texel != glm::u8vec4(0, 0, 0, 255)) ++painted;
+    EXPECT_EQ(painted, texels.size()) << "the draw did not cover its own framebuffer";
+}
+
+// Resizing a framebuffer resizes what it renders into.
+//
+// It used to resize nothing at all: the base implementation was empty and only the *default*
+// framebuffer's override did anything, because there the swap chain owns the images. So a scene
+// following a viewport's size called Resize every frame and kept rendering at its original one.
+TEST_F(GpuTest, FramebufferResizeResizesItsAttachments) {
+    constexpr std::uint32_t kFirst = 64;
+    constexpr std::uint32_t kSecond = 96;
+
+    auto color = Image::Builder{}
+        .setType(Image::Type::e2D)
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{kFirst, kFirst})
+        .addUsage(Image::Usage::eColorAttachment)
+        .addUsage(Image::Usage::eTransferSrc)
+        .build();
+    auto depth = Image::Builder{}
+        .setType(Image::Type::e2D)
+        .setFormat(Image::Format::eD32_SFLOAT)
+        .setExtent(glm::uvec2{kFirst, kFirst})
+        .addUsage(Image::Usage::eDepthStencilAttachment)
+        .build();
+
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto depthView = ImageView::Builder(ResourceRef<const Image>(depth)).build();
+
+    auto framebuffer = Framebuffer::Builder{}
+        .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+        .setDepthAttachment(ResourceRef<const ImageView>(depthView))
+        .build();
+    ASSERT_TRUE(static_cast<bool>(framebuffer));
+    const auto generationBefore = color->generation();
+
+    framebuffer->Resize(glm::uvec2{kSecond, kSecond});
+
+    EXPECT_EQ(framebuffer->getExtent(), glm::uvec2(kSecond, kSecond));
+    EXPECT_EQ(color->getExtent(), glm::uvec3(kSecond, kSecond, 1)) << "the colour attachment followed";
+    EXPECT_EQ(depth->getExtent(), glm::uvec3(kSecond, kSecond, 1)) << "and so did the depth one";
+    // The image was *replaced*, which is what tells a view holding the old one to rebuild.
+    EXPECT_GT(color->generation(), generationBefore);
+
+    // And it is usable at the new size: rendering into it and reading it back is the whole point of
+    // having resized it. A view that had not noticed the replacement would fault here.
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<Framebuffer>(framebuffer));
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kSecond) * kSecond * 4)
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eTransfer);
+
+    const auto texels = readback->Read<glm::u8vec4>();
+    ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSecond) * kSecond);
+    // Cleared to the framebuffer's own colour, at the new size.
+    EXPECT_EQ(texels.front(), glm::u8vec4(0, 0, 0, 255));
+}
+
+// Resizing to the size it already is changes nothing, so a scene may call it every frame.
+TEST_F(GpuTest, FramebufferResizeToTheSameSizeIsANoOp) {
+    auto color = Image::Builder{}
+        .setType(Image::Type::e2D)
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{32, 32})
+        .addUsage(Image::Usage::eColorAttachment)
+        .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+        .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f})
+        .build();
+
+    const auto generation = color->generation();
+    framebuffer->Resize(glm::uvec2{32, 32});
+    framebuffer->Resize(glm::uvec2{0, 16});     // a zero extent names nothing and is ignored
+    EXPECT_EQ(color->generation(), generation) << "the image was not replaced";
+    EXPECT_EQ(color->getExtent(), glm::uvec3(32, 32, 1));
 }
 
 } // namespace

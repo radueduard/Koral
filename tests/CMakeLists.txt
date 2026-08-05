@@ -17,19 +17,30 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 
 add_executable(koral_tests
-        test_tlsf_allocator.cpp
+        test_mesh_tlsf_allocator.cpp
         test_flags.cpp
         test_error.cpp
         test_log_repeat.cpp
+        test_log_history.cpp
+        test_gui_extras.cpp
         test_structs.cpp
+        test_image_format.cpp
         test_mesh_layout.cpp
+        test_vertex_layout.cpp
         test_resource.cpp
         test_builder_recoverable.cpp
         test_project_config.cpp
+        test_module.cpp
 )
 
 target_link_libraries(koral_tests PRIVATE
         Koral
+        # The vertex-format layer lives in the mesh module now, so testing it means linking the
+        # module exactly as a project would.
+        koral-mesh
+        # The GUI extras' widgets are header-only, so the only way to exercise them is to compile and
+        # draw them — which test_gui_extras.cpp does against a headless ImGui context.
+        koral-gui-extras
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum

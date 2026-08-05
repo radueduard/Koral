@@ -26,7 +26,7 @@
 #include "image.h"
 #include "imageView.h"
 #include "mesh.h"
-#include "meshLayout.h"
+#include <koralMesh.h>
 #include "rayTracingPipeline.h"
 #include "shader.h"
 
@@ -44,8 +44,8 @@ using kor::Shader;
 namespace {
 
 using Pixel = glm::u8vec4;
-using PosVertex = kor::ParamVertex<kor::Position>;
-using PosMesh = kor::ParamMesh<PosVertex>;
+using PosVertex = kmesh::ParamVertex<kmesh::Position>;
+using PosMesh = kmesh::ParamMesh<PosVertex>;
 
 constexpr std::uint32_t kW = 16;
 constexpr std::uint32_t kH = 16;

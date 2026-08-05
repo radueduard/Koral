@@ -21,6 +21,7 @@
 #include "framebuffer.h"
 #include "image.h"
 #include "imageView.h"
+#include "log.h"
 #include "sampler.h"
 
 using kor::Buffer;
@@ -405,6 +406,45 @@ TEST_F(GpuTest, DebugLabelsRecord) {
         cb.EndDebugLabel();
     }, CommandBuffer::Usage::eGraphics);
     SUCCEED();
+}
+
+// Re-recording and re-submitting the same command buffer must be clean.
+//
+// It was not: Submit() signalled a semaphore that nothing in the engine ever waited on, and a
+// binary semaphore has to be unsignalled by the time its next signal executes. So the second
+// submit of any command buffer the caller reuses — the normal shape for anything iterative, and
+// what a timed compute loop does every step — reported
+// VUID-vkQueueSubmit-pSignalSemaphores-00067 for no reason at all. The fence was always what
+// reported completion; the semaphore was write-only.
+//
+// Reads the validation layer's own verdict out of the log, since a signal-with-no-waiter is
+// invisible from the API surface. Vacuous if the layer is not loaded, which is the same condition
+// under which the whole suite stops catching Vulkan misuse.
+TEST_F(GpuTest, ResubmittingACommandBufferIsValid) {
+    auto image = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
+
+    const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+
+    const auto since = [] {
+        const auto history = kor::log::history();
+        return history.empty() ? 0ull : history.back().sequence;
+    }();
+
+    // Three passes: the first submit is always fine, and it is the ones after it that used to
+    // trip. Each is a complete record → submit → wait cycle, as a caller reusing the buffer does.
+    for (int pass = 0; pass < 3; ++pass) {
+        cb->Begin();
+        cb->ClearColorImage(ResourceRef<const Image>(image), glm::vec4{0.f, 1.f, 0.f, 1.f});
+        cb->End();
+        ASSERT_TRUE(cb->Submit()) << "pass " << pass << " failed to submit";
+        cb->WaitForFence();
+    }
+
+    for (const auto& record : kor::log::historySince(since)) {
+        if (record.level != kor::log::Level::eError) continue;
+        EXPECT_EQ(record.message.find("VUID"), std::string::npos)
+            << "the validation layer objected to re-submitting a command buffer: " << record.message;
+    }
 }
 
 } // namespace

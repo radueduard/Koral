@@ -8,7 +8,7 @@ for CI and fast (<1s).
 
 | File                       | Unit under test        | Focus |
 |----------------------------|------------------------|-------|
-| `test_tlsf_allocator.cpp`  | `kor::TLSFAllocator`   | alloc/free, splitting, coalescing, accounting, OOM, a randomized no-overlap stress test |
+| `test_mesh_tlsf_allocator.cpp` | `kmesh::TLSFAllocator` | alloc/free, splitting, coalescing, accounting, OOM, a randomized no-overlap stress test |
 | `test_flags.cpp`           | `kor::Flags<Enum>`     | bit set/test/combine/mask, equality, conversions |
 | `test_error.cpp`           | `error.h` / `error.cpp`| `describe()` completeness, `Error::toString()`, `fail()`, `guard()`, `Result::valueOrThrow`, cause chains (`history()`, `root()`, `causedBy()`) |
 | `test_structs.cpp`         | `structs.h`            | `sizeofChannelType()`, default pipeline-state values |

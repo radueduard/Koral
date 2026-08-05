@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <memory>
 #include <numeric>
+#include <span>
 #include <vector>
 
 #include <GLFW/glfw3.h>
@@ -42,7 +43,7 @@
 #include "image.h"
 #include "imageView.h"
 #include "mesh.h"
-#include "meshLayout.h"
+#include <koralMesh.h>
 #include "resource.h"
 #include "sampler.h"
 #include "scene.h"
@@ -128,6 +129,7 @@ void drawFrame(kor::Scene& scene) {
         scene.Render(cb);
         kor::GUI::Render(cb, scene);
     });
+    kor::GUI::RenderPlatformWindows();   // after the frame, as the runtime does
 }
 
 // ---- shared GL window, created once for the whole binary ---------------------
@@ -407,8 +409,8 @@ TEST_F(GlTest, RenderParity) {
 
     // ---- Phase 6: indexed mesh draw ---------------------------------------
     {
-        using PosVertex = kor::ParamVertex<kor::Position>;
-        using PosMesh = kor::ParamMesh<PosVertex>;
+        using PosVertex = kmesh::ParamVertex<kmesh::Position>;
+        using PosMesh = kmesh::ParamMesh<PosVertex>;
 
         std::vector<PosVertex> verts = {
             PosVertex{ glm::vec3{-1.0f, -1.0f, 0.0f} },
@@ -423,7 +425,7 @@ TEST_F(GlTest, RenderParity) {
         const auto vert = loadShader("meshTriangle.vert.glsl", Shader::Stage::eVertex, "glt.mesh.vert");
         const auto frag = loadShader("flatTriangle.frag.glsl", Shader::Stage::eFragment, "glt.flat.frag");
         auto pipeline = GraphicsPipeline::Builder{}
-                            .setVertexShader<PosMesh>(vert)
+                            .setVertexShader(vert, PosMesh::Layout())
                             .setFragmentShader(frag)
                             .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
                             .build();
@@ -709,6 +711,124 @@ TEST_F(GlTest, DebugLabels) {
         cb.EndDebugLabel();
     }, CommandBuffer::Usage::eGraphics);
     SUCCEED();
+}
+
+// -----------------------------------------------------------------------------
+// eDeviceDynamic on OpenGL. GL cannot request a memory placement, so the type
+// degrades to eDynamic — but it must still behave: host-writable, visible to a
+// dispatch, and readable back (slowly is fine, broken is not; a placement hint
+// must never become a correctness difference between backends).
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, DeviceDynamicBufferRoundTrips) {
+    constexpr std::uint32_t kCount = 256;
+
+    std::vector<std::uint32_t> source(kCount);
+    std::iota(source.begin(), source.end(), 1u);
+
+    Buffer::Builder<std::uint32_t> builder;
+    builder.setData(source);
+    builder.addUsage(Buffer::Usage::eStorage);
+    builder.addUsage(Buffer::Usage::eTransferSrc);
+    builder.setType(Buffer::Type::eDeviceDynamic);
+    auto buffer = builder.build();
+    ASSERT_TRUE(buffer.valid());
+    EXPECT_TRUE(buffer->isHostVisible());
+
+    const auto readBack = buffer->Read<std::uint32_t>();
+    ASSERT_EQ(readBack.size(), source.size());
+    EXPECT_TRUE(std::ranges::equal(readBack, source))
+        << "an eDeviceDynamic buffer did not read back what was written to it";
+}
+
+// -----------------------------------------------------------------------------
+// GPU timers, the GL half. Different machinery entirely from Vulkan's query pool:
+// two glQueryCounter objects per scope, polled for GL_QUERY_RESULT_AVAILABLE so
+// the recording thread never blocks on the GPU. Driven through the frame path,
+// which is where the results are collected.
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, GpuTimersMeasureFrameWork) {
+    auto image = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
+
+    const int budget = static_cast<int>(kor::Context::Scheduler().getImageCount()) + 8;
+    bool found = false;
+    double milliseconds = 0.0;
+
+    for (int frame = 0; frame < budget && !found; ++frame) {
+        kor::Context::Scheduler().Draw([&](CommandBuffer& cb) {
+            cb.Timer("gl.clears", [&](CommandBuffer& inner) {
+                for (int i = 0; i < 8; ++i)
+                    inner.ClearColorImage(ResourceRef<const Image>(image), glm::vec4{0.f, 1.f, 0.f, 1.f});
+            });
+        });
+
+        for (const auto& f : kor::Context::Scheduler().getFrames()) {
+            for (const auto& timing : f.get().getCommandBuffer().getTimings()) {
+                if (timing.label != "gl.clears") continue;
+                found = true;
+                milliseconds = timing.milliseconds;
+            }
+        }
+    }
+
+    ASSERT_TRUE(found) << "no frame reported its timer within " << budget << " frames";
+    EXPECT_GT(milliseconds, 0.0);
+    EXPECT_LT(milliseconds, 1000.0);
+}
+
+// -----------------------------------------------------------------------------
+// Block-compressed upload and readback, the GL half of what the Vulkan suite
+// checks in CompressedImageUploadRoundTrips. GL spells these formats after the
+// extensions they came in and needs its own entry points for them
+// (glCompressedTextureSubImage2D / glGetCompressedTextureSubImage), so the path
+// is genuinely different code even though the engine API is the same. BC7 is
+// GL_ARB_texture_compression_bptc — core since 4.2.
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, CompressedImageUploadRoundTrips) {
+    constexpr std::uint32_t kSize = 16;   // 4x4 blocks of BC7
+    const auto format = Image::Format::eBC7_UNORM;
+    const auto byteCount = Image::SizeOfRegion(format, { kSize, kSize, 1 });
+    ASSERT_EQ(byteCount, 256u);
+
+    std::vector<std::uint8_t> blocks(byteCount);
+    for (std::size_t i = 0; i < blocks.size(); ++i)
+        blocks[i] = static_cast<std::uint8_t>((i / Image::BlockSizeFromImageFormat(format)) + 1);
+
+    auto image = Image::Builder{}
+        .setType(Image::Type::e2D)
+        .setFormat(format)
+        .setExtent(glm::uvec2{ kSize, kSize })
+        .addUsage(Image::Usage::eTransferDst)
+        .addUsage(Image::Usage::eTransferSrc)
+        .addUsage(Image::Usage::eSampled)
+        .build();
+    ASSERT_TRUE(static_cast<bool>(image)) << (image.error() ? image.error()->message : "");
+
+    const auto staging = Buffer::Builder<std::uint8_t>()
+        .setDataView(std::span<const std::uint8_t>(blocks))
+        .setUsage(Buffer::Usage::eTransferSrc)
+        .setType(Buffer::Type::eStaging)
+        .build();
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(byteCount))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyBufferToImage(ResourceRef<const Buffer>(staging), ResourceRef<const Image>(image), kor::Copy{
+            .imageOffset = { 0, 0, 0 },
+            .imageExtent = { kSize, kSize, 1 },
+        });
+        cb.CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(readback), kor::Copy{
+            .imageOffset = { 0, 0, 0 },
+            .imageExtent = { kSize, kSize, 1 },
+        });
+    }, CommandBuffer::Usage::eTransfer);
+
+    const auto out = readback->Read<std::uint8_t>();
+    ASSERT_EQ(out.size(), blocks.size());
+    EXPECT_EQ(out, blocks);
 }
 
 // -----------------------------------------------------------------------------
