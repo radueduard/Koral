@@ -150,6 +150,17 @@ namespace kor::ogl
                 return GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
             case Type::eDynamic:
                 return GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
+            // GL has no equivalent knob: buffer storage is placed by the driver and there is no way
+            // to ask for the device-local, host-visible heap the Vulkan backend targets here. So
+            // eDeviceDynamic degrades to exactly eDynamic, which is the same fallback VMA performs
+            // on a device without a resizable BAR.
+            //
+            // Including the read bit is deliberate, even though the type says not to read. Dropping
+            // it would leave Read() mapping write-only memory and then reading from it — undefined,
+            // and a hard failure where Vulkan merely makes it slow. A type whose contract is about
+            // speed must not become a correctness difference between backends.
+            case Type::eDeviceDynamic:
+                return GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
             default:
                 kor::log::error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
                 return GL_DYNAMIC_STORAGE_BIT;

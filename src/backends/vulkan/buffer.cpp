@@ -39,8 +39,29 @@ namespace kor::vk
 			flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
 			break;
 		case Type::eDynamic:
+			// PREFER_HOST + RANDOM is what keeps this in cached system memory, which is the whole
+			// point of the type: the CPU may read it back as cheaply as it writes it. See
+			// eDeviceDynamic below for the other half of that trade.
 			memoryUsage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
 			flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+			break;
+		case Type::eDeviceDynamic:
+			// AUTO (not PREFER_HOST) with SEQUENTIAL_WRITE is precisely the combination VMA reads
+			// as "direct GPU access, CPU sequential write", which makes it prefer a
+			// DEVICE_LOCAL | HOST_VISIBLE memory type — the resizable BAR heap, where the GPU runs
+			// at full device speed and the CPU still writes straight in.
+			//
+			// Both halves matter. SEQUENTIAL_WRITE alone with PREFER_HOST is explicitly steered
+			// away from device memory, and AUTO alone with RANDOM takes VMA's "always CPU memory"
+			// branch, because RANDOM asks for HOST_CACHED and BAR memory is uncached. Changing one
+			// without the other silently does nothing.
+			//
+			// Where no such memory type exists — no resizable BAR, or an integrated GPU where the
+			// distinction is meaningless — VMA falls back to host memory on its own, so this stays
+			// safe to ask for everywhere. The cost is that the memory is write-combined: see the
+			// warning on Read().
+			memoryUsage = VMA_MEMORY_USAGE_AUTO;
+			flags |= VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 			break;
 		}
 
@@ -127,9 +148,15 @@ namespace kor::vk
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
 
+		// What this frame has to receive, kept as well as the per-buffer copy regions: the host path
+		// below needs the source frame of each, which a vk::BufferCopy does not carry.
+		struct FrameWrite { glm::u32 srcFrameIndex; glm::u64 offset; glm::u64 byteSize; };
+		std::vector<FrameWrite> _pendingWritesForThisFrame;
+
 		std::unordered_set<PendingWrite, PendingWrite::Hash> remaining;
 		for (auto write : _pendingWrites) {
 			if (write.buffersLeftToUpdate.contains(currentFrame)) {
+				_pendingWritesForThisFrame.push_back({ write.srcFrameIndex, write.offset, write.byteSize });
 				copyRegionsPerBuffer[_buffers[write.srcFrameIndex]].push_back(
 					::vk::BufferCopy()
 						.setSrcOffset(write.offset)
@@ -148,6 +175,31 @@ namespace kor::vk
 			return;
 		}
 
+		// Host-visible memory is propagated on the *host*, and that is worth a paragraph.
+		//
+		// The copy is only ever made into the copy belonging to the frame now being recorded, and that
+		// frame's fence was waited on before recording began — so nothing is reading it and the CPU may
+		// simply write it. Doing it through the GPU instead meant a submit *and*
+		// `queue->waitIdle()` (runSingleTimeCommand waits by default): a full stall of the queue, once
+		// per written buffer, on every frame after one was written. A camera writes its uniform block
+		// on every frame it moves, so moving the camera stalled the queue every frame — which is both
+		// slower than the rest of the frame put together and uneven enough to see.
+		if (isHostVisible()) {
+			auto& allocator = Context::Allocator();
+			auto* destination = static_cast<std::byte*>(allocator.MapMemory(_allocations[currentFrame]));
+
+			for (const auto& write : _pendingWritesForThisFrame) {
+				auto* source = static_cast<std::byte*>(allocator.MapMemory(_allocations[write.srcFrameIndex]));
+				std::memcpy(destination + write.offset, source + write.offset, write.byteSize);
+				allocator.UnmapMemory(_allocations[write.srcFrameIndex]);
+			}
+
+			allocator.FlushAllocation(_allocations[currentFrame], 0, VK_WHOLE_SIZE);
+			allocator.UnmapMemory(_allocations[currentFrame]);
+			return;
+		}
+
+		// Device-local memory has no host mapping, so it still costs a copy on the queue.
 		auto dstBuffer = _buffers[currentFrame];
 		Context::Device().runSingleTimeCommand([dstBuffer, &copyRegionsPerBuffer](const kor::vk::CommandBuffer& commandBuffer) {
 			for (const auto&[srcBuffer, copyRegions] : copyRegionsPerBuffer) {
