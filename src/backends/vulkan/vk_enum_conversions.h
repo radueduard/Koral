@@ -414,8 +414,30 @@ namespace kor
         case Image::Format::eBC2_SRGB: return ::vk::Format::eBc2SrgbBlock;
         case Image::Format::eBC3_UNORM: return ::vk::Format::eBc3UnormBlock;
         case Image::Format::eBC3_SRGB: return ::vk::Format::eBc3SrgbBlock;
+        case Image::Format::eBC4_UNORM: return ::vk::Format::eBc4UnormBlock;
+        case Image::Format::eBC4_SNORM: return ::vk::Format::eBc4SnormBlock;
+        case Image::Format::eBC5_UNORM: return ::vk::Format::eBc5UnormBlock;
+        case Image::Format::eBC5_SNORM: return ::vk::Format::eBc5SnormBlock;
+        case Image::Format::eBC6H_UFLOAT: return ::vk::Format::eBc6HUfloatBlock;
+        case Image::Format::eBC6H_SFLOAT: return ::vk::Format::eBc6HSfloatBlock;
         case Image::Format::eBC7_UNORM: return ::vk::Format::eBc7UnormBlock;
         case Image::Format::eBC7_SRGB: return ::vk::Format::eBc7SrgbBlock;
+
+        case Image::Format::eASTC_4x4_UNORM: return ::vk::Format::eAstc4x4UnormBlock;
+        case Image::Format::eASTC_4x4_SRGB: return ::vk::Format::eAstc4x4SrgbBlock;
+        case Image::Format::eASTC_6x6_UNORM: return ::vk::Format::eAstc6x6UnormBlock;
+        case Image::Format::eASTC_6x6_SRGB: return ::vk::Format::eAstc6x6SrgbBlock;
+        case Image::Format::eASTC_8x8_UNORM: return ::vk::Format::eAstc8x8UnormBlock;
+        case Image::Format::eASTC_8x8_SRGB: return ::vk::Format::eAstc8x8SrgbBlock;
+
+        case Image::Format::eETC2_RGB8_UNORM: return ::vk::Format::eEtc2R8G8B8UnormBlock;
+        case Image::Format::eETC2_RGB8_SRGB: return ::vk::Format::eEtc2R8G8B8SrgbBlock;
+        case Image::Format::eETC2_RGBA8_UNORM: return ::vk::Format::eEtc2R8G8B8A8UnormBlock;
+        case Image::Format::eETC2_RGBA8_SRGB: return ::vk::Format::eEtc2R8G8B8A8SrgbBlock;
+        case Image::Format::eEAC_R11_UNORM: return ::vk::Format::eEacR11UnormBlock;
+        case Image::Format::eEAC_R11_SNORM: return ::vk::Format::eEacR11SnormBlock;
+        case Image::Format::eEAC_RG11_UNORM: return ::vk::Format::eEacR11G11UnormBlock;
+        case Image::Format::eEAC_RG11_SNORM: return ::vk::Format::eEacR11G11SnormBlock;
         default: throw std::runtime_error("Unsupported image format!");
         }
     }

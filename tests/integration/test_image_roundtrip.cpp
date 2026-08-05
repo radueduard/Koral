@@ -284,4 +284,82 @@ TEST_F(GpuTest, ByteSizedGuardRejectsLargeFormatOverflow) {
     EXPECT_EQ(cb->errors().front().code, kor::ErrorCode::eCopySizeExceedsBuffer);
 }
 
+// Blit::filtering has to reach the GPU. The Vulkan backend used to hardcode eNearest in both
+// doBlit overloads and ignore the field entirely, so a downscale that asked to be averaged was
+// point-sampled instead — silently, and differently from OpenGL, which had always honoured it.
+// GenerateMipmaps asks for eLinear, so every Vulkan mip chain was built the wrong way.
+//
+// Shrinking a 2x2 checker of black and white to 1x1 separates the two unambiguously: linear
+// weights all four texels equally and lands mid-grey, nearest can only ever return one of the
+// source texels, so it lands on an extreme. No assumption about *which* texel nearest picks.
+TEST_F(GpuTest, BlitFilteringIsHonoured) {
+    const std::vector<Pixel> checker = {
+        Pixel(0, 0, 0, 255),       Pixel(255, 255, 255, 255),
+        Pixel(255, 255, 255, 255), Pixel(0, 0, 0, 255),
+    };
+
+    const auto makeSource = [&] {
+        Image::Builder ib;
+        ib.setType(Image::Type::e2D)
+          .setFormat(Image::Format::eRGBA8_UNORM)
+          .setExtent(glm::uvec2{2, 2})
+          .addUsage(Image::Usage::eTransferSrc)
+          .addUsage(Image::Usage::eTransferDst)
+          .setData(std::span<const Pixel>(checker));
+        return ib.build();
+    };
+
+    const auto blitTo1x1 = [&](const kor::Filter filter) {
+        auto source = makeSource();
+        Image::Builder ib;
+        ib.setType(Image::Type::e2D)
+          .setFormat(Image::Format::eRGBA8_UNORM)
+          .setExtent(glm::uvec2{1, 1})
+          .addUsage(Image::Usage::eTransferSrc)
+          .addUsage(Image::Usage::eTransferDst);
+        auto destination = ib.build();
+
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+            cb.Blit(ResourceRef<const Image>(source), ResourceRef<const Image>(destination),
+                    kor::Blit{ .filtering = filter });
+        }, CommandBuffer::Usage::eGraphics);
+
+        const std::vector<Pixel> out = readbackPixels(destination, 1, 1);
+        EXPECT_EQ(out.size(), 1u);
+        return out.front().r;
+    };
+
+    const int linear = blitTo1x1(kor::Filter::eLinear);
+    const int nearest = blitTo1x1(kor::Filter::eNearest);
+
+    // 127.5 in exact arithmetic; the rounding of the last bit is the driver's business.
+    EXPECT_NEAR(linear, 128, 8) << "eLinear did not average the four source texels";
+    EXPECT_TRUE(nearest == 0 || nearest == 255)
+        << "eNearest returned " << nearest << ", which is not one of the source texels";
+}
+
+// A partial-range barrier: a base mip level with no count, meaning "levels 2..3". The count used
+// to be resolved against the image's *total* mip count rather than the levels left above the
+// base, so this emitted barriers for levels 4 and 5 of a 4-level image — two spec violations
+// (VUID-VkImageMemoryBarrier-subresourceRange-01486 and -01724) per submission.
+//
+// Like the coverage tests, this asserts nothing beyond running clean: the validation layer
+// reports through the log rather than failing the process, so read the output when it changes.
+TEST_F(GpuTest, PartialRangeImageBarrierStaysInBounds) {
+    Image::Builder ib;
+    ib.setType(Image::Type::e2D)
+      .setFormat(Image::Format::eRGBA8_UNORM)
+      .setExtent(glm::uvec2{8, 8})
+      .setMipLevels(4) // 8 -> 4 -> 2 -> 1
+      .addUsage(Image::Usage::eTransferSrc)
+      .addUsage(Image::Usage::eTransferDst);
+    auto image = ib.build();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.ImageBarrier(kor::ImageBarrier(ResourceRef<const Image>(image),
+                                          kor::ResourceAccess::TransferDst, 2u));
+    }, CommandBuffer::Usage::eGraphics);
+    SUCCEED();
+}
+
 } // namespace

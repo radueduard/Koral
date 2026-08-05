@@ -28,6 +28,22 @@ namespace kor::ogl
             case Type::e3D:
                 target = GL_TEXTURE_3D;
                 break;
+            // A layered view of a layered texture. glTextureView can reinterpret a 2D array as a
+            // cube map and back — they are the same view class — which is what lets a six-layer
+            // image be written as an array and sampled as a cube.
+            case Type::e1DArray:
+                target = GL_TEXTURE_1D_ARRAY;
+                break;
+            case Type::e2DArray:
+                target = image.getMSAA() == MSAA::eNone
+                    ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+                break;
+            case Type::eCube:
+                target = GL_TEXTURE_CUBE_MAP;
+                break;
+            case Type::eCubeArray:
+                target = GL_TEXTURE_CUBE_MAP_ARRAY;
+                break;
             default:
                 throw std::runtime_error("Unsupported image type!");
         }

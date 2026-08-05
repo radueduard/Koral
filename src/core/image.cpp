@@ -16,6 +16,25 @@
 
 namespace kor
 {
+    // The per-subresource access tracking lives here, in the core, rather than in a backend, so the
+    // barrier resolver and both backends share one notion of current state. It persists between
+    // command buffers because the resource's state does: what one frame leaves behind is what the
+    // next starts from.
+    //
+    // That is sound only because a frame records and submits exactly one command buffer
+    // (Scheduler::Draw), so record order is execute order. Should that become several buffers, or
+    // several threads, the resolver needs per-buffer entry/exit states reconciled at submit instead
+    // of a single value read at record time.
+    glm::u32 Image::trackingFrame() const
+    {
+        // Only a per-frame image has more than one copy, and only then does which frame it is matter.
+        // Asked of the scheduler rather than remembered, so it is always the copy a command recorded
+        // now would actually touch.
+        if (!_isPerFrame) return 0;
+        if (!Context::HasDevice() || Context::IsHeadless()) return 0;
+        return Context::Scheduler().getCurrentImageIndex();
+    }
+
     std::optional<ResourceAccess> Image::getTrackedAccess(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
         const auto tracked = _trackedAccess.find(trackingKey(mipLevel, arrayLayer));
@@ -243,6 +262,121 @@ namespace kor
             return 2;
         default: throw std::runtime_error("Unsupported image format for channel count!");
         }
+    }
+
+    void Image::Resize(const glm::uvec3& extent)
+    {
+        if (_extent == extent || extent.x == 0 || extent.y == 0 || extent.z == 0) return;
+
+        // The extent first, since a backend builds the new image from it.
+        _extent = extent;
+        doResize(extent);
+
+        // A replaced image is a *new* image: it starts in an undefined layout with nothing to wait on,
+        // whatever the one before it had been transitioned to. Forgetting that here is what makes the
+        // next use emit the barrier it needs — without it the resolver compares against the old
+        // image's state, decides nothing is required, and the GPU reads an untransitioned image.
+        _trackedAccess.clear();
+
+        // Anything holding a handle to the old image — an image view above all — finds out through this.
+        ++_generation;
+    }
+
+    bool Image::IsFormatSupported(const kor::Image::Format format, const Flags<Usage> usage)
+    {
+        // No device, no answer — and "no" is the safe one: a caller choosing a format from what is
+        // supported would otherwise pick something that cannot be created a moment later.
+        if (!Context::HasDevice()) return false;
+
+        if (Context::activeAPI() == API::eVulkan)
+            return vk::Image::IsFormatSupported(format, usage);
+        if (Context::activeAPI() == API::eOpenGL)
+            return ogl::Image::IsFormatSupported(format, usage);
+        return false;
+    }
+
+    bool Image::IsBlockCompressed(const kor::Image::Format format)
+    {
+        switch (format)
+        {
+        case Format::eBC1_RGB_UNORM:   case Format::eBC1_RGB_SRGB:
+        case Format::eBC1_RGBA_UNORM:  case Format::eBC1_RGBA_SRGB:
+        case Format::eBC2_UNORM:       case Format::eBC2_SRGB:
+        case Format::eBC3_UNORM:       case Format::eBC3_SRGB:
+        case Format::eBC4_UNORM:       case Format::eBC4_SNORM:
+        case Format::eBC5_UNORM:       case Format::eBC5_SNORM:
+        case Format::eBC6H_UFLOAT:     case Format::eBC6H_SFLOAT:
+        case Format::eBC7_UNORM:       case Format::eBC7_SRGB:
+        case Format::eASTC_4x4_UNORM:  case Format::eASTC_4x4_SRGB:
+        case Format::eASTC_6x6_UNORM:  case Format::eASTC_6x6_SRGB:
+        case Format::eASTC_8x8_UNORM:  case Format::eASTC_8x8_SRGB:
+        case Format::eETC2_RGB8_UNORM: case Format::eETC2_RGB8_SRGB:
+        case Format::eETC2_RGBA8_UNORM:case Format::eETC2_RGBA8_SRGB:
+        case Format::eEAC_R11_UNORM:   case Format::eEAC_R11_SNORM:
+        case Format::eEAC_RG11_UNORM:  case Format::eEAC_RG11_SNORM:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    glm::uvec2 Image::BlockExtentFromImageFormat(const kor::Image::Format format)
+    {
+        switch (format)
+        {
+        // ASTC is the only family here with a choice of block size, and the format names it.
+        case Format::eASTC_6x6_UNORM: case Format::eASTC_6x6_SRGB:
+            return { 6, 6 };
+        case Format::eASTC_8x8_UNORM: case Format::eASTC_8x8_SRGB:
+            return { 8, 8 };
+        default:
+            // Every other compressed format is 4x4; an uncompressed one is its own texel, which
+            // makes the block arithmetic in SizeOfRegion the same code for both.
+            return IsBlockCompressed(format) ? glm::uvec2{ 4, 4 } : glm::uvec2{ 1, 1 };
+        }
+    }
+
+    glm::u32 Image::BlockSizeFromImageFormat(const kor::Image::Format format)
+    {
+        switch (format)
+        {
+        // The 8-byte half of the family: three or one channel, no independent alpha.
+        case Format::eBC1_RGB_UNORM:   case Format::eBC1_RGB_SRGB:
+        case Format::eBC1_RGBA_UNORM:  case Format::eBC1_RGBA_SRGB:
+        case Format::eBC4_UNORM:       case Format::eBC4_SNORM:
+        case Format::eETC2_RGB8_UNORM: case Format::eETC2_RGB8_SRGB:
+        case Format::eEAC_R11_UNORM:   case Format::eEAC_R11_SNORM:
+            return 8;
+        // Everything else compressed is 16 bytes a block, whatever its block covers.
+        case Format::eBC2_UNORM:       case Format::eBC2_SRGB:
+        case Format::eBC3_UNORM:       case Format::eBC3_SRGB:
+        case Format::eBC5_UNORM:       case Format::eBC5_SNORM:
+        case Format::eBC6H_UFLOAT:     case Format::eBC6H_SFLOAT:
+        case Format::eBC7_UNORM:       case Format::eBC7_SRGB:
+        case Format::eASTC_4x4_UNORM:  case Format::eASTC_4x4_SRGB:
+        case Format::eASTC_6x6_UNORM:  case Format::eASTC_6x6_SRGB:
+        case Format::eASTC_8x8_UNORM:  case Format::eASTC_8x8_SRGB:
+        case Format::eETC2_RGBA8_UNORM:case Format::eETC2_RGBA8_SRGB:
+        case Format::eEAC_RG11_UNORM:  case Format::eEAC_RG11_SNORM:
+            return 16;
+        default:
+            // Uncompressed: one texel is the block.
+            return ChannelSizeFromImageFormat(format) * ChannelCountFromImageFormat(format);
+        }
+    }
+
+    glm::u64 Image::SizeOfRegion(const kor::Image::Format format, const glm::uvec3 extent,
+                                 const glm::u32 layerCount)
+    {
+        const auto block = BlockExtentFromImageFormat(format);
+        // Round up: a 5-texel row of a 4x4 format still costs two blocks, and a buffer sized for
+        // one and a quarter would be short.
+        const glm::u64 blocksX = (static_cast<glm::u64>(extent.x) + block.x - 1) / block.x;
+        const glm::u64 blocksY = (static_cast<glm::u64>(extent.y) + block.y - 1) / block.y;
+        const glm::u64 depth = std::max(1u, extent.z);
+        const glm::u64 layers = std::max(1u, layerCount);
+
+        return blocksX * blocksY * depth * layers * BlockSizeFromImageFormat(format);
     }
 
     Image::Image(const Builder& createInfo) :
