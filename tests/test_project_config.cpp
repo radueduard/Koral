@@ -128,6 +128,79 @@ TEST(ProjectConfig, AbsoluteDirectoriesAreLeftAlone)
     EXPECT_EQ(config.assetDirectories[0], "/opt/shared/textures");
 }
 
+// --- modules ---------------------------------------------------------------------------------
+
+TEST(ProjectConfig, ReadsTheModuleList)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({
+        "modules": ["koral-camera", "physics/libphysics.so"],
+        "paths": { "moduleDirectories": ["modules", "/opt/koral/modules"] }
+    })", kBase));
+
+    ASSERT_EQ(config.modules.size(), 2u);
+    EXPECT_EQ(config.modules[0], "koral-camera");
+    EXPECT_EQ(config.modules[1], "physics/libphysics.so");  // names are not paths; kept verbatim
+
+    ASSERT_EQ(config.moduleDirectories.size(), 2u);
+    EXPECT_EQ(config.moduleDirectories[0], "/projects/game/modules");   // relative: resolved
+    EXPECT_EQ(config.moduleDirectories[1], "/opt/koral/modules");       // absolute: left alone
+}
+
+TEST(ProjectConfig, ModuleListDefaultsToEmptyAndIsLeftAloneWhenAbsent)
+{
+    ProjectConfig config;
+    config.modules = { "compiled-in" };
+
+    ASSERT_TRUE(config.merge("{}", kBase));
+    ASSERT_EQ(config.modules.size(), 1u);
+    EXPECT_EQ(config.modules[0], "compiled-in");
+}
+
+TEST(ProjectConfig, ModuleListIsReplacedNotAppended)
+{
+    ProjectConfig config;
+    config.modules = { "compiled-in" };
+
+    ASSERT_TRUE(config.merge(R"({ "modules": ["koral-camera"] })", kBase));
+    ASSERT_EQ(config.modules.size(), 1u);
+    EXPECT_EQ(config.modules[0], "koral-camera");
+}
+
+TEST(ProjectConfig, ModuleFlagAppendsWithoutDuplicating)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "modules": ["koral-camera"] })", kBase));
+
+    ASSERT_TRUE(override_(config, { "--module", "physics", "--module", "koral-camera" }));
+
+    // "physics" was added; "koral-camera" was already there and is not repeated — the list is a
+    // set, and loading the same module twice would be an error the user could not see coming.
+    ASSERT_EQ(config.modules.size(), 2u);
+    EXPECT_EQ(config.modules[0], "koral-camera");
+    EXPECT_EQ(config.modules[1], "physics");
+}
+
+TEST(ProjectConfig, MissingModuleFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--module" });
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
+}
+
+TEST(ProjectConfig, ModulesDirFlagIsPrependedAheadOfTheConfigs)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "paths": { "moduleDirectories": ["modules"] } })", kBase));
+
+    ASSERT_TRUE(override_(config, { "--modules-dir", "/opt/other/modules" }));
+
+    ASSERT_EQ(config.moduleDirectories.size(), 2u);
+    EXPECT_EQ(config.moduleDirectories[0], "/opt/other/modules");
+    EXPECT_EQ(config.moduleDirectories[1], "/projects/game/modules");
+}
+
 TEST(ProjectConfig, UnknownKeysAreIgnored)
 {
     // Forward compatibility: a config written by a newer Hub must still load in an older runtime.

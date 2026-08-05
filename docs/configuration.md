@@ -28,8 +28,10 @@ share no code: this schema is the whole contract between them.
   },
   "paths": {
     "assetDirectories":  ["assets"],
-    "shaderDirectories": ["shaders"]
-  }
+    "shaderDirectories": ["shaders"],
+    "moduleDirectories": []
+  },
+  "modules": ["some-observer-module"]
 }
 ```
 
@@ -87,14 +89,73 @@ Failing that, the runtime searches the same way from the working directory. In f
 Running with no config at all is fine — the project then gets its compiled-in defaults, plus
 whatever the flags say.
 
+## Modules
+
+Modules are optional engine features — shared libraries built against Koral's module API
+(`include/module.h`). Seven ship with the engine, and a project links the ones it uses:
+
+| Module | For |
+|---|---|
+| `koral-mesh` | Vertex formats and the meshes built from them |
+| `koral-model-import` | Reading model files (glTF, FBX, OBJ…) into CPU-side arrays |
+| `koral-image-import` | Reading images: PNG/JPEG/EXR/HDR, KTX/KTX2, and cubemaps |
+| `koral-image-export` | Writing images: one subimage to any container, or a whole texture as KTX2 |
+| `koral-image-compress` | Turning an image into a GPU-compressed KTX2 (a build-time step) |
+| `koral-camera` | Camera objects and their controllers |
+| `koral-gui-extras` | ImGui widgets on top of the engine's GUI: log and statistics panels, a viewport, a gizmo, a camera panel, a gradient editor, a file browser |
+
+Asset loading in particular is *all* modules now: the engine itself reads no files but shaders and its
+own config, so a project that generates its geometry and textures procedurally links none of the five
+above and carries neither Assimp nor OpenImageIO.
+
+**No module draws an interface.** A module has no opinion about what your application looks like, so
+none of them opens a window or adds a panel — what a widget for one of them looks like is
+`koral-gui-extras`' business, and drawing it is yours. `<koralCameraPanel.h>` is the case that used to
+be otherwise: the camera module drew a "Cameras" panel from its own `RenderUI` hook, and it is now an
+opt-in widget built entirely on the public camera API, so a project that wants a different one has
+everything it needs to write it.
+
+A module depends on another only when it actually calls into it: `koral-image-compress` reads its
+input through `koral-image-import`, and says so, so linking the one brings the other. Where two
+modules merely *meet*, the seam is a header instead, belonging to whoever includes it —
+`<koralModelMesh.h>` pours imported geometry into a `koral-mesh` vertex format and is templates only,
+so it needs both modules linked while neither library needs the other. Include it without `koral-mesh`
+on the link line and it says so, rather than failing on a missing include.
+
+**A module the project uses needs no configuration.** Link it (`target_link_libraries(MyScene
+PRIVATE Koral koral-camera)`), include its header, and call its API; the library registers itself
+with the runtime as it is loaded, and `modules` stays empty.
+
+`modules` is for the other case: a module nothing links against, whose whole contribution is a
+lifecycle hook — an observer, a profiler, a physics step nobody calls into. Each entry is either:
+
+- a **bare name** (`"koral-camera"`), decorated for the platform (`libkoral-camera.so`,
+  `koral-camera.dll`, `libkoral-camera.dylib`) and searched for in `paths.moduleDirectories`, then
+  beside the scene library, then in the framework's own `modules/` directory; or
+- a **path** (relative to the config file, or absolute), used as written.
+
+Listing a module that is also linked is harmless — both routes are keyed on the module's id, so it
+is loaded once either way.
+
+Modules are loaded before the graphics device exists and initialized in the order their declared
+dependencies require, so the order of this list does not matter. What does matter is completeness:
+a module required by a listed module must be reachable too — by being linked, or by being listed
+here — and a missing required dependency stops startup with an error naming both modules.
+
+`paths.moduleDirectories` is searched before the framework's own modules, so a project can override
+a shipped module by dropping its own build in one of these directories. Most projects need only the
+bare names and no directories at all.
+
 ## Asset and shader directories
 
 `paths.assetDirectories` and `paths.shaderDirectories` are the roots that **relative** paths are
 resolved against, tried in the order listed. They apply to:
 
-- `Importer::LoadImage` / `LoadImageAsync` — textures.
-- `Importer::Load` — models. A model's own material textures are looked for beside the model first,
-  and if they are not there, across these same roots.
+- `kimg::LoadImage` / `LoadImageAsync` / `LoadCubemap...` — textures, from the image import module.
+  Output paths — what the export and compression modules write — are never resolved: a file you are
+  writing is not a file you are looking for.
+- `kmdl::Importer::Load` — models, from the model import module. A model's own material textures are
+  looked for beside the model first, and if they are not there, across these same roots.
 - Shaders: GLSL/SPIR-V paths, `#include`s, and Slang module imports.
 - Anything that calls `kor::assetPath` or `kor::shaderPath` directly.
 
@@ -139,6 +200,8 @@ For compatibility, the original singular form is still read:
 | `--config <file>`                    | Config file to read.                                                                 |
 | `--assets <dir>`                     | Prepend an asset search directory. Repeatable; the last one given is searched first. |
 | `--shaders <dir>`                    | Prepend a shader search directory. Repeatable.                                       |
+| `--module <name>`                    | Load an additional module, by name or path. Repeatable.                              |
+| `--modules-dir <dir>`                | Prepend a module search directory. Repeatable.                                       |
 | `--title <text>`                     | Window title.                                                                        |
 | `--width <n>`, `--height <n>`        | Window size.                                                                         |
 | `--api <name>`                       | `Vulkan` or `OpenGL`.                                                                |

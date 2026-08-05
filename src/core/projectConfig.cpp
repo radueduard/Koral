@@ -63,6 +63,7 @@ namespace kor
         {
             std::optional<std::vector<std::string>> assetDirectories;
             std::optional<std::vector<std::string>> shaderDirectories;
+            std::optional<std::vector<std::string>> moduleDirectories;
 
             // The original singular form, kept readable so projects scaffolded before the lists
             // existed still find their content. The list wins when both are present.
@@ -76,6 +77,10 @@ namespace kor
             std::optional<std::string> name;
             std::optional<RenderingDocument> rendering;
             std::optional<PathsDocument> paths;
+
+            // Top level rather than under "paths", because these are not paths: they are the
+            // project's list of optional engine features, which happen to be resolved to files.
+            std::optional<std::vector<std::string>> modules;
         };
     }
 
@@ -218,7 +223,13 @@ namespace kor
 
                 if (p.shaderDirectories)  config.shaderDirectories = resolveAll(*p.shaderDirectories);
                 else if (p.shadersDir)    config.shaderDirectories = resolveAll({ *p.shadersDir });
+
+                if (p.moduleDirectories)  config.moduleDirectories = resolveAll(*p.moduleDirectories);
             }
+
+            // Replaced wholesale, like the directory lists and for the same reason: a file that
+            // could only add to the binary's list could never turn a module off.
+            if (doc.modules) config.modules = *doc.modules;
 
             return {};
         }
@@ -334,7 +345,15 @@ namespace kor
                 if (ec) return invalid(std::format("--imgui-ini '{}' is not a usable path", text));
                 imguiIni = file.lexically_normal();
             }
-            else if (arg == "--assets" || arg == "--shaders") {
+            else if (arg == "--module") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --module");
+                // Appended, not prepended: modules are a set, not a search order — the loader sorts
+                // them by their declared dependencies regardless of the order they arrive in.
+                if (std::ranges::find(modules, text) == modules.end())
+                    modules.emplace_back(text);
+            }
+            else if (arg == "--assets" || arg == "--shaders" || arg == "--modules-dir") {
                 std::string_view text;
                 if (!value(text)) return invalid(std::format("missing value for {}", arg));
 
@@ -348,7 +367,9 @@ namespace kor
                 // Inserted at the front, so a directory named on the command line outranks the
                 // config's — and so that among several, the last one typed wins, like every other
                 // flag here.
-                auto& directories = arg == "--assets" ? assetDirectories : shaderDirectories;
+                auto& directories = arg == "--assets"  ? assetDirectories
+                                  : arg == "--shaders" ? shaderDirectories
+                                                       : moduleDirectories;
                 directories.insert(directories.begin(), dir.lexically_normal());
             }
             else {
@@ -404,6 +425,8 @@ namespace kor
             "  --config <file>     Config file to read (default: nearest koral.json above the scene library)\n"
             "  --assets <dir>      Prepend a directory to search for relative asset paths (repeatable)\n"
             "  --shaders <dir>     Prepend a directory to search for relative shader paths (repeatable)\n"
+            "  --module <name>     Load an additional module, by name or path (repeatable)\n"
+            "  --modules-dir <dir> Prepend a directory to search for modules (repeatable)\n"
             "  --title <text>      Window title\n"
             "  --width <n>         Window width\n"
             "  --height <n>        Window height\n"

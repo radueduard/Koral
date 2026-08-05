@@ -55,7 +55,7 @@
  * @section koral_json_paths Path resolution
  *
  * The directories are the roots that relative paths are resolved against at load time. Given
- * `"assetDirectories": ["assets"]`, a scene that asks for `Importer::LoadImage("textures/wood.png")`
+ * `"assetDirectories": ["assets"]`, a scene that asks for `kimg::LoadImage("textures/wood.png")`
  * gets `<project>/assets/textures/wood.png` — and if it isn't there, Koral keeps looking through the
  * remaining roots, ending with the assets that ship with the engine itself. Config directories are
  * searched first, so a project can shadow an engine asset by name; it can never lose access to the
@@ -79,6 +79,17 @@
 
 namespace kor
 {
+    /**
+     * @brief A project's run settings: which window to open, which backend, where its files live.
+     *
+     * Layered, weakest first — the library's own CreateProjectConfig() is what the project was
+     * compiled to want, koral.json is what its author configured without recompiling, and the
+     * command-line flags are what this one run overrides. Each layer only replaces the keys it
+     * mentions, which is what makes overriding one setting possible without restating the rest.
+     *
+     * The runtime assembles all three before the window exists. A project embedding Koral directly
+     * can use this the same way, or ignore it and configure Window::Builder itself.
+     */
     struct KORAL_API ProjectConfig
     {
         /** @brief The file name the runtime searches for. */
@@ -99,10 +110,35 @@ namespace kor
          */
         std::vector<std::filesystem::path> shaderDirectories;
 
-        std::string title;                  // empty => engine falls back to the scene name
+        /**
+         * @brief Directories searched for the libraries named in @ref modules, most specific first.
+         * Koral's own module directory is always searched after these, so a project can override a
+         * shipped module by name without losing access to the rest.
+         */
+        std::vector<std::filesystem::path> moduleDirectories;
+
+        /**
+         * @brief The modules to load, by name or by path. @see kor::Module
+         *
+         * A bare name ("camera") is decorated for the platform and looked up in
+         * @ref moduleDirectories; anything with a directory in it is used as written. They are
+         * loaded before the device exists and initialized in dependency order, so the order they
+         * are listed in does not matter — but every module must be listed, including ones that are
+         * only there because another module requires them.
+         */
+        std::vector<std::string> modules;
+
+        /** @brief Window title. Empty means the engine falls back to the scene library's name. */
+        std::string title;
+
+        /** @brief Initial size of the drawable area, in pixels. */
         glm::uvec2 extent = { 1280, 720 };
+
+        /** @brief Which graphics backend to bring up. */
         API api = API::eVulkan;
-        WindowPlatform platform = WindowPlatform::eAuto;  // Linux windowing system; ignored elsewhere
+
+        /** @brief Which Linux windowing system to open on. Ignored on Windows and macOS. */
+        WindowPlatform platform = WindowPlatform::eAuto;
 
         /**
          * @brief Which GPU the Vulkan backend should use. Empty (the default) keeps the automatic
@@ -112,10 +148,20 @@ namespace kor
          * automatic choice with a warning. The OpenGL backend cannot choose a device; ignored there.
          */
         std::string gpu;
+
+        /** @brief Whether to open fullscreen on the primary monitor. */
         bool fullscreen = false;
+
+        /** @brief Whether the user may resize the window. */
         bool resizable = false;
+
+        /** @brief Whether the OS draws a title bar and border. */
         bool decorated = true;
+
+        /** @brief Whether the framebuffer's alpha composites with the desktop. */
         bool transparentFramebuffer = false;
+
+        /** @brief Whether presentation waits for the display's refresh. */
         bool vsync = true;
 
         /**
