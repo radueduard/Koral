@@ -112,6 +112,10 @@ namespace kor::vk
             break;
         }
 
+        // Before the fence is reset, and so before anything is queued against this image: the image
+        // we just acquired may still be owned by an older frame whose submit has not finished.
+        _swapChain->ClaimAcquiredImage(fence);
+
         if (const auto result = Context::Device()->resetFences(1, &fence); result != ::vk::Result::eSuccess) {
             throw std::runtime_error("Failed to reset fence: " + ::vk::to_string(result));
         }

@@ -62,6 +62,12 @@ namespace kor::vk
         ::vk::Result Acquire(const kor::vk::Frame &frame);
         ::vk::Result Present(const kor::vk::Frame &frame);
 
+        /**
+         * Waits until whichever frame last rendered into the just-acquired image has finished, then
+         * records @p frameFence as that image's owner. Call it after Acquire and before the submit.
+         */
+        void ClaimAcquiredImage(const ::vk::Fence& frameFence);
+
     private:
         glm::uvec2 _extent;
         MSAA _msaa = MSAA::e2x;
@@ -77,6 +83,10 @@ namespace kor::vk
         kor::Resource<kor::Image> _swapChainImages;
         kor::Resource<kor::Image> _depthImages;
         std::vector<::vk::Semaphore> _renderFinishedSemaphores;
+
+        // The in-flight fence of the frame that last rendered into each image, or null for an image
+        // nothing has touched yet. Not owned — the fences belong to the scheduler's frames.
+        std::vector<::vk::Fence> _imagesInFlight;
 
         kor::Resource<kor::ImageView> _swapChainImageViews;
         kor::Resource<kor::ImageView> _depthImageViews;

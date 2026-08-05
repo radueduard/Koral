@@ -154,6 +154,10 @@ namespace kor::vk
             _renderFinishedSemaphores.push_back(Context::Device()->createSemaphore({}));
         }
 
+        // Sized alongside them, and cleared here: Resize waits for the device to go idle before
+        // recreating, so nothing is in flight and no image has an owner any more.
+        _imagesInFlight.assign(swapChainImageHandles.size(), nullptr);
+
         _swapChainImages = Resource<kor::Image>(std::make_unique<kor::vk::Image>(swapChainImageHandles, _extent, getFormat(_surfaceFormat.format), _msaa));
 
         _depthImages = Image::Builder()
@@ -206,6 +210,25 @@ namespace kor::vk
             // report it once, uniformly, instead of it escaping as an opaque SystemError.
             return ::vk::Result::eErrorDeviceLost;
         }
+    }
+
+    void SwapChain::ClaimAcquiredImage(const ::vk::Fence& frameFence) {
+        // This is *not* the wait the scheduler has already done. That one was on the current frame
+        // slot's own fence, which says nothing about the other frames in flight — and a driver
+        // routinely hands out more swapchain images than there are frames, so the frame that last
+        // rendered into this image is usually a different one, with a different fence.
+        //
+        // Without the wait, that frame's submit could still be signalling this image's
+        // renderFinished semaphore while we queue a submit that signals it again, which is
+        // VUID-vkQueueSubmit-pSignalSemaphores-00067: a binary semaphore must be unsignalled when
+        // the operation signalling it executes.
+        if (const ::vk::Fence previous = _imagesInFlight[_imageIndex]) {
+            const auto result = Context::Device()->waitForFences(1, &previous, ::vk::True, UINT64_MAX);
+            if (result != ::vk::Result::eSuccess) {
+                throw std::runtime_error("Failed to wait on the fence holding this swapchain image: " + ::vk::to_string(result));
+            }
+        }
+        _imagesInFlight[_imageIndex] = frameFence;
     }
 
     ::vk::Result SwapChain::Present(const kor::vk::Frame &frame) {
