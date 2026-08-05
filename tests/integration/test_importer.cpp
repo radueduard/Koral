@@ -1,7 +1,9 @@
-// Integration coverage for the asset importer: model loading through Assimp
-// (importer.cpp + assimpImporter/) and image decoding/upload (Importer::LoadImage).
-// Uses the bundled DamagedHelmet glTF asset. Runs on the headless device since
-// the mesh/image uploads need a GPU; skips when no device is available.
+// Integration coverage for the model import module (modules/model-import): loading through Assimp and
+// the bridge from imported geometry to one of the mesh module's vertex formats.
+// Uses the bundled DamagedHelmet glTF asset. Runs on the headless device since the mesh uploads
+// need a GPU; skips when no device is available.
+//
+// Image loading lives in the image module now, and is covered by test_image_module.cpp.
 
 #include "gpu_fixture.h"
 
@@ -12,11 +14,13 @@
 #include "buffer.h"
 #include "context.h"
 #include "image.h"
-#include "importer.h"
 #include "mesh.h"
-#include "meshLayout.h"
 
-using kor::Importer;
+#include <koralMesh.h>
+#include <koralModelImport.h>
+#include <koralModelMesh.h>
+
+using kmdl::Importer;
 using kor::ResourceRef;
 
 namespace {
@@ -62,87 +66,20 @@ TEST_F(GpuTest, ImporterLoadsGltfSceneMetadata) {
     (void)importer->GetBoneTransformationMatrices();
 }
 
-// Upload a scene mesh into GPU vertex/index buffers via Importer::LoadMesh,
+// Upload a scene mesh into GPU vertex/index buffers via the mesh module's LoadMesh,
 // driving importer_detail::buildVertices/uploadVertexBuffer for a multi-attribute
 // vertex (position + normal + uv), all of which the helmet provides.
 TEST_F(GpuTest, ImporterUploadsMeshToGpu) {
-    using Vertex = kor::ParamVertex<kor::Position, kor::Normal, kor::UV>;
-    using Mesh = kor::ParamMesh<Vertex>;
+    using Vertex = kmesh::ParamVertex<kmesh::Position, kmesh::Normal, kmesh::UV>;
+    using Mesh = kmesh::ParamMesh<Vertex>;
 
     auto importer = Importer::Load(helmetPath());
     ASSERT_NE(importer, nullptr);
     Importer::Scene scene = importer->LoadScene();
     ASSERT_FALSE(scene.meshes.empty());
 
-    auto gpuMesh = importer->LoadMesh<Mesh>(scene.meshes.front());
+    auto gpuMesh = kmdl::LoadMesh<Mesh>(scene.meshes.front());
     ASSERT_TRUE(static_cast<bool>(gpuMesh));
-}
-
-// Decode one of the helmet's textures off disk and upload it, with and without
-// a generated mip chain — exercises Importer::LoadImage end to end.
-TEST_F(GpuTest, ImporterLoadsImageFromDisk) {
-    const auto path = kor::assetPath("DamagedHelmet/Default_albedo.jpg");
-
-    auto image = Importer::LoadImage(path);
-    ASSERT_TRUE(static_cast<bool>(image));
-    const glm::uvec3 extent = image->getExtent();
-    EXPECT_GT(extent.x, 0u);
-    EXPECT_GT(extent.y, 0u);
-
-    auto mipped = Importer::LoadImage(path, /*generateMipmaps=*/true);
-    ASSERT_TRUE(static_cast<bool>(mipped));
-    EXPECT_EQ(mipped->getExtent(), extent);
-}
-
-// Save a GPU image to disk and read it back, verifying the pixels survive the
-// round-trip. Drives Importer::SaveImage (CopyImageToBuffer + OIIO encode) and
-// the decode path again on a file this test produced.
-TEST_F(GpuTest, ImporterSaveImageRoundTrips) {
-    using kor::Buffer;
-    using kor::CommandBuffer;
-    using kor::Image;
-
-    constexpr std::uint32_t kSize = 8;
-    auto image = Image::Builder{}
-                     .setType(Image::Type::e2D)
-                     .setFormat(Image::Format::eRGBA8_UNORM)
-                     .setExtent(glm::uvec2{kSize, kSize})
-                     .addUsage(Image::Usage::eTransferDst)
-                     .addUsage(Image::Usage::eTransferSrc)
-                     .addUsage(Image::Usage::eSampled)
-                     .build();
-    // 0.25/0.5/0.75 -> 64/128/191 in UNORM8.
-    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(ResourceRef<const Image>(image), glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
-    }, CommandBuffer::Usage::eGraphics);
-
-    const auto outPath = std::filesystem::temp_directory_path() / "koral_importer_roundtrip.png";
-    std::error_code ec;
-    std::filesystem::remove(outPath, ec);
-    Importer::SaveImage(outPath, "roundtrip", kor::FileFormat::ePNG, ResourceRef<const Image>(image));
-    ASSERT_TRUE(std::filesystem::exists(outPath));
-
-    auto reloaded = Importer::LoadImage(outPath);
-    ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->getExtent(), glm::uvec3(kSize, kSize, 1));
-
-    // Read the reloaded texels back and confirm the color survived the PNG round-trip.
-    Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(kSize) * kSize * 4)
-      .addUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
-    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.CopyImageToBuffer(ResourceRef<const Image>(reloaded), ResourceRef<const Buffer>(readback));
-    }, CommandBuffer::Usage::eTransfer);
-    const auto texels = readback->Read<glm::u8vec4>();
-    ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSize) * kSize);
-    for (const auto& t : texels) {
-        EXPECT_NEAR(t.r, 64, 2);
-        EXPECT_NEAR(t.g, 128, 2);
-        EXPECT_NEAR(t.b, 191, 2);
-    }
-    std::filesystem::remove(outPath, ec);
 }
 
 } // namespace

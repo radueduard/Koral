@@ -1,191 +1,66 @@
 //
-// Created by radue on 2/23/2026.
+// Created by radue on 29.07.2026.
 //
+
+/**
+ * @file koralModelMesh.h
+ * @brief Where the model importer meets the mesh module: imported geometry, poured into a vertex format.
+ *
+ * kmdl::Importer reads a model file into plain CPU-side arrays and stops there — it has no opinion
+ * about vertex formats. kmesh's formats know their layout but nothing about files. This is the join:
+ * given an imported mesh and a format, it takes the attributes the format asks for, fills any the
+ * file did not supply with zeroes, and uploads the result.
+ *
+ * @code
+ * auto importer = kmdl::Importer::Load("models/sponza.gltf");
+ * const auto scene = importer->LoadScene();
+ * for (const auto& mesh : scene.meshes)
+ *     meshes.push_back(kmdl::LoadMesh<MyMesh>(mesh));
+ * @endcode
+ *
+ * Neither module depends on the other. This file is the seam, and it belongs to whoever includes it:
+ * it is templates only, compiled into the consumer's translation unit, so `koral-model-import` never
+ * links `koral-mesh` and `koral-mesh` never hears of Assimp. A project that builds geometry
+ * procedurally gets vertex formats without a model reader; one that only wants the CPU-side arrays a
+ * file contains gets the reader without vertex formats. Wanting both is what this header is for, and
+ * it says so below rather than letting a missing module surface as a mysterious "no such file".
+ */
 
 #pragma once
 
-#include <expected>
-#include <filesystem>
-#include <memory>
+// The compatibility gate. Including this header is a statement that both modules are in play, so say
+// plainly which one is missing instead of failing on the include below.
+#if !__has_include(<koralMesh.h>)
+#  error "koralModelMesh.h bridges the model importer and the mesh module, and the mesh module is not here. Link koral-mesh too (target_link_libraries(<target> PRIVATE Koral::koral-model-import Koral::koral-mesh)), or include <koralModelImport.h> on its own if the imported CPU-side arrays are all you need."
+#endif
+
 #include <optional>
 #include <span>
+#include <tuple>
+#include <utility>
 #include <vector>
 
-#include "api.h"
-#include "context.h"
-#include "task.h"
-#include "meshLayout.h"
-#include "meshHeap.h"
-#include "buffer.h"
+#include <glm/glm.hpp>
 
-namespace kor
+#include <buffer.h>
+#include <context.h>
+#include <koralModelImport.h>
+#include <resource.h>
+#include <task.h>
+
+#include <koralMesh.h>
+#include <koralMeshHeap.h>
+
+namespace kmdl
 {
-    class Image;
-
-    enum class FileFormat
-    {
-        ePNG,
-        eJPG,
-        eBMP,
-        eTGA,
-        eHDR,
-        eDDS,
-        ePPM,
-        eTIF,
-    };
-
-    struct KORAL_API AABB {
-        glm::vec3 min;
-        glm::vec3 max;
-    };
-
-    class KORAL_API Importer
-    {
-    public:
-        struct KORAL_API Material {
-            std::string name;
-
-            float alphaCutoff = 1.f;
-            glm::vec4 baseColorFactor = glm::vec4(1.0f);
-            glm::vec4 emissiveFactor = glm::vec4(1.0f);
-            float roughness = 1.0f;
-            float metallic = 1.0f;
-            int doubleSided = false;
-
-            std::optional<std::filesystem::path> albedoTexturePath;
-            std::optional<std::filesystem::path> normalTexturePath;
-            std::optional<std::filesystem::path> roughnessTexturePath;
-            std::optional<std::filesystem::path> metallicTexturePath;
-            std::optional<std::filesystem::path> ambientOcclusionTexturePath;
-            std::optional<std::filesystem::path> emissiveTexturePath;
-
-            std::optional<std::filesystem::path> ambientTexturePath;
-            std::optional<std::filesystem::path> diffuseTexturePath;
-            std::optional<std::filesystem::path> specularTexturePath;
-            std::optional<std::filesystem::path> shininessTexturePath;
-
-            std::optional<std::filesystem::path> displacementTexturePath;
-            std::optional<std::filesystem::path> alphaTexturePath;
-            std::optional<std::filesystem::path> heightTexturePath;
-        };
-
-        struct KORAL_API Mesh {
-            std::string name;
-
-            std::vector<glm::vec3> positions;
-            std::optional<std::vector<glm::vec3>> normals;
-            std::optional<std::vector<glm::vec3>> tangents;
-            std::optional<std::vector<glm::vec3>> bitangents;
-            std::unordered_map<glm::u32, std::vector<glm::vec3>> vertexColors;
-            std::unordered_map<glm::u32, std::vector<glm::vec2>> vertexUVs;
-            std::optional<std::pair<std::vector<glm::vec4>, std::vector<glm::uvec4>>> boneData;
-            std::optional<std::vector<glm::u32>> indices;
-        };
-
-        struct KORAL_API Node {
-            glm::i32 id = -1;
-            std::string name;
-            std::vector<glm::u32> childIndices;
-
-            std::vector<glm::u32> meshIndices;
-            std::vector<glm::u32> materialIndices;
-
-            glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);
-            glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);
-            glm::vec3 scale = glm::vec3(1.f, 1.f, 1.f);
-            AABB aabb;
-        };
-
-        struct KORAL_API Light {
-            enum class Type { ePoint, eDirectional, eSpot };
-
-            std::string name;
-            Type      type      = Type::ePoint;
-            glm::vec3 position  = glm::vec3(0.0f);              // world space
-            glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f); // world space (spot/directional)
-            glm::vec3 color     = glm::vec3(1.0f);
-            float     intensity = 1.0f;
-            float     range          = 0.0f;  // 0 = no limit
-            float     innerConeAngle = 0.0f;  // radians (spot)
-            float     outerConeAngle = 0.0f;  // radians (spot)
-        };
-
-        struct KORAL_API Scene {
-            std::vector<Mesh> meshes;
-            std::vector<Material> materials;
-            std::vector<Node> nodes;
-            std::vector<Light> lights;
-        };
-
-        virtual ~Importer() = default;
-
-        // A relative path is resolved against the asset search roots — the directories listed under
-        // "assetDirectories" in koral.json, then the ones that ship with the engine — so a scene can
-        // say LoadImage("textures/wood.png") without knowing where the project ended up on disk.
-        // An absolute path is opened as given. See kor::assetPath and projectConfig.h.
-        static kor::Resource<Image> LoadImage(const std::filesystem::path& relativePath, bool generateMipmaps = false);
-        // Returns the image directly via the awaited task. All CPU work runs on background
-        // threads; GPU uploads are chunked so the main/render thread is never held for long.
-        static Task<Resource<Image>> LoadImageAsync(const std::filesystem::path& relativePath, bool generateMipmaps = false);
-
-        // Writes where it is told: an output path is not a lookup, so it is never resolved.
-        static void SaveImage(const std::filesystem::path& path, const std::string& name, FileFormat fileFormat, ResourceRef<const Image> image);
-
-        // Resolved like LoadImage. The model's material textures are then looked for beside the
-        // model itself, and failing that, across the same asset roots.
-        static std::unique_ptr<Importer> Load(const std::filesystem::path& relativePath);
-
-        virtual std::vector<std::string> GetMeshNames() = 0;
-        virtual std::vector<std::string> GetMaterialNames() = 0;
-
-        virtual Mesh GetMesh(const std::string& name) = 0;
-        virtual Material GetMaterial(const std::string& name) = 0;
-
-        virtual Scene LoadScene() = 0;
-
-        virtual std::expected<std::vector<glm::mat4>, std::string> GetBoneTransformationMatrices() = 0;
-
-        // ------------------------------------------------------------------
-        // Typed GPU mesh loading — works on any Importer::Mesh returned by
-        // LoadScene() or GetMesh(), without needing a concrete importer type.
-        // ------------------------------------------------------------------
-
-        // Build a standalone ParamMesh from scene mesh data.
-        // MeshT must be a ParamMesh<Stream0, ...>; specify it explicitly.
-        template<typename MeshT>
-        kor::Resource<MeshT> LoadMesh(const Mesh& mesh);
-
-        // Suballocate into a MeshHeap. Streams are deduced from the heap type.
-        template<typename... Streams>
-        std::optional<typename MeshHeap<Streams...>::Allocation>
-        LoadMeshIntoHeap(const Mesh& mesh, const MeshHeap<Streams...>& heap);
-
-        template <class ... Streams>
-        Task<std::optional<typename MeshHeap<Streams...>::Allocation>>
-        LoadMeshIntoHeapAsync(const Mesh& mesh, const MeshHeap<Streams...>& heap);
-
-        template<typename... Streams>
-        std::optional<typename MeshHeap<Streams...>::Allocation>
-        LoadMeshIntoHeap(const Mesh& mesh, ResourceRef<const MeshHeap<Streams...>> heap)
-        { return LoadMeshIntoHeap(mesh, *heap); }
-
-        template<typename... Streams>
-        Task<std::optional<typename MeshHeap<Streams...>::Allocation>>
-        LoadMeshIntoHeapAsync(const Mesh& mesh, Resource<const MeshHeap<Streams...>>& heap)
-        { return LoadMeshIntoHeapAsync(mesh, *heap); }
-
-    protected:
-        std::filesystem::path _path;
-    };
-} // namespace kor
-
-// =============================================================================
-// ImporterAttributeTraits<Attr>
-//   Maps each VertexAttributeType to the corresponding field in Importer::Mesh.
-//   Specialise this for any custom attribute tags.
-// =============================================================================
-namespace kor
-{
+    /**
+     * @brief Maps a vertex attribute type onto the field of Importer::Mesh that supplies it.
+     * @tparam Attr The attribute being sourced.
+     *
+     * A specialisation answers two questions: whether the imported mesh has this attribute at all,
+     * and how to read one vertex's worth of it. The built-in attributes are all specialised here;
+     * specialise it for a custom attribute tag to make it loadable from a file too.
+     */
     template<typename Attr>
     struct ImporterAttributeTraits
     {
@@ -194,50 +69,50 @@ namespace kor
     };
 
     // ---- Position -----------------------------------------------------------
-    template<> struct ImporterAttributeTraits<Position2> {
+    template<> struct ImporterAttributeTraits<kmesh::Position2> {
         static bool available(const Importer::Mesh& m) { return !m.positions.empty(); }
         static glm::vec2 get(const Importer::Mesh& m, unsigned int v) { return { m.positions[v].x, m.positions[v].y }; }
     };
-    template<> struct ImporterAttributeTraits<Position> {
+    template<> struct ImporterAttributeTraits<kmesh::Position> {
         static bool available(const Importer::Mesh& m) { return !m.positions.empty(); }
         static glm::vec3 get(const Importer::Mesh& m, unsigned int v) { return m.positions[v]; }
     };
-    template<> struct ImporterAttributeTraits<Position4> {
+    template<> struct ImporterAttributeTraits<kmesh::Position4> {
         static bool available(const Importer::Mesh& m) { return !m.positions.empty(); }
         static glm::vec4 get(const Importer::Mesh& m, unsigned int v) { return { m.positions[v], 1.f }; }
     };
 
     // ---- Normal -------------------------------------------------------------
-    template<> struct ImporterAttributeTraits<Normal> {
+    template<> struct ImporterAttributeTraits<kmesh::Normal> {
         static bool available(const Importer::Mesh& m) { return m.normals.has_value(); }
         static glm::vec3 get(const Importer::Mesh& m, unsigned int v) { return (*m.normals)[v]; }
     };
-    template<> struct ImporterAttributeTraits<Normal4> {
+    template<> struct ImporterAttributeTraits<kmesh::Normal4> {
         static bool available(const Importer::Mesh& m) { return m.normals.has_value(); }
         static glm::vec4 get(const Importer::Mesh& m, unsigned int v) { return { (*m.normals)[v], 0.f }; }
     };
 
     // ---- UV -----------------------------------------------------------------
-    template<> struct ImporterAttributeTraits<UV> {
+    template<> struct ImporterAttributeTraits<kmesh::UV> {
         static bool available(const Importer::Mesh& m) { return m.vertexUVs.contains(0u); }
         static glm::vec2 get(const Importer::Mesh& m, unsigned int v) { return m.vertexUVs.at(0u)[v]; }
     };
     template<std::size_t Channel>
-    struct ImporterAttributeTraits<IndexedAttribute<UV, Channel>> {
+    struct ImporterAttributeTraits<kmesh::IndexedAttribute<kmesh::UV, Channel>> {
         static bool available(const Importer::Mesh& m) { return m.vertexUVs.contains(static_cast<glm::u32>(Channel)); }
         static glm::vec2 get(const Importer::Mesh& m, unsigned int v) { return m.vertexUVs.at(static_cast<glm::u32>(Channel))[v]; }
     };
 
     // ---- Tangent / Bitangent ------------------------------------------------
-    template<> struct ImporterAttributeTraits<Tangent> {
+    template<> struct ImporterAttributeTraits<kmesh::Tangent> {
         static bool available(const Importer::Mesh& m) { return m.tangents.has_value(); }
         static glm::vec3 get(const Importer::Mesh& m, unsigned int v) { return (*m.tangents)[v]; }
     };
-    template<> struct ImporterAttributeTraits<Bitangent> {
+    template<> struct ImporterAttributeTraits<kmesh::Bitangent> {
         static bool available(const Importer::Mesh& m) { return m.bitangents.has_value(); }
         static glm::vec3 get(const Importer::Mesh& m, unsigned int v) { return (*m.bitangents)[v]; }
     };
-    template<> struct ImporterAttributeTraits<PackedTangent> {
+    template<> struct ImporterAttributeTraits<kmesh::PackedTangent> {
         static bool available(const Importer::Mesh& m) {
             return m.tangents.has_value() && m.bitangents.has_value() && m.normals.has_value();
         }
@@ -252,32 +127,32 @@ namespace kor
 
     // ---- Color --------------------------------------------------------------
     // Note: Importer::Mesh stores colors as vec3 (RGB). Alpha defaults to 1.
-    template<> struct ImporterAttributeTraits<Color3> {
+    template<> struct ImporterAttributeTraits<kmesh::Color3> {
         static bool available(const Importer::Mesh& m) { return m.vertexColors.contains(0u); }
         static glm::vec3 get(const Importer::Mesh& m, unsigned int v) { return m.vertexColors.at(0u)[v]; }
     };
-    template<> struct ImporterAttributeTraits<Color> {
+    template<> struct ImporterAttributeTraits<kmesh::Color> {
         static bool available(const Importer::Mesh& m) { return m.vertexColors.contains(0u); }
         static glm::vec4 get(const Importer::Mesh& m, unsigned int v) { return { m.vertexColors.at(0u)[v], 1.f }; }
     };
     template<std::size_t Channel>
-    struct ImporterAttributeTraits<IndexedAttribute<Color3, Channel>> {
+    struct ImporterAttributeTraits<kmesh::IndexedAttribute<kmesh::Color3, Channel>> {
         static bool available(const Importer::Mesh& m) { return m.vertexColors.contains(static_cast<glm::u32>(Channel)); }
         static glm::vec3 get(const Importer::Mesh& m, unsigned int v) { return m.vertexColors.at(static_cast<glm::u32>(Channel))[v]; }
     };
     template<std::size_t Channel>
-    struct ImporterAttributeTraits<IndexedAttribute<Color, Channel>> {
+    struct ImporterAttributeTraits<kmesh::IndexedAttribute<kmesh::Color, Channel>> {
         static bool available(const Importer::Mesh& m) { return m.vertexColors.contains(static_cast<glm::u32>(Channel)); }
         static glm::vec4 get(const Importer::Mesh& m, unsigned int v) { return { m.vertexColors.at(static_cast<glm::u32>(Channel))[v], 1.f }; }
     };
 
     // ---- Bones --------------------------------------------------------------
     // boneData = pair<vector<vec4> weights, vector<uvec4> ids>
-    template<> struct ImporterAttributeTraits<BoneWeights> {
+    template<> struct ImporterAttributeTraits<kmesh::BoneWeights> {
         static bool available(const Importer::Mesh& m) { return m.boneData.has_value(); }
         static glm::vec4 get(const Importer::Mesh& m, unsigned int v) { return m.boneData->first[v]; }
     };
-    template<> struct ImporterAttributeTraits<BoneIds> {
+    template<> struct ImporterAttributeTraits<kmesh::BoneIds> {
         static bool available(const Importer::Mesh& m) { return m.boneData.has_value(); }
         static glm::ivec4 get(const Importer::Mesh& m, unsigned int v) { return static_cast<glm::ivec4>(m.boneData->second[v]); }
     };
@@ -350,12 +225,14 @@ namespace kor
         }
     } // namespace importer_detail
 
-    // =============================================================================
-    // Importer::LoadMesh / Importer::LoadMeshIntoHeap — out-of-line definitions
-    // =============================================================================
-
+    /**
+     * @brief Builds a standalone GPU mesh from imported geometry.
+     * @tparam MeshT The target mesh type, a ParamMesh<...>. Specify it explicitly.
+     * @param mesh The imported geometry, from kor::Importer::LoadScene or GetMesh.
+     * @return The GPU mesh, with its own buffers.
+     */
     template<typename MeshT>
-    kor::Resource<MeshT> Importer::LoadMesh(const Mesh& mesh)
+    kor::Resource<MeshT> LoadMesh(const Importer::Mesh& mesh)
     {
         typename MeshT::Builder builder;
 
@@ -380,9 +257,16 @@ namespace kor
         return builder.Build();
     }
 
+    /**
+     * @brief Uploads imported geometry into a shared heap instead of its own buffers.
+     * @param mesh The imported geometry.
+     * @param heap The heap to suballocate from; the vertex streams are deduced from its type.
+     * @return The allocation handle, or nullopt when the heap has no room. Freeing the handle
+     *         returns the space.
+     */
     template<typename... Streams>
-    std::optional<typename MeshHeap<Streams...>::Allocation>
-    Importer::LoadMeshIntoHeap(const Mesh& mesh, const MeshHeap<Streams...>& heap)
+    std::optional<typename kmesh::MeshHeap<Streams...>::Allocation>
+    LoadMeshIntoHeap(const Importer::Mesh& mesh, const kmesh::MeshHeap<Streams...>& heap)
     {
         std::tuple<std::vector<Streams>...> streamsTuple{
             importer_detail::buildVertices<Streams>(mesh)...
@@ -401,11 +285,17 @@ namespace kor
         }(std::index_sequence_for<Streams...>{});
     }
 
+    /**
+     * @brief Uploads imported geometry into a heap without blocking the frame.
+     * @param mesh The imported geometry.
+     * @param heap The heap to suballocate from.
+     * @return A task yielding the allocation handle, or nullopt when the heap has no room.
+     */
     template<typename... Streams>
-    kor::Task<std::optional<typename MeshHeap<Streams...>::Allocation>>
-    Importer::LoadMeshIntoHeapAsync(const Mesh& mesh, const MeshHeap<Streams...>& heap)
+    kor::Task<std::optional<typename kmesh::MeshHeap<Streams...>::Allocation>>
+    LoadMeshIntoHeapAsync(const Importer::Mesh& mesh, const kmesh::MeshHeap<Streams...>& heap)
     {
-        Context::SwitchToBackgroundThread();
+        kor::Context::SwitchToBackgroundThread();
 
         std::tuple<std::vector<Streams>...> streamsTuple{
             importer_detail::buildVertices<Streams>(mesh)...
@@ -415,7 +305,7 @@ namespace kor
         if (mesh.indices.has_value())
             indexSpan = std::span<const glm::u32>(*mesh.indices);
 
-        Context::SwitchToMainThread();
+        kor::Context::SwitchToMainThread();
         auto allocation = [&]<std::size_t... I>(std::index_sequence<I...>)
         {
             return heap.Create(
@@ -426,5 +316,15 @@ namespace kor
         co_return std::move(allocation);
     }
 
-} // namespace kor
+    /** @brief Uploads into a heap held by reference. @see LoadMeshIntoHeap */
+    template<typename... Streams>
+    std::optional<typename kmesh::MeshHeap<Streams...>::Allocation>
+    LoadMeshIntoHeap(const Importer::Mesh& mesh, kor::ResourceRef<const kmesh::MeshHeap<Streams...>> heap)
+    { return LoadMeshIntoHeap(mesh, *heap); }
 
+    /** @brief Uploads into a heap held by reference, without blocking. @see LoadMeshIntoHeapAsync */
+    template<typename... Streams>
+    kor::Task<std::optional<typename kmesh::MeshHeap<Streams...>::Allocation>>
+    LoadMeshIntoHeapAsync(const Importer::Mesh& mesh, kor::Resource<const kmesh::MeshHeap<Streams...>>& heap)
+    { return LoadMeshIntoHeapAsync(mesh, *heap); }
+} // namespace kmdl

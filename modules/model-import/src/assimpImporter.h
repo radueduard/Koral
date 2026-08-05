@@ -8,8 +8,7 @@
 #include <unordered_map>
 #include <iostream>
 
-#include "importer.h"
-#include "vertexBufferLoader.h"
+#include <koralModelImport.h>
 
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
@@ -17,7 +16,7 @@
 #include <assimp/postprocess.h>
 #include <assimp/GltfMaterial.h>
 
-namespace kor {
+namespace kmdl {
     class AssimpImporter : public Importer {
     public:
         explicit AssimpImporter(const std::filesystem::path &path);
@@ -38,7 +37,7 @@ namespace kor {
          * A material's texture paths are written relative to the model file, so that is the first
          * place to look. When the file is not there — textures pulled out into a shared folder, a
          * path exported on a machine that no longer exists — hand back the bare relative name and
-         * let Importer::LoadImage try it against the project's asset roots. That is the difference
+         * let kimg::LoadImage try it against the project's asset roots. That is the difference
          * between a model that renders and one that comes up untextured.
          */
         [[nodiscard]] std::filesystem::path resolveTexture(const aiString &name) const {
@@ -54,52 +53,6 @@ namespace kor {
         }
 
         std::expected<std::vector<glm::mat4>, std::string> GetBoneTransformationMatrices() override;
-
-        // -----------------------------------------------------------------
-        // Typed mesh loading — builds GPU buffers directly from the aiMesh.
-        // MeshT must be a ParamMesh<Stream0, ...>.
-        // -----------------------------------------------------------------
-        template<typename MeshT>
-        kor::Resource<MeshT> LoadMesh(const std::string& meshName)
-        {
-            const auto it = _meshNameToIndex.find(meshName);
-            if (it == _meshNameToIndex.end())
-                throw std::runtime_error("Mesh not found: " + meshName);
-            return kor::LoadMesh<MeshT>(*_scene->mMeshes[it->second]);
-        }
-
-        // Overload: load by index.
-        template<typename MeshT>
-        kor::Resource<MeshT> LoadMesh(glm::u32 index)
-        {
-            if (index >= _scene->mNumMeshes)
-                throw std::out_of_range("Mesh index out of range: " + std::to_string(index));
-            return kor::LoadMesh<MeshT>(*_scene->mMeshes[index]);
-        }
-
-        // -----------------------------------------------------------------
-        // Heap variants — suballocate into an existing MeshHeap.
-        // Returns nullopt when the heap is full.
-        // -----------------------------------------------------------------
-        template<typename... Streams>
-        std::optional<typename MeshHeap<Streams...>::Allocation>
-        LoadMeshIntoHeap(const std::string& meshName, const MeshHeap<Streams...>& heap)
-        {
-            const auto it = _meshNameToIndex.find(meshName);
-            if (it == _meshNameToIndex.end())
-                throw std::runtime_error("Mesh not found: " + meshName);
-            return kor::LoadMeshIntoHeap(heap, *_scene->mMeshes[it->second]);
-        }
-
-        // Overload: load by index.
-        template<typename... Streams>
-        std::optional<typename MeshHeap<Streams...>::Allocation>
-        LoadMeshIntoHeap(glm::u32 index, const MeshHeap<Streams...>& heap)
-        {
-            if (index >= _scene->mNumMeshes)
-                throw std::out_of_range("Mesh index out of range: " + std::to_string(index));
-            return kor::LoadMeshIntoHeap(heap, *_scene->mMeshes[index]);
-        }
 
     private:
         Assimp::Importer _importer = {};
