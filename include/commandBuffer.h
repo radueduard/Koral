@@ -231,6 +231,12 @@ namespace kor
         [[nodiscard]] bool hasTouched(const kor::ResourceRef<const Image>& image) const;
 
         /**
+         * @brief The window framebuffer's colour image — what the screen-targeting Blit and Resolve
+         *        write into, and what hasTouched() is asked about. Null before there is a window.
+         */
+        [[nodiscard]] static ResourceRef<const Image> screenImage();
+
+        /**
          * @brief What kind of work a command buffer may record.
          *
          * Determines which queue it is created on. Combine them with Flags when one buffer records

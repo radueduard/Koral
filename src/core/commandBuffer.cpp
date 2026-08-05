@@ -1108,6 +1108,13 @@ namespace kor
     }
 
 
+    kor::ResourceRef<const Image> CommandBuffer::screenImage()
+    {
+        const auto framebuffer = Context::DefaultFramebuffer();
+        if (!framebuffer.valid() || framebuffer->getColorAttachments().empty()) return {};
+        return framebuffer->getColorAttachments()[0].get().getImage();
+    }
+
     bool CommandBuffer::hasTouched(const kor::ResourceRef<const Image>& image) const
     {
         if (!image.alive()) return false;
@@ -1511,13 +1518,28 @@ namespace kor
     {
         if (_failed) return *this;
         if (reject(srcImage, "blit source image")) return *this;
-        // The destination is the swapchain image, which the backend resolves for itself; only
-        // the source can be described here, so the backend still transitions the destination.
-        return enqueue("Blit", where, {
-                ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
-                             .baseMipLevel = blitInfo.srcMipLevel, .levelCount = 1u,
-                             .baseArrayLayer = blitInfo.srcBaseArrayLayer, .layerCount = blitInfo.layerCount },
-            }, PassEdge::eNone, [this, srcImage, blitInfo] { doBlit(srcImage, blitInfo); });
+
+        // The destination is the window's framebuffer image, which the backend resolves for itself
+        // — but it is *declared* here all the same. Leaving it out made this the one way of drawing
+        // to the screen that hasTouched() could not see, so the runtime decided the frame had not
+        // touched the framebuffer and cleared it (@see the clear in engine.cpp) on top of the blit
+        // that had just happened: a scene whose whole output is Blit(image) presented a blank
+        // window. Declaring it also puts the destination in front of the barrier resolver rather
+        // than relying solely on the backend's own transition, which is what the two-image
+        // overload below has always done.
+        std::vector<ResourceUse> uses {
+            ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
+                         .baseMipLevel = blitInfo.srcMipLevel, .levelCount = 1u,
+                         .baseArrayLayer = blitInfo.srcBaseArrayLayer, .layerCount = blitInfo.layerCount },
+        };
+        if (const auto screen = screenImage(); screen.alive()) {
+            uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::TransferDst,
+                                        .baseMipLevel = blitInfo.dstMipLevel, .levelCount = 1u,
+                                        .baseArrayLayer = blitInfo.dstBaseArrayLayer, .layerCount = blitInfo.layerCount });
+        }
+
+        return enqueue("Blit", where, std::move(uses),
+            PassEdge::eNone, [this, srcImage, blitInfo] { doBlit(srcImage, blitInfo); });
     }
 
     CommandBuffer& CommandBuffer::Blit(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Blit blitInfo,
@@ -1541,11 +1563,21 @@ namespace kor
     {
         if (_failed) return *this;
         if (reject(srcImage, "resolve source image")) return *this;
-        return enqueue("Resolve", where, {
-                ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
-                             .baseMipLevel = resolveInfo.srcMipLevel, .levelCount = 1u,
-                             .baseArrayLayer = resolveInfo.srcBaseArrayLayer, .layerCount = resolveInfo.layerCount },
-            }, PassEdge::eNone, [this, srcImage, resolveInfo] { doResolve(srcImage, resolveInfo); });
+
+        // The window's framebuffer image, declared for the same reason as in Blit above.
+        std::vector<ResourceUse> uses {
+            ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
+                         .baseMipLevel = resolveInfo.srcMipLevel, .levelCount = 1u,
+                         .baseArrayLayer = resolveInfo.srcBaseArrayLayer, .layerCount = resolveInfo.layerCount },
+        };
+        if (const auto screen = screenImage(); screen.alive()) {
+            uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::TransferDst,
+                                        .baseMipLevel = resolveInfo.dstMipLevel, .levelCount = 1u,
+                                        .baseArrayLayer = resolveInfo.dstBaseArrayLayer, .layerCount = resolveInfo.layerCount });
+        }
+
+        return enqueue("Resolve", where, std::move(uses),
+            PassEdge::eNone, [this, srcImage, resolveInfo] { doResolve(srcImage, resolveInfo); });
     }
 
     CommandBuffer& CommandBuffer::Resolve(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Resolve resolveInfo,

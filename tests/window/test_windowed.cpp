@@ -972,6 +972,45 @@ TEST_F(VkWindowTest, ATouchedScreenIsNotClearedAgain) {
     kor::GUI::RenderPlatformWindows();
 }
 
+// The case the two above left open, and it shipped in 0.1.0: a scene whose entire output is
+// Blit(image), which is how a compute rasterizer shows its canvas and how both IPG labs are
+// written.
+//
+// The screen-targeting Blit resolves its destination inside the backend, so it used to declare only
+// its *source* as a use. That made it the one way of drawing to the screen that hasTouched() could
+// not see: the runtime concluded the frame had never touched the framebuffer and cleared it on top
+// of the blit, leaving a blank window with the interface still drawn over it. Nothing caught it
+// because every other screen test reaches the framebuffer through BeginRendering or a clear, both
+// of which declare it.
+TEST_F(VkWindowTest, BlittingToTheScreenCountsAsTouchingIt) {
+    auto& scene = VkEnvironment::scene();
+
+    const auto canvas = kor::Image::Builder{}
+        .setType(kor::Image::Type::e2D)
+        .setFormat(kor::Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{64, 64})
+        .addUsage(kor::Image::Usage::eTransferSrc)
+        .addUsage(kor::Image::Usage::eTransferDst)
+        .build();
+    ASSERT_TRUE(canvas);
+
+    kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
+        const auto framebuffer = kor::Context::DefaultFramebuffer();
+        ASSERT_TRUE(framebuffer.valid());
+        const auto screen = framebuffer->getColorAttachments()[0].get().getImage();
+
+        cb.ClearColorImage(kor::ResourceRef<const kor::Image>(canvas), glm::vec4{0.9f, 0.2f, 0.1f, 1.f})
+          .Blit(kor::ResourceRef<const kor::Image>(canvas));
+
+        EXPECT_TRUE(cb.hasTouched(screen))
+            << "a blit to the screen is the whole output of a compute-rasterizer scene; if the "
+               "runtime cannot see it, it clears the picture away";
+
+        kor::GUI::Render(cb, scene);
+    });
+    kor::GUI::RenderPlatformWindows();
+}
+
 // GPU timers over the real frame path, which is the one thing the headless timer tests cannot
 // reach: the frame's command buffer is reset and re-recorded every frame, and its results are
 // collected when its frame in flight comes round again. Run with validation on, this is also what
