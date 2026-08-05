@@ -118,6 +118,8 @@ find_package(glm CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
+# Assimp is found here but linked only by modules/model-import — the engine itself no longer reads
+# model files. Kept at this level so the module (a subdirectory) sees the imported target.
 find_package(assimp REQUIRED)
 
 # Pin find_package(Vulkan) to the vcpkg-provided headers + loader instead of a
@@ -253,7 +255,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 target_link_libraries(${PROJECT_NAME} PRIVATE magic_enum::magic_enum)
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW OpenGL::GL)
-target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
+# assimp is deliberately absent: model importing lives in modules/model-import, which links it.
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
 target_link_libraries(${PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
@@ -307,38 +309,22 @@ target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-glsl)
 target_link_libraries(${PROJECT_NAME} PRIVATE slang::slang)
 target_link_libraries(${PROJECT_NAME} PRIVATE reflectcpp::reflectcpp)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${JASPER_LIBRARIES})
+# ZLIB only: the rest of the codec stack (TIFF/JPEG/PNG/Jasper) came in with OpenImageIO, which
+# moved to the image module along with the code that used it.
+target_link_libraries(${PROJECT_NAME} PRIVATE ${ZLIB_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui::imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
 target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE KTX::ktx)
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenImageIO::OpenImageIO)
+# KTX and OpenImageIO are deliberately absent: image IO lives in modules/image, which links them.
 
 if(UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GLX)
-    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
-# The MSVC counterpart of the --allow-multiple-definition above, and it is there for the same
-# reason: fmt ends up in the link twice.
-#
-# OpenImageIO links fmt::fmt-header-only, which propagates FMT_HEADER_ONLY=1 into every one of our
-# translation units and bakes inline fmt definitions into our objects and into OpenImageIO's own
-# static library. spdlog::spdlog, meanwhile, links the *compiled* fmt::fmt, whose fmt.lib exports
-# the same symbols as strong definitions. GNU ld is told to tolerate that; MSVC instead fails the
-# link with a wall of LNK2005 "already defined in OpenImageIO.lib".
-#
-# This is a band-aid, exactly as the Linux flag is. The real fix is to stop mixing header-only and
-# compiled fmt, which is not simply a matter of switching to spdlog::spdlog_header_only -- that
-# target links fmt::fmt as well, so it would have to be done by overriding an imported target's
-# link interface, and doing that blind would risk the two platforms that currently build. Worth
-# revisiting once the release is out; the duplicate definitions are identical code, so picking the
-# first is safe in practice.
-if(MSVC)
-    target_link_options(${PROJECT_NAME} PRIVATE /FORCE:MULTIPLE /IGNORE:4006 /IGNORE:4088)
-endif()
+# The duplicate-fmt band-aid that used to live here (-Wl,--allow-multiple-definition, and MSVC's
+# /FORCE:MULTIPLE beside it) moved to modules/image along with OpenImageIO, which is what dragged a
+# second copy of fmt into the link. Koral no longer links it, so it no longer needs the flag.
 
 # <windows.h> defines min() and max() as function-like macros, which collide with
 # std::numeric_limits<T>::max() and friends and produce a baffling C2589 rather than anything that
@@ -613,11 +599,15 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
             "${KORAL_VCPKG_PREFIX}/include/fmt"
             DESTINATION ${KORAL_VENDOR_INCLUDEDIR})
 
-    # imgui's headers are loose files at the top of include/, not a directory.
+    # imgui's headers are loose files at the top of include/, not a directory. ImGuizmo's header comes
+    # along because the GUI extras module's koralGizmo.h includes it: its *objects* reach a consumer
+    # through that module's shared library, which re-exports them, but the declarations have to be
+    # compiled and so have to be here.
     file(GLOB KORAL_VENDOR_IMGUI_HEADERS
             "${KORAL_VCPKG_PREFIX}/include/imgui*.h"
             "${KORAL_VCPKG_PREFIX}/include/imconfig.h"
-            "${KORAL_VCPKG_PREFIX}/include/imstb_*.h")
+            "${KORAL_VCPKG_PREFIX}/include/imstb_*.h"
+            "${KORAL_VCPKG_PREFIX}/include/ImGuizmo.h")
     install(FILES ${KORAL_VENDOR_IMGUI_HEADERS} DESTINATION ${KORAL_VENDOR_INCLUDEDIR})
 
     # The static archives the consumer must actually link. Order matters for GNU ld: a static lib
@@ -760,6 +750,19 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cmake_export_targets.cmake"
         "include(\"${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/Export/${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/${PROJECT_NAME}Targets.cmake\" OPTIONAL)
 ")
+
+# ---------------------------------------------------------------------------
+# Modules: optional engine features a project links against (see include/module.h).
+#
+# The projects that demonstrate them are not built here: they are ordinary Koral
+# projects that consume the *installed* SDK, and they live outside this tree
+# (CameraDemo is a Hub project). Building them from here would test a build
+# layout no user has.
+# ---------------------------------------------------------------------------
+option(KORAL_BUILD_MODULES "Build the modules that ship with Koral" ON)
+if(KORAL_BUILD_MODULES)
+    add_subdirectory(modules)
+endif()
 
 # ---------------------------------------------------------------------------
 # Unit tests (gtest). Enable with -DGFX_BUILD_TESTS=ON (default ON).
