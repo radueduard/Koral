@@ -4,6 +4,10 @@
 // A generic CPU-side Two-Level Segregated Fit (TLSF) allocator.
 // Operates in abstract "element" units. No GPU, no mesh concepts.
 //
+// It lives in the mesh module because MeshHeap is the only thing that needs it, and the engine
+// should not carry a suballocator in its public surface for one consumer's sake. Nothing about
+// the algorithm is mesh-specific — a project that wants it for something else links koral-mesh.
+//
 
 #pragma once
 
@@ -16,21 +20,37 @@
 #include <stdexcept>
 #include <vector>
 
-namespace kor
+namespace kmesh
 {
-    // -------------------------------------------------------------------------
-    // TLSFAllocation
-    // Returned by TLSFAllocator::Allocate(). Offsets and sizes are in elements.
-    // -------------------------------------------------------------------------
+    /**
+     * @brief A reserved range within a TLSF-managed heap. Offsets and sizes are in elements.
+     *
+     * Returned by TLSFAllocator::Allocate() and handed back to TLSFAllocator::Free() unchanged.
+     */
     struct TLSFAllocation
     {
         uint64_t offset; ///< Element offset into the backing heap.
         uint64_t size;   ///< Number of elements actually reserved (may exceed requested due to block granularity).
     };
 
-    // -------------------------------------------------------------------------
-    // TLSFAllocator
-    // -------------------------------------------------------------------------
+    /**
+     * @brief A general-purpose suballocator: hands out ranges of one large block in O(1).
+     *
+     * Two-Level Segregated Fit keeps free blocks in buckets indexed by size, so a fitting block is
+     * found by two bit scans rather than a search — allocation and free both take constant time,
+     * whatever the fragmentation. Adjacent free blocks are merged as they are released.
+     *
+     * It manages no memory of its own: it works in abstract element units over a heap somebody else
+     * owns, which is how MeshHeap packs many meshes into one pair of GPU buffers. Not thread-safe.
+     *
+     * @code
+     * kmesh::TLSFAllocator allocator(vertexCapacity);
+     * if (const auto range = allocator.Allocate(vertexCount)) {
+     *     upload(range->offset, range->size);
+     *     allocator.Free(*range);
+     * }
+     * @endcode
+     */
     class TLSFAllocator
     {
     public:
@@ -41,7 +61,11 @@ namespace kor
         static constexpr int FL_INDEX_MAX        = 32;                      // supports allocations up to 2^32 elements
         static constexpr uint64_t MIN_BLOCK_SIZE = SL_INDEX_COUNT;          // 32 elements minimum
 
-        // ---------------------------------------------------------------------
+        /**
+         * @brief Creates an allocator over a heap of @p capacity elements.
+         * @param capacity How many elements the backing heap holds.
+         * @throws std::invalid_argument if @p capacity is below MIN_BLOCK_SIZE.
+         */
         explicit TLSFAllocator(uint64_t capacity)
             : _capacity(capacity)
         {
@@ -74,8 +98,12 @@ namespace kor
         TLSFAllocator(TLSFAllocator&&)                 = default;
         TLSFAllocator& operator=(TLSFAllocator&&)      = default;
 
-        // ---------------------------------------------------------------------
-        /// Allocate `numElements` elements. Returns nullopt if out of space.
+        /**
+         * @brief Reserves a contiguous range of elements.
+         * @param numElements How many are needed.
+         * @return The reserved range, or nullopt when no free block is large enough. The range may
+         *         be larger than requested: allocations are rounded up to the block granularity.
+         */
         [[nodiscard]] std::optional<TLSFAllocation> Allocate(uint64_t numElements)
         {
             if (numElements == 0) return std::nullopt;
@@ -119,8 +147,12 @@ namespace kor
             return TLSFAllocation{ _pool[blockIdx].offset, _pool[blockIdx].size };
         }
 
-        // ---------------------------------------------------------------------
-        /// Free a previously returned allocation.
+        /**
+         * @brief Releases a range, merging it with any free neighbours.
+         * @param alloc The range exactly as Allocate() returned it.
+         *
+         * Freeing a range that was never allocated, or freeing one twice, asserts in a debug build.
+         */
         void Free(TLSFAllocation alloc)
         {
             const uint32_t blockIdx = findBlockByOffset(alloc.offset);
@@ -134,8 +166,17 @@ namespace kor
             insertFreeBlock(merged);
         }
 
+        /** @brief How many elements the heap holds in total. */
         [[nodiscard]] uint64_t Capacity()  const { return _capacity;  }
+
+        /** @brief How many elements are currently reserved, including block-granularity rounding. */
         [[nodiscard]] uint64_t Allocated() const { return _allocated; }
+
+        /**
+         * @brief How many elements are unreserved.
+         * @return Capacity minus Allocated. Not a promise that a single allocation of that size will
+         *         succeed: the free space may be spread over several blocks.
+         */
         [[nodiscard]] uint64_t Available() const { return _capacity - _allocated; }
 
     private:
@@ -335,4 +376,4 @@ namespace kor
         }
     };
 
-} // namespace kor
+} // namespace kmesh

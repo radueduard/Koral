@@ -1,4 +1,4 @@
-// Unit tests for kor::TLSFAllocator — a pure CPU-side two-level segregated-fit
+// Unit tests for kmesh::TLSFAllocator — a pure CPU-side two-level segregated-fit
 // allocator working in abstract element units. No GPU involved.
 
 #include <gtest/gtest.h>
@@ -7,10 +7,10 @@
 #include <random>
 #include <vector>
 
-#include "tlsfAllocator.h"
+#include <koralTlsfAllocator.h>
 
-using kor::TLSFAllocator;
-using kor::TLSFAllocation;
+using kmesh::TLSFAllocator;
+using kmesh::TLSFAllocation;
 
 namespace {
 
