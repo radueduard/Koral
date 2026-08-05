@@ -15,6 +15,38 @@
 #include "imageView.h"
 
 namespace kor {
+
+    void Framebuffer::Resize(const glm::uvec2& newExtent) const
+    {
+        if (newExtent.x == 0 || newExtent.y == 0) return;
+
+        // The default framebuffer is the swap chain's, and the swap chain resizes its own images: the
+        // backend override re-points this at the new ones. Resizing them from here would be resizing
+        // images this framebuffer does not own.
+        if (_isDefault) return;
+
+        if (_extent == newExtent) return;
+        _extent = newExtent;
+
+        // Each attachment's image. Two attachments can name the same image — a depth and a stencil
+        // attachment usually do — and Image::Resize is a no-op the second time round, since by then
+        // the extent already matches.
+        const auto resize = [&newExtent](const ImageView& view) {
+            if (const auto image = view.getImage(); image.valid()) {
+                const_cast<Image&>(*image).Resize({ newExtent.x, newExtent.y, 1 });
+            }
+        };
+
+        for (const auto& attachment : _colorAttachments) resize(attachment.get());
+        if (_colorResolveAttachments) {
+            for (const auto& attachment : *_colorResolveAttachments) resize(attachment.get());
+        }
+        if (_depthAttachment) resize(_depthAttachment->get());
+        if (_depthResolveAttachment) resize(_depthResolveAttachment->get());
+        if (_stencilAttachment) resize(_stencilAttachment->get());
+        if (_stencilResolveAttachment) resize(_stencilResolveAttachment->get());
+    }
+
     Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(ResourceRef<const ImageView> imageView, ClearColor clearColor)
     {
         colorAttachments.emplace_back(*imageView);

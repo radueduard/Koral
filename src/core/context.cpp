@@ -159,6 +159,10 @@ void kor::Context::DrainMainThread() {
     _mainThreadExecutor->Drain();
 }
 
+bool kor::Context::HasRepository() noexcept {
+    return _repository != nullptr;
+}
+
 kor::Repository & kor::Context::Repository() {
     if (!_repository) {
         throw std::runtime_error("Resource repository is not initialized for this thread!");
@@ -174,6 +178,11 @@ kor::API kor::Context::activeAPI()
 bool kor::Context::IsHeadless()
 {
     return _headless;
+}
+
+bool kor::Context::HasDevice() noexcept
+{
+    return _window != nullptr || _headless;
 }
 
 bool kor::Context::SupportsRayTracing()

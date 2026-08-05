@@ -68,9 +68,10 @@ namespace kor {
     /** @brief The preference set by @ref setPreferredGpu; empty means automatic. */
     KORAL_API const std::string& preferredGpu();
 
+    /** @brief The graphics backend a context runs on. */
     enum class API {
-        eOpenGL,
-        eVulkan,
+        eOpenGL,    ///< OpenGL. Broadest hardware support; no ray tracing or mesh shaders.
+        eVulkan,    ///< Vulkan. The default, and the only backend with ray tracing.
     };
 
     /**
@@ -88,12 +89,30 @@ namespace kor {
         eWayland,
     };
 
+    /**
+     * @brief Process-wide access to whatever the runtime has brought up.
+     *
+     * Everything here is static, because there is one window, one device and one scheduler per
+     * process. A scene reaches the pieces it needs through this rather than being handed them:
+     *
+     * @code
+     * const auto extent = kor::Context::Window().getExtent();
+     * commandBuffer.BeginRendering(kor::Context::DefaultFramebuffer());
+     * @endcode
+     *
+     * The accessors are only valid once a context exists — after the window has been built, or
+     * after InitHeadless(). Calling them from a scene is always safe: by the time Initialize() runs,
+     * everything below is up.
+     */
     class Context
     {
         friend class kor::Window;
         friend class kor::Scheduler;
     public:
+        /** @brief The application window. Not valid in a headless context, which has none. */
         static KORAL_API kor::Window& Window();
+
+        /** @brief The frame scheduler: swap chain, frames in flight, and which image is current. */
         static KORAL_API const kor::Scheduler& Scheduler();
 
         /**
@@ -124,6 +143,14 @@ namespace kor {
         static KORAL_API bool IsHeadless();
 
         /**
+         * @brief Whether there is a graphics device at all — a window's, or a headless one's.
+         *
+         * For code that has to answer a question about the device without being able to assume one
+         * exists yet, such as which image formats it supports. @see Image::IsFormatSupported
+         */
+        [[nodiscard]] static KORAL_API bool HasDevice() noexcept;
+
+        /**
          * @brief Whether the active device supports ray tracing (acceleration structures + the
          *        ray tracing pipeline).
          *
@@ -135,13 +162,54 @@ namespace kor {
          */
         static KORAL_API bool SupportsRayTracing();
 
+        /**
+         * @brief The framebuffer wrapping the swap-chain image this frame presents.
+         * @return The window's default framebuffer — the same one CommandBuffer::BeginRendering
+         *         uses when called without one. Recreated on resize, so hold it for a frame rather
+         *         than for the run.
+         */
         static KORAL_API kor::ResourceRef<const kor::Framebuffer> DefaultFramebuffer();
 
+        /**
+         * @brief Awaitable that moves the rest of a coroutine onto the main thread.
+         *
+         * The thread the run loop drives, and the only one that may touch the device. Anything a
+         * background coroutine produced has to come back here before it is used.
+         */
         static KORAL_API kor::SwitchAwaiter SwitchToMainThread();
+
+        /**
+         * @brief Awaitable that moves the rest of a coroutine onto a background thread.
+         *
+         * For work that would otherwise stall the frame — reading a file, decoding an image,
+         * compiling a shader.
+         */
         static KORAL_API kor::SwitchAwaiter SwitchToBackgroundThread();
+
+        /**
+         * @brief Runs everything queued for the main thread, then returns.
+         *
+         * Called by the run loop once per frame, which is what lets a coroutine resume there. Only
+         * of interest when driving Koral without the runtime.
+         */
         static KORAL_API void DrainMainThread();
 
+        /**
+         * @brief The resource repository, which tracks live resources and updates them each frame.
+         *
+         * How per-frame buffers propagate their writes and how a pipeline notices that its shader
+         * was recompiled. Resources register themselves; a scene rarely touches this.
+         */
         static KORAL_API kor::Repository& Repository();
+
+        /**
+         * @brief Whether there is a repository to reach — that is, whether a context exists at all.
+         *
+         * For code that may legitimately run before startup or after shutdown, typically a module
+         * registering something of its own for the per-frame update. @ref Repository throws in that
+         * situation, which is right for a scene (it cannot happen) and wrong for a library.
+         */
+        [[nodiscard]] static KORAL_API bool HasRepository() noexcept;
 
     private:
         inline static kor::Window* _window = nullptr;

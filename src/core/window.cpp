@@ -13,6 +13,8 @@
 #include <GLFW/glfw3.h>
 
 #include "gui.h"
+#include "scene.h"
+#include "module.h"
 #include "scheduler.h"
 #include "surface.h"
 #include "../backends/vulkan/vulkanContext.h"
@@ -24,6 +26,13 @@
 void initGlfwVulkanLoader();
 
 namespace kor {
+    // Here rather than in the header: window.h forward-declares Scene, so the unique_ptr member's
+    // destructor can only be instantiated where Scene is complete.
+    Window::Builder::Builder(std::unique_ptr<Scene> scene) : scene(std::move(scene)) {}
+    Window::Builder::~Builder() = default;
+    Window::Builder::Builder(Builder&&) noexcept = default;
+    Window::Builder& Window::Builder::operator=(Builder&&) noexcept = default;
+
     Window::Window(Builder& createInfo) :
         _title(createInfo.title),
         _extent(createInfo.extent),
@@ -204,21 +213,22 @@ namespace kor {
         // safely forward events to ImGui. We use install_callbacks=false in
         // ImGui's init (see vulkan/gui.cpp and open_gl/gui.cpp) so ImGui does
         // NOT install its own GLFW callbacks; our callbacks are the sole chain.
-        glfwSetKeyCallback(_window, Input::Callbacks::keyCallback);
-        glfwSetCursorPosCallback(_window, Input::Callbacks::mouseMoveCallback);
-        glfwSetMouseButtonCallback(_window, Input::Callbacks::mouseButtonCallback);
-        glfwSetScrollCallback(_window, Input::Callbacks::scrollCallback);
-        glfwSetWindowFocusCallback(_window, Input::Callbacks::focusCallback);
-        glfwSetCharCallback(_window, Input::Callbacks::charCallback);
-        glfwSetCursorEnterCallback(_window, Input::Callbacks::cursorEnterCallback);
-
         Time::setup();
         Input::setup(_window);
+        // Through the same path an undocked panel's window takes, so there is one way in rather than
+        // two that can drift apart. @see Input::attachTo
+        Input::attachTo(_window);
 
         Context::_mainThreadExecutor = new MainThreadExecutor();
         Context::_backgroundExecutor = new BackgroundExecutor();
 
         Context::_repository = new Repository();
+
+        // Modules first: a scene's Initialize() is where it asks a module for the things it needs
+        // (a camera, a light), so every module has to be ready before the scene runs. They were
+        // constructed much earlier — before the device — and this is the point at which there is
+        // finally something for them to build resources against.
+        ModuleHost::Initialize();
 
         _scene->Initialize();
     }
@@ -228,20 +238,33 @@ namespace kor {
         return std::make_unique<Window>(*this);
     }
 
-    // Defaulted here rather than in the header: kor::Surface is only forward-declared there, and
-    // both of these have to be able to destroy the std::unique_ptr<Surface> member. See window.h.
+    // Defaulted here rather than in the header, and it has to stay that way.
+    //
+    // _surface is a std::unique_ptr to a forward-declared kor::Surface, so anything that destroys
+    // it needs the complete type. Move-assignment destroys the object being overwritten, and the
+    // move constructor needs the destructor available for unwinding, so `= default` in the header
+    // would instantiate std::default_delete<Surface> against an incomplete type. The constructor
+    // and destructor are out of line for the same reason; these two were the ones left behind.
+    //
+    // GCC and Clang happen not to instantiate the deleter here and compile it either way, so this
+    // only ever showed up on MSVC ("can't delete an incomplete type"), the first time the Windows
+    // leg of the release was run.
     Window::Window(Window &&) = default;
     Window &Window::operator=(Window &&) = default;
 
     // Out of line for the same reason, but for kor::Framebuffer: returning the ResourceRef by value
-    // needs the complete type, which this file has via <framebuffer.h> and the header does not.
+    // instantiates that type's destructor, which needs it complete. This file has it via
+    // <framebuffer.h>; window.h does not (see context.h).
     ResourceRef<Framebuffer> Window::getFramebuffer() const {
         return _framebuffer;
     }
 
     Window::~Window() {
         Context::Scheduler().WaitIdle();
+        // The scene goes first: it holds resources the modules created, and those have to be
+        // released while the module that made them is still alive to release them properly.
         _scene.reset();
+        ModuleHost::Shutdown();
         GUI::Shutdown();
         _framebuffer.reset();
         delete Context::_scheduler;
