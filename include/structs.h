@@ -3,14 +3,20 @@
 //
 
 #pragma once
+#include <optional>
 #include <stdexcept>
-#include <glm/fwd.hpp>
+#include <string>
+#include <glm/glm.hpp>
 
 #include "flags.h"
 #include "api.h"
+#include "resource.h"
 
 namespace kor
 {
+    class Buffer;
+    class Image;
+
     /**
      * @brief The type of vertex input pipe channels. Used to define the format of vertex attributes in the graphics pipeline.
      */
@@ -445,6 +451,18 @@ namespace kor
     };
 
     /**
+     * @brief How texels are chosen when an image is sampled or rescaled.
+     *
+     * Used both by samplers (how a shader reads a texture) and by CommandBuffer::Blit (how the
+     * source rectangle is stretched onto a destination of a different size).
+     */
+    enum class Filter
+    {
+        eNearest,   ///< Take the single nearest texel. Exact and blocky; the right choice when the source and destination are the same size, or for data that must not be interpolated (IDs, indices, masks).
+        eLinear,    ///< Interpolate between the neighbouring texels. Smooth, and what you want when scaling a colour image up or down.
+    };
+
+    /**
      * @brief Description of an indirect draw command.
      */
     struct KORAL_API IndirectDrawCommand
@@ -475,5 +493,256 @@ namespace kor
         uint32_t taskCountX;
         uint32_t taskCountY;
         uint32_t taskCountZ;
+    };
+
+    // =========================================================================
+    //  Command recording
+    //
+    //  The parameter types of CommandBuffer. They are declared here, with the rest of the API's
+    //  vocabulary, rather than in commandBuffer.h, which is left holding only the interface that
+    //  consumes them.
+    // =========================================================================
+
+    /**
+     * @brief The access a buffer must be usable for, as demanded of CommandBuffer::Barrier.
+     *
+     * You rarely need one. The command buffer inserts barriers itself: every recorded command
+     * declares the resources it touches and how, and the recording is resolved as a whole at
+     * End(), which is what lets a transition be placed *before* the render pass that needs it
+     * rather than illegally inside it.
+     *
+     * Write one for the accesses that analysis cannot see — chiefly a buffer a shader reaches
+     * through a raw device address, which appears in no descriptor set. A barrier you write is
+     * also taken as authoritative for the range it covers: the resolver advances its tracking
+     * past it and does not emit a second one, so the hand-written barrier replaces the automatic
+     * barrier rather than doubling it.
+     */
+    class KORAL_API BufferBarrier {
+    public:
+        /**
+         * @param buffer The buffer to transition.
+         * @param dstAccess The access the buffer must support once the barrier has executed. Everything recorded before the barrier is made visible to it.
+         * @param offset Byte offset of the range being transitioned.
+         * @param size Length of that range in bytes. The default covers everything from @p offset to the end of the buffer.
+         */
+        BufferBarrier(
+            const kor::ResourceRef<const kor::Buffer> &buffer,
+            ResourceAccess dstAccess,
+            glm::u64 offset = 0,
+            glm::u64 size = UINT64_MAX);
+
+        [[nodiscard]] kor::ResourceRef<const kor::Buffer> getBuffer() const { return _buffer; }
+        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
+        [[nodiscard]] glm::u64 getOffset() const { return _offset; }
+        [[nodiscard]] glm::u64 getSize() const { return _size; }
+
+    private:
+        kor::ResourceRef<const kor::Buffer> _buffer;
+        ResourceAccess _dstAccess;
+        glm::u64 _offset;
+        glm::u64 _size;
+    };
+
+    /**
+     * @brief The access an image must be usable for, as demanded of CommandBuffer::Barrier.
+     *
+     * The image counterpart of BufferBarrier, and the same advice applies: the command buffer
+     * does this for you, and a barrier you write yourself suppresses the automatic one for the
+     * subresources it names. Unlike a buffer, an image also carries a *layout* the driver picks
+     * from the access — transitioning to ResourceAccess::TransferDst, for instance, is what makes
+     * the image a legal copy destination.
+     *
+     * Every subresource argument defaults to nullopt, meaning the whole image. Give them to
+     * transition one mip level or one array layer of a texture on its own, which is how a mip
+     * chain is built (each level is read as a transfer source while the next is written).
+     */
+    class KORAL_API ImageBarrier {
+    public:
+        /**
+         * @param image The image to transition.
+         * @param dstAccess The access the image must support once the barrier has executed, and with it the layout the image is put into.
+         * @param baseMipLevel First mip level of the range; nullopt starts at level 0.
+         * @param levelCount Number of mip levels; nullopt covers every level from @p baseMipLevel to the last.
+         * @param baseArrayLayer First array layer of the range; nullopt starts at layer 0.
+         * @param layerCount Number of array layers; nullopt covers every layer from @p baseArrayLayer to the last.
+         */
+        ImageBarrier(
+            const kor::ResourceRef<const kor::Image> &image,
+            ResourceAccess dstAccess,
+            std::optional<glm::u32> baseMipLevel = std::nullopt,
+            std::optional<glm::u32> levelCount = std::nullopt,
+            std::optional<glm::u32> baseArrayLayer = std::nullopt,
+            std::optional<glm::u32> layerCount = std::nullopt);
+
+        [[nodiscard]] kor::ResourceRef<const kor::Image> getImage() const { return _image; }
+        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
+        [[nodiscard]] std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] std::optional<glm::u32> getLevelCount() const { return _levelCount; }
+        [[nodiscard]] std::optional<glm::u32> getBaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] std::optional<glm::u32> getLayerCount() const { return _layerCount; }
+
+    private:
+        kor::ResourceRef<const kor::Image> _image;
+        ResourceAccess _dstAccess;
+        std::optional<glm::u32> _baseMipLevel;
+        std::optional<glm::u32> _levelCount;
+        std::optional<glm::u32> _baseArrayLayer;
+        std::optional<glm::u32> _layerCount;
+    };
+
+    /**
+     * @brief Which region of which image CommandBuffer::Blit reads, and where it writes it.
+     *
+     * A blit copies a rectangle between images and rescales it on the way, so the two extents are
+     * independent — that is the difference between it and a copy. Both images are named by the
+     * Blit() call itself; everything else about the transfer is here. Defaults blit the whole of
+     * mip 0, layer 0 onto the whole of the destination's mip 0, layer 0.
+     */
+    class KORAL_API Blit {
+    public:
+        glm::ivec3 srcOffset = { 0, 0, 0 };     ///< Texel coordinate the source rectangle starts at.
+        glm::ivec3 srcExtent = { -1, -1, -1 };  ///< Size of the source rectangle in texels. The default (-1) means the source image's full extent.
+        glm::ivec3 dstOffset = { 0, 0, 0 };     ///< Texel coordinate the destination rectangle starts at.
+        glm::ivec3 dstExtent = { -1, -1, -1 };  ///< Size of the destination rectangle in texels. The default (-1) means the destination image's full extent. Differing from @ref srcExtent is what scales the image.
+        glm::u32 srcBaseArrayLayer = 0;         ///< First array layer read from the source.
+        glm::u32 dstBaseArrayLayer = 0;         ///< First array layer written on the destination.
+        glm::u32 layerCount = 1;                ///< How many array layers to blit, starting from the two base layers above.
+        glm::u32 srcMipLevel = 0;               ///< Mip level read from the source.
+        glm::u32 dstMipLevel = 0;               ///< Mip level written on the destination.
+        kor::Filter filtering = kor::Filter::eNearest;  ///< How texels are sampled when the two extents differ. Only meaningful when they do — a same-size blit reads each texel exactly once either way.
+    };
+
+    /**
+     * @brief Which region of which image CommandBuffer::Resolve reads, and where it writes it.
+     *
+     * A resolve collapses a multisampled image into a single-sampled one — the step that turns
+     * an MSAA render target into something that can be sampled or presented. It is a Blit without
+     * the filter: the samples of each pixel are combined by the resolve mode, not interpolated,
+     * so the two extents are expected to match.
+     */
+    class KORAL_API Resolve {
+    public:
+        glm::ivec3 srcOffset = { 0, 0, 0 };     ///< Texel coordinate the source rectangle starts at.
+        glm::ivec3 srcExtent = { -1, -1, -1 };  ///< Size of the source rectangle in texels. The default (-1) means the source image's full extent.
+        glm::ivec3 dstOffset = { 0, 0, 0 };     ///< Texel coordinate the destination rectangle starts at.
+        glm::ivec3 dstExtent = { -1, -1, -1 };  ///< Size of the destination rectangle in texels. The default (-1) means the destination image's full extent.
+        glm::u32 srcBaseArrayLayer = 0;         ///< First array layer read from the source.
+        glm::u32 dstBaseArrayLayer = 0;         ///< First array layer written on the destination.
+        glm::u32 layerCount = 1;                ///< How many array layers to resolve, starting from the two base layers above.
+        glm::u32 srcMipLevel = 0;               ///< Mip level read from the source.
+        glm::u32 dstMipLevel = 0;               ///< Mip level written on the destination.
+    };
+
+    /**
+     * @brief How buffer memory is laid out against image texels, for the copies in both directions.
+     *
+     * Shared by CommandBuffer::CopyBufferToImage and CommandBuffer::CopyImageToBuffer; the buffer
+     * is the source in the first and the destination in the second, but the layout it describes is
+     * the same either way. Defaults copy the whole of mip 0, layer 0 to or from tightly packed
+     * memory at the start of the buffer.
+     */
+    class KORAL_API Copy {
+    public:
+        glm::u64 bufferOffset = 0;              ///< Byte offset into the buffer where the texel data begins.
+        glm::u64 bufferRowLength = 0;           ///< Row pitch in *texels*, for buffer memory with padding between rows. The default (0) means rows are tightly packed, i.e. equal to @ref imageExtent.x.
+        glm::u64 bufferImageHeight = 0;         ///< Slice pitch in *rows*, for buffer memory with padding between 2D slices. The default (0) means slices are tightly packed, i.e. equal to @ref imageExtent.y.
+        glm::ivec3 imageOffset = { 0, 0, 0 };   ///< Texel coordinate in the image the copied region starts at.
+        glm::ivec3 imageExtent = { -1, -1, -1 };///< Size of the copied region in texels. The default (-1) means the image's full extent.
+        glm::u32 imageBaseArrayLayer = 0;       ///< First array layer copied.
+        glm::u32 imageLayerCount = 1;           ///< How many array layers to copy, starting from @ref imageBaseArrayLayer.
+        glm::u32 imageMipLevel = 0;             ///< Mip level copied.
+    };
+
+    /**
+     * @brief What happens to an attachment's existing contents when a render pass opens.
+     */
+    enum class LoadOperation {
+        eLoad,      ///< Keep what is already in the attachment and draw over it. Costs the bandwidth of reading it back, and is what you want when adding to an image rendered earlier in the frame.
+        eClear,     ///< Fill the attachment with its clear value first. Usually the cheapest way to start a pass, because the hardware never has to read the old contents.
+        eDontCare   ///< Leave the contents undefined. Only correct when the pass writes every pixel it will later read; anything else reads garbage that differs between GPUs.
+    };
+
+    /**
+     * @brief What happens to an attachment's contents when a render pass closes.
+     */
+    enum class StoreOperation {
+        eStore,     ///< Write the results back to memory, so a later pass — or the display — can read them.
+        eDontCare   ///< Discard them. Right for a depth buffer nothing reads after the pass, and it saves the bandwidth of writing it out.
+    };
+
+    /**
+     * @brief The load/store behaviour a render pass opens with, passed to CommandBuffer::BeginRendering.
+     *
+     * Three attachment kinds, each with a load op deciding what the pass starts from and a store op
+     * deciding what survives it. Which of them apply depends on the framebuffer being rendered to;
+     * settings for an attachment it does not have are ignored. Defaults clear everything on entry
+     * and keep everything on exit, which is the correct-but-conservative choice — a depth buffer
+     * nothing samples afterwards is worth switching to StoreOperation::eDontCare.
+     */
+    class KORAL_API RenderParameters {
+    public:
+        kor::LoadOperation colorLoadOperation = kor::LoadOperation::eClear;     ///< What the colour attachments start from.
+        kor::LoadOperation depthLoadOperation = kor::LoadOperation::eClear;     ///< What the depth attachment starts from.
+        kor::LoadOperation stencilLoadOperation = kor::LoadOperation::eClear;   ///< What the stencil attachment starts from.
+
+        kor::StoreOperation colorStoreOperation = kor::StoreOperation::eStore;      ///< Whether the colour results survive the pass.
+        kor::StoreOperation depthStoreOperation = kor::StoreOperation::eStore;      ///< Whether the depth results survive the pass.
+        kor::StoreOperation stencilStoreOperation = kor::StoreOperation::eStore;    ///< Whether the stencil results survive the pass.
+    };
+
+    /**
+     * @brief What one CommandBuffer::BeginTimer / EndTimer scope cost on the GPU.
+     *
+     * Produced by CommandBuffer::getTimings(), in the order the scopes were opened. The time is
+     * measured on the device, so it is what the GPU spent, not what the recording thread did.
+     *
+     * @see CommandBuffer::BeginTimer
+     */
+    struct TimerResult {
+        std::string label;          ///< The name given to BeginTimer.
+        double milliseconds = 0.0;  ///< GPU time between the scope's two timestamps.
+        glm::u32 depth = 0;         ///< Nesting depth; 0 for an outermost scope, 1 for one opened inside it, and so on.
+    };
+
+    /**
+     * @brief Selects which polygon face(s) a stencil setter affects.
+     *
+     * Mirrors the per-face stencil model, so front and back can carry different masks, references
+     * and operations — which is how single-pass techniques like stencil shadow volumes count
+     * front and back faces against the same buffer.
+     */
+    enum class StencilFace : glm::u8 {
+        eFront = 1,         ///< Front-facing polygons only, as decided by FrontFace.
+        eBack = 2,          ///< Back-facing polygons only.
+        eFrontAndBack = 3,  ///< Both, with the same value. The usual choice.
+    };
+
+    /**
+     * @brief One flag per pipeline-derived dynamic state the command buffer tracks.
+     *
+     * A bit is set once the state has a current value on the GPU — either applied from the bound
+     * pipeline's default or overridden by an explicit CommandBuffer::Set* call — and cleared when a
+     * new graphics pipeline is bound. What the tracking buys is that a pipeline's baked defaults are
+     * applied lazily, before the first draw that needs them, instead of being re-sent on every bind.
+     *
+     * @see CommandBuffer::applyDynamicDefaults
+     */
+    enum class DynamicState : glm::u32 {
+        eLineWidth              = 1 << 0,   ///< @see CommandBuffer::SetLineWidth
+        eDepthBias              = 1 << 1,   ///< @see CommandBuffer::SetDepthBias
+        eBlendConstants         = 1 << 2,   ///< @see CommandBuffer::SetBlendConstants
+        eStencilCompareMask     = 1 << 3,   ///< @see CommandBuffer::SetStencilCompareMask
+        eStencilWriteMask       = 1 << 4,   ///< @see CommandBuffer::SetStencilWriteMask
+        eStencilReference       = 1 << 5,   ///< @see CommandBuffer::SetStencilReference
+        eCullMode               = 1 << 6,   ///< @see CommandBuffer::SetCullMode
+        eFrontFace              = 1 << 7,   ///< @see CommandBuffer::SetFrontFace
+        eDepthTestEnable        = 1 << 8,   ///< @see CommandBuffer::SetDepthTestEnable
+        eDepthWriteEnable       = 1 << 9,   ///< @see CommandBuffer::SetDepthWriteEnable
+        eDepthCompareOp         = 1 << 10,  ///< @see CommandBuffer::SetDepthCompareOp
+        eStencilTestEnable      = 1 << 11,  ///< @see CommandBuffer::SetStencilTestEnable
+        eStencilOp              = 1 << 12,  ///< @see CommandBuffer::SetStencilOp
+        eDepthBiasEnable        = 1 << 13,  ///< @see CommandBuffer::SetDepthBiasEnable
+        eRasterizerDiscardEnable = 1 << 14, ///< @see CommandBuffer::SetRasterizerDiscardEnable
+        ePrimitiveRestartEnable = 1 << 15,  ///< @see CommandBuffer::SetPrimitiveRestartEnable
     };
 }

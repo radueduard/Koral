@@ -100,11 +100,20 @@ namespace kor::ogl
 
     CommandBuffer::CommandBuffer(const Flags<Usage> usage): kor::CommandBuffer(usage) {}
 
+    CommandBuffer::~CommandBuffer()
+    {
+        if (!_timerQueries.empty())
+            glDeleteQueries(static_cast<GLsizei>(_timerQueries.size()), _timerQueries.data());
+    }
+
     kor::CommandBuffer& CommandBuffer::Begin()
     {
         if (_filled) throw std::runtime_error("CommandBuffer has already been recorded! You must reset it first!");
         resetErrors();
         clearRecords();
+        // Re-recording is proof the previous replay is behind us, so this is where the last
+        // submission's timestamps are collected. @see kor::CommandBuffer::retireTimers
+        retireTimers();
         _recording = true;
 
         return *this;
@@ -120,6 +129,7 @@ namespace kor::ogl
         // Same two-phase finish as Vulkan: with the whole sequence recorded, work out where the
         // barriers belong. They are emitted at Submit, when the GL context actually runs them.
         resolveBarriers();
+        submitTimers();
     }
 
     kor::CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, glm::vec4)
@@ -219,6 +229,18 @@ namespace kor::ogl
         enqueue([this] ()
         {
             kor::CommandBuffer::EndRendering();
+
+            // Hand the binding back to the window.
+            //
+            // GL has no notion of "outside a render pass": whatever framebuffer was last bound
+            // stays bound, and anything drawn afterwards lands in it. The base call above only
+            // clears our *state*, so without this the offscreen target the pass just finished
+            // with is still the draw buffer — and the GUI, which is recorded as a plain Run()
+            // rather than inside a pass of its own (@see ogl::GUI::Render), drew the entire
+            // editor into the scene's texture. The window's back buffer was never touched, so it
+            // presented exactly what it was cleared to: black.
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glCheckError();
         });
         return *this;
     }
@@ -1044,8 +1066,11 @@ namespace kor::ogl
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
             const auto& oglImage = dynamic_cast<const ogl::Image&>(*image);
 
-            const GLenum baseFormat = ogl::Image::BaseFormatFromImageFormat(image->getFormat());
-            const GLenum dataType = ogl::Image::DataTypeFromImageFormat(image->getFormat());
+            // A compressed format has no base format or data type — the driver is handed blocks, not
+            // texels — and asking for them would throw. Resolved only for the uncompressed path.
+            const bool compressed = kor::Image::IsBlockCompressed(image->getFormat());
+            const GLenum baseFormat = compressed ? GL_NONE : ogl::Image::BaseFormatFromImageFormat(image->getFormat());
+            const GLenum dataType = compressed ? GL_NONE : ogl::Image::DataTypeFromImageFormat(image->getFormat());
             const glm::ivec3 ext = resolveCopyExtent(*image, copyInfo);
             const GLint mip = static_cast<GLint>(copyInfo.imageMipLevel);
 
@@ -1058,6 +1083,41 @@ namespace kor::ogl
             glCheckError();
 
             const auto ptr = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(copyInfo.bufferOffset));
+
+            // A compressed format goes through the glCompressedTextureSubImage* entry points, which
+            // take a byte count rather than a format/type pair: the driver is handed blocks it does
+            // not unpack. GL_UNPACK_ROW_LENGTH does not apply to them either, so the data must be
+            // tightly packed — which is what SizeOfRegion measures and what every loader produces.
+            if (compressed) {
+                const GLenum internalFormat = ogl::Image::InternalFormatFromImageFormat(image->getFormat());
+                const auto byteCount = static_cast<GLsizei>(kor::Image::SizeOfRegion(
+                    image->getFormat(),
+                    { static_cast<glm::u32>(ext.x), static_cast<glm::u32>(ext.y), static_cast<glm::u32>(ext.z) },
+                    copyInfo.imageLayerCount));
+
+                if (image->getType() == kor::Image::Type::e2D && image->getArrayLayers() == 1) {
+                    glCompressedTextureSubImage2D(*oglImage, mip, copyInfo.imageOffset.x, copyInfo.imageOffset.y,
+                                                  ext.x, ext.y, internalFormat, byteCount, ptr);
+                } else if (image->getType() == kor::Image::Type::e2D) {
+                    glCompressedTextureSubImage3D(*oglImage, mip, copyInfo.imageOffset.x, copyInfo.imageOffset.y,
+                                                  static_cast<GLint>(copyInfo.imageBaseArrayLayer),
+                                                  ext.x, ext.y, static_cast<GLint>(copyInfo.imageLayerCount),
+                                                  internalFormat, byteCount, ptr);
+                } else if (image->getType() == kor::Image::Type::e3D) {
+                    glCompressedTextureSubImage3D(*oglImage, mip, copyInfo.imageOffset.x, copyInfo.imageOffset.y,
+                                                  copyInfo.imageOffset.z, ext.x, ext.y, ext.z,
+                                                  internalFormat, byteCount, ptr);
+                } else {
+                    throw std::runtime_error("Unsupported image type for a compressed buffer-to-image copy!");
+                }
+                glCheckError();
+
+                glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+                glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, 0);
+                glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+                glCheckError();
+                return;
+            }
 
             switch (image->getType()) {
             case kor::Image::Type::e1D:
@@ -1100,8 +1160,11 @@ namespace kor::ogl
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
             const auto& oglImage = dynamic_cast<const ogl::Image&>(*image);
 
-            const GLenum baseFormat = ogl::Image::BaseFormatFromImageFormat(image->getFormat());
-            const GLenum dataType = ogl::Image::DataTypeFromImageFormat(image->getFormat());
+            // A compressed format has no base format or data type — the driver is handed blocks, not
+            // texels — and asking for them would throw. Resolved only for the uncompressed path.
+            const bool compressed = kor::Image::IsBlockCompressed(image->getFormat());
+            const GLenum baseFormat = compressed ? GL_NONE : ogl::Image::BaseFormatFromImageFormat(image->getFormat());
+            const GLenum dataType = compressed ? GL_NONE : ogl::Image::DataTypeFromImageFormat(image->getFormat());
             const glm::ivec3 ext = resolveCopyExtent(*image, copyInfo);
             const GLint mip = static_cast<GLint>(copyInfo.imageMipLevel);
 
@@ -1139,7 +1202,13 @@ namespace kor::ogl
 
             const auto bufSize = static_cast<GLsizei>(oglBuffer.getSize() - copyInfo.bufferOffset);
             const auto ptr = reinterpret_cast<void*>(static_cast<std::uintptr_t>(copyInfo.bufferOffset));
-            glGetTextureSubImage(*oglImage, mip, xo, yo, zo, w, h, d, baseFormat, dataType, bufSize, ptr);
+            // The compressed counterpart of the write path: blocks come back as blocks, so there is
+            // no format/type pair to hand over — only how many bytes there is room for.
+            if (compressed) {
+                glGetCompressedTextureSubImage(*oglImage, mip, xo, yo, zo, w, h, d, bufSize, ptr);
+            } else {
+                glGetTextureSubImage(*oglImage, mip, xo, yo, zo, w, h, d, baseFormat, dataType, bufSize, ptr);
+            }
             glCheckError();
 
             glPixelStorei(GL_PACK_ROW_LENGTH, 0);
@@ -1199,6 +1268,54 @@ namespace kor::ogl
         if (_state.boundGraphicsPipeline.has_value())
             return dynamic_cast<const kor::ogl::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value()).getBindlessArrays();
         return empty;
+    }
+
+    void CommandBuffer::WaitForFence() const
+    {
+        glFinish();
+    }
+
+    void CommandBuffer::writeTimerTimestamp(const glm::u32 queryIndex)
+    {
+        // Runs at replay, on the GL thread, so the objects can be created here on demand.
+        if (queryIndex >= _timerQueries.size()) {
+            const auto first = _timerQueries.size();
+            _timerQueries.resize(queryIndex + 1);
+            glGenQueries(static_cast<GLsizei>(_timerQueries.size() - first), _timerQueries.data() + first);
+            glCheckError();
+        }
+        // glQueryCounter, not the GL_TIME_ELAPSED pair: elapsed-time queries cannot nest (only one
+        // may be active at a time), and nested scopes are the point. Two independent counters
+        // subtracted give the same answer and nest freely.
+        glQueryCounter(_timerQueries[queryIndex], GL_TIMESTAMP);
+        glCheckError();
+    }
+
+    bool CommandBuffer::readTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
+    {
+        const glm::u32 queryCount = scopeCount * 2;
+        if (scopeCount == 0 || queryCount > _timerQueries.size()) return false;
+
+        // GL_QUERY_RESULT_AVAILABLE rather than GL_QUERY_RESULT: the latter blocks until the result
+        // arrives, which would stall the recording thread on the GPU — exactly what this must not do.
+        for (glm::u32 i = 0; i < queryCount; ++i) {
+            GLuint available = GL_FALSE;
+            glGetQueryObjectuiv(_timerQueries[i], GL_QUERY_RESULT_AVAILABLE, &available);
+            if (available == GL_FALSE) return false;
+        }
+
+        millisecondsOut.clear();
+        millisecondsOut.reserve(scopeCount);
+        for (glm::u32 i = 0; i < scopeCount; ++i) {
+            GLuint64 begin = 0, end = 0;
+            glGetQueryObjectui64v(_timerQueries[i * 2], GL_QUERY_RESULT, &begin);
+            glGetQueryObjectui64v(_timerQueries[i * 2 + 1], GL_QUERY_RESULT, &end);
+            // GL timestamps are nanoseconds.
+            const double nanoseconds = end >= begin ? static_cast<double>(end - begin) : 0.0;
+            millisecondsOut.push_back(nanoseconds / 1'000'000.0);
+        }
+        glCheckError();
+        return true;
     }
 
     kor::CommandBuffer & CommandBuffer::PushConstants(const void *data, glm::u32 size, glm::u32 offset) {

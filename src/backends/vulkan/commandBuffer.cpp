@@ -42,15 +42,26 @@ namespace kor::vk
     CommandBuffer::CommandBuffer(const kor::vk::Queue& queue, const ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool& parentCommandPool)
         : kor::CommandBuffer(getCommandBufferUsage(queue)), _queue(queue), _parentPool(parentCommandPool) {
         _handle = commandBuffer;
-        _signalSemaphore = Context::Device()->createSemaphore({});
         _fence = kor::vk::Context::Device()->createFence({});
+
+        // Timestamps are not universal: a queue family may report zero valid timestamp bits, which
+        // is the driver saying this queue cannot be timed. Leaving the period at zero is what makes
+        // supportsTimers() false and turns the timer commands into no-ops on such a queue.
+        if (queue.getFamily().getProperties().timestampValidBits > 0) {
+            _timestampPeriod = Context::Runtime().getPhysicalDevice().getProperties().limits.timestampPeriod;
+            if (_timestampPeriod > 0.f) {
+                _timerPool = Context::Device()->createQueryPool(::vk::QueryPoolCreateInfo()
+                    .setQueryType(::vk::QueryType::eTimestamp)
+                    .setQueryCount(MaxTimerScopes * 2));
+            }
+        }
     }
 
     CommandBuffer::~CommandBuffer() {
         Context::Device().freeCommandBuffer(*this);
 
-        Context::Device()->destroySemaphore(_signalSemaphore);
         Context::Device()->destroyFence(_fence);
+        if (_timerPool) Context::Device()->destroyQueryPool(_timerPool);
     }
 
     void CommandBuffer::Run(const std::function<void(const kor::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore) const {
@@ -68,9 +79,6 @@ namespace kor::vk
                 .setWaitSemaphores(waitSemaphore)
                 .setWaitDstStageMask(dstStageMask);
 
-        if (_signalSemaphore != nullptr)
-            submitInfo.setSignalSemaphores(_signalSemaphore);
-
         try {
             _queue->submit(submitInfo, _fence);
         } catch (const std::runtime_error& e) {
@@ -82,6 +90,10 @@ namespace kor::vk
     {
         resetErrors();
         clearRecords();
+        // Before the pool is reset below, which is what destroys the results being collected.
+        // Re-recording is proof the GPU is done with the last submission, so this is the earliest
+        // moment the previous frame's timestamps can be read — and the reason they are read here.
+        retireTimers();
         constexpr auto commandBufferBeginInfo = ::vk::CommandBufferBeginInfo()
             .setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
         _handle.begin(commandBufferBeginInfo);
@@ -93,6 +105,17 @@ namespace kor::vk
         // Nothing recorded so far has reached the GPU. Work out where the barriers belong now
         // that the whole sequence is visible, then emit everything in order.
         resolveBarriers();
+
+        // A timestamp may only be written into a query that has been reset, and vkCmdResetQueryPool
+        // is illegal inside a render pass. Here is the one point that satisfies both without
+        // guessing: the recording is complete, so the exact number of scopes is known, and not a
+        // single command has been emitted yet, so we are outside every pass the frame will open.
+        // Sized to what was actually recorded, which is why a frame that opens no scope resets
+        // nothing at all.
+        if (const glm::u32 scopes = timerScopeCount(); _timerPool && scopes > 0)
+            _handle.resetQueryPool(_timerPool, 0, scopes * 2);
+
+        submitTimers();
         emitRecords();
         _handle.end();
     }
@@ -497,10 +520,13 @@ namespace kor::vk
             const auto dstAccessMask = getVkAccessFlags(barrier.getDstAccess());
             const auto aspectMask = getVkImageAspectFlags(vkImage.getFormat());
 
+            // An absent count means "the rest of the image", so it is measured from the base
+            // rather than from zero. Resolving it to the image's *total* count instead walked past
+            // the last level whenever a base was given without one. Matches resolveBarriers().
             const auto baseMip = barrier.getBaseMipLevel().value_or(0);
-            const auto mipCount = barrier.getLevelCount().value_or(vkImage.getMipLevels());
+            const auto mipCount = barrier.getLevelCount().value_or(vkImage.getMipLevels() - baseMip);
             const auto baseLayer = barrier.getBaseArrayLayer().value_or(0);
-            const auto layerCount = barrier.getLayerCount().value_or(vkImage.getArrayLayers());
+            const auto layerCount = barrier.getLayerCount().value_or(vkImage.getArrayLayers() - baseLayer);
 
             // The current (old) layout and access mask are tracked per subresource, and a
             // range can legitimately span subresources in different layouts — e.g. right
@@ -718,7 +744,7 @@ namespace kor::vk
                     ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.z },
                     ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y, blitInfo.dstOffset.z + blitInfo.dstExtent.z }
                 }),
-            ::vk::Filter::eNearest);
+            getVkFilter(blitInfo.filtering));
 
         return *this;
     }
@@ -758,7 +784,7 @@ namespace kor::vk
                     ::vk::Offset3D{ blitInfo.dstOffset.x, blitInfo.dstOffset.y, blitInfo.dstOffset.z },
                     ::vk::Offset3D{ blitInfo.dstOffset.x + blitInfo.dstExtent.x, blitInfo.dstOffset.y + blitInfo.dstExtent.y, blitInfo.dstOffset.z + blitInfo.dstExtent.z }
                 }),
-            ::vk::Filter::eNearest);
+            getVkFilter(blitInfo.filtering));
          return *this;
     }
 
@@ -902,19 +928,32 @@ namespace kor::vk
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;
         if (copyInfo.bufferImageHeight == 0)
             copyInfo.bufferImageHeight = copyInfo.imageExtent.y;
+
+        // A compressed format is addressed in blocks, and Vulkan requires the buffer's row length and
+        // image height to be whole numbers of them. The last mip levels of any texture are smaller
+        // than one block — a 2x2 level of a 4x4 format — so rounding up here is not an edge case but
+        // the ordinary end of every mip chain.
+        if (Image::IsBlockCompressed(image->getFormat())) {
+            const auto block = Image::BlockExtentFromImageFormat(image->getFormat());
+            const auto roundUp = [](const glm::u32 value, const glm::u32 to) { return (value + to - 1) / to * to; };
+            copyInfo.bufferRowLength = roundUp(copyInfo.bufferRowLength, block.x);
+            copyInfo.bufferImageHeight = roundUp(copyInfo.bufferImageHeight, block.y);
+        }
         if (copyInfo.bufferRowLength < copyInfo.imageExtent.x || copyInfo.bufferImageHeight < copyInfo.imageExtent.y)
             return record(ErrorCode::eInvalidArgument,
                 std::format("Buffer row length {} / image height {} too small for image extent {}x{}.",
                             copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y));
-        // Copy footprint in *bytes* (not texels): rowLength*imageHeight give the packed
-        // texel counts, times depth and layer count, times the format's texel size. For
-        // packed (unpadded) buffers this is the exact required size. Depth/stencil texel
-        // sizes are conservatively over-estimated, which only makes the guard stricter.
+        // Copy footprint in *bytes* (not texels): rowLength/imageHeight give the packed extent, and
+        // SizeOfRegion turns it into bytes — counting blocks for a compressed format and texels for
+        // an uncompressed one, so a BC7 upload is measured in the units it is actually stored in
+        // rather than in texels it does not have. For packed (unpadded) buffers this is the exact
+        // required size. Depth/stencil texel sizes are conservatively over-estimated, which only
+        // makes the guard stricter.
         {
-            const glm::u64 texelSize = static_cast<glm::u64>(Image::ChannelSizeFromImageFormat(image->getFormat()))
-                                     * Image::ChannelCountFromImageFormat(image->getFormat());
-            const glm::u64 copyBytes = static_cast<glm::u64>(copyInfo.bufferRowLength) * copyInfo.bufferImageHeight
-                                     * copyInfo.imageExtent.z * copyInfo.imageLayerCount * texelSize;
+            const glm::u64 copyBytes = Image::SizeOfRegion(
+                image->getFormat(),
+                { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
+                copyInfo.imageLayerCount);
             if (copyBytes + copyInfo.bufferOffset > vkBuffer.getSize())
                 return record(ErrorCode::eCopySizeExceedsBuffer,
                     std::format("Buffer offset {} + copy size {} exceeds buffer size {}.",
@@ -975,19 +1014,32 @@ namespace kor::vk
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;
         if (copyInfo.bufferImageHeight == 0)
             copyInfo.bufferImageHeight = copyInfo.imageExtent.y;
+
+        // A compressed format is addressed in blocks, and Vulkan requires the buffer's row length and
+        // image height to be whole numbers of them. The last mip levels of any texture are smaller
+        // than one block — a 2x2 level of a 4x4 format — so rounding up here is not an edge case but
+        // the ordinary end of every mip chain.
+        if (Image::IsBlockCompressed(image->getFormat())) {
+            const auto block = Image::BlockExtentFromImageFormat(image->getFormat());
+            const auto roundUp = [](const glm::u32 value, const glm::u32 to) { return (value + to - 1) / to * to; };
+            copyInfo.bufferRowLength = roundUp(copyInfo.bufferRowLength, block.x);
+            copyInfo.bufferImageHeight = roundUp(copyInfo.bufferImageHeight, block.y);
+        }
         if (copyInfo.bufferRowLength < copyInfo.imageExtent.x || copyInfo.bufferImageHeight < copyInfo.imageExtent.y)
             return record(ErrorCode::eInvalidArgument,
                 std::format("Buffer row length {} / image height {} too small for image extent {}x{}.",
                             copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y));
-        // Copy footprint in *bytes* (not texels): rowLength*imageHeight give the packed
-        // texel counts, times depth and layer count, times the format's texel size. For
-        // packed (unpadded) buffers this is the exact required size. Depth/stencil texel
-        // sizes are conservatively over-estimated, which only makes the guard stricter.
+        // Copy footprint in *bytes* (not texels): rowLength/imageHeight give the packed extent, and
+        // SizeOfRegion turns it into bytes — counting blocks for a compressed format and texels for
+        // an uncompressed one, so a BC7 upload is measured in the units it is actually stored in
+        // rather than in texels it does not have. For packed (unpadded) buffers this is the exact
+        // required size. Depth/stencil texel sizes are conservatively over-estimated, which only
+        // makes the guard stricter.
         {
-            const glm::u64 texelSize = static_cast<glm::u64>(Image::ChannelSizeFromImageFormat(image->getFormat()))
-                                     * Image::ChannelCountFromImageFormat(image->getFormat());
-            const glm::u64 copyBytes = static_cast<glm::u64>(copyInfo.bufferRowLength) * copyInfo.bufferImageHeight
-                                     * copyInfo.imageExtent.z * copyInfo.imageLayerCount * texelSize;
+            const glm::u64 copyBytes = Image::SizeOfRegion(
+                image->getFormat(),
+                { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
+                copyInfo.imageLayerCount);
             if (copyBytes + copyInfo.bufferOffset > vkBuffer.getSize())
                 return record(ErrorCode::eCopySizeExceedsBuffer,
                     std::format("Buffer offset {} + copy size {} exceeds buffer size {}.",
@@ -1045,12 +1097,14 @@ namespace kor::vk
     kor::VoidResult CommandBuffer::Submit()
     {
         const auto commandBuffers = std::array { _handle };
-        auto submitInfo = ::vk::SubmitInfo()
+        const auto submitInfo = ::vk::SubmitInfo()
             .setCommandBuffers(commandBuffers);
 
-        if (_signalSemaphore != nullptr)
-            submitInfo.setSignalSemaphores(_signalSemaphore);
-
+        // Nothing is signalled but the fence. A semaphore was signalled here too, with no waiter
+        // anywhere, which made the second submit of any re-recorded buffer invalid: a binary
+        // semaphore must be unsignalled when the signal operation executes, and nothing was
+        // consuming it to get it back there.
+        //
         // Submit regardless of recorded errors so the fence still signals (callers
         // WaitForFence afterwards); report the first error, if any, to the caller.
         try {
@@ -1079,6 +1133,54 @@ namespace kor::vk
         } catch (const std::runtime_error& e) {
             std::cerr << e.what() << std::endl;
         }
+    }
+
+    void CommandBuffer::writeTimerTimestamp(const glm::u32 queryIndex)
+    {
+        if (!_timerPool) return;
+        // An even slot opens a scope and an odd one closes it. Timestamping the *earliest* stage on
+        // the way in and the *latest* on the way out is what makes the pair bracket the work rather
+        // than sample two arbitrary points inside it: the write happens once everything before it
+        // has reached that stage, so top-of-pipe going in cannot land after the scope's first
+        // command started, and bottom-of-pipe coming out cannot land before its last one finished.
+        const auto stage = (queryIndex % 2 == 0)
+            ? ::vk::PipelineStageFlagBits::eTopOfPipe
+            : ::vk::PipelineStageFlagBits::eBottomOfPipe;
+        _handle.writeTimestamp(stage, _timerPool, queryIndex);
+    }
+
+    bool CommandBuffer::readTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
+    {
+        if (!_timerPool || scopeCount == 0) return false;
+
+        const glm::u32 queryCount = scopeCount * 2;
+        // Two values per query: the tick count and whether it has one yet. Asking for availability
+        // instead of passing eWait is the whole point — this must never block the recording thread,
+        // and a not-yet-ready result simply means the caller keeps the timings it already had.
+        struct Query { glm::u64 ticks; glm::u64 available; };
+        std::vector<Query> results(queryCount);
+
+        const auto result = Context::Device()->getQueryPoolResults(
+            _timerPool, 0, queryCount,
+            results.size() * sizeof(Query), results.data(), sizeof(Query),
+            ::vk::QueryResultFlagBits::e64 | ::vk::QueryResultFlagBits::eWithAvailability);
+
+        if (result != ::vk::Result::eSuccess) return false;   // eNotReady, most often
+        for (const auto& [ticks, available] : results) {
+            if (!available) return false;
+        }
+
+        millisecondsOut.clear();
+        millisecondsOut.reserve(scopeCount);
+        for (glm::u32 i = 0; i < scopeCount; ++i) {
+            const glm::u64 begin = results[i * 2].ticks;
+            const glm::u64 end = results[i * 2 + 1].ticks;
+            // Timestamps are only valid to timestampValidBits, so the counter can wrap between a
+            // scope's two reads. Report zero rather than the enormous number the subtraction gives.
+            const double ticks = end >= begin ? static_cast<double>(end - begin) : 0.0;
+            millisecondsOut.push_back(ticks * static_cast<double>(_timestampPeriod) / 1'000'000.0);
+        }
+        return true;
     }
 
     kor::CommandBuffer& CommandBuffer::PushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {

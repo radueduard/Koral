@@ -22,6 +22,7 @@ namespace kor::ogl
     public:
         void CheckRecording() const;
         explicit CommandBuffer(Flags<Usage> usage);
+        ~CommandBuffer() override;
 
         kor::CommandBuffer& Begin() override;
         void End() override;
@@ -94,10 +95,21 @@ namespace kor::ogl
         [[nodiscard]] GLuint getBoundPipelineProgram() const;
         [[nodiscard]] const std::vector<BindlessSamplerArray>& getBoundPipelineBindlessArrays() const;
 
-        void WaitForFence() const override {}
+        // glFinish, not nothing. The contract is "blocks until the GPU has finished the work
+        // submitted from this buffer", and callers rely on it: a readback expects its data to be
+        // there, and CollectTimer expects the timestamps to have landed. GL mostly got away with a
+        // no-op because a following readback synchronises implicitly — a query poll does not.
+        void WaitForFence() const override;
+
+        // glQueryCounter is core in 3.3 and the scheduler already refuses to start below 4.5, so
+        // there is no device here that cannot be timed.
+        [[nodiscard]] bool supportsTimers() const override { return true; }
 
     protected:
         kor::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
+
+        void writeTimerTimestamp(glm::u32 queryIndex) override;
+        bool readTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) override;
 
     private:
         // Issue the default full-framebuffer viewport/scissor at replay time when the
@@ -137,6 +149,11 @@ namespace kor::ogl
         bool _recording = false;
         bool _filled = false;
         bool _submitted = false;
+
+        // Two GL query objects per timer scope, grown on demand and then reused for the life of
+        // the command buffer. Unlike Vulkan's pool these need no reset: glQueryCounter overwrites
+        // the object's result outright.
+        std::vector<GLuint> _timerQueries;
     };
 }
 

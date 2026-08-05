@@ -26,6 +26,13 @@
 #include "../backends/vulkan/vulkanContext.h"
 #include "../../include/window.h"
 
+// Every command here that takes a resource is a non-virtual wrapper: it validates, rejects
+// unusable resources, updates the tracked state, and only then calls the matching do* the backend
+// implements. A backend therefore *cannot* be handed a poisoned or destroyed resource — which is
+// the precondition that all ~150 `dynamic_cast<const vk::X&>(*ref)` sites in the backends have
+// always silently assumed. That used to be a convention each override had to remember, and several
+// did not; the split makes it structural.
+
 namespace kor
 {
     namespace
@@ -137,14 +144,28 @@ namespace kor
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
 
+    // ---- Deferred recording ---------------------------------------------------------------
+    //
+    // A command does not reach the backend when it is called. It validates immediately — so a
+    // destroyed or poisoned resource still fails at the caller's line — and then parks an emit
+    // closure together with the set of resources it touches. End() walks that list twice: once to
+    // work out where barriers belong, once to emit everything in order.
+    //
+    // The lookahead is the whole point. A transition a draw needs often has to be emitted *before*
+    // the render pass containing that draw was opened (sample a shadow map that was rendered
+    // earlier in the frame), and Vulkan forbids a layout transition inside a render pass. Holding
+    // the commands lets the resolver insert the barrier at a legal point instead of breaking the
+    // pass apart.
     CommandBuffer& CommandBuffer::enqueue(const char* command, const std::source_location where,
                                           std::vector<ResourceUse> uses, const PassEdge pass,
                                           std::function<void()> emit, const bool transitions,
                                           const bool dereferencesDeviceAddresses)
     {
-        // Recorded from inside another command's emit: there is no recording left to join, and
-        // appending here would invalidate emitRecords()' walk. Run it where it stands, which
-        // also keeps it in the right order relative to the command that triggered it.
+        // Recorded from inside another command's emit — Run()'s lambda calls straight back into the
+        // API, and applyDynamicDefaults() reaches back through the virtual Set* overrides. There is
+        // no recording left to join, and appending here would invalidate emitRecords()' walk. Run it
+        // where it stands, which also keeps it in the right order relative to the command that
+        // triggered it. This mirrors the OpenGL backend's own `_executing` guard.
         if (_emitting) {
             emit();
             return *this;
@@ -383,10 +404,13 @@ namespace kor
                 if (!use.image.alive()) continue;
                 trackedImages.emplace(use.image.get(), use.image);
 
+                // An absent count means "the rest of the image", so it is measured from the base
+                // rather than from zero. Resolving it to the image's *total* count instead walked
+                // past the last level whenever a base was given without one.
                 const auto baseMip = use.baseMipLevel.value_or(0);
-                const auto mipCount = use.levelCount.value_or(use.image->getMipLevels());
+                const auto mipCount = use.levelCount.value_or(use.image->getMipLevels() - baseMip);
                 const auto baseLayer = use.baseArrayLayer.value_or(0);
-                const auto layerCount = use.layerCount.value_or(use.image->getArrayLayers());
+                const auto layerCount = use.layerCount.value_or(use.image->getArrayLayers() - baseLayer);
 
                 // Per subresource: a range can straddle subresources sitting in different
                 // states — right after GenerateMipmaps the last mip is still TransferDst while
@@ -471,23 +495,45 @@ namespace kor
 
         if (pending.empty()) return;
 
-        // Splice back to front so the earlier indices stay valid.
-        for (auto batch = pending.rbegin(); batch != pending.rend(); ++batch) {
-            auto buffers = std::move(batch->buffers);
-            auto images = std::move(batch->images);
-            if (buffers.empty() && images.empty()) continue;
+        // Merged in one pass into a fresh vector rather than spliced in place.
+        //
+        // Splicing read better — insert each barrier at its index, back to front so the earlier
+        // indices stay valid — but every insert shifts the tail of the vector, and a Record is not
+        // cheap to move: a std::function, a vector of ResourceRefs, a source_location. A recording
+        // where most commands need a barrier therefore cost O(n²) moves, which is not a corner
+        // case: back-to-back dispatches over one storage buffer are the normal shape of an
+        // iterative GPU algorithm, and each one write-after-writes the last. An odd-even
+        // transposition sort at a few thousand passes spent most of a second here.
+        //
+        // batchFor() only ever appends with a non-decreasing `at` — inside a pass every barrier
+        // hoists to the index that opened it, and outside one `at` is the current index — so the
+        // batches are already in order and a single merge walk is enough.
+        std::vector<Record> merged;
+        merged.reserve(_records.size() + pending.size());
 
-            Record barrier{
-                .emit = [this, buffers = std::move(buffers), images = std::move(images)]() mutable {
+        std::size_t next = 0;
+        for (auto& batch : pending) {
+            while (next < batch.at) merged.push_back(std::move(_records[next++]));
+
+            if (batch.buffers.empty() && batch.images.empty()) continue;
+            merged.push_back(Record{
+                .emit = [this, buffers = std::move(batch.buffers), images = std::move(batch.images)]() mutable {
                     doBarrier(std::move(buffers), std::move(images));
                 },
                 .pass = PassEdge::eNone,
                 .command = "Barrier",
-            };
-            _records.insert(_records.begin() + static_cast<std::ptrdiff_t>(batch->at), std::move(barrier));
+            });
         }
+        while (next < _records.size()) merged.push_back(std::move(_records[next++]));
+
+        _records = std::move(merged);
     }
 
+    // The backends advance _state from inside their do* implementations so their own emit-time
+    // decisions (which bind point a descriptor set belongs to, which dynamic states a draw still
+    // needs defaults for) see the values in force at *that* point in the sequence rather than at the
+    // end of recording. That replay only lands correctly if it starts from the same blank slate
+    // recording did, which is what this restores.
     void CommandBuffer::resetTrackedState()
     {
         _state.boundFramebuffer = std::nullopt;
@@ -516,6 +562,9 @@ namespace kor
             if (_records[i].emit) _records[i].emit();
         }
         _emitting = false;
+        // Counted after the walk so that anything appended during it is included, which is what
+        // the barriers the resolver inserted and Run()'s lambda can both amount to.
+        _lastFrameCommandCount = _records.size();
         _records.clear();
     }
 
@@ -575,10 +624,29 @@ namespace kor
         for (const auto& attachment : framebuffer->getColorAttachments()) {
             uses.push_back(ResourceUse{ .image = attachment.get().getImage(), .access = ResourceAccess::ColorAttachment });
         }
-        if (framebuffer->hasDepthAttachment())
-            uses.push_back(ResourceUse{ .image = framebuffer->getDepthAttachment().getImage(), .access = ResourceAccess::DepthAttachment });
-        if (framebuffer->hasStencilAttachment())
-            uses.push_back(ResourceUse{ .image = framebuffer->getStencilAttachment().getImage(), .access = ResourceAccess::StencilAttachment });
+        // Depth and stencil are declared as one use per *image*, at the combined
+        // depth/stencil layout, rather than one per attachment slot.
+        //
+        // A combined format (D32_S8, D24_S8) is one image serving both slots, which is exactly
+        // what the default framebuffer is. Declaring it twice was wrong three times over: the
+        // resolver saw two writes to one subresource in one record and reported the pass as
+        // sampling its own attachment; the barrier it emitted carried the whole format's aspect
+        // mask (depth|stencil) with a depth-only layout, which Vulkan forbids outright; and the
+        // layout it left the image in was not the one BeginRendering then declares.
+        //
+        // One layout per image is also the only thing the tracker can represent — its key is
+        // image + level + layer, with no aspect — and the combined layout is legal for a
+        // depth-only or stencil-only image too, so nothing is given up by using it everywhere.
+        const auto declareDepthStencil = [&](const ImageView& attachment) {
+            auto image = attachment.getImage();
+            for (const auto& use : uses) {
+                if (use.image.get() == image.get()) return;  // the other slot, same image
+            }
+            uses.push_back(ResourceUse{ .image = std::move(image),
+                                        .access = ResourceAccess::DepthStencilAttachment });
+        };
+        if (framebuffer->hasDepthAttachment())   declareDepthStencil(framebuffer->getDepthAttachment());
+        if (framebuffer->hasStencilAttachment()) declareDepthStencil(framebuffer->getStencilAttachment());
 
         return enqueue("BeginRendering", where, std::move(uses), PassEdge::eOpens,
             [this, framebuffer, renderParameters] { doBeginRendering(framebuffer, renderParameters); });
@@ -802,6 +870,163 @@ namespace kor
     CommandBuffer& CommandBuffer::EndDebugLabel() { return *this; }
     CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string&, glm::vec4) { return *this; }
 
+    // ---- GPU timers ---------------------------------------------------------------------------
+    //
+    // A scope owns two query slots, 2i and 2i+1 for the i-th scope opened. Allocating them at
+    // record time is what keeps the emit closures trivial — each one writes a slot it was handed —
+    // and it is safe because the emit walk visits the records in the order they were made, so slot
+    // order and timestamp order agree even after the resolver has interleaved barriers between them.
+
+    CommandBuffer& CommandBuffer::BeginTimer(std::string label, const std::source_location where)
+    {
+        if (_failed) return *this;
+        // Nothing to measure with. Silently inert rather than an error: a scene that times itself
+        // should still run on a queue that cannot timestamp.
+        if (!supportsTimers()) return *this;
+        // Recorded from inside another command's emit callback — a Run() lambda reaching back into
+        // the API. Too late for a scope: the query slots this would need were counted and reset
+        // before the walk began, so its timestamps would be written into queries nothing prepared.
+        if (_emitting) return *this;
+
+        if (_pendingTimers.size() >= MaxTimerScopes) {
+            return record(Error{
+                .code = ErrorCode::eInvalidArgument,
+                .message = std::format("Cannot open the timer '{}': a recording may open at most {} timer scopes.",
+                                       label, MaxTimerScopes),
+                .where = where,
+            });
+        }
+
+        const auto scope = static_cast<glm::u32>(_pendingTimers.size());
+        _pendingTimers.push_back(TimerScope{
+            .label = std::move(label),
+            .depth = static_cast<glm::u32>(_timerStack.size()),
+            .where = where,
+        });
+        _timerStack.push_back(scope);
+
+        return enqueue("BeginTimer", where, {}, PassEdge::eNone,
+                       [this, scope] { writeTimerTimestamp(scope * 2); });
+    }
+
+    CommandBuffer& CommandBuffer::EndTimer(const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (!supportsTimers()) return *this;
+        if (_emitting) return *this;   // paired with the same guard in BeginTimer
+
+        if (_timerStack.empty()) {
+            return record(Error{
+                .code = ErrorCode::eInvalidArgument,
+                .message = "EndTimer without a matching BeginTimer.",
+                .where = where,
+            });
+        }
+
+        const auto scope = _timerStack.back();
+        _timerStack.pop_back();
+
+        return enqueue("EndTimer", where, {}, PassEdge::eNone,
+                       [this, scope] { writeTimerTimestamp(scope * 2 + 1); });
+    }
+
+    bool CommandBuffer::collectTimers()
+    {
+        // Already collected: the results are sitting in _timings and _submittedTimers was emptied
+        // when they landed. Says yes so a repeated CollectTimer keeps working.
+        if (_submittedTimers.empty()) return !_timings.empty();
+
+        std::vector<double> milliseconds;
+        // Not ready is not an error — the results simply stay as they were, which keeps a
+        // profiler's readings steady instead of flickering to nothing.
+        if (!readTimerTimestamps(static_cast<glm::u32>(_submittedTimers.size()), milliseconds)
+            || milliseconds.size() != _submittedTimers.size())
+            return false;
+
+        _timings.clear();
+        _timings.reserve(_submittedTimers.size());
+        for (std::size_t i = 0; i < _submittedTimers.size(); ++i) {
+            _timings.push_back(TimerResult{
+                .label = _submittedTimers[i].label,
+                .milliseconds = milliseconds[i],
+                .depth = _submittedTimers[i].depth,
+            });
+        }
+        _submittedTimers.clear();
+        return true;
+    }
+
+    void CommandBuffer::retireTimers()
+    {
+        // The scopes recorded last time round, now that the GPU has had a whole cycle of frames in
+        // flight to finish them.
+        collectTimers();
+
+        _pendingTimers.clear();
+        _timerStack.clear();
+    }
+
+    const std::vector<TimerResult>& CommandBuffer::CollectTimings()
+    {
+        collectTimers();
+        return _timings;
+    }
+
+    Result<double> CommandBuffer::CollectTimer(const std::string_view label)
+    {
+        if (!supportsTimers())
+            return fail(ErrorCode::eInvalidArgument,
+                        "Cannot read the timer '{}': this command buffer's queue cannot timestamp.", label);
+
+        // Distinguishes the two ways there can be no answer, because the caller's fix differs: work
+        // still in flight needs a WaitForFence or another try, a name that was never recorded needs
+        // the code changed.
+        const bool ready = collectTimers();
+
+        for (const auto& timing : _timings) {
+            if (timing.label == label) return timing.milliseconds;
+        }
+
+        if (!ready)
+            return fail(ErrorCode::eInvalidArgument,
+                        "The timer '{}' has no result yet: the GPU has not finished the work it "
+                        "measures. Wait for the submission to complete (WaitForFence) or ask again later.", label);
+
+        return fail(ErrorCode::eInvalidArgument,
+                    "No timer named '{}' was recorded in the last submission.", label);
+    }
+
+    void CommandBuffer::submitTimers()
+    {
+        // An unclosed scope has a begin timestamp and no end, so it can never resolve. Say so at
+        // End(), where the whole recording is visible, rather than letting it silently vanish —
+        // unless the recording already failed, which is why the scope was left open and has been
+        // reported once already.
+        if (!_failed) {
+            for (const auto scope : _timerStack) {
+                record(Error{
+                    .code = ErrorCode::eInvalidArgument,
+                    .message = std::format("The timer '{}' was never closed with EndTimer.", _pendingTimers[scope].label),
+                    .where = _pendingTimers[scope].where,
+                });
+            }
+        }
+        _timerStack.clear();
+
+        // Replaced outright, never merged. This recording reuses the same query slots from zero, so
+        // whatever the last one left in them is gone whether or not it was ever collected — and
+        // keeping its labels around would pin the new timestamps to the old scopes.
+        //
+        // Note what this does *not* touch: the results already published in _timings. A recording
+        // that opens no scope leaves nothing to collect, and the last real reading stands.
+        _submittedTimers.clear();
+        // Only a complete set can be read back, so a recording that failed publishes nothing: its
+        // scopes may have a begin timestamp and no end.
+        if (_errors.empty())
+            _submittedTimers = std::move(_pendingTimers);
+        _pendingTimers.clear();
+    }
+
     void CommandBuffer::stateBindMesh(const kor::ResourceRef<const Mesh>& mesh)
     {
         _state.boundMesh = mesh;
@@ -818,15 +1043,34 @@ namespace kor
             [this, mesh] { doBindMesh(mesh); });
     }
 
+    glm::uvec2 CommandBuffer::defaultViewportExtent() const
+    {
+        // The framebuffer being rendered into, not the window.
+        //
+        // These are the same thing only when the pass targets the screen. A pass that renders into a
+        // target of its own — a viewport's image, a shadow map, a reflection — would otherwise be
+        // rasterised at the window's size and show a crop of a picture drawn for a surface it is not:
+        // the symptom is a scene that looks "zoomed in" inside a small target and ignores its size.
+        if (_state.boundFramebuffer.has_value() && _state.boundFramebuffer->valid()) {
+            if (const auto extent = (*_state.boundFramebuffer)->getExtent(); extent.x > 0 && extent.y > 0)
+                return extent;
+        }
+        // No pass, or one whose framebuffer says nothing: the window is the only size left to assume,
+        // and it is the right one for the default framebuffer.
+        return Context::Window().getExtent();
+    }
+
     CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, const std::source_location where)
     {
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (!_state.viewportSet) {
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetScissor(0, 0, extent.x, extent.y);
         }
         return *this;
     }
@@ -839,10 +1083,12 @@ namespace kor
         if (!_state.boundMesh.value()->hasIndexBuffer())
             return record(ErrorCode::eMeshHasNoIndexBuffer, "Cannot draw indexed: the bound mesh has no index buffer.");
         if (!_state.viewportSet) {
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetScissor(0, 0, extent.x, extent.y);
         }
         return *this;
     }
@@ -850,18 +1096,46 @@ namespace kor
     CommandBuffer & CommandBuffer::DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, const std::source_location where) {
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw mesh tasks without a graphics pipeline bound.");
-        if (!_state.viewportSet)
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
-        if (!_state.scissorSet)
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+        if (!_state.viewportSet) {
+            const auto extent = defaultViewportExtent();
+            this->SetViewport(0, 0, extent.x, extent.y);
+        }
+        if (!_state.scissorSet) {
+            const auto extent = defaultViewportExtent();
+            this->SetScissor(0, 0, extent.x, extent.y);
+        }
         return *this;
     }
 
+
+    bool CommandBuffer::hasTouched(const kor::ResourceRef<const Image>& image) const
+    {
+        if (!image.alive()) return false;
+
+        // Compared by what they point at: a use holds its own ref to the same image.
+        const auto* target = image.get();
+        for (const auto& record : _records) {
+            for (const auto& use : record.uses) {
+                if (use.image.alive() && use.image.get() == target) return true;
+            }
+        }
+        return false;
+    }
 
     CommandBuffer& CommandBuffer::GenerateMipmaps(kor::ResourceRef<const Image> image)
     {
         if (_failed) return *this;
         if (reject(image, "image")) return *this;
+
+        // Mips are generated by blitting each level from the one above it, and a block-compressed
+        // format cannot be blitted into — the hardware would have to decompress, filter and
+        // re-encode. Said here rather than left to the backend, because the fix is upstream: a
+        // compressed texture carries the mip chain it was encoded with. @see the image modules
+        if (Image::IsBlockCompressed(image->getFormat()))
+            return record(ErrorCode::eInvalidArgument,
+                "Mipmaps cannot be generated for a block-compressed image; encode the mip chain "
+                "into the file instead.");
+
         return doGenerateMipmaps(image);  // expands into Blit records, each declaring its own uses
     }
 
@@ -918,10 +1192,12 @@ namespace kor
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetScissor(0, 0, extent.x, extent.y);
         }
         BindMesh(mesh);
         DrawIndexed(UINT64_MAX, instanceCount, 0, 0, baseInstance);
@@ -932,10 +1208,12 @@ namespace kor
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
-            this->SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
-            this->SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            const auto extent = defaultViewportExtent();
+            this->SetScissor(0, 0, extent.x, extent.y);
         }
         BindMesh(mesh);
         DrawIndexed(indexCount, 1, baseIndex, 0, 0);
@@ -1082,9 +1360,9 @@ namespace kor
         if (reject(indirectBuffer, "indirect buffer")) return *this;
 
         if (!_state.viewportSet)
-            SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            SetViewport(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
         if (!_state.scissorSet)
-            SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
 
         auto uses = usesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::IndirectBuffer, .offset = offset });
@@ -1104,9 +1382,9 @@ namespace kor
         if (reject(indirectBuffer, "indirect buffer")) return *this;
 
         if (!_state.viewportSet)
-            SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            SetViewport(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
         if (!_state.scissorSet)
-            SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
 
         auto uses = usesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::IndirectBuffer, .offset = offset });
@@ -1124,9 +1402,9 @@ namespace kor
         if (reject(indirectBuffer, "indirect buffer")) return *this;
 
         if (!_state.viewportSet)
-            SetViewport(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            SetViewport(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
         if (!_state.scissorSet)
-            SetScissor(0, 0, Context::Window().getExtent().x, Context::Window().getExtent().y);
+            SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
 
         auto uses = usesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::IndirectBuffer, .offset = offset });

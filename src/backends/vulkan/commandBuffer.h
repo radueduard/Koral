@@ -21,7 +21,6 @@ namespace kor::vk
         void Run(const std::function<void(const kor::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore = nullptr) const;
 
         [[nodiscard]] const ::vk::CommandPool& getParentPool() const { return _parentPool; }
-        [[nodiscard]] const ::vk::Semaphore& getSignalSemaphore() const { return _signalSemaphore; }
         [[nodiscard]] const ::vk::Fence& getFence() const { return _fence; }
         [[nodiscard]] const kor::vk::Queue& getQueue() const { return _queue; }
 
@@ -87,6 +86,8 @@ namespace kor::vk
 
         void WaitForFence() const override;
 
+        [[nodiscard]] bool supportsTimers() const override { return _timestampPeriod > 0.f; }
+
     private:
         // Park an emit closure as a core Record. Every override that talks to _handle goes
         // through this: the base class has already validated and advanced its tracked state by
@@ -118,10 +119,25 @@ namespace kor::vk
         kor::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
         kor::Resource<kor::Image> _resolveHelperImage;
 
+        void writeTimerTimestamp(glm::u32 queryIndex) override;
+        bool readTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) override;
+
     private:
         const kor::vk::Queue& _queue;
         const ::vk::CommandPool& _parentPool;
-        ::vk::Semaphore _signalSemaphore = nullptr;
+        // Completion is reported by the fence alone. There was a semaphore signalled alongside it
+        // here, which nothing ever waited on — and a binary semaphore signalled twice with no wait
+        // in between is invalid, so re-submitting the same buffer tripped validation for nothing.
+        // Ordering against other submissions belongs to the scheduler, which carries its own.
         ::vk::Fence _fence = nullptr;
+
+        // One pool for the whole command buffer, two queries per timer scope. Sized up front
+        // because a Vulkan query pool cannot grow, and reset in its entirety at Begin() — the only
+        // point in the stream guaranteed to be outside a render pass, which vkCmdResetQueryPool
+        // requires.
+        ::vk::QueryPool _timerPool = nullptr;
+        // Nanoseconds per timestamp tick, or 0 when this queue cannot timestamp at all, which is
+        // what supportsTimers() reads.
+        float _timestampPeriod = 0.f;
     };
 }
