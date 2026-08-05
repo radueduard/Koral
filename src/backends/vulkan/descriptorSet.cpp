@@ -179,6 +179,18 @@ namespace kor::vk
 
     DescriptorSet::~DescriptorSet()
     {
+        // The frames still in flight may be about to read through these. A set is not only destroyed
+        // at teardown: a shader edit that reshapes a block replays the builder, and the *new* set
+        // replacing the old one is what destroys it — mid-frame, with the previous frames' command
+        // buffers still holding it. Freeing then is a use-after-free the validation layer catches as
+        // "can't be called on VkDescriptorSet ... currently in use by VkCommandBuffer".
+        //
+        // So wait for the device, exactly as a resize does (@see vk::Image::doResize) and for the
+        // same reason: without a deferred-deletion queue there is nowhere else to put the wait. It
+        // stalls, which is only noticeable when sets are destroyed in bulk — a graveyard that frees
+        // N frames later is the fix if it ever matters, and this is the second place it would go.
+        if (!_descriptorSets.empty()) Context::Device()->waitIdle();
+
         for (const auto& descriptorSet : _descriptorSets) {
             Context::DescriptorPool().Free(descriptorSet);
         }

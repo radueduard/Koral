@@ -3,6 +3,7 @@
 //
 
 #include <descriptorSet.h>
+#include <semantics.h>
 #include <descriptor.h>
 #include <descriptorSetLayout.h>
 #include <pipeline.h>
@@ -195,17 +196,18 @@ namespace kor
     }
 
     DescriptorSet::Builder::Builder(ResourceRef<const Pipeline> pipeline, const glm::u32 setIndex)
+        : pipeline(std::move(pipeline)), setIndex(setIndex)
     {
-        adopt(pipeline, "pipeline");
-        // A poisoned pipeline has no layouts to ask for. Leave `layout` empty: create() refuses to
-        // build, and this descriptor set is poisoned with the pipeline's error as its cause.
-        if (pipeline.valid()) layout = pipeline->getSetLayoutRef(setIndex);
+        // Resolved here *and* on every later attempt: a shader reload can replace the layout, and a
+        // rebuild has to fill the new one. A poisoned pipeline has no layouts to ask for — `layout`
+        // stays empty, resolve() refuses, and this set is poisoned with the pipeline's error as its
+        // cause. @see resolve
+        if (this->pipeline.valid()) layout = this->pipeline->getSetLayoutRef(setIndex);
         initWrites();
     }
 
     DescriptorSet::Builder::Builder(ResourceRef<const DescriptorSetLayout> layout) : layout(layout)
     {
-        adopt(layout, "descriptor set layout");
         initWrites();
     }
 
@@ -213,6 +215,92 @@ namespace kor
         : layout(ResourceRef<const DescriptorSetLayout>(&layout))
     {
         initWrites();
+    }
+
+    DescriptorSet::Builder& DescriptorSet::Builder::rejectSemantic(const glm::u32 binding, const char* what,
+                                                                   const bool unusable)
+    {
+        if (!_error) _error = Error{
+            .code = ErrorCode::eInvalidArgument,
+            .message = unusable
+                ? std::format("The resource written to binding {} is unusable ('{}'), so there is "
+                              "nothing to fill the block from.", binding, what ? what : "?")
+                : std::format("Binding {} was written from a '{}', which cannot fill a semantic "
+                              "block: it does not implement kor::SemanticSerializer. Pass a "
+                              "kor::Descriptor instead, or make the type serializable.",
+                              binding, what ? what : "?"),
+        };
+        return *this;
+    }
+
+    DescriptorSet::Builder& DescriptorSet::Builder::writeSemantic(const glm::u32 binding, SemanticSerializer& serializer)
+    {
+        return recordSemantic(binding, [&serializer] { return &serializer; }, "<reference>");
+    }
+
+    DescriptorSet::Builder& DescriptorSet::Builder::recordSemantic(
+        const glm::u32 binding, std::function<SemanticSerializer*()> resolve, std::string what)
+    {
+        if (_error) return *this;
+        semanticWrites[binding] = { std::move(resolve), std::move(what) };
+        return *this;
+    }
+
+    /**
+     * @brief Re-reads the layout and fills every semantic binding from it.
+     *
+     * Run per attempt, which is the whole point: a shader edit that reshapes a block gives a
+     * different answer here, and that is what a rebuild is for.
+     */
+    VoidResult DescriptorSet::Builder::resolve() const
+    {
+        const auto reject = [](std::string message) {
+            return std::unexpected(Error{ .code = ErrorCode::eInvalidArgument, .message = std::move(message) });
+        };
+
+        // From the pipeline every time. A reload that reshaped this set built a *new* layout, and
+        // the one captured at construction is expired — asking again is what finds the new one.
+        if (pipeline.alive()) {
+            if (!pipeline.valid())
+                return reject("The pipeline this set belongs to is unusable, so it has no layout to fill.");
+            layout = pipeline->getSetLayoutRef(setIndex);
+        }
+
+        if (semanticWrites.empty()) return {};
+
+        for (const auto& [binding, semantic] : semanticWrites) {
+            if (!layout.valid())
+                return reject(std::format("Cannot fill binding {} from semantics: the layout is unusable.", binding));
+
+            const auto& bindings = layout->bindings();
+            const auto it = bindings.find(binding);
+            if (it == bindings.end())
+                return reject(std::format("The layout has no binding {} to fill.", binding));
+
+            const auto& description = it->second;
+            if (description.members.empty())
+                return reject(std::format(
+                    "Binding {} is not a block with fields, so there is nothing for a semantic to "
+                    "fill. Only a uniform or storage buffer can be written this way.", binding));
+
+            SemanticSerializer* serializer = semantic.resolve ? semantic.resolve() : nullptr;
+            if (!serializer)
+                return reject(std::format(
+                    "The resource written to binding {} is unusable ('{}'), so there is nothing to "
+                    "fill the block from.", binding, semantic.what));
+
+            // The buffer for exactly this shape, from the object that will keep it filled. A shape
+            // it has not been asked for before is created here — which is how a block that gained a
+            // field arrives with a buffer the right size, already filled.
+            auto buffer = serializer->semanticBuffers().acquire(description.members,
+                                                                description.blockSize, *serializer);
+            if (!buffer) return std::unexpected(buffer.error());
+
+            auto& slots = writes[binding];
+            if (slots.empty()) slots.resize(1);
+            slots[0] = Descriptor(*buffer);
+        }
+        return {};
     }
 
     DescriptorSet::Builder& DescriptorSet::Builder::write(const glm::u32 binding, const Descriptor& descriptor, const glm::u32 index)
@@ -292,6 +380,14 @@ namespace kor
     {
         beginAttempt();
 
+        // Adopted here rather than in the constructor, so that every attempt records the generation
+        // its inputs had *this* time. Adopting once at construction would leave the first
+        // generations recorded for ever, and dependenciesChanged() would then answer yes on every
+        // frame after the first reload.
+        if (pipeline.alive() || !layout.alive()) adopt(pipeline, "pipeline");
+        if (auto v = resolve(); !v) return std::unexpected(v.error());
+        adopt(layout, "descriptor set layout");
+
         if (_error) return std::unexpected(*_error);
         if (auto v = validate(); !v) return std::unexpected(v.error());
 
@@ -308,7 +404,13 @@ namespace kor
 
     kor::Resource<DescriptorSet> DescriptorSet::Builder::build(const std::source_location where) const
     {
-        return materialize<DescriptorSet>(*this, "DescriptorSet", where);
+        auto set = materialize<DescriptorSet>(*this, "DescriptorSet", where);
+        // Registered even when poisoned, exactly as a pipeline is: the Repository's repair pass is
+        // what replays the builder when the layout it was built against is reshaped, and what brings
+        // the set back once a broken shader compiles again.
+        if (Context::HasRepository())
+            Context::Repository().addRef(ResourceRef<const DescriptorSet>(set));
+        return set;
     }
 
     DescriptorSet::DescriptorSet(const Builder& builder) : _layout(builder.layout), _writes(builder.writes)

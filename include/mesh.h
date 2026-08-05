@@ -9,25 +9,52 @@
 #include <span>
 #include <vector>
 
-#include "meshType.h"
 #include "structs.h"
 #include "buffer.h"
 #include "context.h"
+#include "vertexLayout.h"
 #include "api.h"
 
 namespace kor
 {
+    /**
+     * @brief Geometry ready to draw: the vertex buffers, and optionally an index buffer.
+     *
+     * A mesh is the pair of "what to draw" that a draw call needs. Bind one and the counts follow
+     * from it, so CommandBuffer::DrawMesh takes it as the single argument:
+     *
+     * @code
+     * commandBuffer.DrawMesh(mesh, 1, 0);
+     * @endcode
+     *
+     * The buffers themselves are ordinary device-local Buffers, and makeBuffer() is the shorthand
+     * for creating them with the usages a mesh needs. How the vertex data is laid out — which
+     * attribute sits at which offset, and what each one *is* — is a @ref VertexLayout the mesh
+     * carries but does not invent: writing vertex formats is the mesh module's business, and this
+     * is the description the engine reads them through.
+     */
     class KORAL_API Mesh
     {
     public:
         Mesh() = default;
         virtual ~Mesh() = default;
 
+        /** @brief How many vertices the mesh holds, taken from the vertex buffers' size and stride. */
         [[nodiscard]] glm::u64 getVertexCount() const { return _vertexCount; }
+
+        /** @brief Whether the mesh has an index buffer, and so whether it can be drawn indexed. */
         [[nodiscard]] bool hasIndexBuffer() const { return _indexBuffer.has_value(); }
+
+        /** @brief How many indices the mesh holds, or nullopt if it has no index buffer. */
         [[nodiscard]] std::optional<glm::u32> getIndexCount() const { return _indexCount; }
+
+        /** @brief The width of one index — typically ChannelType::eUShort or eUInt — or nullopt if there is no index buffer. */
         [[nodiscard]] std::optional<ChannelType> getIndexType() const { return _indexType; }
 
+        /**
+         * @brief The vertex buffers, in binding order.
+         * @return One reference per binding the vertex format declares. Index 0 is binding 0.
+         */
         [[nodiscard]] std::vector<kor::ResourceRef<const Buffer>> getVertexBuffers() const
         {
             std::vector<kor::ResourceRef<const Buffer>> vertexBuffers;
@@ -40,6 +67,8 @@ namespace kor
             }
             return vertexBuffers;
         }
+
+        /** @brief The index buffer, or nullopt if the mesh is drawn non-indexed. */
         [[nodiscard]] std::optional<kor::ResourceRef<const Buffer>> getIndexBuffer() const {
             if (!_indexBuffer.has_value())
                 return std::nullopt;
@@ -47,12 +76,37 @@ namespace kor
         }
 
         /**
+         * @brief How this mesh's vertices are laid out, and what each attribute is.
+         *
+         * The description a pipeline is matched against: what the mesh holds, by name, with no
+         * shader locations in it. @see VertexLayout
+         */
+        [[nodiscard]] const VertexLayout& getVertexLayout() const { return _vertexLayout; }
+
+        /**
          * @brief The vertex attribute carrying the vertex position, if the mesh declares one.
          * Used as the position source when building a ray-tracing acceleration structure.
+         *
+         * @return The attribute — its binding, offset and channel format — or nullopt if the mesh
+         *         has no vertex layout at all, in which case it cannot be ray traced. A layout that
+         *         does not say which attribute is the position is taken at its first.
+         *         @see VertexLayout::positionAttribute
          */
         [[nodiscard]] const std::optional<VertexInputAttributeDescription>& getPositionAttribute() const { return _positionAttribute; }
 
     protected:
+        /**
+         * @brief Adopts the vertex layout, and with it the position the ray tracer reads.
+         *
+         * What a vertex format calls once it knows its own shape. The position attribute is derived
+         * here rather than passed in, so the two can never disagree.
+         */
+        void setVertexLayout(VertexLayout layout)
+        {
+            _vertexLayout = std::move(layout);
+            _positionAttribute = _vertexLayout.position();
+        }
+
         glm::u64 _vertexCount{};
         std::vector<kor::Resource<Buffer>> _vertexBuffers = {};
 
@@ -60,12 +114,19 @@ namespace kor
         std::optional<kor::Resource<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
 
+        VertexLayout _vertexLayout = {};
         std::optional<VertexInputAttributeDescription> _positionAttribute = std::nullopt;
 
     public:
         /**
          * Creates a device-local buffer and copies the contents of `data` into it.
          * `T` is deduced from the span, so the const element type does not need to be spelled out.
+         *
+         * @param data The vertices or indices to upload. Copied during the call.
+         * @param usage What the buffer is for — Buffer::Usage::eVertex or eIndex. The transfer and
+         *        storage usages a mesh needs are added on top, as is acceleration-structure input
+         *        when the device supports ray tracing.
+         * @return The buffer, ready to hand to a mesh builder.
          */
         template<typename T>
         static kor::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
@@ -93,6 +154,11 @@ namespace kor
         /**
          * Creates an empty device-local buffer sized for `instanceCount` elements of `T`.
          * The caller is expected to fill it later. `T` must be specified explicitly.
+         *
+         * @param instanceCount How many elements of T the buffer must hold.
+         * @param usage What the buffer is for; the transfer and storage usages are added on top.
+         * @return The buffer, its contents undefined until something writes them — a compute shader
+         *         generating geometry, for instance.
          */
         template<typename T>
         static kor::Resource<Buffer> makeBuffer(glm::u64 instanceCount, Flags<Buffer::Usage> usage)
@@ -108,87 +174,5 @@ namespace kor
                 .setType(Buffer::Type::eDeviceLocal)
                 .build();
         }
-    };
-
-    template<typename Derived>
-    class CustomMesh : public Mesh
-    {
-    public:
-        static void Initialize() {
-            if (DefineMeshParent())
-                Derived::DefineMesh();
-        }
-
-        struct Builder
-        {
-            glm::u64 vertexCount = 0;
-            std::vector<kor::Resource<Buffer>> vertexBuffers {};
-
-            std::optional<glm::u32> indexCount = std::nullopt;
-            std::optional<kor::Resource<Buffer>> indexBuffer = std::nullopt;
-            std::optional<ChannelType> indexType = std::nullopt;
-
-            explicit Builder()
-            {
-                if (DefineMeshParent())
-                    Derived::DefineMesh();
-                vertexBuffers.resize(Derived::VertexBindingDescription().size());
-            }
-
-            Builder& SetVertexBuffer(const glm::u32 binding, kor::Resource<Buffer> vertexBuffer) {
-                if (vertexCount == 0)
-                    vertexCount = vertexBuffer->getSize() / _vertexBindingDescription[binding].stride;
-                else if (vertexCount != vertexBuffer->getSize() / _vertexBindingDescription[binding].stride)
-                    throw std::runtime_error("All vertex buffers must have the same vertex count!");
-
-                vertexBuffers[binding] = std::move(vertexBuffer);
-                return *this;
-            }
-
-            Builder& SetIndexBuffer(kor::Resource<Buffer> indexBuffer, const ChannelType indexType) {
-                this->indexCount = static_cast<glm::u32>(indexBuffer->getSize() / sizeofChannelType(indexType));
-                this->indexBuffer = std::move(indexBuffer);
-                this->indexType = indexType;
-                return *this;
-            }
-
-            kor::Resource<Derived> Build()
-            {
-                return kor::MakeResource<Derived>(*this);
-            }
-        };
-
-        explicit CustomMesh(Builder& createInfo)
-        {
-            static_assert(MeshType<Derived>, "Derived class must satisfy MeshType concept!");
-            _vertexCount = createInfo.vertexCount;
-            _vertexBuffers = std::move(createInfo.vertexBuffers);
-            _indexCount = createInfo.indexCount;
-            _indexBuffer = std::move(createInfo.indexBuffer);
-            _indexType = createInfo.indexType;
-        }
-
-        [[nodiscard]] static const std::vector<VertexInputBindingDescription>& VertexBindingDescription() { return _vertexBindingDescription; }
-        [[nodiscard]] static const std::vector<VertexInputAttributeDescription>& VertexAttributeDescription() { return _vertexAttributeDescription; }
-    protected:
-
-        inline static std::vector<VertexInputBindingDescription> _vertexBindingDescription {};
-        inline static std::vector<VertexInputAttributeDescription> _vertexAttributeDescription {};
-
-    private:
-        static bool DefineMeshParent()
-        {
-            static bool defined = false;
-            if (defined) return false;
-            defined = true;
-            return true;
-        }
-    };
-
-    class NullMesh : public CustomMesh<NullMesh>
-    {
-    public:
-        static void DefineMesh() {}
-        explicit NullMesh(Builder& createInfo) : CustomMesh(createInfo) {}
     };
 }

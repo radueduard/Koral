@@ -30,9 +30,39 @@ namespace kor
         return *this;
     }
 
+    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::addBlockBinding(
+        const glm::u32 binding, const DescriptorType type, const glm::u32 count,
+        const Shader::AccessKind access, const Flags<Shader::Stage> stages, const bool active,
+        std::vector<Shader::BlockMember> members, const glm::u32 blockSize)
+    {
+        addBinding(binding, type, count, access, stages, active);
+        if (const auto it = _bindings.find(binding); it != _bindings.end()) {
+            it->second.members = std::move(members);
+            it->second.blockSize = blockSize;
+        }
+        return *this;
+    }
+
     bool DescriptorSetLayout::matches(const Builder& builder) const
     {
         return _bindings == builder._bindings;
+    }
+
+    bool DescriptorSetLayout::refreshBlocks(const Builder& builder)
+    {
+        bool changed = false;
+        for (auto& [binding, description] : _bindings) {
+            const auto it = builder._bindings.find(binding);
+            if (it == builder._bindings.end()) continue;   // matches() guarantees there is one
+
+            if (description.blockSize == it->second.blockSize &&
+                description.members == it->second.members) continue;
+
+            description.members = it->second.members;
+            description.blockSize = it->second.blockSize;
+            changed = true;
+        }
+        return changed;
     }
 
     Result<std::unique_ptr<DescriptorSetLayout>> DescriptorSetLayout::Builder::create() const

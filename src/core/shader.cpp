@@ -375,6 +375,16 @@ namespace kor {
             _stage = result.stage;                          // auto-detected from [shader(...)]
             if (!result.resolvedPath.empty()) _path = result.resolvedPath; // for hot-reload
             _dependencies = std::move(result.dependencies); // module + imports, for hot-reload
+            _fieldSemantics.clear();                        // [module("SEMANTIC")] annotations
+            for (auto& [field, annotation] : result.fieldSemantics) {
+                _fieldSemantics.emplace(field, FieldSemantic{ std::move(annotation.moduleName),
+                                                              std::move(annotation.semantic) });
+            }
+            _inputSemantics.clear();                        // `: SEMANTIC` on the stage inputs
+            for (auto& [location, annotation] : result.varyingSemantics) {
+                _inputSemantics.emplace(location, FieldSemantic{ std::move(annotation.moduleName),
+                                                                 std::move(annotation.semantic) });
+            }
             if (_spirvCode.empty())
                 throw BackendException(Error{
                     .code = ErrorCode::eShaderCompileFailed,
@@ -521,9 +531,143 @@ namespace kor {
 	    }
     }
 
+    // `#pragma module(SEMANTIC)` on one line, the field it decorates on the next. GLSL has no
+    // attribute syntax, and a pragma is the one thing that can be written inside a block and still
+    // be a directive rather than a comment — glslang accepts and ignores it, so the text is ours
+    // to read. Which is what this does: the compiler discards it, so the annotation is recovered
+    // from the source rather than from the SPIR-V.
+    //
+    // Includes are followed, because a project is expected to keep its shared blocks in a header.
+    void Shader::fetchFieldSemantics(const std::string& rawSource)
+    {
+        // The pragmas that mean something to a compiler rather than to us. Everything else of the
+        // form name(ARG) is read as an annotation, which is what makes the module's own name the
+        // directive: `#pragma camera(VIEW_MATRIX)` needs nothing registered anywhere.
+        static constexpr std::string_view kReserved[] {
+            "once", "optimize", "debug", "STDGL", "pack", "warning", "message", "region", "endregion",
+        };
+
+        // Comments go first, replaced by spaces so every offset still lines up. Without this a
+        // *description* of a pragma — in the header explaining it, or in a project's own shaders —
+        // is read as one, and the semantic it appears to declare is nonsense. Found exactly that way.
+        std::string source = rawSource;
+        for (std::size_t i = 0; i + 1 < source.size(); ++i) {
+            if (source[i] != '/') continue;
+
+            if (source[i + 1] == '/') {
+                while (i < source.size() && source[i] != '\n') source[i++] = ' ';
+            } else if (source[i + 1] == '*') {
+                const std::size_t end = source.find("*/", i + 2);
+                const std::size_t stop = end == std::string::npos ? source.size() : end + 2;
+                for (; i < stop; ++i) if (source[i] != '\n') source[i] = ' ';
+            }
+        }
+
+        static constexpr std::string_view kPragma = "#pragma";
+
+        std::size_t at = 0;
+        while ((at = source.find(kPragma, at)) != std::string::npos) {
+            const std::size_t lineEnd = source.find('\n', at);
+            const std::size_t limit = lineEnd == std::string::npos ? source.size() : lineEnd;
+
+            // module ( SEMANTIC )
+            std::size_t cursor = source.find_first_not_of(" \t", at + kPragma.size());
+            const std::size_t open = source.find('(', cursor);
+            const std::size_t close = source.find(')', open == std::string::npos ? cursor : open);
+            if (cursor == std::string::npos || open == std::string::npos ||
+                close == std::string::npos || open > limit || close > limit) {
+                at = limit;
+                continue;   // not of the annotation shape; some other pragma's business
+            }
+
+            std::string moduleName(source, cursor, open - cursor);
+            std::erase_if(moduleName, [](const unsigned char c) { return std::isspace(c); });
+            if (std::ranges::find(kReserved, moduleName) != std::end(kReserved)) {
+                at = limit;
+                continue;
+            }
+
+            std::string semantic(source, open + 1, close - open - 1);
+            std::erase(semantic, '"');   // accepted so both languages can be written alike
+            std::erase_if(semantic, [](const unsigned char c) { return std::isspace(c); });
+            if (moduleName.empty() || semantic.empty()) { at = limit; continue; }
+
+            // The declaration it decorates: the next line with something on it. Its field name is
+            // the last identifier before the ';' or the '[' of an array.
+            cursor = limit == source.size() ? source.size() : limit + 1;
+            const std::size_t statementEnd = source.find_first_of(";[", cursor);
+            if (statementEnd == std::string::npos) break;
+
+            const std::string declaration(source, cursor, statementEnd - cursor);
+            const std::size_t nameEnd = declaration.find_last_not_of(" \t\r\n");
+            if (nameEnd == std::string::npos) { at = statementEnd; continue; }
+            std::size_t nameStart = declaration.find_last_of(" \t\r\n*&", nameEnd);
+            nameStart = nameStart == std::string::npos ? 0 : nameStart + 1;
+
+            if (std::string field = declaration.substr(nameStart, nameEnd - nameStart + 1); !field.empty()) {
+                _fieldSemantics.emplace(std::move(field), FieldSemantic{ std::move(moduleName), std::move(semantic) });
+            }
+            at = statementEnd;
+        }
+    }
+
+    // The block's fields, as the compiled shader lays them out, plus whatever semantic each was
+    // annotated with. Offsets and types come from the SPIR-V, so they are the same however the
+    // shader was written; only the annotation is language-specific, and that arrives in
+    // _fieldSemantics from whichever front end read it. @see semantics.h
+    void Shader::fetchBlockMembers(const spirv_cross::Compiler& module,
+                                   const spirv_cross::Resource& resource,
+                                   Descriptor& descriptor) const
+    {
+    	const auto& blockType = module.get_type(resource.base_type_id);
+    	if (blockType.basetype != spirv_cross::SPIRType::Struct) return;
+
+    	descriptor.blockSize = static_cast<glm::u32>(module.get_declared_struct_size(blockType));
+    	descriptor.members.reserve(blockType.member_types.size());
+
+    	for (glm::u32 i = 0; i < blockType.member_types.size(); ++i) {
+    		const auto& memberType = module.get_type(blockType.member_types[i]);
+
+    		BlockMember member;
+    		member.name = module.get_member_name(resource.base_type_id, i);
+    		member.offset = module.type_struct_member_offset(blockType, i);
+    		member.size = static_cast<glm::u32>(module.get_declared_struct_member_size(blockType, i));
+    		member.rows = static_cast<glm::u8>(memberType.vecsize);
+    		member.columns = static_cast<glm::u8>(memberType.columns);
+
+    		// Mirrors SemanticSlot::Scalar. Kept as a number here so shader.h does not have to
+    		// include semantics.h, which includes resource.h, which would be a cycle.
+    		switch (memberType.basetype) {
+    		case spirv_cross::SPIRType::Float:  member.scalar = 0; break;
+    		case spirv_cross::SPIRType::Int:    member.scalar = 1; break;
+    		case spirv_cross::SPIRType::UInt:   member.scalar = 2; break;
+    		case spirv_cross::SPIRType::Boolean:member.scalar = 3; break;
+    		case spirv_cross::SPIRType::Double: member.scalar = 4; break;
+    		default:                            member.scalar = 5; break;
+    		}
+
+    		if (const auto it = _fieldSemantics.find(member.name); it != _fieldSemantics.end()) {
+    			member.semanticNamespace = it->second.moduleName;
+    			member.semantic = it->second.semantic;
+    		}
+    		descriptor.members.push_back(std::move(member));
+    	}
+    }
+
     void Shader::fetchMemoryLayout()
     {
     	if (!_valid) return;
+
+    	// GLSL's annotations live in the source, so they are read once the include set is known —
+    	// a project keeps its shared blocks in a header, and the pragma travels with them. Slang's
+    	// arrive through reflection and are already in place by now.
+    	if (_lang == Lang::eGLSL) {
+    		_fieldSemantics.clear();
+    		for (const auto& dependency : _dependencies) {
+    			if (const auto text = utils::ReadFileAsString(dependency); !text.empty())
+    				fetchFieldSemantics(text);
+    		}
+    	}
 
         const auto module = spirv_cross::Compiler(_spirvCode);
         const auto resources = module.get_shader_resources();
@@ -554,7 +698,22 @@ namespace kor {
 			const auto& type = module.get_type(input.type_id);
         	const auto[channelType, channelCount] = SPIRTypeConverter(type);
 
-			memoryLayout.inputs.emplace(location, locationSpan, name, channelType, channelCount);
+        	// What the input was annotated with, from whichever half of the language knows: GLSL's
+        	// `#pragma mesh(POSITION)` is read out of the source and keyed by name, Slang's
+        	// `: POSITION` comes through its reflection and is keyed by location, since what Slang
+        	// calls a varying rarely survives into the SPIR-V. @see vertexLayout.h
+        	std::string semanticNamespace;
+        	std::string semantic;
+        	if (const auto byName = _fieldSemantics.find(name); byName != _fieldSemantics.end()) {
+        		semanticNamespace = byName->second.moduleName;
+        		semantic = byName->second.semantic;
+        	} else if (const auto byLocation = _inputSemantics.find(location); byLocation != _inputSemantics.end()) {
+        		semanticNamespace = byLocation->second.moduleName;
+        		semantic = byLocation->second.semantic;
+        	}
+
+			memoryLayout.inputs.emplace(location, locationSpan, name, channelType, channelCount,
+			                            std::move(semanticNamespace), std::move(semantic));
 		} // inputs
 		for (const auto& output : resources.stage_outputs) {
 			auto location = module.get_decoration(output.id, spv::DecorationLocation);
@@ -614,7 +773,9 @@ namespace kor {
 			const uint32_t binding = module.get_decoration(buffer.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformBuffer, name, count, stage, AccessKind::eRead, isActive(buffer) });
+			auto descriptor = Descriptor { DescriptorType::eUniformBuffer, name, count, stage, AccessKind::eRead, isActive(buffer) };
+			fetchBlockMembers(module, buffer, descriptor);
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eUniformBuffer
 		for (const auto& buffer : resources.storage_buffers) {
 			const uint32_t set = module.get_decoration(buffer.id, spv::DecorationDescriptorSet);
@@ -623,7 +784,9 @@ namespace kor {
 			const auto& name = module.get_name(buffer.id);
 			// Block flags, not the variable's: NonWritable/NonReadable land on the members.
 			const auto access = AccessFrom(module.get_buffer_block_flags(buffer.id));
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) });
+			auto descriptor = Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) };
+			fetchBlockMembers(module, buffer, descriptor);
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eStorageBuffer
 		for (const auto& accelerationStructure : resources.acceleration_structures) {
 			const uint32_t set = module.get_decoration(accelerationStructure.id, spv::DecorationDescriptorSet);

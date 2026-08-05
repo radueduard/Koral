@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <string>
+#include <map>
 #include <vector>
 
 #include <glm/fwd.hpp>
@@ -20,6 +21,20 @@ namespace kor
         Shader::Stage stage;                ///< Stage auto-detected from the entry point's [shader(...)] attribute.
         std::filesystem::path resolvedPath; ///< The module's resolved source file (for hot-reload tracking).
         std::vector<std::filesystem::path> dependencies; ///< Every source file the module depends on (module + imports), for hot-reload tracking.
+
+        /// One field's annotation: the attribute's name is the module, its argument the semantic.
+        struct FieldSemantic { std::string moduleName; std::string semantic; };
+
+        /// Field name -> annotation, from the [module("SEMANTIC")] attributes on block members.
+        /// Slang keeps user attributes in its reflection but drops `: SEMANTIC` on anything that
+        /// is not a varying, which is why the annotation is an attribute at all. @see semantics.h
+        std::map<std::string, FieldSemantic> fieldSemantics;
+
+        /// Location -> the `: SEMANTIC` on a stage input. Varyings are the one place Slang keeps a
+        /// semantic, so a vertex input needs no attribute — `float3 p : POSITION` says it already.
+        /// Keyed by location because the parameter's name is not what reaches the SPIR-V, and the
+        /// module name is empty: a bare semantic names no vocabulary. @see vertexLayout.h
+        std::map<glm::u32, FieldSemantic> varyingSemantics;
     };
 
     // Thin wrapper over the Slang in-process compiler. Compiles a single entry point of a

@@ -1,15 +1,17 @@
-// Unit tests for the compile-time vertex layout machinery in meshLayout.h:
-// VertexValueTraits, Std430AlignTraits, ParamVertex storage/stride/offset math,
-// and FindPositionAttribute. This is pure CPU reflection math — no GPU needed.
+// Unit tests for the mesh module's compile-time vertex layout machinery (koralMesh.h):
+// VertexValueTraits, Std430AlignTraits, ParamVertex storage/stride/offset math, and the runtime
+// kor::VertexLayout that MakeVertexLayout builds out of them — including which attribute a ray
+// tracer reads the position from. This is pure CPU reflection math — no GPU needed.
 // (ParamMesh::Create and friends touch the GPU and are intentionally not used.)
 
 #include <gtest/gtest.h>
 
 #include <glm/glm.hpp>
 
-#include "meshLayout.h"
+#include <koralMesh.h>
 
-using namespace kor;
+using namespace kmesh;
+using kor::ChannelType;
 
 namespace {
 
@@ -73,42 +75,108 @@ TEST(MeshLayout, ParamVertexConstructAndGet) {
 }
 
 // -----------------------------------------------------------------------------
-// FindPositionAttribute: locates the PositionAttribute-marked attribute across
-// one or more vertex streams and reports its binding/offset/format.
+// MakeVertexLayout: the runtime description a pipeline is matched against —
+// bindings and strides, offsets, channel formats, and the semantic each
+// attribute answers to.
 // -----------------------------------------------------------------------------
-TEST(MeshLayout, FindPositionInSingleStream) {
-    auto pos = FindPositionAttribute<PNU>();
-    ASSERT_TRUE(pos.has_value());
-    EXPECT_EQ(pos->binding, 0u);
-    EXPECT_EQ(pos->offset, 0u); // Position is first
-    EXPECT_EQ(pos->channelCount, 3u);
-    EXPECT_EQ(pos->channelType, ChannelType::eFloat);
+TEST(MeshLayout, LayoutDescribesEveryAttribute) {
+    const auto layout = MakeVertexLayout<PNU>();
+
+    ASSERT_EQ(layout.bindings.size(), 1u);
+    EXPECT_EQ(layout.bindings[0].binding, 0u);
+    EXPECT_EQ(layout.bindings[0].stride, PNU::kStride);
+
+    ASSERT_EQ(layout.attributes.size(), 3u);
+    EXPECT_EQ(layout.attributes[0].semantic, "POSITION");
+    EXPECT_EQ(layout.attributes[1].semantic, "NORMAL");
+    EXPECT_EQ(layout.attributes[2].semantic, "UV");
+
+    // The vocabulary is the module's, and every attribute says so.
+    for (const auto& attribute : layout.attributes)
+        EXPECT_EQ(attribute.semanticNamespace, semantics::kNamespace);
+
+    EXPECT_EQ(layout.attributes[1].offset, PNU::OffsetOf<1>());
+    EXPECT_EQ(layout.attributes[2].channelCount, 2u);
+    EXPECT_EQ(layout.attributes[2].channelType, ChannelType::eFloat);
 }
 
-TEST(MeshLayout, FindPositionWhenNotFirst) {
-    using NPU = ParamVertex<Normal, Position, UV>;
-    auto pos = FindPositionAttribute<NPU>();
-    ASSERT_TRUE(pos.has_value());
-    EXPECT_EQ(pos->binding, 0u);
-    EXPECT_EQ(pos->offset, NPU::OffsetOf<1>()); // Position is the 2nd attribute
+TEST(MeshLayout, IndexedAttributeSemanticCarriesItsChannel) {
+    using TwoUVs = ParamVertex<Position, IndexedAttribute<UV, 0>, IndexedAttribute<UV, 1>>;
+    const auto layout = MakeVertexLayout<TwoUVs>();
+
+    ASSERT_EQ(layout.attributes.size(), 3u);
+    EXPECT_EQ(layout.attributes[1].semantic, "UV0");
+    EXPECT_EQ(layout.attributes[2].semantic, "UV1");
 }
 
-TEST(MeshLayout, FindPositionAcrossMultipleStreams) {
+TEST(MeshLayout, StreamsBecomeSeparateBindings) {
     using PosStream = ParamVertex<Position>;
     using UvStream  = ParamVertex<UV>;
-    // Position lives in the first stream -> binding 0.
-    auto a = FindPositionAttribute<PosStream, UvStream>();
-    ASSERT_TRUE(a.has_value());
-    EXPECT_EQ(a->binding, 0u);
-    // Position lives in the second stream -> binding 1.
-    auto b = FindPositionAttribute<UvStream, PosStream>();
-    ASSERT_TRUE(b.has_value());
-    EXPECT_EQ(b->binding, 1u);
+    const auto layout = MakeVertexLayout<PosStream, UvStream>();
+
+    ASSERT_EQ(layout.bindings.size(), 2u);
+    ASSERT_EQ(layout.attributes.size(), 2u);
+    EXPECT_EQ(layout.attributes[0].binding, 0u);
+    EXPECT_EQ(layout.attributes[1].binding, 1u);
 }
 
-TEST(MeshLayout, FindPositionReturnsNulloptWhenAbsent) {
-    using NoPos = ParamVertex<Normal, UV, Color>;
-    EXPECT_FALSE(FindPositionAttribute<NoPos>().has_value());
+TEST(MeshLayout, BareValueStreamHasOneUnnamedAttribute) {
+    // A heap of plain glm::vec3 positions: one attribute, no semantic, so it can only be
+    // matched by declaration order.
+    const auto layout = MakeVertexLayout<glm::vec3, glm::vec2>();
+
+    ASSERT_EQ(layout.bindings.size(), 2u);
+    EXPECT_EQ(layout.bindings[0].stride, sizeof(glm::vec3));
+    ASSERT_EQ(layout.attributes.size(), 2u);
+    EXPECT_TRUE(layout.attributes[0].semantic.empty());
+    EXPECT_EQ(layout.attributes[0].channelCount, 3u);
+    EXPECT_EQ(layout.attributes[1].channelCount, 2u);
+}
+
+// -----------------------------------------------------------------------------
+// The position a ray tracer reads: the first attribute unless the format marks
+// another one with PositionAttribute.
+// -----------------------------------------------------------------------------
+TEST(MeshLayout, PositionDefaultsToTheFirstAttribute) {
+    const auto layout = MakeVertexLayout<ParamVertex<Normal, UV>>();
+
+    // Nothing carries PositionAttribute, so nothing is recorded — and the first attribute is
+    // what gets read.
+    EXPECT_FALSE(layout.positionAttribute.has_value());
+    const auto position = layout.position();
+    ASSERT_TRUE(position.has_value());
+    EXPECT_EQ(position->binding, 0u);
+    EXPECT_EQ(position->offset, 0u);
+}
+
+TEST(MeshLayout, PositionIsFoundWhenNotFirst) {
+    using NPU = ParamVertex<Normal, Position, UV>;
+    const auto layout = MakeVertexLayout<NPU>();
+
+    ASSERT_TRUE(layout.positionAttribute.has_value());
+    EXPECT_EQ(*layout.positionAttribute, 1u);
+
+    const auto position = layout.position();
+    ASSERT_TRUE(position.has_value());
+    EXPECT_EQ(position->offset, NPU::OffsetOf<1>());
+    EXPECT_EQ(position->channelCount, 3u);
+    EXPECT_EQ(position->channelType, ChannelType::eFloat);
+}
+
+TEST(MeshLayout, PositionIsFoundInALaterStream) {
+    using PosStream = ParamVertex<Position>;
+    using UvStream  = ParamVertex<UV>;
+    const auto layout = MakeVertexLayout<UvStream, PosStream>();
+
+    const auto position = layout.position();
+    ASSERT_TRUE(position.has_value());
+    EXPECT_EQ(position->binding, 1u);
+}
+
+TEST(MeshLayout, PositionOfAnEmptyLayoutIsNothing) {
+    const kor::VertexLayout layout;
+    EXPECT_TRUE(layout.empty());
+    EXPECT_FALSE(layout.position().has_value());
 }
 
 } // namespace

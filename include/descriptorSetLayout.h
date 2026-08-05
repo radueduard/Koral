@@ -19,38 +19,81 @@
 
 namespace kor
 {
+    /**
+     * @brief The shape of a descriptor set: what kind of resource sits at each binding.
+     *
+     * Derived from the shader's own reflection when a pipeline is built, so a project rarely
+     * constructs one — DescriptorSet::Builder takes the pipeline and the set index and finds the
+     * layout itself. Build one by hand only for a set that no pipeline owns.
+     */
     class KORAL_API DescriptorSetLayout
     {
     public:
-        // What a binding is, plus what the shader does with it. The type and count are the
-        // binding's *interface* and decide layout identity (see matches()); the access, stages
-        // and active flag are only what the automatic barrier resolver needs to know to
-        // synchronise the bound resource, and deliberately take no part in that identity.
+        /**
+         * @brief What one binding is, plus what the shader does with it.
+         *
+         * The type and count are the binding's *interface* and decide layout identity; the access,
+         * stages and active flag are what the automatic barrier resolver needs in order to
+         * synchronise the bound resource, and deliberately take no part in that identity.
+         */
         struct KORAL_API Binding {
-            DescriptorType type;
-            glm::u32 count = 1;
-            Shader::AccessKind access = Shader::AccessKind::eRead;
-            Flags<Shader::Stage> stages;
-            bool active = true;
+            DescriptorType type;                                        ///< What kind of resource belongs here.
+            glm::u32 count = 1;                                         ///< How many, for an array binding.
+            Shader::AccessKind access = Shader::AccessKind::eRead;      ///< Whether shaders read it, write it, or both.
+            Flags<Shader::Stage> stages;                                ///< Which shader stages reach it.
+            bool active = true;                                         ///< Whether the entry point actually uses it; an unused binding needs no synchronisation.
 
-            // Interface only, on purpose. matches() is what decides whether a shader reload
-            // can keep the existing layout object, so letting access/stages/active in here
-            // would rebuild the layout — and expire every descriptor set holding it — over an
-            // edit that merely made a storage buffer read-only.
+            /// The block's fields, for a buffer binding. What lets a semantic-filled descriptor
+            /// know the shape the shader asked for. Outside matches(), for the same reason the
+            /// rest of the non-interface state is. @see semantics.h
+            std::vector<Shader::BlockMember> members;
+            glm::u32 blockSize = 0;
+
+            /**
+             * @brief Whether two bindings present the same interface.
+             *
+             * Interface only, on purpose. matches() is what decides whether a shader reload can
+             * keep the existing layout object, so letting access, stages or the active flag in here
+             * would rebuild the layout — and expire every descriptor set holding it — over an edit
+             * that merely made a storage buffer read-only.
+             */
             bool operator==(const Binding& other) const {
                 return type == other.type && count == other.count;
             }
         };
 
+        /** @brief Describes a layout binding by binding. */
         class KORAL_API Builder : public ::Builder
         {
             friend class DescriptorSetLayout;
         public:
+            /**
+             * @brief Declares one binding.
+             * @param binding The binding number the shader uses.
+             * @param type What kind of resource belongs there.
+             * @param count How many, for an array binding.
+             * @param access Whether shaders read it, write it, or both.
+             * @param stages Which shader stages reach it.
+             * @param active Whether the entry point actually uses it.
+             */
             Builder& addBinding(glm::u32 binding, DescriptorType type, glm::u32 count = 1,
                                 Shader::AccessKind access = Shader::AccessKind::eRead,
                                 Flags<Shader::Stage> stages = {}, bool active = true);
+
+            /**
+             * @brief Declares a buffer binding along with the block's fields.
+             *
+             * Only reflection calls this — the members come out of the compiled shader, and a
+             * hand-written layout has none to give. @see semantics.h
+             */
+            Builder& addBlockBinding(glm::u32 binding, DescriptorType type, glm::u32 count,
+                                     Shader::AccessKind access, Flags<Shader::Stage> stages, bool active,
+                                     std::vector<Shader::BlockMember> members, glm::u32 blockSize);
+
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<DescriptorSetLayout>> create() const;
+
+            /** @brief Creates the layout, poisoned rather than thrown if a binding is contradictory. */
             [[nodiscard]] kor::Resource<DescriptorSetLayout> build(std::source_location where = std::source_location::current()) const;
         private:
             std::map<glm::u32, Binding> _bindings;
@@ -63,7 +106,16 @@ namespace kor
         DescriptorSetLayout(const DescriptorSetLayout&) = delete;
         DescriptorSetLayout& operator=(const DescriptorSetLayout&) = delete;
 
+        /**
+         * @brief The bindings, as (binding number, type, count) triples.
+         * @return One entry per declared binding, in binding order.
+         */
         [[nodiscard]] std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> getBindings() const;
+
+        /** @brief Every binding, in full — including the block fields reflection found. */
+        [[nodiscard]] const std::map<glm::u32, Binding>& bindings() const { return _bindings; }
+
+        /** @brief What kind of resource belongs at @p binding. */
         [[nodiscard]] DescriptorType getBindingType(glm::u32 binding) const;
 
         /** @brief Full per-binding description, including what the shader does with it. */
@@ -76,6 +128,19 @@ namespace kor
          * change the set's interface — which keeps every descriptor set built from it alive.
          */
         [[nodiscard]] bool matches(const Builder& builder) const;
+
+        /**
+         * @brief Adopts @p builder's block descriptions, keeping this layout's identity.
+         * @return Whether anything actually changed.
+         *
+         * The other half of @ref matches. A shader edit that adds a field to a uniform block leaves
+         * the *interface* identical — same binding, same descriptor type — so the Vulkan object and
+         * every descriptor set holding it stay valid, and rebuilding would needlessly dangle them.
+         * But the block's fields are exactly what a semantic-filled binding is built from, so they
+         * have to be brought up to date here. The caller announces the change (Resource::markChanged)
+         * so that the sets built against it rebuild themselves.
+         */
+        bool refreshBlocks(const Builder& builder);
 
     protected:
 
