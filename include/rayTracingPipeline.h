@@ -31,6 +31,28 @@ namespace kor
     class Shader;
     class CommandBuffer;
 
+    /**
+     * @brief A compiled ray-tracing pipeline and its shader binding table.
+     *
+     * Unlike a graphics pipeline, which runs one shader per stage, this holds a *set* of shaders
+     * and the GPU picks between them per ray: the raygen shader casts, a miss shader runs when a
+     * ray hits nothing, and the hit group matching the geometry runs when it does.
+     *
+     * @code
+     * kor::RayTracingPipeline::Builder builder;
+     * auto pipeline = builder
+     *     .setRaygenShader(raygen)
+     *     .addMissShader(miss)
+     *     .addHitGroup({ .closestHitShader = closestHit })
+     *     .setMaxRecursionDepth(2)
+     *     .build();
+     *
+     * commandBuffer.BindRayTracingPipeline(pipeline).TraceRays(width, height);
+     * @endcode
+     *
+     * Requires a device with ray-tracing support — check Context::SupportsRayTracing(). Without it
+     * the build fails into a poisoned resource rather than crashing. Vulkan only.
+     */
     class KORAL_API RayTracingPipeline : public Pipeline
     {
     public:
@@ -42,31 +64,51 @@ namespace kor
          */
         struct KORAL_API HitGroup
         {
-            std::optional<ResourceRef<const Shader>> closestHitShader = std::nullopt;
-            std::optional<ResourceRef<const Shader>> anyHitShader = std::nullopt;
-            std::optional<ResourceRef<const Shader>> intersectionShader = std::nullopt;
+            std::optional<ResourceRef<const Shader>> closestHitShader = std::nullopt;   ///< Runs for the nearest hit along the ray. The usual place to shade a surface.
+            std::optional<ResourceRef<const Shader>> anyHitShader = std::nullopt;       ///< Runs for every candidate hit, in no particular order. Where alpha-tested geometry rejects a hit.
+            std::optional<ResourceRef<const Shader>> intersectionShader = std::nullopt; ///< Computes intersections for procedural geometry. Omit it for triangles.
         };
 
+        /** @brief Collects the shaders a ray-tracing pipeline is assembled from. */
         struct KORAL_API Builder : ::Builder
         {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
 
-            std::optional<ResourceRef<const Shader>> raygenShader = std::nullopt;
-            std::vector<ResourceRef<const Shader>> missShaders = {};
-            std::vector<HitGroup> hitGroups = {};
-            std::vector<ResourceRef<const Shader>> callableShaders = {};
-            glm::u32 maxRecursionDepth = 1;
+            std::optional<ResourceRef<const Shader>> raygenShader = std::nullopt;  ///< The entry point, run once per ray of the TraceRays grid.
+            std::vector<ResourceRef<const Shader>> missShaders = {};                ///< Run when a ray hits nothing; the shader index is chosen by the trace call.
+            std::vector<HitGroup> hitGroups = {};                                   ///< Run when a ray hits geometry; the group is chosen by the instance it hit.
+            std::vector<ResourceRef<const Shader>> callableShaders = {};            ///< Invoked explicitly by other ray-tracing shaders.
+            glm::u32 maxRecursionDepth = 1;                                         ///< How deep rays may recurse.
 
+            /** @brief Sets the raygen shader — the entry point run once per ray. Required. */
             Builder& setRaygenShader(ResourceRef<const Shader> raygenShader);
+
+            /** @brief Appends a miss shader. Its position is the index a trace call selects it by. */
             Builder& addMissShader(ResourceRef<const Shader> missShader);
+
+            /** @brief Appends a hit group. Its position is what AccelerationStructure::Instance::hitGroupIndex refers to. */
             Builder& addHitGroup(const HitGroup& hitGroup);
+
+            /** @brief Appends a callable shader, which other ray-tracing shaders may invoke by index. */
             Builder& addCallableShader(ResourceRef<const Shader> callableShader);
+
+            /**
+             * @brief Sets how deep rays may recurse — a shader casting a ray that casts another.
+             * @param maxRecursionDepth The limit. Keep it as low as the effect allows; devices cap
+             *        it, and deeper recursion costs stack memory per ray.
+             */
             Builder& setMaxRecursionDepth(glm::u32 maxRecursionDepth);
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<RayTracingPipeline>> create() const;
+
+            /**
+             * @brief Compiles the pipeline and its shader binding table.
+             * @return It as a Resource; poisoned rather than thrown when a shader fails to compile
+             *         or the device has no ray-tracing support.
+             */
             [[nodiscard]] kor::Resource<RayTracingPipeline> build(std::source_location where = std::source_location::current()) const;
         };
 
