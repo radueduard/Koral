@@ -1,8 +1,68 @@
+/**
+ * @file koralGuiExtras.h
+ * @brief The GUI extras module: ImGui widgets that are useful but not the engine's business.
+ *
+ * The engine brings up one ImGui context, styles it, loads its fonts and renders it (@ref kor::GUI).
+ * Widgets built *on* that are a different thing: every project wants a different handful, and none of
+ * them belong in the SDK's core headers. They live here instead.
+ *
+ * @code
+ * // CMakeLists.txt:  target_link_libraries(MyScene PRIVATE Koral::Koral Koral::koral-gui-extras)
+ *
+ * #include <koralGuiExtras.h>
+ *
+ * void MyScene::RenderUI() {
+ *     if (_gradient.Draw("Falloff")) rebuildRamp(_gradient.Points());
+ *
+ *     if (ImGui::Button("Open...")) _browser.Open();
+ *     _browser.Display();
+ *     if (_browser.HasSelected()) load(_browser.GetSelected());
+ *
+ *     _log.Draw();       // kgui::LogPanel   — everything the process has logged
+ *     _stats.Draw();     // kgui::StatsPanel — frame time, and what the engine is holding
+ *
+ *     _viewport.Draw("Scene");                                      // kgui::Viewport
+ *     _gizmo.Manipulate(_viewport, view, projection, _transform);   // kgui::Gizmo, over it
+ * }
+ * @endcode
+ *
+ * Four of them read the engine as well as ImGui: @ref kgui::LogPanel and @ref kgui::StatsPanel, which
+ * are what you want on screen while developing, and @ref kgui::Viewport with @ref kgui::Gizmo, which
+ * are how an image you rendered becomes something to look at and manipulate. The rest are widgets you
+ * compose yourself.
+ *
+ * Header-only, deliberately: an ImGui widget is a function that draws, and compiling it into the
+ * consumer is what lets it use the ImGui the consumer already has. The library this module ships
+ * exists only so the module has an identity the runtime can see.
+ *
+ * @note These are widgets, not a framework. They assume an ImGui frame is already in progress, which
+ *       inside Scene::RenderUI it always is.
+ */
+
 #pragma once
-#include "imgui.h"
-#include <vector>
+
+#include <imgui.h>
+
 #include <algorithm>
 #include <cstring>
+#include <vector>
+
+// A file browser, vendored: ImGui has no built-in one, and every tool wants the same dialog.
+// Upstream is github.com/AirGuanZ/imgui-filebrowser (MIT); kept as its own header so an update is a
+// file copy. It declares ImGui::FileBrowser, which is the name upstream users expect.
+#include "imfilebrowser.h"
+
+// The pieces that read the engine rather than only ImGui. Each in its own header, because a project
+// that wants one of them should not have to compile the rest: the panels pull in Koral's log and
+// timing, the viewport pulls in images and the GUI, and the gizmo pulls in ImGuizmo.
+#include "koralLogPanel.h"
+#include "koralStatsPanel.h"
+#include "koralViewport.h"
+#include "koralGizmo.h"
+
+// Not included here, on purpose: <koralCameraPanel.h> draws the *camera module's* cameras, so it needs
+// koral-camera linked as well and refuses to compile without it. Including it from this umbrella would
+// make every consumer of the GUI extras need the camera module. Include it yourself if you use both.
 
 // ---------------------------------------------------------------------------
 //  GradientPoint
