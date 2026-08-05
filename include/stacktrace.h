@@ -34,25 +34,45 @@
 namespace kor
 {
 #if KOR_HAS_STD_STACKTRACE
+    /** @brief The captured call stack of a failed build, as std::stacktrace where it is available. */
     using Stacktrace = std::stacktrace;
 #else
+    /**
+     * @brief The captured call stack of a failed build, on toolchains without <stacktrace>.
+     *
+     * Iterable like std::stacktrace and interchangeable with it at the source level, but each frame
+     * carries only a symbol: description() returns it, while source_file() and source_line() are
+     * always empty.
+     */
     class KORAL_API Stacktrace {
     public:
+        /** @brief One frame of the stack. */
         struct Frame {
-            std::string symbol;
+            std::string symbol; ///< The resolved symbol, or an address when it cannot be resolved.
 
+            /** @brief The frame as text. */
             [[nodiscard]] const std::string& description() const noexcept { return symbol; }
+            /** @brief Always empty here; the fallback unwinder has no debug info. */
             [[nodiscard]] static std::string source_file() { return {}; }
+            /** @brief Always zero here; the fallback unwinder has no debug info. */
             [[nodiscard]] static std::size_t source_line() noexcept { return 0; }
         };
 
         using value_type = Frame;   // matches std::stacktrace, so callers can name the frame type
 
+        /** @brief An empty trace. */
         Stacktrace() = default;
 
+        /**
+         * @brief Captures the current call stack.
+         * @param skip How many innermost frames to leave out, so the capture site itself does not
+         *        appear in the trace.
+         */
         [[nodiscard]] static Stacktrace current(unsigned skip = 0);
 
+        /** @brief Iterator to the innermost frame. */
         [[nodiscard]] auto begin() const noexcept { return _frames.begin(); }
+        /** @brief Iterator past the outermost frame. */
         [[nodiscard]] auto end() const noexcept { return _frames.end(); }
 
     private:

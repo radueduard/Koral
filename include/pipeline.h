@@ -28,6 +28,22 @@ namespace kor
 {
     class CommandBuffer;
 
+    /**
+     * @brief What every pipeline type has in common: its shaders' interface, and hot reload.
+     *
+     * A pipeline is the compiled state a draw or dispatch runs with. This base holds the parts that
+     * do not depend on which kind it is — the descriptor set layouts and push-constant ranges
+     * derived from the shaders by reflection, so a project never restates in C++ what the shader
+     * already declares.
+     *
+     * It also watches its shaders. Edit a shader source while the application is running and it is
+     * recompiled, the pipeline is rebuilt, and the descriptor set layouts are kept if the interface
+     * did not change — so the sets already built against them stay valid. A shader that fails to
+     * compile leaves the pipeline unusable rather than crashing: commands recorded with it fail and
+     * name the shader, and the pipeline heals itself when the source is fixed.
+     *
+     * @see GraphicsPipeline, ComputePipeline, RayTracingPipeline
+     */
     class KORAL_API Pipeline : public AutoUpdatable
     {
     public:

@@ -26,16 +26,45 @@ namespace kor
     class Shader;
     class CommandBuffer;
 
+    /**
+     * @brief A compiled compute pipeline: one shader, run over a grid of workgroups.
+     *
+     * The simplest pipeline type — no fixed-function state, just the shader and whatever
+     * specialization constants are baked into it.
+     *
+     * @code
+     * kor::ComputePipeline::Builder builder;
+     * auto cull = builder.setComputeShader(cullShader).build();
+     *
+     * commandBuffer.BindComputePipeline(cull).Dispatch(groupsX, 1, 1);
+     * @endcode
+     *
+     * @see Pipeline for the descriptor reflection and hot reload it inherits
+     */
     class KORAL_API ComputePipeline : public Pipeline {
     public:
+        /** @brief Collects the shader a compute pipeline is compiled from. */
         struct KORAL_API Builder : ::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
 
-            std::optional<ResourceRef<const Shader>> computeShader;
+            std::optional<ResourceRef<const Shader>> computeShader;    ///< The shader to run.
+
+            /** @brief Sets the compute shader. Required. */
             Builder& setComputeShader(ResourceRef<const Shader> computeShader);
 
+            /**
+             * @brief Bakes a specialization constant into the shader.
+             * @tparam T The constant's type; must be trivially copyable.
+             * @param id The constant id the shader declares.
+             * @param value The value compiled in.
+             *
+             * Commonly used to fix a workgroup size or a feature switch at build time, so the
+             * compiler can fold branches and unroll loops it otherwise could not.
+             *
+             * @throws std::runtime_error if the accumulated constants exceed the internal buffer.
+             */
             template<typename T> requires std::is_trivially_copyable_v<T>
             Builder& setSpecializationConstant(glm::u32 id, T value) {
                 const glm::u32 valueSize = sizeof(T);
@@ -50,6 +79,12 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<ComputePipeline>> create() const;
+
+            /**
+             * @brief Compiles the pipeline.
+             * @return It as a Resource; poisoned rather than thrown when the shader fails to
+             *         compile, and repaired automatically when it is fixed.
+             */
             [[nodiscard]] kor::Resource<ComputePipeline> build(std::source_location where = std::source_location::current()) const;
 
             std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
@@ -61,7 +96,10 @@ namespace kor
 
         ~ComputePipeline() override;
 
+        /** @brief Binds the pipeline. Called by the backend; a scene uses CommandBuffer::BindComputePipeline. */
         void Bind(const CommandBuffer& commandBuffer) const override;
+
+        /** @brief Unbinds it, where the backend has such a notion. */
         void Unbind() const override;
 
     protected:

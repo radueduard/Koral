@@ -10,18 +10,44 @@ namespace kor {
 	class Window;
 	class Engine;
 
+	/**
+	 * @brief Frame timing for the running application.
+	 *
+	 * The run loop advances these once per frame, before the scene is updated, so every call within
+	 * one frame sees the same values. Anything that should move at a constant speed regardless of
+	 * frame rate must scale by FrameTime():
+	 *
+	 * @code
+	 * position += velocity * kor::Time::FrameTime();
+	 * @endcode
+	 */
 	class KORAL_API Time {
 	public:
+		/**
+		 * @brief How long the previous frame took, in seconds.
+		 * @return The elapsed time between the last two frame starts. Multiply per-second rates by
+		 *         it to make motion frame-rate independent.
+		 */
 		static float FrameTime();
+
+		/**
+		 * @brief The interval of the fixed-rate update, in seconds.
+		 * @return Time since the last fixed step, which the loop takes at 60 Hz. Intended for
+		 *         simulation that needs a steady step rather than a variable one.
+		 */
 		static float FixedDeltaTime();
+
+		/**
+		 * @brief How long the window has been open, in seconds.
+		 * @return Seconds accumulated since the first frame. Useful for driving animation from a
+		 *         clock rather than from accumulated deltas.
+		 */
 		static float WindowTime();
 
 	private:
 		friend class Window;
 		friend class Engine;
 
-		// There is a single window, so time is a process-wide singleton (state
-		// lives in time.cpp). Driven by the frame loop via these two hooks.
 		static void setup();
 		static void update();
 	};

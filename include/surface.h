@@ -10,10 +10,24 @@
 namespace kor {
     class Window;
 
+    /**
+     * @brief The presentable surface of a window: what the swap chain draws into.
+     *
+     * Created by the window as it is built and owned by it — reach the live one through
+     * Window::getSurface(). What it wraps depends on the backend and the platform, and none of that
+     * is exposed here: a scene never has to name a surface to render to the screen.
+     */
     class KORAL_API Surface {
     public:
+        /** @brief Constructs the surface for a window. Prefer Create(). */
         explicit Surface(const kor::Window& window) {}
         virtual ~Surface() {};
+
+        /**
+         * @brief Creates the surface the active graphics API needs for @p window.
+         * @param window The window to present to.
+         * @return The surface, owned by the caller.
+         */
         static std::unique_ptr<kor::Surface> Create(const kor::Window &window);
     protected:
     };

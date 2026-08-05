@@ -9,8 +9,15 @@
 #include <filesystem>
 #include <glm/fwd.hpp>
 
+/** @brief Small file helpers, mostly for loading shader sources and binaries. */
 namespace kor::utils
 {
+    /**
+     * @brief Reads a whole text file into a string.
+     * @param filePath File to read.
+     * @return Its contents. Line endings are normalised to '\\n', and the result always ends with one.
+     * @throws std::runtime_error if the file cannot be opened.
+     */
     inline std::string ReadFileAsString(const std::filesystem::path& filePath)
     {
         std::ifstream file(filePath);
@@ -30,6 +37,12 @@ namespace kor::utils
         return buffer;
     }
 
+    /**
+     * @brief Writes a string to a file, replacing anything already there.
+     * @param filePath File to write. Its parent directory must exist.
+     * @param data Contents to write.
+     * @throws std::runtime_error if the file cannot be opened for writing.
+     */
     inline void WriteToFile(const std::filesystem::path& filePath, const std::string& data)
     {
         std::ofstream file(filePath);
@@ -41,6 +54,13 @@ namespace kor::utils
         file.close();
     }
 
+    /**
+     * @brief Reads a binary file as an array of 32-bit words — the form compiled SPIR-V takes.
+     * @param filePath File to read.
+     * @return Its contents, one element per four bytes.
+     * @throws std::runtime_error if the file cannot be opened, or if its size is not a multiple of
+     *         four, which for a shader binary means it is truncated or not SPIR-V at all.
+     */
     inline std::vector<glm::u32> ReadFileToUIntVector(const std::filesystem::path& filePath)
     {
         std::ifstream file(filePath, std::ios::binary | std::ios::ate);
@@ -63,6 +83,12 @@ namespace kor::utils
         return buffer;
     }
 
+    /**
+     * @brief Writes an array of 32-bit words to a binary file, replacing anything already there.
+     * @param filePath File to write. Its parent directory must exist.
+     * @param data Words to write, in order.
+     * @throws std::runtime_error if the file cannot be opened for writing.
+     */
     inline void WriteUIntVectorToFile(const std::filesystem::path& filePath, const std::vector<glm::u32>& data)
     {
         std::ofstream file(filePath, std::ios::binary);

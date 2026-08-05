@@ -31,6 +31,11 @@ namespace kor
     public:
         virtual ~Job() = default;
 
+        /**
+         * @brief The whole of the job. Called once; the program exits when the task it returns completes.
+         * @return A task the engine drives to completion, pumping the executors, before tearing the
+         *         device down — so anything it co_awaits gets to finish.
+         */
         virtual kor::Task<void> Run() = 0;
     };
 }

@@ -15,6 +15,12 @@ namespace kor
 {
     enum class MSAA;
 
+    /**
+     * @brief One frame in flight: the swap-chain image it draws into and the command buffer it records with.
+     *
+     * The scheduler keeps several, cycling through them so the CPU can record the next frame while
+     * the GPU is still working on the previous one.
+     */
     class Frame
     {
     public:
@@ -24,35 +30,66 @@ namespace kor
         Frame(const Frame&) = delete;
         Frame& operator=(const Frame&) = delete;
 
+        /** @brief Which swap-chain image this frame presents. Also indexes the per-frame copies of resources. */
 		[[nodiscard]] glm::u32 getImageIndex() const { return _imageIndex; }
+
+        /** @brief The command buffer this frame's work is recorded into. */
 		[[nodiscard]] kor::CommandBuffer& getCommandBuffer() const { return *_commandBuffer; }
     protected:
         glm::u32 _imageIndex;
 		std::unique_ptr<kor::CommandBuffer> _commandBuffer;
     };
 
+    /**
+     * @brief Owns the swap chain and the frames in flight, and runs one frame from start to present.
+     *
+     * The run loop calls Draw() once per frame; everything else here is the state a scene may need
+     * to read — most often getCurrentImageIndex(), which is the index a per-frame resource uses to
+     * find the copy the current frame owns.
+     *
+     * Created by the window as it is built; reach the live one through Context::Scheduler().
+     */
     class Scheduler
     {
     public:
+        /** @brief How many swap-chain images the scheduler asks for. */
         struct Builder {
-            glm::u32 minImageCount = 2;
-            glm::u32 imageCount = 2;
+            glm::u32 minImageCount = 2;     ///< The fewest images that will do. Two allows double buffering.
+            glm::u32 imageCount = 2;        ///< How many to request; the driver may give more, and the actual count is what getImageCount() reports.
 
+            /** @brief Sets the minimum number of swap-chain images. */
             Builder& setMinImageCount(const glm::u32 minImageCount) { this->minImageCount = minImageCount; return *this; }
+            /** @brief Sets the number of swap-chain images to request. */
             Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
+            /** @brief Creates the scheduler for the active backend. Owned by the caller. */
             [[nodiscard]] Scheduler* build() const;
         };
 
         virtual ~Scheduler() = default;
+
+        /** @brief Creates the swap chain, the frames and their command buffers. Called once by the window. */
     	virtual void Initialize() = 0;
 
+        /** @brief How many frames are in flight — the actual swap-chain image count, which may exceed what was requested. */
         [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
+
+        /**
+         * @brief Which frame is currently being recorded.
+         * @return An index below getImageCount(). A per-frame buffer or image uses this to select
+         *         the copy that is safe to write this frame.
+         */
     	[[nodiscard]] virtual glm::u32 getCurrentImageIndex() const { return _currentFrame; }
+
+        /** @brief The frame currently being recorded. */
         [[nodiscard]] const kor::Frame &getCurrentFrame() const { return *_frames.at(_currentFrame); }
+
+        /** @brief The frame that will be recorded next, wrapping round at the end. */
         [[nodiscard]] const kor::Frame &getNextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
 
+        /** @brief Moves on to the next frame. Called by Draw(); a scene should not. */
     	void advanceFrame() const { _currentFrame = (_currentFrame + 1) % _imageCount; }
 
+        /** @brief Every frame in flight, in index order. */
         [[nodiscard]] std::vector<std::reference_wrapper<Frame>> getFrames() const
         {
     		std::vector<std::reference_wrapper<Frame>> frames;
@@ -62,11 +99,23 @@ namespace kor
 			return frames;
         }
 
+        /**
+         * @brief Runs one whole frame: acquire an image, record, submit and present.
+         * @param renderFunc Callback that records the frame's work; the run loop passes one that
+         *        updates resources and calls Scene::Render.
+         */
         virtual void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const { _started = true; }
 
+        /** @brief Whether the first frame has begun. Before it has, there is no current image to speak of. */
     	[[nodiscard]] bool hasStarted() const { return _started; }
+
+        /** @brief Blocks until the GPU has finished everything submitted so far. Used when tearing down. */
     	virtual void WaitIdle() const = 0;
 
+        /**
+         * @brief Every frame index except @p index.
+         * @return The frames a write to @p index still has to be propagated to; see PendingWrite.
+         */
     	std::unordered_set<glm::u32> ImageIndicesExcept(const glm::u32 index) const
 		{
 			std::unordered_set<glm::u32> indices;

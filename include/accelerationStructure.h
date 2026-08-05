@@ -28,9 +28,32 @@ namespace kor
 {
     class Mesh;
 
+    /**
+     * @brief The spatial index rays are traced against: geometry (BLAS) or placed instances (TLAS).
+     *
+     * Ray tracing needs the scene organised so a ray can find what it hits without testing every
+     * triangle. That is a two-level structure: a bottom-level structure holds the triangles of a
+     * mesh, and a top-level structure holds instances, each naming a bottom-level structure and a
+     * transform. Building the geometry once and instancing it many times is what makes a scene of
+     * repeated objects cheap.
+     *
+     * @code
+     * kor::AccelerationStructure::Builder blasBuilder;
+     * auto blas = blasBuilder.addMesh(mesh).build();
+     *
+     * kor::AccelerationStructure::Builder tlasBuilder;
+     * auto tlas = tlasBuilder.addInstance({ .blas = blas, .transform = model }).build();
+     * @endcode
+     *
+     * The TLAS is what a shader binds, through a Descriptor built from it. Requires a device with
+     * ray-tracing support — see Context::SupportsRayTracing(). Structures are built as they are
+     * created, not refitted, so a moving instance means rebuilding the TLAS; the BLAS it refers to
+     * can stay.
+     */
     class KORAL_API AccelerationStructure
     {
     public:
+        /** @brief Which level of the two-level structure this is. */
         enum class Type
         {
             eBottomLevel,   ///< Holds geometry built from meshes.
@@ -40,8 +63,8 @@ namespace kor
         /** @brief A placed instance of a bottom-level structure inside a top-level one. */
         struct KORAL_API Instance
         {
-            ResourceRef<const AccelerationStructure> blas;
-            glm::mat4 transform = glm::mat4(1.0f);
+            ResourceRef<const AccelerationStructure> blas;   ///< The geometry being placed. Must be a bottom-level structure.
+            glm::mat4 transform = glm::mat4(1.0f);           ///< Where it sits in world space.
             glm::u32 instanceCustomIndex = 0;   ///< Available to shaders as gl_InstanceCustomIndexEXT.
             glm::u32 hitGroupIndex = 0;         ///< SBT hit-group record offset for this instance.
         };
