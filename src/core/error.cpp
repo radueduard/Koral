@@ -35,7 +35,9 @@ namespace kor
         case ErrorCode::eShaderStageMismatch:        return "eShaderStageMismatch";
         case ErrorCode::eDescriptorConflict:         return "eDescriptorConflict";
         case ErrorCode::eShaderCompileFailed:        return "eShaderCompileFailed";
+        case ErrorCode::eVertexLayoutMismatch:       return "eVertexLayoutMismatch";
         case ErrorCode::eConfigInvalid:              return "eConfigInvalid";
+        case ErrorCode::eModuleLoadFailed:           return "eModuleLoadFailed";
         }
         return "eUnknown";
     }
@@ -87,8 +89,12 @@ namespace kor
             return "Descriptor declarations conflict across the pipeline's shader stages.";
         case ErrorCode::eShaderCompileFailed:
             return "Shader compilation or linking failed.";
+        case ErrorCode::eVertexLayoutMismatch:
+            return "The vertex shader asks for a semantic the vertex layout does not carry.";
         case ErrorCode::eConfigInvalid:
             return "The koral.json config file is malformed, or one of its keys has the wrong type.";
+        case ErrorCode::eModuleLoadFailed:
+            return "A module could not be found or loaded, or a module it requires is missing.";
         }
         return "Unknown error.";
     }

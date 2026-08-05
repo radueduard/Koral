@@ -32,19 +32,44 @@
 #include "resource.h"
 #include "stacktrace.h"
 
+/**
+ * @brief The base every Koral builder derives from.
+ *
+ * Builders are configured by chained setters and turned into a resource by build(). Nothing they
+ * do throws: a problem found while configuring, or while building, is recorded and comes back as a
+ * poisoned Resource that names what went wrong and where.
+ *
+ * Deriving from this is only of interest when adding a resource type to Koral. Using a builder
+ * needs nothing from here.
+ */
 struct Builder {
     virtual ~Builder() = default;
 
-    // Whether a resource built by this builder could ever be repaired at runtime, and therefore
-    // whether it is worth keeping the builder around to retry with.
-    //
-    // Only shaders and the pipelines made from them say yes: their failures are fixed by editing a
-    // file. A buffer or image that failed to allocate is not fixed by anything the user can type,
-    // so retaining its builder would buy nothing — and cost a great deal, because those builders
-    // own the resource's initial data (a whole vertex buffer, a whole texture). Retaining that for
-    // the lifetime of the resource would silently double its host memory.
+    /**
+     * @brief Whether a resource built by this builder could ever be repaired at runtime, and so
+     *        whether it is worth keeping the builder around to retry with.
+     *
+     * Only shaders and the pipelines made from them say yes: their failures are fixed by editing a
+     * file. A buffer or image that failed to allocate is not fixed by anything the user can type,
+     * so retaining its builder would buy nothing — and cost a great deal, because those builders
+     * own the resource's initial data (a whole vertex buffer, a whole texture). Retaining that for
+     * the lifetime of the resource would silently double its host memory.
+     */
     static constexpr bool Recoverable = false;
 
+    /**
+     * @brief Whether a *working* resource of this kind is stale once an input changes in place.
+     *
+     * Off for almost everything: an input that is rebuilt keeps its identity, and a pipeline whose
+     * shader was edited reloads itself without being replaced. A descriptor set says yes, because
+     * what it holds is decided entirely by the layout it was built against — when a shader edit
+     * reshapes a block, the set's contents are wrong and only building it again can fix them.
+     *
+     * Requires @ref Recoverable: there is no rebuilding without a retained builder.
+     */
+    static constexpr bool RebuildsOnInputChange = false;
+
+    /** @brief Whether anything recorded so far will make the build fail. */
     [[nodiscard]] bool hasErrors() const noexcept {
         for (const auto& d : _diagnostics) {
             if (d.severity == Severity::Error) return true;
@@ -53,14 +78,16 @@ struct Builder {
     }
 
 protected:
+    /** @brief Whether a recorded problem prevents the build or merely deserves a mention. */
     enum class Severity { Warning, Error };
 
+    /** @brief One problem found while configuring or building. */
     struct Diagnostic {
-        Severity severity;
-        kor::ErrorCode code;
-        std::string message;
-        kor::Stacktrace trace;
-        std::shared_ptr<const kor::Error> cause;  ///< The input error responsible, if any.
+        Severity severity;                          ///< Whether it prevents the build.
+        kor::ErrorCode code;                        ///< What kind of problem it is.
+        std::string message;                        ///< What went wrong, in words.
+        kor::Stacktrace trace;                      ///< Where it was recorded.
+        std::shared_ptr<const kor::Error> cause;    ///< The input error responsible, if any.
     };
 
     mutable std::vector<Diagnostic> _diagnostics{};
@@ -70,25 +97,31 @@ protected:
     // is what stops a broken pipeline from rebuilding itself every frame while you edit a shader.
     mutable std::vector<std::pair<std::weak_ptr<kor::ResourceStateBase>, std::uint64_t>> _deps{};
 
+    /**
+     * @brief Records a problem that will make the build fail.
+     * @param code What kind of problem it is.
+     * @param message What went wrong.
+     * @param cause The input error responsible, when this failure is inherited from one.
+     */
     void addError(const kor::ErrorCode code, std::string message,
                   std::shared_ptr<const kor::Error> cause = nullptr) const {
         _diagnostics.push_back({Severity::Error, code, std::move(message),
                                 kor::Stacktrace::current(2), std::move(cause)});
     }
 
+    /** @brief Records something worth mentioning that does not prevent the build. Logged by validate(). */
     void warn(std::string message) const {
         _diagnostics.push_back({Severity::Warning, kor::ErrorCode::eNone, std::move(message),
                                 kor::Stacktrace::current(2), nullptr});
     }
 
-    // Start a build attempt: forget everything the *previous attempt* discovered, keeping what the
-    // setters recorded. Without this, a retried builder would accumulate a fresh copy of its
-    // inputs' problems on every attempt.
-    //
-    // Setters record too, not just create(): a builder that stores a plain reference to its input
-    // (Framebuffer's attachments, DescriptorSet's layout) has to inspect that input at the moment
-    // it is handed over, because storing it means dereferencing it. Those findings are permanent —
-    // the builder never saw a usable input, so there is nothing for a retry to recover.
+    /**
+     * @brief Starts a build attempt, discarding what the previous attempt discovered.
+     *
+     * Keeps what the setters recorded, since those findings are permanent — the builder never saw a
+     * usable input, so there is nothing for a retry to recover. Without this, a retried builder
+     * would accumulate a fresh copy of its inputs' problems on every attempt.
+     */
     void beginAttempt() const {
         if (!_configWatermark) {
             _configWatermark = _diagnostics.size();
@@ -98,10 +131,16 @@ protected:
         _deps.resize(*_depWatermark);
     }
 
-    // Consume a resource input. If the input is unusable then so are we, and its error becomes
-    // the *cause* of ours — so the user is shown the shader that failed to compile, not merely
-    // the pipeline that could not be assembled from it. The input's generation is recorded
-    // either way, so that a later repair can be noticed.
+    /**
+     * @brief Consumes a resource input, inheriting its failure if it has one.
+     * @param input The resource being built from.
+     * @param what What it is, for the message ("vertex shader", "layout", ...).
+     *
+     * If the input is unusable then so are we, and its error becomes the *cause* of ours — so the
+     * user is shown the shader that failed to compile, not merely the pipeline that could not be
+     * assembled from it. The input's generation is recorded either way, so a later repair can be
+     * noticed.
+     */
     template<typename T>
     void adopt(const kor::ResourceRef<T>& input, const std::string_view what) const {
         if (!input.alive()) {
@@ -117,14 +156,20 @@ protected:
         _deps.emplace_back(input.state(), input.generation());
     }
 
+    /** @brief Consumes an owned resource as an input. @see adopt(const kor::ResourceRef<T>&, std::string_view) */
     template<typename T>
     void adopt(const kor::Resource<T>& input, const std::string_view what) const {
         adopt(kor::ResourceRef<const T>(input), what);
     }
 
-    // Logs warnings and returns the first error, with its cause chain attached. Errors are not
-    // logged here: they end up poisoning the resource, and materialize() prints the complete
-    // history in one piece rather than a line per level.
+    /**
+     * @brief Logs the recorded warnings and returns the first error.
+     * @return An empty result when nothing failed, otherwise the first error with its cause chain
+     *         attached.
+     *
+     * Errors are not logged here: they end up poisoning the resource, and materialize() prints the
+     * complete history in one piece rather than a line per level.
+     */
     [[nodiscard]] kor::VoidResult validate() const {
         std::optional<kor::Error> firstError;
         for (const auto& [severity, code, message, trace, cause] : _diagnostics) {
@@ -154,10 +199,12 @@ protected:
      *
      * Never throws and never returns nothing: a failure is a poisoned resource that keeps its
      * identity, so refs taken from it stay valid and come good if it is ever repaired.
+     *
+     * @param self The builder to attempt, and to keep for retries when it is recoverable.
+     * @param name What is being built, for diagnostics.
+     * @param where The caller's build() site, so an error names the project's file and line rather
+     *        than somewhere inside Koral. Every build() forwards its own defaulted argument here.
      */
-    // @p where is the caller's build() site, defaulted at that call so it names the project's
-    // file and line rather than somewhere inside Koral. Every build() takes it and forwards it
-    // here; without that the location would be whichever library .cpp constructed the Error.
     template<typename T, typename SelfBuilder>
     [[nodiscard]] kor::Resource<T> materialize(const SelfBuilder& self, std::string name,
                                                const std::source_location where = std::source_location::current()) const {
@@ -186,6 +233,7 @@ protected:
                 resource.addDependency(state.lock(), generation);
             }
             resource.setRebuild([attempt] { return attempt->create(); });
+            resource.setRebuildsOnInputChange(SelfBuilder::RebuildsOnInputChange);
             // create() re-adopts the builder's inputs on every run, so reading _deps back after an
             // attempt is what keeps the dependency list (and its generations) honest across repairs.
             resource.setDependencyProbe([attempt] { return attempt->_deps; });

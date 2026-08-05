@@ -42,6 +42,18 @@ static_assert(kor::ComputePipeline::Builder::Recoverable);
 static_assert(kor::GraphicsPipeline::Builder::Recoverable);
 static_assert(kor::RayTracingPipeline::Builder::Recoverable);
 
+// And the one that is repairable for a different reason: a descriptor set is not fixed by editing a
+// broken shader so much as *reshaped* by editing a working one. What it holds is decided by the
+// layout it was built against, so when a block gains a field the set has to be built again — the
+// only resource that rebuilds while perfectly healthy. @see Builder::RebuildsOnInputChange
+static_assert(kor::DescriptorSet::Builder::Recoverable);
+static_assert(kor::DescriptorSet::Builder::RebuildsOnInputChange);
+
+// Nothing else rebuilds itself behind the caller's back.
+static_assert(!kor::Shader::Builder::RebuildsOnInputChange);
+static_assert(!kor::GraphicsPipeline::Builder::RebuildsOnInputChange);
+static_assert(!kor::Buffer::RawBuilder::RebuildsOnInputChange);
+
 // Not repairable, and expensive or unsafe to retain. These must never keep their builder.
 static_assert(!kor::Buffer::RawBuilder::Recoverable);
 static_assert(!kor::Buffer::Builder<std::byte>::Recoverable);  // owns a copy of the buffer's data
@@ -49,7 +61,6 @@ static_assert(!kor::Image::Builder::Recoverable);              // owns a copy of
 static_assert(!kor::ImageView::Builder::Recoverable);
 static_assert(!kor::Sampler::Builder::Recoverable);
 static_assert(!kor::Framebuffer::Builder::Recoverable);        // holds raw refs to its attachments
-static_assert(!kor::DescriptorSet::Builder::Recoverable);      // holds a raw ref to its layout
 
 TEST(BuilderRecoverable, SplitIsEnforcedAtCompileTime) {
     SUCCEED();  // the static_asserts above are the test

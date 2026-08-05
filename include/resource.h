@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <algorithm>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -42,12 +43,18 @@
 #include "task.h"
 
 namespace kor {
-    // Marker base for resources the Repository drives once per frame. Inheriting
-    // it (rather than just declaring automaticUpdate()) is what RefStorage keys
-    // on, so the auto-update can never be silently disabled by an inaccessible
-    // override — a non-public automaticUpdate() becomes a compile error.
+    /**
+     * @brief Marker base for resources the Repository drives once per frame.
+     *
+     * Buffers use it to propagate per-frame writes; pipelines use it to notice a recompiled shader.
+     * Inheriting it — rather than merely declaring automaticUpdate() — is what the repository keys
+     * on, so the update can never be silently disabled by an inaccessible override: a non-public
+     * automaticUpdate() becomes a compile error instead of a resource that quietly stops updating.
+     */
     struct AutoUpdatable {
         virtual ~AutoUpdatable() = default;
+
+        /** @brief Called once per frame, at the top of the frame, on the main thread. */
         virtual void automaticUpdate() = 0;
     };
 
@@ -112,14 +119,28 @@ namespace kor {
         }
 
         /**
-         * @brief Whether this resource is broken and something has changed that might fix it.
+         * @brief Whether a resource this one was built from announced a change in place.
          *
-         * Consumes the repair request. Only poisoned resources are candidates: a *working* resource
-         * whose shader changed is hot-reloaded in place (Shader::OnReload), which keeps its object
-         * identity and its subscribers — a rebuild would throw those away.
+         * Set from Builder::RebuildsOnInputChange. Most resources leave it false: a *working*
+         * resource whose shader changed is hot-reloaded in place (Shader::OnReload), which keeps its
+         * object identity and its subscribers, and a rebuild would throw those away. A descriptor
+         * set is the exception — what it holds is decided entirely by the layout it was built
+         * against, so when that layout's blocks are reshaped the only way to be right is to build
+         * it again. @see DescriptorSet::Builder
+         */
+        bool rebuildsOnInputChange = false;
+
+        /**
+         * @brief Whether this resource should be rebuilt now, and something has changed to make it
+         *        worth trying.
+         *
+         * Consumes the repair request. A poisoned resource is always a candidate — that is the
+         * "fix the shader and the pipeline comes back" path. A *healthy* one is a candidate only if
+         * it asked to be. @see rebuildsOnInputChange
          */
         [[nodiscard]] bool needsRepair() {
-            if (!poisoned() || !recoverable()) return false;
+            if (!recoverable()) return false;
+            if (!poisoned() && !rebuildsOnInputChange) return false;
             const bool requested = repairRequested.exchange(false, std::memory_order_relaxed);
             return requested || dependenciesChanged();
         }
@@ -280,6 +301,21 @@ namespace kor {
         void addDependency(const std::shared_ptr<ResourceStateBase>& dep, const std::uint64_t generation) {
             if (_state && dep) _state->dependencies.emplace_back(dep, generation);
         }
+
+        /** @brief Whether a dependency changing in place should rebuild this. @see ResourceStateBase::rebuildsOnInputChange */
+        void setRebuildsOnInputChange(const bool rebuilds) {
+            if (_state) _state->rebuildsOnInputChange = rebuilds;
+        }
+
+        /**
+         * @brief Announce that the object changed in place, so everything built from it rebuilds.
+         *
+         * For the case a rebuild cannot express: an object that has to keep its identity — a
+         * descriptor set layout still referenced by live sets, say — but whose contents no longer
+         * describe what its dependents were built against. Bumping the generation is exactly what
+         * a successful rebuild does, so dependents notice it the same way.
+         */
+        void markChanged() { if (_state) ++_state->generation; }
 
         /** @brief Destroy the object. Existing refs expire, exactly as before. */
         void reset() { _state.reset(); }
@@ -507,12 +543,31 @@ namespace kor {
     template<typename T>
     ResourceRef(const Resource<T>&) -> ResourceRef<T>;
 
+    /**
+     * @brief Tracks every live resource, updates them each frame, and repairs the broken ones.
+     *
+     * Resources register themselves as they are built, so a scene never adds anything by hand.
+     * Once per frame the repository asks each of them to update — which is how a per-frame buffer
+     * propagates its writes — and retries the ones whose failure may have been fixed, which is how
+     * a shader edit brings a poisoned pipeline back.
+     *
+     * Reach it through Context::Repository(). The named get()/add() side is for code that wants to
+     * look a resource up by string id rather than hold it.
+     */
     class Repository {
         struct IStorage {
             virtual ~IStorage() = default;
             virtual void update() = 0;
             /** @return true if anything was actually brought back this pass. */
             virtual bool repair() = 0;
+
+            /** @return How many resources of this type the repository is watching. */
+            [[nodiscard]] virtual std::size_t size() const = 0;
+            /**
+             * @return How many of them are poisoned — built from something that failed and waiting
+             *         for it to be fixed. Worth surfacing: a poisoned resource is silent by design.
+             */
+            [[nodiscard]] virtual std::size_t unusable() const = 0;
         };
 
         template<typename T>
@@ -536,6 +591,13 @@ namespace kor {
                     }
                 }
             }
+
+            [[nodiscard]] std::size_t size() const override { return items.size(); }
+
+            [[nodiscard]] std::size_t unusable() const override {
+                return static_cast<std::size_t>(std::ranges::count_if(
+                    items | std::views::values, [](const Resource<T>& resource) { return !resource; }));
+            }
         };
 
         template<typename T>
@@ -551,6 +613,12 @@ namespace kor {
             }
 
             void update() override {
+                // Drop what the owner has destroyed. These are refs, not owners, so an expired one
+                // is not a leak of the object — but nothing else ever removes them, and a scene
+                // that creates and drops resources as it runs would otherwise grow this list
+                // without bound. Done here rather than in repair() so both passes see the same set.
+                std::erase_if(items, [](const ResourceRef<T>& item) { return !item.alive(); });
+
                 if constexpr (std::is_base_of_v<AutoUpdatable, T>) {
                     for (auto& item : items) {
                         if (item.valid()) {
@@ -559,15 +627,53 @@ namespace kor {
                     }
                 }
             }
+
+            [[nodiscard]] std::size_t size() const override { return items.size(); }
+
+            [[nodiscard]] std::size_t unusable() const override {
+                return static_cast<std::size_t>(std::ranges::count_if(
+                    items, [](const ResourceRef<T>& item) { return !item.valid(); }));
+            }
         };
 
     public:
+        /**
+         * @brief One frame's worth of repository work: repair what can be repaired, then update everything.
+         *
+         * Called at the top of the frame by the run loop.
+         */
         void update() {
             repair();
 
             for (const auto &storage: _refStorages | std::views::values) {
                 storage->update();
             }
+        }
+
+        /**
+         * @brief How many resources the repository is watching, across every type.
+         *
+         * For a diagnostic overlay rather than for logic: it counts what the engine has been asked to
+         * keep an eye on, which is every resource built through a builder.
+         */
+        [[nodiscard]] std::size_t trackedResources() const {
+            std::size_t total = 0;
+            for (const auto& storage : _storages | std::views::values) total += storage->size();
+            for (const auto& storage : _refStorages | std::views::values) total += storage->size();
+            return total;
+        }
+
+        /**
+         * @brief How many of them are unusable — poisoned, or destroyed out from under a ref.
+         *
+         * A poisoned resource reports itself once and then waits quietly to be repaired, so a count
+         * of them is the one number that says "something is broken right now" without reading a log.
+         */
+        [[nodiscard]] std::size_t unusableResources() const {
+            std::size_t total = 0;
+            for (const auto& storage : _storages | std::views::values) total += storage->unusable();
+            for (const auto& storage : _refStorages | std::views::values) total += storage->unusable();
+            return total;
         }
 
         /**
@@ -591,6 +697,10 @@ namespace kor {
             kor::log::warn("Resource repair did not settle after {} passes; giving up this frame.", maxPasses);
         }
 
+        /**
+         * @brief The resource of type @p T registered under @p id.
+         * @throws std::runtime_error if no such resource is registered.
+         */
         template<typename T>
         T& get(std::string_view id) {
             auto& s = storage<T>();
@@ -606,6 +716,10 @@ namespace kor {
             return *it->second;
         }
 
+        /**
+         * @brief The resource of type @p T registered under @p id.
+         * @throws std::runtime_error if no such resource is registered.
+         */
         template<typename T>
         const T& get(std::string_view id) const {
             const auto& s = tryStorage<T>();
@@ -621,6 +735,11 @@ namespace kor {
             return *it->second;
         }
 
+        /**
+         * @brief Registers a resource under @p id and takes ownership of it.
+         * @return A reference to it. Registering a second resource under the same id is logged and
+         *         leaves the first in place.
+         */
         template<typename T>
         ResourceRef<T> add(std::string_view id, Resource<T> resource) {
             auto& s = storage<T>();
@@ -631,6 +750,11 @@ namespace kor {
             return ResourceRef<T>(it->second);
         }
 
+        /**
+         * @brief Registers a resource owned elsewhere, so it takes part in the per-frame update.
+         *
+         * What a buffer or pipeline does with itself at build time. Ownership stays with the caller.
+         */
         template<typename T>
         void addRef(ResourceRef<T> resource) {
             auto& s = refStorage<T>();

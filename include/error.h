@@ -69,9 +69,13 @@ namespace kor
         eShaderStageMismatch,  ///< A shader was supplied for the wrong pipeline stage.
         eDescriptorConflict,   ///< Descriptor declarations conflict across merged shader stages.
         eShaderCompileFailed,  ///< Shader compilation/linking failed.
+        eVertexLayoutMismatch, ///< A vertex shader asks for a semantic the vertex layout does not carry.
 
         // --- configuration ---
         eConfigInvalid,        ///< A koral.json config file is malformed or has a key of the wrong type.
+
+        // --- modules ---
+        eModuleLoadFailed,     ///< A module could not be found, loaded, or ordered against its dependencies.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */
@@ -91,10 +95,10 @@ namespace kor
      */
     struct KORAL_API Error
     {
-        ErrorCode code = ErrorCode::eNone;
-        std::string message;
-        std::source_location where = std::source_location::current();
-        std::shared_ptr<const Error> cause;  ///< The error that made our input unusable, if any.
+        ErrorCode code = ErrorCode::eNone;      ///< What kind of failure this is.
+        std::string message;                    ///< What went wrong, in words, with the specifics filled in.
+        std::source_location where = std::source_location::current();   ///< Where it was raised — the caller's build() or record site, not somewhere inside Koral.
+        std::shared_ptr<const Error> cause;     ///< The error that made our input unusable, if any.
 
         /** @brief Format this error alone as "kor::Error(code): message [file:line]". */
         [[nodiscard]] std::string toString() const;
@@ -126,7 +130,9 @@ namespace kor
      */
     struct KORAL_API BackendException : std::runtime_error
     {
-        Error error;
+        Error error;    ///< The structured error being carried.
+
+        /** @param e The error to carry; its message becomes the exception's what(). */
         explicit BackendException(Error e)
             : std::runtime_error(e.message), error(std::move(e)) {}
     };

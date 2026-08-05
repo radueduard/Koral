@@ -103,15 +103,22 @@ namespace kor
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription)
             {
-                builder.addBinding(binding, descriptor.type, descriptor.count,
-                                   descriptor.access, descriptor.stages, descriptor.active);
+                builder.addBlockBinding(binding, descriptor.type, descriptor.count,
+                                        descriptor.access, descriptor.stages, descriptor.active,
+                                        descriptor.members, descriptor.blockSize);
             }
 
             if (const auto existing = _setLayouts.find(setIndex);
                 existing != _setLayouts.end() && existing->second.valid() &&
                 existing->second->matches(builder))
             {
-                rebuilt[setIndex] = std::move(existing->second);  // unchanged: keep it alive
+                // The interface is unchanged, so the layout object — and every descriptor set
+                // holding it — stays valid. Its *blocks* may still have been reshaped by the edit
+                // (a field added to a uniform block changes no binding), and those are what a
+                // semantic-filled binding was built from: adopt them, and say so, so the sets
+                // built against this layout rebuild themselves against the new shape.
+                if (existing->second->refreshBlocks(builder)) existing->second.markChanged();
+                rebuilt[setIndex] = std::move(existing->second);
                 continue;
             }
 
