@@ -24,44 +24,43 @@ namespace kor::vk
         [[nodiscard]] const ::vk::Fence& getFence() const { return _fence; }
         [[nodiscard]] const kor::vk::Queue& getQueue() const { return _queue; }
 
-        kor::CommandBuffer& Begin() override;
-        void End() override;
-        kor::CommandBuffer& BeginRendering(RenderParameters renderParameters) override;
-        kor::CommandBuffer& doBeginRendering(kor::ResourceRef<const kor::Framebuffer> framebuffer, RenderParameters renderParameters) override;
-        kor::CommandBuffer& EndRendering() override;
-        kor::CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
-        kor::CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
-        kor::CommandBuffer& SetLineWidth(float lineWidth) override;
-        kor::CommandBuffer& SetDepthBias(float constantFactor, float clamp, float slopeFactor) override;
-        kor::CommandBuffer& SetBlendConstants(glm::vec4 constants) override;
-        kor::CommandBuffer& SetStencilCompareMask(StencilFace face, glm::u32 compareMask) override;
-        kor::CommandBuffer& SetStencilWriteMask(StencilFace face, glm::u32 writeMask) override;
-        kor::CommandBuffer& SetStencilReference(StencilFace face, glm::u32 reference) override;
-        kor::CommandBuffer& SetCullMode(Flags<CullMode> cullMode) override;
-        kor::CommandBuffer& SetFrontFace(FrontFace frontFace) override;
-        kor::CommandBuffer& SetDepthTestEnable(bool enable) override;
-        kor::CommandBuffer& SetDepthWriteEnable(bool enable) override;
-        kor::CommandBuffer& SetDepthCompareOp(CompareOp compareOp) override;
-        kor::CommandBuffer& SetStencilTestEnable(bool enable) override;
-        kor::CommandBuffer& SetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp) override;
-        kor::CommandBuffer& SetDepthBiasEnable(bool enable) override;
-        kor::CommandBuffer& SetRasterizerDiscardEnable(bool enable) override;
-        kor::CommandBuffer& SetPrimitiveRestartEnable(bool enable) override;
+        kor::CommandBuffer& doBegin() override;
+        void doEnd() override;
+        kor::CommandBuffer& doBeginRendering(const RenderInfo& renderInfo) override;
+        kor::CommandBuffer& doEndRendering() override;
+        kor::CommandBuffer& doSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
+        kor::CommandBuffer& doSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
+        kor::CommandBuffer& doSetLineWidth(float lineWidth) override;
+        kor::CommandBuffer& doSetDepthBias(float constantFactor, float clamp, float slopeFactor) override;
+        kor::CommandBuffer& doSetBlendConstants(glm::vec4 constants) override;
+        kor::CommandBuffer& doSetStencilCompareMask(StencilFace face, glm::u32 compareMask) override;
+        kor::CommandBuffer& doSetStencilWriteMask(StencilFace face, glm::u32 writeMask) override;
+        kor::CommandBuffer& doSetStencilReference(StencilFace face, glm::u32 reference) override;
+        kor::CommandBuffer& doSetCullMode(Flags<CullMode> cullMode) override;
+        kor::CommandBuffer& doSetFrontFace(FrontFace frontFace) override;
+        kor::CommandBuffer& doSetDepthTestEnable(bool enable) override;
+        kor::CommandBuffer& doSetDepthWriteEnable(bool enable) override;
+        kor::CommandBuffer& doSetDepthCompareOp(CompareOp compareOp) override;
+        kor::CommandBuffer& doSetStencilTestEnable(bool enable) override;
+        kor::CommandBuffer& doSetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp) override;
+        kor::CommandBuffer& doSetDepthBiasEnable(bool enable) override;
+        kor::CommandBuffer& doSetRasterizerDiscardEnable(bool enable) override;
+        kor::CommandBuffer& doSetPrimitiveRestartEnable(bool enable) override;
         kor::CommandBuffer& doBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline) override;
         kor::CommandBuffer& doBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline) override;
         kor::CommandBuffer& doBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline) override;
         kor::CommandBuffer& doBindDescriptorSet(glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set, bool debug) override;
         kor::CommandBuffer& doBindMesh(kor::ResourceRef<const Mesh> mesh) override;
         kor::CommandBuffer& doBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) override;
-        kor::CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color) override;
-        kor::CommandBuffer& EndDebugLabel() override;
-        kor::CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color) override;
-        kor::CommandBuffer& Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) override;
+        kor::CommandBuffer& doBeginDebugLabel(const std::string& label, glm::vec4 color) override;
+        kor::CommandBuffer& doEndDebugLabel() override;
+        kor::CommandBuffer& doInsertDebugLabel(const std::string& label, glm::vec4 color) override;
+        kor::CommandBuffer& doDispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) override;
         kor::CommandBuffer& doDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) override;
-        kor::CommandBuffer& TraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where) override;
-        kor::CommandBuffer& Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) override;
-        kor::CommandBuffer& DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) override;
-        kor::CommandBuffer& DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) override;
+        kor::CommandBuffer& doTraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where) override;
+        kor::CommandBuffer& doDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) override;
+        kor::CommandBuffer& doDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) override;
+        kor::CommandBuffer& doDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) override;
         kor::CommandBuffer& doDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
         kor::CommandBuffer& doDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
         kor::CommandBuffer& doDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
@@ -79,14 +78,14 @@ namespace kor::vk
         kor::CommandBuffer& doCopyBufferToImage(ResourceRef<const kor::Buffer> buffer, ResourceRef<const kor::Image> image, kor::Copy copyInfo) override;
         kor::CommandBuffer& doCopyImageToBuffer(ResourceRef<const kor::Image> image, ResourceRef<const kor::Buffer> buffer, kor::Copy copyInfo) override;
 
-        kor::CommandBuffer& Run(const std::function<void(kor::CommandBuffer&)>& command) override;
+        kor::CommandBuffer& doRun(const std::function<void(kor::CommandBuffer&)>& command) override;
 
-        kor::VoidResult Submit() override;
-        void Reset() override;
+        kor::VoidResult doSubmit() override;
+        void doReset() override;
 
-        void WaitForFence() const override;
+        void doWaitForFence() const override;
 
-        [[nodiscard]] bool supportsTimers() const override { return _timestampPeriod > 0.f; }
+        [[nodiscard]] bool doSupportsTimers() const override { return _timestampPeriod > 0.f; }
 
     private:
         // Park an emit closure as a core Record. Every override that talks to _handle goes
@@ -116,11 +115,11 @@ namespace kor::vk
         }
 
     protected:
-        kor::CommandBuffer & PushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
+        kor::CommandBuffer & doPushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
         kor::Resource<kor::Image> _resolveHelperImage;
 
-        void writeTimerTimestamp(glm::u32 queryIndex) override;
-        bool readTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) override;
+        void doWriteTimerTimestamp(glm::u32 queryIndex) override;
+        bool doReadTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) override;
 
     private:
         const kor::vk::Queue& _queue;

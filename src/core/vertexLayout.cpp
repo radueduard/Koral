@@ -41,6 +41,18 @@ namespace kor
             if (semanticNamespace.empty()) return std::string(semantic);
             return std::string(semanticNamespace) + "(" + std::string(semantic) + ")";
         }
+
+        // The first location two attributes both claim, if any. Only the layout can produce one:
+        // where the shader decides the locations they are distinct by construction.
+        std::optional<glm::u32> duplicateLocation(const std::vector<VertexInputAttributeDescription>& resolved)
+        {
+            for (std::size_t i = 0; i < resolved.size(); ++i) {
+                for (std::size_t j = i + 1; j < resolved.size(); ++j) {
+                    if (resolved[i].location == resolved[j].location) return resolved[i].location;
+                }
+            }
+            return std::nullopt;
+        }
     }
 
     std::optional<VertexInputAttributeDescription> VertexLayout::position() const
@@ -88,20 +100,32 @@ namespace kor
 
         std::vector<VertexInputAttributeDescription> resolved;
 
-        // Nothing annotated: the shader's locations are the layout's declaration order, which is
-        // what a vertex layout meant before it could be matched by name. Every attribute is
-        // described, whether the shader reads it or not — an unread one is simply not fetched.
+        // Nothing annotated: the locations are the layout's to decide — each attribute's own, where
+        // it names one, and otherwise its place in the list, which is what a vertex layout meant
+        // before it could be matched by name. Every attribute is described, whether the shader
+        // reads it or not — an unread one is simply not fetched.
         if (!annotated) {
             resolved.reserve(attributes.size());
             for (std::size_t i = 0; i < attributes.size(); ++i) {
                 const auto& attribute = attributes[i];
                 resolved.push_back(VertexInputAttributeDescription{
-                    .location     = static_cast<glm::u32>(i),
+                    .location     = attribute.location.value_or(static_cast<glm::u32>(i)),
                     .binding      = attribute.binding,
                     .channelCount = attribute.channelCount,
                     .channelType  = attribute.channelType,
                     .offset       = attribute.offset,
                 });
+            }
+
+            // Two attributes at one location is a shader reading one of them and never the other.
+            // The usual cause is a layout that numbers some of its attributes and leaves the rest
+            // to fall back onto a number already taken.
+            if (const auto clash = duplicateLocation(resolved)) {
+                return fail(ErrorCode::eVertexLayoutMismatch,
+                    "Two vertex attributes are described at location {}. A layout that gives any "
+                    "attribute an explicit location should give them all one: the rest fall back to "
+                    "their position in the list, which is what collided here.",
+                    *clash);
             }
             return resolved;
         }
@@ -114,14 +138,21 @@ namespace kor
             const VertexLayout::Attribute* match = nullptr;
 
             if (input.semantic.empty()) {
-                // Not annotated, in a shader where others are: fall back to its location's place in
-                // the layout, so one un-annotated input among annotated ones still works.
-                if (input.location < attributes.size())
+                // Not annotated, in a shader where others are: an attribute that names this
+                // location answers for it, and failing that the one at that place in the list — so
+                // one un-annotated input among annotated ones still works.
+                for (const auto& attribute : attributes) {
+                    if (attribute.location == input.location) {
+                        match = &attribute;
+                        break;
+                    }
+                }
+                if (!match && input.location < attributes.size())
                     match = &attributes[input.location];
                 if (!match) {
                     return fail(ErrorCode::eVertexLayoutMismatch,
                         "Vertex input '{}' at location {} carries no semantic, and the vertex layout "
-                        "has no attribute at that position to fall back to.",
+                        "has no attribute at that location to fall back to.",
                         input.name, input.location);
                 }
             } else {
@@ -140,7 +171,17 @@ namespace kor
                         if (!available.empty()) available += ", ";
                         available += describe(attribute.semanticNamespace, attribute.semantic);
                     }
-                    if (available.empty()) available = "nothing";
+
+                    // A layout that names nothing at all is not a layout missing one semantic: it
+                    // describes its attributes by location, and the shader is asking it a question
+                    // it cannot answer in principle.
+                    if (available.empty()) {
+                        return fail(ErrorCode::eVertexLayoutMismatch,
+                            "Vertex input '{}' asks for {}, but the vertex layout names no semantics at "
+                            "all — it describes its {} attribute(s) by location. Either annotate nothing "
+                            "in the shader, or give the layout's attributes semantics.",
+                            input.name, describe(input.semanticNamespace, input.semantic), attributes.size());
+                    }
 
                     return fail(ErrorCode::eVertexLayoutMismatch,
                         "Vertex input '{}' asks for {}, which the vertex layout does not carry. It has: {}.",

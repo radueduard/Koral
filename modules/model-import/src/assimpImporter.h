@@ -55,6 +55,19 @@ namespace kmdl {
         std::expected<std::vector<glm::mat4>, std::string> GetBoneTransformationMatrices() override;
 
     private:
+        /**
+         * @brief What GetMesh and GetMaterial actually do, keyed on the index rather than the name.
+         *
+         * A name is not a key. glTF lets meshes and materials go unnamed — Sponza's twenty-five
+         * materials are every one of them called "" — and assimp hands that straight through, so a
+         * name→index map collapses them onto whichever one came last. Node::meshIndices and
+         * Node::materialIndices are *indices*, and LoadScene fills the arrays they point into, so
+         * both go through these; the name-keyed public overrides resolve a name and then land here,
+         * for a caller that has a name and nothing else.
+         */
+        Mesh GetMeshAt(glm::u32 meshIndex);
+        Material GetMaterialAt(glm::u32 materialIndex);
+
         Assimp::Importer _importer = {};
         Assimp::Exporter _exporter = {};
         const aiScene* _scene;
@@ -127,8 +140,15 @@ namespace kmdl {
         if (meshIndexIt == _meshNameToIndex.end()) {
             throw std::runtime_error("Mesh not found: " + meshName);
         }
-        const auto meshIndex = meshIndexIt->second;
+        return GetMeshAt(meshIndexIt->second);
+    }
+
+    inline Importer::Mesh AssimpImporter::GetMeshAt(const glm::u32 meshIndex) {
+        if (meshIndex >= _scene->mNumMeshes) {
+            throw std::runtime_error("Mesh index out of range: " + std::to_string(meshIndex));
+        }
         const auto& mesh = _scene->mMeshes[meshIndex];
+        const std::string meshName = mesh->mName.C_Str();
 
         Mesh result;
         result.positions.reserve(mesh->mNumVertices);
@@ -227,8 +247,15 @@ namespace kmdl {
         if (materialIndexIt == _materialNameToIndex.end()) {
             throw std::runtime_error("Material not found: " + materialName);
         }
-        const auto materialIndex = materialIndexIt->second;
+        return GetMaterialAt(materialIndexIt->second);
+    }
+
+    inline Importer::Material AssimpImporter::GetMaterialAt(const glm::u32 materialIndex) {
+        if (materialIndex >= _scene->mNumMaterials) {
+            throw std::runtime_error("Material index out of range: " + std::to_string(materialIndex));
+        }
         const auto& material = _scene->mMaterials[materialIndex];
+        const std::string materialName = material->GetName().C_Str();
 
         Material result;
 
@@ -413,16 +440,17 @@ namespace kmdl {
     inline Importer::Scene AssimpImporter::LoadScene() {
         Scene result;
 
+        // By index, never by name: Node::meshIndices and Node::materialIndices index straight into
+        // these two arrays, so entry i has to be assimp's mesh i and material i even when several of
+        // them share a name — or are all unnamed, which is what a glTF that never bothered looks like.
         result.meshes.reserve(_scene->mNumMeshes);
         for (unsigned int i = 0; i < _scene->mNumMeshes; ++i) {
-            const std::string meshName = _scene->mMeshes[i]->mName.C_Str();
-            result.meshes.emplace_back(GetMesh(meshName));
+            result.meshes.emplace_back(GetMeshAt(i));
         }
 
         result.materials.reserve(_scene->mNumMaterials);
         for (unsigned int i = 0; i < _scene->mNumMaterials; ++i) {
-            const std::string materialName = _scene->mMaterials[i]->GetName().C_Str();
-            result.materials.emplace_back(GetMaterial(materialName));
+            result.materials.emplace_back(GetMaterialAt(i));
         }
 
         std::queue<std::pair<aiNode*, glm::u32>> nodeQueue;

@@ -31,8 +31,20 @@
  * describes the vertices, normally the mesh module, which is why an attribute carries the module's
  * name alongside the semantic. The engine only matches the two.
  *
- * A shader that annotates nothing is matched by declaration order instead: attribute *i* of the
- * layout feeds location *i*, which is what a layout meant before semantics existed.
+ * A shader that annotates nothing is matched by location instead: an attribute that names one is
+ * fed to it (@ref VertexLayout::Attribute::AtLocation), and one that names nothing falls back to
+ * its place in the list — attribute *i* feeds location *i*, which is what a layout meant before
+ * semantics existed.
+ *
+ * @code
+ * kor::VertexLayout {
+ *     .bindings = { kor::VertexInputBindingDescription(0, sizeof(Vertex)) },
+ *     .attributes = {
+ *         kor::VertexLayout::Attribute::AtLocation(0, 0, offsetof(Vertex, position), kor::ChannelType::eFloat, 3),
+ *         kor::VertexLayout::Attribute::AtLocation(1, 0, offsetof(Vertex, color),    kor::ChannelType::eFloat, 3),
+ *     },
+ * }
+ * @endcode
  *
  * @see kor::Mesh::getVertexLayout, kor::GraphicsPipeline::Builder::setVertexShader
  */
@@ -66,7 +78,7 @@ namespace kor
         struct KORAL_API Attribute
         {
             /// What it is: `POSITION`, `NORMAL`, `UV1`. Empty for an attribute that declares
-            /// nothing, which can then only be matched by declaration order.
+            /// nothing, which is then matched by location instead. @see AtLocation
             std::string semantic;
             /// Which vocabulary the semantic is from — the `mesh` of `mesh(POSITION)`. Empty means
             /// "any", so a shader annotated for one module still matches.
@@ -76,6 +88,48 @@ namespace kor
             glm::u32 offset = 0;                        ///< Its byte offset within the vertex.
             ChannelType channelType = ChannelType::eFloat;  ///< The element type of one channel.
             glm::u32 channelCount = 0;                  ///< How many channels — 3 for a vec3.
+
+            /**
+             * @brief Which shader location reads it, for a layout that says so outright.
+             *
+             * Unset, the attribute's place in the list is its location — attribute *i* feeds
+             * location *i*. Setting it is what lets a layout skip a location, or list its
+             * attributes in an order that is not the shader's. Either way it is only consulted for
+             * inputs the shader did not annotate: a semantic, where there is one, wins.
+             */
+            std::optional<glm::u32> location = std::nullopt;
+
+            /**
+             * @brief An attribute described by location alone, naming no semantic.
+             * @param location Which of the vertex shader's inputs reads it.
+             * @param binding Which vertex buffer it is read from.
+             * @param offset Its byte offset within the vertex.
+             * @param channelType The element type of one channel.
+             * @param channelCount How many channels — 3 for a vec3.
+             *
+             * The plain form, for a shader written against fixed locations and a layout written
+             * against the same ones:
+             *
+             * @code
+             * kor::VertexLayout::Attribute::AtLocation(0, 0, offsetof(Vertex, position), kor::ChannelType::eFloat, 3)
+             * @endcode
+             *
+             * Nothing has to be annotated on either side. What it gives up is the guarantee
+             * semantics buy: renumber the shader's inputs and this layout is silently feeding them
+             * the wrong bytes, where a named attribute would have moved with them.
+             */
+            [[nodiscard]] static Attribute AtLocation(const glm::u32 location, const glm::u32 binding,
+                                                      const glm::u32 offset, const ChannelType channelType,
+                                                      const glm::u32 channelCount)
+            {
+                return Attribute{
+                    .binding      = binding,
+                    .offset       = offset,
+                    .channelType  = channelType,
+                    .channelCount = channelCount,
+                    .location     = location,
+                };
+            }
         };
 
         /**

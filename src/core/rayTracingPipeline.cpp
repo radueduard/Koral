@@ -136,8 +136,8 @@ namespace kor
 
         // Merge descriptor set layouts and push constants across all stages.
         const auto shaders = collectShaders();
-        if (!buildLayouts(shaders))
-            return fail(ErrorCode::eDescriptorConflict, "Descriptor declarations conflict across the ray-tracing pipeline's shader stages.");
+        if (auto merged = buildLayouts(shaders); !merged)
+            return std::unexpected(merged.error());
 
         return {};
     }

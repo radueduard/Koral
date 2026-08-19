@@ -5,15 +5,19 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
 #include <optional>
+#include <source_location>
 #include <span>
 #include <vector>
 
 #include "structs.h"
 #include "buffer.h"
+#include "builder.h"
 #include "context.h"
 #include "vertexLayout.h"
 #include "api.h"
+#include "dataRange.h"
 
 namespace kor
 {
@@ -29,13 +33,124 @@ namespace kor
      *
      * The buffers themselves are ordinary device-local Buffers, and makeBuffer() is the shorthand
      * for creating them with the usages a mesh needs. How the vertex data is laid out — which
-     * attribute sits at which offset, and what each one *is* — is a @ref VertexLayout the mesh
-     * carries but does not invent: writing vertex formats is the mesh module's business, and this
-     * is the description the engine reads them through.
+     * attribute sits at which offset, and what each one *is* — is a @ref VertexLayout: buffers plus
+     * a layout describing them is all a mesh is, and @ref Mesh::Builder assembles one from exactly
+     * that:
+     *
+     * @code
+     * auto mesh = kor::Mesh::Builder()
+     *     .setVertexBuffer(0, vertexBuffer)
+     *     .setIndexBuffer(indexBuffer)
+     *     .setVertexLayout(kor::VertexLayout {
+     *         .bindings = {
+     *             kor::VertexInputBindingDescription(0, sizeof(Vertex)),
+     *         },
+     *         .attributes = {
+     *             kor::VertexLayout::Attribute("POSITION", "vertex", 0, offsetof(Vertex, position), kor::ChannelType::eFloat, 3),
+     *             kor::VertexLayout::Attribute("COLOR", "vertex", 0, offsetof(Vertex, color), kor::ChannelType::eFloat, 3),
+     *         },
+     *     })
+     *     .build();
+     * @endcode
+     *
+     * The semantics are what let the shader ask for an attribute by name. A shader written against
+     * fixed locations wants none of that, and says so:
+     *
+     * @code
+     *         .attributes = {
+     *             kor::VertexLayout::Attribute::AtLocation(0, 0, offsetof(Vertex, position), kor::ChannelType::eFloat, 3),
+     *             kor::VertexLayout::Attribute::AtLocation(1, 0, offsetof(Vertex, color),    kor::ChannelType::eFloat, 3),
+     *         },
+     * @endcode
+     *
+     * Writing the layout out by hand like this is the low-level route, and the one everything else
+     * is built on. Describing a vertex *type* once and having the strides, offsets and channel
+     * formats computed from it is the mesh module's business (`kmesh::ParamMesh`); it produces the
+     * same @ref VertexLayout this takes.
      */
     class KORAL_API Mesh
     {
     public:
+        /**
+         * @brief Collects the buffers a mesh is made of and the layout describing them.
+         *
+         * One vertex buffer per binding the layout declares, optionally an index buffer, and the
+         * layout itself. The order the three are set in does not matter: nothing is checked until
+         * build(), which is what lets the layout be named last.
+         *
+         * The vertex count is derived — each binding's buffer size divided by that binding's stride
+         * — and every binding must agree on it. The index count follows from the index buffer's
+         * size and the width of one index the same way.
+         */
+        struct KORAL_API Builder : ::Builder
+        {
+            /**
+             * @brief Sets the vertex buffer feeding one binding of the layout.
+             * @param binding Which binding of the vertex layout this buffer feeds.
+             * @param vertexBuffer The data. It must have been created with Buffer::Usage::eVertex,
+             *        and its size divided by the binding's stride gives the vertex count.
+             *
+             * The mesh only *refers* to the buffer, exactly as a framebuffer refers to its
+             * attachments: whoever owns it must keep it alive for as long as the mesh is drawn.
+             * Hand over an rvalue instead — `std::move(buffer)`, or a makeBuffer() call written in
+             * place — and the mesh takes ownership, which is what a mesh built from data nothing
+             * else refers to wants.
+             */
+            Builder& setVertexBuffer(glm::u32 binding, ResourceRef<Buffer> vertexBuffer);
+
+            /** @brief Sets the vertex buffer for one binding and takes ownership of it. */
+            Builder& setVertexBuffer(glm::u32 binding, Resource<Buffer>&& vertexBuffer);
+
+            /**
+             * @brief Gives the mesh an index buffer, making it drawable with DrawIndexed.
+             * @param indexBuffer The indices. Must have been created with Buffer::Usage::eIndex.
+             * @param indexType The width of one index — eUByte, eUShort or eUInt. The count follows
+             *        from the buffer's size. A signed type of the same width is read as its
+             *        unsigned counterpart, since an index is never negative.
+             *
+             * Referenced rather than owned, on the same terms as setVertexBuffer.
+             */
+            Builder& setIndexBuffer(ResourceRef<Buffer> indexBuffer, ChannelType indexType = ChannelType::eUInt);
+
+            /** @brief Gives the mesh an index buffer and takes ownership of it. */
+            Builder& setIndexBuffer(Resource<Buffer>&& indexBuffer, ChannelType indexType = ChannelType::eUInt);
+
+            /**
+             * @brief Describes what the vertex buffers hold: the bindings and their strides, and
+             *        what each attribute is.
+             *
+             * Also decides which attribute a ray-tracing build reads positions from.
+             * @see VertexLayout
+             */
+            Builder& setVertexLayout(VertexLayout layout);
+
+            /** @brief One build attempt. Internal: prefer build(). */
+            [[nodiscard]] Result<std::unique_ptr<Mesh>> create() const;
+
+            /**
+             * @brief Creates the mesh.
+             * @return It as a Resource; poisoned rather than thrown when a binding has no buffer,
+             *         the buffers disagree on the vertex count, or a buffer was created without the
+             *         usage it is being put to.
+             */
+            [[nodiscard]] Resource<Mesh> build(std::source_location where = std::source_location::current()) const;
+
+        protected:
+            std::vector<ResourceRef<Buffer>> _vertexBuffers {};      ///< Indexed by binding, not by order of setting.
+            std::optional<ResourceRef<Buffer>> _indexBuffer = std::nullopt;
+            ChannelType _indexType = ChannelType::eUInt;
+            VertexLayout _vertexLayout {};
+
+            // Buffers handed over as rvalues. Held by shared_ptr rather than by value because
+            // create() is const and may run more than once: every mesh built from this builder
+            // shares the same buffers, rather than the first one taking them and the rest getting
+            // nothing.
+            std::vector<std::shared_ptr<Resource<Buffer>>> _ownedBuffers {};
+
+            /** @brief Validates the configuration and fills @p mesh with it. */
+            [[nodiscard]] VoidResult populate(Mesh& mesh) const;
+        };
+
         Mesh() = default;
         virtual ~Mesh() = default;
 
@@ -58,11 +173,12 @@ namespace kor
         [[nodiscard]] std::vector<kor::ResourceRef<const Buffer>> getVertexBuffers() const
         {
             std::vector<kor::ResourceRef<const Buffer>> vertexBuffers;
+            vertexBuffers.reserve(_vertexBuffers.size());
             for (const auto& vertexBuffer : _vertexBuffers)
             {
-                // Convert from the owning Resource (lifetime-tracked) rather than from a
-                // raw Buffer&: the latter takes the `unsafe` ResourceRef ctor with an empty
-                // lifetime stamp, which the descriptor layer rejects as an invalid buffer.
+                // Const-qualify the tracked ref rather than taking one off a raw Buffer&: the
+                // latter takes the `unsafe` ResourceRef ctor with an empty lifetime stamp, which
+                // the descriptor layer rejects as an invalid buffer.
                 vertexBuffers.emplace_back(vertexBuffer);
             }
             return vertexBuffers;
@@ -72,7 +188,7 @@ namespace kor
         [[nodiscard]] std::optional<kor::ResourceRef<const Buffer>> getIndexBuffer() const {
             if (!_indexBuffer.has_value())
                 return std::nullopt;
-            return _indexBuffer;
+            return kor::ResourceRef<const Buffer>(*_indexBuffer);
         }
 
         /**
@@ -107,12 +223,48 @@ namespace kor
             _positionAttribute = _vertexLayout.position();
         }
 
+        /**
+         * @brief Takes ownership of @p buffer and appends it as the next binding's vertex buffer.
+         * @return The reference the mesh will bind, so the caller can go on writing through it.
+         *
+         * For a mesh that creates its own storage — one built from vertex data, or a heap that
+         * suballocates out of buffers it owns. A mesh built from buffers someone else owns holds
+         * plain references instead. @see Builder::setVertexBuffer
+         */
+        kor::ResourceRef<Buffer> adoptVertexBuffer(kor::Resource<Buffer> buffer)
+        {
+            auto owned = std::make_shared<kor::Resource<Buffer>>(std::move(buffer));
+            auto ref = kor::ResourceRef<Buffer>(*owned);
+            _ownedBuffers.push_back(std::move(owned));
+            _vertexBuffers.push_back(ref);
+            return ref;
+        }
+
+        /** @brief Takes ownership of @p buffer and makes it the index buffer. @see adoptVertexBuffer */
+        kor::ResourceRef<Buffer> adoptIndexBuffer(kor::Resource<Buffer> buffer, const ChannelType indexType)
+        {
+            auto owned = std::make_shared<kor::Resource<Buffer>>(std::move(buffer));
+            auto ref = kor::ResourceRef<Buffer>(*owned);
+            _ownedBuffers.push_back(std::move(owned));
+            _indexBuffer = ref;
+            _indexType = indexType;
+            return ref;
+        }
+
         glm::u64 _vertexCount{};
-        std::vector<kor::Resource<Buffer>> _vertexBuffers = {};
+
+        /// What the mesh binds, one per binding of its layout. References, so that several meshes
+        /// can be carved out of one set of buffers; _ownedBuffers holds the ones the mesh itself
+        /// keeps alive.
+        std::vector<kor::ResourceRef<Buffer>> _vertexBuffers = {};
 
         std::optional<glm::u32> _indexCount = std::nullopt;
-        std::optional<kor::Resource<Buffer>> _indexBuffer = std::nullopt;
+        std::optional<kor::ResourceRef<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
+
+        /// The buffers this mesh owns, keeping them alive for as long as it is drawn. Shared
+        /// because a builder can hand the same buffers to more than one mesh.
+        std::vector<std::shared_ptr<kor::Resource<Buffer>>> _ownedBuffers = {};
 
         VertexLayout _vertexLayout = {};
         std::optional<VertexInputAttributeDescription> _positionAttribute = std::nullopt;
@@ -120,16 +272,18 @@ namespace kor
     public:
         /**
          * Creates a device-local buffer and copies the contents of `data` into it.
-         * `T` is deduced from the span, so the const element type does not need to be spelled out.
+         * `T` is deduced from the range's element type, so nothing has to be spelled out.
          *
-         * @param data The vertices or indices to upload. Copied during the call.
+         * @param data The vertices or indices to upload, as any range — a vector, an array, a
+         *        span. Copied during the call.
          * @param usage What the buffer is for — Buffer::Usage::eVertex or eIndex. The transfer and
          *        storage usages a mesh needs are added on top, as is acceleration-structure input
          *        when the device supports ray tracing.
          * @return The buffer, ready to hand to a mesh builder.
          */
-        template<typename T>
-        static kor::Resource<Buffer> makeBuffer(std::span<const T> data, Flags<Buffer::Usage> usage)
+        template<typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
+            requires RangeOf<R, T>
+        static kor::Resource<Buffer> makeBuffer(R&& data, Flags<Buffer::Usage> usage)
         {
             // Keep final buffers transfer-capable as requested, and usable as ray-tracing
             // acceleration structure build input (implies device address) -- but only when the
@@ -145,7 +299,7 @@ namespace kor
             }
 
             return Buffer::Builder<T>()
-                .setDataView(data)
+                .setData(std::forward<R>(data))
                 .setUsage(finalUsage)
                 .setType(Buffer::Type::eDeviceLocal)
                 .build();

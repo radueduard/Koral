@@ -13,6 +13,7 @@
 
 #include "flags.h"
 #include "api.h"
+#include "dataRange.h"
 #include <source_location>
 
 #include "builder.h"
@@ -349,14 +350,18 @@ namespace kor
 
             /**
              * @brief Fills the image from a typed span of pixels.
-             * @param pixels The pixels, e.g. std::span<const glm::u8vec4> for an 8-bit RGBA image.
+             * @param source The pixels as any range — a vector, an array, a span — of the type one
+             *        texel is, e.g. glm::u8vec4 for an 8-bit RGBA image.
              *        Copied during this call, and must match the image's format and extent.
              *
              * Uploaded to mip 0 of every array layer when build() runs; if the image has more mip
              * levels, the rest are generated from it. Implies the transfer usages that needs.
              */
-            template<typename T>
-            Builder& setData(std::span<const T> pixels) {
+            template<typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
+                requires RangeOf<R, T>
+            Builder& setData(R&& source) {
+                const ContiguousCopy<T> contiguous(std::forward<R>(source));
+                const std::span<const T> pixels = contiguous.view();
                 const auto bytes = std::as_bytes(pixels);
                 data.assign(bytes.begin(), bytes.end());
                 usage |= Usage::eTransferDst;

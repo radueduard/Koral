@@ -22,33 +22,13 @@ namespace kor
     class ImageView;
 
     /**
-     * @brief The value a colour attachment is cleared to, in whatever type its format holds.
-     *
-     * Pick the alternative that matches the attachment: a float vector for UNORM/SFLOAT formats, an
-     * integer one for UINT/SINT. Clearing a float format with an integer value is a mismatch the
-     * backend cannot fix.
-     */
-    using ClearColor = std::variant<
-        float,
-        glm::vec2,
-        glm::vec3,
-        glm::vec4,
-        glm::i32,
-        glm::ivec2,
-        glm::ivec3,
-        glm::ivec4,
-        glm::u32,
-        glm::uvec2,
-        glm::uvec3,
-        glm::uvec4
-    >;
-
-    /**
      * @brief The set of attachments a render pass draws into.
      *
      * A framebuffer names the colour targets, the depth and stencil target, and the values each is
-     * cleared to. Pass one to CommandBuffer::BeginRendering to render into it; pass nothing to
-     * render into the window's default framebuffer.
+     * cleared to *by default*. Pass one to CommandBuffer::BeginRendering to render into it; pass
+     * nothing to render into the window's default framebuffer. A pass that wants to clear this
+     * framebuffer to something else says so in its own @ref RenderInfo, which overrides these
+     * without touching the framebuffer everything else shares.
      *
      * @code
      * kor::Framebuffer::Builder builder;

@@ -24,6 +24,7 @@ namespace kor
         case ErrorCode::eNoGraphicsPipelineBound:    return "eNoGraphicsPipelineBound";
         case ErrorCode::eNoComputePipelineBound:     return "eNoComputePipelineBound";
         case ErrorCode::eNoRayTracingPipelineBound:  return "eNoRayTracingPipelineBound";
+        case ErrorCode::eNoPipelineBound:            return "eNoPipelineBound";
         case ErrorCode::eNoMeshBound:                return "eNoMeshBound";
         case ErrorCode::eMeshHasNoIndexBuffer:       return "eMeshHasNoIndexBuffer";
         case ErrorCode::eCopySizeExceedsBuffer:      return "eCopySizeExceedsBuffer";
@@ -36,6 +37,7 @@ namespace kor
         case ErrorCode::eDescriptorConflict:         return "eDescriptorConflict";
         case ErrorCode::eShaderCompileFailed:        return "eShaderCompileFailed";
         case ErrorCode::eVertexLayoutMismatch:       return "eVertexLayoutMismatch";
+        case ErrorCode::ePushConstantMismatch:       return "ePushConstantMismatch";
         case ErrorCode::eConfigInvalid:              return "eConfigInvalid";
         case ErrorCode::eModuleLoadFailed:           return "eModuleLoadFailed";
         }
@@ -67,6 +69,8 @@ namespace kor
             return "Bind a compute pipeline before dispatching.";
         case ErrorCode::eNoRayTracingPipelineBound:
             return "Bind a ray-tracing pipeline before tracing rays.";
+        case ErrorCode::eNoPipelineBound:
+            return "Bind a pipeline before recording commands that address its interface.";
         case ErrorCode::eNoMeshBound:
             return "Bind a mesh before recording an indexed or mesh draw.";
         case ErrorCode::eMeshHasNoIndexBuffer:
@@ -91,6 +95,8 @@ namespace kor
             return "Shader compilation or linking failed.";
         case ErrorCode::eVertexLayoutMismatch:
             return "The vertex shader asks for a semantic the vertex layout does not carry.";
+        case ErrorCode::ePushConstantMismatch:
+            return "The push constant named is not one this pipeline declares, or not the size it declares it with.";
         case ErrorCode::eConfigInvalid:
             return "The koral.json config file is malformed, or one of its keys has the wrong type.";
         case ErrorCode::eModuleLoadFailed:

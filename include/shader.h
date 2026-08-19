@@ -21,7 +21,7 @@
 
 // Reflection types, forward-declared: SPIRV-Cross is an implementation detail of the compile step,
 // and its headers are not something a project should acquire by including this one.
-namespace spirv_cross { class Compiler; struct Resource; }
+namespace spirv_cross { class Compiler; struct Resource; struct SPIRType; }
 
 namespace kor
 {
@@ -181,12 +181,49 @@ namespace kor
             std::map<glm::u32, Descriptor> descriptors; ///< Keyed by binding number.
         };
 
+        /**
+         * @brief One addressable thing inside a push-constant block.
+         *
+         * A field of the block, of a struct nested in it, or one element of an array — flattened
+         * into a single list keyed by path, with everything needed to write a C++ value into the
+         * layout the shader chose for it.
+         */
+        struct KORAL_API PushConstantField {
+            std::string name;       ///< Path from the block: `model`, `material.albedo`, `weights[2]`.
+            glm::u32 offset = 0;    ///< Absolute byte offset within the pipeline's push-constant range.
+            glm::u32 size = 0;      ///< Bytes the shader reserves for it, padding included.
+
+            glm::u8 scalar = 5;     ///< ValueScalar, as a plain byte; 5 (eOther) for a struct.
+            glm::u8 rows = 1;       ///< Vector components, or matrix rows.
+            glm::u8 columns = 1;    ///< Matrix columns; 1 for scalars and vectors.
+
+            glm::u32 count = 1;         ///< Array elements, or 1. An array *element* is itself 1.
+            glm::u32 arrayStride = 0;   ///< Bytes between array elements, as the shader spaced them.
+            glm::u32 matrixStride = 0;  ///< Bytes between matrix columns, likewise.
+
+            /// Whether this is an aggregate — a struct, or a whole array — rather than a value the
+            /// engine can lay out itself. Aggregates are still writable, but only as raw bytes of
+            /// exactly @ref size, since C++ says nothing about what is inside one.
+            bool aggregate = false;
+        };
+
         /** @brief A push-constant block the shader declares. */
         struct KORAL_API PushConstant {
             std::string name;       ///< Its name in the source.
             glm::u32 size;          ///< Its size in bytes.
             glm::u32 offset;        ///< Its byte offset within the pipeline's push-constant range.
             Flags<Stage> stages;    ///< Which stages read it.
+
+            /// The block's fields, flattened: every top-level member, every field of a nested
+            /// struct as `outer.inner`, and every element of an array as `name[i]`. The offsets
+            /// are absolute within the pipeline's push-constant range, so each one can be written
+            /// on its own — which is what lets CommandBuffer::PushConstant address a constant by
+            /// name, and what makes a struct whose C++ padding differs from the shader's a
+            /// non-problem: its fields are written individually, where the shader put them.
+            ///
+            /// Outside operator<=> for the same reason Descriptor's members are: renaming a field
+            /// must not make the merge treat this as a different block.
+            std::vector<PushConstantField> members;
 
             auto operator<=>(const PushConstant& other) const {
                 return std::tie(name, size, offset) <=> std::tie(other.name, other.size, other.offset);
@@ -371,10 +408,26 @@ namespace kor
         /** @brief Reflects the compiled SPIR-V into the memory layout. Called after Compile(). */
         void fetchMemoryLayout();
 
-        /** @brief One block binding's fields. @see semantics.h */
+        /** @brief One block's fields — a descriptor's or a push constant's. @see semantics.h */
         void fetchBlockMembers(const spirv_cross::Compiler& module,
                                const spirv_cross::Resource& resource,
-                               Descriptor& descriptor) const;
+                               std::vector<BlockMember>& members,
+                               glm::u32& blockSize) const;
+
+        /**
+         * @brief Flattens a push-constant block into every path that can be written on its own.
+         * @param type The struct being walked — the block itself, or one nested in it.
+         * @param prefix What to prepend to each name: empty at the top, `material.` inside.
+         * @param baseOffset Where @p type starts within the push-constant range.
+         *
+         * Recurses through nested structs and array elements, so a field's C++ padding never has
+         * to match the shader's: whatever the layouts disagree about, each leaf is written where
+         * the shader put it. @see PushConstantField
+         */
+        static void flattenPushConstant(const spirv_cross::Compiler& module,
+                                        const spirv_cross::SPIRType& type,
+                                        const std::string& prefix, glm::u32 baseOffset,
+                                        std::vector<PushConstantField>& out);
 
         /**
          * @brief Reads the semantic annotations out of the shader's own source.

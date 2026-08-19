@@ -467,10 +467,14 @@ namespace kmesh
         {
             static_assert(MeshType<Derived>, "Derived class must satisfy MeshType concept!");
             _vertexCount = createInfo.vertexCount;
-            _vertexBuffers = std::move(createInfo.vertexBuffers);
+            // The buffers were created for this mesh alone, so it takes them over: adopting keeps
+            // each one alive and appends it in binding order, which is the order they are in here.
+            for (auto& vertexBuffer : createInfo.vertexBuffers)
+                adoptVertexBuffer(std::move(vertexBuffer));
+            if (createInfo.indexBuffer.has_value())
+                adoptIndexBuffer(std::move(*createInfo.indexBuffer),
+                                 createInfo.indexType.value_or(kor::ChannelType::eUInt));
             _indexCount = createInfo.indexCount;
-            _indexBuffer = std::move(createInfo.indexBuffer);
-            _indexType = createInfo.indexType;
 
             setVertexLayout(Layout());
         }

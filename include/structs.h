@@ -16,6 +16,7 @@ namespace kor
 {
     class Buffer;
     class Image;
+    class Framebuffer;
 
     /**
      * @brief The type of vertex input pipe channels. Used to define the format of vertex attributes in the graphics pipeline.
@@ -671,23 +672,141 @@ namespace kor
     };
 
     /**
-     * @brief The load/store behaviour a render pass opens with, passed to CommandBuffer::BeginRendering.
+     * @brief The value a colour attachment is cleared to, in whatever type its format holds.
      *
-     * Three attachment kinds, each with a load op deciding what the pass starts from and a store op
-     * deciding what survives it. Which of them apply depends on the framebuffer being rendered to;
-     * settings for an attachment it does not have are ignored. Defaults clear everything on entry
-     * and keep everything on exit, which is the correct-but-conservative choice — a depth buffer
-     * nothing samples afterwards is worth switching to StoreOperation::eDontCare.
+     * Pick the alternative that matches the attachment: a float vector for UNORM/SFLOAT formats, an
+     * integer one for UINT/SINT. Clearing a float format with an integer value is a mismatch the
+     * backend cannot fix.
      */
-    class KORAL_API RenderParameters {
-    public:
-        kor::LoadOperation colorLoadOperation = kor::LoadOperation::eClear;     ///< What the colour attachments start from.
-        kor::LoadOperation depthLoadOperation = kor::LoadOperation::eClear;     ///< What the depth attachment starts from.
-        kor::LoadOperation stencilLoadOperation = kor::LoadOperation::eClear;   ///< What the stencil attachment starts from.
+    using ClearColor = std::variant<
+        float,
+        glm::vec2,
+        glm::vec3,
+        glm::vec4,
+        glm::i32,
+        glm::ivec2,
+        glm::ivec3,
+        glm::ivec4,
+        glm::u32,
+        glm::uvec2,
+        glm::uvec3,
+        glm::uvec4
+    >;
 
-        kor::StoreOperation colorStoreOperation = kor::StoreOperation::eStore;      ///< Whether the colour results survive the pass.
+    /**
+     * @brief What one render pass renders into, and what happens to it on the way in and out.
+     *
+     * Everything CommandBuffer::BeginRendering needs: the framebuffer, a load op per attachment
+     * kind deciding what the pass starts from, a store op deciding what survives it, and — for the
+     * attachments the load op clears — what they are cleared *to*. Which of them apply depends on
+     * the framebuffer being rendered to; settings for an attachment it does not have are ignored.
+     * Defaults clear everything on entry and keep everything on exit, which is the
+     * correct-but-conservative choice — a depth buffer nothing samples afterwards is worth
+     * switching to StoreOperation::eDontCare.
+     *
+     * @code
+     * commandBuffer.BeginRendering(gBuffer);                       // clear to the framebuffer's own values
+     *
+     * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer)        // or override them, this pass only
+     *     .setClearColor(0, glm::vec4{0.1f, 0.1f, 0.12f, 1.f})
+     *     .setClearColor(2, glm::uvec4{~0u})                       // an integer attachment's sentinel
+     *     .setDepthStoreOperation(kor::StoreOperation::eDontCare));
+     *
+     * commandBuffer.BeginRendering();                              // the screen, with its own values
+     * @endcode
+     *
+     * A clear value left unset falls back to the one the framebuffer was built with, so a pass that
+     * wants the usual thing says nothing. The fallback is taken when the pass is *recorded*, not
+     * when it runs, which is what makes two passes over one framebuffer able to clear it to two
+     * different colours in the same frame.
+     */
+    class KORAL_API RenderInfo {
+    public:
+        /** @brief Renders to the window's default framebuffer — the screen. */
+        RenderInfo();
+
+        // Not explicit: `BeginRendering(myFramebuffer)` is the common case by a wide margin, and
+        // there is nothing for the conversion to be confused with — BeginRendering takes one
+        // argument, and nothing else in the API takes a RenderInfo.
+        RenderInfo(const kor::ResourceRef<const kor::Framebuffer>& framebuffer);
+        RenderInfo(const kor::ResourceRef<kor::Framebuffer>& framebuffer);
+        RenderInfo(const kor::Resource<kor::Framebuffer>& framebuffer);
+
+        RenderInfo& setColorLoadOperation(const kor::LoadOperation op) { colorLoadOperation = op; return *this; }
+        RenderInfo& setDepthLoadOperation(const kor::LoadOperation op) { depthLoadOperation = op; return *this; }
+        RenderInfo& setStencilLoadOperation(const kor::LoadOperation op) { stencilLoadOperation = op; return *this; }
+        RenderInfo& setColorStoreOperation(const kor::StoreOperation op) { colorStoreOperation = op; return *this; }
+        RenderInfo& setDepthStoreOperation(const kor::StoreOperation op) { depthStoreOperation = op; return *this; }
+        RenderInfo& setStencilStoreOperation(const kor::StoreOperation op) { stencilStoreOperation = op; return *this; }
+
+        /**
+         * @brief What colour attachment @p index is cleared to, for this pass only.
+         * @param index Which colour attachment, in the order the framebuffer declares them.
+         * @param color The value, in the type the attachment's format holds. @see ClearColor
+         *
+         * Attachments not named here keep the framebuffer's own clear value, so overriding one of
+         * five means writing one line, not five.
+         */
+        RenderInfo& setClearColor(const size_t index, const ClearColor &color)
+        {
+            if (index >= clearColors.size()) {
+                clearColors.resize(index + 1, std::nullopt);
+            }
+            clearColors[index] = color;
+            return *this;
+        }
+        RenderInfo& setClearDepth(const float depth) { clearDepth = depth; return *this; }
+        RenderInfo& setClearStencil(const glm::i32 stencil) { clearStencil = stencil; return *this; }
+
+        [[nodiscard]] kor::ResourceRef<const kor::Framebuffer> getFramebuffer() const { return framebuffer; }
+
+        [[nodiscard]] kor::LoadOperation getColorLoadOperation() const { return colorLoadOperation; }
+        [[nodiscard]] kor::LoadOperation getDepthLoadOperation() const { return depthLoadOperation; }
+        [[nodiscard]] kor::LoadOperation getStencilLoadOperation() const { return stencilLoadOperation; }
+        [[nodiscard]] kor::StoreOperation getColorStoreOperation() const { return colorStoreOperation; }
+        [[nodiscard]] kor::StoreOperation getDepthStoreOperation() const { return depthStoreOperation; }
+        [[nodiscard]] kor::StoreOperation getStencilStoreOperation() const { return stencilStoreOperation; }
+
+        /**
+         * @brief What colour attachment @p index will be cleared to.
+         *
+         * The value this pass was given, or the framebuffer's own once resolveClearValues() has
+         * run. Black for an attachment neither of them describes, which cannot happen for a pass
+         * recorded through BeginRendering.
+         */
+        [[nodiscard]] const ClearColor& getClearColor(glm::u32 index) const;
+
+        /** @brief What the depth attachment will be cleared to; the far plane if nothing said. */
+        [[nodiscard]] float getClearDepth() const { return clearDepth.value_or(1.f); }
+
+        /** @brief What the stencil attachment will be cleared to; 0 if nothing said. */
+        [[nodiscard]] glm::i32 getClearStencil() const { return clearStencil.value_or(0); }
+
+        /**
+         * @brief Fills in every clear value this pass did not set from @p framebuffer's own.
+         *
+         * Called by CommandBuffer::BeginRendering while it records, and the reason a clear value is
+         * a property of the *record* rather than of the framebuffer: OpenGL replays its records
+         * after the fact, so a value read at replay time would be whatever the framebuffer holds
+         * then — the last one written, for every pass in the frame — rather than what each pass was
+         * recorded with. Resolving here makes both backends agree.
+         */
+        void resolveClearValues(const kor::Framebuffer& framebuffer);
+
+    private:
+        kor::ResourceRef<const kor::Framebuffer> framebuffer;        ///< The framebuffer the pass will render to. Its attachments determine which of the load/store ops below are used.
+
+        kor::LoadOperation colorLoadOperation = kor::LoadOperation::eClear;         ///< What the color attachments start from.
+        kor::LoadOperation depthLoadOperation = kor::LoadOperation::eClear;         ///< What the depth attachment starts from.
+        kor::LoadOperation stencilLoadOperation = kor::LoadOperation::eClear;       ///< What the stencil attachment starts from.
+
+        kor::StoreOperation colorStoreOperation = kor::StoreOperation::eStore;      ///< Whether the color results survive the pass.
         kor::StoreOperation depthStoreOperation = kor::StoreOperation::eStore;      ///< Whether the depth results survive the pass.
         kor::StoreOperation stencilStoreOperation = kor::StoreOperation::eStore;    ///< Whether the stencil results survive the pass.
+
+        std::vector<std::optional<ClearColor>> clearColors {};                      ///< Clear values for the color attachments, in the order they are bound. Only used if @ref colorLoadOperation is LoadOperation::eClear.
+        std::optional<float> clearDepth = std::nullopt;                             ///< Clear value for the depth attachment. Only used if @ref depthLoadOperation is LoadOperation::eClear.
+        std::optional<glm::i32> clearStencil = std::nullopt;                        ///< Clear value for the stencil attachment.
     };
 
     /**

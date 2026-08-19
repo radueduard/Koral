@@ -218,8 +218,8 @@ namespace kor
         if (_meshShader.has_value()) shaders.push_back(*_meshShader);
 
         // Merge descriptor set layouts and push constants across all stages.
-        if (!buildLayouts(shaders))
-            return fail(ErrorCode::eDescriptorConflict, "Descriptor declarations conflict across the pipeline's shader stages.");
+        if (auto merged = buildLayouts(shaders); !merged)
+            return std::unexpected(merged.error());
 
         return {};
     }

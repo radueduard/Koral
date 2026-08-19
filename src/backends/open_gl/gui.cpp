@@ -113,11 +113,30 @@ namespace kor
 
         glCheckError();
 
+        // Flipped vertically on the way in, for a source that was *rendered* into.
+        //
+        // Koral rasterizes Vulkan's Y-down clip space on GL through glClipControl(GL_UPPER_LEFT),
+        // which leaves an offscreen target's rows in memory bottom-up relative to Vulkan's. A
+        // render → sample → present chain never notices, because every stage is mirrored alike —
+        // but ImGui is not part of that chain. It samples this handle with the same UVs it samples
+        // its font atlas with, top row at v=0, so a rendered target reaches the screen upside down
+        // while an uploaded texture reaches it the right way up. Undoing the mirror here, in a
+        // blit that already happens, costs nothing and keeps `ImGui::Image(**handle, …)` meaning
+        // the same thing on both backends. @see ogl::Scheduler::Initialize
+        //
+        // Which images were rendered into is read off their usage. An image only written by a
+        // compute imageStore is already top-down — glClipControl moves the rasterizer, not the
+        // shader — so one carrying eColorAttachment it never actually rendered with would come out
+        // flipped. Sampling one of those through ImGui is not a thing any scene here does.
+        const bool rendered = (_image->getUsage() & kor::Image::Usage::eColorAttachment)
+                           || (_image->getUsage() & kor::Image::Usage::eDepthStencilAttachment);
+        const auto width = static_cast<GLint>(oglImage.getExtent().x);
+        const auto height = static_cast<GLint>(oglImage.getExtent().y);
+
         glBlitFramebuffer(
-            0, 0,
-            oglImage.getExtent().x, oglImage.getExtent().y,
-            0, 0,
-            oglImage.getExtent().x, oglImage.getExtent().y,
+            0, 0, width, height,
+            0, rendered ? height : 0,
+            width, rendered ? 0 : height,
             GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         glCheckError();

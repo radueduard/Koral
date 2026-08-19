@@ -139,15 +139,17 @@ namespace kmesh
                 ? kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eAccelerationStructureInput)
                 : kor::Flags<kor::Buffer::Usage>{};
 
+            // The heap owns its buffers: every mesh in it is a range of these, so they outlive any
+            // one suballocation and are kept alive by the heap itself.
             _vertexBuffers.reserve(sizeof...(Streams));
-            (_vertexBuffers.emplace_back(
+            (adoptVertexBuffer(
                 makeBuffer<Streams>(vertexCapacity,
                     kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eVertex) | rtInputUsage)), ...);
 
             if (indexCapacity.has_value()) {
-                _indexBuffer = makeBuffer<glm::u32>(*indexCapacity,
-                    kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eIndex) | rtInputUsage);
-                _indexType   = kor::ChannelType::eUInt;
+                adoptIndexBuffer(makeBuffer<glm::u32>(*indexCapacity,
+                    kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eIndex) | rtInputUsage),
+                    kor::ChannelType::eUInt);
             }
 
             // The heap's own vertex layout, which is what a pipeline drawing out of it is matched

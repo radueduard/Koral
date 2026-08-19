@@ -21,6 +21,7 @@
 #include <unordered_set>
 
 #include <spirv_cross.hpp>
+#include <spirv_glsl.hpp>
 
 #include "slangCompiler.h"
 #include "fileWatcher.h"
@@ -617,13 +618,14 @@ namespace kor {
     // _fieldSemantics from whichever front end read it. @see semantics.h
     void Shader::fetchBlockMembers(const spirv_cross::Compiler& module,
                                    const spirv_cross::Resource& resource,
-                                   Descriptor& descriptor) const
+                                   std::vector<BlockMember>& members,
+                                   glm::u32& blockSize) const
     {
     	const auto& blockType = module.get_type(resource.base_type_id);
     	if (blockType.basetype != spirv_cross::SPIRType::Struct) return;
 
-    	descriptor.blockSize = static_cast<glm::u32>(module.get_declared_struct_size(blockType));
-    	descriptor.members.reserve(blockType.member_types.size());
+    	blockSize = static_cast<glm::u32>(module.get_declared_struct_size(blockType));
+    	members.reserve(blockType.member_types.size());
 
     	for (glm::u32 i = 0; i < blockType.member_types.size(); ++i) {
     		const auto& memberType = module.get_type(blockType.member_types[i]);
@@ -650,7 +652,111 @@ namespace kor {
     			member.semanticNamespace = it->second.moduleName;
     			member.semantic = it->second.semantic;
     		}
-    		descriptor.members.push_back(std::move(member));
+    		members.push_back(std::move(member));
+    	}
+    }
+
+
+    namespace {
+        // Whether a block's declared offsets and strides are the ones a packing standard
+        // prescribes. spirv-cross implements those rules already and keeps them right across
+        // corner cases (vec3 in arrays, nested struct alignment, matrix columns); the method is
+        // merely protected, so this two-line subclass reaches it rather than writing the rules
+        // out a second time and getting one of them subtly wrong.
+        struct PackingProbe final : spirv_cross::CompilerGLSL {
+            explicit PackingProbe(const std::vector<glm::u32>& spirv) : CompilerGLSL(spirv) {}
+            using CompilerGLSL::buffer_is_packing_standard;
+        };
+    }
+
+    // Every path inside a push-constant block that can be written by itself: each member, each
+    // field of a nested struct, each element of an array. The offsets are the compiler's, so a
+    // value written through one of these lands where the shader reads it however the two languages
+    // disagree about padding — which is the whole point of walking down to the leaves.
+    void Shader::flattenPushConstant(const spirv_cross::Compiler& module,
+                                     const spirv_cross::SPIRType& type,
+                                     const std::string& prefix, const glm::u32 baseOffset,
+                                     std::vector<PushConstantField>& out)
+    {
+    	if (type.basetype != spirv_cross::SPIRType::Struct) return;
+
+    	for (glm::u32 i = 0; i < type.member_types.size(); ++i) {
+    		const auto& memberType = module.get_type(type.member_types[i]);
+    		const auto name = prefix + module.get_member_name(type.self, i);
+    		const auto offset = baseOffset + module.type_struct_member_offset(type, i);
+    		const auto size = static_cast<glm::u32>(module.get_declared_struct_member_size(type, i));
+
+    		PushConstantField field;
+    		field.name = name;
+    		field.offset = offset;
+    		field.size = size;
+    		field.rows = static_cast<glm::u8>(memberType.vecsize);
+    		field.columns = static_cast<glm::u8>(memberType.columns);
+
+    		switch (memberType.basetype) {
+    		case spirv_cross::SPIRType::Float:  field.scalar = 0; break;
+    		case spirv_cross::SPIRType::Int:    field.scalar = 1; break;
+    		case spirv_cross::SPIRType::UInt:   field.scalar = 2; break;
+    		case spirv_cross::SPIRType::Boolean:field.scalar = 3; break;
+    		case spirv_cross::SPIRType::Double: field.scalar = 4; break;
+    		default:                            field.scalar = 5; break;
+    		}
+
+    		const bool isArray = !memberType.array.empty();
+    		const bool isStruct = memberType.basetype == spirv_cross::SPIRType::Struct;
+
+    		if (field.columns > 1)
+    			field.matrixStride = module.type_struct_member_matrix_stride(type, i);
+
+    		if (isArray) {
+    			// The array as a whole first, so it can still be written in one go when the C++
+    			// side happens to be laid out identically, then each element on its own.
+    			field.count = memberType.array[0];
+    			field.arrayStride = module.type_struct_member_array_stride(type, i);
+    			field.aggregate = isStruct;
+    			out.push_back(field);
+
+    			auto elementType = memberType;
+    			elementType.array.clear();
+    			elementType.array_size_literal.clear();
+
+    			for (glm::u32 element = 0; element < field.count; ++element) {
+    				const auto elementOffset = offset + element * field.arrayStride;
+    				const auto elementName = std::format("{}[{}]", name, element);
+
+    				if (isStruct) {
+    					PushConstantField aggregate = field;
+    					aggregate.name = elementName;
+    					aggregate.offset = elementOffset;
+    					aggregate.size = field.arrayStride;
+    					aggregate.count = 1;
+    					aggregate.arrayStride = 0;
+    					aggregate.aggregate = true;
+    					out.push_back(aggregate);
+    					flattenPushConstant(module, elementType, elementName + ".", elementOffset, out);
+    					continue;
+    				}
+
+    				PushConstantField leaf = field;
+    				leaf.name = elementName;
+    				leaf.offset = elementOffset;
+    				leaf.size = field.arrayStride;
+    				leaf.count = 1;
+    				leaf.arrayStride = 0;
+    				out.push_back(leaf);
+    			}
+    			continue;
+    		}
+
+    		if (isStruct) {
+    			// Writable whole when the sizes agree, and field by field when they do not.
+    			field.aggregate = true;
+    			out.push_back(field);
+    			flattenPushConstant(module, memberType, name + ".", offset, out);
+    			continue;
+    		}
+
+    		out.push_back(field);
     	}
     }
 
@@ -774,7 +880,7 @@ namespace kor {
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
 			auto descriptor = Descriptor { DescriptorType::eUniformBuffer, name, count, stage, AccessKind::eRead, isActive(buffer) };
-			fetchBlockMembers(module, buffer, descriptor);
+			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eUniformBuffer
 		for (const auto& buffer : resources.storage_buffers) {
@@ -785,7 +891,7 @@ namespace kor {
 			// Block flags, not the variable's: NonWritable/NonReadable land on the members.
 			const auto access = AccessFrom(module.get_buffer_block_flags(buffer.id));
 			auto descriptor = Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) };
-			fetchBlockMembers(module, buffer, descriptor);
+			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eStorageBuffer
 		for (const auto& accelerationStructure : resources.acceleration_structures) {
@@ -812,7 +918,43 @@ namespace kor {
     		const auto offset = start;
     		const auto size = end - start;
 
-			memoryLayout.pushConstants.emplace(offset, PushConstant { name, size, offset, stage });
+			// Push-constant blocks are std430 and nothing else. It is the default in Vulkan GLSL
+			// and what Slang emits, so this only ever catches a block that asked for something
+			// else — and that is worth catching, because the whole point of knowing the layout is
+			// that a C++ struct can be written to match it. Under std140 an array of floats
+			// strides sixteen bytes instead of four, and a matching struct silently writes one
+			// value in four.
+			{
+				PackingProbe probe(_spirvCode);
+				glm::u32 failedIndex = 0;
+				if (const auto& probeType = probe.get_type(pushConstant.base_type_id);
+					!probe.buffer_is_packing_standard(probeType, spirv_cross::BufferPackingStd430, &failedIndex))
+				{
+					const auto member = failedIndex < probeType.member_types.size()
+						? probe.get_member_name(pushConstant.base_type_id, failedIndex)
+						: std::string("<unknown>");
+					// Thrown, not logged and shrugged off: at construction guard() turns this into a
+					// poisoned shader — and so a poisoned pipeline — while a *reload* that
+					// introduces it keeps the last working version, which is the same treatment a
+					// syntax error gets.
+					throw BackendException(Error{
+						.code = ErrorCode::ePushConstantMismatch,
+						.message = std::format(
+							"Push-constant block '{}' in {} is not laid out as std430 — '{}' does not sit "
+							"where std430 puts it. Push constants must be std430, which is the default: "
+							"drop any explicit std140 or scalar qualifier on the block.",
+							name, _path.filename().string(), member),
+					});
+				}
+			}
+
+			// The same members the range was computed from, kept this time and flattened all the
+			// way down: their paths are what CommandBuffer::PushConstant looks a constant up by,
+			// and their offsets are absolute within the range, so each one can be pushed on its own.
+			PushConstant pushConstantBlock { name, size, offset, stage };
+			flattenPushConstant(module, type, {}, 0, pushConstantBlock.members);
+
+			memoryLayout.pushConstants.emplace(offset, std::move(pushConstantBlock));
 		} // push constants
 
     	_memoryLayout = memoryLayout;

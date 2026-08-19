@@ -86,7 +86,7 @@ namespace kor::vk
         }
     }
 
-    kor::CommandBuffer& CommandBuffer::Begin()
+    kor::CommandBuffer& CommandBuffer::doBegin()
     {
         resetErrors();
         clearRecords();
@@ -100,7 +100,7 @@ namespace kor::vk
         return *this;
     }
 
-    void CommandBuffer::End()
+    void CommandBuffer::doEnd()
     {
         // Nothing recorded so far has reached the GPU. Work out where the barriers belong now
         // that the whole sequence is visible, then emit everything in order.
@@ -120,7 +120,7 @@ namespace kor::vk
         _handle.end();
     }
 
-    kor::CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const glm::vec4 color)
+    kor::CommandBuffer& CommandBuffer::doBeginDebugLabel(const std::string& label, const glm::vec4 color)
     {
         return defer("BeginDebugLabel", [=, this] {
             // Guard on the loaded function pointer: VK_EXT_debug_utils is optional, so the
@@ -134,7 +134,7 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::EndDebugLabel()
+    kor::CommandBuffer& CommandBuffer::doEndDebugLabel()
     {
         return defer("EndDebugLabel", [=, this] {
             if (VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdEndDebugUtilsLabelEXT) {
@@ -143,7 +143,7 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const glm::vec4 color)
+    kor::CommandBuffer& CommandBuffer::doInsertDebugLabel(const std::string& label, const glm::vec4 color)
     {
         return defer("InsertDebugLabel", [=, this] {
             if (VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdInsertDebugUtilsLabelEXT) {
@@ -155,28 +155,23 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
-        kor::CommandBuffer::BeginRendering();
-        const auto framebuffer = _state.boundFramebuffer.value();
-        return kor::CommandBuffer::BeginRendering(framebuffer, renderParameters);
-    }
-
-    kor::CommandBuffer& CommandBuffer::doBeginRendering(kor::ResourceRef<const kor::Framebuffer> framebuffer, RenderParameters renderParameters)
+    kor::CommandBuffer& CommandBuffer::doBeginRendering(const RenderInfo& renderInfo)
     {
+        const auto framebuffer = renderInfo.getFramebuffer();
         stateBeginRendering(framebuffer);
         // The attachment transitions are declared as uses by kor::CommandBuffer::BeginRendering
         // and emitted by the resolver *before* this record — they cannot be emitted here, since
         // by then the render pass is about to open and Vulkan forbids a transition inside one.
 
         std::vector<::vk::RenderingAttachmentInfoKHR> colorAttachmentInfos;
-        int i = 0;
+        glm::u32 i = 0;
         for (auto& colorAttachment : framebuffer->getColorAttachments()) {
             auto attachInfo = ::vk::RenderingAttachmentInfoKHR()
                 .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&colorAttachment.get()))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                .setClearValue(getVkClearValue(framebuffer->getClearColor(i)))
-                .setLoadOp(getVkLoadOp(renderParameters.colorLoadOperation))
-                .setStoreOp(getVkStoreOp(renderParameters.colorStoreOperation));
+                .setClearValue(getVkClearValue(renderInfo.getClearColor(i)))
+                .setLoadOp(getVkLoadOp(renderInfo.getColorLoadOperation()))
+                .setStoreOp(getVkStoreOp(renderInfo.getColorStoreOperation()));
             if (framebuffer->hasResolveAttachments()) {
                 attachInfo
                     .setResolveImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
@@ -187,19 +182,24 @@ namespace kor::vk
             i++;
         }
 
+        // One clear value for both slots: a combined depth/stencil format is one image, and the
+        // pass carries one value for each half of it.
+        const auto depthStencilClear = ::vk::ClearValue().setDepthStencil(
+            { renderInfo.getClearDepth(), static_cast<glm::u32>(renderInfo.getClearStencil()) });
+
         const auto depthAttachment = framebuffer->hasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
             .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getDepthAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
-            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
-            .setLoadOp(getVkLoadOp(renderParameters.depthLoadOperation))
-            .setStoreOp(getVkStoreOp(renderParameters.depthStoreOperation))) : std::nullopt;
+            .setClearValue(depthStencilClear)
+            .setLoadOp(getVkLoadOp(renderInfo.getDepthLoadOperation()))
+            .setStoreOp(getVkStoreOp(renderInfo.getDepthStoreOperation()))) : std::nullopt;
 
         const auto stencilAttachment = framebuffer->hasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
             .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getStencilAttachment()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
-            .setClearValue(::vk::ClearValue().setDepthStencil({ framebuffer->getClearDepth(), static_cast<glm::u32>(framebuffer->getClearStencil()) }))
-            .setLoadOp(getVkLoadOp(renderParameters.stencilLoadOperation))
-            .setStoreOp(getVkStoreOp(renderParameters.stencilStoreOperation))) : std::nullopt;
+            .setClearValue(depthStencilClear)
+            .setLoadOp(getVkLoadOp(renderInfo.getStencilLoadOperation()))
+            .setStoreOp(getVkStoreOp(renderInfo.getStencilStoreOperation()))) : std::nullopt;
 
         auto extent = framebuffer->getExtent();
         const auto renderArea = ::vk::Rect2D()
@@ -218,17 +218,15 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::EndRendering()
+    kor::CommandBuffer& CommandBuffer::doEndRendering()
     {
-        kor::CommandBuffer::EndRendering();
         return defer("EndRendering", [=, this] {
             _handle.endRenderingKHR();
         }, PassEdge::eCloses);
     }
 
-    kor::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::doSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
-        kor::CommandBuffer::SetViewport(x, y, width, height);
         return defer("SetViewport", [=, this] {
             // Koral's canonical clip space is Vulkan's own, so the viewport is passed straight
             // through for every framebuffer — no negative height, no default/offscreen split.
@@ -244,9 +242,8 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::doSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
-        kor::CommandBuffer::SetScissor(x, y, width, height);
         return defer("SetScissor", [=, this] {
             const ::vk::Rect2D scissor = ::vk::Rect2D()
                 .setOffset({ static_cast<glm::i32>(x), static_cast<glm::i32>(y) })
@@ -255,66 +252,58 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetLineWidth(const float lineWidth)
+    kor::CommandBuffer& CommandBuffer::doSetLineWidth(const float lineWidth)
     {
-        kor::CommandBuffer::SetLineWidth(lineWidth);
         return defer("SetLineWidth", [=, this] {
             _handle.setLineWidth(lineWidth);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
+    kor::CommandBuffer& CommandBuffer::doSetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
     {
-        kor::CommandBuffer::SetDepthBias(constantFactor, clamp, slopeFactor);
         return defer("SetDepthBias", [=, this] {
             _handle.setDepthBias(constantFactor, clamp, slopeFactor);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetBlendConstants(const glm::vec4 constants)
+    kor::CommandBuffer& CommandBuffer::doSetBlendConstants(const glm::vec4 constants)
     {
-        kor::CommandBuffer::SetBlendConstants(constants);
         return defer("SetBlendConstants", [=, this] {
             const float bc[4] = { constants.r, constants.g, constants.b, constants.a };
             _handle.setBlendConstants(bc);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
+    kor::CommandBuffer& CommandBuffer::doSetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
     {
-        kor::CommandBuffer::SetStencilCompareMask(face, compareMask);
         return defer("SetStencilCompareMask", [=, this] {
             _handle.setStencilCompareMask(getVkStencilFace(face), compareMask);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
+    kor::CommandBuffer& CommandBuffer::doSetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
     {
-        kor::CommandBuffer::SetStencilWriteMask(face, writeMask);
         return defer("SetStencilWriteMask", [=, this] {
             _handle.setStencilWriteMask(getVkStencilFace(face), writeMask);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const glm::u32 reference)
+    kor::CommandBuffer& CommandBuffer::doSetStencilReference(const StencilFace face, const glm::u32 reference)
     {
-        kor::CommandBuffer::SetStencilReference(face, reference);
         return defer("SetStencilReference", [=, this] {
             _handle.setStencilReference(getVkStencilFace(face), reference);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetCullMode(const Flags<CullMode> cullMode)
+    kor::CommandBuffer& CommandBuffer::doSetCullMode(const Flags<CullMode> cullMode)
     {
-        kor::CommandBuffer::SetCullMode(cullMode);
         return defer("SetCullMode", [=, this] {
             _handle.setCullMode(getVkCullMode(cullMode));
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetFrontFace(const FrontFace frontFace)
+    kor::CommandBuffer& CommandBuffer::doSetFrontFace(const FrontFace frontFace)
     {
-        kor::CommandBuffer::SetFrontFace(frontFace);
         return defer("SetFrontFace", [=, this] {
             // Winding is canonical (Vulkan) too, so this is a plain pass-through. GL agrees
             // because GL_UPPER_LEFT negates NDC Y, which flips its window-space winding to
@@ -323,65 +312,57 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetDepthTestEnable(const bool enable)
     {
-        kor::CommandBuffer::SetDepthTestEnable(enable);
         return defer("SetDepthTestEnable", [=, this] {
             _handle.setDepthTestEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthWriteEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetDepthWriteEnable(const bool enable)
     {
-        kor::CommandBuffer::SetDepthWriteEnable(enable);
         return defer("SetDepthWriteEnable", [=, this] {
             _handle.setDepthWriteEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthCompareOp(const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::doSetDepthCompareOp(const CompareOp compareOp)
     {
-        kor::CommandBuffer::SetDepthCompareOp(compareOp);
         return defer("SetDepthCompareOp", [=, this] {
             _handle.setDepthCompareOp(getVkCompareOp(compareOp));
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetStencilTestEnable(const bool enable)
     {
-        kor::CommandBuffer::SetStencilTestEnable(enable);
         return defer("SetStencilTestEnable", [=, this] {
             _handle.setStencilTestEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::doSetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
     {
-        kor::CommandBuffer::SetStencilOp(face, failOp, passOp, depthFailOp, compareOp);
         return defer("SetStencilOp", [=, this] {
             _handle.setStencilOp(getVkStencilFace(face), getVkStencilOp(failOp), getVkStencilOp(passOp), getVkStencilOp(depthFailOp), getVkCompareOp(compareOp));
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthBiasEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetDepthBiasEnable(const bool enable)
     {
-        kor::CommandBuffer::SetDepthBiasEnable(enable);
         return defer("SetDepthBiasEnable", [=, this] {
             _handle.setDepthBiasEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetRasterizerDiscardEnable(const bool enable)
     {
-        kor::CommandBuffer::SetRasterizerDiscardEnable(enable);
         return defer("SetRasterizerDiscardEnable", [=, this] {
             _handle.setRasterizerDiscardEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetPrimitiveRestartEnable(const bool enable)
     {
-        kor::CommandBuffer::SetPrimitiveRestartEnable(enable);
         return defer("SetPrimitiveRestartEnable", [=, this] {
             _handle.setPrimitiveRestartEnable(enable);
         });
@@ -410,12 +391,8 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::TraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::doTraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth, const std::source_location where)
     {
-        if (_failed) return *this;
-        if (!_state.boundRayTracingPipeline.has_value())
-            return record(ErrorCode::eNoRayTracingPipelineBound, "Cannot trace rays without a ray-tracing pipeline bound.");
-
         return deferAt("TraceRays", where, [=, this] {
             const auto& vkPipeline = dynamic_cast<const kor::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
             _handle.traceRaysKHR(
@@ -569,7 +546,7 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::doDispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ, const std::source_location where)
     {
         if (_failed) return *this;
         return deferAt("Dispatch", where, [=, this] {
@@ -584,8 +561,7 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ, const std::source_location where) {
-        kor::CommandBuffer::DrawMeshTasks(taskCountX, taskCountY, taskCountZ, where);
+    kor::CommandBuffer& CommandBuffer::doDrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ, const std::source_location where) {
         if (_failed) return *this;
         return deferAt("DrawMeshTasks", where, [=, this] {
             applyDynamicDefaults();
@@ -617,13 +593,8 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::doDraw(const glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
     {
-        if (vertexCount == UINT64_MAX && _state.boundMesh.has_value()) {
-            vertexCount = _state.boundMesh.value()->getVertexCount();
-        }
-        kor::CommandBuffer::Draw(vertexCount, instanceCount, firstVertex, firstInstance, where);
-        if (_failed) return *this;
         return deferAt("Draw", where, [=, this] {
             // At emit time the tracked state has replayed to this point, so the dynamic-state
             // mask is the one that was in force for *this* draw, not the end of recording.
@@ -632,13 +603,7 @@ namespace kor::vk
         }, PassEdge::eNone, usesForBoundResources(true), boundPipelineUsesDeviceAddresses());
     }
 
-    kor::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, const std::source_location where) {
-        kor::CommandBuffer::DrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, where);
-        if (_failed) return *this;
-        const auto mesh = _state.boundMesh.value();
-        if (indexCount == UINT64_MAX) {
-            indexCount = mesh->getIndexCount().value();
-        }
+    kor::CommandBuffer & CommandBuffer::doDrawIndexed(const glm::u64 indexCount, const glm::u32 instanceCount, const glm::u32 firstIndex, const glm::i32 vertexOffset, const glm::u32 firstInstance, const std::source_location where) {
         return deferAt("DrawIndexed", where, [=, this] {
             applyDynamicDefaults();
             _handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
@@ -1078,7 +1043,7 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::Run(const std::function<void(kor::CommandBuffer&)>& command)
+    kor::CommandBuffer& CommandBuffer::doRun(const std::function<void(kor::CommandBuffer&)>& command)
     {
         // Deferred like everything else, and for the same reason. The point of Run is to reach
         // the raw VkCommandBuffer — the ImGui backend records its own draws through it — and
@@ -1094,7 +1059,7 @@ namespace kor::vk
         return defer("Run", [this, command] { command(*this); });
     }
 
-    kor::VoidResult CommandBuffer::Submit()
+    kor::VoidResult CommandBuffer::doSubmit()
     {
         const auto commandBuffers = std::array { _handle };
         const auto submitInfo = ::vk::SubmitInfo()
@@ -1115,13 +1080,13 @@ namespace kor::vk
         return result();
     }
 
-    void CommandBuffer::Reset()
+    void CommandBuffer::doReset()
     {
         _state = {};
         _handle.reset();
     }
 
-    void CommandBuffer::WaitForFence() const
+    void CommandBuffer::doWaitForFence() const
     {
         try {
             auto result = Context::Device()->waitForFences(_fence, true, UINT64_MAX);
@@ -1135,7 +1100,7 @@ namespace kor::vk
         }
     }
 
-    void CommandBuffer::writeTimerTimestamp(const glm::u32 queryIndex)
+    void CommandBuffer::doWriteTimerTimestamp(const glm::u32 queryIndex)
     {
         if (!_timerPool) return;
         // An even slot opens a scope and an odd one closes it. Timestamping the *earliest* stage on
@@ -1149,7 +1114,7 @@ namespace kor::vk
         _handle.writeTimestamp(stage, _timerPool, queryIndex);
     }
 
-    bool CommandBuffer::readTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
+    bool CommandBuffer::doReadTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
     {
         if (!_timerPool || scopeCount == 0) return false;
 
@@ -1183,7 +1148,7 @@ namespace kor::vk
         return true;
     }
 
-    kor::CommandBuffer& CommandBuffer::PushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {
+    kor::CommandBuffer& CommandBuffer::doPushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {
         // The bytes, not the pointer: PushConstants<T> hands us the address of a caller
         // temporary, which is long gone by the time End() emits.
         std::vector<std::byte> bytes(size);

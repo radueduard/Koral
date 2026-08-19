@@ -221,7 +221,7 @@ namespace kor
                 : Error{ .code = ErrorCode::eInvalidArgument, .message = "Could not allocate the block." });
         }
 
-        block.buffer->Write(std::span<const std::byte>(block.staging), 0);
+        block.buffer->Write(block.staging, 0);
         const auto [it, inserted] = _state->blocks.emplace(shape, std::move(block));
         return ResourceRef<const Buffer>(it->second.buffer);
     }
@@ -246,7 +246,7 @@ namespace kor
             // costs a compare rather than a write into memory the GPU may be about to read.
             if (next != block.staging) {
                 block.staging = std::move(next);
-                block.buffer->Write(std::span<const std::byte>(block.staging), 0);
+                block.buffer->Write(block.staging, 0);
             }
         }
     }

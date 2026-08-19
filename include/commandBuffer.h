@@ -21,6 +21,7 @@
 #include <glm/glm.hpp>
 
 #include "structs.h"
+#include "shaderValue.h"
 
 namespace kor
 {
@@ -32,6 +33,7 @@ namespace kor
     class RayTracingPipeline;
     class Framebuffer;
     class Mesh;
+    class Pipeline;
 
     /**
      * @brief Records the work a frame submits to the GPU.
@@ -189,7 +191,7 @@ namespace kor
          * False on a queue whose family reports no valid timestamp bits — a dedicated transfer
          * queue on some drivers — in which case the timer commands do nothing.
          */
-        [[nodiscard]] virtual bool supportsTimers() const { return false; }
+        [[nodiscard]] bool supportsTimers() const { return doSupportsTimers(); }
 
         /** @brief The most scopes one recording may open. Beyond this BeginTimer fails the recording. */
         static constexpr glm::u32 MaxTimerScopes = 256;
@@ -277,7 +279,7 @@ namespace kor
          *
          * Clears the accumulated errors as well, so a buffer that failed last frame starts clean.
          */
-        virtual CommandBuffer& Begin() = 0;
+        CommandBuffer& Begin();
 
         /**
          * @brief Closes recording and hands the finished sequence to the driver.
@@ -286,7 +288,7 @@ namespace kor
          * and then emitted in order. Nothing has reached the GPU before this, and nothing is
          * executed by it: Submit() does that.
          */
-        virtual void End() = 0;
+        void End();
 
         /**
          * @brief Submits the recorded work to its queue.
@@ -295,10 +297,10 @@ namespace kor
          * Does not wait for completion. Use WaitForFence() when the results have to be readable on
          * the CPU.
          */
-        virtual VoidResult Submit() = 0;
+        VoidResult Submit();
 
         /** @brief Returns the buffer to its initial state, dropping everything recorded. */
-        virtual void Reset() = 0;
+        void Reset();
 
         /**
          * @brief Blocks until the GPU has finished the work submitted from this buffer.
@@ -306,35 +308,38 @@ namespace kor
          * The coarsest possible synchronisation — it stalls the calling thread completely. Needed
          * after a readback, unnecessary between frames, which the scheduler already paces.
          */
-        virtual void WaitForFence() const = 0;
+        void WaitForFence() const;
 
         // ---- Render passes --------------------------------------------------------------------
 
         /**
-         * @brief Opens a render pass on the window's default framebuffer.
-         * @param renderParameters What happens to the attachments on entry and exit.
+         * @brief Opens a render pass.
+         * @param renderInfo What to render into, and what happens to it on the way in and out.
+         *        A framebuffer on its own is enough — it converts — and the whole argument may be
+         *        left out to render to the window's default framebuffer, which is the swap-chain
+         *        image this frame is presented from, and so how a scene draws to the screen.
          *
-         * The default framebuffer is the swap-chain image this frame will be presented from, so
-         * this is how a scene draws to the screen.
-         */
-        virtual CommandBuffer& BeginRendering(RenderParameters renderParameters = {});
-
-        /**
-         * @brief Opens a render pass on a framebuffer of your own.
-         * @param framebuffer The attachments to render into.
-         * @param renderParameters What happens to those attachments on entry and exit.
+         * @code
+         * commandBuffer.BeginRendering();          // the screen
+         * commandBuffer.BeginRendering(gBuffer);   // a framebuffer of your own
+         * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer).setClearColor(0, glm::vec4{1.f}));
+         * @endcode
          *
          * Its attachments are declared as used, so the transitions they need are emitted ahead of
          * the pass rather than inside it. Binding a pipeline, a viewport and a scissor does not
          * survive the pass: opening one clears them, since the next pass may have a different
          * format or size.
+         *
+         * Whatever @p renderInfo leaves unsaid about clear values is taken from the framebuffer at
+         * this point and recorded with the pass, so one framebuffer can be cleared to two different
+         * things by two passes in a frame. @see RenderInfo
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& BeginRendering(ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters = {},
-                                      std::source_location where = std::source_location::current());
+        CommandBuffer& BeginRendering(const RenderInfo& renderInfo = {},
+            std::source_location where = std::source_location::current());
 
         /** @brief Closes the render pass opened by BeginRendering. */
-        virtual CommandBuffer& EndRendering();
+        CommandBuffer& EndRendering();
 
         /**
          * @brief Sets the region of the attachment the rendering is mapped onto.
@@ -344,7 +349,7 @@ namespace kor
          * Defaults to the whole window if a draw is recorded without one, so a scene drawing to the
          * screen may skip it entirely.
          */
-        virtual CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
+        CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
 
         /**
          * @brief Sets the rectangle outside which fragments are discarded.
@@ -354,7 +359,7 @@ namespace kor
          * Like the viewport, defaults to the whole window when a draw is recorded without one.
          * Unlike the viewport it does not rescale anything — it only clips.
          */
-        virtual CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
+        CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
 
         // ---- Dynamic state --------------------------------------------------------------------
         //
@@ -365,7 +370,7 @@ namespace kor
         // same pipeline can be reused across draws that differ only in these.
 
         /** @brief Sets the width of rasterized lines, in pixels. Applies when the pipeline's polygon mode is PolygonMode::eLine. */
-        virtual CommandBuffer& SetLineWidth(float lineWidth);
+        CommandBuffer& SetLineWidth(float lineWidth);
 
         /**
          * @brief Sets the depth bias applied to rasterized fragments.
@@ -376,37 +381,37 @@ namespace kor
          *
          * Requires SetDepthBiasEnable(true) or a pipeline that enables it.
          */
-        virtual CommandBuffer& SetDepthBias(float constantFactor, float clamp, float slopeFactor);
+        CommandBuffer& SetDepthBias(float constantFactor, float clamp, float slopeFactor);
 
         /** @brief Sets the constant colour used by blend factors BlendFactor::eConstantColor and eOneMinusConstantColor. */
-        virtual CommandBuffer& SetBlendConstants(glm::vec4 constants);
+        CommandBuffer& SetBlendConstants(glm::vec4 constants);
 
         /** @brief Sets which bits of the stencil value and reference take part in the comparison. */
-        virtual CommandBuffer& SetStencilCompareMask(StencilFace face, glm::u32 compareMask);
+        CommandBuffer& SetStencilCompareMask(StencilFace face, glm::u32 compareMask);
 
         /** @brief Sets which bits of the stencil buffer a stencil operation may write. */
-        virtual CommandBuffer& SetStencilWriteMask(StencilFace face, glm::u32 writeMask);
+        CommandBuffer& SetStencilWriteMask(StencilFace face, glm::u32 writeMask);
 
         /** @brief Sets the value the stencil test compares against, and the value StencilOp::eReplace writes. */
-        virtual CommandBuffer& SetStencilReference(StencilFace face, glm::u32 reference);
+        CommandBuffer& SetStencilReference(StencilFace face, glm::u32 reference);
 
         /** @brief Sets which polygon faces are discarded. An empty Flags draws both. */
-        virtual CommandBuffer& SetCullMode(Flags<CullMode> cullMode);
+        CommandBuffer& SetCullMode(Flags<CullMode> cullMode);
 
         /** @brief Sets which winding order counts as front-facing, and so what SetCullMode culls. */
-        virtual CommandBuffer& SetFrontFace(FrontFace frontFace);
+        CommandBuffer& SetFrontFace(FrontFace frontFace);
 
         /** @brief Enables or disables the depth test. Disabled, fragments are drawn regardless of what is in front of them. */
-        virtual CommandBuffer& SetDepthTestEnable(bool enable);
+        CommandBuffer& SetDepthTestEnable(bool enable);
 
         /** @brief Enables or disables writing to the depth buffer. Off with the test still on is the usual setup for transparent geometry. */
-        virtual CommandBuffer& SetDepthWriteEnable(bool enable);
+        CommandBuffer& SetDepthWriteEnable(bool enable);
 
         /** @brief Sets the comparison a fragment's depth must pass against the depth buffer. */
-        virtual CommandBuffer& SetDepthCompareOp(CompareOp compareOp);
+        CommandBuffer& SetDepthCompareOp(CompareOp compareOp);
 
         /** @brief Enables or disables the stencil test. */
-        virtual CommandBuffer& SetStencilTestEnable(bool enable);
+        CommandBuffer& SetStencilTestEnable(bool enable);
 
         /**
          * @brief Sets what happens to the stencil buffer on each outcome of the two tests.
@@ -416,16 +421,16 @@ namespace kor
          * @param depthFailOp Applied when the stencil test passes but the depth test fails.
          * @param compareOp The comparison the stencil test itself performs.
          */
-        virtual CommandBuffer& SetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp);
+        CommandBuffer& SetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp);
 
         /** @brief Enables or disables depth bias. The amount comes from SetDepthBias. */
-        virtual CommandBuffer& SetDepthBiasEnable(bool enable);
+        CommandBuffer& SetDepthBiasEnable(bool enable);
 
         /** @brief Discards primitives before rasterization, so vertex work runs and no fragments are produced. */
-        virtual CommandBuffer& SetRasterizerDiscardEnable(bool enable);
+        CommandBuffer& SetRasterizerDiscardEnable(bool enable);
 
         /** @brief Enables the index value that restarts a strip or fan mid-buffer (all-ones for the index type). */
-        virtual CommandBuffer& SetPrimitiveRestartEnable(bool enable);
+        CommandBuffer& SetPrimitiveRestartEnable(bool enable);
 
         // ---- Bindings -------------------------------------------------------------------------
 
@@ -489,6 +494,64 @@ namespace kor
             return PushConstants(&data, sizeof(T), offset);
         }
 
+        /**
+         * @brief Uploads one push constant, named the way the shader names it.
+         * @tparam T Any trivially copyable type; it must be the size the shader declared.
+         * @param name The field's name in the shader — the `tint` of `vec4 tint;`.
+         * @param data The value to upload. Copied immediately.
+         * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
+         *
+         * The offset comes from the bound pipeline's own reflection, so nothing on this side has to
+         * know the block's layout, and moving a field in the shader cannot silently feed the wrong
+         * bytes to it:
+         *
+         * @code{.glsl}
+         * layout(push_constant) uniform Push {
+         *     mat4 model;
+         *     vec4 tint;
+         * } push;
+         * @endcode
+         *
+         * @code
+         * commandBuffer.PushConstant("model", modelMatrix)
+         *              .PushConstant("tint", glm::vec4{1, 0, 0, 1});
+         * @endcode
+         *
+         * A name no stage declares, or a value of the wrong shape, fails the recording with
+         * ErrorCode::ePushConstantMismatch naming what the pipeline does declare. Stages are
+         * merged: a constant both the vertex and fragment shader declare is written once, for both.
+         *
+         * @section push_constant_alignment Padding is not your problem
+         *
+         * The value is written *element by element* into the layout the shader declared, so the
+         * two sides never have to agree about padding. A `mat3` reserves three columns of four
+         * floats in the shader and is nine tight floats in C++; an array of `vec3` strides sixteen
+         * bytes per element and is twelve in C++. Both are written correctly from the obvious
+         * `glm::mat3` and `std::array<glm::vec3, N>` — the strides come from reflection.
+         *
+         * Nesting is flattened, so a struct whose C++ padding differs from the shader's is
+         * addressed field by field rather than copied whole:
+         *
+         * @code
+         * commandBuffer.PushConstant("material.albedo", albedo)
+         *              .PushConstant("material.roughness", 0.4f)
+         *              .PushConstant("weights[2]", 1.f);
+         * @endcode
+         *
+         * A type the engine cannot see inside — one of your own structs — is copied as it stands,
+         * with its size checked against the field's. That check is exact rather than "at most",
+         * because a value larger than the field would run into whatever the shader put next.
+         *
+         * @note For a shape the engine knows, the scalar type and dimensions are checked too, so a
+         *       `vec3` handed to a `vec4` is refused rather than leaving a component uninitialised.
+         *       @see PushConstants for writing a whole block at one offset.
+         */
+        template<typename T> requires std::is_trivially_copyable_v<T>
+        CommandBuffer& PushConstant(const std::string_view name, const T& data,
+                                    const std::source_location where = std::source_location::current()) {
+            return PushConstant(name, &data, sizeof(T), shapeOf<T>(), where);
+        }
+
         // ---- Barriers -------------------------------------------------------------------------
 
         /**
@@ -528,13 +591,13 @@ namespace kor
          * @param label Name shown in the debugger.
          * @param color Colour the debugger tints the region with.
          */
-        virtual CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
+        CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
 
         /** @brief Closes the innermost region opened by BeginDebugLabel. */
-        virtual CommandBuffer& EndDebugLabel();
+        CommandBuffer& EndDebugLabel();
 
         /** @brief Places a single named marker, without opening a region. */
-        virtual CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
+        CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
 
         /**
          * @brief Records @p body inside a named region, closing it afterwards.
@@ -561,8 +624,8 @@ namespace kor
          *        count is this multiplied by that.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        virtual CommandBuffer& Dispatch(glm::u32 groupCountX = 1, glm::u32 groupCountY = 1, glm::u32 groupCountZ = 1,
-                                        std::source_location where = std::source_location::current()) = 0;
+        CommandBuffer& Dispatch(glm::u32 groupCountX = 1, glm::u32 groupCountY = 1, glm::u32 groupCountZ = 1,
+                                        std::source_location where = std::source_location::current());
 
         /**
          * @brief Runs the bound compute pipeline over a grid the GPU itself decided.
@@ -582,7 +645,7 @@ namespace kor
          * Fails on devices or backends without ray-tracing support.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        virtual CommandBuffer& TraceRays(glm::u32 width = 1, glm::u32 height = 1, glm::u32 depth = 1,
+        CommandBuffer& TraceRays(glm::u32 width = 1, glm::u32 height = 1, glm::u32 depth = 1,
                                          std::source_location where = std::source_location::current());
 
         // ---- Draws ----------------------------------------------------------------------------
@@ -598,7 +661,7 @@ namespace kor
          * whole window first.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        virtual CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0,
+        CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0,
                                     std::source_location where = std::source_location::current());
 
         /**
@@ -613,7 +676,7 @@ namespace kor
          * Needs a graphics pipeline and a mesh with an index buffer bound.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        virtual CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0,
+        CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0,
                                            std::source_location where = std::source_location::current());
 
         /**
@@ -643,7 +706,7 @@ namespace kor
          * Requires mesh-shader support; unavailable on the OpenGL backend.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        virtual CommandBuffer& DrawMeshTasks(glm::u32 taskCountX = 1, glm::u32 taskCountY = 1, glm::u32 taskCountZ = 1,
+        CommandBuffer& DrawMeshTasks(glm::u32 taskCountX = 1, glm::u32 taskCountY = 1, glm::u32 taskCountZ = 1,
                                              std::source_location where = std::source_location::current());
 
         /**
@@ -827,7 +890,7 @@ namespace kor
          * its draws. Like every other command it is deferred, so the callback runs at End(), in the
          * position it was written, rather than where it was called.
          */
-        virtual CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command) = 0;
+        CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command);
 
         /**
          * @brief Records one branch or the other.
@@ -1013,6 +1076,14 @@ namespace kor
          */
         [[nodiscard]] glm::uvec2 defaultViewportExtent() const;
 
+        /**
+         * @brief Gives a draw the whole target when it set no viewport or scissor of its own.
+         *
+         * Recorded as ordinary Set calls, so the tracking bits and the commands the backend emits
+         * cannot disagree about what is in force.
+         */
+        void ensureViewportAndScissor();
+
         /** @brief Whether the currently bound pipeline reaches buffers through device addresses. */
         [[nodiscard]] bool boundPipelineUsesDeviceAddresses() const;
 
@@ -1050,6 +1121,15 @@ namespace kor
 
         /** @brief Records that a render pass opened on this framebuffer, clearing the pipeline and viewport bindings. */
         void stateBeginRendering(const ResourceRef<const Framebuffer>& framebuffer);
+
+        /**
+         * @brief Drops the framebuffer and pipeline bindings a pass held.
+         *
+         * Separate from EndRendering for the same reason stateBeginRendering is: a backend that
+         * replays its records later has to apply the same change again at replay time, and cannot
+         * call EndRendering to get it without recursing back into its own do* half.
+         */
+        void stateEndRendering();
         /** @brief Records the bound compute pipeline. */
         void stateBindComputePipeline(const ResourceRef<const ComputePipeline>& pipeline);
         /** @brief Records the bound graphics pipeline, and clears the dynamic-state mask. */
@@ -1067,7 +1147,58 @@ namespace kor
         // validates, rejects unusable resources and updates the tracked state; only then is the
         // matching do* called, so a backend is never handed a poisoned or destroyed resource.
 
-        virtual CommandBuffer& doBeginRendering(ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters) = 0;
+        virtual CommandBuffer& doBeginRendering(const RenderInfo& renderParameters) = 0;
+        // Recording lifecycle. The base owns what is common to every backend — resetting the
+        // errors and records, retiring the previous submission's timers, resolving barriers once
+        // the whole sequence is visible — and each of these supplies only the API call that ends it.
+        virtual CommandBuffer& doBegin() = 0;
+        virtual void doEnd() = 0;
+        virtual VoidResult doSubmit() = 0;
+        virtual void doReset() = 0;
+        virtual void doWaitForFence() const = 0;
+        virtual CommandBuffer& doRun(const std::function<void(CommandBuffer&)>& command) = 0;
+
+        virtual CommandBuffer& doEndRendering() = 0;
+
+        // Dynamic state. The guard ("is a graphics pipeline bound?") and the tracking bit that
+        // stops applyDynamicDefaults from stamping the pipeline's value over an explicit one are
+        // the base's; these emit the command and nothing else.
+        virtual CommandBuffer& doSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
+        virtual CommandBuffer& doSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
+        virtual CommandBuffer& doSetLineWidth(float lineWidth) = 0;
+        virtual CommandBuffer& doSetDepthBias(float constantFactor, float clamp, float slopeFactor) = 0;
+        virtual CommandBuffer& doSetBlendConstants(glm::vec4 constants) = 0;
+        virtual CommandBuffer& doSetStencilCompareMask(StencilFace face, glm::u32 compareMask) = 0;
+        virtual CommandBuffer& doSetStencilWriteMask(StencilFace face, glm::u32 writeMask) = 0;
+        virtual CommandBuffer& doSetStencilReference(StencilFace face, glm::u32 reference) = 0;
+        virtual CommandBuffer& doSetCullMode(Flags<CullMode> cullMode) = 0;
+        virtual CommandBuffer& doSetFrontFace(FrontFace frontFace) = 0;
+        virtual CommandBuffer& doSetDepthTestEnable(bool enable) = 0;
+        virtual CommandBuffer& doSetDepthWriteEnable(bool enable) = 0;
+        virtual CommandBuffer& doSetDepthCompareOp(CompareOp compareOp) = 0;
+        virtual CommandBuffer& doSetStencilTestEnable(bool enable) = 0;
+        virtual CommandBuffer& doSetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp) = 0;
+        virtual CommandBuffer& doSetDepthBiasEnable(bool enable) = 0;
+        virtual CommandBuffer& doSetRasterizerDiscardEnable(bool enable) = 0;
+        virtual CommandBuffer& doSetPrimitiveRestartEnable(bool enable) = 0;
+
+        /// Default to nothing: a backend without debug-marker support simply ignores labels.
+        virtual CommandBuffer& doBeginDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
+        virtual CommandBuffer& doEndDebugLabel() { return *this; }
+        virtual CommandBuffer& doInsertDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
+
+        virtual CommandBuffer& doDispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) = 0;
+        /// Defaults to reporting ray tracing as unsupported, like doBindRayTracingPipeline.
+        virtual CommandBuffer& doTraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where);
+        /// @param vertexCount Already resolved from the bound mesh when the caller left it defaulted.
+        virtual CommandBuffer& doDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) = 0;
+        /// @param indexCount Already resolved from the bound mesh when the caller left it defaulted.
+        virtual CommandBuffer& doDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) = 0;
+        /// Unimplemented on OpenGL, where it is a no-op.
+        virtual CommandBuffer& doDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) { return *this; }
+
+        virtual CommandBuffer& doPushConstants(const void* data, glm::u32 size, glm::u32 offset) = 0;
+
         virtual CommandBuffer& doBindComputePipeline(ResourceRef<const ComputePipeline> pipeline) = 0;
         virtual CommandBuffer& doBindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline) = 0;
         /// Defaults to reporting ray tracing as unsupported, like TraceRays; OpenGL leaves it alone.
@@ -1110,8 +1241,11 @@ namespace kor
             std::source_location where;
         };
 
+        /** @brief Backend hook: whether this device and queue can timestamp at all. @see supportsTimers */
+        [[nodiscard]] virtual bool doSupportsTimers() const { return false; }
+
         /** @brief Backend hook: write the timestamp for query slot @p queryIndex at this point in the stream. */
-        virtual void writeTimerTimestamp(glm::u32 queryIndex) {}
+        virtual void doWriteTimerTimestamp(glm::u32 queryIndex) {}
 
         /**
          * @brief Backend hook: read back the previous submission's timestamps, without blocking.
@@ -1120,7 +1254,7 @@ namespace kor
          * @return false if the GPU has not finished with them, in which case nothing is reported
          *         and the previous results stand.
          */
-        virtual bool readTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) { return false; }
+        virtual bool doReadTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) { return false; }
 
         /**
          * @brief Fetches the last submission's timestamps if the GPU has finished with them.
@@ -1154,6 +1288,16 @@ namespace kor
 
         glm::u64 _lastFrameCommandCount = 0;
 
-        virtual CommandBuffer& PushConstants(const void* data, glm::u32 size, glm::u32 offset) = 0;
+        CommandBuffer& PushConstants(const void* data, glm::u32 size, glm::u32 offset);
+
+        /** @brief Whichever pipeline is bound, of the three kinds, or nullptr when none is. */
+        [[nodiscard]] const Pipeline* boundPipeline() const;
+
+        /**
+         * @brief Resolves @p name on the bound pipeline and writes @p data into the layout it declared.
+         * @param shape What the value is, when the engine can tell; an unknown shape is copied raw.
+         */
+        CommandBuffer& PushConstant(std::string_view name, const void* data, glm::u32 size,
+                                    ValueShape shape, std::source_location where);
     };
 }

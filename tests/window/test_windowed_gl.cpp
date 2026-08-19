@@ -697,6 +697,162 @@ TEST_F(GlTest, TexturedDraw) {
 }
 
 // -----------------------------------------------------------------------------
+// Push constants addressed by name, across two stages, through GL's emulation.
+//
+// GL has no push constants: the pipeline owns a std140 UBO and a write lands at the same byte
+// offset Vulkan would have used. So the name lookup has to produce the same offsets here, and a
+// constant only the vertex stage reads has to survive being written alongside one only the
+// fragment stage reads.
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, PushConstantsByNameAcrossStages) {
+    auto target = makeTarget({0.f, 0.f, 0.f, 1.f});
+    const auto vert = loadShader("pushMultiStage.vert.glsl", Shader::Stage::eVertex, "glt.pushmulti.vert");
+    const auto frag = loadShader("pushMultiStage.frag.glsl", Shader::Stage::eFragment, "glt.pushmulti.frag");
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    const auto* offsetConstant = pipeline->findPushConstant("offset");
+    const auto* colorConstant = pipeline->findPushConstant("color");
+    ASSERT_NE(offsetConstant, nullptr);
+    ASSERT_NE(colorConstant, nullptr);
+    EXPECT_TRUE(offsetConstant->stages & Shader::Stage::eVertex);
+    EXPECT_TRUE(colorConstant->stages & Shader::Stage::eFragment);
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("offset", glm::vec2{0.f, 0.f});
+        cb.PushConstant("color", glm::vec4{1.f, 0.f, 1.f, 1.f});   // magenta
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    const auto out = readbackImage(target.image);
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        ASSERT_EQ(out[i], Pixel(255, 0, 255, 255)) << "texel " << i;
+    }
+
+    // The vertex stage's half of the block, on its own: shifted clear off the target.
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("offset", glm::vec2{2.f, 0.f});
+        cb.PushConstant("color", glm::vec4{1.f, 0.f, 1.f, 1.f});
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    EXPECT_EQ(readbackImage(target.image).front(), Pixel(0, 0, 0, 255))
+        << "the vertex stage did not read its half of the block";
+}
+
+// -----------------------------------------------------------------------------
+// The padded shapes — a mat3, an array of vec3 — through GL's push-constant UBO.
+//
+// GL has no push constants: the block is re-emitted as a uniform buffer. If that changed any
+// stride, a value laid out from the reflected (SPIR-V) strides would land somewhere else here than
+// it does on Vulkan, and this is the test that would say so.
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
+    auto target = makeTarget({0.f, 0.f, 0.f, 1.f});
+    const auto vert = loadShader("flatTriangle.vert.glsl", Shader::Stage::eVertex, "glt.aligned.vert");
+    const auto frag = loadShader("pushAligned.frag.glsl", Shader::Stage::eFragment, "glt.aligned.frag");
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    const auto* basis = pipeline->findPushConstant("basis");
+    const auto* tints = pipeline->findPushConstant("tints");
+    ASSERT_NE(basis, nullptr);
+    ASSERT_NE(tints, nullptr);
+    EXPECT_EQ(basis->matrixStride, 16u);
+    EXPECT_EQ(tints->arrayStride, 16u);
+
+    glm::mat3 basisValue(0.f);
+    basisValue[0] = glm::vec3{0.2f, 0.f, 0.f};
+    basisValue[1] = glm::vec3{0.f, 0.4f, 0.f};
+    basisValue[2] = glm::vec3{0.f, 0.f, 0.6f};
+    const std::array tintsValue{ glm::vec3{0.2f, 0.f, 0.f}, glm::vec3{0.f, 0.2f, 0.f}, glm::vec3{0.f, 0.f, 0.2f} };
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("basis", basisValue);
+        cb.PushConstant("tints", tintsValue);
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    // The same colour Vulkan produces from the same two calls, which is the whole point.
+    const auto out = readbackImage(target.image);
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    EXPECT_EQ(out.front(), Pixel(102, 153, 204, 255));
+}
+
+// -----------------------------------------------------------------------------
+// Per-pass clear values, on the backend that can actually get them wrong.
+//
+// GL records a render pass as a lambda and replays it at Submit. A clear value
+// read from the framebuffer at *replay* time would be the last one written — so
+// two passes over one framebuffer would both come out green, while Vulkan, which
+// bakes the value in as it records, would give red then green. RenderInfo resolves
+// against the framebuffer while recording precisely so the two agree; this is the
+// test that fails if that resolution is ever moved back into the backend.
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
+    auto target = makeTarget({0.f, 0.f, 1.f, 1.f});   // built blue; neither pass asks for it
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto firstPass = rb.build();
+    auto secondPass = rb.build();
+
+    // Both passes in one command buffer, so both lambdas are queued before either runs — which is
+    // the arrangement that catches a value read at replay time.
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(kor::RenderInfo(ResourceRef<const Framebuffer>(target.framebuffer))
+                              .setClearColor(0, glm::vec4{1.f, 0.f, 0.f, 1.f}));
+        cb.EndRendering();
+        cb.CopyImageToBuffer(ResourceRef<const Image>(target.image), ResourceRef<const Buffer>(firstPass));
+
+        cb.BeginRendering(kor::RenderInfo(ResourceRef<const Framebuffer>(target.framebuffer))
+                              .setClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
+        cb.EndRendering();
+        cb.CopyImageToBuffer(ResourceRef<const Image>(target.image), ResourceRef<const Buffer>(secondPass));
+    }, CommandBuffer::Usage::eGraphics);
+
+    const auto first = firstPass->Read<Pixel>();
+    const auto second = secondPass->Read<Pixel>();
+    ASSERT_EQ(first.size(), static_cast<std::size_t>(kW) * kH);
+    ASSERT_EQ(second.size(), static_cast<std::size_t>(kW) * kH);
+    EXPECT_EQ(first.front(), Pixel(255, 0, 0, 255)) << "the first pass cleared to its own red";
+    EXPECT_EQ(second.front(), Pixel(0, 255, 0, 255)) << "the second pass cleared to its own green";
+
+    // And a pass that overrides nothing still gets the framebuffer's own value.
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+    EXPECT_EQ(readbackImage(target.image).front(), Pixel(0, 0, 255, 255));
+}
+
+// -----------------------------------------------------------------------------
 // Debug-label commands (scoped + single markers). No-ops without a debugger, but
 // they still record and must not fail the command buffer.
 // -----------------------------------------------------------------------------

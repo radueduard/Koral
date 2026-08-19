@@ -17,6 +17,7 @@
 
 #include "flags.h"
 #include "api.h"
+#include "dataRange.h"
 #include <source_location>
 
 #include "builder.h"
@@ -314,17 +315,21 @@ namespace kor
 
             /**
              * @brief Sizes the buffer to @p data and fills it with a copy of it.
-             * @param data Any contiguous range of T — a vector, an array, a span.
+             * @param data Any range of T — a vector, an array, a span, or a view computed on the fly.
              *
-             * The copy is taken here, so @p data need not outlive the call. An empty range fails
-             * the build with ErrorCode::eBufferSizeInvalid.
+             * The copy is taken here, so @p data need not outlive the call, and a range that is not
+             * contiguous is walked rather than refused. An empty range fails the build with
+             * ErrorCode::eBufferSizeInvalid.
              */
-            template <std::ranges::contiguous_range Container> requires std::same_as<std::ranges::range_value_t<Container>, T>
-            Builder& setData(const Container& data) {
-                if (data.size() <= 0) {
+            template <RangeOf<T> R>
+            Builder& setData(R&& data) {
+                _ownedData.clear();
+                if constexpr (std::ranges::sized_range<R>) _ownedData.reserve(std::ranges::size(data));
+                for (const auto& element : data) _ownedData.push_back(element);
+
+                if (_ownedData.empty()) {
                     addError(ErrorCode::eBufferSizeInvalid, "Data container must have size > 0");
                 }
-                _ownedData.assign(data.begin(), data.end());
                 _externalView = {};
                 _instanceCount = static_cast<glm::i64>(_ownedData.size());
                 _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
@@ -333,15 +338,17 @@ namespace kor
 
             /**
              * @brief Sizes the buffer to @p view and fills it from that memory, without copying it.
-             * @param view The source data.
+             * @param view The source data: any contiguous range of T. Something that is not
+             *        contiguous cannot be viewed — pass it to setData, which copies.
              *
              * @warning Nothing is copied until build(). The memory @p view refers to must still be
              *          alive then. Use setData when it might not be.
              */
-            Builder& setDataView(const std::span<const T> view) {
+            template <ContiguousRangeOf<T> R>
+            Builder& setDataView(R&& view) {
                 _ownedData.clear();
-                _externalView = view;
-                _instanceCount = static_cast<glm::i64>(view.size());
+                _externalView = std::span<const T>(std::ranges::data(view), std::ranges::size(view));
+                _instanceCount = static_cast<glm::i64>(_externalView.size());
                 _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
@@ -572,6 +579,7 @@ namespace kor
          * @brief Writes a contiguous range of elements into the buffer.
          * @tparam T The element type. Must be trivially copyable.
          * @param data The elements to write. Its size decides how many.
+         * @param elements The data to write: any range of T — a vector, an array, a span, a view.
          * @param offset Element offset to start at, counted in elements of T.
          *
          * On a per-frame buffer the write lands in the current frame's copy and is propagated to
@@ -583,8 +591,13 @@ namespace kor
          * @throws std::out_of_range if the range runs past the end of the buffer.
          * @throws std::runtime_error if the buffer is currently mapped; write through the mapping instead.
          */
-        template <typename T> requires std::is_trivially_copyable_v<T>
-        void Write(const std::span<const T> data, const glm::u64 offset = 0) {
+        template <typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
+            requires RangeOf<R, T> && std::is_trivially_copyable_v<T>
+        void Write(R&& elements, const glm::u64 offset = 0) {
+            // Contiguous where it lies, copied into a temporary where it is not — either way what
+            // reaches the GPU below is one block of bytes. @see kor::ContiguousCopy
+            const ContiguousCopy<T> contiguous(std::forward<R>(elements));
+            const std::span<const T> data = contiguous.view();
             const auto count = static_cast<glm::u64>(data.size());
             validateElementRange<T>(offset, count, "Write");
 
@@ -610,7 +623,7 @@ namespace kor
                         .setUsage(Usage::eTransferSrc)
                         .setType(Type::eStaging);
                     auto stagingBuffer = stagingBuilder.build();
-                    stagingBuffer->Write<T>(data, 0);
+                    stagingBuffer->Write(data, 0);
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), byteSize, 0, byteOffset);
                     }, CommandBuffer::Usage::eTransfer);
@@ -861,7 +874,7 @@ namespace kor
 
             /**
              * @brief Copies elements into the mapped range.
-             * @param data The elements to write. Its size decides how many.
+             * @param elements The elements to write: any range of T. Its size decides how many.
              * @param localOffset Element offset within the mapping, not within the buffer.
              *
              * On a per-frame buffer the written region is recorded for propagation to the other
@@ -869,7 +882,10 @@ namespace kor
              *
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            void Write(const std::span<const T> data, glm::u64 localOffset = 0) {
+            template <RangeOf<T> R = std::span<const T>>
+            void Write(R&& elements, glm::u64 localOffset = 0) {
+                const ContiguousCopy<T> contiguous(std::forward<R>(elements));
+                const std::span<const T> data = contiguous.view();
                 const auto count = static_cast<glm::u64>(data.size());
                 if (localOffset > _count || count > (_count - localOffset)) {
                     kor::log::error("Attempted to write beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + count);

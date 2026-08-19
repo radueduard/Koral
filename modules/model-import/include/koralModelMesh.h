@@ -186,7 +186,7 @@ namespace kmdl
         kor::Resource<kor::Buffer> uploadVertexBuffer(const std::vector<StreamT>& vertices)
         {
             return kor::Buffer::Builder<StreamT>()
-                .setDataView(std::span<const StreamT>(vertices))
+                .setDataView(vertices)
                 .addUsage(kor::Buffer::Usage::eVertex)
                 .addUsage(kor::Buffer::Usage::eTransferDst)
                 .addUsage(kor::Buffer::Usage::eTransferSrc)
@@ -209,7 +209,7 @@ namespace kmdl
         inline kor::Resource<kor::Buffer> uploadIndexBuffer(const std::vector<glm::u32>& indices)
         {
             return kor::Buffer::Builder<glm::u32>()
-                .setDataView(std::span(indices))
+                .setDataView(indices)
                 .addUsage(kor::Buffer::Usage::eIndex)
                 .addUsage(kor::Buffer::Usage::eTransferDst)
                 .addUsage(kor::Buffer::Usage::eTransferSrc)

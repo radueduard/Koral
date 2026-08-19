@@ -73,8 +73,8 @@ namespace kor
             return fail(ErrorCode::eShaderStageMismatch, "The shader provided to a compute pipeline must be a compute shader.");
 
         const std::array shaders = { *_shader };
-        if (!buildLayouts(shaders))
-            return fail(ErrorCode::eDescriptorConflict, "Descriptor declarations conflict in the compute pipeline.");
+        if (auto merged = buildLayouts(shaders); !merged)
+            return std::unexpected(merged.error());
         return {};
     }
 

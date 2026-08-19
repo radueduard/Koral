@@ -106,7 +106,7 @@ namespace kor::ogl
             glDeleteQueries(static_cast<GLsizei>(_timerQueries.size()), _timerQueries.data());
     }
 
-    kor::CommandBuffer& CommandBuffer::Begin()
+    kor::CommandBuffer& CommandBuffer::doBegin()
     {
         if (_filled) throw std::runtime_error("CommandBuffer has already been recorded! You must reset it first!");
         resetErrors();
@@ -119,7 +119,7 @@ namespace kor::ogl
         return *this;
     }
 
-    void CommandBuffer::End()
+    void CommandBuffer::doEnd()
     {
         if (!_recording) throw std::runtime_error("CommandBuffer is not currently recording!");
 
@@ -132,7 +132,7 @@ namespace kor::ogl
         submitTimers();
     }
 
-    kor::CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, glm::vec4)
+    kor::CommandBuffer& CommandBuffer::doBeginDebugLabel(const std::string& label, glm::vec4)
     {
         CheckRecording();
         enqueue([label] () {
@@ -141,7 +141,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::EndDebugLabel()
+    kor::CommandBuffer& CommandBuffer::doEndDebugLabel()
     {
         CheckRecording();
         enqueue([] () {
@@ -150,7 +150,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, glm::vec4)
+    kor::CommandBuffer& CommandBuffer::doInsertDebugLabel(const std::string& label, glm::vec4)
     {
         CheckRecording();
         enqueue([label] () {
@@ -160,81 +160,84 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
-        CheckRecording();
-        enqueue([this, renderParameters] () {
-            if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Another rendering operation is still in progress!");
-            kor::CommandBuffer::BeginRendering(renderParameters);
-            const auto framebuffer = _state.boundFramebuffer.value();
-            const auto& oglFramebuffer = dynamic_cast<const ogl::Framebuffer&>(*framebuffer);
-            framebuffer->Bind();
-            resetStateForClear();
-
-            if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
-                const auto& clearColor = oglFramebuffer.getClearColor(0);
-                const glm::vec4 clearVec4 = std::visit([](auto&& v) -> glm::vec4 {
-                    using T = std::decay_t<decltype(v)>;
-                    if constexpr (std::is_same_v<T, glm::vec4>) return v;
-                    else if constexpr (std::is_same_v<T, glm::vec3>) return glm::vec4(v, 0.f);
-                    else if constexpr (std::is_same_v<T, glm::vec2>) return glm::vec4(v, 0.f, 0.f);
-                    else if constexpr (std::is_same_v<T, float>) return glm::vec4(v, 0.f, 0.f, 0.f);
-                    else return glm::vec4(0.f, 0.f, 0.f, 1.f);
-                }, clearColor);
-                glClearNamedFramebufferfv(*oglFramebuffer, GL_COLOR, 0, glm::value_ptr(clearVec4));
-            }
-            glCheckError();
-            if (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear)
-                glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
-            glCheckError();
-        });
-        return *this;
-    }
-
-    kor::CommandBuffer& CommandBuffer::doBeginRendering(kor::ResourceRef<const kor::Framebuffer> _framebuffer, RenderParameters renderParameters)
+    kor::CommandBuffer& CommandBuffer::doBeginRendering(const RenderInfo& renderInfo)
     {
         CheckRecording();
-        enqueue([_framebuffer, this, renderParameters] ()
+        enqueue([renderInfo, this] ()
         {
             if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Another rendering operation is still in progress!");
-            stateBeginRendering(_framebuffer);
-            const auto framebuffer = _state.boundFramebuffer.value();
+            const auto framebuffer = renderInfo.getFramebuffer();
+            stateBeginRendering(framebuffer);
             const auto& oglFramebuffer = dynamic_cast<const ogl::Framebuffer&>(*framebuffer);
             framebuffer->Bind();
             resetStateForClear();
 
-            int i = 0;
-            for (const auto& attachment : _state.boundFramebuffer.value()->getColorAttachments())
+            const bool clearsColor = renderInfo.getColorLoadOperation() == LoadOperation::eClear;
+            const bool clearsDepthStencil = renderInfo.getDepthLoadOperation() == LoadOperation::eClear
+                                         || renderInfo.getStencilLoadOperation() == LoadOperation::eClear;
+
+            // The default framebuffer is FBO 0, whose buffers belong to the window: it carries no
+            // attachment objects, so there is nothing to ask for a format and nothing to walk. Its
+            // colour buffer is always normalised and its depth/stencil always present, which is
+            // what the two constants below stand in for.
+            if (framebuffer->IsDefault()) {
+                if (clearsColor) {
+                    clearColorBuffer(*oglFramebuffer, 0, kor::Image::Format::eRGBA8_UNORM,
+                                     renderInfo.getClearColor(0));
+                    glCheckError();
+                }
+                if (clearsDepthStencil) {
+                    glClearNamedFramebufferfi(*oglFramebuffer, GL_DEPTH_STENCIL, 0,
+                                              renderInfo.getClearDepth(), renderInfo.getClearStencil());
+                    glCheckError();
+                }
+                return;
+            }
+
+            glm::u32 i = 0;
+            for (const auto& attachment : framebuffer->getColorAttachments())
             {
-                if (renderParameters.colorLoadOperation == LoadOperation::eClear) {
+                if (clearsColor) {
                     // Clear with the function matching the attachment's data type — an
                     // integer attachment (e.g. the r32ui visibility buffer) must not be
                     // cleared as float or its sentinel never gets written.
                     const auto format = attachment.get().getImage()->getFormat();
-                    clearColorBuffer(*oglFramebuffer, i, format, oglFramebuffer.getClearColor(i));
+                    clearColorBuffer(*oglFramebuffer, static_cast<GLint>(i), format, renderInfo.getClearColor(i));
                 }
                 i++;
             }
-            if (framebuffer->hasDepthStencilAttachment() && (renderParameters.depthLoadOperation == LoadOperation::eClear || renderParameters.stencilLoadOperation == LoadOperation::eClear))
+            if (framebuffer->hasDepthStencilAttachment() && clearsDepthStencil)
             {
-                glClearNamedFramebufferfi(*oglFramebuffer,  GL_DEPTH_STENCIL, 0, oglFramebuffer.getClearDepth(), oglFramebuffer.getClearStencil());
+                glClearNamedFramebufferfi(*oglFramebuffer, GL_DEPTH_STENCIL, 0,
+                                          renderInfo.getClearDepth(), renderInfo.getClearStencil());
                 glCheckError();
             }
         });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::EndRendering()
+    kor::CommandBuffer& CommandBuffer::doEndRendering()
     {
         CheckRecording();
-        enqueue([this] ()
+        // Through the base directly rather than the local enqueue(), which records everything as
+        // PassEdge::eNone: the barrier resolver closes a pass on the eCloses edge and nothing else
+        // emits one — the core's EndRendering only clears its own record-time state. Left as eNone,
+        // openPassAt stays set for the rest of the buffer, and every later use of an attachment the
+        // pass wrote — a Blit of the colour target, say — is reported as a feedback loop and takes
+        // the frame's submit down with it. @see CommandBuffer::resolveBarriers
+        kor::CommandBuffer::enqueue("EndRendering", std::source_location::current(), {},
+                                    PassEdge::eCloses, [this] ()
         {
-            kor::CommandBuffer::EndRendering();
+            // Again at replay: the base cleared the *record-time* state when EndRendering was
+            // called, but the replay walk keeps its own idea of what is bound, and the next pass's
+            // BeginRendering refuses to open while this one still looks open.
+            stateEndRendering();
 
             // Hand the binding back to the window.
             //
             // GL has no notion of "outside a render pass": whatever framebuffer was last bound
-            // stays bound, and anything drawn afterwards lands in it. The base call above only
-            // clears our *state*, so without this the offscreen target the pass just finished
+            // stays bound, and anything drawn afterwards lands in it. Clearing the state only
+            // clears our bookkeeping, so without this the offscreen target the pass just finished
             // with is still the draw buffer — and the GUI, which is recorded as a plain Run()
             // rather than inside a pass of its own (@see ogl::GUI::Render), drew the entire
             // editor into the scene's texture. The window's back buffer was never touched, so it
@@ -411,7 +414,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::Dispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::doDispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, const std::source_location where)
     {
         CheckRecording();
         enqueue([this, groupCountX, groupCountY, groupCountZ] () {
@@ -528,18 +531,13 @@ namespace kor::ogl
         glCheckError();
     }
 
-    kor::CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::doDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, const std::source_location where)
     {
         CheckRecording();
-        enqueue([this, vertexCount, instanceCount, firstVertex, firstInstance] () mutable
+        enqueue([this, vertexCount, instanceCount, firstVertex, firstInstance] ()
         {
             if (!_state.boundGraphicsPipeline.has_value())
                 throw std::runtime_error("You can't draw without a graphics pipeline!");
-            if (vertexCount == UINT64_MAX) {
-                if (!_state.boundMesh.has_value())
-                    throw std::runtime_error("Draw called with default vertex count but no mesh is bound!");
-                vertexCount = _state.boundMesh.value()->getVertexCount();
-            }
             applyDefaultViewportScissor();
             const auto& oglPipeline = dynamic_cast<const GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
             const auto mode = oglPipeline.getMode();
@@ -549,9 +547,9 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, const std::source_location where) {
+    kor::CommandBuffer & CommandBuffer::doDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, const std::source_location where) {
         CheckRecording();
-        enqueue([this, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance] () mutable {
+        enqueue([this, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance] () {
             if (!_state.boundGraphicsPipeline.has_value())
                 throw std::runtime_error("You can't draw without a graphics pipeline!");
             if (!_state.boundMesh.has_value())
@@ -561,8 +559,6 @@ namespace kor::ogl
             const auto mode = oglPipeline.getMode();
             const auto mesh = _state.boundMesh.value();
             const auto indexType = mesh->getIndexType().value();
-            if (indexCount == UINT64_MAX)
-                indexCount = mesh->getIndexCount().value();
             // firstIndex is a texel offset into the index buffer; convert to a byte offset.
             const auto indexSize = indexType == ChannelType::eUShort ? 2 : 4;
             const auto byteOffset = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(firstIndex) * indexSize);
@@ -579,7 +575,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::doSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         CheckRecording();
         enqueue([this, x, y, width, height] ()
@@ -597,7 +593,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::doSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         CheckRecording();
         enqueue([this, x, y, width, height] ()
@@ -615,14 +611,14 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetLineWidth(const float lineWidth)
+    kor::CommandBuffer& CommandBuffer::doSetLineWidth(const float lineWidth)
     {
         CheckRecording();
         enqueue([lineWidth] { glLineWidth(lineWidth); });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthBias(const float constantFactor, float, const float slopeFactor)
+    kor::CommandBuffer& CommandBuffer::doSetDepthBias(const float constantFactor, float, const float slopeFactor)
     {
         // GL has no depth-bias clamp without the polygon-offset-clamp extension, so the
         // clamp argument is dropped here to match GraphicsPipeline::Bind.
@@ -631,7 +627,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetBlendConstants(const glm::vec4 constants)
+    kor::CommandBuffer& CommandBuffer::doSetBlendConstants(const glm::vec4 constants)
     {
         CheckRecording();
         enqueue([constants] { glBlendColor(constants.r, constants.g, constants.b, constants.a); });
@@ -662,7 +658,7 @@ namespace kor::ogl
         glCheckError();
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
+    kor::CommandBuffer& CommandBuffer::doSetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
     {
         CheckRecording();
         enqueue([this, face, compareMask] {
@@ -673,7 +669,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
+    kor::CommandBuffer& CommandBuffer::doSetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
     {
         CheckRecording();
         enqueue([face, writeMask] {
@@ -683,7 +679,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const glm::u32 reference)
+    kor::CommandBuffer& CommandBuffer::doSetStencilReference(const StencilFace face, const glm::u32 reference)
     {
         CheckRecording();
         enqueue([this, face, reference] {
@@ -694,7 +690,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetStencilTestEnable(const bool enable)
     {
         CheckRecording();
         enqueue([enable] {
@@ -704,7 +700,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::doSetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
     {
         CheckRecording();
         enqueue([this, face, failOp, passOp, depthFailOp, compareOp] {
@@ -717,7 +713,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetCullMode(const Flags<CullMode> cullMode)
+    kor::CommandBuffer& CommandBuffer::doSetCullMode(const Flags<CullMode> cullMode)
     {
         CheckRecording();
         enqueue([cullMode]
@@ -734,49 +730,49 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetFrontFace(const FrontFace frontFace)
+    kor::CommandBuffer& CommandBuffer::doSetFrontFace(const FrontFace frontFace)
     {
         CheckRecording();
         enqueue([frontFace] { glFrontFace(frontFace == FrontFace::eCounterClockwise ? GL_CCW : GL_CW); });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetDepthTestEnable(const bool enable)
     {
         CheckRecording();
         enqueue([enable] { if (enable) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST); });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthWriteEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetDepthWriteEnable(const bool enable)
     {
         CheckRecording();
         enqueue([enable] { glDepthMask(enable ? GL_TRUE : GL_FALSE); });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthCompareOp(const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::doSetDepthCompareOp(const CompareOp compareOp)
     {
         CheckRecording();
         enqueue([compareOp] { glDepthFunc(toGLOperator(compareOp)); });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetDepthBiasEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetDepthBiasEnable(const bool enable)
     {
         CheckRecording();
         enqueue([enable] { if (enable) glEnable(GL_POLYGON_OFFSET_FILL); else glDisable(GL_POLYGON_OFFSET_FILL); });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetRasterizerDiscardEnable(const bool enable)
     {
         CheckRecording();
         enqueue([enable] { if (enable) glEnable(GL_RASTERIZER_DISCARD); else glDisable(GL_RASTERIZER_DISCARD); });
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::doSetPrimitiveRestartEnable(const bool enable)
     {
         CheckRecording();
         enqueue([enable] { if (enable) glEnable(GL_PRIMITIVE_RESTART); else glDisable(GL_PRIMITIVE_RESTART); });
@@ -1036,7 +1032,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::Run(const std::function<void(kor::CommandBuffer&)>& command)
+    kor::CommandBuffer& CommandBuffer::doRun(const std::function<void(kor::CommandBuffer&)>& command)
     {
         CheckRecording();
         enqueue([command, this] ()
@@ -1219,7 +1215,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::VoidResult CommandBuffer::Submit()
+    kor::VoidResult CommandBuffer::doSubmit()
     {
         if (!_filled)
             return std::unexpected(Error{ .code = ErrorCode::eInvalidArgument, .message = "Cannot submit a command buffer that has not been recorded yet." });
@@ -1233,7 +1229,7 @@ namespace kor::ogl
         return result();
     }
 
-    void CommandBuffer::Reset()
+    void CommandBuffer::doReset()
     {
         _filled = false;
         _submitted = false;
@@ -1270,12 +1266,12 @@ namespace kor::ogl
         return empty;
     }
 
-    void CommandBuffer::WaitForFence() const
+    void CommandBuffer::doWaitForFence() const
     {
         glFinish();
     }
 
-    void CommandBuffer::writeTimerTimestamp(const glm::u32 queryIndex)
+    void CommandBuffer::doWriteTimerTimestamp(const glm::u32 queryIndex)
     {
         // Runs at replay, on the GL thread, so the objects can be created here on demand.
         if (queryIndex >= _timerQueries.size()) {
@@ -1291,7 +1287,7 @@ namespace kor::ogl
         glCheckError();
     }
 
-    bool CommandBuffer::readTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
+    bool CommandBuffer::doReadTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
     {
         const glm::u32 queryCount = scopeCount * 2;
         if (scopeCount == 0 || queryCount > _timerQueries.size()) return false;
@@ -1318,7 +1314,7 @@ namespace kor::ogl
         return true;
     }
 
-    kor::CommandBuffer & CommandBuffer::PushConstants(const void *data, glm::u32 size, glm::u32 offset) {
+    kor::CommandBuffer & CommandBuffer::doPushConstants(const void *data, glm::u32 size, glm::u32 offset) {
         CheckRecording();
         // The caller's `data` is transient, so snapshot it now and upload at replay
         // time. Push constants are emulated as a std140 UBO the pipeline owns (see

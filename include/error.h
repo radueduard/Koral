@@ -56,6 +56,7 @@ namespace kor
         eNoGraphicsPipelineBound,    ///< A graphics command was recorded with no graphics pipeline bound.
         eNoComputePipelineBound,     ///< A compute command was recorded with no compute pipeline bound.
         eNoRayTracingPipelineBound,  ///< A ray-tracing command was recorded with no ray-tracing pipeline bound.
+        eNoPipelineBound,            ///< A command needing any pipeline was recorded with none bound.
         eNoMeshBound,                ///< An indexed/mesh draw was recorded with no mesh bound.
         eMeshHasNoIndexBuffer,       ///< An indexed draw was recorded for a mesh without an index buffer.
         eCopySizeExceedsBuffer,      ///< A copy/clear/fill range exceeds the target buffer size.
@@ -70,6 +71,7 @@ namespace kor
         eDescriptorConflict,   ///< Descriptor declarations conflict across merged shader stages.
         eShaderCompileFailed,  ///< Shader compilation/linking failed.
         eVertexLayoutMismatch, ///< A vertex shader asks for a semantic the vertex layout does not carry.
+        ePushConstantMismatch, ///< A push constant was named that the pipeline does not declare, or with the wrong size, or two stages declare one name differently.
 
         // --- configuration ---
         eConfigInvalid,        ///< A koral.json config file is malformed or has a key of the wrong type.

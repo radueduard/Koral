@@ -143,6 +143,46 @@ namespace kor
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
+    RenderInfo::RenderInfo() : RenderInfo(Context::DefaultFramebuffer()) {}
+
+    RenderInfo::RenderInfo(const kor::ResourceRef<const kor::Framebuffer>& framebuffer) : framebuffer(framebuffer)
+    {
+        // Sized here so the common case — override one attachment, leave the rest — needs no
+        // resizing later. A framebuffer that failed to build has nothing to ask; BeginRendering
+        // rejects it by name, and this must not throw before it gets the chance.
+        if (framebuffer.valid())
+            clearColors.resize(framebuffer->getColorAttachmentCount(), std::nullopt);
+    }
+
+    RenderInfo::RenderInfo(const kor::ResourceRef<kor::Framebuffer>& framebuffer)
+        : RenderInfo(ResourceRef<const Framebuffer>(framebuffer)) {}
+
+    RenderInfo::RenderInfo(const kor::Resource<kor::Framebuffer>& framebuffer)
+        : RenderInfo(ResourceRef<const Framebuffer>(framebuffer)) {}
+
+    const ClearColor& RenderInfo::getClearColor(const glm::u32 index) const
+    {
+        // Opaque black, for an attachment that neither the pass nor the framebuffer describes.
+        // Unreachable through BeginRendering, which resolves against the framebuffer first.
+        static const ClearColor black = glm::vec4(0.f, 0.f, 0.f, 1.f);
+        if (index >= clearColors.size() || !clearColors[index].has_value()) return black;
+        return *clearColors[index];
+    }
+
+    void RenderInfo::resolveClearValues(const kor::Framebuffer& framebuffer)
+    {
+        const auto declared = framebuffer.getClearValues().clearColor.size();
+        if (clearColors.size() < declared) clearColors.resize(declared, std::nullopt);
+
+        for (std::size_t i = 0; i < clearColors.size(); ++i) {
+            if (clearColors[i].has_value()) continue;
+            if (i < declared) clearColors[i] = framebuffer.getClearColor(static_cast<glm::u32>(i));
+        }
+
+        if (!clearDepth.has_value()) clearDepth = framebuffer.getClearDepth();
+        if (!clearStencil.has_value()) clearStencil = framebuffer.getClearStencil();
+    }
+
 
     // ---- Deferred recording ---------------------------------------------------------------
     //
@@ -191,6 +231,108 @@ namespace kor
         if (_state.boundRayTracingPipeline.has_value() && _state.boundRayTracingPipeline->alive())
             return _state.boundRayTracingPipeline.value()->usesDeviceAddresses();
         return false;
+    }
+
+    const Pipeline* CommandBuffer::boundPipeline() const
+    {
+        // Only one of the three can be bound at a time; the state helpers clear the others.
+        if (_state.boundComputePipeline.has_value() && _state.boundComputePipeline->valid())
+            return _state.boundComputePipeline.value().get();
+        if (_state.boundGraphicsPipeline.has_value() && _state.boundGraphicsPipeline->valid())
+            return _state.boundGraphicsPipeline.value().get();
+        if (_state.boundRayTracingPipeline.has_value() && _state.boundRayTracingPipeline->valid())
+            return _state.boundRayTracingPipeline.value().get();
+        return nullptr;
+    }
+
+    namespace {
+        // "float3", "float4x4", "float3[4]" — how a shape reads in a mismatch report.
+        std::string describeShape(const ValueScalar scalar, const glm::u8 rows, const glm::u8 columns,
+                                  const glm::u32 count)
+        {
+            static constexpr std::string_view names[] { "float", "int", "uint", "bool", "double", "struct" };
+            const auto index = static_cast<std::size_t>(scalar);
+            std::string text(index < std::size(names) ? names[index] : "unknown");
+
+            if (columns > 1)   text += std::format("{}x{}", columns, rows);
+            else if (rows > 1) text += std::to_string(rows);
+            if (count > 1)     text += std::format("[{}]", count);
+            return text;
+        }
+    }
+
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const void* data, const glm::u32 size,
+                                               const ValueShape shape, const std::source_location where)
+    {
+        if (_failed) return *this;
+
+        const auto* pipeline = boundPipeline();
+        if (pipeline == nullptr)
+            return record(ErrorCode::eNoPipelineBound,
+                std::format("Cannot push the constant '{}': no pipeline is bound to look it up on.", name));
+
+        const auto* member = pipeline->findPushConstant(name);
+        if (member == nullptr) {
+            // Naming what there is turns "no such constant" into a fix: the usual cause is a
+            // rename on one side of the pair, or a field addressed as a whole when the shader
+            // nests it (or the other way round).
+            std::string available;
+            for (const auto& declared : pipeline->getPushConstants() | std::views::keys) {
+                if (!available.empty()) available += ", ";
+                available += declared;
+            }
+            if (available.empty()) available = "none at all";
+
+            return record(ErrorCode::ePushConstantMismatch,
+                std::format("The bound pipeline declares no push constant called '{}'. It declares: {}.",
+                            name, available));
+        }
+
+        // A shape the engine cannot see inside — one of the caller's own structs, or the shader's
+        // own aggregate. Nothing can be laid out for it, so it goes in as it stands and the size
+        // has to match exactly: a longer write would run into whatever the shader put next.
+        if (!shape.known || member->aggregate) {
+            if (member->size != size)
+                return record(ErrorCode::ePushConstantMismatch,
+                    std::format("Push constant '{}' is {} bytes in the shader, but {} were given. "
+                                "A struct is copied as it stands, so the two layouts have to agree — "
+                                "or write its fields one at a time, as '{}.field'.",
+                                name, member->size, size, name));
+            return PushConstants(data, size, member->offset);
+        }
+
+        const auto declared = ValueShape{ static_cast<ValueScalar>(member->scalar), member->rows,
+                                          member->columns, member->count, true };
+        if (!declared.sameAs(shape))
+            return record(ErrorCode::ePushConstantMismatch,
+                std::format("Push constant '{}' is declared as {} but a {} was given.",
+                            name, describeShape(declared.scalar, declared.rows, declared.columns, declared.count),
+                            describeShape(shape.scalar, shape.rows, shape.columns, shape.count)));
+
+        // Same shape, possibly different padding: the shader spaces array elements and matrix
+        // columns however its own rules say, and C++ packs them tight. Copying the value straight
+        // over is what puts two thirds of a mat3 in the right place and the rest anywhere; so it is
+        // reassembled here, one column at a time, into the strides reflection reported.
+        const glm::u32 scalarSize = shape.scalarSize();
+        const glm::u32 tightColumn = scalarSize * shape.rows;
+        const glm::u32 tightElement = tightColumn * shape.columns;
+        const glm::u32 columnStride = member->matrixStride > 0 ? member->matrixStride : tightColumn;
+        const glm::u32 elementStride = member->arrayStride > 0 ? member->arrayStride : tightElement;
+
+        if (elementStride == tightElement && columnStride == tightColumn)
+            return PushConstants(data, size, member->offset);   // laid out alike; nothing to do
+
+        std::vector<std::byte> laidOut(member->size, std::byte{});
+        const auto* source = static_cast<const std::byte*>(data);
+        for (glm::u32 element = 0; element < shape.count; ++element) {
+            for (glm::u32 column = 0; column < shape.columns; ++column) {
+                const glm::u32 to = element * elementStride + column * columnStride;
+                const glm::u32 from = element * tightElement + column * tightColumn;
+                if (to + tightColumn > laidOut.size() || from + tightColumn > size) break;
+                std::memcpy(laidOut.data() + to, source + from, tightColumn);
+            }
+        }
+        return PushConstants(laidOut.data(), static_cast<glm::u32>(laidOut.size()), member->offset);
     }
 
     std::vector<CommandBuffer::ResourceUse> CommandBuffer::usesForBoundResources(const bool includeMesh) const
@@ -590,16 +732,6 @@ namespace kor
         return std::unexpected(_errors.front());
     }
 
-    CommandBuffer & CommandBuffer::BeginRendering(RenderParameters renderParameters) {
-        _state.boundFramebuffer = Context::Window().getFramebuffer();
-        _state.boundComputePipeline = std::nullopt;
-        _state.boundGraphicsPipeline = std::nullopt;
-        _state.boundRayTracingPipeline = std::nullopt;
-        _state.viewportSet = false;
-        _state.scissorSet = false;
-        return *this;
-    }
-
     void CommandBuffer::stateBeginRendering(const kor::ResourceRef<const Framebuffer>& framebuffer)
     {
         _state.boundFramebuffer = framebuffer;
@@ -610,10 +742,11 @@ namespace kor
         _state.scissorSet = false;
     }
 
-    CommandBuffer& CommandBuffer::BeginRendering(kor::ResourceRef<const Framebuffer> framebuffer, RenderParameters renderParameters,
-                                                 const std::source_location where)
+    CommandBuffer& CommandBuffer::BeginRendering(const RenderInfo& renderInfo, const std::source_location where)
     {
         if (_failed) return *this;
+
+        const auto framebuffer = renderInfo.getFramebuffer();
         if (reject(framebuffer, "framebuffer")) return *this;
         stateBeginRendering(framebuffer);
 
@@ -648,17 +781,27 @@ namespace kor
         if (framebuffer->hasDepthAttachment())   declareDepthStencil(framebuffer->getDepthAttachment());
         if (framebuffer->hasStencilAttachment()) declareDepthStencil(framebuffer->getStencilAttachment());
 
+        // Whatever this pass did not say is taken from the framebuffer *now*, while it is in hand,
+        // and travels with the record. @see RenderInfo::resolveClearValues
+        RenderInfo resolved = renderInfo;
+        resolved.resolveClearValues(*framebuffer);
+
         return enqueue("BeginRendering", where, std::move(uses), PassEdge::eOpens,
-            [this, framebuffer, renderParameters] { doBeginRendering(framebuffer, renderParameters); });
+            [this, resolved = std::move(resolved)] { doBeginRendering(resolved); });
     }
 
-    CommandBuffer& CommandBuffer::EndRendering()
+    void CommandBuffer::stateEndRendering()
     {
         _state.boundFramebuffer = std::nullopt;
         _state.boundComputePipeline = std::nullopt;
         _state.boundGraphicsPipeline = std::nullopt;
         _state.boundRayTracingPipeline = std::nullopt;
-        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::EndRendering()
+    {
+        stateEndRendering();
+        return doEndRendering();
     }
 
     CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
@@ -666,7 +809,7 @@ namespace kor
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the viewport without a graphics pipeline bound.");
         _state.viewportSet = true;
-        return *this;
+        return doSetViewport(x, y, width, height);
     }
 
     CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
@@ -674,66 +817,68 @@ namespace kor
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the scissor without a graphics pipeline bound.");
         _state.scissorSet = true;
-        return *this;
+        return doSetScissor(x, y, width, height);
     }
 
     // ---- Dynamic state --------------------------------------------------
-    // The base implementations only validate and record intent (which state the
-    // caller has established); backends override to emit the GPU command and then
-    // chain up to these to mark the tracking bit.
+    // One shape for all of them: refuse the call without a graphics pipeline bound, mark the
+    // tracking bit that stops applyDynamicDefaults stamping the pipeline's own value over this
+    // one, then hand the emit to the backend. Backends implement only the do* half, so neither
+    // the guard nor the bit can be forgotten by one of them — which is exactly what had happened
+    // to OpenGL, whose setters chained up to none of this.
 #define KORAL_DYNAMIC_STATE_SETTER_GUARD(bit, name)                                            \
         if (!_state.boundGraphicsPipeline.has_value())                                       \
             return record(ErrorCode::eNoGraphicsPipelineBound,                               \
                 "Cannot set " name " without a graphics pipeline bound.");                   \
         _state.dynamicStateSet |= DynamicState::bit;
 
-    CommandBuffer& CommandBuffer::SetLineWidth(float)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eLineWidth, "line width") return *this; }
+    CommandBuffer& CommandBuffer::SetLineWidth(const float lineWidth)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eLineWidth, "line width") return doSetLineWidth(lineWidth); }
 
-    CommandBuffer& CommandBuffer::SetDepthBias(float, float, float)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return *this; }
+    CommandBuffer& CommandBuffer::SetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return doSetDepthBias(constantFactor, clamp, slopeFactor); }
 
-    CommandBuffer& CommandBuffer::SetBlendConstants(glm::vec4)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return *this; }
+    CommandBuffer& CommandBuffer::SetBlendConstants(const glm::vec4 constants)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return doSetBlendConstants(constants); }
 
-    CommandBuffer& CommandBuffer::SetStencilCompareMask(StencilFace, glm::u32)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return *this; }
+    CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return doSetStencilCompareMask(face, compareMask); }
 
-    CommandBuffer& CommandBuffer::SetStencilWriteMask(StencilFace, glm::u32)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return *this; }
+    CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return doSetStencilWriteMask(face, writeMask); }
 
-    CommandBuffer& CommandBuffer::SetStencilReference(StencilFace, glm::u32)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return *this; }
+    CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const glm::u32 reference)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return doSetStencilReference(face, reference); }
 
-    CommandBuffer& CommandBuffer::SetCullMode(Flags<CullMode>)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eCullMode, "cull mode") return *this; }
+    CommandBuffer& CommandBuffer::SetCullMode(const Flags<CullMode> cullMode)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eCullMode, "cull mode") return doSetCullMode(cullMode); }
 
-    CommandBuffer& CommandBuffer::SetFrontFace(FrontFace)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eFrontFace, "front face") return *this; }
+    CommandBuffer& CommandBuffer::SetFrontFace(const FrontFace frontFace)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eFrontFace, "front face") return doSetFrontFace(frontFace); }
 
-    CommandBuffer& CommandBuffer::SetDepthTestEnable(bool)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthTestEnable, "depth test enable") return *this; }
+    CommandBuffer& CommandBuffer::SetDepthTestEnable(const bool enable)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthTestEnable, "depth test enable") return doSetDepthTestEnable(enable); }
 
-    CommandBuffer& CommandBuffer::SetDepthWriteEnable(bool)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthWriteEnable, "depth write enable") return *this; }
+    CommandBuffer& CommandBuffer::SetDepthWriteEnable(const bool enable)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthWriteEnable, "depth write enable") return doSetDepthWriteEnable(enable); }
 
-    CommandBuffer& CommandBuffer::SetDepthCompareOp(CompareOp)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthCompareOp, "depth compare op") return *this; }
+    CommandBuffer& CommandBuffer::SetDepthCompareOp(const CompareOp compareOp)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthCompareOp, "depth compare op") return doSetDepthCompareOp(compareOp); }
 
-    CommandBuffer& CommandBuffer::SetStencilTestEnable(bool)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilTestEnable, "stencil test enable") return *this; }
+    CommandBuffer& CommandBuffer::SetStencilTestEnable(const bool enable)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilTestEnable, "stencil test enable") return doSetStencilTestEnable(enable); }
 
-    CommandBuffer& CommandBuffer::SetStencilOp(StencilFace, StencilOp, StencilOp, StencilOp, CompareOp)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilOp, "stencil op") return *this; }
+    CommandBuffer& CommandBuffer::SetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilOp, "stencil op") return doSetStencilOp(face, failOp, passOp, depthFailOp, compareOp); }
 
-    CommandBuffer& CommandBuffer::SetDepthBiasEnable(bool)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBiasEnable, "depth bias enable") return *this; }
+    CommandBuffer& CommandBuffer::SetDepthBiasEnable(const bool enable)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBiasEnable, "depth bias enable") return doSetDepthBiasEnable(enable); }
 
-    CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(bool)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eRasterizerDiscardEnable, "rasterizer discard enable") return *this; }
+    CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(const bool enable)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eRasterizerDiscardEnable, "rasterizer discard enable") return doSetRasterizerDiscardEnable(enable); }
 
-    CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(bool)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(ePrimitiveRestartEnable, "primitive restart enable") return *this; }
+    CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(const bool enable)
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(ePrimitiveRestartEnable, "primitive restart enable") return doSetPrimitiveRestartEnable(enable); }
 
 #undef KORAL_DYNAMIC_STATE_SETTER_GUARD
 
@@ -855,7 +1000,15 @@ namespace kor
             [this, pipeline] { doBindRayTracingPipeline(pipeline); });
     }
 
-    CommandBuffer& CommandBuffer::TraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, const std::source_location where)
+    CommandBuffer& CommandBuffer::TraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth, const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (!_state.boundRayTracingPipeline.has_value())
+            return record(ErrorCode::eNoRayTracingPipelineBound, "Cannot trace rays without a ray-tracing pipeline bound.");
+        return doTraceRays(width, height, depth, where);
+    }
+
+    CommandBuffer& CommandBuffer::doTraceRays(glm::u32, glm::u32, glm::u32, std::source_location)
     {
         return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
     }
@@ -865,10 +1018,10 @@ namespace kor
         return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
     }
 
-    // Default no-ops: a backend without debug-marker support simply ignores labels.
-    CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string&, glm::vec4) { return *this; }
-    CommandBuffer& CommandBuffer::EndDebugLabel() { return *this; }
-    CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string&, glm::vec4) { return *this; }
+    // A backend without debug-marker support ignores these; the do* defaults are the no-ops.
+    CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const glm::vec4 color) { return doBeginDebugLabel(label, color); }
+    CommandBuffer& CommandBuffer::EndDebugLabel() { return doEndDebugLabel(); }
+    CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const glm::vec4 color) { return doInsertDebugLabel(label, color); }
 
     // ---- GPU timers ---------------------------------------------------------------------------
     //
@@ -906,7 +1059,7 @@ namespace kor
         _timerStack.push_back(scope);
 
         return enqueue("BeginTimer", where, {}, PassEdge::eNone,
-                       [this, scope] { writeTimerTimestamp(scope * 2); });
+                       [this, scope] { doWriteTimerTimestamp(scope * 2); });
     }
 
     CommandBuffer& CommandBuffer::EndTimer(const std::source_location where)
@@ -927,7 +1080,7 @@ namespace kor
         _timerStack.pop_back();
 
         return enqueue("EndTimer", where, {}, PassEdge::eNone,
-                       [this, scope] { writeTimerTimestamp(scope * 2 + 1); });
+                       [this, scope] { doWriteTimerTimestamp(scope * 2 + 1); });
     }
 
     bool CommandBuffer::collectTimers()
@@ -939,7 +1092,7 @@ namespace kor
         std::vector<double> milliseconds;
         // Not ready is not an error — the results simply stay as they were, which keeps a
         // profiler's readings steady instead of flickering to nothing.
-        if (!readTimerTimestamps(static_cast<glm::u32>(_submittedTimers.size()), milliseconds)
+        if (!doReadTimerTimestamps(static_cast<glm::u32>(_submittedTimers.size()), milliseconds)
             || milliseconds.size() != _submittedTimers.size())
             return false;
 
@@ -1060,51 +1213,123 @@ namespace kor
         return Context::Window().getExtent();
     }
 
-    CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, const std::source_location where)
+    CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
     {
+        if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
-        if (!_state.viewportSet) {
-            const auto extent = defaultViewportExtent();
-            this->SetViewport(0, 0, extent.x, extent.y);
+
+        // The defaulted vertex count means "as many as the bound mesh holds", resolved here so
+        // both backends are handed a number rather than each working the sentinel out again.
+        if (vertexCount == UINT64_MAX) {
+            if (!_state.boundMesh.has_value())
+                return record(ErrorCode::eNoMeshBound, "Cannot draw with the default vertex count: no mesh is bound to take it from.");
+            vertexCount = _state.boundMesh.value()->getVertexCount();
         }
-        if (!_state.scissorSet) {
-            const auto extent = defaultViewportExtent();
-            this->SetScissor(0, 0, extent.x, extent.y);
-        }
-        return *this;
+
+        ensureViewportAndScissor();
+        return doDraw(vertexCount, instanceCount, firstVertex, firstInstance, where);
     }
 
-    CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, const std::source_location where) {
+    CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, const glm::u32 instanceCount, const glm::u32 firstIndex, const glm::i32 vertexOffset, const glm::u32 firstInstance, const std::source_location where) {
+        if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (!_state.boundMesh.has_value())
             return record(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
         if (!_state.boundMesh.value()->hasIndexBuffer())
             return record(ErrorCode::eMeshHasNoIndexBuffer, "Cannot draw indexed: the bound mesh has no index buffer.");
-        if (!_state.viewportSet) {
-            const auto extent = defaultViewportExtent();
-            this->SetViewport(0, 0, extent.x, extent.y);
-        }
-        if (!_state.scissorSet) {
-            const auto extent = defaultViewportExtent();
-            this->SetScissor(0, 0, extent.x, extent.y);
-        }
-        return *this;
+
+        if (indexCount == UINT64_MAX)
+            indexCount = _state.boundMesh.value()->getIndexCount().value();
+
+        ensureViewportAndScissor();
+        return doDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, where);
     }
 
-    CommandBuffer & CommandBuffer::DrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, const std::source_location where) {
+    CommandBuffer & CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ, const std::source_location where) {
+        if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
             return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw mesh tasks without a graphics pipeline bound.");
+
+        ensureViewportAndScissor();
+        return doDrawMeshTasks(taskCountX, taskCountY, taskCountZ, where);
+    }
+
+    // A draw with no viewport or scissor of its own gets the whole target, which is what a
+    // full-screen pass means and what every backend needed anyway. Recorded as ordinary Set calls
+    // so the tracking bits and the emitted commands stay in step.
+    void CommandBuffer::ensureViewportAndScissor()
+    {
         if (!_state.viewportSet) {
             const auto extent = defaultViewportExtent();
-            this->SetViewport(0, 0, extent.x, extent.y);
+            SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
             const auto extent = defaultViewportExtent();
-            this->SetScissor(0, 0, extent.x, extent.y);
+            SetScissor(0, 0, extent.x, extent.y);
         }
-        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ, const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (!_state.boundComputePipeline.has_value())
+            return record(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
+        return doDispatch(groupCountX, groupCountY, groupCountZ, where);
+    }
+
+    // ---- Recording lifecycle --------------------------------------------------------------
+    //
+    // Everything both backends did identically lives here; each supplies only the API call that
+    // finishes the job. Begin clears what the previous recording left behind, End resolves the
+    // barriers now that the whole sequence is visible, and Reset drops both.
+
+    CommandBuffer& CommandBuffer::Begin()
+    {
+        resetErrors();
+        clearRecords();
+        // Before the backend resets anything the results live in: re-recording is proof the GPU is
+        // done with the last submission, so this is the earliest the timestamps can be read.
+        retireTimers();
+        return doBegin();
+    }
+
+    void CommandBuffer::End()
+    {
+        // Nothing recorded so far has reached the GPU. Work out where the barriers belong now that
+        // the whole sequence is visible; the backend then emits, or defers emitting to Submit.
+        resolveBarriers();
+        doEnd();
+    }
+
+    VoidResult CommandBuffer::Submit()
+    {
+        return doSubmit();
+    }
+
+    void CommandBuffer::Reset()
+    {
+        _state = {};
+        clearRecords();
+        doReset();
+    }
+
+    void CommandBuffer::WaitForFence() const
+    {
+        doWaitForFence();
+    }
+
+    CommandBuffer& CommandBuffer::Run(const std::function<void(CommandBuffer&)>& command)
+    {
+        if (_failed) return *this;
+        return doRun(command);
+    }
+
+    CommandBuffer& CommandBuffer::PushConstants(const void* data, const glm::u32 size, const glm::u32 offset)
+    {
+        if (_failed) return *this;
+        return doPushConstants(data, size, offset);
     }
 
 

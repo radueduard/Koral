@@ -659,5 +659,813 @@ TEST_F(GpuTest, FramebufferResizeToTheSameSizeIsANoOp) {
     EXPECT_EQ(color->getExtent(), glm::uvec3(32, 32, 1));
 }
 
+// Push constants addressed by name, declared once in a shared header and read by two stages.
+//
+// The vertex stage reads `offset` and the fragment stage reads `color`, out of one block — so the
+// pipeline's merge has to union the two stages' declarations rather than treat them as rivals, and
+// each constant has to be written at the offset the compiler chose without the CPU ever naming a
+// byte. The shifted triangle proves the vertex half landed and the colour proves the fragment half.
+TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("pushMultiStage.vert.glsl").getOrBuild("push.multi.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("pushMultiStage.frag.glsl").getOrBuild("push.multi.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    // Both constants are on the pipeline, each with the stage that reads it.
+    const auto* offsetConstant = pipeline->findPushConstant("offset");
+    const auto* colorConstant = pipeline->findPushConstant("color");
+    ASSERT_NE(offsetConstant, nullptr);
+    ASSERT_NE(colorConstant, nullptr);
+    EXPECT_EQ(offsetConstant->size, sizeof(glm::vec2));
+    EXPECT_EQ(colorConstant->size, sizeof(glm::vec4));
+    EXPECT_NE(colorConstant->offset, offsetConstant->offset) << "two constants cannot share bytes";
+    EXPECT_TRUE(offsetConstant->stages & Shader::Stage::eVertex);
+    EXPECT_TRUE(colorConstant->stages & Shader::Stage::eFragment);
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        // No offsets, no struct mirroring the block: the names are the whole contract.
+        cb.PushConstant("offset", glm::vec2{2.f, 0.f});   // shifts the triangle off to the right
+        cb.PushConstant("color", glm::vec4{0.f, 0.f, 1.f, 1.f});
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto shifted = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(shifted));
+    }, CommandBuffer::Usage::eTransfer);
+
+    // Shifted two clip units right, the triangle misses the target entirely: the vertex stage
+    // really did read its half of the block.
+    const std::vector<Pixel> offscreen = shifted->Read<Pixel>();
+    EXPECT_EQ(offscreen.front(), Pixel(0, 0, 0, 255)) << "the vertex push constant was ignored";
+
+    // Again with no shift: now the triangle covers everything, in the fragment stage's colour.
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("offset", glm::vec2{0.f, 0.f});
+        cb.PushConstant("color", glm::vec4{0.f, 0.f, 1.f, 1.f});
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    auto covered = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(covered));
+    }, CommandBuffer::Usage::eTransfer);
+
+    const std::vector<Pixel> out = covered->Read<Pixel>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        EXPECT_EQ(out[i], Pixel(0, 0, 255, 255)) << "texel " << i;
+    }
+}
+
+// A name the pipeline does not declare, or a value of the wrong size, fails the recording where it
+// was written — rather than writing the wrong bytes to whatever happens to sit at that offset.
+TEST_F(GpuTest, PushConstantByNameRejectsWhatTheShaderDoesNotDeclare) {
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("pushMultiStage.vert.glsl").getOrBuild("push.multi.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("pushMultiStage.frag.glsl").getOrBuild("push.multi.frag");
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid());
+
+    EXPECT_EQ(pipeline->findPushConstant("tint"), nullptr);
+
+    const auto unknown = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    unknown->Begin();
+    unknown->BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+    unknown->BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+    unknown->PushConstant("tint", glm::vec4{1.f});
+    unknown->EndRendering();
+    unknown->End();
+
+    ASSERT_FALSE(unknown->errors().empty());
+    EXPECT_EQ(unknown->errors().front().code, kor::ErrorCode::ePushConstantMismatch);
+    // The message has to name what there *is*, since the usual cause is a rename on one side.
+    EXPECT_NE(unknown->errors().front().message.find("color"), std::string::npos)
+        << unknown->errors().front().message;
+
+    const auto wrongSize = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    wrongSize->Begin();
+    wrongSize->BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+    wrongSize->BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+    wrongSize->PushConstant("color", glm::vec2{1.f});   // the shader declares a vec4
+    wrongSize->EndRendering();
+    wrongSize->End();
+
+    ASSERT_FALSE(wrongSize->errors().empty());
+    EXPECT_EQ(wrongSize->errors().front().code, kor::ErrorCode::ePushConstantMismatch);
+
+    // And with nothing bound to look the name up on.
+    const auto unbound = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    unbound->Begin();
+    unbound->PushConstant("color", glm::vec4{1.f});
+    unbound->End();
+    ASSERT_FALSE(unbound->errors().empty());
+    EXPECT_EQ(unbound->errors().front().code, kor::ErrorCode::eNoPipelineBound);
+}
+
+// How far the by-name lookup reaches into a block: to its top-level members and no further.
+//
+// A nested struct and an array are each *one* constant — written whole, never field by field. That
+// works because the size a member is declared with is the size that gets written: `Material` is 20
+// bytes (vec4 + float) and the next member starts at 96, so the 12 bytes of alignment padding
+// between them belong to nobody and are never touched. A C++ mirror of the struct has to be
+// exactly those 20 bytes; when the shader's layout rules pad differently from C++'s — a vec4 after
+// a float, where std430 aligns to 16 and C++ does not — the sizes disagree and the write is
+// refused rather than landing half in the next constant.
+TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("flatTriangle.vert.glsl").getOrBuild("nested.flat.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("pushNested.frag.glsl").getOrBuild("nested.push.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    // Three constants, one per top-level member, whatever each one is made of.
+    const auto* model = pipeline->findPushConstant("model");
+    const auto* material = pipeline->findPushConstant("material");
+    const auto* weights = pipeline->findPushConstant("weights");
+    ASSERT_NE(model, nullptr);
+    ASSERT_NE(material, nullptr);
+    ASSERT_NE(weights, nullptr);
+    EXPECT_EQ(model->offset, 0u);
+    EXPECT_EQ(model->size, 64u);                    // mat4
+    EXPECT_EQ(material->offset, 64u);
+    EXPECT_EQ(material->size, 20u);                 // vec4 + float, without the tail padding
+    EXPECT_EQ(weights->offset, 96u);                // ...which the next member's offset does include
+    EXPECT_EQ(weights->size, 16u);                  // float[4], the whole array
+
+    // Nesting is flattened, so the inner fields are addressable by path — which is what makes a
+    // struct whose C++ padding differs from the shader's a non-problem. The bare inner names are
+    // not: a path is rooted at the block, so nothing is ambiguous between two structs.
+    const auto* albedo = pipeline->findPushConstant("material.albedo");
+    const auto* roughness = pipeline->findPushConstant("material.roughness");
+    ASSERT_NE(albedo, nullptr);
+    ASSERT_NE(roughness, nullptr);
+    EXPECT_EQ(albedo->offset, 64u);
+    EXPECT_EQ(albedo->size, 16u);
+    EXPECT_EQ(roughness->offset, 80u);
+    EXPECT_EQ(roughness->size, 4u);
+    EXPECT_EQ(pipeline->findPushConstant("albedo"), nullptr);
+    EXPECT_EQ(pipeline->findPushConstant("roughness"), nullptr);
+
+    // Array elements likewise.
+    const auto* thirdWeight = pipeline->findPushConstant("weights[2]");
+    ASSERT_NE(thirdWeight, nullptr);
+    EXPECT_EQ(thirdWeight->offset, 104u);
+    EXPECT_EQ(thirdWeight->size, 4u);
+
+    // Written whole, at exactly the size the shader declared.
+    const std::array<float, 5> materialValue{ 0.f, 0.f, 1.f, 1.f, 1.f };   // albedo = blue, roughness = 1
+    const std::array<float, 4> weightsValue{ 0.f, 0.f, 1.f, 0.f };         // weights[2] = 1 -> alpha
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("material", materialValue);
+        cb.PushConstant("weights", weightsValue);
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eTransfer);
+
+    // Blue from the struct's albedo, opaque from the array's third element: both landed where the
+    // shader reads them.
+    EXPECT_EQ(readback->Read<Pixel>().front(), Pixel(0, 0, 255, 255));
+
+    // The obvious C++ mirror of that struct is also exactly 20 bytes — glm's vectors carry no
+    // extra alignment by default — so a nested struct is pushed as itself, not as a byte blob.
+    struct CppMaterial { glm::vec4 albedo; float roughness; };
+    static_assert(sizeof(CppMaterial) == 20, "glm gained alignment; the mirror no longer matches");
+    EXPECT_EQ(sizeof(CppMaterial), material->size);
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("material", CppMaterial{ glm::vec4{0.f, 1.f, 0.f, 1.f}, 1.f });
+        cb.PushConstant("weights", weightsValue);
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    auto asStruct = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(asStruct));
+    }, CommandBuffer::Usage::eTransfer);
+
+    // Green this time, and still opaque: the struct went in whole and left `weights` alone.
+    EXPECT_EQ(asStruct->Read<Pixel>().front(), Pixel(0, 255, 0, 255));
+
+    // The same thing written field by field, which needs no agreement between the layouts at all.
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("material.albedo", glm::vec4{1.f, 0.f, 0.f, 1.f});
+        cb.PushConstant("material.roughness", 1.f);
+        cb.PushConstant("weights[2]", 1.f);
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    auto byField = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(byField));
+    }, CommandBuffer::Usage::eTransfer);
+    EXPECT_EQ(byField->Read<Pixel>().front(), Pixel(255, 0, 0, 255));
+}
+
+// A mat3 and an array of vec3 pushed from their obvious C++ spellings, which are tightly packed
+// and 12 bytes shorter apiece than what the shader reserves. Nothing in the test says so: the
+// strides come from reflection and the value is reassembled into them.
+TEST_F(GpuTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("flatTriangle.vert.glsl").getOrBuild("aligned.flat.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("pushAligned.frag.glsl").getOrBuild("aligned.push.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert)
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    // What the shader reserves, against what C++ would have handed over.
+    const auto* basis = pipeline->findPushConstant("basis");
+    const auto* tints = pipeline->findPushConstant("tints");
+    ASSERT_NE(basis, nullptr);
+    ASSERT_NE(tints, nullptr);
+    EXPECT_EQ(basis->size, 48u) << "three columns of four floats";
+    EXPECT_EQ(basis->matrixStride, 16u);
+    EXPECT_EQ(sizeof(glm::mat3), 36u) << "which is not what glm hands over";
+    EXPECT_EQ(tints->arrayStride, 16u);
+    EXPECT_EQ(sizeof(std::array<glm::vec3, 3>), 36u);
+
+    // Columns and elements chosen so every one of them contributes a distinct, exactly
+    // representable amount: a value that landed in the wrong column cannot produce this colour.
+    glm::mat3 basisValue(0.f);
+    basisValue[0] = glm::vec3{0.2f, 0.f, 0.f};
+    basisValue[1] = glm::vec3{0.f, 0.4f, 0.f};
+    basisValue[2] = glm::vec3{0.f, 0.f, 0.6f};
+    const std::array tintsValue{ glm::vec3{0.2f, 0.f, 0.f}, glm::vec3{0.f, 0.2f, 0.f}, glm::vec3{0.f, 0.f, 0.2f} };
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.PushConstant("basis", basisValue);
+        cb.PushConstant("tints", tintsValue);
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eTransfer);
+
+    // (0.2 + 0.2, 0.4 + 0.2, 0.6 + 0.2) — every column and every element accounted for.
+    EXPECT_EQ(readback->Read<Pixel>().front(), Pixel(102, 153, 204, 255));
+
+    // A single element of the array addressed on its own, at the shader's stride.
+    const auto* second = pipeline->findPushConstant("tints[1]");
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(second->offset, tints->offset + 16u);
+    EXPECT_EQ(second->size, 16u);
+}
+
+// Two stages that place one push constant differently poison the pipeline, naming the constant.
+// Left to the driver this is silent: both stages read the same bytes, and one of them reads them
+// as something they are not.
+TEST_F(GpuTest, PipelinePoisonsWhenTwoStagesDeclareAPushConstantDifferently) {
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("pushConflict.vert.glsl").getOrBuild("push.conflict.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("pushConflict.frag.glsl").getOrBuild("push.conflict.frag");
+    ASSERT_TRUE(vert.valid());
+    ASSERT_TRUE(frag.valid());
+
+    const auto pipeline = GraphicsPipeline::Builder{}
+                              .setVertexShader(vert)
+                              .setFragmentShader(frag)
+                              .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                              .build();
+
+    ASSERT_TRUE(pipeline.poisoned()) << "the stages disagree about 'tint' and nothing said so";
+    EXPECT_EQ(pipeline.error()->code, kor::ErrorCode::ePushConstantMismatch);
+    EXPECT_NE(pipeline.error()->message.find("tint"), std::string::npos) << pipeline.error()->message;
+}
+
+// Two passes over one framebuffer in a single frame, each clearing it to a colour of its own.
+//
+// This is the case a clear value stored on the *framebuffer* cannot express, and the reason
+// RenderInfo resolves its values while the pass is recorded: OpenGL replays its records after the
+// fact, so a value read at replay time would be the last one written — green for both halves —
+// while Vulkan, which bakes it in at record time, would show red then green. The two backends have
+// to agree, and they only do because neither reads the framebuffer once the record is made.
+TEST_F(GpuTest, TwoPassesClearOneFramebufferToDifferentColors) {
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    // Built with blue, which neither pass below asks for: what lands in the image is whichever
+    // override was recorded, never the framebuffer's own.
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 1.f, 1.f})
+                           .build();
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto firstPass = rb.build();
+    auto secondPass = rb.build();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        // Pass one: red. Copied out before the second pass overwrites it, so both records are in
+        // one command buffer — replaying them in order is exactly what the GL backend does.
+        cb.BeginRendering(kor::RenderInfo(ResourceRef<const Framebuffer>(framebuffer))
+                              .setClearColor(0, glm::vec4{1.f, 0.f, 0.f, 1.f}));
+        cb.EndRendering();
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(firstPass));
+
+        // Pass two: green, same framebuffer.
+        cb.BeginRendering(kor::RenderInfo(ResourceRef<const Framebuffer>(framebuffer))
+                              .setClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
+        cb.EndRendering();
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(secondPass));
+    }, CommandBuffer::Usage::eGraphics);
+
+    const std::vector<Pixel> first = firstPass->Read<Pixel>();
+    const std::vector<Pixel> second = secondPass->Read<Pixel>();
+    ASSERT_EQ(first.size(), static_cast<std::size_t>(kW) * kH);
+    ASSERT_EQ(second.size(), static_cast<std::size_t>(kW) * kH);
+    EXPECT_EQ(first.front(), Pixel(255, 0, 0, 255)) << "the first pass cleared to its own red";
+    EXPECT_EQ(second.front(), Pixel(0, 255, 0, 255)) << "the second pass cleared to its own green";
+}
+
+// A pass that overrides nothing gets the framebuffer's own clear values, so everything written
+// before RenderInfo existed keeps working.
+TEST_F(GpuTest, APassWithoutOverridesUsesTheFramebuffersClearValues) {
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 1.f, 1.f})
+                           .build();
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));   // a framebuffer converts
+        cb.EndRendering();
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eGraphics);
+
+    const std::vector<Pixel> out = readback->Read<Pixel>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    EXPECT_EQ(out.front(), Pixel(0, 0, 255, 255));
+}
+
+// An integer attachment takes an integer clear value, which is the case a float-only override
+// would silently get wrong — the sentinel a visibility buffer is seeded with is never 0.0f.
+TEST_F(GpuTest, AnIntegerAttachmentIsClearedWithAnIntegerOverride) {
+    auto ids = Image::Builder{}
+                   .setType(Image::Type::e2D)
+                   .setFormat(Image::Format::eR32_UINT)
+                   .setExtent(glm::uvec2{kW, kH})
+                   .addUsage(Image::Usage::eColorAttachment)
+                   .addUsage(Image::Usage::eTransferSrc)
+                   .build();
+    auto idsView = ImageView::Builder(ResourceRef<const Image>(ids)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(idsView), glm::uvec4{0u})
+                           .build();
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(glm::u32))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(kor::RenderInfo(ResourceRef<const Framebuffer>(framebuffer))
+                              .setClearColor(0, glm::uvec4{0xFFFFFFFFu}));
+        cb.EndRendering();
+        cb.CopyImageToBuffer(ResourceRef<const Image>(ids), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eGraphics);
+
+    const std::vector<glm::u32> out = readback->Read<glm::u32>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    EXPECT_EQ(out.front(), 0xFFFFFFFFu);
+}
+
+// A vertex type the engine knows nothing about, described to kor::Mesh::Builder by hand. The
+// colour deliberately does not sit at offset 0: if the layout's offsets were ignored the shader
+// would read the position as a colour, and the readback below would not be flat blue.
+struct HandWrittenVertex {
+    glm::vec3 position;
+    glm::vec3 color;
+};
+
+// The base Mesh built straight from buffers and a VertexLayout — no mesh module, no vertex type
+// reflected over — and drawn through a pipeline whose vertex inputs are matched to that layout by
+// semantic. This is the whole point of the builder: geometry whose format is decided at runtime.
+TEST_F(GpuTest, MeshBuilderDrawsHandWrittenVertexFormat) {
+    const std::vector<HandWrittenVertex> vertices = {
+        { glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{0.f, 0.f, 1.f} },
+        { glm::vec3{ 3.f, -1.f, 0.f}, glm::vec3{0.f, 0.f, 1.f} },
+        { glm::vec3{-1.f,  3.f, 0.f}, glm::vec3{0.f, 0.f, 1.f} },
+    };
+    const std::vector<std::uint32_t> indices = {0, 1, 2};
+
+    auto vertexBuffer = kor::Mesh::makeBuffer(vertices, Buffer::Usage::eVertex);
+    auto indexBuffer = kor::Mesh::makeBuffer(indices, Buffer::Usage::eIndex);
+
+    auto mesh = kor::Mesh::Builder()
+        .setVertexBuffer(0, vertexBuffer)
+        .setIndexBuffer(indexBuffer)
+        .setVertexLayout(kor::VertexLayout {
+            .bindings = {
+                kor::VertexInputBindingDescription(0, sizeof(HandWrittenVertex)),
+            },
+            .attributes = {
+                kor::VertexLayout::Attribute("POSITION", "vertex", 0, offsetof(HandWrittenVertex, position), kor::ChannelType::eFloat, 3),
+                kor::VertexLayout::Attribute("COLOR", "vertex", 0, offsetof(HandWrittenVertex, color), kor::ChannelType::eFloat, 3),
+            },
+        })
+        .build();
+    ASSERT_TRUE(mesh.valid()) << (mesh.error() ? mesh.error()->history() : "");
+
+    // The counts are derived from the buffers and the layout's stride, not passed in.
+    EXPECT_EQ(mesh->getVertexCount(), vertices.size());
+    ASSERT_TRUE(mesh->hasIndexBuffer());
+    EXPECT_EQ(mesh->getIndexCount().value(), indices.size());
+    EXPECT_EQ(mesh->getIndexType().value(), kor::ChannelType::eUInt);
+    // The position a ray-tracing build would read comes from the layout, unasked.
+    ASSERT_TRUE(mesh->getPositionAttribute().has_value());
+    EXPECT_EQ(mesh->getPositionAttribute()->offset, offsetof(HandWrittenVertex, position));
+
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("vertexColor.vert.glsl").getOrBuild("meshBuilder.vertexColor.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("vertexColor.frag.glsl").getOrBuild("meshBuilder.vertexColor.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert, mesh->getVertexLayout())
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.BindMesh(ResourceRef<const kor::Mesh>(mesh));
+        cb.DrawIndexed();
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eTransfer);
+
+    const std::vector<Pixel> out = readback->Read<Pixel>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    // The triangle covers the whole target, and every vertex carries the same blue: the colour
+    // attribute was read from its own offset, at the layout's stride.
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        EXPECT_EQ(out[i], Pixel(0, 0, 255, 255)) << "texel " << i;
+    }
+}
+
+// The same geometry described without a single semantic: the layout says which location each
+// attribute is read at, and the shader annotates nothing. The attributes are listed colour-first,
+// so a result that is still correct proves the locations decided it and not the order.
+TEST_F(GpuTest, MeshBuilderDrawsALayoutDescribedByLocationAlone) {
+    const std::vector<HandWrittenVertex> vertices = {
+        { glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{1.f, 0.f, 0.f} },
+        { glm::vec3{ 3.f, -1.f, 0.f}, glm::vec3{1.f, 0.f, 0.f} },
+        { glm::vec3{-1.f,  3.f, 0.f}, glm::vec3{1.f, 0.f, 0.f} },
+    };
+    const std::vector<std::uint32_t> indices = {0, 1, 2};
+
+    auto mesh = kor::Mesh::Builder()
+        .setVertexBuffer(0, kor::Mesh::makeBuffer(vertices, Buffer::Usage::eVertex))
+        .setIndexBuffer(kor::Mesh::makeBuffer(indices, Buffer::Usage::eIndex))
+        .setVertexLayout(kor::VertexLayout {
+            .bindings = {
+                kor::VertexInputBindingDescription(0, sizeof(HandWrittenVertex)),
+            },
+            .attributes = {
+                kor::VertexLayout::Attribute::AtLocation(1, 0, offsetof(HandWrittenVertex, color), kor::ChannelType::eFloat, 3),
+                kor::VertexLayout::Attribute::AtLocation(0, 0, offsetof(HandWrittenVertex, position), kor::ChannelType::eFloat, 3),
+            },
+        })
+        .build();
+    ASSERT_TRUE(mesh.valid()) << (mesh.error() ? mesh.error()->history() : "");
+    EXPECT_EQ(mesh->getVertexCount(), vertices.size());
+
+    auto color = Image::Builder{}
+                     .setType(Image::Type::e2D)
+                     .setFormat(Image::Format::eRGBA8_UNORM)
+                     .setExtent(glm::uvec2{kW, kH})
+                     .addUsage(Image::Usage::eColorAttachment)
+                     .addUsage(Image::Usage::eTransferSrc)
+                     .build();
+    auto colorView = ImageView::Builder(ResourceRef<const Image>(color)).build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .addColorAttachment(ResourceRef<const ImageView>(colorView), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                           .build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.setPath("vertexColorLocations.vert.glsl").getOrBuild("meshBuilder.locations.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.setPath("vertexColor.frag.glsl").getOrBuild("meshBuilder.locations.frag");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+                        .setVertexShader(vert, mesh->getVertexLayout())
+                        .setFragmentShader(frag)
+                        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+                        .build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(ResourceRef<const Framebuffer>(framebuffer));
+        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.BindMesh(ResourceRef<const kor::Mesh>(mesh));
+        cb.DrawIndexed();
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics);
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .addUsage(Buffer::Usage::eTransferDst)
+      .setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(ResourceRef<const Image>(color), ResourceRef<const Buffer>(readback));
+    }, CommandBuffer::Usage::eTransfer);
+
+    const std::vector<Pixel> out = readback->Read<Pixel>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        EXPECT_EQ(out[i], Pixel(255, 0, 0, 255)) << "texel " << i;
+    }
+}
+
+// A buffer handed over as an rvalue belongs to the mesh, which is what geometry nothing else
+// refers to wants: the mesh keeps it alive on its own.
+TEST_F(GpuTest, MeshBuilderAdoptsBuffersGivenAsRvalues) {
+    const std::vector<glm::vec3> positions = {
+        glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{3.f, -1.f, 0.f}, glm::vec3{-1.f, 3.f, 0.f},
+    };
+
+    kor::Resource<kor::Mesh> mesh;
+    {
+        auto vertexBuffer = kor::Mesh::makeBuffer(positions, Buffer::Usage::eVertex);
+        mesh = kor::Mesh::Builder()
+            .setVertexBuffer(0, std::move(vertexBuffer))
+            .setVertexLayout(kor::VertexLayout {
+                .bindings = { kor::VertexInputBindingDescription(0, sizeof(glm::vec3)) },
+                .attributes = {
+                    kor::VertexLayout::Attribute("POSITION", "vertex", 0, 0, kor::ChannelType::eFloat, 3),
+                },
+            })
+            .build();
+    }   // the local Resource is gone; only the mesh's own hold on the buffer is left
+
+    ASSERT_TRUE(mesh.valid()) << (mesh.error() ? mesh.error()->history() : "");
+    EXPECT_EQ(mesh->getVertexCount(), positions.size());
+    ASSERT_FALSE(mesh->getVertexBuffers().empty());
+    EXPECT_TRUE(mesh->getVertexBuffers().front().valid()) << "the adopted buffer outlives its handle";
+    EXPECT_FALSE(mesh->hasIndexBuffer());
+}
+
+// Geometry that does not match its description is a poisoned mesh naming what is wrong, not a
+// draw that reads the wrong bytes.
+TEST_F(GpuTest, MeshBuilderPoisonsMisdescribedGeometry) {
+    const std::vector<glm::vec3> positions = {
+        glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{3.f, -1.f, 0.f}, glm::vec3{-1.f, 3.f, 0.f},
+    };
+    const std::vector<glm::vec2> uvs = { glm::vec2{0.f}, glm::vec2{1.f} };   // one vertex short
+
+    auto positionBuffer = kor::Mesh::makeBuffer(positions, Buffer::Usage::eVertex);
+    auto uvBuffer = kor::Mesh::makeBuffer(uvs, Buffer::Usage::eVertex);
+
+    const kor::VertexLayout twoBindings {
+        .bindings = {
+            kor::VertexInputBindingDescription(0, sizeof(glm::vec3)),
+            kor::VertexInputBindingDescription(1, sizeof(glm::vec2)),
+        },
+        .attributes = {
+            kor::VertexLayout::Attribute("POSITION", "vertex", 0, 0, kor::ChannelType::eFloat, 3),
+            kor::VertexLayout::Attribute("UV", "vertex", 1, 0, kor::ChannelType::eFloat, 2),
+        },
+    };
+
+    // A binding the layout declares and nothing was set for.
+    const auto missing = kor::Mesh::Builder()
+        .setVertexBuffer(0, positionBuffer)
+        .setVertexLayout(twoBindings)
+        .build();
+    EXPECT_TRUE(missing.poisoned()) << "binding 1 has no vertex buffer";
+
+    // Buffers that imply different vertex counts.
+    const auto disagreeing = kor::Mesh::Builder()
+        .setVertexBuffer(0, positionBuffer)
+        .setVertexBuffer(1, uvBuffer)
+        .setVertexLayout(twoBindings)
+        .build();
+    EXPECT_TRUE(disagreeing.poisoned()) << "3 positions against 2 UVs";
+
+    // A buffer with nothing describing it.
+    const auto undescribed = kor::Mesh::Builder()
+        .setVertexBuffer(0, positionBuffer)
+        .build();
+    EXPECT_TRUE(undescribed.poisoned()) << "no vertex layout was set";
+
+    // A buffer that was never made a vertex buffer.
+    auto plain = Buffer::Builder<glm::vec3>()
+        .setDataView(positions)
+        .setUsage(Buffer::Usage::eStorage)
+        .setType(Buffer::Type::eDynamic)    // host-visible, so the data needs no staging copy
+        .build();
+    const auto wrongUsage = kor::Mesh::Builder()
+        .setVertexBuffer(0, plain)
+        .setVertexLayout(kor::VertexLayout {
+            .bindings = { kor::VertexInputBindingDescription(0, sizeof(glm::vec3)) },
+            .attributes = {
+                kor::VertexLayout::Attribute("POSITION", "vertex", 0, 0, kor::ChannelType::eFloat, 3),
+            },
+        })
+        .build();
+    EXPECT_TRUE(wrongUsage.poisoned()) << "the buffer was not created with Usage::eVertex";
+}
+
+
+
+
+
+// Push-constant blocks are std430, and a shader that asks for anything else does not load.
+//
+// This is what makes a hand-matched C++ struct a reasonable thing to write: under std140 an array
+// of floats strides sixteen bytes instead of four, so a struct that mirrors the block would write
+// one value in four and look almost right. The layout is checked against spirv-cross's own std430
+// rules, so the answer is the same one the compiler used.
+TEST_F(GpuTest, APushConstantBlockThatIsNotStd430DoesNotLoad) {
+    const auto shader = Shader::Builder{}
+                            .setLang<Shader::Lang::eGLSL>()
+                            .setStage(Shader::Stage::eFragment)
+                            .setPath(kor::shaderPath("pushStd140.frag.glsl"))
+                            .build();
+
+    ASSERT_TRUE(shader.poisoned()) << "an explicitly std140 push-constant block was accepted";
+    EXPECT_EQ(shader.error()->code, kor::ErrorCode::ePushConstantMismatch);
+    // Named down to the member, since that is what has to move.
+    EXPECT_NE(shader.error()->message.find("weights"), std::string::npos) << shader.error()->message;
+    EXPECT_NE(shader.error()->message.find("std430"), std::string::npos) << shader.error()->message;
+}
+
 } // namespace
 
