@@ -16,7 +16,7 @@
  * kgui::Viewport _viewport;
  *
  * void MyScene::Initialize() {
- *     _viewport.setImage(kor::ResourceRef<const kor::Image>(_colorTarget));   // once
+ *     _viewport.setImage(_colorTarget);   // once
  * }
  *
  * void MyScene::Update() {
@@ -58,6 +58,7 @@
  */
 
 #pragma once
+#include <cstdint>
 
 #include <algorithm>
 #include <cmath>
@@ -87,8 +88,7 @@ namespace kgui
     {
     public:
         /** @brief How the image is laid out inside the window. */
-        enum class Fit
-        {
+        enum class Fit : std::uint8_t {
             /**
              * @brief Fill the window, and expect a target of exactly that size. The default.
              *
@@ -254,7 +254,7 @@ namespace kgui
                 return std::nullopt;
 
             // Scaled to the *image's* extent, which under eContain is not the window's.
-            const auto extent = _image.alive() ? _image->getExtent() : glm::uvec3(_content, 1);
+            const auto extent = _image.alive() ? _image->extent() : glm::uvec3(_content, 1);
             return glm::vec2(normalized.x * static_cast<float>(extent.x),
                              normalized.y * static_cast<float>(extent.y));
         }
@@ -272,7 +272,7 @@ namespace kgui
         /**
          * @brief Makes the ImGui texture handle for whatever @ref _image currently is.
          *
-         * A GUI_Image is a backend object — a descriptor set on Vulkan, a texture name on GL — so it
+         * A GuiImage is a backend object — a descriptor set on Vulkan, a texture name on GL — so it
          * is built through the engine. And it can fail: there may be no GUI backend at all (a
          * headless run), or the image may not be sampleable. Guarded rather than left to throw,
          * because the caller is Scene::RenderUI and a viewport that cannot show its image should draw
@@ -287,7 +287,7 @@ namespace kgui
             if (!_image.alive()) return;
 
             auto created = kor::guard(kor::ErrorCode::eBackend, [this] {
-                return kor::GUI_Image::Create(_image);
+                return kor::GuiImage::Create(_image);
             });
             if (created) {
                 _handle = std::move(*created);
@@ -317,7 +317,7 @@ namespace kgui
             if (_fit == Fit::eStretch || !_image.alive())
                 return Rect{ cursor, available };
 
-            const auto extent = _image->getExtent();
+            const auto extent = _image->extent();
             if (extent.x == 0 || extent.y == 0) return Rect{ cursor, available };
 
             const float imageAspect = static_cast<float>(extent.x) / static_cast<float>(extent.y);
@@ -354,7 +354,7 @@ namespace kgui
         }
 
         kor::ResourceRef<const kor::Image> _image;
-        kor::Resource<kor::GUI_Image> _handle;
+        kor::Resource<kor::GuiImage> _handle;
         /// The image generation the handle was built for, so a replaced image is noticed. @see refreshHandle
         glm::u64 _handleGeneration = 0;
         Fit _fit = Fit::eStretch;

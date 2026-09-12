@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <cstdint>
 
 #include <optional>
 #include <string>
@@ -26,7 +27,7 @@ namespace kor {
      * QWERTY and an AZERTY keyboard even though it prints differently. For text entry, take the
      * characters from Dear ImGui rather than reading keys here.
      */
-    enum class Key : unsigned short {
+    enum class Key : std::uint16_t {
         eSpace = 32,
         eApostrophe = 39,
         eComma = 44,
@@ -150,7 +151,7 @@ namespace kor {
     };
 
     /** @brief A mouse button. The first three have names; the rest are numbered. */
-    enum class MouseButton {
+    enum class MouseButton : std::uint8_t {
         e1 = 0,
         e2 = 1,
         e3 = 2,
@@ -165,7 +166,7 @@ namespace kor {
     };
 
     /** @brief Modifier keys and locks, as a set of bits. */
-    enum class SpecialKey {
+    enum class SpecialKey : std::uint8_t {
         eShift = 1 << 0,    ///< Either shift key is down.
         eCtrl = 1 << 1,     ///< Either control key is down.
         eAlt = 1 << 2,      ///< Either alt key is down.
@@ -181,7 +182,7 @@ namespace kor {
      * while eHeld persists for as long as the key stays down. Which is why "did the user just press
      * jump" and "is the user holding forward" are different questions with different answers.
      */
-    enum class KeyState {
+    enum class KeyState : std::uint8_t {
         eNotPressed,    ///< Up, and it was up last frame too.
         ePressed,       ///< Went down this frame.
         eHeld,          ///< Still down, having gone down on an earlier frame.
@@ -198,7 +199,7 @@ namespace kor {
      *
      * @code
      * void MyScene::Update() {
-     *     if (kor::Input::isKeyHeld(kor::Key::eW)) camera.moveForward(kor::Time::FrameTime());
+     *     if (kor::Input::isKeyHeld(kor::Key::eW)) camera.moveForward(kor::Time::frameTime());
      *     if (kor::Input::isKeyPressed(kor::Key::eSpace)) jump();     // once per press
      * }
      * @endcode
@@ -214,10 +215,10 @@ namespace kor {
     	friend class Engine;
     public:
         /** @brief Where @p key is in the press-hold-release cycle this frame. */
-        static KeyState getKeyState(Key key);
+        static KeyState keyState(Key key);
 
         /** @brief Where @p button is in the press-hold-release cycle this frame. */
-        static KeyState getMouseButtonState(MouseButton button);
+        static KeyState mouseButtonState(MouseButton button);
 
         /** @brief Whether @p key went down this frame. True for one frame per press. */
         static bool isKeyPressed(Key key);
@@ -281,16 +282,16 @@ namespace kor {
         [[nodiscard]] static bool interfaceWantsKeyboard();
 
         /** @brief Cursor position in pixels, measured from the top-left of the drawable area. */
-        static const glm::vec2& getMousePosition();
+        static const glm::vec2& mousePosition();
 
         /** @brief How far the cursor moved since the previous frame, in pixels. The value to drive a look-around camera with. */
-        static const glm::vec2& getMousePositionDelta();
+        static const glm::vec2& mousePositionDelta();
 
         /** @brief How far the wheel turned this frame. Y is the usual vertical wheel; X is horizontal scrolling where the device has it. */
-        static const glm::vec2& getMouseScrollDelta();
+        static const glm::vec2& mouseScrollDelta();
 
         /** @brief Where the cursor was on the previous frame, in pixels. */
-        static const glm::vec2& getLastMousePosition();
+        static const glm::vec2& lastMousePosition();
 
         /**
          * @brief What the cursor does while the application runs.
@@ -299,8 +300,7 @@ namespace kor {
          * across the screen, so it cannot leave the window, reach the edge of the desktop, or land on
          * something and click it — and the movement keeps arriving as deltas, without limit.
          */
-        enum class CursorMode
-        {
+        enum class CursorMode : std::uint8_t {
             eNormal,    ///< Visible, and free to move. The default.
             eHidden,    ///< Invisible, but still moving and still able to leave the window.
             eCaptured,  ///< Invisible and locked in place: only the movement is reported. Also called relative mode.
@@ -324,7 +324,7 @@ namespace kor {
         static void setCursorMode(CursorMode mode);
 
         /** @brief What the cursor is currently doing. */
-        [[nodiscard]] static CursorMode getCursorMode();
+        [[nodiscard]] static CursorMode cursorMode();
 
         /**
          * @brief Starts reading input from another window as well as the main one.

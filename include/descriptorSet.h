@@ -84,7 +84,7 @@ namespace kor
     {
     public:
         /** @brief Collects the resources to bind at each binding of one set. */
-        struct KORAL_API Builder : ::Builder
+        struct KORAL_API Builder : kor::Builder
         {
             /**
              * @brief Builds against a set of a pipeline — the preferred form.
@@ -456,16 +456,20 @@ namespace kor
         virtual void bind(const CommandBuffer& commandBuffer, glm::u32 index) const {};
 
         /**
-         * @brief Replaces what is bound at one binding, after the set was built.
+         * @brief Points one binding at something else, after the set was built.
          * @param binding The binding number.
          * @param descriptor The new resource.
          * @param index Which element, for an array binding.
+         *
+         * The counterpart to Builder::write, which binds while the set is being assembled. Named
+         * apart from it on purpose: the two take identical arguments, and one letter's difference
+         * in case would be a typo that silently compiled into the other.
          *
          * @warning Takes effect immediately, including for work already recorded but not yet
          *          submitted. Rewriting a set the GPU may still be reading is a race; give
          *          per-frame data a per-frame buffer, or a set per frame in flight.
          */
-        virtual void Write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index) = 0;
+        virtual void rebind(glm::u32 binding, const Descriptor& descriptor, glm::u32 index) = 0;
 
         /**
          * @name Rewriting a binding with the resource itself
@@ -473,43 +477,43 @@ namespace kor
          * The same overloads the builder takes, for a set that is already built:
          *
          * @code
-         * set->Write(0, newCameraBuffer);
-         * set->Write("albedo", newView, sampler);
+         * set->rebind(0, newCameraBuffer);
+         * set->rebind("albedo", newView, sampler);
          * @endcode
          *
          * Not virtual — each one is the matching kor::Descriptor and a call to the overload above,
-         * so a backend implements one Write and gets all of them. The warning there applies here
+         * so a backend implements one rebind and gets all of them. The warning there applies here
          * too: this takes effect immediately, including for work already recorded.
          *
          * @param index Which element, for an array binding. A name may carry `[n]` instead.
          */
         ///@{
-        void Write(glm::u32 binding, const ResourceRef<const Buffer>& buffer, glm::u32 index = 0);
-        void Write(glm::u32 binding, const Buffer::Slice& slice, glm::u32 index = 0);
-        void Write(glm::u32 binding, const ResourceRef<const BufferView>& bufferView, glm::u32 index = 0);
-        void Write(glm::u32 binding, const ResourceRef<const ImageView>& imageView, glm::u32 index = 0);
-        void Write(glm::u32 binding, const ResourceRef<const ImageView>& imageView,
+        void rebind(glm::u32 binding, const ResourceRef<const Buffer>& buffer, glm::u32 index = 0);
+        void rebind(glm::u32 binding, const Buffer::Slice& slice, glm::u32 index = 0);
+        void rebind(glm::u32 binding, const ResourceRef<const BufferView>& bufferView, glm::u32 index = 0);
+        void rebind(glm::u32 binding, const ResourceRef<const ImageView>& imageView, glm::u32 index = 0);
+        void rebind(glm::u32 binding, const ResourceRef<const ImageView>& imageView,
                    const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
-        void Write(glm::u32 binding, const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
-        void Write(glm::u32 binding, const ResourceRef<const AccelerationStructure>& accelerationStructure,
+        void rebind(glm::u32 binding, const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
+        void rebind(glm::u32 binding, const ResourceRef<const AccelerationStructure>& accelerationStructure,
                    glm::u32 index = 0);
 
-        void Write(std::string_view name, const Descriptor& descriptor);
-        void Write(std::string_view name, const ResourceRef<const Buffer>& buffer);
-        void Write(std::string_view name, const Buffer::Slice& slice);
-        void Write(std::string_view name, const ResourceRef<const BufferView>& bufferView);
-        void Write(std::string_view name, const ResourceRef<const ImageView>& imageView);
-        void Write(std::string_view name, const ResourceRef<const ImageView>& imageView,
+        void rebind(std::string_view name, const Descriptor& descriptor);
+        void rebind(std::string_view name, const ResourceRef<const Buffer>& buffer);
+        void rebind(std::string_view name, const Buffer::Slice& slice);
+        void rebind(std::string_view name, const ResourceRef<const BufferView>& bufferView);
+        void rebind(std::string_view name, const ResourceRef<const ImageView>& imageView);
+        void rebind(std::string_view name, const ResourceRef<const ImageView>& imageView,
                    const ResourceRef<const Sampler>& sampler);
-        void Write(std::string_view name, const ResourceRef<const Sampler>& sampler);
-        void Write(std::string_view name, const ResourceRef<const AccelerationStructure>& accelerationStructure);
+        void rebind(std::string_view name, const ResourceRef<const Sampler>& sampler);
+        void rebind(std::string_view name, const ResourceRef<const AccelerationStructure>& accelerationStructure);
         ///@}
 
         /** @brief Logs what the set currently holds, binding by binding. A debugging aid. */
         virtual void DebugPrint() const {};
 
         /** @brief The layout this set was allocated against — what each binding is, and what shaders do with it. */
-        [[nodiscard]] ResourceRef<const DescriptorSetLayout> getLayout() const { return _layout; }
+        [[nodiscard]] ResourceRef<const DescriptorSetLayout> layout() const { return _layout; }
 
         /**
          * @brief What is currently written into the set, by binding.
@@ -517,7 +521,7 @@ namespace kor
          *         array binding. Together with the layout, this is what tells the barrier resolver
          *         which resources a draw will touch.
          */
-        [[nodiscard]] const std::map<glm::u32, std::vector<Descriptor>>& getWrites() const { return _writes; }
+        [[nodiscard]] const std::map<glm::u32, std::vector<Descriptor>>& writes() const { return _writes; }
 
     protected:
         explicit DescriptorSet(const Builder &builder);
@@ -530,18 +534,18 @@ namespace kor
         /**
          * @brief Splits `"textures[3]"` into the name and the element it selects.
          *
-         * Shared by the builder and by Write(): both address a binding the same way, so both take
+         * Shared by the builder and by rebind(): both address a binding the same way, so both take
          * the subscript off the name the same way. Anything that is not a well-formed trailing
          * subscript is left as part of the name.
          */
         static std::pair<std::string_view, glm::u32> splitIndex(std::string_view name);
 
         /**
-         * @brief The binding this set's layout calls @p name, for a Write() addressed by name.
+         * @brief The binding this set's layout calls @p name, for a rebind() addressed by name.
          * @return The binding number, or nullopt — after logging why — when there is no such
          *         binding, or no usable layout to ask.
          *
-         * Write() returns void and is called on a live set, so a bad name cannot poison anything:
+         * rebind() returns void and is called on a live set, so a bad name cannot poison anything:
          * it is reported and the write is dropped, rather than throwing through a setter.
          */
         [[nodiscard]] std::optional<glm::u32> resolveWriteTarget(std::string_view name) const;

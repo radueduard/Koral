@@ -251,13 +251,13 @@ TEST_F(HeadlessImGui, StatsPanelShowsCountersOfYourOwn) {
 // Long enough to wrap the frame-time ring buffer, which is where an off-by-one would live.
 TEST_F(HeadlessImGui, StatsPanelWrapsItsHistory) {
     kgui::StatsPanel panel;
-    for (std::size_t i = 0; i < kgui::StatsPanel::kHistory + 10; ++i) {
+    for (std::size_t i = 0; i < kgui::StatsPanel::History + 10; ++i) {
         frame([&] { panel.Draw(); });
     }
 }
 
 TEST_F(HeadlessImGui, GradientEditorAndFileBrowserDraw) {
-    GradientEditor gradient;
+    kgui::GradientEditor gradient;
     ImGui::FileBrowser browser;
 
     frame([&] {

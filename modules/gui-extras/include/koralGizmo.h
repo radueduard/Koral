@@ -29,6 +29,7 @@
  */
 
 #pragma once
+#include <cstdint>
 
 #include <glm/glm.hpp>
 
@@ -69,10 +70,10 @@ namespace kgui
     {
     public:
         /** @brief What the handle does. Mirrors ImGuizmo's operations, in the three that are usual. */
-        enum class Operation { eTranslate, eRotate, eScale, eUniversal };
+        enum class Operation : std::uint8_t { eTranslate, eRotate, eScale, eUniversal };
 
         /** @brief Whether the handle is aligned to the object or to the world. */
-        enum class Space { eLocal, eWorld };
+        enum class Space : std::uint8_t { eLocal, eWorld };
 
         void setOperation(const Operation operation) { _operation = operation; }
         [[nodiscard]] Operation operation() const { return _operation; }

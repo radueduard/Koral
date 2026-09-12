@@ -53,7 +53,7 @@ TEST(MeshLayout, Std430Alignment) {
 using PNU = ParamVertex<Position, Normal, UV>;
 
 TEST(MeshLayout, ParamVertexAttributeCount) {
-    EXPECT_EQ(PNU::kAttributeCount, 3u);
+    EXPECT_EQ(PNU::AttributeCount, 3u);
 }
 
 TEST(MeshLayout, ParamVertexOffsets) {
@@ -63,8 +63,8 @@ TEST(MeshLayout, ParamVertexOffsets) {
 }
 
 TEST(MeshLayout, ParamVertexStrideMatchesStorageSize) {
-    EXPECT_EQ(PNU::kStride, sizeof(PNU::Storage));
-    EXPECT_EQ(PNU::kStride, 48u); // 32 (UV offset) + 8, padded up to 16-alignment
+    EXPECT_EQ(PNU::Stride, sizeof(PNU::Storage));
+    EXPECT_EQ(PNU::Stride, 48u); // 32 (UV offset) + 8, padded up to 16-alignment
 }
 
 TEST(MeshLayout, ParamVertexConstructAndGet) {
@@ -84,7 +84,7 @@ TEST(MeshLayout, LayoutDescribesEveryAttribute) {
 
     ASSERT_EQ(layout.bindings.size(), 1u);
     EXPECT_EQ(layout.bindings[0].binding, 0u);
-    EXPECT_EQ(layout.bindings[0].stride, PNU::kStride);
+    EXPECT_EQ(layout.bindings[0].stride, PNU::Stride);
 
     ASSERT_EQ(layout.attributes.size(), 3u);
     EXPECT_EQ(layout.attributes[0].semantic, "POSITION");
@@ -93,7 +93,7 @@ TEST(MeshLayout, LayoutDescribesEveryAttribute) {
 
     // The vocabulary is the module's, and every attribute says so.
     for (const auto& attribute : layout.attributes)
-        EXPECT_EQ(attribute.semanticNamespace, semantics::kNamespace);
+        EXPECT_EQ(attribute.semanticNamespace, semantics::Namespace);
 
     EXPECT_EQ(layout.attributes[1].offset, PNU::OffsetOf<1>());
     EXPECT_EQ(layout.attributes[2].channelCount, 2u);

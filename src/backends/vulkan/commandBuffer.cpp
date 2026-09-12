@@ -157,7 +157,7 @@ namespace kor::vk
 
     kor::CommandBuffer& CommandBuffer::doBeginRendering(const RenderInfo& renderInfo)
     {
-        const auto framebuffer = renderInfo.getFramebuffer();
+        const auto framebuffer = renderInfo.framebuffer();
         stateBeginRendering(framebuffer);
         // The attachment transitions are declared as uses by kor::CommandBuffer::BeginRendering
         // and emitted by the resolver *before* this record — they cannot be emitted here, since
@@ -165,18 +165,18 @@ namespace kor::vk
 
         std::vector<::vk::RenderingAttachmentInfoKHR> colorAttachmentInfos;
         glm::u32 i = 0;
-        for (auto& colorAttachment : framebuffer->getColorAttachments()) {
+        for (auto& colorAttachment : framebuffer->colorAttachments()) {
             auto attachInfo = ::vk::RenderingAttachmentInfoKHR()
                 .setImageView(**dynamic_cast<const kor::vk::ImageView*>(colorAttachment.view.get()))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                .setClearValue(getVkClearValue(renderInfo.getClearColor(i)))
-                .setLoadOp(getVkLoadOp(renderInfo.getColorLoadOperation()))
-                .setStoreOp(getVkStoreOp(renderInfo.getColorStoreOperation()));
-            if (framebuffer->getResolveAttachment(i).valid()) {
+                .setClearValue(getVkClearValue(renderInfo.clearColor(i)))
+                .setLoadOp(getVkLoadOp(renderInfo.colorLoadOperation()))
+                .setStoreOp(getVkStoreOp(renderInfo.colorStoreOperation()));
+            if (framebuffer->resolveAttachment(i).valid()) {
                 attachInfo
                     .setResolveImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                    .setResolveImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->getResolveAttachment(i).get()))
-                    .setResolveMode(getVkResolveMode(framebuffer->getResolveMode()));
+                    .setResolveImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->resolveAttachment(i).get()))
+                    .setResolveMode(getVkResolveMode(framebuffer->resolveMode()));
             }
             colorAttachmentInfos.push_back(attachInfo);
             i++;
@@ -185,23 +185,23 @@ namespace kor::vk
         // One clear value for both slots: a combined depth/stencil format is one image, and the
         // pass carries one value for each half of it.
         const auto depthStencilClear = ::vk::ClearValue().setDepthStencil(
-            { renderInfo.getClearDepth(), static_cast<glm::u32>(renderInfo.getClearStencil()) });
+            { renderInfo.clearDepth(), static_cast<glm::u32>(renderInfo.clearStencil()) });
 
         const auto depthAttachment = framebuffer->hasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->getDepthAttachment().get()))
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->depthAttachment().get()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(depthStencilClear)
-            .setLoadOp(getVkLoadOp(renderInfo.getDepthLoadOperation()))
-            .setStoreOp(getVkStoreOp(renderInfo.getDepthStoreOperation()))) : std::nullopt;
+            .setLoadOp(getVkLoadOp(renderInfo.depthLoadOperation()))
+            .setStoreOp(getVkStoreOp(renderInfo.depthStoreOperation()))) : std::nullopt;
 
         const auto stencilAttachment = framebuffer->hasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->getStencilAttachment().get()))
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->stencilAttachment().get()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(depthStencilClear)
-            .setLoadOp(getVkLoadOp(renderInfo.getStencilLoadOperation()))
-            .setStoreOp(getVkStoreOp(renderInfo.getStencilStoreOperation()))) : std::nullopt;
+            .setLoadOp(getVkLoadOp(renderInfo.stencilLoadOperation()))
+            .setStoreOp(getVkStoreOp(renderInfo.stencilStoreOperation()))) : std::nullopt;
 
-        auto extent = framebuffer->getExtent();
+        auto extent = framebuffer->extent();
         const auto renderArea = ::vk::Rect2D()
             .setOffset({0, 0})
             .setExtent({ extent.x, extent.y });
@@ -404,9 +404,8 @@ namespace kor::vk
         }, PassEdge::eNone, usesForBoundResources(false), boundPipelineUsesDeviceAddresses());
     }
 
-    kor::CommandBuffer& CommandBuffer::doBindDescriptorSet(const glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set, const bool debug)
+    kor::CommandBuffer& CommandBuffer::doBindDescriptorSet(const glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set)
     {
-        if (debug) set->DebugPrint();
 
         if (_state.boundComputePipeline.has_value()) {
             const auto& vkPipeline = dynamic_cast<const kor::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
@@ -452,7 +451,7 @@ namespace kor::vk
         stateBindMesh(mesh);
         std::vector<::vk::Buffer> vertexBuffers;
         std::vector<::vk::DeviceSize> offsets;
-        for (const auto& buffer : mesh->getVertexBuffers()) {
+        for (const auto& buffer : mesh->vertexBuffers()) {
             const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
             vertexBuffers.push_back(*vkBuffer);
             offsets.push_back(0);
@@ -460,8 +459,8 @@ namespace kor::vk
         _handle.bindVertexBuffers(0, vertexBuffers, offsets);
         if (mesh->hasIndexBuffer())
         {
-            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*mesh->getIndexBuffer().value());
-            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->getIndexType().value()));
+            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*mesh->indexBuffer().value());
+            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->indexType().value()));
         }
         return *this;
     }
@@ -476,34 +475,34 @@ namespace kor::vk
         std::vector<::vk::BufferMemoryBarrier> vkBufferBarriers;
         std::vector<::vk::ImageMemoryBarrier> vkImageBarriers;
         for (const auto& barrier : bufferBarriers) {
-            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*barrier.getBuffer());
+            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*barrier.buffer());
             vkBufferBarriers.push_back(::vk::BufferMemoryBarrier()
                 .setSrcAccessMask(vkBuffer.getAccessMask())
-                .setDstAccessMask(getVkAccessFlags(barrier.getDstAccess()))
+                .setDstAccessMask(getVkAccessFlags(barrier.dstAccess()))
                 .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setBuffer(*vkBuffer)
-                .setOffset(barrier.getOffset())
-                .setSize(barrier.getSize()));
+                .setOffset(barrier.offset())
+                .setSize(barrier.size()));
 
-            dstStageMask |= getVkPipelineStageFlags(barrier.getDstAccess());
+            dstStageMask |= getVkPipelineStageFlags(barrier.dstAccess());
 
-            vkBuffer.setAccessMask(getVkAccessFlags(barrier.getDstAccess()));
+            vkBuffer.setAccessMask(getVkAccessFlags(barrier.dstAccess()));
         }
         for (const auto& barrier : imageBarriers) {
-            const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*barrier.getImage());
+            const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*barrier.image());
 
-            const auto newLayout = getVkImageLayout(barrier.getDstAccess());
-            const auto dstAccessMask = getVkAccessFlags(barrier.getDstAccess());
-            const auto aspectMask = getVkImageAspectFlags(vkImage.getFormat());
+            const auto newLayout = getVkImageLayout(barrier.dstAccess());
+            const auto dstAccessMask = getVkAccessFlags(barrier.dstAccess());
+            const auto aspectMask = getVkImageAspectFlags(vkImage.format());
 
             // An absent count means "the rest of the image", so it is measured from the base
             // rather than from zero. Resolving it to the image's *total* count instead walked past
             // the last level whenever a base was given without one. Matches resolveBarriers().
-            const auto baseMip = barrier.getBaseMipLevel().value_or(0);
-            const auto mipCount = barrier.getLevelCount().value_or(vkImage.getMipLevels() - baseMip);
-            const auto baseLayer = barrier.getBaseArrayLayer().value_or(0);
-            const auto layerCount = barrier.getLayerCount().value_or(vkImage.getArrayLayers() - baseLayer);
+            const auto baseMip = barrier.baseMipLevel().value_or(0);
+            const auto mipCount = barrier.levelCount().value_or(vkImage.mipLevels() - baseMip);
+            const auto baseLayer = barrier.baseArrayLayer().value_or(0);
+            const auto layerCount = barrier.layerCount().value_or(vkImage.arrayLayers() - baseLayer);
 
             // The current (old) layout and access mask are tracked per subresource, and a
             // range can legitimately span subresources in different layouts — e.g. right
@@ -532,7 +531,7 @@ namespace kor::vk
                 }
             }
 
-            dstStageMask |= getVkPipelineStageFlags(barrier.getDstAccess());
+            dstStageMask |= getVkPipelineStageFlags(barrier.dstAccess());
         }
 
         _handle.pipelineBarrier(
@@ -616,10 +615,10 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, void *data, const glm::u64 offset, glm::u64 size) {
+    kor::CommandBuffer & CommandBuffer::doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, const void* data, const glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
-        if (size == UINT64_MAX) {
-            size = vkBuffer.getSize() - offset;
+        if (size == WholeSize) {
+            size = vkBuffer.size() - offset;
         }
         _handle.updateBuffer(*vkBuffer, offset, size, data);
         return *this;
@@ -629,13 +628,13 @@ namespace kor::vk
         if (_failed) return *this;
         const auto& vkSrcBuffer = dynamic_cast<const kor::vk::Buffer&>(*srcBuffer);
         const auto& vkDstBuffer = dynamic_cast<const kor::vk::Buffer&>(*dstBuffer);
-        if (size == UINT64_MAX) {
-            size = std::min(vkSrcBuffer.getSize() - srcOffset, vkDstBuffer.getSize() - dstOffset);
+        if (size == WholeSize) {
+            size = std::min(vkSrcBuffer.size() - srcOffset, vkDstBuffer.size() - dstOffset);
         }
-        if (size > vkSrcBuffer.getSize() - srcOffset || size > vkDstBuffer.getSize() - dstOffset) {
+        if (size > vkSrcBuffer.size() - srcOffset || size > vkDstBuffer.size() - dstOffset) {
             return record(ErrorCode::eCopySizeExceedsBuffer,
                 std::format("Copy size {} exceeds buffer bounds (src size {}, dst size {}, srcOffset {}, dstOffset {}).",
-                            size, vkSrcBuffer.getSize(), vkDstBuffer.getSize(), srcOffset, dstOffset));
+                            size, vkSrcBuffer.size(), vkDstBuffer.size(), srcOffset, dstOffset));
         }
 
         _handle.copyBuffer(*vkSrcBuffer, *vkDstBuffer, ::vk::BufferCopy()
@@ -654,19 +653,19 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doBlit(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
-        ResourceRef<const kor::Image> dstImage =  dynamic_cast<const Scheduler&>(kor::Context::Scheduler()).getSwapChain().getImage();
+    kor::CommandBuffer& CommandBuffer::doBlitToScreen(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
+        ResourceRef<const kor::Image> dstImage =  dynamic_cast<const Scheduler&>(kor::Context::Scheduler()).getSwapChain().image();
         Barrier({}, {
             {
                 srcImage,
-                ResourceAccess::TransferSrc,
+                ResourceAccess::eTransferSrc,
                 blitInfo.srcMipLevel,
                 1,
                 blitInfo.srcBaseArrayLayer,
                 blitInfo.layerCount
             }, {
                 dstImage,
-                ResourceAccess::TransferDst,
+                ResourceAccess::eTransferDst,
                 blitInfo.dstMipLevel,
                 1,
                 blitInfo.dstBaseArrayLayer,
@@ -675,9 +674,9 @@ namespace kor::vk
         });
 
         if (blitInfo.srcExtent == glm::ivec3(-1))
-            blitInfo.srcExtent = srcImage->getExtent();
+            blitInfo.srcExtent = srcImage->extent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = dstImage->getExtent();
+            blitInfo.dstExtent = dstImage->extent();
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
         const auto& vkDstImage = dynamic_cast<const Image&>(*dstImage);
@@ -717,9 +716,9 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::doBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo)
     {
         if (blitInfo.srcExtent == glm::ivec3(-1))
-            blitInfo.srcExtent = srcImage->getExtent();
+            blitInfo.srcExtent = srcImage->extent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = dstImage->getExtent();
+            blitInfo.dstExtent = dstImage->extent();
 
         // Both operands are declared as uses by the core wrapper; the resolver
         // emits their transitions ahead of this record.
@@ -753,41 +752,41 @@ namespace kor::vk
          return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doResolve(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
+    kor::CommandBuffer & CommandBuffer::doResolveToScreen(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
         if (_failed) return *this;
-        if (srcImage->getSampleCount() == SampleCount::e1)
+        if (srcImage->sampleCount() == SampleCount::e1)
             return record(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
 
         if (!_resolveHelperImage)
             _resolveHelperImage = kor::Image::Builder()
                 .setIsPerFrame(true)
-                .setExtent(srcImage->getExtent())
-                .setFormat(srcImage->getFormat())
-                .setUsage(kor::Image::Usage::eTransferDst)
-                .addUsage(kor::Image::Usage::eTransferSrc)
+                .setExtent(srcImage->extent())
+                .setFormat(srcImage->format())
+                // Resolved into, then copied out of.
+                .setUsage(kor::Image::Usage::eTransferDst | kor::Image::Usage::eTransferSrc)
                 .build();
-        if (_resolveHelperImage->getExtent() != srcImage->getExtent())
-            _resolveHelperImage->Resize(srcImage->getExtent());
+        if (_resolveHelperImage->extent() != srcImage->extent())
+            _resolveHelperImage->Resize(srcImage->extent());
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
         const auto& vkDstImage =  dynamic_cast<const Image&>(*_resolveHelperImage);
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
-            resolveInfo.srcExtent = vkSrcImage.getExtent();
+            resolveInfo.srcExtent = vkSrcImage.extent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = vkDstImage.getExtent();
+            resolveInfo.dstExtent = vkDstImage.extent();
 
         Barrier({}, {
             {
                 srcImage,
-                ResourceAccess::TransferSrc,
+                ResourceAccess::eTransferSrc,
                 resolveInfo.srcMipLevel,
                 1,
                 resolveInfo.srcBaseArrayLayer,
                 resolveInfo.layerCount
             }, {
                 _resolveHelperImage,
-                ResourceAccess::TransferDst,
+                ResourceAccess::eTransferDst,
                 resolveInfo.dstMipLevel,
                 1,
                 resolveInfo.dstBaseArrayLayer,
@@ -813,36 +812,37 @@ namespace kor::vk
                 .setDstOffset({ resolveInfo.dstOffset.x, resolveInfo.dstOffset.y, resolveInfo.dstOffset.z })
                 .setExtent({ static_cast<glm::u32>(resolveInfo.srcExtent.x), static_cast<glm::u32>(resolveInfo.srcExtent.y), static_cast<glm::u32>(resolveInfo.srcExtent.z) }));
 
-        Blit(kor::ResourceRef<const kor::Image>(_resolveHelperImage), kor::Blit{});
+        // Resolved into the helper above; this is the step that puts it on screen.
+        BlitToScreen(_resolveHelperImage, kor::Blit{});
         return *this;
     }
 
     kor::CommandBuffer& CommandBuffer::doResolve(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Resolve resolveInfo) {
         if (_failed) return *this;
-        if (srcImage->getSampleCount() == SampleCount::e1)
+        if (srcImage->sampleCount() == SampleCount::e1)
             return record(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
-        if (dstImage && dstImage->getSampleCount() != SampleCount::e1)
+        if (dstImage && dstImage->sampleCount() != SampleCount::e1)
             return record(ErrorCode::eResolveRequiresMultisample, "Resolve destination image must not be multisampled.");
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
         const auto& vkDstImage =dynamic_cast<const Image&>(*dstImage);
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
-            resolveInfo.srcExtent = vkSrcImage.getExtent();
+            resolveInfo.srcExtent = vkSrcImage.extent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = vkDstImage.getExtent();
+            resolveInfo.dstExtent = vkDstImage.extent();
 
         Barrier({}, {
             {
                 srcImage,
-                ResourceAccess::TransferSrc,
+                ResourceAccess::eTransferSrc,
                 resolveInfo.srcMipLevel,
                 1,
                 resolveInfo.srcBaseArrayLayer,
                 resolveInfo.layerCount
             }, {
                 dstImage,
-                ResourceAccess::TransferDst,
+                ResourceAccess::eTransferDst,
                 resolveInfo.dstMipLevel,
                 1,
                 resolveInfo.dstBaseArrayLayer,
@@ -876,18 +876,18 @@ namespace kor::vk
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
-        if (copyInfo.bufferOffset >= vkBuffer.getSize())
+        if (copyInfo.bufferOffset >= vkBuffer.size())
             return record(ErrorCode::eCopySizeExceedsBuffer,
-                std::format("Buffer offset {} exceeds buffer size {}.", copyInfo.bufferOffset, vkBuffer.getSize()));
-        if (copyInfo.imageMipLevel >= vkImage.getMipLevels())
+                std::format("Buffer offset {} exceeds buffer size {}.", copyInfo.bufferOffset, vkBuffer.size()));
+        if (copyInfo.imageMipLevel >= vkImage.mipLevels())
             return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.getMipLevels()));
-        if (copyInfo.imageBaseArrayLayer >= vkImage.getArrayLayers())
+                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.mipLevels()));
+        if (copyInfo.imageBaseArrayLayer >= vkImage.arrayLayers())
             return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.getArrayLayers()));
+                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.arrayLayers()));
 
         if (copyInfo.imageExtent == glm::ivec3(-1))
-            copyInfo.imageExtent = image->getExtent();
+            copyInfo.imageExtent = image->extent();
 
         if (copyInfo.bufferRowLength == 0)
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;
@@ -898,8 +898,8 @@ namespace kor::vk
         // image height to be whole numbers of them. The last mip levels of any texture are smaller
         // than one block — a 2x2 level of a 4x4 format — so rounding up here is not an edge case but
         // the ordinary end of every mip chain.
-        if (Image::IsBlockCompressed(image->getFormat())) {
-            const auto block = Image::BlockExtentFromImageFormat(image->getFormat());
+        if (Image::isBlockCompressed(image->format())) {
+            const auto block = Image::blockExtent(image->format());
             const auto roundUp = [](const glm::u32 value, const glm::u32 to) { return (value + to - 1) / to * to; };
             copyInfo.bufferRowLength = roundUp(copyInfo.bufferRowLength, block.x);
             copyInfo.bufferImageHeight = roundUp(copyInfo.bufferImageHeight, block.y);
@@ -909,29 +909,29 @@ namespace kor::vk
                 std::format("Buffer row length {} / image height {} too small for image extent {}x{}.",
                             copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y));
         // Copy footprint in *bytes* (not texels): rowLength/imageHeight give the packed extent, and
-        // SizeOfRegion turns it into bytes — counting blocks for a compressed format and texels for
+        // sizeOfRegion turns it into bytes — counting blocks for a compressed format and texels for
         // an uncompressed one, so a BC7 upload is measured in the units it is actually stored in
         // rather than in texels it does not have. For packed (unpadded) buffers this is the exact
         // required size. Depth/stencil texel sizes are conservatively over-estimated, which only
         // makes the guard stricter.
         {
-            const glm::u64 copyBytes = Image::SizeOfRegion(
-                image->getFormat(),
+            const glm::u64 copyBytes = Image::sizeOfRegion(
+                image->format(),
                 { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
                 copyInfo.imageLayerCount);
-            if (copyBytes + copyInfo.bufferOffset > vkBuffer.getSize())
+            if (copyBytes + copyInfo.bufferOffset > vkBuffer.size())
                 return record(ErrorCode::eCopySizeExceedsBuffer,
                     std::format("Buffer offset {} + copy size {} exceeds buffer size {}.",
-                                copyInfo.bufferOffset, copyBytes, vkBuffer.getSize()));
+                                copyInfo.bufferOffset, copyBytes, vkBuffer.size()));
         }
-        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.getArrayLayers())
+        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.arrayLayers())
             return record(ErrorCode::eImageSubresourceOutOfRange,
                 std::format("Image base array layer {} + layer count {} exceeds image array layers {}.",
-                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.getArrayLayers()));
+                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.arrayLayers()));
 
         ImageBarrier({
             image,
-            ResourceAccess::TransferDst,
+            ResourceAccess::eTransferDst,
             copyInfo.imageMipLevel,
             1,
             copyInfo.imageBaseArrayLayer,
@@ -947,7 +947,7 @@ namespace kor::vk
                 .setBufferRowLength(copyInfo.bufferRowLength)
                 .setBufferImageHeight(copyInfo.bufferImageHeight)
                 .setImageSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(getVkImageAspectFlags(vkImage.getFormat()))
+                    .setAspectMask(getVkImageAspectFlags(vkImage.format()))
                     .setMipLevel(copyInfo.imageMipLevel)
                     .setBaseArrayLayer(copyInfo.imageBaseArrayLayer)
                     .setLayerCount(copyInfo.imageLayerCount))
@@ -962,18 +962,18 @@ namespace kor::vk
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
-        if (copyInfo.bufferOffset >= vkBuffer.getSize())
+        if (copyInfo.bufferOffset >= vkBuffer.size())
             return record(ErrorCode::eCopySizeExceedsBuffer,
-                std::format("Buffer offset {} exceeds buffer size {}.", copyInfo.bufferOffset, vkBuffer.getSize()));
-        if (copyInfo.imageMipLevel >= vkImage.getMipLevels())
+                std::format("Buffer offset {} exceeds buffer size {}.", copyInfo.bufferOffset, vkBuffer.size()));
+        if (copyInfo.imageMipLevel >= vkImage.mipLevels())
             return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.getMipLevels()));
-        if (copyInfo.imageBaseArrayLayer >= vkImage.getArrayLayers())
+                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.mipLevels()));
+        if (copyInfo.imageBaseArrayLayer >= vkImage.arrayLayers())
             return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.getArrayLayers()));
+                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.arrayLayers()));
 
         if (copyInfo.imageExtent == glm::ivec3(-1))
-            copyInfo.imageExtent = image->getExtent();
+            copyInfo.imageExtent = image->extent();
 
         if (copyInfo.bufferRowLength == 0)
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;
@@ -984,8 +984,8 @@ namespace kor::vk
         // image height to be whole numbers of them. The last mip levels of any texture are smaller
         // than one block — a 2x2 level of a 4x4 format — so rounding up here is not an edge case but
         // the ordinary end of every mip chain.
-        if (Image::IsBlockCompressed(image->getFormat())) {
-            const auto block = Image::BlockExtentFromImageFormat(image->getFormat());
+        if (Image::isBlockCompressed(image->format())) {
+            const auto block = Image::blockExtent(image->format());
             const auto roundUp = [](const glm::u32 value, const glm::u32 to) { return (value + to - 1) / to * to; };
             copyInfo.bufferRowLength = roundUp(copyInfo.bufferRowLength, block.x);
             copyInfo.bufferImageHeight = roundUp(copyInfo.bufferImageHeight, block.y);
@@ -995,29 +995,29 @@ namespace kor::vk
                 std::format("Buffer row length {} / image height {} too small for image extent {}x{}.",
                             copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y));
         // Copy footprint in *bytes* (not texels): rowLength/imageHeight give the packed extent, and
-        // SizeOfRegion turns it into bytes — counting blocks for a compressed format and texels for
+        // sizeOfRegion turns it into bytes — counting blocks for a compressed format and texels for
         // an uncompressed one, so a BC7 upload is measured in the units it is actually stored in
         // rather than in texels it does not have. For packed (unpadded) buffers this is the exact
         // required size. Depth/stencil texel sizes are conservatively over-estimated, which only
         // makes the guard stricter.
         {
-            const glm::u64 copyBytes = Image::SizeOfRegion(
-                image->getFormat(),
+            const glm::u64 copyBytes = Image::sizeOfRegion(
+                image->format(),
                 { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
                 copyInfo.imageLayerCount);
-            if (copyBytes + copyInfo.bufferOffset > vkBuffer.getSize())
+            if (copyBytes + copyInfo.bufferOffset > vkBuffer.size())
                 return record(ErrorCode::eCopySizeExceedsBuffer,
                     std::format("Buffer offset {} + copy size {} exceeds buffer size {}.",
-                                copyInfo.bufferOffset, copyBytes, vkBuffer.getSize()));
+                                copyInfo.bufferOffset, copyBytes, vkBuffer.size()));
         }
-        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.getArrayLayers())
+        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.arrayLayers())
             return record(ErrorCode::eImageSubresourceOutOfRange,
                 std::format("Image base array layer {} + layer count {} exceeds image array layers {}.",
-                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.getArrayLayers()));
+                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.arrayLayers()));
 
         ImageBarrier({
             image,
-            ResourceAccess::TransferSrc,
+            ResourceAccess::eTransferSrc,
             copyInfo.imageMipLevel,
             1,
             copyInfo.imageBaseArrayLayer,
@@ -1033,7 +1033,7 @@ namespace kor::vk
                 .setBufferRowLength(copyInfo.bufferRowLength)
                 .setBufferImageHeight(copyInfo.bufferImageHeight)
                 .setImageSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(getVkImageAspectFlags(vkImage.getFormat()))
+                    .setAspectMask(getVkImageAspectFlags(vkImage.format()))
                     .setMipLevel(copyInfo.imageMipLevel)
                     .setBaseArrayLayer(copyInfo.imageBaseArrayLayer)
                     .setLayerCount(copyInfo.imageLayerCount))
@@ -1089,7 +1089,7 @@ namespace kor::vk
     void CommandBuffer::doWaitForFence() const
     {
         try {
-            auto result = Context::Device()->waitForFences(_fence, true, UINT64_MAX);
+            auto result = Context::Device()->waitForFences(_fence, true, WholeSize);
             if (result != ::vk::Result::eSuccess) {
                 std::cerr << "Failed to wait for fence: " << ::vk::to_string(result) << std::endl;
             }
@@ -1148,12 +1148,12 @@ namespace kor::vk
         return true;
     }
 
-    kor::CommandBuffer& CommandBuffer::doPushConstants(const void *data, const glm::u32 size, const glm::u32 offset) {
-        // The bytes, not the pointer: PushConstants<T> hands us the address of a caller
+    kor::CommandBuffer& CommandBuffer::doPushConstantBlock(const void *data, const glm::u32 size, const glm::u32 offset) {
+        // The bytes, not the pointer: PushConstantBlock<T> hands us the address of a caller
         // temporary, which is long gone by the time End() emits.
         std::vector<std::byte> bytes(size);
         if (data && size) std::memcpy(bytes.data(), data, size);
-        return defer("PushConstants", [this, bytes = std::move(bytes), size, offset] {
+        return defer("PushConstantBlock", [this, bytes = std::move(bytes), size, offset] {
             const void* data = bytes.data();
             if (_state.boundComputePipeline.has_value()) {
             const auto& vkPipeline = dynamic_cast<const kor::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
@@ -1167,7 +1167,7 @@ namespace kor::vk
             const auto& vkPipeline = dynamic_cast<const kor::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
             _handle.pushConstants(
                 vkPipeline.getPipelineLayout(),
-                getVkShaderStageFlags(vkPipeline.getPushConstantRange(offset).stages),
+                getVkShaderStageFlags(vkPipeline.pushConstantRange(offset).stages),
                 offset,
                 size,
                 data);
@@ -1175,7 +1175,7 @@ namespace kor::vk
             const auto& vkPipeline = dynamic_cast<const kor::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
             _handle.pushConstants(
                 vkPipeline.getPipelineLayout(),
-                getVkShaderStageFlags(vkPipeline.getPushConstantRange(offset).stages),
+                getVkShaderStageFlags(vkPipeline.pushConstantRange(offset).stages),
                 offset,
                 size,
                 data);

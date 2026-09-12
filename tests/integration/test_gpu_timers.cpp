@@ -49,7 +49,7 @@ struct Workload {
 
         Buffer::Builder<std::uint32_t> bufBuilder;
         bufBuilder.setData(input);
-        bufBuilder.addUsage(Buffer::Usage::eStorage);
+        bufBuilder.setUsage(Buffer::Usage::eStorage);
         auto buffer = bufBuilder.build();
 
         Shader::Builder shaderBuilder;
@@ -61,7 +61,7 @@ struct Workload {
         auto pipeline = pipeBuilder.build();
 
         auto descriptorSet =
-            DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
+            DescriptorSet::Builder(pipeline, 0)
                 .write(0, buffer)
                 .build();
 
@@ -69,8 +69,8 @@ struct Workload {
     }
 
     void record(CommandBuffer& cb) const {
-        cb.BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
-        cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, descriptorSet);
         for (std::uint32_t i = 0; i < kDispatches; ++i)
             cb.Dispatch(kCount / kLocalSize, 1, 1);
     }
@@ -101,12 +101,12 @@ TEST_F(GpuTest, TimerReportsPositiveGpuTimeAfterTheNextRecording) {
 
     // The deferral, stated as a test: the work is finished on the GPU, but nothing has collected
     // the timestamps yet, because collecting them is what the next Begin() does.
-    EXPECT_TRUE(cb->getTimings().empty())
+    EXPECT_TRUE(cb->timings().empty())
         << "timings appeared before the recording that collects them";
 
     cb->Begin();
 
-    const auto& timings = cb->getTimings();
+    const auto& timings = cb->timings();
     ASSERT_EQ(timings.size(), 1u);
     EXPECT_EQ(timings[0].label, "dispatches");
     EXPECT_EQ(timings[0].depth, 0u);
@@ -139,7 +139,7 @@ TEST_F(GpuTest, NestedTimersReportTheirDepthAndOrder) {
 
     cb->Begin();
 
-    const auto& timings = cb->getTimings();
+    const auto& timings = cb->timings();
     ASSERT_EQ(timings.size(), 2u);
     // Reported in the order the scopes were *opened*, so the enclosing one comes first.
     EXPECT_EQ(timings[0].label, "outer");
@@ -169,10 +169,10 @@ TEST_F(GpuTest, StaleTimingsSurviveARecordingThatTimesNothing) {
     // lack of scopes must not then wipe them, or a UI reading them would flicker to empty whenever
     // a frame happened not to measure anything.
     runAndWait(*cb, [&](CommandBuffer& c) { work.record(c); });
-    ASSERT_EQ(cb->getTimings().size(), 1u);
+    ASSERT_EQ(cb->timings().size(), 1u);
 
     cb->Begin();
-    const auto& timings = cb->getTimings();
+    const auto& timings = cb->timings();
     ASSERT_EQ(timings.size(), 1u);
     EXPECT_EQ(timings[0].label, "measured");
     cb->End();
@@ -180,7 +180,7 @@ TEST_F(GpuTest, StaleTimingsSurviveARecordingThatTimesNothing) {
 
 
 // The one-shot path: a command buffer that is submitted once and never re-recorded, which is what
-// a job's compute pass is. Waiting for the next Begin() would mean waiting forever, so CollectTimer
+// a job's compute pass is. Waiting for the next Begin() would mean waiting forever, so collectTimer
 // goes and fetches the timestamps itself.
 TEST_F(GpuTest, CollectTimerReadsAResultWithoutAnotherRecording) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
@@ -194,20 +194,20 @@ TEST_F(GpuTest, CollectTimerReadsAResultWithoutAnotherRecording) {
     });
 
     // No second Begin() anywhere in this test — that is the whole point.
-    const auto milliseconds = cb->CollectTimer("sort");
+    const auto milliseconds = cb->collectTimer("sort");
     ASSERT_TRUE(milliseconds.has_value()) << milliseconds.error().message;
     EXPECT_GT(*milliseconds, 0.0);
     EXPECT_LT(*milliseconds, 1000.0);
 
     // Idempotent: the results stay readable once fetched, so a caller may ask again — or ask for a
     // second scope — without the first call having consumed them.
-    const auto again = cb->CollectTimer("sort");
+    const auto again = cb->collectTimer("sort");
     ASSERT_TRUE(again.has_value()) << again.error().message;
     EXPECT_DOUBLE_EQ(*again, *milliseconds);
 
     // And the plural form sees the same set.
-    ASSERT_EQ(cb->CollectTimings().size(), 1u);
-    EXPECT_EQ(cb->CollectTimings().front().label, "sort");
+    ASSERT_EQ(cb->collectTimings().size(), 1u);
+    EXPECT_EQ(cb->collectTimings().front().label, "sort");
 }
 
 // A name that was never recorded is a mistake in the caller's code, and has to read as one rather
@@ -223,7 +223,7 @@ TEST_F(GpuTest, CollectTimerNamesTheTimerItCannotFind) {
         c.Timer("sort", [&](CommandBuffer& inner) { work.record(inner); });
     });
 
-    const auto missing = cb->CollectTimer("scan");
+    const auto missing = cb->collectTimer("scan");
     ASSERT_FALSE(missing.has_value());
     EXPECT_NE(missing.error().message.find("scan"), std::string::npos) << missing.error().message;
     // Specifically not the in-flight message: the work is done, the name is simply wrong.
@@ -231,7 +231,7 @@ TEST_F(GpuTest, CollectTimerNamesTheTimerItCannotFind) {
         << "a misspelled name was reported as unfinished work: " << missing.error().message;
 }
 
-// getTimings() stays a plain accessor — it must not go and fetch, or the recurring path would
+// timings() stays a plain accessor — it must not go and fetch, or the recurring path would
 // collect at unpredictable moments instead of once per Begin().
 TEST_F(GpuTest, GetTimingsDoesNotFetchButCollectTimingsDoes) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
@@ -244,9 +244,9 @@ TEST_F(GpuTest, GetTimingsDoesNotFetchButCollectTimingsDoes) {
         c.Timer("sort", [&](CommandBuffer& inner) { work.record(inner); });
     });
 
-    EXPECT_TRUE(cb->getTimings().empty()) << "getTimings() collected results on its own";
-    EXPECT_EQ(cb->CollectTimings().size(), 1u);
-    EXPECT_EQ(cb->getTimings().size(), 1u) << "what CollectTimings fetched must stay readable";
+    EXPECT_TRUE(cb->timings().empty()) << "timings() collected results on its own";
+    EXPECT_EQ(cb->collectTimings().size(), 1u);
+    EXPECT_EQ(cb->timings().size(), 1u) << "what collectTimings fetched must stay readable";
 }
 
 
@@ -282,7 +282,7 @@ TEST_F(GpuTest, UnclosedTimerIsReportedAtEnd) {
 
     // And nothing is published from a recording that could not resolve.
     cb->Begin();
-    EXPECT_TRUE(cb->getTimings().empty());
+    EXPECT_TRUE(cb->timings().empty());
     cb->End();
 }
 

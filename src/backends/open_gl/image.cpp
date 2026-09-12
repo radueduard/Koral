@@ -14,16 +14,16 @@
 
 namespace kor::ogl
 {
-    GLenum GetTargetFromImageType(const kor::Image::Type type, const kor::MSAA msaa, const glm::u32 arrayLayers)
+    GLenum GetTargetFromImageType(const kor::Image::Type type, const kor::SampleCount msaa, const glm::u32 arrayLayers)
     {
         switch (type) {
         case kor::Image::Type::e1D:
             return arrayLayers == 1 ? GL_TEXTURE_1D : GL_TEXTURE_1D_ARRAY;
         case kor::Image::Type::e2D:
             if (arrayLayers == 1) {
-                return msaa == kor::MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
+                return msaa == kor::SampleCount::e1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE;
             } else {
-                return msaa == kor::MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
+                return msaa == kor::SampleCount::e1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
             }
         case kor::Image::Type::e3D:
             return GL_TEXTURE_3D;
@@ -34,7 +34,7 @@ namespace kor::ogl
 
     Image::Image(const kor::Image::Builder& createInfo) : kor::Image(createInfo)
     {
-        if (createInfo.msaa != MSAA::eNone && createInfo.type != Type::e2D) {
+        if (createInfo.sampleCount != SampleCount::e1 && createInfo.type != Type::e2D) {
             std::cerr << "Error: Multisampled images are only supported for 2D images! Attempting to create a multisampled image with type " << magic_enum::enum_name(createInfo.type) << std::endl;
         }
 
@@ -42,12 +42,12 @@ namespace kor::ogl
             std::cerr << "Error: Multisampled images are not supported!" << std::endl;
         }
 
-        if (IsDepthStencilFormat(createInfo.format) && createInfo.type != Type::e2D) {
+        if (isDepthStencilFormat(createInfo.format) && createInfo.type != Type::e2D) {
             std::cerr << "Error: Depth/stencil formats are only supported for 2D images! Attempting to create a depth/stencil image with type " << magic_enum::enum_name(createInfo.type) << std::endl;
         }
 
 
-        // Determine the appropriate OpenGL texture target based on the image type and MSAA settings
+        // Determine the appropriate OpenGL texture target based on the image type and SampleCount settings
         GLenum target;
         switch (createInfo.type) {
         case Type::e1D:
@@ -55,8 +55,8 @@ namespace kor::ogl
             break;
         case Type::e2D:
             target = createInfo.arrayLayers == 1
-                ? (createInfo.msaa == MSAA::eNone ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
-                : (createInfo.msaa == MSAA::eNone ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
+                ? (createInfo.sampleCount == SampleCount::e1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
+                : (createInfo.sampleCount == SampleCount::e1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
             break;
         case Type::e3D:
             target = GL_TEXTURE_3D;
@@ -83,16 +83,16 @@ namespace kor::ogl
         } else if (createInfo.type == kor::Image::Type::e1D && createInfo.arrayLayers > 1) {
             glTexStorage2D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.arrayLayers);
         } else if (createInfo.type == kor::Image::Type::e2D && createInfo.arrayLayers == 1) {
-            if (createInfo.msaa == kor::MSAA::eNone) {
+            if (createInfo.sampleCount == kor::SampleCount::e1) {
                 glTexStorage2D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y);
             } else {
-                glTexStorage2DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, GL_TRUE);
+                glTexStorage2DMultisample(target, static_cast<GLsizei>(createInfo.sampleCount), internalFormat, createInfo.extent.x, createInfo.extent.y, GL_TRUE);
             }
         } else if (createInfo.type == kor::Image::Type::e2D && createInfo.arrayLayers > 1) {
-            if (createInfo.msaa == kor::MSAA::eNone) {
+            if (createInfo.sampleCount == kor::SampleCount::e1) {
                 glTexStorage3D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers);
             } else {
-                glTexStorage3DMultisample(target, static_cast<GLsizei>(createInfo.msaa), internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers, GL_TRUE);
+                glTexStorage3DMultisample(target, static_cast<GLsizei>(createInfo.sampleCount), internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.arrayLayers, GL_TRUE);
             }
         } else if (createInfo.type == kor::Image::Type::e3D) {
             glTexStorage3D(target, _mipLevels, internalFormat, createInfo.extent.x, createInfo.extent.y, createInfo.extent.z);
@@ -116,7 +116,7 @@ namespace kor::ogl
         // Image views forward to the image's current id (see ImageView::operator*),
         // so they keep working across the swap — but the generation is still bumped, because the
         // contract is shared with Vulkan and something other than a view may be watching it.
-        const GLenum target = GetTargetFromImageType(_type, _msaa, _arrayLayers);
+        const GLenum target = GetTargetFromImageType(_type, _sampleCount, _arrayLayers);
         glDeleteTextures(1, &_id);
         glCreateTextures(target, 1, &_id);
         glBindTexture(target, _id);
@@ -130,16 +130,16 @@ namespace kor::ogl
         } else if (_type == Type::e1D && _arrayLayers > 1) {
             glTexStorage2D(target, _mipLevels, internalFormat, extent.x, _arrayLayers);
         } else if (_type == Type::e2D && _arrayLayers == 1) {
-            if (_msaa == MSAA::eNone) {
+            if (_sampleCount == SampleCount::e1) {
                 glTexStorage2D(target, _mipLevels, internalFormat, extent.x, extent.y);
             } else {
-                glTexStorage2DMultisample(target, static_cast<GLsizei>(_msaa), internalFormat, extent.x, extent.y, GL_TRUE);
+                glTexStorage2DMultisample(target, static_cast<GLsizei>(_sampleCount), internalFormat, extent.x, extent.y, GL_TRUE);
             }
         } else if (_type == Type::e2D && _arrayLayers > 1) {
-            if (_msaa == MSAA::eNone) {
+            if (_sampleCount == SampleCount::e1) {
                 glTexStorage3D(target, _mipLevels, internalFormat, extent.x, extent.y, _arrayLayers);
             } else {
-                glTexStorage3DMultisample(target, static_cast<GLsizei>(_msaa), internalFormat, extent.x, extent.y, _arrayLayers, GL_TRUE);
+                glTexStorage3DMultisample(target, static_cast<GLsizei>(_sampleCount), internalFormat, extent.x, extent.y, _arrayLayers, GL_TRUE);
             }
         } else if (_type == Type::e3D) {
             glTexStorage3D(target, _mipLevels, internalFormat, extent.x, extent.y, extent.z);
@@ -151,7 +151,7 @@ namespace kor::ogl
         }
     }
 
-    bool Image::IsFormatSupported(const kor::Image::Format format, const Flags<kor::Image::Usage> usage)
+    bool Image::isFormatSupported(const kor::Image::Format format, const Flags<kor::Image::Usage> usage)
     {
         // A format the conversion table has no entry for is one this engine cannot make an image of,
         // whatever the driver has.

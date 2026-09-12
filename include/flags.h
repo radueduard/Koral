@@ -8,6 +8,30 @@
 namespace kor
 {
     /**
+     * @brief Opt an enumeration into the bitwise operators below.
+     *
+     * Specialise it as std::true_type next to the enum:
+     *
+     * @code
+     * enum class CullMode : std::uint8_t { eNone = 0, eFront = 1 << 0, eBack = 1 << 1 };
+     * template<> struct enable_flags<CullMode> : std::true_type {};
+     * @endcode
+     *
+     * Opt-in rather than blanket, because the operators below are free templates over *any*
+     * enumeration: unconstrained, they would make `a | b` compile for every scoped enum in the
+     * program — including the ones where two enumerators ORed together mean nothing.
+     *
+     * Only these operators are gated. kor::Flags<E> itself is not, because naming the type is
+     * already deliberate, and because several of these enums are nested in a class that uses
+     * Flags of them in its own body — where no specialisation could be visible yet.
+     */
+    template <class E> struct enable_flags : std::false_type {};
+
+    /** @brief An enumeration whose enumerators are bits, per @ref enable_flags. */
+    template <class E>
+    concept FlagEnum = std::is_enum_v<E> && enable_flags<E>::value;
+
+    /**
      * @brief A type-safe set of bit flags built from a scoped enumeration.
      * @tparam Enum The enumeration whose enumerators are the individual bits. Each must be a
      *         distinct power of two.
@@ -69,6 +93,50 @@ namespace kor
             return *this;
         }
 
+        /** @brief Narrows the set to the bits it shares with @p other. */
+        Flags& operator &=(const Flags& other) {
+            _flags &= other._flags;
+            return *this;
+        }
+
+        /**
+         * @brief The intersection of the two sets.
+         *
+         * Note the asymmetry with operator&(Enum), which answers a bool: testing for one flag is
+         * the common case and reads better as a condition, while masking against several only
+         * makes sense as a set.
+         */
+        Flags operator &(const Flags& other) const {
+            Flags result(*this);
+            result &= other;
+            return result;
+        }
+
+        /** @brief Toggles the bits of @p other in the set. */
+        Flags& operator ^=(const Flags& other) {
+            _flags ^= other._flags;
+            return *this;
+        }
+
+        /** @brief The symmetric difference: the flags in one set or the other, but not both. */
+        Flags operator ^(const Flags& other) const {
+            Flags result(*this);
+            result ^= other;
+            return result;
+        }
+
+        /**
+         * @brief Every bit this set does not hold.
+         *
+         * The complement covers the whole underlying type, not just the enumerators that were
+         * defined, so it is only useful as the right-hand side of an `&`.
+         */
+        Flags operator ~() const {
+            Flags result;
+            result._flags = static_cast<UnderlyingType>(~_flags);
+            return result;
+        }
+
         /**
          * @brief Tests whether a flag is present.
          * @return true if @p flag is in the set.
@@ -104,4 +172,11 @@ namespace kor
     private:
         UnderlyingType _flags;
     };
+
+    // Combining two bare enumerators. Free rather than hidden friends of Flags: the operands are
+    // enumerators, so ADL never reaches Flags<E> and a friend declared there would be unfindable.
+    template <FlagEnum E> Flags<E> operator|(E a, E b) noexcept { return Flags<E>{a} | Flags<E>{b}; }
+    template <FlagEnum E> Flags<E> operator&(E a, E b) noexcept { return Flags<E>{a} & Flags<E>{b}; }
+    template <FlagEnum E> Flags<E> operator^(E a, E b) noexcept { return Flags<E>{a} ^ Flags<E>{b}; }
+    template <FlagEnum E> Flags<E> operator~(E a)      noexcept { return ~Flags<E>{a}; }
 }

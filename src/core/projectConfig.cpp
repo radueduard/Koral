@@ -153,12 +153,12 @@ namespace kor
 
             const auto& doc = *document;
 
-            if (doc.schemaVersion && *doc.schemaVersion > ProjectConfig::kSchemaVersion) {
+            if (doc.schemaVersion && *doc.schemaVersion > ProjectConfig::SchemaVersion) {
                 // Forward-compatible on purpose: a newer file may only *add* keys, which we ignore.
                 // Say so once rather than failing, so an old runtime still starts a new project.
                 log::warn("[config] '{}' declares schema {}, this build understands {}; "
                           "unknown settings will be ignored",
-                          source, *doc.schemaVersion, ProjectConfig::kSchemaVersion);
+                          source, *doc.schemaVersion, ProjectConfig::SchemaVersion);
             }
 
             // The project's name is the window title unless the file names one explicitly — which
@@ -390,7 +390,7 @@ namespace kor
         // in a build directory (<project>/cmake-build-debug/libFoo.so), and the config lives at the
         // project root above it.
         for (; !directory.empty(); directory = directory.parent_path()) {
-            if (auto candidate = directory / kFileName; std::filesystem::is_regular_file(candidate, ec))
+            if (auto candidate = directory / FileName; std::filesystem::is_regular_file(candidate, ec))
                 return candidate;
             if (directory.parent_path() == directory) break;  // reached the filesystem root
         }

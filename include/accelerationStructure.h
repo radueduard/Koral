@@ -13,6 +13,7 @@
  */
 
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <glm/mat4x4.hpp>
 #include <glm/fwd.hpp>
@@ -46,7 +47,7 @@ namespace kor
      * @endcode
      *
      * The TLAS is what a shader binds, through a Descriptor built from it. Requires a device with
-     * ray-tracing support — see Context::SupportsRayTracing(). Structures are built as they are
+     * ray-tracing support — see Context::supportsRayTracing(). Structures are built as they are
      * created, not refitted, so a moving instance means rebuilding the TLAS; the BLAS it refers to
      * can stay.
      */
@@ -54,8 +55,7 @@ namespace kor
     {
     public:
         /** @brief Which level of the two-level structure this is. */
-        enum class Type
-        {
+        enum class Type : std::uint8_t {
             eBottomLevel,   ///< Holds geometry built from meshes.
             eTopLevel,      ///< Holds instances referencing bottom-level structures.
         };
@@ -86,7 +86,7 @@ namespace kor
             glm::u64 indexCount  = 0;       ///< Number of indices; 0 means "all of the mesh's indices".
         };
 
-        struct KORAL_API Builder : ::Builder
+        struct KORAL_API Builder : kor::Builder
         {
             std::vector<Geometry> geometries = {};  ///< Geometry for a bottom-level structure.
             std::vector<Instance> instances = {};   ///< Instances for a top-level structure.
@@ -136,7 +136,7 @@ namespace kor
         AccelerationStructure& operator=(const AccelerationStructure&) = delete;
 
         /** @brief Whether this is a bottom-level or top-level structure. */
-        [[nodiscard]] Type getType() const { return _type; }
+        [[nodiscard]] Type type() const { return _type; }
 
     protected:
         explicit AccelerationStructure(const Builder& createInfo);

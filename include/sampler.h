@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <cstdint>
 #include <memory>
 
 #include "structs.h"
@@ -32,7 +33,7 @@ namespace kor
      *     .setMipmapMode(kor::Sampler::MipmapMode::eLinear)
      *     .setAnisotropyEnable(true)
      *     .setMaxAnisotropy(16.f)
-     *     .setMaxLod(static_cast<float>(texture->getMipLevels()))
+     *     .setMaxLod(static_cast<float>(texture->mipLevels()))
      *     .build();
      * @endcode
      *
@@ -42,13 +43,13 @@ namespace kor
     {
     public:
         /** @brief How the two nearest mip levels are combined. */
-        enum class MipmapMode {
+        enum class MipmapMode : std::uint8_t {
             eNearest,   ///< Take the single closest level. Cheaper, and visibly seams where the level changes.
             eLinear     ///< Blend the two closest levels — trilinear filtering.
         };
 
         /** @brief What happens when a texture coordinate falls outside 0..1. */
-        enum class AddressMode {
+        enum class AddressMode : std::uint8_t {
             eRepeat,            ///< Tile the texture. The default, and what a tiling material wants.
             eMirroredRepeat,    ///< Tile, mirroring alternate copies, which hides the seam.
             eClampToEdge,       ///< Stretch the edge texel outwards. What a full-screen or UI texture wants.
@@ -56,7 +57,7 @@ namespace kor
         };
 
         /** @brief Describes the sampler to create. */
-        struct KORAL_API Builder : ::Builder
+        struct KORAL_API Builder : kor::Builder
         {
             Filter minFilter = Filter::eLinear;                 ///< Filtering when the texture is minified.
             Filter magFilter = Filter::eLinear;                 ///< Filtering when the texture is magnified.

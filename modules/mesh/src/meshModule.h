@@ -22,7 +22,7 @@ namespace kmesh
     class MeshModule final : public kor::Module
     {
     public:
-        static constexpr std::string_view kModuleId      = kmesh::kModuleId;
-        static constexpr std::uint32_t    kModuleVersion = kmesh::kModuleVersion;
+        static constexpr std::string_view ModuleId      = kmesh::ModuleId;
+        static constexpr std::uint32_t    ModuleVersion = kmesh::ModuleVersion;
     };
 }

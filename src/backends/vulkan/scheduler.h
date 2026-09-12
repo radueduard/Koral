@@ -50,15 +50,23 @@ namespace kor::vk
     	Scheduler(const Scheduler &) = delete;
     	Scheduler &operator=(const Scheduler &) = delete;
 
-    	void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const override;
+    	void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) override;
 
     	[[nodiscard]] const kor::vk::SwapChain &getSwapChain() const { return *_swapChain; }
     	[[nodiscard]] bool isResized() const { return _resized; }
-		glm::u32 getCurrentImageIndex() const override { return _swapChain->getCurrentImageIndex(); }
+		glm::u32 currentImageIndex() const override { return _swapChain->currentImageIndex(); }
 
 
     private:
     	std::unique_ptr<kor::vk::SwapChain> _swapChain;
+
+    	/// Takes the swap chain's actual image count as this scheduler's, then (re)builds everything
+    	/// sized to it. Runs at Initialize and again on every resize.
+    	void adoptSwapChainSizing();
+
+    	/// Resize the swap chain, re-adopt its sizing, and re-point the default framebuffer — in that
+    	/// order, because each step feeds the next.
+    	void recreateSwapChain(const glm::uvec2& extent);
 
     	void createFrames() override;
 

@@ -3,6 +3,8 @@
 //
 
 #pragma once
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <variant>
@@ -22,8 +24,23 @@ namespace kor
     /**
      * @brief The type of vertex input pipe channels. Used to define the format of vertex attributes in the graphics pipeline.
      */
-    enum class ChannelType : glm::u32
-    {
+    /**
+     * @brief "All of it, from here on" — the whole of a buffer, or every remaining element.
+     *
+     * The one sentinel the API uses for this. A count of 0 means zero, everywhere, so asking for
+     * nothing and asking for everything cannot be confused; leaving the parameter defaulted asks
+     * for everything, which is what it is defaulted to.
+     *
+     * @code
+     * cb.CopyBuffer(src, dst);                  // the whole buffer
+     * const auto all  = buffer->Read<T>();      // every element
+     * const auto some = buffer->Read<T>(16);    // sixteen of them
+     * const auto none = buffer->Read<T>(0);     // none
+     * @endcode
+     */
+    inline constexpr glm::u64 WholeSize = std::numeric_limits<glm::u64>::max();
+
+    enum class ChannelType : std::uint8_t {
         eFloat = 0,
         eInt = 1,
         eUInt = 2,
@@ -35,71 +52,60 @@ namespace kor
     };
 
     /**
-     * @brief The type of descriptor. Used to define the type of resources that can be bound to a descriptor set layout binding.
+     * @brief What a resource is about to be used for, as one value pairing a pipeline stage with an
+     *        access kind.
      *
-     * @note The exact meaning of each descriptor type may vary depending on the graphics API being used, but in general they can be categorized as follows:
+     * The vocabulary barriers are written in: `BufferBarrier(buf, ResourceAccess::eComputeWrite)`
+     * says "a compute shader is about to write this", and the backend turns that into the stage and
+     * access masks its API wants. One enum rather than two independent masks, because the pairs that
+     * make sense are few and the ones that do not are a common source of silent stalls.
+     *
+     * The command buffer also tracks the last access of every resource it touches, so most barriers
+     * are inserted for you; naming one by hand is for the cases it cannot infer.
+     *
+     * The trailing comment on each is the Vulkan stage + access it maps to.
      */
-    enum class PipelineStage {
+    enum class ResourceAccess : std::uint8_t {
         // Compute
-        Compute = 1 << 0,
+        eComputeRead,         // COMPUTE_SHADER + SHADER_READ
+        eComputeWrite,        // COMPUTE_SHADER + SHADER_WRITE
+        eComputeReadWrite,    // COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
 
         // Vertex pipeline
-        VertexInput = 1 << 1,
-        VertexShader = 1 << 2,
-        FragmentShader = 1 << 3,
-        EarlyFragmentTests = 1 << 4,
-        LateFragmentTests = 1 << 5,
-        ColorAttachmentOutput = 1 << 6,
-
-        // Transfer
-        Transfer = 1 << 7,
-
-        // Bottom and top of pipe
-        TopOfPipe = 1 << 8,
-        BottomOfPipe = 1 << 9
-    };
-
-    enum class ResourceAccess {
-        // Compute
-        ComputeRead,         // COMPUTE_SHADER + SHADER_READ
-        ComputeWrite,        // COMPUTE_SHADER + SHADER_WRITE
-        ComputeReadWrite,    // COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
-
-        // Vertex pipeline
-        VertexBuffer,        // VERTEX_INPUT + VERTEX_ATTRIBUTE_READ
-        IndexBuffer,         // VERTEX_INPUT + INDEX_READ
-        IndirectBuffer,      // DRAW_INDIRECT + INDIRECT_COMMAND_READ
+        eVertexBuffer,        // VERTEX_INPUT + VERTEX_ATTRIBUTE_READ
+        eIndexBuffer,         // VERTEX_INPUT + INDEX_READ
+        eIndirectBuffer,      // DRAW_INDIRECT + INDIRECT_COMMAND_READ
 
         // Vertex shader
-        VertexShaderRead,    // VERTEX_SHADER + SHADER_READ
-        VertexShaderWrite,   // VERTEX_SHADER + SHADER_WRITE
-        VertexShaderReadWrite, // VERTEX_SHADER + SHADER_READ | SHADER_WRITE
+        eVertexShaderRead,    // VERTEX_SHADER + SHADER_READ
+        eVertexShaderWrite,   // VERTEX_SHADER + SHADER_WRITE
+        eVertexShaderReadWrite, // VERTEX_SHADER + SHADER_READ | SHADER_WRITE
 
         // Fragment shader
-        FragmentShaderRead,  // FRAGMENT_SHADER + SHADER_READ
-        FragmentShaderWrite, // FRAGMENT_SHADER + SHADER_WRITE
-        FragmentShaderReadWrite, // FRAGMENT_SHADER + SHADER_READ | SHADER_WRITE
+        eFragmentShaderRead,  // FRAGMENT_SHADER + SHADER_READ
+        eFragmentShaderWrite, // FRAGMENT_SHADER + SHADER_WRITE
+        eFragmentShaderReadWrite, // FRAGMENT_SHADER + SHADER_READ | SHADER_WRITE
 
         // Attachments
-        ColorAttachment,         // COLOR_ATTACHMENT_OUTPUT + COLOR_ATTACHMENT_WRITE
-        DepthStencilAttachment,  // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
-        DepthStencilRead,        // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
-        DepthAttachment,         // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
-        DepthRead,               // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
-        StencilAttachment,       // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
-        StencilRead,             // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
+        eColorAttachment,         // COLOR_ATTACHMENT_OUTPUT + COLOR_ATTACHMENT_WRITE
+        eDepthStencilAttachment,  // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
+        eDepthStencilRead,        // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
+        eDepthAttachment,         // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
+        eDepthRead,               // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
+        eStencilAttachment,       // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_WRITE
+        eStencilRead,             // EARLY/LATE_FRAGMENT_TESTS + DEPTH_STENCIL_READ
 
         // Transfer
-        TransferSrc,         // TRANSFER + TRANSFER_READ
-        TransferDst,         // TRANSFER + TRANSFER_WRITE
+        eTransferSrc,         // TRANSFER + TRANSFER_READ
+        eTransferDst,         // TRANSFER + TRANSFER_WRITE
 
         // General
-        AllShaderRead,          // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ
-        AllShaderWrite,         // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_WRITE
-        AllShaderReadWrite,     // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
+        eAllShaderRead,          // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ
+        eAllShaderWrite,         // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_WRITE
+        eAllShaderReadWrite,     // VERTEX_SHADER | FRAGMENT_SHADER | COMPUTE_SHADER + SHADER_READ | SHADER_WRITE
 
         // Present
-        Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
+        ePresent,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
     };
 
     /**
@@ -115,7 +121,7 @@ namespace kor
      * that is not an image at all. Lives here rather than on Shader so that image.h can name it
      * without pulling in the whole of shader.h. @see Shader::ImageShape, Image::view
      */
-    enum class ImageShape : glm::u8 {
+    enum class ImageShape : std::uint8_t {
         eUnknown,   ///< Not an image binding, or a shape reflection could not name.
         e1D,        ///< `sampler1D`, `image1D`.
         e2D,        ///< `sampler2D`, `image2D`. The ordinary case.
@@ -127,7 +133,7 @@ namespace kor
         eBuffer,    ///< `samplerBuffer`, `imageBuffer` — a texel buffer, viewed through a BufferView.
     };
 
-    enum class DescriptorType {
+    enum class DescriptorType : std::uint8_t {
         eUniformBuffer,             ///< This type of descriptor is used to bind a buffer that contains uniform data,
                                     ///< which is read-only data that is accessed by shaders. Uniform buffers are
                                     ///< typically used to store data that is shared across multiple draw calls,
@@ -229,8 +235,7 @@ namespace kor
     /**
      * @brief The type of primitive topology. Used to define how the vertices are assembled into primitives in the graphics pipeline.
      */
-    enum class Topology : uint8_t
-    {
+    enum class Topology : std::uint8_t {
         ePointList = 0,                 ///< Each vertex represents a single point.
         eLineList = 1,                  ///< Every two vertices form a separate line segment.
         eLineStrip = 2,                 ///< The first two vertices form the first line segment, and each subsequent vertex forms a new line segment with the previous vertex.
@@ -258,8 +263,7 @@ namespace kor
     /**
      * @brief The type of polygon mode. Used to define how polygons are rasterized in the graphics pipeline.
      */
-    enum class PolygonMode : uint8_t
-    {
+    enum class PolygonMode : std::uint8_t {
         eFill = 0,      ///< Polygons are filled in. This is the default mode and the most common one for rendering solid objects.
         eLine = 1,      ///< Polygons are rasterized as wireframes, with only the edges of the polygons being drawn. This can be useful for debugging or for rendering wireframe models.
         ePoint = 2      ///< Polygons are rasterized as points, with only the vertices of the polygons being drawn. This can be useful for debugging or for rendering point cloud data.
@@ -268,17 +272,16 @@ namespace kor
     /**
      * @brief The type of cull mode. Used to define which faces of polygons are culled (not drawn) in the graphics pipeline.
      */
-    enum class CullMode : uint8_t
-    {
+    enum class CullMode : std::uint8_t {
         eFront = 1,     ///< Front faces of polygons are culled. The definition of front and back faces is determined by the front face setting in the rasterization state.
         eBack = 2,      ///< Back faces of polygons are culled. The definition of front and back faces is determined by the front face setting in the rasterization state.
     };
+    template<> struct enable_flags<CullMode> : std::true_type {};
 
     /**
      * @brief The type of front face. Used to define which faces of polygons are considered front-facing in the graphics pipeline.
      */
-    enum class FrontFace : bool
-    {
+    enum class FrontFace : std::uint8_t {
         eCounterClockwise = false,  ///< Polygons with vertices in counter-clockwise order are considered front-facing. This is the default setting and the most common one.
         eClockwise = true           ///< Polygons with vertices in clockwise order are considered front-facing. This can be useful if your modeling software exports models with a different winding order than the default.
     };
@@ -303,8 +306,7 @@ namespace kor
     /**
      * @brief The type of sample count for multisampling. Used to define the number of samples per pixel for multisampled images and framebuffers in the graphics pipeline.
      */
-    enum class SampleCount : uint8_t
-    {
+    enum class SampleCount : std::uint8_t {
         e1 = 1,
         e2 = 2,
         e4 = 4,
@@ -327,8 +329,7 @@ namespace kor
     /**
      * @brief The type of comparison operation. Used to define the comparison function for depth testing and stencil testing in the graphics pipeline.
      */
-    enum class CompareOp : uint8_t
-    {
+    enum class CompareOp : std::uint8_t {
         eNever = 0,             ///< The comparison always fails, meaning that the fragment will be discarded. This can be useful for rendering techniques that require manual control over which fragments are drawn, such as stencil masking or depth pre-pass.
         eLess = 1,              ///< The comparison passes if the fragment's depth value is less than the existing depth value in the depth buffer. This is the default depth comparison function and is commonly used for rendering solid objects.
         eEqual = 2,             ///< The comparison passes if the fragment's depth value is equal to the existing depth value in the depth buffer. This can be useful for rendering techniques that require exact depth matches, such as decals or shadow maps.
@@ -342,8 +343,7 @@ namespace kor
     /**
      * @brief The type of stencil operation. Used to define the operations that are performed on the stencil buffer during stencil testing in the graphics pipeline.
      */
-    enum class StencilOp : uint8_t
-    {
+    enum class StencilOp : std::uint8_t {
         eKeep = 0,                  ///< Keep the existing stencil value. This is the default operation and is commonly used when you want to preserve the current stencil buffer contents.
         eZero = 1,                  ///< Set the stencil value to zero. This can be useful for clearing the stencil buffer or for rendering techniques that require resetting the stencil value, such as stencil shadows or outlining.
         eReplace = 2,               ///< Replace the stencil value with a reference value specified in the stencil state. This can be useful for rendering techniques that require setting specific stencil values, such as stencil masking or for certain shadow mapping techniques.
@@ -363,9 +363,9 @@ namespace kor
         StencilOp passOp = StencilOp::eKeep;        ///< The operation to perform when the stencil test passes. For example, if the pass operation is eIncrementAndClamp, the stencil value will be incremented by one (and clamped to the maximum representable value) when the stencil test passes.
         StencilOp depthFailOp = StencilOp::eKeep;   ///< The operation to perform when the stencil test passes but the depth test fails. For example, if the depth fail operation is eDecrementAndClamp, the stencil value will be decremented by one (and clamped to zero) when the stencil test passes but the depth test fails.
         CompareOp compareOp = CompareOp::eAlways;   ///< The comparison function to use for the stencil test. For example, if the compare operation is eEqual, the stencil test will pass if the stencil value is equal to the reference value specified in the stencil state.
-        uint32_t compareMask = 0;                   ///< The mask that is applied to both the stencil value and the reference value during stencil testing. This can be used to ignore certain bits of the stencil value when performing the comparison, which can be useful for rendering techniques that require partial stencil testing, such as stencil shadows or for certain shadow mapping techniques.
-        uint32_t writeMask = 0;                     ///< The mask that is applied to the stencil value when writing to the stencil buffer. This can be used to ignore certain bits of the stencil value when performing stencil operations, which can be useful for rendering techniques that require partial stencil updates, such as stencil shadows or for certain shadow mapping techniques.
-        uint32_t reference = 0;                     ///< The reference value that is used in stencil testing and stencil operations. This value is compared against the stencil value in the stencil buffer using the specified compare operation, and is also used in stencil operations that require a reference value (e.g., eReplace).
+        glm::u32 compareMask = 0;                   ///< The mask that is applied to both the stencil value and the reference value during stencil testing. This can be used to ignore certain bits of the stencil value when performing the comparison, which can be useful for rendering techniques that require partial stencil testing, such as stencil shadows or for certain shadow mapping techniques.
+        glm::u32 writeMask = 0;                     ///< The mask that is applied to the stencil value when writing to the stencil buffer. This can be used to ignore certain bits of the stencil value when performing stencil operations, which can be useful for rendering techniques that require partial stencil updates, such as stencil shadows or for certain shadow mapping techniques.
+        glm::u32 reference = 0;                     ///< The reference value that is used in stencil testing and stencil operations. This value is compared against the stencil value in the stencil buffer using the specified compare operation, and is also used in stencil operations that require a reference value (e.g., eReplace).
     };
 
     /**
@@ -390,8 +390,7 @@ namespace kor
     /**
      * @brief The type of blend mode. Used to define the blending operation for color blending in the graphics pipeline.
      */
-    enum class BlendMode : uint8_t
-    {
+    enum class BlendMode : std::uint8_t {
         eAdd = 0,               ///< The source and destination colors are added together. This is the default blending mode and is commonly used for rendering transparent objects.
         eSubtract = 1,          ///< The destination color is subtracted from the source color. This can be useful for rendering techniques that require subtractive blending, such as certain particle effects or for certain shadow mapping techniques.
         eReverseSubtract = 2,   ///< The source color is subtracted from the destination color. This can be useful for rendering techniques that require reverse subtractive blending, such as certain particle effects or for certain shadow mapping techniques.
@@ -402,8 +401,7 @@ namespace kor
     /**
      * @brief The type of blend factor. Used to define the blend factors for color blending in the graphics pipeline.
      */
-    enum class BlendFactor : uint8_t
-    {
+    enum class BlendFactor : std::uint8_t {
         eZero = 0,
         eOne = 1,
         eSrcColor = 2,
@@ -422,8 +420,7 @@ namespace kor
     /**
      * @brief The type of logic operation. Used to define the logic operation for color blending in the graphics pipeline when logic operations are enabled.
      */
-    enum class LogicOp : uint8_t
-    {
+    enum class LogicOp : std::uint8_t {
         eClear = 0,
         eAnd = 1,
         eAndReverse = 2,
@@ -445,8 +442,7 @@ namespace kor
     /**
      * @brief The type of blend operation. Used to define the blend operation for color blending in the graphics pipeline when blending is enabled.
      */
-    enum class BlendOp : uint8_t
-    {
+    enum class BlendOp : std::uint8_t {
         eAdd = 0,
         eSubtract = 1,
         eReverseSubtract = 2,
@@ -457,19 +453,18 @@ namespace kor
     /**
      * @brief The type of color component. Used to define which color components are affected by color blending operations in the graphics pipeline.
      */
-    enum class ColorComponent : uint8_t
-    {
+    enum class ColorComponent : std::uint8_t {
         eR = 1,
         eG = 2,
         eB = 4,
         eA = 8
     };
+    template<> struct enable_flags<ColorComponent> : std::true_type {};
 
     /**
      * @brief The type of resolve mode. Used to define how multisampled images are resolved to single-sampled images in the graphics pipeline.
      */
-    enum class ResolveMode : uint8_t
-    {
+    enum class ResolveMode : std::uint8_t {
         eNone = 0,          ///< No resolve operation is performed.
         eSampleZero = 1,    ///< The value of the first sample (sample index 0) is used as the resolved value.
         eAverage = 2,       ///< The average of all samples in the pixel is calculated and used as the resolved value.
@@ -483,8 +478,7 @@ namespace kor
      * Used both by samplers (how a shader reads a texture) and by CommandBuffer::Blit (how the
      * source rectangle is stretched onto a destination of a different size).
      */
-    enum class Filter
-    {
+    enum class Filter : std::uint8_t {
         eNearest,   ///< Take the single nearest texel. Exact and blocky; the right choice when the source and destination are the same size, or for data that must not be interpolated (IDs, indices, masks).
         eLinear,    ///< Interpolate between the neighbouring texels. Smooth, and what you want when scaling a colour image up or down.
     };
@@ -494,10 +488,10 @@ namespace kor
      */
     struct KORAL_API IndirectDrawCommand
     {
-        uint32_t vertexCount;
-        uint32_t instanceCount;
-        uint32_t firstVertex;
-        uint32_t firstInstance;
+        glm::u32 vertexCount;
+        glm::u32 instanceCount;
+        glm::u32 firstVertex;
+        glm::u32 firstInstance;
     };
 
     /**
@@ -505,11 +499,11 @@ namespace kor
      */
     struct KORAL_API IndirectDrawIndexedCommand
     {
-        uint32_t indexCount;
-        uint32_t instanceCount;
-        uint32_t firstIndex;
+        glm::u32 indexCount;
+        glm::u32 instanceCount;
+        glm::u32 firstIndex;
         int32_t vertexOffset;
-        uint32_t firstInstance;
+        glm::u32 firstInstance;
     };
 
     /**
@@ -517,9 +511,9 @@ namespace kor
      */
     struct KORAL_API IndirectDrawMeshTasksCommand
     {
-        uint32_t taskCountX;
-        uint32_t taskCountY;
-        uint32_t taskCountZ;
+        glm::u32 taskCountX;
+        glm::u32 taskCountY;
+        glm::u32 taskCountZ;
     };
 
     // =========================================================================
@@ -556,12 +550,12 @@ namespace kor
             const kor::ResourceRef<const kor::Buffer> &buffer,
             ResourceAccess dstAccess,
             glm::u64 offset = 0,
-            glm::u64 size = UINT64_MAX);
+            glm::u64 size = WholeSize);
 
-        [[nodiscard]] kor::ResourceRef<const kor::Buffer> getBuffer() const { return _buffer; }
-        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
-        [[nodiscard]] glm::u64 getOffset() const { return _offset; }
-        [[nodiscard]] glm::u64 getSize() const { return _size; }
+        [[nodiscard]] kor::ResourceRef<const kor::Buffer> buffer() const { return _buffer; }
+        [[nodiscard]] ResourceAccess dstAccess() const { return _dstAccess; }
+        [[nodiscard]] glm::u64 offset() const { return _offset; }
+        [[nodiscard]] glm::u64 size() const { return _size; }
 
     private:
         kor::ResourceRef<const kor::Buffer> _buffer;
@@ -576,7 +570,7 @@ namespace kor
      * The image counterpart of BufferBarrier, and the same advice applies: the command buffer
      * does this for you, and a barrier you write yourself suppresses the automatic one for the
      * subresources it names. Unlike a buffer, an image also carries a *layout* the driver picks
-     * from the access — transitioning to ResourceAccess::TransferDst, for instance, is what makes
+     * from the access — transitioning to ResourceAccess::eTransferDst, for instance, is what makes
      * the image a legal copy destination.
      *
      * Every subresource argument defaults to nullopt, meaning the whole image. Give them to
@@ -601,12 +595,12 @@ namespace kor
             std::optional<glm::u32> baseArrayLayer = std::nullopt,
             std::optional<glm::u32> layerCount = std::nullopt);
 
-        [[nodiscard]] kor::ResourceRef<const kor::Image> getImage() const { return _image; }
-        [[nodiscard]] ResourceAccess getDstAccess() const { return _dstAccess; }
-        [[nodiscard]] std::optional<glm::u32> getBaseMipLevel() const { return _baseMipLevel; }
-        [[nodiscard]] std::optional<glm::u32> getLevelCount() const { return _levelCount; }
-        [[nodiscard]] std::optional<glm::u32> getBaseArrayLayer() const { return _baseArrayLayer; }
-        [[nodiscard]] std::optional<glm::u32> getLayerCount() const { return _layerCount; }
+        [[nodiscard]] kor::ResourceRef<const kor::Image> image() const { return _image; }
+        [[nodiscard]] ResourceAccess dstAccess() const { return _dstAccess; }
+        [[nodiscard]] std::optional<glm::u32> baseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] std::optional<glm::u32> levelCount() const { return _levelCount; }
+        [[nodiscard]] std::optional<glm::u32> baseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] std::optional<glm::u32> layerCount() const { return _layerCount; }
 
     private:
         kor::ResourceRef<const kor::Image> _image;
@@ -643,7 +637,7 @@ namespace kor
      * @brief Which region of which image CommandBuffer::Resolve reads, and where it writes it.
      *
      * A resolve collapses a multisampled image into a single-sampled one — the step that turns
-     * an MSAA render target into something that can be sampled or presented. It is a Blit without
+     * an SampleCount render target into something that can be sampled or presented. It is a Blit without
      * the filter: the samples of each pixel are combined by the resolve mode, not interpolated,
      * so the two extents are expected to match.
      */
@@ -683,7 +677,7 @@ namespace kor
     /**
      * @brief What happens to an attachment's existing contents when a render pass opens.
      */
-    enum class LoadOperation {
+    enum class LoadOperation : std::uint8_t {
         eLoad,      ///< Keep what is already in the attachment and draw over it. Costs the bandwidth of reading it back, and is what you want when adding to an image rendered earlier in the frame.
         eClear,     ///< Fill the attachment with its clear value first. Usually the cheapest way to start a pass, because the hardware never has to read the old contents.
         eDontCare   ///< Leave the contents undefined. Only correct when the pass writes every pixel it will later read; anything else reads garbage that differs between GPUs.
@@ -692,7 +686,7 @@ namespace kor
     /**
      * @brief What happens to an attachment's contents when a render pass closes.
      */
-    enum class StoreOperation {
+    enum class StoreOperation : std::uint8_t {
         eStore,     ///< Write the results back to memory, so a later pass — or the display — can read them.
         eDontCare   ///< Discard them. Right for a depth buffer nothing reads after the pass, and it saves the bandwidth of writing it out.
     };
@@ -758,12 +752,12 @@ namespace kor
         RenderInfo(const kor::ResourceRef<kor::Framebuffer>& framebuffer);
         RenderInfo(const kor::Resource<kor::Framebuffer>& framebuffer);
 
-        RenderInfo& setColorLoadOperation(const kor::LoadOperation op) { colorLoadOperation = op; return *this; }
-        RenderInfo& setDepthLoadOperation(const kor::LoadOperation op) { depthLoadOperation = op; return *this; }
-        RenderInfo& setStencilLoadOperation(const kor::LoadOperation op) { stencilLoadOperation = op; return *this; }
-        RenderInfo& setColorStoreOperation(const kor::StoreOperation op) { colorStoreOperation = op; return *this; }
-        RenderInfo& setDepthStoreOperation(const kor::StoreOperation op) { depthStoreOperation = op; return *this; }
-        RenderInfo& setStencilStoreOperation(const kor::StoreOperation op) { stencilStoreOperation = op; return *this; }
+        RenderInfo& setColorLoadOperation(const kor::LoadOperation op) { _colorLoadOperation = op; return *this; }
+        RenderInfo& setDepthLoadOperation(const kor::LoadOperation op) { _depthLoadOperation = op; return *this; }
+        RenderInfo& setStencilLoadOperation(const kor::LoadOperation op) { _stencilLoadOperation = op; return *this; }
+        RenderInfo& setColorStoreOperation(const kor::StoreOperation op) { _colorStoreOperation = op; return *this; }
+        RenderInfo& setDepthStoreOperation(const kor::StoreOperation op) { _depthStoreOperation = op; return *this; }
+        RenderInfo& setStencilStoreOperation(const kor::StoreOperation op) { _stencilStoreOperation = op; return *this; }
 
         /**
          * @brief What colour attachment @p index is cleared to, for this pass only.
@@ -773,25 +767,25 @@ namespace kor
          * Attachments not named here keep the framebuffer's own clear value, so overriding one of
          * five means writing one line, not five.
          */
-        RenderInfo& setClearColor(const size_t index, const ClearColor &color)
+        RenderInfo& setClearColor(const glm::u32 index, const ClearColor &color)
         {
-            if (index >= clearColors.size()) {
-                clearColors.resize(index + 1, std::nullopt);
+            if (index >= _clearColors.size()) {
+                _clearColors.resize(index + 1, std::nullopt);
             }
-            clearColors[index] = color;
+            _clearColors[index] = color;
             return *this;
         }
-        RenderInfo& setClearDepth(const float depth) { clearDepth = depth; return *this; }
-        RenderInfo& setClearStencil(const glm::i32 stencil) { clearStencil = stencil; return *this; }
+        RenderInfo& setClearDepth(const float depth) { _clearDepth = depth; return *this; }
+        RenderInfo& setClearStencil(const glm::i32 stencil) { _clearStencil = stencil; return *this; }
 
-        [[nodiscard]] kor::ResourceRef<const kor::Framebuffer> getFramebuffer() const { return framebuffer; }
+        [[nodiscard]] kor::ResourceRef<const kor::Framebuffer> framebuffer() const { return _framebuffer; }
 
-        [[nodiscard]] kor::LoadOperation getColorLoadOperation() const { return colorLoadOperation; }
-        [[nodiscard]] kor::LoadOperation getDepthLoadOperation() const { return depthLoadOperation; }
-        [[nodiscard]] kor::LoadOperation getStencilLoadOperation() const { return stencilLoadOperation; }
-        [[nodiscard]] kor::StoreOperation getColorStoreOperation() const { return colorStoreOperation; }
-        [[nodiscard]] kor::StoreOperation getDepthStoreOperation() const { return depthStoreOperation; }
-        [[nodiscard]] kor::StoreOperation getStencilStoreOperation() const { return stencilStoreOperation; }
+        [[nodiscard]] kor::LoadOperation colorLoadOperation() const { return _colorLoadOperation; }
+        [[nodiscard]] kor::LoadOperation depthLoadOperation() const { return _depthLoadOperation; }
+        [[nodiscard]] kor::LoadOperation stencilLoadOperation() const { return _stencilLoadOperation; }
+        [[nodiscard]] kor::StoreOperation colorStoreOperation() const { return _colorStoreOperation; }
+        [[nodiscard]] kor::StoreOperation depthStoreOperation() const { return _depthStoreOperation; }
+        [[nodiscard]] kor::StoreOperation stencilStoreOperation() const { return _stencilStoreOperation; }
 
         /**
          * @brief What colour attachment @p index will be cleared to.
@@ -800,13 +794,13 @@ namespace kor
          * run. Black for an attachment neither of them describes, which cannot happen for a pass
          * recorded through BeginRendering.
          */
-        [[nodiscard]] const ClearColor& getClearColor(glm::u32 index) const;
+        [[nodiscard]] const ClearColor& clearColor(glm::u32 index) const;
 
         /** @brief What the depth attachment will be cleared to; the far plane if nothing said. */
-        [[nodiscard]] float getClearDepth() const { return clearDepth.value_or(1.f); }
+        [[nodiscard]] float clearDepth() const { return _clearDepth.value_or(1.f); }
 
         /** @brief What the stencil attachment will be cleared to; 0 if nothing said. */
-        [[nodiscard]] glm::i32 getClearStencil() const { return clearStencil.value_or(0); }
+        [[nodiscard]] glm::i32 clearStencil() const { return _clearStencil.value_or(0); }
 
         /**
          * @brief Fills in every clear value this pass did not set from @p framebuffer's own.
@@ -820,25 +814,25 @@ namespace kor
         void resolveClearValues(const kor::Framebuffer& framebuffer);
 
     private:
-        kor::ResourceRef<const kor::Framebuffer> framebuffer;        ///< The framebuffer the pass will render to. Its attachments determine which of the load/store ops below are used.
+        kor::ResourceRef<const kor::Framebuffer> _framebuffer;        ///< The framebuffer the pass will render to. Its attachments determine which of the load/store ops below are used.
 
-        kor::LoadOperation colorLoadOperation = kor::LoadOperation::eClear;         ///< What the color attachments start from.
-        kor::LoadOperation depthLoadOperation = kor::LoadOperation::eClear;         ///< What the depth attachment starts from.
-        kor::LoadOperation stencilLoadOperation = kor::LoadOperation::eClear;       ///< What the stencil attachment starts from.
+        kor::LoadOperation _colorLoadOperation = kor::LoadOperation::eClear;         ///< What the color attachments start from.
+        kor::LoadOperation _depthLoadOperation = kor::LoadOperation::eClear;         ///< What the depth attachment starts from.
+        kor::LoadOperation _stencilLoadOperation = kor::LoadOperation::eClear;       ///< What the stencil attachment starts from.
 
-        kor::StoreOperation colorStoreOperation = kor::StoreOperation::eStore;      ///< Whether the color results survive the pass.
-        kor::StoreOperation depthStoreOperation = kor::StoreOperation::eStore;      ///< Whether the depth results survive the pass.
-        kor::StoreOperation stencilStoreOperation = kor::StoreOperation::eStore;    ///< Whether the stencil results survive the pass.
+        kor::StoreOperation _colorStoreOperation = kor::StoreOperation::eStore;      ///< Whether the color results survive the pass.
+        kor::StoreOperation _depthStoreOperation = kor::StoreOperation::eStore;      ///< Whether the depth results survive the pass.
+        kor::StoreOperation _stencilStoreOperation = kor::StoreOperation::eStore;    ///< Whether the stencil results survive the pass.
 
-        std::vector<std::optional<ClearColor>> clearColors {};                      ///< Clear values for the color attachments, in the order they are bound. Only used if @ref colorLoadOperation is LoadOperation::eClear.
-        std::optional<float> clearDepth = std::nullopt;                             ///< Clear value for the depth attachment. Only used if @ref depthLoadOperation is LoadOperation::eClear.
-        std::optional<glm::i32> clearStencil = std::nullopt;                        ///< Clear value for the stencil attachment.
+        std::vector<std::optional<ClearColor>> _clearColors {};                      ///< Clear values for the color attachments, in the order they are bound. Only used if @ref colorLoadOperation is LoadOperation::eClear.
+        std::optional<float> _clearDepth = std::nullopt;                             ///< Clear value for the depth attachment. Only used if @ref depthLoadOperation is LoadOperation::eClear.
+        std::optional<glm::i32> _clearStencil = std::nullopt;                        ///< Clear value for the stencil attachment.
     };
 
     /**
      * @brief What one CommandBuffer::BeginTimer / EndTimer scope cost on the GPU.
      *
-     * Produced by CommandBuffer::getTimings(), in the order the scopes were opened. The time is
+     * Produced by CommandBuffer::timings(), in the order the scopes were opened. The time is
      * measured on the device, so it is what the GPU spent, not what the recording thread did.
      *
      * @see CommandBuffer::BeginTimer
@@ -856,7 +850,7 @@ namespace kor
      * and operations — which is how single-pass techniques like stencil shadow volumes count
      * front and back faces against the same buffer.
      */
-    enum class StencilFace : glm::u8 {
+    enum class StencilFace : std::uint8_t {
         eFront = 1,         ///< Front-facing polygons only, as decided by FrontFace.
         eBack = 2,          ///< Back-facing polygons only.
         eFrontAndBack = 3,  ///< Both, with the same value. The usual choice.
@@ -872,7 +866,7 @@ namespace kor
      *
      * @see CommandBuffer::applyDynamicDefaults
      */
-    enum class DynamicState : glm::u32 {
+    enum class DynamicState : std::uint16_t {
         eLineWidth              = 1 << 0,   ///< @see CommandBuffer::SetLineWidth
         eDepthBias              = 1 << 1,   ///< @see CommandBuffer::SetDepthBias
         eBlendConstants         = 1 << 2,   ///< @see CommandBuffer::SetBlendConstants
@@ -890,4 +884,5 @@ namespace kor
         eRasterizerDiscardEnable = 1 << 14, ///< @see CommandBuffer::SetRasterizerDiscardEnable
         ePrimitiveRestartEnable = 1 << 15,  ///< @see CommandBuffer::SetPrimitiveRestartEnable
     };
+    template<> struct enable_flags<DynamicState> : std::true_type {};
 }

@@ -69,7 +69,7 @@ namespace kor
     {
         if (!_shader.has_value())
             return fail(ErrorCode::eMissingShaderStage, "A compute pipeline must have a compute shader.");
-        if ((*_shader)->getStage() != Shader::Stage::eCompute)
+        if ((*_shader)->stage() != Shader::Stage::eCompute)
             return fail(ErrorCode::eShaderStageMismatch, "The shader provided to a compute pipeline must be a compute shader.");
 
         const std::array shaders = { *_shader };

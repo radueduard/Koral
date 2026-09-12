@@ -26,7 +26,7 @@
  *     .build();                                // no per-frame behaviour: entirely the scene's
  *
  * // ... later, in Render()
- * commandBuffer.PushConstants(Push{ _player->viewProjection() });
+ * commandBuffer.PushConstantBlock(Push{ _player->viewProjection() });
  * @endcode
  *
  * Linking the module is what loads it: the library registers itself with the runtime as it is
@@ -88,8 +88,8 @@
 namespace kcam
 {
     /** @brief This module's identity, for another module that declares a dependency on it. */
-    inline constexpr std::string_view kModuleId = "koral.camera";
-    inline constexpr std::uint32_t    kModuleVersion = 1;
+    inline constexpr std::string_view ModuleId = "koral.camera";
+    inline constexpr std::uint32_t    ModuleVersion = 1;
 
     /**
      * @brief What a shader can ask a camera to fill in, written `camera(NAME)`.
@@ -109,24 +109,24 @@ namespace kcam
     namespace semantics
     {
         /** @brief The name a shader annotates with: the `camera` of `camera(VIEW_MATRIX)`. */
-        inline constexpr std::string_view kNamespace = "camera";
+        inline constexpr std::string_view Namespace = "camera";
 
-        inline constexpr std::string_view kViewMatrix                  = "VIEW_MATRIX";
-        inline constexpr std::string_view kProjectionMatrix            = "PROJECTION_MATRIX";
-        inline constexpr std::string_view kViewProjectionMatrix        = "VIEW_PROJECTION_MATRIX";
-        inline constexpr std::string_view kInverseViewMatrix           = "INVERSE_VIEW_MATRIX";
-        inline constexpr std::string_view kInverseProjectionMatrix     = "INVERSE_PROJECTION_MATRIX";
-        inline constexpr std::string_view kInverseViewProjectionMatrix = "INVERSE_VIEW_PROJECTION_MATRIX";
+        inline constexpr std::string_view ViewMatrix                  = "VIEW_MATRIX";
+        inline constexpr std::string_view ProjectionMatrix            = "PROJECTION_MATRIX";
+        inline constexpr std::string_view ViewProjectionMatrix        = "VIEW_PROJECTION_MATRIX";
+        inline constexpr std::string_view InverseViewMatrix           = "INVERSE_VIEW_MATRIX";
+        inline constexpr std::string_view InverseProjectionMatrix     = "INVERSE_PROJECTION_MATRIX";
+        inline constexpr std::string_view InverseViewProjectionMatrix = "INVERSE_VIEW_PROJECTION_MATRIX";
 
-        inline constexpr std::string_view kPosition = "POSITION";
-        inline constexpr std::string_view kForward  = "FORWARD";
-        inline constexpr std::string_view kUp       = "UP";
-        inline constexpr std::string_view kRight    = "RIGHT";
+        inline constexpr std::string_view Position = "POSITION";
+        inline constexpr std::string_view Forward  = "FORWARD";
+        inline constexpr std::string_view Up       = "UP";
+        inline constexpr std::string_view Right    = "RIGHT";
 
-        inline constexpr std::string_view kNearPlane  = "NEAR_PLANE";    ///< float
-        inline constexpr std::string_view kFarPlane   = "FAR_PLANE";     ///< float
+        inline constexpr std::string_view NearPlane  = "NEAR_PLANE";    ///< float
+        inline constexpr std::string_view FarPlane   = "FAR_PLANE";     ///< float
         /** @brief vec4: near, far, far - near, 1 / (far - near). */
-        inline constexpr std::string_view kDepthRange = "DEPTH_RANGE";
+        inline constexpr std::string_view DepthRange = "DEPTH_RANGE";
     }
 
     /**
@@ -553,7 +553,7 @@ namespace kcam
         bool serialize(std::string_view semantic, kor::SemanticSlot& slot) const override = 0;
 
         /** @brief "camera" — what a shader writes in `camera(VIEW_MATRIX)`. */
-        [[nodiscard]] std::string_view semanticNamespace() const override { return semantics::kNamespace; }
+        [[nodiscard]] std::string_view semanticNamespace() const override { return semantics::Namespace; }
 
         /** @brief The blocks this camera has been asked to fill. @see kor::SemanticBuffers */
         kor::SemanticBuffers& semanticBuffers() override = 0;
@@ -630,7 +630,7 @@ namespace kcam
          * @brief Everything a perspective camera starts from. Every field has a usable default, so
          *        `PerspectiveCamera::Builder{}.build()` is already a working camera.
          */
-        struct KCAM_API Builder : ::Builder
+        struct KCAM_API Builder : kor::Builder
         {
             std::string name = "camera";            ///< Label for interfaces and logs.
             float fovY = glm::radians(60.f);        ///< Vertical field of view, in radians.
@@ -750,7 +750,7 @@ namespace kcam
     {
     public:
         /** @brief Everything an orthographic camera starts from. */
-        struct KCAM_API Builder : ::Builder
+        struct KCAM_API Builder : kor::Builder
         {
             std::string name = "camera";            ///< Label for interfaces and logs.
             float left = -1.f, right = 1.f;         ///< Horizontal extent of the view volume.

@@ -36,7 +36,7 @@ namespace kcam
 
             // Built before there is an engine to drive it — from a static initializer, or a test.
             // The camera works; nothing will move it.
-            if (!kor::Context::HasRepository()) {
+            if (!kor::Context::hasRepository()) {
                 kor::log::warn("[camera] '{}' was built before the engine came up; it will not be "
                                "updated automatically. Build cameras from Scene::Initialize onwards.",
                                camera->name());

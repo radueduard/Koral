@@ -44,7 +44,7 @@ namespace kor
     class KORAL_API ComputePipeline : public Pipeline {
     public:
         /** @brief Collects the shader a compute pipeline is compiled from. */
-        struct KORAL_API Builder : ::Builder {
+        struct KORAL_API Builder : kor::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
@@ -68,12 +68,12 @@ namespace kor
             template<typename T> requires std::is_trivially_copyable_v<T>
             Builder& setSpecializationConstant(glm::u32 id, T value) {
                 const glm::u32 valueSize = sizeof(T);
-                if (currentSpecConstantSize + valueSize > specConstantsData.size()) {
+                if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
                     throw std::runtime_error("Exceeded maximum specialization constant data size");
                 }
-                specConstantsMetadata.emplace_back(id, currentSpecConstantSize, valueSize);
-                std::memcpy(specConstantsData.data() + currentSpecConstantSize, &value, valueSize);
-                currentSpecConstantSize += valueSize;
+                specConstantsMetadata.emplace_back(id, _currentSpecConstantSize, valueSize);
+                std::memcpy(specConstantsData.data() + _currentSpecConstantSize, &value, valueSize);
+                _currentSpecConstantSize += valueSize;
                 return *this;
             }
 
@@ -91,7 +91,7 @@ namespace kor
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
 
         private:
-            glm::u32 currentSpecConstantSize = 0;
+            glm::u32 _currentSpecConstantSize = 0;
         };
 
         ~ComputePipeline() override;

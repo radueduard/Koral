@@ -357,7 +357,7 @@ namespace kor::ogl
 
         // Push constants are emitted as a std140 uniform buffer; give that buffer the
         // binding point the pipeline reserved so glBindBufferRange(GL_UNIFORM_BUFFER)
-        // in CommandBuffer::PushConstants targets the same slot the shader reads.
+        // in CommandBuffer::PushConstantBlock targets the same slot the shader reads.
         if (pushConstantBinding.has_value()) {
             for (const auto& resource : resources.push_constant_buffers) {
                 compiler.set_decoration(resource.id, spv::DecorationDescriptorSet, 0);

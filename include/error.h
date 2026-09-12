@@ -37,8 +37,7 @@ namespace kor
      * Each code maps to a stable one-line description via @ref describe, which is
      * also the source of truth for docs/errors.md. Codes are grouped by domain.
      */
-    enum class ErrorCode
-    {
+    enum class ErrorCode : std::uint8_t {
         eNone = 0,             ///< No error (success sentinel).
 
         // --- generic ---
@@ -78,6 +77,9 @@ namespace kor
 
         // --- modules ---
         eModuleLoadFailed,     ///< A module could not be found, loaded, or ordered against its dependencies.
+
+        // --- files ---
+        eFileNotReadable,      ///< A file could not be opened, or its contents are not the shape expected.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */

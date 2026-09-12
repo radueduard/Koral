@@ -183,7 +183,7 @@ namespace kor {
         // built from this shader already refers to, and repairing it in place is what brings
         // all of them back at once.
         if (Context::Repository().contains<Shader>(identifier))
-            return ResourceRef<const Shader>(Context::Repository().getRef<Shader>(identifier));
+            return ResourceRef<const Shader>(Context::Repository().ref<Shader>(identifier));
 
         // Registered whether or not it compiled. A shader that failed to compile has to stay
         // alive, registered and watched — otherwise the file watcher never learns about the
@@ -207,7 +207,7 @@ namespace kor {
             if (!ctx || !shaderRef.alive()) return;
 
             std::vector<std::filesystem::path> dependencies;
-            if (shaderRef.valid()) dependencies = shaderRef->getDependencies();
+            if (shaderRef.valid()) dependencies = shaderRef->dependencies();
             else if (!fallback.empty()) dependencies.push_back(fallback);
 
             for (const auto& dependency : dependencies)
@@ -360,16 +360,19 @@ namespace kor {
         _modified = false;
 
         switch (_lang) {
-        case Lang::eSPIRV:
-            _spirvCode = utils::ReadFileToUIntVector(_path);
+        case Lang::eSPIRV: {
+            auto spirv = utils::ReadFileAsUInts(_path);
+            if (!spirv) throw BackendException(spirv.error());
+            _spirvCode = std::move(*spirv);
             _dependencies = { _path };
             if (_spirvCode.empty())
                 throw BackendException(Error{
                     .code = ErrorCode::eShaderCompileFailed,
-                    .message = std::format("SPIR-V module '{}' is missing or empty.", _path.string()),
+                    .message = std::format("SPIR-V module '{}' is empty.", _path.string()),
                 });
             _valid = true;
             return;
+        }
         case Lang::eSlang: {
             auto result = SlangCompiler::Compile(_module, _entry, searchPaths());
             _spirvCode = std::move(result.spirv);
@@ -399,7 +402,9 @@ namespace kor {
             break; // fall through to the glslang path below
         }
 
-        const auto source = utils::ReadFileAsString(_path);
+        const auto sourceRead = utils::ReadFileAsString(_path);
+        if (!sourceRead) throw BackendException(sourceRead.error());
+        const auto& source = *sourceRead;
         glslang::InitializeProcess();
         const auto eShStage = shaderStageToEShLanguage(_stage);
 
@@ -790,8 +795,10 @@ namespace kor {
     	if (_lang == Lang::eGLSL) {
     		_fieldSemantics.clear();
     		for (const auto& dependency : _dependencies) {
-    			if (const auto text = utils::ReadFileAsString(dependency); !text.empty())
-    				fetchFieldSemantics(text);
+    			// An unreadable dependency is skipped rather than fatal: the shader itself compiled,
+    			// and this pass only harvests field semantics from the files it included.
+    			if (const auto text = utils::ReadFileAsString(dependency); text && !text->empty())
+    				fetchFieldSemantics(*text);
     		}
     	}
 

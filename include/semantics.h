@@ -62,6 +62,7 @@
 #include <glm/glm.hpp>
 
 #include "api.h"
+#include "shaderValue.h"
 #include "error.h"
 #include "resource.h"
 #include "shader.h"
@@ -82,8 +83,14 @@ namespace kor
     {
         friend class DescriptorSet;
     public:
-        /** @brief The scalar a field is made of. */
-        enum class Scalar : std::uint8_t { eFloat, eInt, eUInt, eBool, eDouble, eOther };
+        /**
+         * @brief The scalar a field is made of.
+         *
+         * An alias rather than an enum of its own: this and CommandBuffer::PushConstant's type
+         * check describe the same thing, and two enums with the same six enumerators would only
+         * stay in step by hand. @see kor::ValueScalar
+         */
+        using Scalar = ValueScalar;
 
         SemanticSlot(std::string_view semantic, std::string_view field,
                      Scalar scalar, std::uint8_t rows, std::uint8_t columns,
@@ -97,21 +104,23 @@ namespace kor
 
         /**
          * @brief Writes a value into the field.
-         * @return true if it was written; false if the field is not of that shape, in which case
-         *         the mismatch is recorded and @ref error explains it.
          *
-         * A serializer calls whichever of these matches the value it holds and ignores the result:
-         * the recorded error is what the descriptor set reports, all of them at once, rather than
-         * each caller having to check.
+         * Call whichever matches the value you hold. A field that is not of that shape is not
+         * written and the mismatch is recorded; @ref error explains it, and the descriptor set
+         * reports every such error together rather than a caller checking after each write.
+         *
+         * Returns nothing on purpose. These used to answer bool, which invited a per-call check
+         * that no caller wants and none in the engine ever made — the accumulated error is both
+         * the better report and the one the set actually acts on.
          */
-        bool set(float value);
-        bool set(std::int32_t value);
-        bool set(std::uint32_t value);
-        bool set(const glm::vec2& value);
-        bool set(const glm::vec3& value);
-        bool set(const glm::vec4& value);
-        bool set(const glm::mat3& value);
-        bool set(const glm::mat4& value);
+        void set(float value);
+        void set(std::int32_t value);
+        void set(std::uint32_t value);
+        void set(const glm::vec2& value);
+        void set(const glm::vec3& value);
+        void set(const glm::vec4& value);
+        void set(const glm::mat3& value);
+        void set(const glm::mat4& value);
 
         /** @brief Why the last set() was refused, if it was. */
         [[nodiscard]] const std::optional<Error>& error() const { return _error; }

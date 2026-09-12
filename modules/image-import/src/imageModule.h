@@ -23,8 +23,8 @@ namespace kimg
     class ImageImportModule final : public kor::Module
     {
     public:
-        static constexpr std::string_view kModuleId      = kimg::kImportModuleId;
-        static constexpr std::uint32_t    kModuleVersion = kimg::kImportModuleVersion;
+        static constexpr std::string_view ModuleId      = kimg::ImportModuleId;
+        static constexpr std::uint32_t    ModuleVersion = kimg::ImportModuleVersion;
 
     private:
         // Private on purpose: the runtime dispatches this virtually through kor::Module*, and

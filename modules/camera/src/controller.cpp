@@ -62,10 +62,10 @@ namespace kcam
         {
             float raw = 0.f;
             switch (axis.source) {
-            case AxisSource::eMouseX:  raw = kor::Input::getMousePositionDelta().x; break;
-            case AxisSource::eMouseY:  raw = kor::Input::getMousePositionDelta().y; break;
-            case AxisSource::eScrollX: raw = kor::Input::getMouseScrollDelta().x; break;
-            case AxisSource::eScrollY: raw = kor::Input::getMouseScrollDelta().y; break;
+            case AxisSource::eMouseX:  raw = kor::Input::mousePositionDelta().x; break;
+            case AxisSource::eMouseY:  raw = kor::Input::mousePositionDelta().y; break;
+            case AxisSource::eScrollX: raw = kor::Input::mouseScrollDelta().x; break;
+            case AxisSource::eScrollY: raw = kor::Input::mouseScrollDelta().y; break;
             case AxisSource::eNone:    return 0.f;
             }
             return raw * axis.sensitivity * (axis.invert ? -1.f : 1.f);

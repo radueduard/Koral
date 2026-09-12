@@ -85,7 +85,7 @@ namespace kor
         };
 
         /** @brief Describes a layout binding by binding. */
-        class KORAL_API Builder : public ::Builder
+        class KORAL_API Builder : public kor::Builder
         {
             friend class DescriptorSetLayout;
         public:
@@ -139,16 +139,17 @@ namespace kor
         DescriptorSetLayout& operator=(const DescriptorSetLayout&) = delete;
 
         /**
-         * @brief The bindings, as (binding number, type, count) triples.
-         * @return One entry per declared binding, in binding order.
+         * @brief Every binding, in full — including the block fields reflection found.
+         * @return Keyed by binding number, in binding order.
+         *
+         * The one way to walk a layout. Reach for `| std::views::keys` when only the numbers
+         * matter and `| std::views::values` for the descriptions, and note that a lookup by
+         * binding number is a find() on this rather than a scan.
          */
-        [[nodiscard]] std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> getBindings() const;
-
-        /** @brief Every binding, in full — including the block fields reflection found. */
         [[nodiscard]] const std::map<glm::u32, Binding>& bindings() const { return _bindings; }
 
         /** @brief What kind of resource belongs at @p binding. */
-        [[nodiscard]] DescriptorType getBindingType(glm::u32 binding) const;
+        [[nodiscard]] DescriptorType bindingType(glm::u32 binding) const;
 
         /**
          * @brief The number of the binding the shader calls @p name.
@@ -166,9 +167,6 @@ namespace kor
          * shader to find out what the binding is actually called.
          */
         [[nodiscard]] std::vector<std::string> bindingNames() const;
-
-        /** @brief Full per-binding description, including what the shader does with it. */
-        [[nodiscard]] const std::map<glm::u32, Binding>& getBindingDescriptions() const { return _bindings; }
 
         /**
          * @brief Whether @p builder describes exactly this layout.

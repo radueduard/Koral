@@ -111,7 +111,7 @@ namespace kor
     {
     public:
         /** @brief Collects the shaders and state a graphics pipeline is compiled from. */
-        struct KORAL_API Builder : ::Builder {
+        struct KORAL_API Builder : kor::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
@@ -122,7 +122,7 @@ namespace kor
             std::optional<kor::ResourceRef<const Shader>> fragmentShader = std::nullopt;
             std::optional<kor::ResourceRef<const Shader>> taskShader = std::nullopt;
             std::optional<kor::ResourceRef<const Shader>> meshShader = std::nullopt;
-            std::optional<kor::ResourceRef<Framebuffer>> framebuffer = std::nullopt;
+            std::optional<kor::ResourceRef<const Framebuffer>> framebuffer = std::nullopt;
             std::vector<VertexInputAttributeDescription> vertexAttributeDescriptions = {};
             std::vector<VertexInputBindingDescription> vertexBindingDescriptions = {};
             /// What the vertices hold, by name. Turned into locations at build time by matching it
@@ -196,7 +196,7 @@ namespace kor
              * @param framebuffer The target. Its attachment formats and sample count are compiled
              *        into the pipeline, so it can only be used in a pass on a compatible framebuffer.
              */
-            Builder& setFramebuffer(kor::ResourceRef<Framebuffer> framebuffer);
+            Builder& setFramebuffer(kor::ResourceRef<const Framebuffer> framebuffer);
 
             /**
              * @brief Bakes a specialization constant into every shader stage of this pipeline.
@@ -214,12 +214,12 @@ namespace kor
             template<typename T> requires std::is_trivially_copyable_v<T>
             Builder& setSpecializationConstant(glm::u32 id, T value) {
                 const glm::u32 valueSize = sizeof(T);
-                if (currentSpecConstantSize + valueSize > specConstantsData.size()) {
+                if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
                     throw std::runtime_error("Exceeded maximum specialization constant data size");
                 }
-                specConstantsMetadata.emplace_back(id, currentSpecConstantSize, valueSize);
-                std::memcpy(specConstantsData.data() + currentSpecConstantSize, &value, valueSize);
-                currentSpecConstantSize += valueSize;
+                specConstantsMetadata.emplace_back(id, _currentSpecConstantSize, valueSize);
+                std::memcpy(specConstantsData.data() + _currentSpecConstantSize, &value, valueSize);
+                _currentSpecConstantSize += valueSize;
                 return *this;
             }
 
@@ -237,32 +237,32 @@ namespace kor
             [[nodiscard]] kor::Resource<GraphicsPipeline> build(std::source_location where = std::source_location::current()) const;
 
         private:
-            glm::u32 currentSpecConstantSize = 0;
+            glm::u32 _currentSpecConstantSize = 0;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */
         ~GraphicsPipeline() override;
 
         /** @brief Vertex input binding descriptions, if available. */
-        [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& getVertexBindingDescriptions() const { return _vertexBindingDescriptions; }
+        [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& vertexBindingDescriptions() const { return _vertexBindingDescriptions; }
 
         /** @brief Vertex input attribute descriptions, if available. */
-        [[nodiscard]] const std::optional<std::vector<VertexInputAttributeDescription>>& getVertexAttributeDescriptions() const { return _vertexAttributeDescriptions; }
+        [[nodiscard]] const std::optional<std::vector<VertexInputAttributeDescription>>& vertexAttributeDescriptions() const { return _vertexAttributeDescriptions; }
 
         /** @brief Configured input assembly state. */
-        [[nodiscard]] const InputAssemblyState& getInputAssemblyState() const { return _inputAssemblyState; }
+        [[nodiscard]] const InputAssemblyState& inputAssemblyState() const { return _inputAssemblyState; }
 
         /** @brief Configured rasterization state. */
-        [[nodiscard]] const RasterizationState& getRasterizationState() const { return _rasterizationState; }
+        [[nodiscard]] const RasterizationState& rasterizationState() const { return _rasterizationState; }
 
         /** @brief Configured multisample state. */
-        [[nodiscard]] const MultisampleState& getMultisampleState() const { return _multisampleState; }
+        [[nodiscard]] const MultisampleState& multisampleState() const { return _multisampleState; }
 
         /** @brief Configured depth/stencil state. */
-        [[nodiscard]] const DepthStencilState& getDepthStencilState() const { return _depthStencilState; }
+        [[nodiscard]] const DepthStencilState& depthStencilState() const { return _depthStencilState; }
 
         /** @brief Configured color blend state. */
-        [[nodiscard]] const ColorBlendState& getColorBlendState() const { return _colorBlendState; }
+        [[nodiscard]] const ColorBlendState& colorBlendState() const { return _colorBlendState; }
 
     protected:
         /**

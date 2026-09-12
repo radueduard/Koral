@@ -94,7 +94,7 @@ TEST_F(CameraPanelTest, DrawsWithNoCamerasAtAllAndInsideAWindowOfTheCallersOwn) 
 TEST_F(CameraPanelTest, DrawsEveryControllerKindAndAspectSource) {
     auto image = kor::Image::Builder{}
         .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .addUsage(kor::Image::Usage::eColorAttachment)
+        .setUsage(kor::Image::Usage::eColorAttachment)
         .setExtent(glm::uvec2{ 320, 200 })
         .build();
     ASSERT_TRUE(image);

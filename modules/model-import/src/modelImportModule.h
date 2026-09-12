@@ -20,7 +20,7 @@ namespace kmdl
     class ModelImportModule final : public kor::Module
     {
     public:
-        static constexpr std::string_view kModuleId      = kmdl::kModuleId;
-        static constexpr std::uint32_t    kModuleVersion = kmdl::kModuleVersion;
+        static constexpr std::string_view ModuleId      = kmdl::ModuleId;
+        static constexpr std::uint32_t    ModuleVersion = kmdl::ModuleVersion;
     };
 }

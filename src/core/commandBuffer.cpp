@@ -49,21 +49,21 @@ namespace kor
 
             switch (kind) {
             case Shader::AccessKind::eWrite:
-                if (only(Shader::Stage::eCompute))  return ResourceAccess::ComputeWrite;
-                if (only(Shader::Stage::eVertex))   return ResourceAccess::VertexShaderWrite;
-                if (only(Shader::Stage::eFragment)) return ResourceAccess::FragmentShaderWrite;
-                return ResourceAccess::AllShaderWrite;
+                if (only(Shader::Stage::eCompute))  return ResourceAccess::eComputeWrite;
+                if (only(Shader::Stage::eVertex))   return ResourceAccess::eVertexShaderWrite;
+                if (only(Shader::Stage::eFragment)) return ResourceAccess::eFragmentShaderWrite;
+                return ResourceAccess::eAllShaderWrite;
             case Shader::AccessKind::eReadWrite:
-                if (only(Shader::Stage::eCompute))  return ResourceAccess::ComputeReadWrite;
-                if (only(Shader::Stage::eVertex))   return ResourceAccess::VertexShaderReadWrite;
-                if (only(Shader::Stage::eFragment)) return ResourceAccess::FragmentShaderReadWrite;
-                return ResourceAccess::AllShaderReadWrite;
+                if (only(Shader::Stage::eCompute))  return ResourceAccess::eComputeReadWrite;
+                if (only(Shader::Stage::eVertex))   return ResourceAccess::eVertexShaderReadWrite;
+                if (only(Shader::Stage::eFragment)) return ResourceAccess::eFragmentShaderReadWrite;
+                return ResourceAccess::eAllShaderReadWrite;
             case Shader::AccessKind::eRead:
             default:
-                if (only(Shader::Stage::eCompute))  return ResourceAccess::ComputeRead;
-                if (only(Shader::Stage::eVertex))   return ResourceAccess::VertexShaderRead;
-                if (only(Shader::Stage::eFragment)) return ResourceAccess::FragmentShaderRead;
-                return ResourceAccess::AllShaderRead;
+                if (only(Shader::Stage::eCompute))  return ResourceAccess::eComputeRead;
+                if (only(Shader::Stage::eVertex))   return ResourceAccess::eVertexShaderRead;
+                if (only(Shader::Stage::eFragment)) return ResourceAccess::eFragmentShaderRead;
+                return ResourceAccess::eAllShaderRead;
             }
         }
 
@@ -73,19 +73,19 @@ namespace kor
         bool writes(const ResourceAccess access)
         {
             switch (access) {
-            case ResourceAccess::ComputeWrite:
-            case ResourceAccess::ComputeReadWrite:
-            case ResourceAccess::VertexShaderWrite:
-            case ResourceAccess::VertexShaderReadWrite:
-            case ResourceAccess::FragmentShaderWrite:
-            case ResourceAccess::FragmentShaderReadWrite:
-            case ResourceAccess::AllShaderWrite:
-            case ResourceAccess::AllShaderReadWrite:
-            case ResourceAccess::ColorAttachment:
-            case ResourceAccess::DepthStencilAttachment:
-            case ResourceAccess::DepthAttachment:
-            case ResourceAccess::StencilAttachment:
-            case ResourceAccess::TransferDst:
+            case ResourceAccess::eComputeWrite:
+            case ResourceAccess::eComputeReadWrite:
+            case ResourceAccess::eVertexShaderWrite:
+            case ResourceAccess::eVertexShaderReadWrite:
+            case ResourceAccess::eFragmentShaderWrite:
+            case ResourceAccess::eFragmentShaderReadWrite:
+            case ResourceAccess::eAllShaderWrite:
+            case ResourceAccess::eAllShaderReadWrite:
+            case ResourceAccess::eColorAttachment:
+            case ResourceAccess::eDepthStencilAttachment:
+            case ResourceAccess::eDepthAttachment:
+            case ResourceAccess::eStencilAttachment:
+            case ResourceAccess::eTransferDst:
                 return true;
             default:
                 return false;
@@ -143,15 +143,15 @@ namespace kor
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
-    RenderInfo::RenderInfo() : RenderInfo(Context::DefaultFramebuffer()) {}
+    RenderInfo::RenderInfo() : RenderInfo(Context::defaultFramebuffer()) {}
 
-    RenderInfo::RenderInfo(const kor::ResourceRef<const kor::Framebuffer>& framebuffer) : framebuffer(framebuffer)
+    RenderInfo::RenderInfo(const kor::ResourceRef<const kor::Framebuffer>& framebuffer) : _framebuffer(framebuffer)
     {
         // Sized here so the common case — override one attachment, leave the rest — needs no
         // resizing later. A framebuffer that failed to build has nothing to ask; BeginRendering
         // rejects it by name, and this must not throw before it gets the chance.
         if (framebuffer.valid())
-            clearColors.resize(framebuffer->getColorAttachmentCount(), std::nullopt);
+            _clearColors.resize(framebuffer->colorAttachmentCount(), std::nullopt);
     }
 
     RenderInfo::RenderInfo(const kor::ResourceRef<kor::Framebuffer>& framebuffer)
@@ -160,27 +160,27 @@ namespace kor
     RenderInfo::RenderInfo(const kor::Resource<kor::Framebuffer>& framebuffer)
         : RenderInfo(ResourceRef<const Framebuffer>(framebuffer)) {}
 
-    const ClearColor& RenderInfo::getClearColor(const glm::u32 index) const
+    const ClearColor& RenderInfo::clearColor(const glm::u32 index) const
     {
         // Opaque black, for an attachment that neither the pass nor the framebuffer describes.
         // Unreachable through BeginRendering, which resolves against the framebuffer first.
         static const ClearColor black = glm::vec4(0.f, 0.f, 0.f, 1.f);
-        if (index >= clearColors.size() || !clearColors[index].has_value()) return black;
-        return *clearColors[index];
+        if (index >= _clearColors.size() || !_clearColors[index].has_value()) return black;
+        return *_clearColors[index];
     }
 
     void RenderInfo::resolveClearValues(const kor::Framebuffer& framebuffer)
     {
-        const auto declared = framebuffer.getClearValues().clearColor.size();
-        if (clearColors.size() < declared) clearColors.resize(declared, std::nullopt);
+        const auto declared = framebuffer.clearValues().clearColor.size();
+        if (_clearColors.size() < declared) _clearColors.resize(declared, std::nullopt);
 
-        for (std::size_t i = 0; i < clearColors.size(); ++i) {
-            if (clearColors[i].has_value()) continue;
-            if (i < declared) clearColors[i] = framebuffer.getClearColor(static_cast<glm::u32>(i));
+        for (std::size_t i = 0; i < _clearColors.size(); ++i) {
+            if (_clearColors[i].has_value()) continue;
+            if (i < declared) _clearColors[i] = framebuffer.clearColor(static_cast<glm::u32>(i));
         }
 
-        if (!clearDepth.has_value()) clearDepth = framebuffer.getClearDepth();
-        if (!clearStencil.has_value()) clearStencil = framebuffer.getClearStencil();
+        if (!_clearDepth.has_value()) _clearDepth = framebuffer.clearDepth();
+        if (!_clearStencil.has_value()) _clearStencil = framebuffer.clearStencil();
     }
 
 
@@ -285,7 +285,7 @@ namespace kor
             // rename on one side of the pair, or a field addressed as a whole when the shader
             // nests it (or the other way round).
             std::string available;
-            for (const auto& declared : pipeline->getPushConstants() | std::views::keys) {
+            for (const auto& declared : pipeline->pushConstants() | std::views::keys) {
                 if (!available.empty()) available += ", ";
                 available += declared;
             }
@@ -306,7 +306,7 @@ namespace kor
                                 "A struct is copied as it stands, so the two layouts have to agree — "
                                 "or write its fields one at a time, as '{}.field'.",
                                 name, member->size, size, name));
-            return PushConstants(data, size, member->offset);
+            return PushConstantBlock(data, size, member->offset);
         }
 
         const auto declared = ValueShape{ static_cast<ValueScalar>(member->scalar), member->rows,
@@ -328,7 +328,7 @@ namespace kor
         const glm::u32 elementStride = member->arrayStride > 0 ? member->arrayStride : tightElement;
 
         if (elementStride == tightElement && columnStride == tightColumn)
-            return PushConstants(data, size, member->offset);   // laid out alike; nothing to do
+            return PushConstantBlock(data, size, member->offset);   // laid out alike; nothing to do
 
         std::vector<std::byte> laidOut(member->size, std::byte{});
         const auto* source = static_cast<const std::byte*>(data);
@@ -340,7 +340,7 @@ namespace kor
                 std::memcpy(laidOut.data() + to, source + from, tightColumn);
             }
         }
-        return PushConstants(laidOut.data(), static_cast<glm::u32>(laidOut.size()), member->offset);
+        return PushConstantBlock(laidOut.data(), static_cast<glm::u32>(laidOut.size()), member->offset);
     }
 
     std::vector<CommandBuffer::ResourceUse> CommandBuffer::usesForBoundResources(const bool includeMesh) const
@@ -354,11 +354,11 @@ namespace kor
 
         for (const auto& set : sets | std::views::values) {
             if (!set.alive() || set.poisoned()) continue;
-            const auto layout = set->getLayout();
+            const auto layout = set->layout();
             if (!layout.alive() || layout.poisoned()) continue;
 
-            const auto& descriptions = layout->getBindingDescriptions();
-            for (const auto& [binding, written] : set->getWrites()) {
+            const auto& descriptions = layout->bindings();
+            for (const auto& [binding, written] : set->writes()) {
                 const auto description = descriptions.find(binding);
                 if (description == descriptions.end()) continue;
                 if (!description->second.active) continue;
@@ -372,22 +372,22 @@ namespace kor
                 for (const auto& descriptor : written) {
                     if (!descriptor.isValid()) continue;  // sparse bindless slot
 
-                    if (const auto buffer = descriptor.getBufferRef(); buffer.alive() && !buffer.poisoned()) {
+                    if (const auto buffer = descriptor.bufferRef(); buffer.alive() && !buffer.poisoned()) {
                         uses.push_back(ResourceUse{ .buffer = buffer, .access = access });
                         continue;
                     }
-                    if (const auto view = descriptor.getImageViewRef(); view.alive() && !view.poisoned()) {
-                        const auto image = view->getImage();
+                    if (const auto view = descriptor.imageViewRef(); view.alive() && !view.poisoned()) {
+                        const auto image = view->image();
                         if (!image.alive() || image.poisoned()) continue;
                         // The view's own slice, not the whole image: a shadow atlas layer or a
                         // single mip can legitimately be in a different state from its siblings.
                         uses.push_back(ResourceUse{
                             .image = image,
                             .access = access,
-                            .baseMipLevel = view->getBaseMipLevel(),
-                            .levelCount = view->getMipLevelCount(),
-                            .baseArrayLayer = view->getBaseArrayLayer(),
-                            .layerCount = view->getArrayLayerCount(),
+                            .baseMipLevel = view->baseMipLevel(),
+                            .levelCount = view->mipLevelCount(),
+                            .baseArrayLayer = view->baseArrayLayer(),
+                            .layerCount = view->arrayLayerCount(),
                         });
                     }
                 }
@@ -397,13 +397,13 @@ namespace kor
         if (includeMesh && _state.boundMesh.has_value()) {
             const auto& mesh = _state.boundMesh.value();
             if (mesh.alive() && !mesh.poisoned()) {
-                for (const auto& buffer : mesh->getVertexBuffers()) {
+                for (const auto& buffer : mesh->vertexBuffers()) {
                     if (buffer.alive() && !buffer.poisoned())
-                        uses.push_back(ResourceUse{ .buffer = buffer, .access = ResourceAccess::VertexBuffer });
+                        uses.push_back(ResourceUse{ .buffer = buffer, .access = ResourceAccess::eVertexBuffer });
                 }
                 if (mesh->hasIndexBuffer()) {
-                    if (const auto index = mesh->getIndexBuffer().value(); index.alive() && !index.poisoned())
-                        uses.push_back(ResourceUse{ .buffer = index, .access = ResourceAccess::IndexBuffer });
+                    if (const auto index = mesh->indexBuffer().value(); index.alive() && !index.poisoned())
+                        uses.push_back(ResourceUse{ .buffer = index, .access = ResourceAccess::eIndexBuffer });
                 }
             }
         }
@@ -523,7 +523,7 @@ namespace kor
                     trackedBuffers.emplace(use.buffer.get(), use.buffer);
                     const auto current = state.find(key);
                     const auto previous = current == state.end()
-                        ? use.buffer->getTrackedAccess()
+                        ? use.buffer->trackedAccess()
                         : std::optional(current->second);
 
                     // Never synchronised, a genuine transition, or a second write that has to
@@ -539,7 +539,7 @@ namespace kor
                     state[key] = use.access;
                     establishedAt.insert_or_assign(key, Established{ i, record.command, record.where });
 
-                    if (use.buffer->getUsage() & Buffer::Usage::eShaderDeviceAddress) {
+                    if (use.buffer->usage() & Buffer::Usage::eShaderDeviceAddress) {
                         if (record.transitions) {
                             // A barrier naming it: from here on it is guarded.
                             unguardedWrites.erase(use.buffer.get());
@@ -558,9 +558,9 @@ namespace kor
                 // rather than from zero. Resolving it to the image's *total* count instead walked
                 // past the last level whenever a base was given without one.
                 const auto baseMip = use.baseMipLevel.value_or(0);
-                const auto mipCount = use.levelCount.value_or(use.image->getMipLevels() - baseMip);
+                const auto mipCount = use.levelCount.value_or(use.image->mipLevels() - baseMip);
                 const auto baseLayer = use.baseArrayLayer.value_or(0);
-                const auto layerCount = use.layerCount.value_or(use.image->getArrayLayers() - baseLayer);
+                const auto layerCount = use.layerCount.value_or(use.image->arrayLayers() - baseLayer);
 
                 // Per subresource: a range can straddle subresources sitting in different
                 // states — right after GenerateMipmaps the last mip is still TransferDst while
@@ -573,7 +573,7 @@ namespace kor
                         const Key key{ use.image.get(), mip, layer };
                         const auto current = state.find(key);
                         const auto previous = current == state.end()
-                            ? use.image->getTrackedAccess(mip, layer)
+                            ? use.image->trackedAccess(mip, layer)
                             : std::optional(current->second);
                         if (!previous || *previous != use.access || writes(use.access)) {
                             needed = true;
@@ -723,8 +723,8 @@ namespace kor
                                                              const std::source_location where)
     {
         for (const auto& use : uses) {
-            const bool asSource = use.access == ResourceAccess::TransferSrc;
-            const bool asDestination = use.access == ResourceAccess::TransferDst;
+            const bool asSource = use.access == ResourceAccess::eTransferSrc;
+            const bool asDestination = use.access == ResourceAccess::eTransferDst;
             if (!asSource && !asDestination) continue;
 
             const char* flag = asSource ? "eTransferSrc" : "eTransferDst";
@@ -737,20 +737,22 @@ namespace kor
                     .code = ErrorCode::eInvalidArgument,
                     .message = std::format(
                         "{} would have this {} {} as a transfer, but it was not created with "
-                        "Usage::{}. Add .addUsage(kor::{}::Usage::{}) where it is built — or, if it "
-                        "called setUsage(), include that flag in the set it names.",
-                        command, kind, role, flag, kind, flag),
+                        "Usage::{}. Include it in the set setUsage() names where the {} is built — "
+                        "setUsage replaces the default roles rather than adding to them, so the "
+                        "transfer flags have to be named alongside the others: "
+                        ".setUsage(... | kor::{}::Usage::{}).",
+                        command, kind, role, flag, kind, kind, flag),
                     .where = where,
                 };
             };
 
             if (use.buffer.alive() && use.buffer.valid()) {
-                const auto usage = use.buffer->getUsage();
+                const auto usage = use.buffer->usage();
                 if (!(usage & (asSource ? Buffer::Usage::eTransferSrc : Buffer::Usage::eTransferDst)))
                     return complain("Buffer");
             }
             if (use.image.alive() && use.image.valid()) {
-                const auto usage = use.image->getUsage();
+                const auto usage = use.image->usage();
                 if (!(usage & (asSource ? Image::Usage::eTransferSrc : Image::Usage::eTransferDst)))
                     return complain("Image");
             }
@@ -794,7 +796,7 @@ namespace kor
     {
         if (_failed) return *this;
 
-        const auto framebuffer = renderInfo.getFramebuffer();
+        const auto framebuffer = renderInfo.framebuffer();
         if (reject(framebuffer, "framebuffer")) return *this;
         stateBeginRendering(framebuffer);
 
@@ -802,8 +804,8 @@ namespace kor
         // emit. Declaring them means they batch with whatever else the pass needs, and all of
         // it lands in front of the pass instead of illegally inside it.
         std::vector<ResourceUse> uses;
-        for (const auto& attachment : framebuffer->getColorAttachments()) {
-            uses.push_back(ResourceUse{ .image = attachment.view->getImage(), .access = ResourceAccess::ColorAttachment });
+        for (const auto& attachment : framebuffer->colorAttachments()) {
+            uses.push_back(ResourceUse{ .image = attachment.view->image(), .access = ResourceAccess::eColorAttachment });
         }
         // Depth and stencil are declared as one use per *image*, at the combined
         // depth/stencil layout, rather than one per attachment slot.
@@ -820,15 +822,15 @@ namespace kor
         // depth-only or stencil-only image too, so nothing is given up by using it everywhere.
         const auto declareDepthStencil = [&](const ResourceRef<const ImageView>& attachment) {
             if (!attachment.valid()) return;
-            auto image = attachment->getImage();
+            auto image = attachment->image();
             for (const auto& use : uses) {
                 if (use.image.get() == image.get()) return;  // the other slot, same image
             }
             uses.push_back(ResourceUse{ .image = std::move(image),
-                                        .access = ResourceAccess::DepthStencilAttachment });
+                                        .access = ResourceAccess::eDepthStencilAttachment });
         };
-        if (framebuffer->hasDepthAttachment())   declareDepthStencil(framebuffer->getDepthAttachment());
-        if (framebuffer->hasStencilAttachment()) declareDepthStencil(framebuffer->getStencilAttachment());
+        if (framebuffer->hasDepthAttachment())   declareDepthStencil(framebuffer->depthAttachment());
+        if (framebuffer->hasStencilAttachment()) declareDepthStencil(framebuffer->stencilAttachment());
 
         // Whatever this pass did not say is taken from the framebuffer *now*, while it is in hand,
         // and travels with the record. @see RenderInfo::resolveClearValues
@@ -935,10 +937,10 @@ namespace kor
     {
         if (!_state.boundGraphicsPipeline.has_value()) return;
         const auto& pipeline = *_state.boundGraphicsPipeline.value();
-        const RasterizationState& rs = pipeline.getRasterizationState();
-        const DepthStencilState&  ds = pipeline.getDepthStencilState();
-        const ColorBlendState&    cb = pipeline.getColorBlendState();
-        const InputAssemblyState& ia = pipeline.getInputAssemblyState();
+        const RasterizationState& rs = pipeline.rasterizationState();
+        const DepthStencilState&  ds = pipeline.depthStencilState();
+        const ColorBlendState&    cb = pipeline.colorBlendState();
+        const InputAssemblyState& ia = pipeline.inputAssemblyState();
 
         // Snapshot the mask so setters marking their own bit don't affect sibling
         // decisions (e.g. the front/back pair below).
@@ -1135,7 +1137,7 @@ namespace kor
     bool CommandBuffer::collectTimers()
     {
         // Already collected: the results are sitting in _timings and _submittedTimers was emptied
-        // when they landed. Says yes so a repeated CollectTimer keeps working.
+        // when they landed. Says yes so a repeated collectTimer keeps working.
         if (_submittedTimers.empty()) return !_timings.empty();
 
         std::vector<double> milliseconds;
@@ -1168,13 +1170,13 @@ namespace kor
         _timerStack.clear();
     }
 
-    const std::vector<TimerResult>& CommandBuffer::CollectTimings()
+    const std::vector<TimerResult>& CommandBuffer::collectTimings()
     {
         collectTimers();
         return _timings;
     }
 
-    Result<double> CommandBuffer::CollectTimer(const std::string_view label)
+    Result<double> CommandBuffer::collectTimer(const std::string_view label)
     {
         if (!supportsTimers())
             return fail(ErrorCode::eInvalidArgument,
@@ -1254,12 +1256,12 @@ namespace kor
         // rasterised at the window's size and show a crop of a picture drawn for a surface it is not:
         // the symptom is a scene that looks "zoomed in" inside a small target and ignores its size.
         if (_state.boundFramebuffer.has_value() && _state.boundFramebuffer->valid()) {
-            if (const auto extent = (*_state.boundFramebuffer)->getExtent(); extent.x > 0 && extent.y > 0)
+            if (const auto extent = (*_state.boundFramebuffer)->extent(); extent.x > 0 && extent.y > 0)
                 return extent;
         }
         // No pass, or one whose framebuffer says nothing: the window is the only size left to assume,
         // and it is the right one for the default framebuffer.
-        return Context::Window().getExtent();
+        return Context::Window().extent();
     }
 
     CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
@@ -1270,10 +1272,10 @@ namespace kor
 
         // The defaulted vertex count means "as many as the bound mesh holds", resolved here so
         // both backends are handed a number rather than each working the sentinel out again.
-        if (vertexCount == UINT64_MAX) {
+        if (vertexCount == WholeSize) {
             if (!_state.boundMesh.has_value())
                 return record(ErrorCode::eNoMeshBound, "Cannot draw with the default vertex count: no mesh is bound to take it from.");
-            vertexCount = _state.boundMesh.value()->getVertexCount();
+            vertexCount = _state.boundMesh.value()->vertexCount();
         }
 
         ensureViewportAndScissor();
@@ -1289,8 +1291,8 @@ namespace kor
         if (!_state.boundMesh.value()->hasIndexBuffer())
             return record(ErrorCode::eMeshHasNoIndexBuffer, "Cannot draw indexed: the bound mesh has no index buffer.");
 
-        if (indexCount == UINT64_MAX)
-            indexCount = _state.boundMesh.value()->getIndexCount().value();
+        if (indexCount == WholeSize)
+            indexCount = _state.boundMesh.value()->indexCount().value();
 
         ensureViewportAndScissor();
         return doDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, where);
@@ -1375,17 +1377,17 @@ namespace kor
         return doRun(command);
     }
 
-    CommandBuffer& CommandBuffer::PushConstants(const void* data, const glm::u32 size, const glm::u32 offset)
+    CommandBuffer& CommandBuffer::PushConstantBlock(const void* data, const glm::u32 size, const glm::u32 offset)
     {
         if (_failed) return *this;
-        return doPushConstants(data, size, offset);
+        return doPushConstantBlock(data, size, offset);
     }
 
 
     kor::ResourceRef<const Image> CommandBuffer::screenImage()
     {
-        const auto framebuffer = Context::DefaultFramebuffer();
-        if (!framebuffer.valid() || framebuffer->getColorAttachments().empty()) return {};
+        const auto framebuffer = Context::defaultFramebuffer();
+        if (!framebuffer.valid() || framebuffer->colorAttachments().empty()) return {};
         return framebuffer->colorImage(0);
     }
 
@@ -1412,7 +1414,7 @@ namespace kor
         // format cannot be blitted into — the hardware would have to decompress, filter and
         // re-encode. Said here rather than left to the backend, because the fix is upstream: a
         // compressed texture carries the mip chain it was encoded with. @see the image modules
-        if (Image::IsBlockCompressed(image->getFormat()))
+        if (Image::isBlockCompressed(image->format()))
             return record(ErrorCode::eInvalidArgument,
                 "Mipmaps cannot be generated for a block-compressed image; encode the mip chain "
                 "into the file instead.");
@@ -1423,9 +1425,9 @@ namespace kor
     // Default: blit each mip from the one above it. Vulkan uses this; GL overrides it with
     // glGenerateMipmap. Reached only through the wrapper above, so `image` is always usable.
     CommandBuffer& CommandBuffer::doGenerateMipmaps(ResourceRef<const Image> image) {
-        const auto& extent = image->getExtent();
-        const auto mipLevels = image->getMipLevels();
-        const auto arrayLayers = image->getArrayLayers();
+        const auto& extent = image->extent();
+        const auto mipLevels = image->mipLevels();
+        const auto arrayLayers = image->arrayLayers();
 
         auto mipWidth = static_cast<glm::i32>(extent.x);
         auto mipHeight = static_cast<glm::i32>(extent.y);
@@ -1481,7 +1483,7 @@ namespace kor
             this->SetScissor(0, 0, extent.x, extent.y);
         }
         BindMesh(mesh);
-        DrawIndexed(UINT64_MAX, instanceCount, 0, 0, baseInstance);
+        DrawIndexed(WholeSize, instanceCount, 0, 0, baseInstance);
         return *this;
     }
 
@@ -1533,9 +1535,9 @@ namespace kor
     {
         if (_failed) return *this;
         for (const auto& barrier : bufferBarriers)
-            if (reject(barrier.getBuffer(), "barrier's buffer")) return *this;
+            if (reject(barrier.buffer(), "barrier's buffer")) return *this;
         for (const auto& barrier : imageBarriers)
-            if (reject(barrier.getImage(), "barrier's image")) return *this;
+            if (reject(barrier.image(), "barrier's image")) return *this;
 
         // Describe what this barrier *establishes*, so the resolver advances its tracking past
         // it and emits nothing of its own. A hand-written barrier therefore suppresses the
@@ -1545,15 +1547,15 @@ namespace kor
         uses.reserve(bufferBarriers.size() + imageBarriers.size());
         for (const auto& barrier : bufferBarriers) {
             uses.push_back(ResourceUse{
-                .buffer = barrier.getBuffer(), .access = barrier.getDstAccess(),
-                .offset = barrier.getOffset(), .size = barrier.getSize(),
+                .buffer = barrier.buffer(), .access = barrier.dstAccess(),
+                .offset = barrier.offset(), .size = barrier.size(),
             });
         }
         for (const auto& barrier : imageBarriers) {
             uses.push_back(ResourceUse{
-                .image = barrier.getImage(), .access = barrier.getDstAccess(),
-                .baseMipLevel = barrier.getBaseMipLevel(), .levelCount = barrier.getLevelCount(),
-                .baseArrayLayer = barrier.getBaseArrayLayer(), .layerCount = barrier.getLayerCount(),
+                .image = barrier.image(), .access = barrier.dstAccess(),
+                .baseMipLevel = barrier.baseMipLevel(), .levelCount = barrier.levelCount(),
+                .baseArrayLayer = barrier.baseArrayLayer(), .layerCount = barrier.layerCount(),
             });
         }
 
@@ -1578,8 +1580,8 @@ namespace kor
         ClampedSubresource clampToImage(const Image& image, const glm::u32 baseMip, const glm::u32 mipCount,
                                         const glm::u32 baseLayer, const glm::u32 layerCount)
         {
-            const glm::u32 mips = std::max(image.getMipLevels(), 1u);
-            const glm::u32 layers = std::max(image.getArrayLayers(), 1u);
+            const glm::u32 mips = std::max(image.mipLevels(), 1u);
+            const glm::u32 layers = std::max(image.arrayLayers(), 1u);
             const glm::u32 firstMip = std::min(baseMip, mips - 1);
             const glm::u32 firstLayer = std::min(baseLayer, layers - 1);
             return {
@@ -1589,13 +1591,13 @@ namespace kor
         }
 
         // Same idea for buffers: an offset past the end would name a range outside the
-        // allocation. UINT64_MAX keeps its "to the end" meaning.
+        // allocation. WholeSize keeps its "to the end" meaning.
         std::pair<glm::u64, glm::u64> clampToBuffer(const Buffer& buffer, const glm::u64 offset, const glm::u64 size)
         {
-            const glm::u64 total = buffer.getSize();
+            const glm::u64 total = buffer.size();
             // Strictly inside the allocation: Vulkan requires offset < size, not <=.
             const glm::u64 start = total == 0 ? 0 : std::min(offset, total - 1);
-            if (size == UINT64_MAX) return { start, UINT64_MAX };
+            if (size == WholeSize) return { start, WholeSize };
             return { start, std::min(size, total - start) };
         }
     }
@@ -1607,14 +1609,14 @@ namespace kor
     // resource they receive is alive and usable — that is what the validation here guarantees —
     // and additionally that whatever barriers they need have already been emitted ahead of them.
 
-    CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, kor::ResourceRef<const DescriptorSet> descriptorSet, const bool debug,
+    CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, kor::ResourceRef<const DescriptorSet> descriptorSet,
                                                     const std::source_location where)
     {
         if (_failed) return *this;
         if (reject(descriptorSet, "descriptor set")) return *this;
         stateBindDescriptorSet(index, descriptorSet);
         return enqueue("BindDescriptorSet", where, {}, PassEdge::eNone,
-            [this, index, descriptorSet, debug] { doBindDescriptorSet(index, descriptorSet, debug); });
+            [this, index, descriptorSet] { doBindDescriptorSet(index, descriptorSet); });
     }
 
     CommandBuffer& CommandBuffer::DispatchIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset,
@@ -1626,7 +1628,7 @@ namespace kor
         if (reject(indirectBuffer, "indirect buffer")) return *this;
 
         auto uses = usesForBoundResources(false);
-        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::IndirectBuffer, .offset = offset });
+        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return enqueue("DispatchIndirect", where, std::move(uses), PassEdge::eNone,
             [this, indirectBuffer, offset] { doDispatchIndirect(indirectBuffer, offset); },
             /*transitions=*/false, boundPipelineUsesDeviceAddresses());
@@ -1646,7 +1648,7 @@ namespace kor
             SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
 
         auto uses = usesForBoundResources(true);
-        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::IndirectBuffer, .offset = offset });
+        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return enqueue("DrawIndirect", where, std::move(uses), PassEdge::eNone,
             [this, indirectBuffer, offset, drawCount, stride] { doDrawIndirect(indirectBuffer, offset, drawCount, stride); },
             /*transitions=*/false, boundPipelineUsesDeviceAddresses());
@@ -1668,7 +1670,7 @@ namespace kor
             SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
 
         auto uses = usesForBoundResources(true);
-        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::IndirectBuffer, .offset = offset });
+        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return enqueue("DrawIndexedIndirect", where, std::move(uses), PassEdge::eNone,
             [this, indirectBuffer, offset, drawCount, stride] { doDrawIndexedIndirect(indirectBuffer, offset, drawCount, stride); },
             /*transitions=*/false, boundPipelineUsesDeviceAddresses());
@@ -1688,7 +1690,7 @@ namespace kor
             SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
 
         auto uses = usesForBoundResources(true);
-        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::IndirectBuffer, .offset = offset });
+        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return enqueue("DrawMeshTasksIndirect", where, std::move(uses), PassEdge::eNone,
             [this, indirectBuffer, offset, drawCount, stride] { doDrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride); },
             /*transitions=*/false, boundPipelineUsesDeviceAddresses());
@@ -1701,7 +1703,7 @@ namespace kor
         if (reject(buffer, "buffer")) return *this;
         const auto [start, span] = clampToBuffer(*buffer, offset, size);
         return enqueue("ClearBuffer", where,
-            { ResourceUse{ .buffer = buffer, .access = ResourceAccess::TransferDst, .offset = start, .size = span } },
+            { ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferDst, .offset = start, .size = span } },
             PassEdge::eNone, [this, buffer, offset, size] { doClearBuffer(buffer, offset, size); });
     }
 
@@ -1711,11 +1713,11 @@ namespace kor
         if (_failed) return *this;
         if (reject(image, "image")) return *this;
         return enqueue("ClearColorImage", where,
-            { ResourceUse{ .image = image, .access = ResourceAccess::TransferDst } },
+            { ResourceUse{ .image = image, .access = ResourceAccess::eTransferDst } },
             PassEdge::eNone, [this, image, color] { doClearColorImage(image, color); });
     }
 
-    CommandBuffer& CommandBuffer::FillBuffer(kor::ResourceRef<const Buffer> buffer, void* data, const glm::u64 offset, const glm::u64 size,
+    CommandBuffer& CommandBuffer::FillBuffer(kor::ResourceRef<const Buffer> buffer, const void* data, const glm::u64 offset, const glm::u64 size,
                                              const std::source_location where)
     {
         if (_failed) return *this;
@@ -1723,13 +1725,13 @@ namespace kor
 
         // Copy the payload rather than the pointer: the caller's storage is very often a
         // temporary, and nothing reaches the GPU until End().
-        const glm::u64 byteCount = size == UINT64_MAX ? buffer->getSize() - offset : size;
+        const glm::u64 byteCount = size == WholeSize ? buffer->size() - offset : size;
         std::vector<std::byte> bytes(byteCount);
         if (data && byteCount) std::memcpy(bytes.data(), data, byteCount);
 
         const auto [start, span] = clampToBuffer(*buffer, offset, size);
         return enqueue("FillBuffer", where,
-            { ResourceUse{ .buffer = buffer, .access = ResourceAccess::TransferDst, .offset = start, .size = span } },
+            { ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferDst, .offset = start, .size = span } },
             PassEdge::eNone,
             [this, buffer, bytes = std::move(bytes), offset, size] () mutable {
                 doFillBuffer(buffer, bytes.data(), offset, size);
@@ -1745,8 +1747,8 @@ namespace kor
         const auto [srcStart, srcSpan] = clampToBuffer(*srcBuffer, srcOffset, size);
         const auto [dstStart, dstSpan] = clampToBuffer(*dstBuffer, dstOffset, size);
         return enqueue("CopyBuffer", where, {
-                ResourceUse{ .buffer = srcBuffer, .access = ResourceAccess::TransferSrc, .offset = srcStart, .size = srcSpan },
-                ResourceUse{ .buffer = dstBuffer, .access = ResourceAccess::TransferDst, .offset = dstStart, .size = dstSpan },
+                ResourceUse{ .buffer = srcBuffer, .access = ResourceAccess::eTransferSrc, .offset = srcStart, .size = srcSpan },
+                ResourceUse{ .buffer = dstBuffer, .access = ResourceAccess::eTransferDst, .offset = dstStart, .size = dstSpan },
             }, PassEdge::eNone,
             [this, srcBuffer, dstBuffer, size, srcOffset, dstOffset] { doCopyBuffer(srcBuffer, dstBuffer, size, srcOffset, dstOffset); });
     }
@@ -1759,10 +1761,10 @@ namespace kor
         if (reject(image, "copy destination image")) return *this;
         const auto range = clampToImage(*image, copyInfo.imageMipLevel, 1u,
                                         copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount);
-        const auto [srcOffset, srcSize] = clampToBuffer(*buffer, copyInfo.bufferOffset, UINT64_MAX);
+        const auto [srcOffset, srcSize] = clampToBuffer(*buffer, copyInfo.bufferOffset, WholeSize);
         return enqueue("CopyBufferToImage", where, {
-                ResourceUse{ .buffer = buffer, .access = ResourceAccess::TransferSrc, .offset = srcOffset, .size = srcSize },
-                ResourceUse{ .image = image, .access = ResourceAccess::TransferDst,
+                ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferSrc, .offset = srcOffset, .size = srcSize },
+                ResourceUse{ .image = image, .access = ResourceAccess::eTransferDst,
                              .baseMipLevel = range.baseMip, .levelCount = range.mipCount,
                              .baseArrayLayer = range.baseLayer, .layerCount = range.layerCount },
             }, PassEdge::eNone,
@@ -1777,17 +1779,17 @@ namespace kor
         if (reject(buffer, "copy destination buffer")) return *this;
         const auto range = clampToImage(*image, copyInfo.imageMipLevel, 1u,
                                         copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount);
-        const auto [dstOffset, dstSize] = clampToBuffer(*buffer, copyInfo.bufferOffset, UINT64_MAX);
+        const auto [dstOffset, dstSize] = clampToBuffer(*buffer, copyInfo.bufferOffset, WholeSize);
         return enqueue("CopyImageToBuffer", where, {
-                ResourceUse{ .image = image, .access = ResourceAccess::TransferSrc,
+                ResourceUse{ .image = image, .access = ResourceAccess::eTransferSrc,
                              .baseMipLevel = range.baseMip, .levelCount = range.mipCount,
                              .baseArrayLayer = range.baseLayer, .layerCount = range.layerCount },
-                ResourceUse{ .buffer = buffer, .access = ResourceAccess::TransferDst, .offset = dstOffset, .size = dstSize },
+                ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferDst, .offset = dstOffset, .size = dstSize },
             }, PassEdge::eNone,
             [this, image, buffer, copyInfo] { doCopyImageToBuffer(image, buffer, copyInfo); });
     }
 
-    CommandBuffer& CommandBuffer::Blit(kor::ResourceRef<const Image> srcImage, const kor::Blit blitInfo,
+    CommandBuffer& CommandBuffer::BlitToScreen(kor::ResourceRef<const Image> srcImage, const kor::Blit blitInfo,
                                        const std::source_location where)
     {
         if (_failed) return *this;
@@ -1802,18 +1804,18 @@ namespace kor
         // than relying solely on the backend's own transition, which is what the two-image
         // overload below has always done.
         std::vector<ResourceUse> uses {
-            ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
+            ResourceUse{ .image = srcImage, .access = ResourceAccess::eTransferSrc,
                          .baseMipLevel = blitInfo.srcMipLevel, .levelCount = 1u,
                          .baseArrayLayer = blitInfo.srcBaseArrayLayer, .layerCount = blitInfo.layerCount },
         };
         if (const auto screen = screenImage(); screen.alive()) {
-            uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::TransferDst,
+            uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::eTransferDst,
                                         .baseMipLevel = blitInfo.dstMipLevel, .levelCount = 1u,
                                         .baseArrayLayer = blitInfo.dstBaseArrayLayer, .layerCount = blitInfo.layerCount });
         }
 
         return enqueue("Blit", where, std::move(uses),
-            PassEdge::eNone, [this, srcImage, blitInfo] { doBlit(srcImage, blitInfo); });
+            PassEdge::eNone, [this, srcImage, blitInfo] { doBlitToScreen(srcImage, blitInfo); });
     }
 
     CommandBuffer& CommandBuffer::Blit(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Blit blitInfo,
@@ -1823,16 +1825,16 @@ namespace kor
         if (reject(srcImage, "blit source image")) return *this;
         if (reject(dstImage, "blit destination image")) return *this;
         return enqueue("Blit", where, {
-                ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
+                ResourceUse{ .image = srcImage, .access = ResourceAccess::eTransferSrc,
                              .baseMipLevel = blitInfo.srcMipLevel, .levelCount = 1u,
                              .baseArrayLayer = blitInfo.srcBaseArrayLayer, .layerCount = blitInfo.layerCount },
-                ResourceUse{ .image = dstImage, .access = ResourceAccess::TransferDst,
+                ResourceUse{ .image = dstImage, .access = ResourceAccess::eTransferDst,
                              .baseMipLevel = blitInfo.dstMipLevel, .levelCount = 1u,
                              .baseArrayLayer = blitInfo.dstBaseArrayLayer, .layerCount = blitInfo.layerCount },
             }, PassEdge::eNone, [this, srcImage, dstImage, blitInfo] { doBlit(srcImage, dstImage, blitInfo); });
     }
 
-    CommandBuffer& CommandBuffer::Resolve(kor::ResourceRef<const Image> srcImage, const kor::Resolve resolveInfo,
+    CommandBuffer& CommandBuffer::ResolveToScreen(kor::ResourceRef<const Image> srcImage, const kor::Resolve resolveInfo,
                                           const std::source_location where)
     {
         if (_failed) return *this;
@@ -1840,18 +1842,18 @@ namespace kor
 
         // The window's framebuffer image, declared for the same reason as in Blit above.
         std::vector<ResourceUse> uses {
-            ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
+            ResourceUse{ .image = srcImage, .access = ResourceAccess::eTransferSrc,
                          .baseMipLevel = resolveInfo.srcMipLevel, .levelCount = 1u,
                          .baseArrayLayer = resolveInfo.srcBaseArrayLayer, .layerCount = resolveInfo.layerCount },
         };
         if (const auto screen = screenImage(); screen.alive()) {
-            uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::TransferDst,
+            uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::eTransferDst,
                                         .baseMipLevel = resolveInfo.dstMipLevel, .levelCount = 1u,
                                         .baseArrayLayer = resolveInfo.dstBaseArrayLayer, .layerCount = resolveInfo.layerCount });
         }
 
         return enqueue("Resolve", where, std::move(uses),
-            PassEdge::eNone, [this, srcImage, resolveInfo] { doResolve(srcImage, resolveInfo); });
+            PassEdge::eNone, [this, srcImage, resolveInfo] { doResolveToScreen(srcImage, resolveInfo); });
     }
 
     CommandBuffer& CommandBuffer::Resolve(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Resolve resolveInfo,
@@ -1861,10 +1863,10 @@ namespace kor
         if (reject(srcImage, "resolve source image")) return *this;
         if (reject(dstImage, "resolve destination image")) return *this;
         return enqueue("Resolve", where, {
-                ResourceUse{ .image = srcImage, .access = ResourceAccess::TransferSrc,
+                ResourceUse{ .image = srcImage, .access = ResourceAccess::eTransferSrc,
                              .baseMipLevel = resolveInfo.srcMipLevel, .levelCount = 1u,
                              .baseArrayLayer = resolveInfo.srcBaseArrayLayer, .layerCount = resolveInfo.layerCount },
-                ResourceUse{ .image = dstImage, .access = ResourceAccess::TransferDst,
+                ResourceUse{ .image = dstImage, .access = ResourceAccess::eTransferDst,
                              .baseMipLevel = resolveInfo.dstMipLevel, .levelCount = 1u,
                              .baseArrayLayer = resolveInfo.dstBaseArrayLayer, .layerCount = resolveInfo.layerCount },
             }, PassEdge::eNone, [this, srcImage, dstImage, resolveInfo] { doResolve(srcImage, dstImage, resolveInfo); });

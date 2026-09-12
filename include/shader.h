@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -46,7 +47,7 @@ namespace kor
     class KORAL_API Shader {
     public:
         /** @brief Which stage of which pipeline a shader runs at. */
-        enum class Stage {
+        enum class Stage : std::uint16_t {
             // VTG Graphics Pipeline
             eVertex = 1 << 0,
             eTessellationControl = 1 << 1,
@@ -73,7 +74,7 @@ namespace kor
         };
 
         /** @brief The source language, inferred from the file extension unless set explicitly. */
-        enum class Lang {
+        enum class Lang : std::uint8_t {
             eGLSL,      ///< GLSL source, compiled with glslang. One entry point, "main".
             eSlang,     ///< Slang source, compiled with the Slang compiler. A module may hold several entry points.
             eSPIRV,     ///< Already-compiled SPIR-V, read straight from the file.
@@ -111,7 +112,7 @@ namespace kor
          * producer is allowed to omit those — in which case this reads eReadWrite: conservative, so
          * the barrier that comes out is stronger than necessary but never weaker.
          */
-        enum class AccessKind : glm::u8 {
+        enum class AccessKind : std::uint8_t {
             eRead,      ///< Only read.
             eWrite,     ///< Only written.
             eReadWrite, ///< Both, or not declared precisely enough to tell.
@@ -295,7 +296,7 @@ namespace kor
          *   not have to wrap it in kor::shaderPath() themselves.
          * - **identifier** — getOrBuild() defaults it to "path" or "path:entry".
          */
-        struct KORAL_API Builder : ::Builder {
+        struct KORAL_API Builder : kor::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
@@ -394,13 +395,13 @@ namespace kor
         virtual ~Shader() = default;
 
         /** @brief Which pipeline stage this shader runs at. */
-        [[nodiscard]] Stage getStage() const { return _stage; }
+        [[nodiscard]] Stage stage() const { return _stage; }
 
         /** @brief The language it was compiled from. */
-        [[nodiscard]] Lang getLang() const { return _lang; }
+        [[nodiscard]] Lang lang() const { return _lang; }
 
         /** @brief The resolved path of its source file. */
-        [[nodiscard]] const std::filesystem::path& getSourcePath() const { return _path; }
+        [[nodiscard]] const std::filesystem::path& sourcePath() const { return _path; }
 
         /**
          * @brief Every source file the compiled shader depends on.
@@ -408,7 +409,7 @@ namespace kor
          *         (Slang). All of them are watched, so editing an included file reloads the shaders
          *         that include it.
          */
-        [[nodiscard]] const std::vector<std::filesystem::path>& getDependencies() const { return _dependencies; }
+        [[nodiscard]] const std::vector<std::filesystem::path>& dependencies() const { return _dependencies; }
 
         /**
          * @brief Registers a directory to resolve shader paths and Slang module names against.
@@ -468,7 +469,7 @@ namespace kor
         void fetchFieldSemantics(const std::string& source);
 
         /** @brief The shader's reflected interface: its sets, push constants and stage inputs and outputs. */
-        const MemoryLayout& getMemoryLayout() const { return _memoryLayout; }
+        const MemoryLayout& memoryLayout() const { return _memoryLayout; }
 
         /**
          * @brief Whether this shader reaches buffers through raw device addresses.
@@ -547,4 +548,7 @@ namespace kor
         bool _valid = false;
         bool _modified = true;
     };
+
+    /** @see enable_flags */
+    template<> struct enable_flags<Shader::Stage> : std::true_type {};
 }

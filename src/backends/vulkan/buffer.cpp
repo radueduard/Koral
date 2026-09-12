@@ -71,7 +71,7 @@ namespace kor::vk
 			.setSharingMode(::vk::SharingMode::eExclusive);
 
 
-		const auto frameCount = _isPerFrame ? kor::Context::Scheduler().getImageCount() : 1;
+		const auto frameCount = _isPerFrame ? kor::Context::Scheduler().imageCount() : 1;
 		for (int i = 0; i < frameCount; ++i)
 		{
 			auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
@@ -116,22 +116,22 @@ namespace kor::vk
 
 	::vk::Buffer Buffer::operator*() const
 	{
-		return _buffers[_isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0];
+		return _buffers[_isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0];
 	}
 
-	glm::u64 Buffer::getDeviceAddress() const
+	glm::u64 Buffer::deviceAddress() const
 	{
 		return static_cast<glm::u64>(
 			Context::Device()->getBufferAddress(::vk::BufferDeviceAddressInfo().setBuffer(**this)));
 	}
 
 	::vk::AccessFlags Buffer::getAccessMask() const {
-		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
 		return _accessFlags[currentFrame];
 	}
 
 	void Buffer::setAccessMask(const ::vk::AccessFlags access) const {
-		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
 		_accessFlags[currentFrame] = access;
 	}
 
@@ -144,7 +144,7 @@ namespace kor::vk
 
 	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
 	void Buffer::automaticUpdate() {
-		const auto currentFrame = kor::Context::Scheduler().getCurrentImageIndex();
+		const auto currentFrame = kor::Context::Scheduler().currentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
 
@@ -209,6 +209,6 @@ namespace kor::vk
 	}
 
 	VmaAllocation Buffer::getAllocation() const {
-		return  _allocations[_isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0];
+		return  _allocations[_isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0];
 	}
 }

@@ -79,8 +79,8 @@ namespace kor
         // A view over the shader's reflection, so the matching below needs nothing of the shader
         // but what it declared. The strings are the shader's own and outlive this call.
         std::vector<ShaderInput> inputs;
-        inputs.reserve(vertexShader.getMemoryLayout().inputs.size());
-        for (const auto& input : vertexShader.getMemoryLayout().inputs) {
+        inputs.reserve(vertexShader.memoryLayout().inputs.size());
+        for (const auto& input : vertexShader.memoryLayout().inputs) {
             inputs.push_back(ShaderInput{
                 .location          = input.startingLocation,
                 .name              = input.name,

@@ -35,9 +35,9 @@ namespace kor
             valid = false; _error = Error{ .code = ErrorCode::eInvalidArgument, .message = "Buffer descriptor has an invalid buffer." };
             return;
         }
-        if (offset < 0 || offset >= buffer->getSize()) {
+        if (offset < 0 || offset >= buffer->size()) {
             valid = false; _error = Error{ .code = ErrorCode::eBufferRangeOutOfBounds,
-                .message = std::format("Buffer descriptor offset {} is out of range (buffer size {}).", offset, buffer->getSize()) };
+                .message = std::format("Buffer descriptor offset {} is out of range (buffer size {}).", offset, buffer->size()) };
             return;
         }
         if (range < 0) {
@@ -45,9 +45,9 @@ namespace kor
                 .message = std::format("Buffer descriptor has a negative range {}.", range) };
             return;
         }
-        if (offset + range > buffer->getSize()) {
+        if (offset + range > buffer->size()) {
             valid = false; _error = Error{ .code = ErrorCode::eBufferRangeOutOfBounds,
-                .message = std::format("Buffer descriptor offset {} + range {} exceeds buffer size {}.", offset, range, buffer->getSize()) };
+                .message = std::format("Buffer descriptor offset {} + range {} exceeds buffer size {}.", offset, range, buffer->size()) };
             return;
         }
 
@@ -56,7 +56,7 @@ namespace kor
                 using D = std::decay_t<decltype(d)>;
                 if constexpr (std::is_same_v<D, BufferDescriptor>) {
                     if (d._range == 0) {
-                        d._range = d._buffer->getSize() - d._offset;
+                        d._range = d._buffer->size() - d._offset;
                     }
                 }
             }, _descriptor);
@@ -102,25 +102,25 @@ namespace kor
         }
     }
 
-    ResourceRef<const Buffer> Descriptor::getBufferRef() const {
+    ResourceRef<const Buffer> Descriptor::bufferRef() const {
         if (!valid) return {};
         if (const auto* buffer = std::get_if<BufferDescriptor>(&_descriptor)) return buffer->_buffer;
         // A texel binding is a buffer as far as synchronisation is concerned — the formatting is
         // the shader's business, the hazard is the bytes'. Answering with the underlying buffer
         // here is what makes the barrier resolver see a texel fetch at all.
         if (const auto* texel = std::get_if<TexelBufferDescriptor>(&_descriptor)) {
-            if (texel->_bufferView.valid()) return texel->_bufferView->getBuffer();
+            if (texel->_bufferView.valid()) return texel->_bufferView->buffer();
         }
         return {};
     }
 
-    ResourceRef<const BufferView> Descriptor::getBufferViewRef() const {
+    ResourceRef<const BufferView> Descriptor::bufferViewRef() const {
         if (!valid) return {};
         if (const auto* texel = std::get_if<TexelBufferDescriptor>(&_descriptor)) return texel->_bufferView;
         return {};
     }
 
-    const BufferView& Descriptor::getBufferView() const {
+    const BufferView& Descriptor::bufferView() const {
         if (!valid) {
             kor::log::error("Attempted to get buffer view from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -132,14 +132,14 @@ namespace kor
         return *std::get<TexelBufferDescriptor>(_descriptor)._bufferView;
     }
 
-    ResourceRef<const ImageView> Descriptor::getImageViewRef() const {
+    ResourceRef<const ImageView> Descriptor::imageViewRef() const {
         if (!valid) return {};
         if (const auto* image = std::get_if<ImageDescriptor>(&_descriptor)) return image->_imageView;
         if (const auto* combined = std::get_if<CombinedImageSamplerDescriptor>(&_descriptor)) return combined->_imageView;
         return {};
     }
 
-    const Buffer & Descriptor::getBuffer() const {
+    const Buffer & Descriptor::buffer() const {
         if (!valid) {
             kor::log::error("Attempted to get buffer from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -151,7 +151,7 @@ namespace kor
         return *std::get<BufferDescriptor>(_descriptor)._buffer;
     }
 
-    glm::i64 Descriptor::getOffset() const {
+    glm::i64 Descriptor::offset() const {
         if (!valid) {
             kor::log::error("Attempted to get offset from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -163,7 +163,7 @@ namespace kor
         return std::get<BufferDescriptor>(_descriptor)._offset;
     }
 
-    glm::i64 Descriptor::getRange() const {
+    glm::i64 Descriptor::range() const {
         if (!valid) {
             kor::log::error("Attempted to get range from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -175,7 +175,7 @@ namespace kor
         return std::get<BufferDescriptor>(_descriptor)._range;
     }
 
-    const ImageView & Descriptor::getImageView() const {
+    const ImageView & Descriptor::imageView() const {
         if (!valid) {
             kor::log::error("Attempted to get image view from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -190,7 +190,7 @@ namespace kor
         throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor does not hold an image view." });
     }
 
-    const Sampler & Descriptor::getSampler() const {
+    const Sampler & Descriptor::sampler() const {
         if (!valid) {
             kor::log::error("Attempted to get sampler from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -205,7 +205,7 @@ namespace kor
         throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor does not hold a sampler." });
     }
 
-    const AccelerationStructure & Descriptor::getAccelerationStructure() const {
+    const AccelerationStructure & Descriptor::accelerationStructure() const {
         if (!valid) {
             kor::log::error("Attempted to get acceleration structure from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -226,9 +226,9 @@ namespace kor
     {
         writes.clear();
         if (!layout.valid()) return;  // poisoned or absent: resolve() will refuse to build anyway
-        for (const auto& [binding, type, count] : layout->getBindings()) {
+        for (const auto& [binding, description] : layout->bindings()) {
             writes[binding] = std::vector<Descriptor>();
-            writes[binding].resize(count);
+            writes[binding].resize(description.count);
         }
     }
 
@@ -239,7 +239,7 @@ namespace kor
         // rebuild has to fill the new one. A poisoned pipeline has no layouts to ask for — `layout`
         // stays empty, resolve() refuses, and this set is poisoned with the pipeline's error as its
         // cause. @see resolve
-        if (this->pipeline.valid()) layout = this->pipeline->getSetLayoutRef(setIndex);
+        if (this->pipeline.valid()) layout = this->pipeline->descriptorSetLayoutRef(setIndex);
     }
 
     DescriptorSet::Builder::Builder(ResourceRef<const DescriptorSetLayout> layout) : layout(layout)
@@ -476,7 +476,7 @@ namespace kor
         if (pipeline.alive()) {
             if (!pipeline.valid())
                 return reject("The pipeline this set belongs to is unusable, so it has no layout to fill.");
-            layout = pipeline->getSetLayoutRef(setIndex);
+            layout = pipeline->descriptorSetLayoutRef(setIndex);
         }
 
         initWrites();
@@ -548,10 +548,10 @@ namespace kor
                 // beats the driver's version of the same complaint: the fix is one flag on the
                 // image's builder, and this is the sentence that names it.
                 const auto needs = [&](const Image::Usage usage, const char* flag) -> std::optional<std::string> {
-                    if (write.image->getUsage() & usage) return std::nullopt;
+                    if (write.image->usage() & usage) return std::nullopt;
                     return std::format(
                         "The image written to binding {} was not created with Image::Usage::{}, which is "
-                        "what that binding needs. Add .addUsage(kor::Image::Usage::{}) where it is built.",
+                        "what that binding needs. Add .setUsage(kor::Image::Usage::{}) where it is built.",
                         binding, flag, flag);
                 };
 
@@ -618,25 +618,25 @@ namespace kor
                 {
                 case DescriptorType::eUniformBuffer:
                 case DescriptorType::eStorageBuffer:
-                    (void)descriptor.getBuffer();
+                    (void)descriptor.buffer();
                     break;
                 case DescriptorType::eCombinedImageSampler:
-                    (void)descriptor.getImageView();
-                    (void)descriptor.getSampler();
+                    (void)descriptor.imageView();
+                    (void)descriptor.sampler();
                     break;
                 case DescriptorType::eSampledImage:
                 case DescriptorType::eStorageImage:
-                    (void)descriptor.getImageView();
+                    (void)descriptor.imageView();
                     break;
                 case DescriptorType::eSampler:
-                    (void)descriptor.getSampler();
+                    (void)descriptor.sampler();
                     break;
                 case DescriptorType::eAccelerationStructure:
-                    (void)descriptor.getAccelerationStructure();
+                    (void)descriptor.accelerationStructure();
                     break;
                 case DescriptorType::eUniformTexelBuffer:
                 case DescriptorType::eStorageTexelBuffer:
-                    (void)descriptor.getBufferView();
+                    (void)descriptor.bufferView();
                     break;
                 default:
                     return reject(std::format("Unknown descriptor type for binding {}.", binding));
@@ -690,7 +690,7 @@ namespace kor
         // Registered even when poisoned, exactly as a pipeline is: the Repository's repair pass is
         // what replays the builder when the layout it was built against is reshaped, and what brings
         // the set back once a broken shader compiles again.
-        if (Context::HasRepository())
+        if (Context::hasRepository())
             Context::Repository().addRef(ResourceRef<const DescriptorSet>(set));
         return set;
     }
@@ -716,60 +716,60 @@ namespace kor
         return binding;
     }
 
-    // The resource overloads of Write(): the matching Descriptor, then the one virtual Write a
+    // The resource overloads of rebind(): the matching Descriptor, then the one virtual rebind a
     // backend implements. Named ones look the binding up first; a name nothing answers to is
-    // reported by resolveWriteTarget and the write is dropped.
-    void DescriptorSet::Write(const glm::u32 binding, const ResourceRef<const Buffer>& buffer, const glm::u32 index)
-    { Write(binding, Descriptor(buffer), index); }
+    // reported by resolveWriteTarget and the rebind is dropped.
+    void DescriptorSet::rebind(const glm::u32 binding, const ResourceRef<const Buffer>& buffer, const glm::u32 index)
+    { rebind(binding, Descriptor(buffer), index); }
 
-    void DescriptorSet::Write(const glm::u32 binding, const Buffer::Slice& slice, const glm::u32 index)
-    { Write(binding, Descriptor(slice.buffer, slice.offset, slice.size), index); }
+    void DescriptorSet::rebind(const glm::u32 binding, const Buffer::Slice& slice, const glm::u32 index)
+    { rebind(binding, Descriptor(slice.buffer, slice.offset, slice.size), index); }
 
-    void DescriptorSet::Write(const std::string_view name, const Buffer::Slice& slice)
-    { Write(name, Descriptor(slice.buffer, slice.offset, slice.size)); }
+    void DescriptorSet::rebind(const std::string_view name, const Buffer::Slice& slice)
+    { rebind(name, Descriptor(slice.buffer, slice.offset, slice.size)); }
 
-    void DescriptorSet::Write(const glm::u32 binding, const ResourceRef<const BufferView>& bufferView, const glm::u32 index)
-    { Write(binding, Descriptor(bufferView), index); }
+    void DescriptorSet::rebind(const glm::u32 binding, const ResourceRef<const BufferView>& bufferView, const glm::u32 index)
+    { rebind(binding, Descriptor(bufferView), index); }
 
-    void DescriptorSet::Write(const std::string_view name, const ResourceRef<const BufferView>& bufferView)
-    { Write(name, Descriptor(bufferView)); }
+    void DescriptorSet::rebind(const std::string_view name, const ResourceRef<const BufferView>& bufferView)
+    { rebind(name, Descriptor(bufferView)); }
 
-    void DescriptorSet::Write(const glm::u32 binding, const ResourceRef<const ImageView>& imageView, const glm::u32 index)
-    { Write(binding, Descriptor(imageView), index); }
+    void DescriptorSet::rebind(const glm::u32 binding, const ResourceRef<const ImageView>& imageView, const glm::u32 index)
+    { rebind(binding, Descriptor(imageView), index); }
 
-    void DescriptorSet::Write(const glm::u32 binding, const ResourceRef<const ImageView>& imageView,
+    void DescriptorSet::rebind(const glm::u32 binding, const ResourceRef<const ImageView>& imageView,
                               const ResourceRef<const Sampler>& sampler, const glm::u32 index)
-    { Write(binding, Descriptor(imageView, sampler), index); }
+    { rebind(binding, Descriptor(imageView, sampler), index); }
 
-    void DescriptorSet::Write(const glm::u32 binding, const ResourceRef<const Sampler>& sampler, const glm::u32 index)
-    { Write(binding, Descriptor(sampler), index); }
+    void DescriptorSet::rebind(const glm::u32 binding, const ResourceRef<const Sampler>& sampler, const glm::u32 index)
+    { rebind(binding, Descriptor(sampler), index); }
 
-    void DescriptorSet::Write(const glm::u32 binding,
+    void DescriptorSet::rebind(const glm::u32 binding,
                               const ResourceRef<const AccelerationStructure>& accelerationStructure, const glm::u32 index)
-    { Write(binding, Descriptor(accelerationStructure), index); }
+    { rebind(binding, Descriptor(accelerationStructure), index); }
 
-    void DescriptorSet::Write(const std::string_view name, const Descriptor& descriptor)
+    void DescriptorSet::rebind(const std::string_view name, const Descriptor& descriptor)
     {
         const auto [base, index] = splitIndex(name);
-        if (const auto binding = resolveWriteTarget(base)) Write(*binding, descriptor, index);
+        if (const auto binding = resolveWriteTarget(base)) rebind(*binding, descriptor, index);
     }
 
-    void DescriptorSet::Write(const std::string_view name, const ResourceRef<const Buffer>& buffer)
-    { Write(name, Descriptor(buffer)); }
+    void DescriptorSet::rebind(const std::string_view name, const ResourceRef<const Buffer>& buffer)
+    { rebind(name, Descriptor(buffer)); }
 
-    void DescriptorSet::Write(const std::string_view name, const ResourceRef<const ImageView>& imageView)
-    { Write(name, Descriptor(imageView)); }
+    void DescriptorSet::rebind(const std::string_view name, const ResourceRef<const ImageView>& imageView)
+    { rebind(name, Descriptor(imageView)); }
 
-    void DescriptorSet::Write(const std::string_view name, const ResourceRef<const ImageView>& imageView,
+    void DescriptorSet::rebind(const std::string_view name, const ResourceRef<const ImageView>& imageView,
                               const ResourceRef<const Sampler>& sampler)
-    { Write(name, Descriptor(imageView, sampler)); }
+    { rebind(name, Descriptor(imageView, sampler)); }
 
-    void DescriptorSet::Write(const std::string_view name, const ResourceRef<const Sampler>& sampler)
-    { Write(name, Descriptor(sampler)); }
+    void DescriptorSet::rebind(const std::string_view name, const ResourceRef<const Sampler>& sampler)
+    { rebind(name, Descriptor(sampler)); }
 
-    void DescriptorSet::Write(const std::string_view name,
+    void DescriptorSet::rebind(const std::string_view name,
                               const ResourceRef<const AccelerationStructure>& accelerationStructure)
-    { Write(name, Descriptor(accelerationStructure)); }
+    { rebind(name, Descriptor(accelerationStructure)); }
 
     DescriptorSet::DescriptorSet(const Builder& builder) : _layout(builder.layout), _writes(builder.writes)
     {

@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <cstdint>
 #include <memory>
 #include <glm/fwd.hpp>
 
@@ -29,7 +30,7 @@ namespace kor
      * kor::ImageView::Builder builder(texture);
      * auto view = builder
      *     .setViewType(kor::ImageView::Type::e2D)
-     *     .setMipLevelCount(texture->getMipLevels())
+     *     .setMipLevelCount(texture->mipLevels())
      *     .build();
      * @endcode
      *
@@ -43,7 +44,7 @@ namespace kor
          * Must be compatible with the image itself: a cube view needs six array layers, an array
          * view needs the image to have layers at all.
          */
-        enum class Type {
+        enum class Type : std::uint8_t {
             e1D,        ///< A single row.
             e2D,        ///< A single 2D image. The ordinary case.
             e3D,        ///< A volume.
@@ -54,7 +55,7 @@ namespace kor
         };
 
         /** @brief What one output channel of a sampled texel is taken from. */
-        enum class Swizzle {
+        enum class Swizzle : std::uint8_t {
             eIdentity,  ///< The matching channel of the image, unchanged.
             eZero,      ///< Constant 0.
             eOne,       ///< Constant 1.
@@ -100,7 +101,7 @@ namespace kor
         };
 
         /** @brief Describes the view to create over an image. */
-        struct KORAL_API Builder : ::Builder {
+        struct KORAL_API Builder : kor::Builder {
             kor::ResourceRef<const Image> image;        ///< The image being viewed.
             Type type = Type::e2D;                      ///< How it is seen.
             glm::u32 baseMipLevel = 0;                  ///< First mip level included.
@@ -163,19 +164,19 @@ namespace kor
         virtual ~ImageView() = default;
 
         /** @brief The image this is a view of. */
-        [[nodiscard]] kor::ResourceRef<const Image> getImage() const { return _image; }
+        [[nodiscard]] kor::ResourceRef<const Image> image() const { return _image; }
         /** @brief How the image is seen through this view. */
-        [[nodiscard]] Type getViewType() const { return _viewType; }
+        [[nodiscard]] Type viewType() const { return _viewType; }
         /** @brief First mip level the view covers. */
-        [[nodiscard]] glm::u32 getBaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] glm::u32 baseMipLevel() const { return _baseMipLevel; }
         /** @brief How many mip levels the view covers. */
-        [[nodiscard]] glm::u32 getMipLevelCount() const { return _mipLevelCount; }
+        [[nodiscard]] glm::u32 mipLevelCount() const { return _mipLevelCount; }
         /** @brief First array layer the view covers. */
-        [[nodiscard]] glm::u32 getBaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] glm::u32 baseArrayLayer() const { return _baseArrayLayer; }
         /** @brief How many array layers the view covers. */
-        [[nodiscard]] glm::u32 getArrayLayerCount() const { return _arrayLayerCount; }
+        [[nodiscard]] glm::u32 arrayLayerCount() const { return _arrayLayerCount; }
         /** @brief The channel rewiring applied when sampling through this view. */
-        [[nodiscard]] ComponentMapping getComponentMapping() const { return _componentMapping; }
+        [[nodiscard]] ComponentMapping componentMapping() const { return _componentMapping; }
 
         /** @brief Whether the view follows a per-frame image, and so has one instance per frame in flight. */
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }

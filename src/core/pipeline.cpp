@@ -18,14 +18,14 @@ namespace kor
 {
     Pipeline::~Pipeline() = default;
 
-    const DescriptorSetLayout& Pipeline::getSetLayout(const glm::u32 index) const
+    const DescriptorSetLayout& Pipeline::descriptorSetLayout(const glm::u32 index) const
     {
         if (!_setLayouts.contains(index))
             throw std::runtime_error("This pipeline does not contain a set with that index!");
         return *_setLayouts.at(index);
     }
 
-    ResourceRef<const DescriptorSetLayout> Pipeline::getSetLayoutRef(const glm::u32 index) const
+    ResourceRef<const DescriptorSetLayout> Pipeline::descriptorSetLayoutRef(const glm::u32 index) const
     {
         if (!_setLayouts.contains(index))
             throw std::runtime_error("This pipeline does not contain a set with that index!");
@@ -38,7 +38,7 @@ namespace kor
         return it == _pushConstants.end() ? nullptr : &it->second;
     }
 
-    const Shader::PushConstant& Pipeline::getPushConstantRange(const glm::u32 offset) const
+    const Shader::PushConstant& Pipeline::pushConstantRange(const glm::u32 offset) const
     {
         // The range *containing* the offset, not the one that starts at it. A push writes some
         // part of a block — one named constant out of several — so it is only the first field of
@@ -70,7 +70,7 @@ namespace kor
         std::vector<const Shader::PushConstant*> declaredPushConstants;
         for (const auto& shader : shaders)
         {
-            const auto& memoryLayout = shader->getMemoryLayout();
+            const auto& memoryLayout = shader->memoryLayout();
             for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
             {
                 for (const auto& [binding, descriptor] : setDescription.descriptors)

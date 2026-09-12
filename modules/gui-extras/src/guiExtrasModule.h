@@ -15,14 +15,14 @@
 namespace kgui
 {
     /** @brief This module's identity, for another module that declares a dependency on it. */
-    inline constexpr std::string_view kModuleId = "koral.gui.extras";
-    inline constexpr std::uint32_t    kModuleVersion = 1;
+    inline constexpr std::string_view ModuleId = "koral.gui.extras";
+    inline constexpr std::uint32_t    ModuleVersion = 1;
 
     /** @brief The module: identity, over a library that is otherwise all headers. */
     class GuiExtrasModule final : public kor::Module
     {
     public:
-        static constexpr std::string_view kModuleId      = kgui::kModuleId;
-        static constexpr std::uint32_t    kModuleVersion = kgui::kModuleVersion;
+        static constexpr std::string_view ModuleId      = kgui::ModuleId;
+        static constexpr std::uint32_t    ModuleVersion = kgui::ModuleVersion;
     };
 }

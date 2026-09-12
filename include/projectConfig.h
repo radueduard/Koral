@@ -93,10 +93,10 @@ namespace kor
     struct KORAL_API ProjectConfig
     {
         /** @brief The file name the runtime searches for. */
-        static constexpr std::string_view kFileName = "koral.json";
+        static constexpr std::string_view FileName = "koral.json";
 
         /** @brief The schema this build understands. Bumped when a key changes meaning. */
-        static constexpr int kSchemaVersion = 1;
+        static constexpr int SchemaVersion = 1;
 
         /**
          * @brief Roots for resolving relative asset paths (textures, models), most specific first.

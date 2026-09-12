@@ -15,7 +15,7 @@ class MainThreadExecutor : public kor::Executor {
 public:
     MainThreadExecutor() : mainThreadId_(std::this_thread::get_id()) {}
 
-    bool IsMainThread() const noexcept override {
+    bool isMainThread() const noexcept override {
         return std::this_thread::get_id() == mainThreadId_;
     }
 
@@ -40,7 +40,7 @@ public:
 
     struct SwitchAwaiter : kor::SwitchAwaiter {
         explicit SwitchAwaiter(MainThreadExecutor* executor) noexcept : kor::SwitchAwaiter(executor) {}
-        bool await_ready()  const noexcept override { return exec->IsMainThread(); }
+        bool await_ready()  const noexcept override { return exec->isMainThread(); }
         void await_resume() const noexcept override {}
     };
 

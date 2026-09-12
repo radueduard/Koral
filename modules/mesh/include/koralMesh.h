@@ -70,8 +70,8 @@
 namespace kmesh
 {
     /** @brief This module's identity, for another module that declares a dependency on it. */
-    inline constexpr std::string_view kModuleId = "koral.mesh";
-    inline constexpr std::uint32_t    kModuleVersion = 1;
+    inline constexpr std::string_view ModuleId = "koral.mesh";
+    inline constexpr std::uint32_t    ModuleVersion = 1;
 
     /**
      * @brief What a vertex shader can ask a vertex for, written `mesh(NAME)`.
@@ -83,16 +83,16 @@ namespace kmesh
     namespace semantics
     {
         /** @brief The name a shader annotates with: the `mesh` of `mesh(POSITION)`. */
-        inline constexpr std::string_view kNamespace = "mesh";
+        inline constexpr std::string_view Namespace = "mesh";
 
-        inline constexpr std::string_view kPosition    = "POSITION";
-        inline constexpr std::string_view kNormal      = "NORMAL";
-        inline constexpr std::string_view kColor       = "COLOR";
-        inline constexpr std::string_view kUV          = "UV";
-        inline constexpr std::string_view kTangent     = "TANGENT";
-        inline constexpr std::string_view kBitangent   = "BITANGENT";
-        inline constexpr std::string_view kBoneIds     = "BONE_IDS";
-        inline constexpr std::string_view kBoneWeights = "BONE_WEIGHTS";
+        inline constexpr std::string_view Position    = "POSITION";
+        inline constexpr std::string_view Normal      = "NORMAL";
+        inline constexpr std::string_view Color       = "COLOR";
+        inline constexpr std::string_view UV          = "UV";
+        inline constexpr std::string_view Tangent     = "TANGENT";
+        inline constexpr std::string_view Bitangent   = "BITANGENT";
+        inline constexpr std::string_view BoneIds     = "BONE_IDS";
+        inline constexpr std::string_view BoneWeights = "BONE_WEIGHTS";
     }
 
     /**
@@ -100,7 +100,7 @@ namespace kmesh
      *
      * Deriving from it is what makes an attribute type: `struct Normal : VertexAttribute<glm::vec3>`.
      * The name is what distinguishes two attributes that store the same thing; adding a
-     * `kSemantic` is what lets a shader ask for it by name.
+     * `Semantic` is what lets a shader ask for it by name.
      */
     template<typename T>
     struct VertexAttribute
@@ -219,8 +219,8 @@ namespace kmesh
         template<std::size_t I>
         constexpr const auto& get() const { return StorageGet<I>(storage); }
 
-        static constexpr glm::u32 kAttributeCount = static_cast<glm::u32>(sizeof...(Attrs));  ///< How many attributes this vertex has.
-        static constexpr glm::u32 kStride = static_cast<glm::u32>(sizeof(Storage));           ///< Bytes from one vertex to the next.
+        static constexpr glm::u32 AttributeCount = static_cast<glm::u32>(sizeof...(Attrs));  ///< How many attributes this vertex has.
+        static constexpr glm::u32 Stride = static_cast<glm::u32>(sizeof(Storage));           ///< Bytes from one vertex to the next.
 
         /** @brief Byte offset of attribute @p I, measured from the real memory layout so alignment is included. */
         template<std::size_t I>
@@ -247,13 +247,13 @@ namespace kmesh
     template<typename T>
     concept ReflectableStream = requires {
         typename T::Attributes;
-        { T::kAttributeCount } -> std::convertible_to<glm::u32>;
+        { T::AttributeCount } -> std::convertible_to<glm::u32>;
     };
 
     /**
      * @brief What a shader asks for to be given this attribute, or empty if it answers for nothing.
      *
-     * An attribute declares its own semantic as `kSemantic`; specialise this instead when the
+     * An attribute declares its own semantic as `Semantic`; specialise this instead when the
      * semantic has to be computed, as an indexed attribute's is.
      */
     template<typename Attr>
@@ -261,7 +261,7 @@ namespace kmesh
     {
         static std::string semantic()
         {
-            if constexpr (requires { Attr::kSemantic; }) return std::string(Attr::kSemantic);
+            if constexpr (requires { Attr::Semantic; }) return std::string(Attr::Semantic);
             else return {};
         }
     };
@@ -269,15 +269,17 @@ namespace kmesh
     /**
      * @brief Wraps an attribute with a channel index, so one vertex can carry several of a kind.
      * @tparam Attr The attribute being indexed.
-     * @tparam Channel Which one it is.
+     * @tparam Index Which one it is, readable back as @ref Channel.
      *
      * Two UV sets, for instance: `IndexedAttribute<UV, 0>` and `IndexedAttribute<UV, 1>`, which a
      * shader asks for as `mesh(UV0)` and `mesh(UV1)`.
      */
-    template<VertexAttributeType Attr, std::size_t Channel>
+    template<VertexAttributeType Attr, std::size_t Index>
     struct IndexedAttribute : Attr
     {
-        static constexpr std::size_t kChannel = Channel;
+        /// Which channel this is. The template parameter is named apart from it so the member does
+        /// not shadow it.
+        static constexpr std::size_t Channel = Index;
     };
 
     template<VertexAttributeType Attr, std::size_t Channel>
@@ -300,7 +302,7 @@ namespace kmesh
             if constexpr (ReflectableStream<Stream>) {
                 layout.bindings.push_back(kor::VertexInputBindingDescription{
                     .binding = binding,
-                    .stride  = Stream::kStride,
+                    .stride  = Stream::Stride,
                 });
 
                 [&]<std::size_t... I>(std::index_sequence<I...>) {
@@ -318,14 +320,14 @@ namespace kmesh
 
                         layout.attributes.push_back(kor::VertexLayout::Attribute{
                             .semantic          = AttributeSemanticTraits<Attr>::semantic(),
-                            .semanticNamespace = std::string(semantics::kNamespace),
+                            .semanticNamespace = std::string(semantics::Namespace),
                             .binding           = binding,
                             .offset            = Stream::template OffsetOf<Idx>(),
                             .channelType       = Traits::channelType,
                             .channelCount      = Traits::channelCount,
                         });
                     }.template operator()<I>(), ...);
-                }(std::make_index_sequence<Stream::kAttributeCount>{});
+                }(std::make_index_sequence<Stream::AttributeCount>{});
             } else {
                 // A stream of bare values — a heap of glm::vec3 positions, say. It has one
                 // attribute and no name for it, so it can only be matched by declaration order.
@@ -435,8 +437,8 @@ namespace kmesh
             Builder& SetVertexBuffer(const glm::u32 binding, kor::Resource<kor::Buffer> vertexBuffer) {
                 const auto stride = Layout().bindings[binding].stride;
                 if (vertexCount == 0)
-                    vertexCount = vertexBuffer->getSize() / stride;
-                else if (vertexCount != vertexBuffer->getSize() / stride)
+                    vertexCount = vertexBuffer->size() / stride;
+                else if (vertexCount != vertexBuffer->size() / stride)
                     throw std::runtime_error("All vertex buffers must have the same vertex count!");
 
                 vertexBuffers[binding] = std::move(vertexBuffer);
@@ -449,7 +451,7 @@ namespace kmesh
              * @param indexType The width of one index; the count follows from the buffer's size.
              */
             Builder& SetIndexBuffer(kor::Resource<kor::Buffer> indexBuffer, const kor::ChannelType indexType) {
-                this->indexCount = static_cast<glm::u32>(indexBuffer->getSize() / kor::sizeofChannelType(indexType));
+                this->indexCount = static_cast<glm::u32>(indexBuffer->size() / kor::sizeofChannelType(indexType));
                 this->indexBuffer = std::move(indexBuffer);
                 this->indexType = indexType;
                 return *this;
@@ -656,23 +658,23 @@ namespace kmesh
     // The Position types carry PositionAttribute, which only matters for a format that does not
     // put its position first.
 
-    struct Position2  : VertexAttribute<glm::vec2>, PositionAttribute { static constexpr std::string_view kSemantic = semantics::kPosition; };   ///< 2D position.
-    struct Position   : VertexAttribute<glm::vec3>, PositionAttribute { static constexpr std::string_view kSemantic = semantics::kPosition; };   ///< 3D position. The usual one.
-    struct Position4  : VertexAttribute<glm::vec4>, PositionAttribute { static constexpr std::string_view kSemantic = semantics::kPosition; };   ///< Homogeneous position.
+    struct Position2  : VertexAttribute<glm::vec2>, PositionAttribute { static constexpr std::string_view Semantic = semantics::Position; };   ///< 2D position.
+    struct Position   : VertexAttribute<glm::vec3>, PositionAttribute { static constexpr std::string_view Semantic = semantics::Position; };   ///< 3D position. The usual one.
+    struct Position4  : VertexAttribute<glm::vec4>, PositionAttribute { static constexpr std::string_view Semantic = semantics::Position; };   ///< Homogeneous position.
 
-    struct Normal     : VertexAttribute<glm::vec3> { static constexpr std::string_view kSemantic = semantics::kNormal; };    ///< Surface normal.
-    struct Normal4    : VertexAttribute<glm::vec4> { static constexpr std::string_view kSemantic = semantics::kNormal; };    ///< Surface normal with a spare channel.
+    struct Normal     : VertexAttribute<glm::vec3> { static constexpr std::string_view Semantic = semantics::Normal; };    ///< Surface normal.
+    struct Normal4    : VertexAttribute<glm::vec4> { static constexpr std::string_view Semantic = semantics::Normal; };    ///< Surface normal with a spare channel.
 
-    struct Color3     : VertexAttribute<glm::vec3> { static constexpr std::string_view kSemantic = semantics::kColor; };     ///< Vertex colour, no alpha.
-    struct Color      : VertexAttribute<glm::vec4> { static constexpr std::string_view kSemantic = semantics::kColor; };     ///< Vertex colour with alpha.
+    struct Color3     : VertexAttribute<glm::vec3> { static constexpr std::string_view Semantic = semantics::Color; };     ///< Vertex colour, no alpha.
+    struct Color      : VertexAttribute<glm::vec4> { static constexpr std::string_view Semantic = semantics::Color; };     ///< Vertex colour with alpha.
 
-    struct UV         : VertexAttribute<glm::vec2> { static constexpr std::string_view kSemantic = semantics::kUV; };        ///< Texture coordinates.
-    struct UV3        : VertexAttribute<glm::vec3> { static constexpr std::string_view kSemantic = semantics::kUV; };        ///< Three-dimensional texture coordinates, for volume or cube lookups.
+    struct UV         : VertexAttribute<glm::vec2> { static constexpr std::string_view Semantic = semantics::UV; };        ///< Texture coordinates.
+    struct UV3        : VertexAttribute<glm::vec3> { static constexpr std::string_view Semantic = semantics::UV; };        ///< Three-dimensional texture coordinates, for volume or cube lookups.
 
-    struct Tangent    : VertexAttribute<glm::vec3> { static constexpr std::string_view kSemantic = semantics::kTangent; };   ///< Surface tangent, for normal mapping.
-    struct PackedTangent : VertexAttribute<glm::vec4> { static constexpr std::string_view kSemantic = semantics::kTangent; };///< Tangent in xyz, bitangent handedness in w.
-    struct Bitangent  : VertexAttribute<glm::vec3> { static constexpr std::string_view kSemantic = semantics::kBitangent; }; ///< Surface bitangent.
+    struct Tangent    : VertexAttribute<glm::vec3> { static constexpr std::string_view Semantic = semantics::Tangent; };   ///< Surface tangent, for normal mapping.
+    struct PackedTangent : VertexAttribute<glm::vec4> { static constexpr std::string_view Semantic = semantics::Tangent; };///< Tangent in xyz, bitangent handedness in w.
+    struct Bitangent  : VertexAttribute<glm::vec3> { static constexpr std::string_view Semantic = semantics::Bitangent; }; ///< Surface bitangent.
 
-    struct BoneIds     : VertexAttribute<glm::ivec4> { static constexpr std::string_view kSemantic = semantics::kBoneIds; };     ///< Skinning: which bones influence this vertex.
-    struct BoneWeights : VertexAttribute<glm::vec4>  { static constexpr std::string_view kSemantic = semantics::kBoneWeights; }; ///< Skinning: how much each of them does.
+    struct BoneIds     : VertexAttribute<glm::ivec4> { static constexpr std::string_view Semantic = semantics::BoneIds; };     ///< Skinning: which bones influence this vertex.
+    struct BoneWeights : VertexAttribute<glm::vec4>  { static constexpr std::string_view Semantic = semantics::BoneWeights; }; ///< Skinning: how much each of them does.
 }

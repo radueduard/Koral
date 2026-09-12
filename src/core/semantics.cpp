@@ -72,26 +72,29 @@ namespace kor
         return true;
     }
 
-    bool SemanticSlot::set(const float value)          { return write(Scalar::eFloat, 1, 1, &value, sizeof(value)); }
-    bool SemanticSlot::set(const std::int32_t value)   { return write(Scalar::eInt, 1, 1, &value, sizeof(value)); }
-    bool SemanticSlot::set(const std::uint32_t value)  { return write(Scalar::eUInt, 1, 1, &value, sizeof(value)); }
-    bool SemanticSlot::set(const glm::vec2& value)     { return write(Scalar::eFloat, 2, 1, &value, sizeof(value)); }
-    bool SemanticSlot::set(const glm::vec3& value)     { return write(Scalar::eFloat, 3, 1, &value, sizeof(value)); }
-    bool SemanticSlot::set(const glm::vec4& value)     { return write(Scalar::eFloat, 4, 1, &value, sizeof(value)); }
-    bool SemanticSlot::set(const glm::mat4& value)     { return write(Scalar::eFloat, 4, 4, &value, sizeof(value)); }
+    void SemanticSlot::set(const float value)          { write(Scalar::eFloat, 1, 1, &value, sizeof(value)); }
+    void SemanticSlot::set(const std::int32_t value)   { write(Scalar::eInt, 1, 1, &value, sizeof(value)); }
+    void SemanticSlot::set(const std::uint32_t value)  { write(Scalar::eUInt, 1, 1, &value, sizeof(value)); }
+    void SemanticSlot::set(const glm::vec2& value)     { write(Scalar::eFloat, 2, 1, &value, sizeof(value)); }
+    void SemanticSlot::set(const glm::vec3& value)     { write(Scalar::eFloat, 3, 1, &value, sizeof(value)); }
+    void SemanticSlot::set(const glm::vec4& value)     { write(Scalar::eFloat, 4, 1, &value, sizeof(value)); }
+    void SemanticSlot::set(const glm::mat4& value)     { write(Scalar::eFloat, 4, 4, &value, sizeof(value)); }
 
-    bool SemanticSlot::set(const glm::mat3& value)
+    void SemanticSlot::set(const glm::mat3& value)
     {
         // std140 pads each column of a mat3 out to 16 bytes, so the tight glm::mat3 cannot be
         // copied straight in. Expanded here rather than made the caller's problem.
         if (_scalar != Scalar::eFloat || _rows != 3 || _columns != 3)
-            return write(Scalar::eFloat, 3, 3, &value, sizeof(value));   // reports the mismatch
+        {
+            write(Scalar::eFloat, 3, 3, &value, sizeof(value));   // reports the mismatch
+            return;
+        }
 
         alignas(16) float padded[12] {};
         for (int column = 0; column < 3; ++column) {
             for (int row = 0; row < 3; ++row) padded[column * 4 + row] = value[column][row];
         }
-        return write(Scalar::eFloat, 3, 3, padded, sizeof(padded));
+        write(Scalar::eFloat, 3, 3, padded, sizeof(padded));
     }
 
     // ---- SemanticBuffers ------------------------------------------------------------------------
@@ -210,7 +213,7 @@ namespace kor
 
         block.buffer = Buffer::RawBuilder()
             .setRawSize(static_cast<glm::i64>(blockSize))
-            .addUsage(Buffer::Usage::eUniform)
+            .setUsage(Buffer::Usage::eUniform)
             .setIsPerFrame(true)
             .setType(Buffer::Type::eDynamic)
             .build();

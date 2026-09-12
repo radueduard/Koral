@@ -772,7 +772,7 @@ namespace kor {
         // tryGet (which returns a raw pointer / "unsafe" ref), this carries the owning
         // Resource's lifetime stamp, so it is safe to store and pass around.
         template<typename T>
-        ResourceRef<T> getRef(const std::string_view id) {
+        ResourceRef<T> ref(const std::string_view id) {
             auto& s = storage<T>();
             const auto it = s.items.find(std::string(id));
             if (it == s.items.end()) {

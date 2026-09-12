@@ -121,7 +121,9 @@ kor::Window& kor::Context::Window()
     return *_window;
 }
 
-const kor::Scheduler& kor::Context::Scheduler()
+std::unique_ptr<kor::Scheduler> kor::Context::_scheduler {};
+
+kor::Scheduler& kor::Context::Scheduler()
 {
     if (_scheduler == nullptr) {
         throw std::runtime_error("No scheduler is linked to the current thread!");
@@ -129,13 +131,13 @@ const kor::Scheduler& kor::Context::Scheduler()
     return *_scheduler;
 }
 
-kor::ResourceRef<const kor::Framebuffer> kor::Context::DefaultFramebuffer()
+kor::ResourceRef<const kor::Framebuffer> kor::Context::defaultFramebuffer()
 {
     if (_window == nullptr)
     {
         throw std::runtime_error("There is no default framebuffer!");
     }
-    return _window->getFramebuffer();
+    return _window->framebuffer();
 }
 
 kor::SwitchAwaiter kor::Context::SwitchToMainThread() {
@@ -159,7 +161,7 @@ void kor::Context::DrainMainThread() {
     _mainThreadExecutor->Drain();
 }
 
-bool kor::Context::HasRepository() noexcept {
+bool kor::Context::hasRepository() noexcept {
     return _repository != nullptr;
 }
 
@@ -175,17 +177,17 @@ kor::API kor::Context::activeAPI()
     return _activeAPI;
 }
 
-bool kor::Context::IsHeadless()
+bool kor::Context::isHeadless()
 {
     return _headless;
 }
 
-bool kor::Context::HasDevice() noexcept
+bool kor::Context::hasDevice() noexcept
 {
     return _window != nullptr || _headless;
 }
 
-bool kor::Context::SupportsRayTracing()
+bool kor::Context::supportsRayTracing()
 {
     if (_activeAPI != API::eVulkan) return false;
     if (_window == nullptr && !_headless) return false;

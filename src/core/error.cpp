@@ -40,6 +40,7 @@ namespace kor
         case ErrorCode::ePushConstantMismatch:       return "ePushConstantMismatch";
         case ErrorCode::eConfigInvalid:              return "eConfigInvalid";
         case ErrorCode::eModuleLoadFailed:           return "eModuleLoadFailed";
+        case ErrorCode::eFileNotReadable:            return "eFileNotReadable";
         }
         return "eUnknown";
     }
@@ -101,6 +102,8 @@ namespace kor
             return "The koral.json config file is malformed, or one of its keys has the wrong type.";
         case ErrorCode::eModuleLoadFailed:
             return "A module could not be found or loaded, or a module it requires is missing.";
+        case ErrorCode::eFileNotReadable:
+            return "A file could not be opened for reading or writing, or its contents are not the shape expected.";
         }
         return "Unknown error.";
     }

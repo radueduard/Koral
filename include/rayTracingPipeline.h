@@ -50,7 +50,7 @@ namespace kor
      * commandBuffer.BindRayTracingPipeline(pipeline).TraceRays(width, height);
      * @endcode
      *
-     * Requires a device with ray-tracing support — check Context::SupportsRayTracing(). Without it
+     * Requires a device with ray-tracing support — check Context::supportsRayTracing(). Without it
      * the build fails into a poisoned resource rather than crashing. Vulkan only.
      */
     class KORAL_API RayTracingPipeline : public Pipeline
@@ -70,7 +70,7 @@ namespace kor
         };
 
         /** @brief Collects the shaders a ray-tracing pipeline is assembled from. */
-        struct KORAL_API Builder : ::Builder
+        struct KORAL_API Builder : kor::Builder
         {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
@@ -116,7 +116,7 @@ namespace kor
         ~RayTracingPipeline() override;
 
         /** @brief Maximum ray recursion depth this pipeline was created with. */
-        [[nodiscard]] glm::u32 getMaxRecursionDepth() const { return _maxRecursionDepth; }
+        [[nodiscard]] glm::u32 maxRecursionDepth() const { return _maxRecursionDepth; }
 
     protected:
         explicit RayTracingPipeline(const Builder& createInfo);

@@ -18,36 +18,39 @@
 
 namespace kor {
 
-    void Framebuffer::Resize(const glm::uvec2& newExtent) const
+    void Framebuffer::Resize(const glm::uvec2& newExtent)
     {
         if (newExtent.x == 0 || newExtent.y == 0) return;
 
-        // The default framebuffer is the swap chain's, and the swap chain resizes its own images: the
-        // backend override re-points this at the new ones. Resizing them from here would be resizing
-        // images this framebuffer does not own.
-        if (_isDefault) return;
+        // The default framebuffer is the swap chain's, and the swap chain resizes its own images, so
+        // the shared work below is skipped for it — resizing them from here would be resizing images
+        // this framebuffer does not own. doResize still runs: re-pointing the default at the swap
+        // chain's new images is exactly what the backend half is for.
+        if (!_isDefault) {
+            if (_extent == newExtent) return;
+            _extent = newExtent;
 
-        if (_extent == newExtent) return;
-        _extent = newExtent;
+            // Each attachment's image. Two attachments can name the same image — a depth and a
+            // stencil attachment usually do — and Image::Resize is a no-op the second time round,
+            // since by then the extent already matches.
+            const auto resize = [&newExtent](const ResourceRef<const ImageView>& view) {
+                if (!view.valid()) return;
+                if (const auto image = view->image(); image.valid()) {
+                    const_cast<Image&>(*image).Resize({ newExtent.x, newExtent.y, 1 });
+                }
+            };
 
-        // Each attachment's image. Two attachments can name the same image — a depth and a stencil
-        // attachment usually do — and Image::Resize is a no-op the second time round, since by then
-        // the extent already matches.
-        const auto resize = [&newExtent](const ResourceRef<const ImageView>& view) {
-            if (!view.valid()) return;
-            if (const auto image = view->getImage(); image.valid()) {
-                const_cast<Image&>(*image).Resize({ newExtent.x, newExtent.y, 1 });
-            }
-        };
+            const auto resizeAttachment = [&resize](const Attachment& attachment) {
+                resize(attachment.view);
+                resize(attachment.resolve);
+            };
 
-        const auto resizeAttachment = [&resize](const Attachment& attachment) {
-            resize(attachment.view);
-            resize(attachment.resolve);
-        };
+            for (const auto& attachment : _colorAttachments) resizeAttachment(attachment);
+            if (_depthAttachment) resizeAttachment(*_depthAttachment);
+            if (_stencilAttachment) resizeAttachment(*_stencilAttachment);
+        }
 
-        for (const auto& attachment : _colorAttachments) resizeAttachment(attachment);
-        if (_depthAttachment) resizeAttachment(*_depthAttachment);
-        if (_stencilAttachment) resizeAttachment(*_stencilAttachment);
+        doResize(newExtent);
     }
 
     namespace {
@@ -68,141 +71,73 @@ namespace kor {
     void Framebuffer::Builder::adoptGeometry(const ResourceRef<const ImageView>& imageView)
     {
         if (!imageView.valid()) return;
-        const auto image = imageView->getImage();
+        const auto image = imageView->image();
         if (!image.valid()) return;
-        if (!extent) extent = glm::uvec2{ image->getExtent().x, image->getExtent().y };
-        if (!sampleCount) sampleCount = image->getSampleCount();
+        if (!extent) extent = glm::uvec2{ image->extent().x, image->extent().y };
+        if (!sampleCount) sampleCount = image->sampleCount();
     }
 
-    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(ResourceRef<const ImageView> imageView, ClearColor clearColor)
-    {
-        return addColorAttachment(std::string_view{}, std::move(imageView), clearColor);
-    }
+    // ---- AttachmentSource: an Image or a view of one ---------------------------------------
 
-    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, ClearColor clearColor)
-    {
-        return addColorAttachment(std::string_view{}, std::move(imageView), std::move(resolveView), clearColor);
-    }
+    Framebuffer::Builder::AttachmentSource::AttachmentSource(ResourceRef<const ImageView> view)
+        : view(std::move(view)) {}
 
-    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(ResourceRef<const Image> image, ClearColor clearColor)
-    {
-        return addColorAttachment(std::string_view{}, attachmentViewOf(image), clearColor);
-    }
+    Framebuffer::Builder::AttachmentSource::AttachmentSource(ResourceRef<const Image> image)
+        : view(attachmentViewOf(image)) {}
 
-    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const std::string_view name, ResourceRef<const ImageView> imageView, ClearColor clearColor)
+    Framebuffer::Builder::AttachmentSource::AttachmentSource(const Resource<ImageView>& view)
+        : view(ResourceRef<const ImageView>(view)) {}
+
+    Framebuffer::Builder::AttachmentSource::AttachmentSource(const Resource<Image>& image)
+        : view(attachmentViewOf(ResourceRef<const Image>(image))) {}
+
+    // ---- Attachments -------------------------------------------------------------------------
+
+    Framebuffer::Builder& Framebuffer::Builder::addColor(const ColorAttachment& attachment)
     {
-        adoptGeometry(imageView);
-        colorAttachments.push_back(Attachment{ std::move(imageView), {}, std::string(name) });
-        clearValues.clearColor.emplace_back(clearColor);
+        adoptGeometry(attachment.view.view);
+        colorAttachments.push_back(Attachment{
+            attachment.view.view, attachment.resolve.view, std::string(attachment.name) });
+        clearValues.clearColor.emplace_back(attachment.clear);
+
+        // A resolve target with no mode named would collapse to nothing, so assume the usual one.
+        // Left alone once set, so an explicit setResolveMode wins wherever it appears in the chain.
+        if (attachment.resolve.view.alive() && resolveMode == ResolveMode::eNone) {
+            resolveMode = ResolveMode::eAverage;
+        }
         return *this;
     }
 
-    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const std::string_view name, ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, ClearColor clearColor)
+    Framebuffer::Builder& Framebuffer::Builder::setDepth(const DepthStencilAttachment& attachment)
     {
-        adoptGeometry(imageView);
-        colorAttachments.push_back(Attachment{ std::move(imageView), std::move(resolveView), std::string(name) });
-        clearValues.clearColor.emplace_back(clearColor);
-        if (resolveMode == ResolveMode::eNone) resolveMode = ResolveMode::eAverage;
+        adoptGeometry(attachment.view.view);
+        depthAttachment = Attachment{
+            attachment.view.view, attachment.resolve.view, std::string(attachment.name) };
+        clearValues.clearDepth = attachment.depth;
+        if (attachment.resolve.view.alive() && resolveMode == ResolveMode::eNone) {
+            resolveMode = ResolveMode::eAverage;
+        }
         return *this;
     }
 
-    Framebuffer::Builder& Framebuffer::Builder::addColorAttachment(const std::string_view name, ResourceRef<const Image> image, ClearColor clearColor)
+    Framebuffer::Builder& Framebuffer::Builder::setStencil(const DepthStencilAttachment& attachment)
     {
-        return addColorAttachment(name, attachmentViewOf(image), clearColor);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthAttachment(ResourceRef<const ImageView> imageView, float depth)
-    {
-        return setDepthAttachment(std::string_view{}, std::move(imageView), depth);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, float depth)
-    {
-        adoptGeometry(imageView);
-        depthAttachment = Attachment{ std::move(imageView), std::move(resolveView), "depth" };
-        clearValues.clearDepth = depth;
-        if (resolveMode == ResolveMode::eNone) resolveMode = ResolveMode::eAverage;
+        adoptGeometry(attachment.view.view);
+        stencilAttachment = Attachment{
+            attachment.view.view, attachment.resolve.view, std::string(attachment.name) };
+        clearValues.clearStencil = attachment.stencil;
+        if (attachment.resolve.view.alive() && resolveMode == ResolveMode::eNone) {
+            resolveMode = ResolveMode::eAverage;
+        }
         return *this;
     }
 
-    Framebuffer::Builder& Framebuffer::Builder::setDepthAttachment(ResourceRef<const Image> image, float depth)
+    Framebuffer::Builder& Framebuffer::Builder::setDepthStencil(const DepthStencilAttachment& attachment)
     {
-        return setDepthAttachment(std::string_view{}, attachmentViewOf(image), depth);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthAttachment(const std::string_view name, ResourceRef<const ImageView> imageView, float depth)
-    {
-        adoptGeometry(imageView);
-        // Named "depth" when the caller did not name it, so the usual target is reachable by the
-        // obvious name without every framebuffer having to say so. @see Framebuffer::image
-        depthAttachment = Attachment{ std::move(imageView), {}, name.empty() ? "depth" : std::string(name) };
-        clearValues.clearDepth = depth;
-        return *this;
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthAttachment(const std::string_view name, ResourceRef<const Image> image, float depth)
-    {
-        return setDepthAttachment(name, attachmentViewOf(image), depth);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setStencilAttachment(ResourceRef<const ImageView> imageView, glm::i32 stencil)
-    {
-        return setStencilAttachment(std::string_view{}, std::move(imageView), stencil);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setStencilAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, glm::i32 stencil)
-    {
-        adoptGeometry(imageView);
-        stencilAttachment = Attachment{ std::move(imageView), std::move(resolveView), "stencil" };
-        clearValues.clearStencil = stencil;
-        if (resolveMode == ResolveMode::eNone) resolveMode = ResolveMode::eAverage;
-        return *this;
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setStencilAttachment(ResourceRef<const Image> image, glm::i32 stencil)
-    {
-        return setStencilAttachment(std::string_view{}, attachmentViewOf(image), stencil);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setStencilAttachment(const std::string_view name, ResourceRef<const ImageView> imageView, glm::i32 stencil)
-    {
-        adoptGeometry(imageView);
-        stencilAttachment = Attachment{ std::move(imageView), {}, name.empty() ? "stencil" : std::string(name) };
-        clearValues.clearStencil = stencil;
-        return *this;
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setStencilAttachment(const std::string_view name, ResourceRef<const Image> image, glm::i32 stencil)
-    {
-        return setStencilAttachment(name, attachmentViewOf(image), stencil);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(ResourceRef<const ImageView> imageView, float depth, glm::i32 stencil)
-    {
-        setDepthAttachment(imageView, depth);
-        setStencilAttachment(imageView, stencil);
-        return *this;
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, float depth, glm::i32 stencil)
-    {
-        setDepthAttachment(imageView, resolveView, depth);
-        setStencilAttachment(imageView, resolveView, stencil);
-        return *this;
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(ResourceRef<const Image> image, float depth, glm::i32 stencil)
-    {
-        return setDepthStencilAttachment(attachmentViewOf(image), depth, stencil);
-    }
-
-    Framebuffer::Builder& Framebuffer::Builder::setDepthStencilAttachment(const std::string_view name, ResourceRef<const Image> image, float depth, glm::i32 stencil)
-    {
-        const auto view = attachmentViewOf(image);
         // One view, two roles, one name: a combined depth-stencil format is a single target, and
         // naming it twice would put the same image in the lookup under two names for no gain.
-        setDepthAttachment(name, view, depth);
-        setStencilAttachment(name, view, stencil);
+        setDepth(attachment);
+        setStencil(attachment);
         return *this;
     }
 
@@ -262,15 +197,15 @@ namespace kor {
     }
 
 
-    glm::u32 Framebuffer::getColorAttachmentCount() const { return static_cast<glm::u32>(_colorAttachments.size()); }
-    SampleCount Framebuffer::getSampleCount() const { return _sampleCount; }
+    glm::u32 Framebuffer::colorAttachmentCount() const { return static_cast<glm::u32>(_colorAttachments.size()); }
+    SampleCount Framebuffer::sampleCount() const { return _sampleCount; }
 
-    const std::vector<Framebuffer::Attachment>& Framebuffer::getColorAttachments() const
+    const std::vector<Framebuffer::Attachment>& Framebuffer::colorAttachments() const
     {
         return _colorAttachments;
     }
 
-    ResourceRef<const ImageView> Framebuffer::getColorAttachment(const glm::u32 index) const
+    ResourceRef<const ImageView> Framebuffer::colorAttachment(const glm::u32 index) const
     {
         if (index >= _colorAttachments.size()) return {};
         return _colorAttachments[index].view;
@@ -278,7 +213,7 @@ namespace kor {
 
     bool Framebuffer::hasDepthAttachment() const { return _depthAttachment.has_value(); }
 
-    ResourceRef<const ImageView> Framebuffer::getDepthAttachment() const
+    ResourceRef<const ImageView> Framebuffer::depthAttachment() const
     {
         // An empty ref rather than a throw: the callers that ask are deciding whether to do
         // something with the depth target, and "there isn't one" is an answer they can act on.
@@ -288,7 +223,7 @@ namespace kor {
 
     bool Framebuffer::hasStencilAttachment() const { return _stencilAttachment.has_value(); }
 
-    ResourceRef<const ImageView> Framebuffer::getStencilAttachment() const
+    ResourceRef<const ImageView> Framebuffer::stencilAttachment() const
     {
         if (!_stencilAttachment) return {};
         return _stencilAttachment->view;
@@ -304,7 +239,7 @@ namespace kor {
         return false;
     }
 
-    ResourceRef<const ImageView> Framebuffer::getResolveAttachment(const glm::u32 index) const
+    ResourceRef<const ImageView> Framebuffer::resolveAttachment(const glm::u32 index) const
     {
         if (index >= _colorAttachments.size()) return {};
         return _colorAttachments[index].resolve;
@@ -324,21 +259,21 @@ namespace kor {
     {
         const auto view = attachment(name);
         if (!view.valid()) return {};
-        return view->getImage();
+        return view->image();
     }
 
     ResourceRef<const Image> Framebuffer::colorImage(const glm::u32 index) const
     {
-        const auto view = getColorAttachment(index);
+        const auto view = colorAttachment(index);
         if (!view.valid()) return {};
-        return view->getImage();
+        return view->image();
     }
 
     ResourceRef<const Image> Framebuffer::depthImage() const
     {
-        const auto view = getDepthAttachment();
+        const auto view = depthAttachment();
         if (!view.valid()) return {};
-        return view->getImage();
+        return view->image();
     }
 
     std::vector<std::string> Framebuffer::attachmentNames() const
@@ -356,22 +291,22 @@ namespace kor {
         }
         return names;
     }
-    const ClearColor& Framebuffer::getClearColor(const glm::u32 index) const
+    const ClearColor& Framebuffer::clearColor(const glm::u32 index) const
     {
         return _clearValues.clearColor[index];
     }
 
-    float Framebuffer::getClearDepth() const
+    float Framebuffer::clearDepth() const
     {
         return _clearValues.clearDepth;
     }
 
-    glm::i32 Framebuffer::getClearStencil() const
+    glm::i32 Framebuffer::clearStencil() const
     {
         return _clearValues.clearStencil;
     }
 
-    ResolveMode Framebuffer::getResolveMode() const { return _resolveMode; }
+    ResolveMode Framebuffer::resolveMode() const { return _resolveMode; }
 
     Framebuffer::Framebuffer(const Builder& createInfo) :
         _colorAttachments(createInfo.colorAttachments),
@@ -391,9 +326,9 @@ namespace kor {
             // rather than dereferenced here.
             const auto extentOf = [](const ResourceRef<const ImageView>& view) {
                 if (!view.valid()) return glm::uvec2{ 0, 0 };
-                const auto image = view->getImage();
+                const auto image = view->image();
                 if (!image.valid()) return glm::uvec2{ 0, 0 };
-                return glm::uvec2{ image->getExtent().x, image->getExtent().y };
+                return glm::uvec2{ image->extent().x, image->extent().y };
             };
             _extent = _colorAttachments.empty()
                 ? (_depthAttachment ? extentOf(_depthAttachment->view) : glm::uvec2{ 0, 0 })

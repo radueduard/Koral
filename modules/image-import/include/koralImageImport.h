@@ -39,7 +39,7 @@
  *                                .top   = "py.png", .bottom = "ny.png",
  *                                .front = "pz.png", .back   = "nz.png" });
  *
- * auto view = kor::ImageView::Builder(kor::ResourceRef<const kor::Image>(sky))
+ * auto view = kor::ImageView::Builder(sky)
  *     .setViewType(kor::ImageView::Type::eCube)
  *     .setArrayLayerCount(6)
  *     .build();
@@ -84,8 +84,8 @@
 namespace kimg
 {
     /** @brief This module's identity, for another module that declares a dependency on it. */
-    inline constexpr std::string_view kImportModuleId = "koral.image.import";
-    inline constexpr std::uint32_t    kImportModuleVersion = 1;
+    inline constexpr std::string_view ImportModuleId = "koral.image.import";
+    inline constexpr std::uint32_t    ImportModuleVersion = 1;
 
     /**
      * @brief One decoded image, in CPU memory, before it is anything a GPU knows about.
@@ -101,7 +101,7 @@ namespace kimg
         kor::Image::Format format = kor::Image::Format::eRGBA8_UNORM;  ///< What one texel — or block — holds.
 
         /** @brief How many bytes `pixels` holds for this extent and format. */
-        [[nodiscard]] glm::u64 byteCount() const { return kor::Image::SizeOfRegion(format, extent); }
+        [[nodiscard]] glm::u64 byteCount() const { return kor::Image::sizeOfRegion(format, extent); }
     };
 
     /**

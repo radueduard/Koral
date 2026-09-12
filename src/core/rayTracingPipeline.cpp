@@ -112,25 +112,25 @@ namespace kor
     {
         if (!_raygenShader.has_value())
             return fail(ErrorCode::eMissingShaderStage, "A ray tracing pipeline must have a raygen shader.");
-        if ((*_raygenShader)->getStage() != Shader::Stage::eRaygen)
+        if ((*_raygenShader)->stage() != Shader::Stage::eRaygen)
             return fail(ErrorCode::eShaderStageMismatch, "The raygen shader must be a raygen-stage shader.");
 
         for (const auto& missShader : _missShaders)
-            if (missShader->getStage() != Shader::Stage::eMiss)
+            if (missShader->stage() != Shader::Stage::eMiss)
                 return fail(ErrorCode::eShaderStageMismatch, "A shader provided as a miss shader is not a miss-stage shader.");
 
         for (const auto& callableShader : _callableShaders)
-            if (callableShader->getStage() != Shader::Stage::eCallable)
+            if (callableShader->stage() != Shader::Stage::eCallable)
                 return fail(ErrorCode::eShaderStageMismatch, "A shader provided as a callable shader is not a callable-stage shader.");
 
         for (const auto& hitGroup : _hitGroups) {
             if (!hitGroup.closestHitShader.has_value() && !hitGroup.intersectionShader.has_value())
                 return fail(ErrorCode::eMissingShaderStage, "A hit group must have at least a closest-hit or an intersection shader.");
-            if (hitGroup.closestHitShader.has_value() && (*hitGroup.closestHitShader)->getStage() != Shader::Stage::eClosestHit)
+            if (hitGroup.closestHitShader.has_value() && (*hitGroup.closestHitShader)->stage() != Shader::Stage::eClosestHit)
                 return fail(ErrorCode::eShaderStageMismatch, "The closest-hit shader of a hit group is not a closest-hit-stage shader.");
-            if (hitGroup.anyHitShader.has_value() && (*hitGroup.anyHitShader)->getStage() != Shader::Stage::eAnyHit)
+            if (hitGroup.anyHitShader.has_value() && (*hitGroup.anyHitShader)->stage() != Shader::Stage::eAnyHit)
                 return fail(ErrorCode::eShaderStageMismatch, "The any-hit shader of a hit group is not an any-hit-stage shader.");
-            if (hitGroup.intersectionShader.has_value() && (*hitGroup.intersectionShader)->getStage() != Shader::Stage::eIntersection)
+            if (hitGroup.intersectionShader.has_value() && (*hitGroup.intersectionShader)->stage() != Shader::Stage::eIntersection)
                 return fail(ErrorCode::eShaderStageMismatch, "The intersection shader of a hit group is not an intersection-stage shader.");
         }
 

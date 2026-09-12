@@ -201,11 +201,11 @@ namespace kimg::detail
         // A compressed image cannot be blitted into, and mips are made by blitting: it carries the
         // chain it was encoded with or it has none. The engine refuses this anyway — skipping it here
         // is what keeps the refusal out of the log for a caller who simply passed `true`.
-        const bool mips = generateMipmaps && !kor::Image::IsBlockCompressed(image->getFormat());
+        const bool mips = generateMipmaps && !kor::Image::isBlockCompressed(image->format());
 
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
             if (mips) commandBuffer.GenerateMipmaps(image);
-            commandBuffer.Barrier({}, {{ image, kor::ResourceAccess::AllShaderRead }});
+            commandBuffer.Barrier({}, {{ image, kor::ResourceAccess::eAllShaderRead }});
         });
     }
 
@@ -357,7 +357,7 @@ namespace kimg::detail
             };
 
             for (const auto& candidate : candidates) {
-                if (kor::Image::IsFormatSupported(candidate.format)) return candidate;
+                if (kor::Image::isFormatSupported(candidate.format)) return candidate;
             }
             // Uncompressed, four times the memory, and always available. Better a texture than none.
             return { KTX_TTF_RGBA32, kor::Image::Format::eRGBA8_UNORM };
@@ -459,7 +459,7 @@ namespace kimg::detail
         // Checked before the image is built rather than after: a format this device does not have
         // fails at creation, and every upload that follows then fails too. One error naming the
         // format is worth more than twenty saying the image is unusable.
-        if (!kor::Image::IsFormatSupported(ktx.format)) {
+        if (!kor::Image::isFormatSupported(ktx.format)) {
             auto error = kor::Error{ .code = kor::ErrorCode::eInvalidArgument,
                 .message = std::format("this device does not support image format {}, which the file is in",
                                        static_cast<int>(ktx.format)) };
@@ -471,14 +471,16 @@ namespace kimg::detail
         // compressed, which cannot be blitted into.
         const glm::u32 mipLevels = ktx.fileMipLevels > 1
             ? ktx.fileMipLevels
-            : ((generateMipmaps && !kor::Image::IsBlockCompressed(ktx.format)) ? 0u : 1u);
+            : ((generateMipmaps && !kor::Image::isBlockCompressed(ktx.format)) ? 0u : 1u);
 
         return kor::Image::Builder()
             .setType(ktx.type)
             .setExtent(ktx.extent)
             .setArrayLayers(ktx.arrayLayers)
             .setMipLevels(mipLevels)
-            .setFormat(ktx.format)
+            .setFormat(ktx.format)
+
+
             .build();
     }
 }
