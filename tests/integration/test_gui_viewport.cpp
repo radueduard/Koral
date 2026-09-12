@@ -3,7 +3,7 @@
 //
 // Drawn against a headless ImGui context, as the unit-level widget tests are: no window and no GUI
 // backend, but a real kor::Image to display. What that cannot cover is the *texture handle* —
-// kor::GUI_Image is a backend object and needs the engine's GUI to have been initialised — so the
+// kor::GuiImage is a backend object and needs the engine's GUI to have been initialised — so the
 // viewport is exercised through the path that matters most and is fully testable here: the layout and
 // resize arithmetic, the hover/focus state, and the mouse-to-image mapping.
 
@@ -70,8 +70,7 @@ kor::Resource<Image> target(const std::uint32_t width, const std::uint32_t heigh
         .setType(Image::Type::e2D)
         .setFormat(Image::Format::eRGBA8_UNORM)
         .setExtent(glm::uvec2{ width, height })
-        .addUsage(Image::Usage::eTransferDst)
-        .addUsage(Image::Usage::eSampled)
+        .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
         .build();
 }
 
@@ -93,7 +92,7 @@ TEST_F(GuiViewport, ReportsItsSizeAndSaysWhenItChanged) {
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(320, 240));
-        viewport.setImage(ResourceRef<const Image>(image));
+        viewport.setImage(image);
         viewport.Draw("sized");
     });
     const auto first = viewport.size();
@@ -127,7 +126,7 @@ TEST_F(GuiViewport, StretchFillsTheContentRegion) {
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(400, 300));
-        viewport.setImage(ResourceRef<const Image>(image));
+        viewport.setImage(image);
         viewport.Draw("stretch");
     });
 
@@ -145,7 +144,7 @@ TEST_F(GuiViewport, ContainKeepsTheImageAspectAndCentresIt) {
     ImVec2 windowPosition { 0.f, 0.f };
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(400, 400));   // 1:1 window
-        viewport.setImage(ResourceRef<const Image>(image));
+        viewport.setImage(image);
         viewport.Draw("contain");
 
         // Re-entering an existing window reads its state without drawing anything, which is how the
@@ -174,7 +173,7 @@ TEST_F(GuiViewport, ACollapsedWindowAsksForNothing) {
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(320, 240));
-        viewport.setImage(ResourceRef<const Image>(image));
+        viewport.setImage(image);
         viewport.Draw("collapsing");
     });
     ASSERT_GT(viewport.size().x, 0u);
@@ -197,7 +196,7 @@ TEST_F(GuiViewport, MousePositionIsInImagePixelsOrNothing) {
     ImGui::GetIO().AddMousePosEvent(2000.f, 2000.f);
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(200, 100));
-        viewport.setImage(ResourceRef<const Image>(image));
+        viewport.setImage(image);
         viewport.Draw("picking");
     });
     EXPECT_FALSE(viewport.mousePosition().has_value());
@@ -211,7 +210,7 @@ TEST_F(GuiViewport, SurvivesItsImageBeingDestroyed) {
         auto image = target(64, 64);
         frame([&] {
             placeNextWindow(ImVec2(0, 0), ImVec2(320, 240));
-            viewport.setImage(ResourceRef<const Image>(image));
+            viewport.setImage(image);
             viewport.Draw("dying");
         });
         EXPECT_TRUE(viewport.image().alive());
@@ -258,7 +257,7 @@ TEST_F(GuiViewport, GizmoDrawsOverAViewport) {
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(600, 400));
-        viewport.setImage(ResourceRef<const Image>(image));
+        viewport.setImage(image);
         viewport.Draw("scene");
 
         // Inside the same window, which is what SetDrawlist needs.

@@ -209,8 +209,8 @@ namespace kor
             if (window->hasResized()) {
                 // Modules first, so that anything the scene reads from one in its own OnResize —
                 // a camera's projection, say — already reflects the new size.
-                ModuleHost::OnResize(window->getExtent());
-                scene.OnResize(window->getExtent());
+                ModuleHost::OnResize(window->extent());
+                scene.OnResize(window->extent());
             }
             Time::update();
             Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
@@ -233,8 +233,8 @@ namespace kor
                 //
                 // *Before* the GUI on purpose. Clearing after it would wipe the interface, and the
                 // interface is the one thing such a scene draws.
-                if (const auto framebuffer = Context::DefaultFramebuffer();
-                    framebuffer.valid() && !framebuffer->getColorAttachments().empty()) {
+                if (const auto framebuffer = Context::defaultFramebuffer();
+                    framebuffer.valid() && !framebuffer->colorAttachments().empty()) {
                     if (const auto screen = framebuffer->colorImage(0);
                         !commandBuffer.hasTouched(screen)) {
                         commandBuffer.BeginRendering();

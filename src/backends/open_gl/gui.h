@@ -21,18 +21,18 @@ namespace kor::ogl
         static void Shutdown();
     };
 
-    class GUI_Image final : public kor::GUI_Image
+    class GuiImage final : public kor::GuiImage
     {
     public:
-        explicit GUI_Image(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
-        ~GUI_Image() override;
+        explicit GuiImage(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
+        ~GuiImage() override;
 
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
         void setImage(kor::ResourceRef<const kor::Image> image) override;
 
         ImTextureID operator*() const override;
 
-        // @see kor::GUI_Image::refresh — the copy this handle shows has to be retaken every frame,
+        // @see kor::GuiImage::refresh — the copy this handle shows has to be retaken every frame,
         // or the viewport keeps displaying the frame the handle was created on.
         void refresh(kor::CommandBuffer& commandBuffer) override;
 

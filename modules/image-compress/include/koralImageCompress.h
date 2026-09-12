@@ -66,12 +66,11 @@
 namespace kimg
 {
     /** @brief This module's identity, for another module that declares a dependency on it. */
-    inline constexpr std::string_view kCompressModuleId = "koral.image.compress";
-    inline constexpr std::uint32_t    kCompressModuleVersion = 1;
+    inline constexpr std::string_view CompressModuleId = "koral.image.compress";
+    inline constexpr std::uint32_t    CompressModuleVersion = 1;
 
     /** @brief What to encode into. */
-    enum class Codec
-    {
+    enum class Codec : std::uint8_t {
         /**
          * @brief UASTC: high quality, transcodes to any block format. The default.
          *

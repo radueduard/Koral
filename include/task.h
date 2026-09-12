@@ -23,7 +23,7 @@ namespace kor {
         virtual ~Executor() = default;
 
         /** @brief Whether this executor resumes work on the thread the run loop drives. */
-        virtual bool IsMainThread() const noexcept { return false; }
+        virtual bool isMainThread() const noexcept { return false; }
 
         /** @brief Schedules a suspended coroutine to be resumed on this executor. */
         virtual void Enqueue(std::coroutine_handle<>) = 0;
@@ -107,13 +107,13 @@ namespace kor {
         };
 
         Task() noexcept = default;
-        explicit Task(std::coroutine_handle<promise_type> h) noexcept : handle_(h) {}
+        explicit Task(std::coroutine_handle<promise_type> h) noexcept : _handle(h) {}
 
-        Task(Task&& other) noexcept : handle_(std::exchange(other.handle_, {})) {}
+        Task(Task&& other) noexcept : _handle(std::exchange(other._handle, {})) {}
         Task& operator=(Task&& other) noexcept {
             if (this != &other) {
-                if (handle_) handle_.destroy();
-                handle_ = std::exchange(other.handle_, {});
+                if (_handle) _handle.destroy();
+                _handle = std::exchange(other._handle, {});
             }
             return *this;
         }
@@ -122,12 +122,12 @@ namespace kor {
         Task& operator=(const Task&) = delete;
 
         ~Task() {
-            if (handle_) handle_.destroy();
+            if (_handle) _handle.destroy();
         }
 
         /** @brief Whether the coroutine has run to completion (or was never started). */
         [[nodiscard]] bool done() const noexcept {
-            return !handle_ || handle_.done();
+            return !_handle || _handle.done();
         }
 
         /**
@@ -138,10 +138,10 @@ namespace kor {
          * @note Consumes the task: calling it twice reports that there is nothing to take.
          */
         std::expected<void, std::string> take() {
-            if (!handle_) return std::unexpected("No task to take from");
-            if (!handle_.done()) return std::unexpected("Task is not completed yet");
+            if (!_handle) return std::unexpected("No task to take from");
+            if (!_handle.done()) return std::unexpected("Task is not completed yet");
 
-            auto& p = handle_.promise();
+            auto& p = _handle.promise();
             if (p.exception) {
                 try {
                     std::rethrow_exception(p.exception);
@@ -152,13 +152,13 @@ namespace kor {
                 }
             }
 
-            handle_.destroy();
-            handle_ = {};
+            _handle.destroy();
+            _handle = {};
             return {}; // success
         }
 
     private:
-        std::coroutine_handle<promise_type> handle_{};
+        std::coroutine_handle<promise_type> _handle{};
     };
 
     template <typename T>
@@ -195,13 +195,13 @@ namespace kor {
         };
 
         Task() noexcept = default;
-        explicit Task(std::coroutine_handle<promise_type> h) noexcept : handle_(h) {}
+        explicit Task(std::coroutine_handle<promise_type> h) noexcept : _handle(h) {}
 
-        Task(Task&& other) noexcept : handle_(std::exchange(other.handle_, {})) {}
+        Task(Task&& other) noexcept : _handle(std::exchange(other._handle, {})) {}
         Task& operator=(Task&& other) noexcept {
             if (this != &other) {
-                if (handle_) handle_.destroy();
-                handle_ = std::exchange(other.handle_, {});
+                if (_handle) _handle.destroy();
+                _handle = std::exchange(other._handle, {});
             }
             return *this;
         }
@@ -210,12 +210,12 @@ namespace kor {
         Task& operator=(const Task&) = delete;
 
         ~Task() {
-            if (handle_) handle_.destroy();
+            if (_handle) _handle.destroy();
         }
 
         /** @brief Whether the coroutine has run to completion (or was never started). */
         [[nodiscard]] bool done() const noexcept {
-            return !handle_ || handle_.done();
+            return !_handle || _handle.done();
         }
 
         /**
@@ -226,10 +226,10 @@ namespace kor {
          * @note Consumes the task: calling it twice reports that there is nothing to take.
          */
         std::expected<T, std::string> take() {
-            if (!handle_) return std::unexpected("No task to take from");
-            if (!handle_.done()) return std::unexpected("Task is not completed yet");
+            if (!_handle) return std::unexpected("No task to take from");
+            if (!_handle.done()) return std::unexpected("Task is not completed yet");
 
-            auto& p = handle_.promise();
+            auto& p = _handle.promise();
             if (p.exception) {
                 try {
                     std::rethrow_exception(p.exception);
@@ -244,8 +244,8 @@ namespace kor {
             }
 
             T out = std::move(*p.value);
-            handle_.destroy();
-            handle_ = {};
+            _handle.destroy();
+            _handle = {};
             return out;
         }
 
@@ -272,10 +272,10 @@ namespace kor {
 
         /** @brief Makes the task awaitable, so `co_await task` yields its value. */
         Awaiter operator co_await() noexcept {
-            return Awaiter{handle_};
+            return Awaiter{_handle};
         }
 
     private:
-        std::coroutine_handle<promise_type> handle_{};
+        std::coroutine_handle<promise_type> _handle{};
     };
 }

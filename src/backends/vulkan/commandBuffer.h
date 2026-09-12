@@ -49,7 +49,7 @@ namespace kor::vk
         kor::CommandBuffer& doBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline) override;
         kor::CommandBuffer& doBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline) override;
         kor::CommandBuffer& doBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline) override;
-        kor::CommandBuffer& doBindDescriptorSet(glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set, bool debug) override;
+        kor::CommandBuffer& doBindDescriptorSet(glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set) override;
         kor::CommandBuffer& doBindMesh(kor::ResourceRef<const Mesh> mesh) override;
         kor::CommandBuffer& doBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) override;
         kor::CommandBuffer& doBeginDebugLabel(const std::string& label, glm::vec4 color) override;
@@ -67,12 +67,12 @@ namespace kor::vk
 
         kor::CommandBuffer& doClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset, glm::u64 size) override;
         kor::CommandBuffer& doClearColorImage(kor::ResourceRef<const kor::Image> image, glm::vec4 color) override;
-        kor::CommandBuffer& doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) override;
+        kor::CommandBuffer& doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, const void* data, glm::u64 offset, glm::u64 size) override;
         kor::CommandBuffer& doCopyBuffer(ResourceRef<const kor::Buffer> srcBuffer, ResourceRef<const kor::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) override;
 
-        kor::CommandBuffer& doBlit(ResourceRef<const Image> srcImage, kor::Blit blitInfo) override;
+        kor::CommandBuffer& doBlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo) override;
         kor::CommandBuffer& doBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo) override;
-        kor::CommandBuffer& doResolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) override;
+        kor::CommandBuffer& doResolveToScreen(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) override;
         kor::CommandBuffer& doResolve(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) override;
 
         kor::CommandBuffer& doCopyBufferToImage(ResourceRef<const kor::Buffer> buffer, ResourceRef<const kor::Image> image, kor::Copy copyInfo) override;
@@ -115,7 +115,7 @@ namespace kor::vk
         }
 
     protected:
-        kor::CommandBuffer & doPushConstants(const void *data, glm::u32 size, glm::u32 offset) override;
+        kor::CommandBuffer & doPushConstantBlock(const void *data, glm::u32 size, glm::u32 offset) override;
         kor::Resource<kor::Image> _resolveHelperImage;
 
         void doWriteTimerTimestamp(glm::u32 queryIndex) override;

@@ -50,38 +50,38 @@ namespace kor
     inline ::vk::AccessFlags getVkAccessFlags(const ResourceAccess access) {
         switch (access)
         {
-        case ResourceAccess::ComputeRead: return ::vk::AccessFlagBits::eShaderRead;
-        case ResourceAccess::ComputeWrite: return ::vk::AccessFlagBits::eShaderWrite;
-        case ResourceAccess::ComputeReadWrite: return ::vk::AccessFlagBits::eShaderRead | ::vk::AccessFlagBits::eShaderWrite;
-        case ResourceAccess::VertexBuffer: return ::vk::AccessFlagBits::eVertexAttributeRead;
-        case ResourceAccess::IndexBuffer: return ::vk::AccessFlagBits::eIndexRead;
-        case ResourceAccess::IndirectBuffer: return ::vk::AccessFlagBits::eIndirectCommandRead;
-        case ResourceAccess::ColorAttachment: return ::vk::AccessFlagBits::eColorAttachmentWrite;
-        case ResourceAccess::DepthStencilAttachment:
-        case ResourceAccess::DepthAttachment:
-        case ResourceAccess::StencilAttachment:
+        case ResourceAccess::eComputeRead: return ::vk::AccessFlagBits::eShaderRead;
+        case ResourceAccess::eComputeWrite: return ::vk::AccessFlagBits::eShaderWrite;
+        case ResourceAccess::eComputeReadWrite: return ::vk::AccessFlagBits::eShaderRead | ::vk::AccessFlagBits::eShaderWrite;
+        case ResourceAccess::eVertexBuffer: return ::vk::AccessFlagBits::eVertexAttributeRead;
+        case ResourceAccess::eIndexBuffer: return ::vk::AccessFlagBits::eIndexRead;
+        case ResourceAccess::eIndirectBuffer: return ::vk::AccessFlagBits::eIndirectCommandRead;
+        case ResourceAccess::eColorAttachment: return ::vk::AccessFlagBits::eColorAttachmentWrite;
+        case ResourceAccess::eDepthStencilAttachment:
+        case ResourceAccess::eDepthAttachment:
+        case ResourceAccess::eStencilAttachment:
             return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-        case ResourceAccess::DepthStencilRead:
-        case ResourceAccess::DepthRead:
-        case ResourceAccess::StencilRead:
+        case ResourceAccess::eDepthStencilRead:
+        case ResourceAccess::eDepthRead:
+        case ResourceAccess::eStencilRead:
             return ::vk::AccessFlagBits::eDepthStencilAttachmentRead;
-        case ResourceAccess::TransferSrc: return ::vk::AccessFlagBits::eTransferRead;
-        case ResourceAccess::TransferDst: return ::vk::AccessFlagBits::eTransferWrite;
+        case ResourceAccess::eTransferSrc: return ::vk::AccessFlagBits::eTransferRead;
+        case ResourceAccess::eTransferDst: return ::vk::AccessFlagBits::eTransferWrite;
 
-        case ResourceAccess::VertexShaderRead:
-        case ResourceAccess::FragmentShaderRead:
-        case ResourceAccess::AllShaderRead:
+        case ResourceAccess::eVertexShaderRead:
+        case ResourceAccess::eFragmentShaderRead:
+        case ResourceAccess::eAllShaderRead:
             return ::vk::AccessFlagBits::eShaderRead;
-        case ResourceAccess::VertexShaderWrite:
-        case ResourceAccess::FragmentShaderWrite:
-        case ResourceAccess::AllShaderWrite:
+        case ResourceAccess::eVertexShaderWrite:
+        case ResourceAccess::eFragmentShaderWrite:
+        case ResourceAccess::eAllShaderWrite:
             return ::vk::AccessFlagBits::eShaderWrite;
-        case ResourceAccess::VertexShaderReadWrite:
-        case ResourceAccess::FragmentShaderReadWrite:
-        case ResourceAccess::AllShaderReadWrite:
+        case ResourceAccess::eVertexShaderReadWrite:
+        case ResourceAccess::eFragmentShaderReadWrite:
+        case ResourceAccess::eAllShaderReadWrite:
             return ::vk::AccessFlagBits::eShaderRead | ::vk::AccessFlagBits::eShaderWrite;
 
-        case ResourceAccess::Present: return {}; // no access mask needed for present
+        case ResourceAccess::ePresent: return {}; // no access mask needed for present
         default: throw std::runtime_error("Unknown resource access type!");
         }
     }
@@ -89,40 +89,40 @@ namespace kor
     inline ::vk::PipelineStageFlags getVkPipelineStageFlags(const ResourceAccess access) {
         switch (access)
         {
-        case ResourceAccess::ComputeRead:
-        case ResourceAccess::ComputeWrite:
-        case ResourceAccess::ComputeReadWrite:
+        case ResourceAccess::eComputeRead:
+        case ResourceAccess::eComputeWrite:
+        case ResourceAccess::eComputeReadWrite:
             return ::vk::PipelineStageFlagBits::eComputeShader;
-        case ResourceAccess::VertexBuffer:
-        case ResourceAccess::IndexBuffer:
+        case ResourceAccess::eVertexBuffer:
+        case ResourceAccess::eIndexBuffer:
             return ::vk::PipelineStageFlagBits::eVertexInput;
-        case ResourceAccess::IndirectBuffer:
+        case ResourceAccess::eIndirectBuffer:
             return ::vk::PipelineStageFlagBits::eDrawIndirect;
-        case ResourceAccess::VertexShaderRead:
-        case ResourceAccess::VertexShaderWrite:
-        case ResourceAccess::VertexShaderReadWrite:
+        case ResourceAccess::eVertexShaderRead:
+        case ResourceAccess::eVertexShaderWrite:
+        case ResourceAccess::eVertexShaderReadWrite:
             return ::vk::PipelineStageFlagBits::eVertexShader;
-        case ResourceAccess::FragmentShaderRead:
-        case ResourceAccess::FragmentShaderWrite:
-        case ResourceAccess::FragmentShaderReadWrite:
+        case ResourceAccess::eFragmentShaderRead:
+        case ResourceAccess::eFragmentShaderWrite:
+        case ResourceAccess::eFragmentShaderReadWrite:
             return ::vk::PipelineStageFlagBits::eFragmentShader;
-        case ResourceAccess::ColorAttachment:
+        case ResourceAccess::eColorAttachment:
             return ::vk::PipelineStageFlagBits::eColorAttachmentOutput;
-        case ResourceAccess::DepthStencilAttachment:
-        case ResourceAccess::DepthStencilRead:
-        case ResourceAccess::DepthAttachment:
-        case ResourceAccess::DepthRead:
-        case ResourceAccess::StencilAttachment:
-        case ResourceAccess::StencilRead:
+        case ResourceAccess::eDepthStencilAttachment:
+        case ResourceAccess::eDepthStencilRead:
+        case ResourceAccess::eDepthAttachment:
+        case ResourceAccess::eDepthRead:
+        case ResourceAccess::eStencilAttachment:
+        case ResourceAccess::eStencilRead:
             return ::vk::PipelineStageFlagBits::eEarlyFragmentTests | ::vk::PipelineStageFlagBits::eLateFragmentTests;
-        case ResourceAccess::TransferSrc:
-        case ResourceAccess::TransferDst:
+        case ResourceAccess::eTransferSrc:
+        case ResourceAccess::eTransferDst:
             return ::vk::PipelineStageFlagBits::eTransfer;
-        case ResourceAccess::AllShaderRead:
-        case ResourceAccess::AllShaderWrite:
-            case ResourceAccess::AllShaderReadWrite:
+        case ResourceAccess::eAllShaderRead:
+        case ResourceAccess::eAllShaderWrite:
+            case ResourceAccess::eAllShaderReadWrite:
             return ::vk::PipelineStageFlagBits::eAllCommands;
-        case ResourceAccess::Present:
+        case ResourceAccess::ePresent:
             return ::vk::PipelineStageFlagBits::eBottomOfPipe;
         default: throw std::runtime_error("Unknown resource access type!");
         }
@@ -144,39 +144,39 @@ namespace kor
     inline ::vk::ImageLayout getVkImageLayout(const ResourceAccess access) {
         switch (access)
         {
-        case ResourceAccess::ComputeWrite:
-        case ResourceAccess::ComputeReadWrite:
-        case ResourceAccess::VertexShaderWrite:
-        case ResourceAccess::VertexShaderReadWrite:
-        case ResourceAccess::FragmentShaderWrite:
-        case ResourceAccess::FragmentShaderReadWrite:
-        case ResourceAccess::AllShaderWrite:
-        case ResourceAccess::AllShaderReadWrite:
+        case ResourceAccess::eComputeWrite:
+        case ResourceAccess::eComputeReadWrite:
+        case ResourceAccess::eVertexShaderWrite:
+        case ResourceAccess::eVertexShaderReadWrite:
+        case ResourceAccess::eFragmentShaderWrite:
+        case ResourceAccess::eFragmentShaderReadWrite:
+        case ResourceAccess::eAllShaderWrite:
+        case ResourceAccess::eAllShaderReadWrite:
             return ::vk::ImageLayout::eGeneral;
-        case ResourceAccess::ComputeRead:
-        case ResourceAccess::VertexShaderRead:
-        case ResourceAccess::FragmentShaderRead:
-        case ResourceAccess::AllShaderRead:
+        case ResourceAccess::eComputeRead:
+        case ResourceAccess::eVertexShaderRead:
+        case ResourceAccess::eFragmentShaderRead:
+        case ResourceAccess::eAllShaderRead:
             return ::vk::ImageLayout::eShaderReadOnlyOptimal;
-        case ResourceAccess::ColorAttachment:
+        case ResourceAccess::eColorAttachment:
             return ::vk::ImageLayout::eColorAttachmentOptimal;
-        case ResourceAccess::DepthStencilAttachment:
+        case ResourceAccess::eDepthStencilAttachment:
             return ::vk::ImageLayout::eDepthStencilAttachmentOptimal;
-        case ResourceAccess::DepthStencilRead:
+        case ResourceAccess::eDepthStencilRead:
             return ::vk::ImageLayout::eDepthStencilReadOnlyOptimal;
-        case ResourceAccess::DepthAttachment:
+        case ResourceAccess::eDepthAttachment:
             return ::vk::ImageLayout::eDepthAttachmentOptimal;
-        case ResourceAccess::DepthRead:
+        case ResourceAccess::eDepthRead:
             return ::vk::ImageLayout::eDepthReadOnlyOptimal;
-        case ResourceAccess::StencilAttachment:
+        case ResourceAccess::eStencilAttachment:
             return ::vk::ImageLayout::eStencilAttachmentOptimal;
-        case ResourceAccess::StencilRead:
+        case ResourceAccess::eStencilRead:
             return ::vk::ImageLayout::eStencilReadOnlyOptimal;
-        case ResourceAccess::TransferSrc:
+        case ResourceAccess::eTransferSrc:
             return ::vk::ImageLayout::eTransferSrcOptimal;
-        case ResourceAccess::TransferDst:
+        case ResourceAccess::eTransferDst:
             return ::vk::ImageLayout::eTransferDstOptimal;
-        case ResourceAccess::Present:
+        case ResourceAccess::ePresent:
             return ::vk::ImageLayout::ePresentSrcKHR;
         default: throw std::runtime_error("Unknown resource access type!");
         }
@@ -442,7 +442,7 @@ namespace kor
         }
     }
 
-    inline kor::Image::Format getFormat(const ::vk::Format format)
+    inline kor::Image::Format format(const ::vk::Format format)
     {
         switch (format)
         {
@@ -582,18 +582,6 @@ namespace kor
         if (usage & Buffer::Usage::eAccelerationStructureInput)
             vkUsage |= ::vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | ::vk::BufferUsageFlagBits::eShaderDeviceAddress;
         return vkUsage;
-    }
-
-    inline ::vk::SampleCountFlagBits getVkSampleCount(const MSAA msaa)
-    {
-        switch (msaa) {
-        case MSAA::eNone: return ::vk::SampleCountFlagBits::e1;
-        case MSAA::e2x: return ::vk::SampleCountFlagBits::e2;
-        case MSAA::e4x: return ::vk::SampleCountFlagBits::e4;
-        case MSAA::e8x: return ::vk::SampleCountFlagBits::e8;
-        case MSAA::e16x: return ::vk::SampleCountFlagBits::e16;
-        default: throw std::runtime_error("Unknown MSAA level");
-        }
     }
 
     inline ::vk::Filter getVkFilter(const kor::Filter filter)

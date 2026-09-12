@@ -43,9 +43,7 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
     // --- storage buffer (device-local; upload + readback via staging) -----
     Buffer::Builder<std::uint32_t> bufBuilder;
     bufBuilder.setData(input);
-    bufBuilder.addUsage(Buffer::Usage::eStorage);
-    bufBuilder.addUsage(Buffer::Usage::eTransferSrc);
-    bufBuilder.addUsage(Buffer::Usage::eTransferDst);
+    bufBuilder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     bufBuilder.setType(Buffer::Type::eDeviceLocal);
     auto buffer = bufBuilder.build();
 
@@ -63,15 +61,15 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
 
     // --- descriptor set: bind the storage buffer at set 0, binding 0 ------
     auto descriptorSet =
-        DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
+        DescriptorSet::Builder(pipeline, 0)
             .write(0, buffer)
             .build();
 
     // --- record + submit on the compute queue -----------------------------
     const ResourceRef<const Buffer> bufRef(buffer);
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
-        cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, descriptorSet);
         // No barriers. The buffer is bound through the descriptor set, so the engine knows
         // the dispatch reads and writes it (the shader's SSBO carries neither NonReadable nor
         // NonWritable), and that the readback copy that follows needs those writes visible.
@@ -102,9 +100,7 @@ TEST_F(GpuTest, BackToBackDispatchesAreSynchronised) {
 
     Buffer::Builder<std::uint32_t> bufBuilder;
     bufBuilder.setData(input);
-    bufBuilder.addUsage(Buffer::Usage::eStorage);
-    bufBuilder.addUsage(Buffer::Usage::eTransferSrc);
-    bufBuilder.addUsage(Buffer::Usage::eTransferDst);
+    bufBuilder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     auto buffer = bufBuilder.build();
     ASSERT_TRUE(buffer.valid());
 
@@ -119,14 +115,14 @@ TEST_F(GpuTest, BackToBackDispatchesAreSynchronised) {
     ASSERT_TRUE(pipeline.valid());
 
     auto descriptorSet =
-        DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
+        DescriptorSet::Builder(pipeline, 0)
             .write(0, buffer)
             .build();
     ASSERT_TRUE(descriptorSet.valid());
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
-        cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, descriptorSet);
         cb.Dispatch(kCount / kLocalSize, 1, 1);
         cb.Dispatch(kCount / kLocalSize, 1, 1);
         EXPECT_TRUE(cb.ok()) << "recording failed: " << cb.result().error().toString();
@@ -149,16 +145,16 @@ TEST_F(GpuTest, DeviceAddressHazardIsReported) {
 
     Buffer::Builder<std::uint32_t> bufBuilder;
     bufBuilder.setData(input);
-    bufBuilder.addUsage(Buffer::Usage::eStorage);
-    bufBuilder.addUsage(Buffer::Usage::eTransferSrc);
-    bufBuilder.addUsage(Buffer::Usage::eTransferDst);
-    bufBuilder.addUsage(Buffer::Usage::eShaderDeviceAddress);
+    bufBuilder.setUsage(Buffer::Usage::eStorage
+                        | Buffer::Usage::eTransferSrc
+                        | Buffer::Usage::eTransferDst
+                        | Buffer::Usage::eShaderDeviceAddress);
     auto buffer = bufBuilder.build();
     ASSERT_TRUE(buffer.valid());
 
     Buffer::Builder<std::uint32_t> srcBuilder;
     srcBuilder.setData(input);
-    srcBuilder.addUsage(Buffer::Usage::eTransferSrc);
+    srcBuilder.setUsage(Buffer::Usage::eTransferSrc);
     auto source = srcBuilder.build();
     ASSERT_TRUE(source.valid());
 
@@ -177,14 +173,14 @@ TEST_F(GpuTest, DeviceAddressHazardIsReported) {
     // unsynchronised.
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
     cb->Begin();
-    cb->BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
+    cb->BindComputePipeline(pipeline);
     // Writes the device-address buffer, then runs a shader that may read it through a
     // pointer. Nothing here tells the engine those are the same buffer.
-    cb->CopyBuffer(ResourceRef<const Buffer>(source), ResourceRef<const Buffer>(buffer));
+    cb->CopyBuffer(source, buffer);
     // The address the shader will chase. Pushing it is what makes this a realistic
     // device-address workload rather than a shader with an unset push constant.
-    const glm::u64 address = buffer->getDeviceAddress();
-    cb->PushConstants(address);
+    const glm::u64 address = buffer->deviceAddress();
+    cb->PushConstantBlock(address);
     cb->Dispatch(kCount / kLocalSize, 1, 1);
     cb->End();
 
@@ -214,9 +210,7 @@ TEST_F(GpuTest, ADescriptorSetCanBeWrittenByBindingName) {
 
     Buffer::Builder<std::uint32_t> bufBuilder;
     bufBuilder.setData(input)
-              .addUsage(Buffer::Usage::eStorage)
-              .addUsage(Buffer::Usage::eTransferSrc)
-              .addUsage(Buffer::Usage::eTransferDst);
+              .setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     auto buffer = bufBuilder.build();
     ASSERT_TRUE(buffer.valid());
 
@@ -253,7 +247,7 @@ TEST_F(GpuTest, ADescriptorSetCanBeWrittenByBindingName) {
 // lists the names that do exist rather than leaving the reader to go and read the shader.
 TEST_F(GpuTest, AnUnknownBindingNameIsReportedWithTheOnesThatExist) {
     Buffer::Builder<std::uint32_t> bufBuilder;
-    bufBuilder.setData(std::vector<std::uint32_t>(kCount, 1u)).addUsage(Buffer::Usage::eStorage);
+    bufBuilder.setData(std::vector<std::uint32_t>(kCount, 1u)).setUsage(Buffer::Usage::eStorage);
     auto buffer = bufBuilder.build();
     ASSERT_TRUE(buffer.valid());
 
@@ -285,7 +279,7 @@ TEST_F(GpuTest, ATrailingSubscriptSelectsAnArrayElementByName) {
     ASSERT_TRUE(pipeline.valid());
 
     Buffer::Builder<std::uint32_t> bufBuilder;
-    bufBuilder.setData(std::vector<std::uint32_t>(kCount, 1u)).addUsage(Buffer::Usage::eStorage);
+    bufBuilder.setData(std::vector<std::uint32_t>(kCount, 1u)).setUsage(Buffer::Usage::eStorage);
     auto buffer = bufBuilder.build();
     ASSERT_TRUE(buffer.valid());
 
@@ -311,23 +305,20 @@ TEST_F(GpuTest, ATexelBufferIsFetchedThroughABufferView) {
 
     Buffer::Builder<float> sourceBuilder;
     sourceBuilder.setData(source)
-                 .addUsage(Buffer::Usage::eTexel)      // what makes a formatted view legal
-                 .addUsage(Buffer::Usage::eTransferDst);
+                 .setUsage(Buffer::Usage::eTexel | Buffer::Usage::eTransferDst);
     auto sourceBuffer = sourceBuilder.build();
     ASSERT_TRUE(sourceBuffer.valid()) << (sourceBuffer.error() ? sourceBuffer.error()->history() : "");
 
-    auto view = kor::BufferView::Builder(ResourceRef<const Buffer>(sourceBuffer))
+    auto view = kor::BufferView::Builder(sourceBuffer)
         .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
         .build();
     ASSERT_TRUE(view.valid()) << (view.error() ? view.error()->history() : "");
-    EXPECT_EQ(view->getRange(), static_cast<glm::i64>(source.size() * sizeof(float)))
+    EXPECT_EQ(view->range(), static_cast<glm::i64>(source.size() * sizeof(float)))
         << "a range of 0 should have resolved to the rest of the buffer";
 
     Buffer::Builder<float> destBuilder;
     destBuilder.setData(std::vector<float>(kTexels, -1.f))
-               .addUsage(Buffer::Usage::eStorage)
-               .addUsage(Buffer::Usage::eTransferSrc)
-               .addUsage(Buffer::Usage::eTransferDst);
+               .setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     auto destination = destBuilder.build();
     ASSERT_TRUE(destination.valid());
 
@@ -359,11 +350,11 @@ TEST_F(GpuTest, ATexelBufferIsFetchedThroughABufferView) {
 // flag to add rather than leaving it to the driver's usage-bits complaint.
 TEST_F(GpuTest, ABufferViewNeedsItsBufferCreatedForTexels) {
     Buffer::Builder<float> builder;
-    builder.setData(std::vector<float>(16, 0.f)).addUsage(Buffer::Usage::eStorage);  // no eTexel
+    builder.setData(std::vector<float>(16, 0.f)).setUsage(Buffer::Usage::eStorage);  // no eTexel
     auto buffer = builder.build();
     ASSERT_TRUE(buffer.valid());
 
-    auto view = kor::BufferView::Builder(ResourceRef<const Buffer>(buffer))
+    auto view = kor::BufferView::Builder(buffer)
         .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
         .build();
     ASSERT_FALSE(view.valid()) << "a buffer with no eTexel usage was viewed as texels";

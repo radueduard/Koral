@@ -33,22 +33,6 @@ namespace kor
     class FramebufferImage;
 
     /**
-     * @brief How many samples per pixel a multisampled image stores.
-     *
-     * More samples means smoother edges and proportionally more memory and bandwidth. A
-     * multisampled image cannot be sampled by a shader directly: resolve it first, with
-     * CommandBuffer::Resolve or a framebuffer resolve attachment.
-     */
-    enum class MSAA
-    {
-        eNone = 0,  ///< One sample per pixel; an ordinary image.
-        e2x = 2,    ///< Two samples per pixel.
-        e4x = 4,    ///< Four samples per pixel. The usual choice where MSAA is wanted at all.
-        e8x = 8,    ///< Eight samples per pixel.
-        e16x = 16,  ///< Sixteen samples per pixel. Rarely supported, and rarely worth it.
-    };
-
-    /**
      * @brief A texture, render target or storage image: pixels the GPU can sample or write.
      *
      * Built through its builder, like every resource:
@@ -59,7 +43,7 @@ namespace kor
      *     .setFormat(kor::Image::Format::eRGBA8_SRGB)
      *     .setExtent(glm::uvec2{width, height})
      *     .setMipLevels(mipCount)
-     *     .addUsage(kor::Image::Usage::eSampled)
+     *     .setUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eTransferDst)
      *     .setData(std::span<const glm::u8vec4>(pixels))
      *     .build();
      * @endcode
@@ -77,8 +61,7 @@ namespace kor
     {
     public:
         /** @brief How many dimensions the image has. */
-        enum class Type
-        {
+        enum class Type : std::uint8_t {
             e1D,    ///< A row of pixels. Gradients and lookup tables.
             e2D,    ///< The ordinary case: a texture or a render target.
             e3D,    ///< A volume. Volumetric data and 3D lookup tables.
@@ -95,8 +78,7 @@ namespace kor
          *
          * Not every format is supported by every device for every usage.
          */
-        enum class Format
-        {
+        enum class Format : std::uint8_t {
             // 8-bit single channel formats
             eR8_UNORM,
             eR8_SNORM,
@@ -186,9 +168,9 @@ namespace kor
             // Texels are stored in fixed-size blocks — four bytes a texel becomes one byte or less —
             // which is what lets a scene's textures fit in video memory. The trade is that a block
             // is the smallest addressable unit: these cannot be rendered into, and a copy's offset
-            // and extent must fall on block boundaries. Ask BlockExtentFromImageFormat and
-            // BlockSizeFromImageFormat rather than assuming, and size a staging buffer with
-            // SizeOfRegion.
+            // and extent must fall on block boundaries. Ask blockExtent and
+            // blockSize rather than assuming, and size a staging buffer with
+            // sizeOfRegion.
             //
             // Which of these a given GPU actually supports varies — BC on desktop, ASTC and ETC2 on
             // mobile — which is why a compressed texture is normally shipped as a universal KTX2 and
@@ -235,8 +217,7 @@ namespace kor
         /**
          * @brief Every role the image will play. A role not declared here is invalid at runtime.
          */
-        enum class Usage
-        {
+        enum class Usage : std::uint8_t {
             eTransferSrc = 1 << 0,              ///< Can be copied, blitted or resolved from. Needed to read it back, and to generate mipmaps.
             eTransferDst = 1 << 1,              ///< Can be copied, blitted or cleared into. Needed to upload pixels.
             eSampled = 1 << 2,                  ///< Can be sampled by a shader through a sampler — an ordinary texture.
@@ -246,14 +227,14 @@ namespace kor
         };
 
         /** @brief Describes the image to create, and optionally the pixels to fill it with. */
-        struct KORAL_API Builder : ::Builder {
+        struct KORAL_API Builder : kor::Builder {
             bool isPerFrame = false;                    ///< Whether to allocate one copy per frame in flight.
             Type type = Type::e2D;                      ///< How many dimensions it has.
             Format format = Format::eRGBA8_UNORM;       ///< What one pixel holds.
             glm::uvec3 extent = { 1, 1, 1 };            ///< Size in pixels. Unused dimensions are 1.
             glm::u32 mipLevels = 1;                     ///< Number of mip levels, counting the full-size one.
             glm::u32 arrayLayers = 1;                   ///< Number of layers, for texture arrays.
-            MSAA msaa = MSAA::eNone;                    ///< Samples per pixel.
+            SampleCount sampleCount = SampleCount::e1;  ///< Samples per pixel; e1 is an ordinary image.
 
             /**
              * @brief Every role the image will play.
@@ -265,9 +246,10 @@ namespace kor
              * flag. They cost effectively nothing on a desktop GPU — a tiler may give up lossless
              * compression for eTransferSrc, which is the one case worth taking them off for.
              *
-             * addUsage() adds to this. setUsage() replaces it outright, which is how an image says
-             * it wants exactly these roles and no others; a transfer attempted on an image that
-             * dropped the flag that way is then reported by name at the command that tried it.
+             * setUsage() replaces this outright rather than adding to it, which is how an image
+             * says it wants exactly these roles and no others — so an image that names any role
+             * has to name the transfers it needs too. A transfer attempted on an image that
+             * dropped the flag that way is reported by name at the command that tried it.
              */
             Flags<Usage> usage = Flags<Usage>(Usage::eSampled) | Usage::eTransferSrc | Usage::eTransferDst;
 
@@ -335,33 +317,26 @@ namespace kor
              * A multisampled image can be rendered into but not sampled; resolve it to a
              * single-sampled one first.
              */
-            Builder& setMSAA(const MSAA msaa) {
-                this->msaa = msaa;
-                return *this;
-            }
-
-            /** @brief Sets the samples per pixel from a SampleCount, so a pipeline's multisample state can be passed straight in. */
             Builder& setSampleCount(const SampleCount sampleCount) {
-                switch (sampleCount) {
-                case SampleCount::e1:  this->msaa = MSAA::eNone; break;
-                case SampleCount::e2:  this->msaa = MSAA::e2x;   break;
-                case SampleCount::e4:  this->msaa = MSAA::e4x;   break;
-                case SampleCount::e8:  this->msaa = MSAA::e8x;   break;
-                case SampleCount::e16: this->msaa = MSAA::e16x;  break;
-                default:               this->msaa = MSAA::eNone; break;
-                }
+                this->sampleCount = sampleCount;
                 return *this;
             }
 
-            /** @brief Replaces the usage flags outright, discarding any set before — including those setData() implies. */
+            /**
+             * @brief Declares every role the image will play, replacing the default set.
+             *
+             * Name them all at once — the enumerators OR together, so there is one call rather
+             * than one per role:
+             *
+             * @code
+             * .setUsage(Usage::eColorAttachment | Usage::eSampled | Usage::eTransferSrc)
+             * @endcode
+             *
+             * This *replaces*, including the transfer roles the default carries, so an image that
+             * names its roles has to name the transfers it needs too.
+             */
             Builder& setUsage(const Flags<Usage>& usage) {
                 this->usage = usage;
-                return *this;
-            }
-
-            /** @brief Adds one role to those already declared. */
-            Builder& addUsage(const Usage usage) {
-                this->usage |= usage;
                 return *this;
             }
 
@@ -434,32 +409,26 @@ namespace kor
         [[nodiscard]] glm::u64 generation() const { return _generation; }
 
         /** @brief The image's size in pixels. Unused dimensions are 1. */
-        [[nodiscard]] glm::uvec3 getExtent() const { return _extent; }
+        [[nodiscard]] glm::uvec3 extent() const { return _extent; }
 
         /** @brief How many dimensions the image has. */
-        [[nodiscard]] Type getType() const { return _type; }
+        [[nodiscard]] Type type() const { return _type; }
         /** @brief What one pixel holds. */
-        [[nodiscard]] Format getFormat() const { return _format; }
-        /** @brief The samples per pixel. */
-        [[nodiscard]] MSAA getMSAA() const { return _msaa; }
-
-        /** @brief The samples per pixel as a SampleCount, to match against a pipeline's multisample state. */
-        [[nodiscard]] SampleCount getSampleCount() const {
-            switch (_msaa) {
-            case MSAA::eNone:  return SampleCount::e1;
-            case MSAA::e2x:    return SampleCount::e2;
-            case MSAA::e4x:    return SampleCount::e4;
-            case MSAA::e8x:    return SampleCount::e8;
-            case MSAA::e16x:   return SampleCount::e16;
-            default:           return SampleCount::e1;
-            }
-        }
+        [[nodiscard]] Format format() const { return _format; }
+        /**
+         * @brief The samples per pixel. SampleCount::e1 is an ordinary, non-multisampled image.
+         *
+         * The same type a pipeline's MultisampleState and a framebuffer speak, so the three can be
+         * compared directly. A multisampled image cannot be sampled by a shader: resolve it first,
+         * with CommandBuffer::Resolve or a framebuffer resolve attachment.
+         */
+        [[nodiscard]] SampleCount sampleCount() const { return _sampleCount; }
         /** @brief Every role the image was created for. */
-        [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
+        [[nodiscard]] Flags<Usage> usage() const { return _usage; }
         /** @brief How many mip levels the image has, counting the full-size one. */
-        [[nodiscard]] glm::u32 getMipLevels() const { return _mipLevels; }
+        [[nodiscard]] glm::u32 mipLevels() const { return _mipLevels; }
         /** @brief How many array layers the image has. */
-        [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }
+        [[nodiscard]] glm::u32 arrayLayers() const { return _arrayLayers; }
 
         /**
          * @brief How much of the image a default view covers.
@@ -468,7 +437,7 @@ namespace kor
          * texture wants the whole mip chain, or mip mapping has nothing to select from, while a
          * render target must name exactly one level — rendering into a view of several is invalid.
          */
-        enum class ViewCoverage : glm::u8 {
+        enum class ViewCoverage : std::uint8_t {
             eWholeImage,    ///< Every mip level and every array layer. For sampling.
             eTopLevel,      ///< Mip level 0 only, every array layer. For rendering into.
         };
@@ -510,14 +479,14 @@ namespace kor
         /**
          * @brief Bytes in one channel of @p format — 1 for an 8-bit format, 4 for a 32-bit one.
          * @throws std::runtime_error for a block-compressed format, which has no per-channel size.
-         *         Guard with IsBlockCompressed, or use SizeOfRegion, which answers for both kinds.
+         *         Guard with isBlockCompressed, or use sizeOfRegion, which answers for both kinds.
          */
-        [[nodiscard]] static glm::u32 ChannelSizeFromImageFormat(kor::Image::Format format);
+        [[nodiscard]] static glm::u32 channelSize(kor::Image::Format format);
         /**
          * @brief Channels in @p format — 1 for eR8_UNORM, 4 for eRGBA8_UNORM.
-         * @throws std::runtime_error for a block-compressed format. @see ChannelSizeFromImageFormat
+         * @throws std::runtime_error for a block-compressed format. @see channelSize
          */
-        [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(kor::Image::Format format);
+        [[nodiscard]] static glm::u32 channelCount(kor::Image::Format format);
 
         /**
          * @brief Whether the active device can hold an image of @p format in the roles @p usage names.
@@ -531,7 +500,7 @@ namespace kor
          * the machine actually has. Asking beats assuming — an image created in a format the device
          * lacks fails at creation, in the driver's words rather than yours.
          */
-        [[nodiscard]] static bool IsFormatSupported(kor::Image::Format format,
+        [[nodiscard]] static bool isFormatSupported(kor::Image::Format format,
                                                    Flags<Usage> usage = Usage::eSampled);
 
         /**
@@ -540,19 +509,19 @@ namespace kor
          * The one question worth asking before doing arithmetic on an image's size: a compressed
          * format has no texel size, and its rows are counted in blocks.
          */
-        [[nodiscard]] static bool IsBlockCompressed(kor::Image::Format format);
+        [[nodiscard]] static bool isBlockCompressed(kor::Image::Format format);
 
         /**
          * @brief The texels one block of @p format covers — 4x4 for BC, 8x8 for ASTC 8x8.
          * @return {1, 1} for an uncompressed format, so the same arithmetic works for both.
          */
-        [[nodiscard]] static glm::uvec2 BlockExtentFromImageFormat(kor::Image::Format format);
+        [[nodiscard]] static glm::uvec2 blockExtent(kor::Image::Format format);
 
         /**
          * @brief Bytes one block of @p format occupies — 8 for BC1, 16 for BC7.
          * @return For an uncompressed format, the size of one texel, since that is its block.
          */
-        [[nodiscard]] static glm::u32 BlockSizeFromImageFormat(kor::Image::Format format);
+        [[nodiscard]] static glm::u32 blockSize(kor::Image::Format format);
 
         /**
          * @brief Bytes a tightly packed region of @p format occupies.
@@ -563,7 +532,7 @@ namespace kor
          * What to size a staging buffer with, and what the copy guards measure against. Correct for
          * compressed and uncompressed alike, which is the point of it existing.
          */
-        [[nodiscard]] static glm::u64 SizeOfRegion(kor::Image::Format format, glm::uvec3 extent,
+        [[nodiscard]] static glm::u64 sizeOfRegion(kor::Image::Format format, glm::uvec3 extent,
                                                    glm::u32 layerCount = 1);
 
         /** @brief Whether the image holds a separate copy per frame in flight. */
@@ -579,7 +548,7 @@ namespace kor
          * Read by the command buffer's barrier resolver. Tracked per subresource because a mip
          * chain legitimately holds several at once while it is being generated.
          */
-        [[nodiscard]] std::optional<ResourceAccess> getTrackedAccess(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+        [[nodiscard]] std::optional<ResourceAccess> trackedAccess(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
 
         /** @brief Records the access a subresource has been synchronised for. Called by the barrier resolver. */
         void setTrackedAccess(ResourceAccess access, glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
@@ -640,14 +609,17 @@ namespace kor
         glm::u64 _generation = 0;
         glm::u32 _mipLevels;
         glm::u32 _arrayLayers;
-        MSAA _msaa;
+        SampleCount _sampleCount;
         Flags<Usage> _usage;
     };
 
     /** @brief Whether @p format is a depth and/or stencil format, and so belongs in a depth attachment. */
-    bool IsDepthStencilFormat(Image::Format format);
+    bool isDepthStencilFormat(Image::Format format);
 
     /** @brief Whether @p format carries a stencil component. */
-    bool IsStencilFormat(Image::Format format);
+    bool isStencilFormat(Image::Format format);
+
+    /** @see enable_flags */
+    template<> struct enable_flags<Image::Usage> : std::true_type {};
 }
 

@@ -9,20 +9,28 @@
 #include <filesystem>
 #include <glm/fwd.hpp>
 
-/** @brief Small file helpers, mostly for loading shader sources and binaries. */
+#include "error.h"
+
+/**
+ * @brief Small file helpers, mostly for loading shader sources and binaries.
+ *
+ * Named verb-what-where throughout — ReadFileAsString, WriteUIntsToFile — and UpperCamel because
+ * they move data between places, the same category as Buffer::Read and Buffer::Write. @see koral.h
+ * for the naming rule.
+ */
 namespace kor::utils
 {
     /**
      * @brief Reads a whole text file into a string.
      * @param filePath File to read.
-     * @return Its contents. Line endings are normalised to '\\n', and the result always ends with one.
-     * @throws std::runtime_error if the file cannot be opened.
+     * @return Its contents, or an error if the file cannot be opened. Line endings are normalised
+     *         to '\\n', and the result always ends with one.
      */
-    inline std::string ReadFileAsString(const std::filesystem::path& filePath)
+    [[nodiscard]] inline kor::Result<std::string> ReadFileAsString(const std::filesystem::path& filePath)
     {
         std::ifstream file(filePath);
         if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file: " + filePath.string());
+            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file: {}", filePath.string());
         }
 
         std::string buffer;
@@ -41,38 +49,40 @@ namespace kor::utils
      * @brief Writes a string to a file, replacing anything already there.
      * @param filePath File to write. Its parent directory must exist.
      * @param data Contents to write.
-     * @throws std::runtime_error if the file cannot be opened for writing.
+     * @return An empty result, or an error if the file cannot be opened for writing.
      */
-    inline void WriteToFile(const std::filesystem::path& filePath, const std::string& data)
+    [[nodiscard]] inline kor::VoidResult WriteStringToFile(const std::filesystem::path& filePath, const std::string& data)
     {
         std::ofstream file(filePath);
         if (!file.is_open()) {
-            throw std::runtime_error("Failed to open file for writing: " + filePath.string());
+            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file for writing: {}", filePath.string());
         }
 
         file.write(data.data(), data.size());
         file.close();
+        return {};
     }
 
     /**
      * @brief Reads a binary file as an array of 32-bit words — the form compiled SPIR-V takes.
      * @param filePath File to read.
-     * @return Its contents, one element per four bytes.
-     * @throws std::runtime_error if the file cannot be opened, or if its size is not a multiple of
-     *         four, which for a shader binary means it is truncated or not SPIR-V at all.
+     * @return Its contents, one element per four bytes; an error if the file cannot be opened, or
+     *         if its size is not a multiple of four — which for a shader binary means it is
+     *         truncated or not SPIR-V at all.
      */
-    inline std::vector<glm::u32> ReadFileToUIntVector(const std::filesystem::path& filePath)
+    [[nodiscard]] inline kor::Result<std::vector<glm::u32>> ReadFileAsUInts(const std::filesystem::path& filePath)
     {
         std::ifstream file(filePath, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {
-            throw std::runtime_error("Failed to open file: " + filePath.string());
+            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file: {}", filePath.string());
         }
 
-        const auto fileSize = static_cast<size_t>(file.tellg());
+        const auto fileSize = static_cast<std::size_t>(file.tellg());
         if (fileSize % sizeof(glm::u32) != 0)
         {
-            throw std::runtime_error("File size is not a multiple of uint32_t size: " + filePath.string());
+            return kor::fail(kor::ErrorCode::eFileNotReadable,
+                             "File size {} is not a multiple of 4 bytes: {}", fileSize, filePath.string());
         }
 
         std::vector<glm::u32> buffer(fileSize / sizeof(glm::u32));
@@ -87,16 +97,18 @@ namespace kor::utils
      * @brief Writes an array of 32-bit words to a binary file, replacing anything already there.
      * @param filePath File to write. Its parent directory must exist.
      * @param data Words to write, in order.
-     * @throws std::runtime_error if the file cannot be opened for writing.
+     * @return An empty result, or an error if the file cannot be opened for writing.
      */
-    inline void WriteUIntVectorToFile(const std::filesystem::path& filePath, const std::vector<glm::u32>& data)
+    [[nodiscard]] inline kor::VoidResult WriteUIntsToFile(const std::filesystem::path& filePath, const std::vector<glm::u32>& data)
     {
         std::ofstream file(filePath, std::ios::binary);
-        if (!file.is_open())        {
-            throw std::runtime_error("Failed to open file for writing: " + filePath.string());
+        if (!file.is_open())
+        {
+            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file for writing: {}", filePath.string());
         }
 
         file.write(reinterpret_cast<const char*>(data.data()), data.size() * sizeof(glm::u32));
         file.close();
+        return {};
     }
 }

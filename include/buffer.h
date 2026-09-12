@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <cstdint>
 #include <span>
 #include <memory>
 #include <vector>
@@ -72,7 +73,8 @@ namespace kor
      * Buffer::Builder<glm::mat4> builder;
      * auto cameraBuffer = builder
      *     .setInstanceCount(1)
-     *     .addUsage(Buffer::Usage::eUniform)
+     *     .setUsage(Buffer::Usage::eUniform | Buffer::Usage::eTransferSrc
+     *             | Buffer::Usage::eTransferDst)
      *     .setType(Buffer::Type::eDynamic)
      *     .setIsPerFrame(true)
      *     .build();
@@ -110,8 +112,7 @@ namespace kor
          * Declare everything the buffer will be used for: a use that was not declared is invalid,
          * and declaring more than needed can cost performance.
          */
-        enum class Usage
-        {
+        enum class Usage : std::uint16_t {
             eNone        = 0,       ///< No usage specified. This is not a valid usage flag and should be combined with other flags.
             eTransferSrc = 1 << 0,  ///< Buffer can be used as a source for transfer operations (e.g., copying to another buffer or image).
             eTransferDst = 1 << 1,  ///< Buffer can be used as a destination for transfer operations (e.g., copying from another buffer or image).
@@ -129,7 +130,7 @@ namespace kor
          * @brief Buffer memory type / placement policy. This describes where memory lives and
          * how CPU/GPU can access it.
          */
-        enum class Type {
+        enum class Type : std::uint8_t {
             eDeviceLocal    = 0,    ///< Memory that resides on the GPU and is not directly accessible by the CPU. This type of memory typically offers the best performance for GPU access, but may require explicit staging buffers for data transfer.
             eStaging        = 1,    ///< Memory that is accessible by both the CPU and GPU, but is optimized for data transfer operations. This type of memory is often used for staging buffers when transferring data to or from device-local memory. @warning Write-combined: reading one back is roughly forty times slower than eReadback.
             eReadback       = 2,    ///< Memory that is accessible by both the CPU and GPU, but is optimized for reading data back from the GPU. This type of memory is often used for readback buffers when retrieving data from device-local memory.
@@ -186,11 +187,13 @@ namespace kor
              *    only by code that actually takes an address.
              *  - Usage::eAccelerationStructureInput is tied to an extension. Requesting it on a
              *    device that never enabled ray tracing is itself a validation error, which is why
-             *    Mesh::makeBuffer asks Context::SupportsRayTracing() before adding it.
+             *    Mesh::makeBuffer asks Context::supportsRayTracing() before adding it.
              *
-             * addUsage() adds to this. setUsage() replaces it outright, which is how a buffer says
-             * it wants exactly these roles and no others — and which also switches off the size
-             * deduction, since a caller naming an exact set has already said what it wants.
+             * setUsage() replaces this outright rather than adding to it, which is how a buffer
+             * says it wants exactly these roles and no others — and which also switches off the
+             * size deduction, since a caller naming an exact set has already said what it wants.
+             * So a buffer that names any role has to name every role it needs, the transfers
+             * included. Leave setUsage() alone entirely to keep the set above.
              */
             /// Mutable because create() resolves the size-dependent role into it, and create() is
             /// const — the same reason DescriptorSet::Builder resolves its writes that way.
@@ -229,25 +232,29 @@ namespace kor
             }
 
             /**
-             * @brief Replaces the usage flags outright.
+             * @brief Declares every role the buffer will play, replacing the default set.
              *
-             * Warns if any usage was already set, since this discards it — including the transfer
-             * usages setIsPerFrame added. Prefer addUsage.
+             * Name them all at once — the enumerators OR together, so there is one call rather
+             * than one per role:
+             *
+             * @code
+             * .setUsage(Usage::eVertex | Usage::eStorage | Usage::eTransferDst)
+             * @endcode
+             *
+             * This *replaces*. A buffer that names its roles gets exactly those and nothing else:
+             * not the permissive default above, not the transfer usages setIsPerFrame added, and
+             * not the deduced eUniform — naming an exact set is taken as having said what you
+             * want. So include the transfers you need, or a later copy or readback fails naming
+             * the flag that is missing.
              */
             RawBuilder& setUsage(const Flags<Usage> usage) {
                 if (_usageTouched) {
-                    warn("setUsage overwrites usage flags previously set via addUsage/setIsPerFrame");
+                    warn("setUsage discards the usage flags setIsPerFrame added; "
+                         "include eTransferSrc and eTransferDst if the buffer is still per-frame");
                 }
                 _usage = usage;
                 _usageTouched = true;
                 _usageExact = true;
-                return *this;
-            }
-
-            /** @brief Adds one usage to those already set. */
-            RawBuilder& addUsage(const Usage usage) {
-                _usage |= usage;
-                _usageTouched = true;
                 return *this;
             }
 
@@ -272,7 +279,7 @@ namespace kor
             bool _usageTouched = false; ///< tracks explicit usage edits so setUsage can warn on overwrite
 
             /// Set only by setUsage: the caller named an exact set, so nothing is deduced on top.
-            /// addUsage does not set it — adding a role says nothing about the ones not mentioned.
+            /// A builder that never calls it keeps the permissive default and the deduction.
             bool _usageExact = false;
 
             RawBuilder& setSize(const glm::i64 value) {
@@ -399,7 +406,7 @@ namespace kor
                     // because the buffer cannot outlive this scope before we hand it over.
                     const auto bufferRef = ResourceRef<const Buffer>(buffer.get());
 
-                    switch (buffer->getType()) {
+                    switch (buffer->type()) {
                         case Type::eDeviceLocal: {
                             const auto byteSize = checkedByteSize<T>(static_cast<glm::u64>(_instanceCount), "Builder::build");
                             Builder<std::byte> stagingBuilder;
@@ -555,14 +562,14 @@ namespace kor
          * @throws std::out_of_range if the range runs past the end of the buffer.
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
-        std::vector<T> Read(glm::u64 count = 0, const glm::u64 offset = 0) const
+        std::vector<T> Read(glm::u64 count = WholeSize, const glm::u64 offset = 0) const
         {
             const auto elemCapacity = static_cast<glm::u64>(_size / sizeof(T));
             if (offset > elemCapacity) {
                 kor::log::error("Read: offset exceeds buffer elements. capacity={}, requestedOffset={}", elemCapacity, offset);
                 throw std::out_of_range("Offset exceeds buffer element capacity");
             }
-            if (count == 0) {
+            if (count == WholeSize) {
                 count = elemCapacity - offset;
             }
             validateElementRange<T>(offset, count, "Read");
@@ -729,7 +736,7 @@ namespace kor
             [[nodiscard]] std::span<const T> asSpan() const {
                 return {
                     reinterpret_cast<const T*>(static_cast<const std::byte*>(_buffer->_mappedPtr) + _offset * sizeof(T)),
-                    static_cast<size_t>(_count)
+                    static_cast<std::size_t>(_count)
                 };
             }
 
@@ -740,18 +747,18 @@ namespace kor
              * @return A vector holding the copies.
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = 0) const {
+            std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
-                const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
+                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
 
-                std::vector<T> result(static_cast<size_t>(n));
+                std::vector<T> result(static_cast<std::size_t>(n));
                 std::memcpy(result.data(), static_cast<std::byte*>(_buffer->_mappedPtr) + (_offset + localOffset) * sizeof(T), sizeof(T) * n);
                 return result;
             }
@@ -766,12 +773,12 @@ namespace kor
              *
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            void Invalidate(glm::u64 localOffset = 0, glm::u64 count = 0) const {
+            void Invalidate(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
-                const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
+                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
@@ -842,7 +849,7 @@ namespace kor
              */
             T& operator[](const glm::u64 index) {
                 if (_buffer->isPerFrame()) {
-                    auto currentImageIndex = kor::Context::Scheduler().getCurrentImageIndex();
+                    auto currentImageIndex = kor::Context::Scheduler().currentImageIndex();
                     const glm::u64 writeOffset = (_offset + index) * sizeof(T);
                     constexpr glm::u64 writeSize = sizeof(T);
                     // A fresh write to this region supersedes any still-pending propagation
@@ -855,7 +862,7 @@ namespace kor
                         currentImageIndex,
                         writeOffset,
                         writeSize,
-                        kor::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
+                        kor::Context::Scheduler().imageIndicesExcept(currentImageIndex)
                     );
                 }
 
@@ -879,7 +886,7 @@ namespace kor
             [[nodiscard]] std::span<T> asSpan() {
                 return {
                     reinterpret_cast<T*>( static_cast<std::byte*>(_buffer->_mappedPtr) + _offset * sizeof(T)),
-                    static_cast<size_t>(_count)
+                    static_cast<std::size_t>(_count)
                 };
             }
 
@@ -890,18 +897,18 @@ namespace kor
              * @return A vector holding the copies.
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = 0) const {
+            std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
-                const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
+                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
 
-                std::vector<T> result(static_cast<size_t>(n));
+                std::vector<T> result(static_cast<std::size_t>(n));
                 std::memcpy(result.data(), static_cast<std::byte*>(_buffer->_mappedPtr) + (_offset + localOffset) * sizeof(T), sizeof(T) * n);
                 return result;
             }
@@ -929,7 +936,7 @@ namespace kor
                 std::memcpy(static_cast<std::byte*>(_buffer->_mappedPtr) + (_offset + localOffset) * sizeof(T), data.data(), sizeof(T) * count);
 
                 if (_buffer->isPerFrame()) {
-                    auto currentImageIndex = kor::Context::Scheduler().getCurrentImageIndex();
+                    auto currentImageIndex = kor::Context::Scheduler().currentImageIndex();
                     const glm::u64 writeOffset = (_offset + localOffset) * sizeof(T);
                     const glm::u64 writeSize = count * sizeof(T);
                     // A fresh write to this region supersedes any still-pending propagation
@@ -942,7 +949,7 @@ namespace kor
                         currentImageIndex,
                         writeOffset,
                         writeSize,
-                        kor::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
+                        kor::Context::Scheduler().imageIndicesExcept(currentImageIndex)
                     );
                 }
             }
@@ -957,12 +964,12 @@ namespace kor
              *
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            void Flush(glm::u64 localOffset = 0, glm::u64 count = 0) const {
+            void Flush(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Flush range exceeds mapped range");
                 }
-                const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
+                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Flush range exceeds mapped range");
@@ -976,12 +983,12 @@ namespace kor
              * @param count How many elements; 0 means the rest of the mapping.
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            void Invalidate(glm::u64 localOffset = 0, glm::u64 count = 0) const {
+            void Invalidate(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
-                const glm::u64 n = (count == 0) ? (_count - localOffset) : count;
+                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
@@ -1002,7 +1009,7 @@ namespace kor
          };
 
         /** @brief The buffer's size in bytes. For a per-frame buffer, the size of one frame's copy. */
-        [[nodiscard]] glm::u64 getSize() const { return _size; }
+        [[nodiscard]] glm::u64 size() const { return _size; }
 
         /**
          * @brief Part of a buffer, for binding less than the whole of it.
@@ -1047,16 +1054,16 @@ namespace kor
          *
          * Read by the command buffer's barrier resolver to decide whether a transition is needed.
          */
-        [[nodiscard]] std::optional<ResourceAccess> getTrackedAccess() const { return _trackedAccess; }
+        [[nodiscard]] std::optional<ResourceAccess> trackedAccess() const { return _trackedAccess; }
 
         /** @brief Records the access the buffer has been synchronised for. Called by the barrier resolver. */
         void setTrackedAccess(const ResourceAccess access) const { _trackedAccess = access; }
 
         /** @brief Everything this buffer was created to be used for. */
-        [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
+        [[nodiscard]] Flags<Usage> usage() const { return _usage; }
 
         /** @brief Where this buffer's memory lives. */
-        [[nodiscard]] Type getType() const { return _type; }
+        [[nodiscard]] Type type() const { return _type; }
 
         /**
          * @brief Whether the memory can be reached from the CPU — mapped, written and read directly.
@@ -1078,7 +1085,7 @@ namespace kor
          * @note A buffer a shader reaches through its address appears in no descriptor set, so the
          *       automatic barriers cannot see the access. Declare it with CommandBuffer::Barrier.
          */
-        [[nodiscard]] virtual glm::u64 getDeviceAddress() const { return 0; }
+        [[nodiscard]] virtual glm::u64 deviceAddress() const { return 0; }
 
         /**
          * @brief Maps a range of the buffer for reading.
@@ -1095,8 +1102,8 @@ namespace kor
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
         [[nodiscard]]
-        ConstMapping<T> Map(glm::u64 instanceCount = 0, const glm::u64 offset = 0) const {
-            if (instanceCount == 0) {
+        ConstMapping<T> Map(glm::u64 instanceCount = WholeSize, const glm::u64 offset = 0) const {
+            if (instanceCount == WholeSize) {
                 instanceCount = _size / sizeof(T) - offset;
             }
             validateElementRange<T>(offset, instanceCount, "Map(const)");
@@ -1118,8 +1125,8 @@ namespace kor
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
         [[nodiscard]]
-        MutableMapping<T> Map(glm::u64 instanceCount = 0, const glm::u64 offset = 0) {
-            if (instanceCount == 0) {
+        MutableMapping<T> Map(glm::u64 instanceCount = WholeSize, const glm::u64 offset = 0) {
+            if (instanceCount == WholeSize) {
                 instanceCount = _size / sizeof(T) - offset;
             }
             validateElementRange<T>(offset, instanceCount, "Map(mutable)");
@@ -1227,5 +1234,9 @@ namespace kor
         /// Writes made to one frame's copy that the other frames have not received yet.
         mutable std::unordered_set<PendingWrite, PendingWrite::Hash> _pendingWrites {};
     };
+
+    // Out here rather than beside the enum: a specialisation cannot be written at class scope,
+    // and Buffer uses Flags<Usage> in its own body, which is why Flags itself is not gated on it.
+    template<> struct enable_flags<Buffer::Usage> : std::true_type {};
 }
 

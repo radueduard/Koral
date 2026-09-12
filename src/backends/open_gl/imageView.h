@@ -17,7 +17,7 @@ namespace kor::ogl
 
         GLuint operator*() const;
 
-        [[nodiscard]] GLenum getFormat() const;
+        [[nodiscard]] GLenum format() const;
 
     private:
         GLuint _textureViewID;

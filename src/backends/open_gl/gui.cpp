@@ -51,20 +51,20 @@ namespace kor
         ImGui_ImplGlfw_Shutdown();
     }
 
-    ogl::GUI_Image::GUI_Image(kor::ResourceRef<const kor::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
+    ogl::GuiImage::GuiImage(kor::ResourceRef<const kor::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         _generation = image->generation();
         setImage(image);
         setLayerAndLevel(layer, level);
     }
 
-    ogl::GUI_Image::~GUI_Image()
+    ogl::GuiImage::~GuiImage()
     {
         glDeleteTextures(1, reinterpret_cast<const GLuint*>(&_id));
         glCheckError();
     }
 
-    void ogl::GUI_Image::refresh(kor::CommandBuffer&)
+    void ogl::GuiImage::refresh(kor::CommandBuffer&)
     {
         // No command buffer is used: unlike Vulkan, where the blit has to be recorded into the
         // frame so the engine's barriers can see the read, GL's blit is immediate.
@@ -82,7 +82,7 @@ namespace kor
         setLayerAndLevel(_layer, _level);
     }
 
-    void ogl::GUI_Image::setLayerAndLevel(glm::u32 layer, glm::u32 level)
+    void ogl::GuiImage::setLayerAndLevel(glm::u32 layer, glm::u32 level)
     {
         _layer = layer;
         _level = level;
@@ -95,15 +95,15 @@ namespace kor
         glCheckError();
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, srcFramebuffer);
-        if (_image->getType() == kor::Image::Type::e1D && layer == 0) {
+        if (_image->type() == kor::Image::Type::e1D && layer == 0) {
             glFramebufferTexture1D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_1D, *oglImage, level);
-        } else if (_image->getType() == kor::Image::Type::e1D) {
+        } else if (_image->type() == kor::Image::Type::e1D) {
             glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, *oglImage, layer, level);
-        } else if (_image->getType() == kor::Image::Type::e2D && layer == 0) {
+        } else if (_image->type() == kor::Image::Type::e2D && layer == 0) {
             glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *oglImage, level);
-        } else if (_image->getType() == kor::Image::Type::e2D) {
+        } else if (_image->type() == kor::Image::Type::e2D) {
             glFramebufferTexture3D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_ARRAY, *oglImage, level, layer);
-        } else if (_image->getType() == kor::Image::Type::e3D) {
+        } else if (_image->type() == kor::Image::Type::e3D) {
             glFramebufferTexture3D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, *oglImage, level, layer);
         }
         glCheckError();
@@ -128,10 +128,10 @@ namespace kor
         // compute imageStore is already top-down — glClipControl moves the rasterizer, not the
         // shader — so one carrying eColorAttachment it never actually rendered with would come out
         // flipped. Sampling one of those through ImGui is not a thing any scene here does.
-        const bool rendered = (_image->getUsage() & kor::Image::Usage::eColorAttachment)
-                           || (_image->getUsage() & kor::Image::Usage::eDepthStencilAttachment);
-        const auto width = static_cast<GLint>(oglImage.getExtent().x);
-        const auto height = static_cast<GLint>(oglImage.getExtent().y);
+        const bool rendered = (_image->usage() & kor::Image::Usage::eColorAttachment)
+                           || (_image->usage() & kor::Image::Usage::eDepthStencilAttachment);
+        const auto width = static_cast<GLint>(oglImage.extent().x);
+        const auto height = static_cast<GLint>(oglImage.extent().y);
 
         glBlitFramebuffer(
             0, 0, width, height,
@@ -148,14 +148,14 @@ namespace kor
         glCheckError();
     }
 
-    void ogl::GUI_Image::setImage(kor::ResourceRef<const kor::Image> image)
+    void ogl::GuiImage::setImage(kor::ResourceRef<const kor::Image> image)
     {
         _image = image;
         const auto& oglImage = dynamic_cast<const kor::ogl::Image&>(*image);
         GLuint textureId;
         glGenTextures(1, &textureId);
         glBindTexture(GL_TEXTURE_2D, textureId);
-        glTexStorage2D(GL_TEXTURE_2D, 1, oglImage.getGLFormat(), image->getExtent().x, image->getExtent().y);
+        glTexStorage2D(GL_TEXTURE_2D, 1, oglImage.getGLFormat(), image->extent().x, image->extent().y);
         glCheckError();
 
         if (_id != 0)
@@ -168,7 +168,7 @@ namespace kor
         setLayerAndLevel(0, 0);
     }
 
-    ImTextureID ogl::GUI_Image::operator*() const {
+    ImTextureID ogl::GuiImage::operator*() const {
         return _id;
     }
 }

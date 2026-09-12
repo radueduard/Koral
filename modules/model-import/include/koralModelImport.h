@@ -67,8 +67,8 @@
 namespace kmdl
 {
     /** @brief This module's identity, for another module that declares a dependency on it. */
-    inline constexpr std::string_view kModuleId = "koral.model.import";
-    inline constexpr std::uint32_t    kModuleVersion = 1;
+    inline constexpr std::string_view ModuleId = "koral.model.import";
+    inline constexpr std::uint32_t    ModuleVersion = 1;
 
     /** @brief An axis-aligned bounding box, in the space of whatever it bounds. */
     struct KMDL_API AABB {
@@ -172,7 +172,7 @@ namespace kmdl
         /** @brief A light the file declares. */
         struct KMDL_API Light {
             /** @brief What shape the light emits in. */
-            enum class Type {
+            enum class Type : std::uint8_t {
                 ePoint,         ///< Emits in every direction from a point.
                 eDirectional,   ///< Parallel rays from infinitely far away — the sun.
                 eSpot           ///< A cone from a point, along a direction.

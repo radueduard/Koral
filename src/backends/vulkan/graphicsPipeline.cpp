@@ -36,19 +36,19 @@ namespace kor::vk
     void GraphicsPipeline::Setup()
     {
         std::vector<::vk::Format> colorAttachmentFormats;
-        for (const auto& format : _framebuffer->getColorAttachments()) {
-            colorAttachmentFormats.push_back(getVkFormat(format.view->getImage()->getFormat()));
+        for (const auto& format : _framebuffer->colorAttachments()) {
+            colorAttachmentFormats.push_back(getVkFormat(format.view->image()->format()));
         }
         auto pipelineRenderingCreateInfo = ::vk::PipelineRenderingCreateInfo()
             .setColorAttachmentFormats(colorAttachmentFormats);
         if (_framebuffer->hasDepthAttachment()) {
-            const auto depthFormat = getVkFormat(_framebuffer->getDepthAttachment()->getImage()->getFormat());
+            const auto depthFormat = getVkFormat(_framebuffer->depthAttachment()->image()->format());
             pipelineRenderingCreateInfo.setDepthAttachmentFormat(depthFormat);
         }
         if (_framebuffer->hasStencilAttachment()) {
-            const auto stencilFormat = getVkFormat(_framebuffer->getStencilAttachment()->getImage()->getFormat());
+            const auto stencilFormat = getVkFormat(_framebuffer->stencilAttachment()->image()->format());
             // Only set stencil format if the image actually has a stencil aspect
-            const auto aspectFlags = getVkImageAspectFlags(_framebuffer->getStencilAttachment()->getImage()->getFormat());
+            const auto aspectFlags = getVkImageAspectFlags(_framebuffer->stencilAttachment()->image()->format());
             if (aspectFlags & ::vk::ImageAspectFlagBits::eStencil) {
                 pipelineRenderingCreateInfo.setStencilAttachmentFormat(stencilFormat);
             }
@@ -211,7 +211,7 @@ namespace kor::vk
 
         std::vector<::vk::PipelineColorBlendAttachmentState> vkColorBlendAttachmentStates;
         int index = 0;
-        for (const auto& _ : _framebuffer->getColorAttachments()) {
+        for (const auto& _ : _framebuffer->colorAttachments()) {
             if (_colorBlendState.attachments.empty()) {
                 vkColorBlendAttachmentStates.push_back(::vk::PipelineColorBlendAttachmentState()
                     .setBlendEnable(false)

@@ -21,7 +21,7 @@ namespace kor::vk
         ~AccelerationStructure() override;
 
         /** @brief GPU device address of this acceleration structure. */
-        [[nodiscard]] ::vk::DeviceAddress getDeviceAddress() const { return _deviceAddress; }
+        [[nodiscard]] ::vk::DeviceAddress deviceAddress() const { return _deviceAddress; }
 
     private:
         void buildBottomLevel(const Builder& createInfo);

@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <cstdint>
 
 #include <functional>
 #include <memory>
@@ -16,6 +17,7 @@
 #include <source_location>
 #include "flags.h"
 #include "api.h"
+#include "dataRange.h"
 #include "error.h"
 
 #include <glm/glm.hpp>
@@ -90,7 +92,7 @@ namespace kor
         // executed the commands that write them, which is long after Scene::Render returned. So a
         // scope's result is not available in the frame that recorded it — it is collected at the
         // start of the next recording on the same command buffer, which for the frame's command
-        // buffer is once the frame in flight comes round again. getTimings() therefore reports a
+        // buffer is once the frame in flight comes round again. timings() therefore reports a
         // frame that has definitely completed, a few frames back, and never blocks waiting for one.
         //
         // @note A continuation that runs the instant the GPU signals — rather than at the next
@@ -140,7 +142,7 @@ namespace kor
          * @param label The name given to BeginTimer.
          * @return The GPU time in milliseconds, or an Error explaining why there is none yet.
          *
-         * Unlike getTimings(), this goes and looks: call it any time after Submit() and it will
+         * Unlike timings(), this goes and looks: call it any time after Submit() and it will
          * collect the timestamps if the GPU has finished with them. That makes it the way to time
          * a command buffer that is submitted once and never re-recorded — a job's compute pass,
          * say — where waiting for the next Begin() would mean waiting forever.
@@ -148,7 +150,7 @@ namespace kor
          * @code
          * commandBuffer->Submit();
          * commandBuffer->WaitForFence();
-         * if (const auto ms = commandBuffer->CollectTimer("sort"))
+         * if (const auto ms = commandBuffer->collectTimer("sort"))
          *     kor::log::info("sort took {:.3f} ms", *ms);
          * else
          *     kor::log::warn("{}", ms.error().message);
@@ -157,18 +159,18 @@ namespace kor
          * Never blocks. Called before the GPU has finished — without a WaitForFence, say — it
          * fails with a message saying so rather than stalling, and succeeds on a later call. If
          * more than one scope shares @p label this reports the first one opened; read them all
-         * with CollectTimings().
+         * with collectTimings().
          */
-        [[nodiscard]] Result<double> CollectTimer(std::string_view label);
+        [[nodiscard]] Result<double> collectTimer(std::string_view label);
 
         /**
          * @brief Every scope's result, fetching them if they have arrived.
          * @return One entry per BeginTimer/EndTimer pair, in the order they were opened.
          *
-         * The whole-buffer form of CollectTimer, and the same timing rules apply. Empty while
+         * The whole-buffer form of collectTimer, and the same timing rules apply. Empty while
          * nothing has been measured or the GPU has not finished.
          */
-        [[nodiscard]] const std::vector<TimerResult>& CollectTimings();
+        [[nodiscard]] const std::vector<TimerResult>& collectTimings();
 
         /**
          * @brief The scopes already collected, without going to look for more.
@@ -177,13 +179,13 @@ namespace kor
          * What a recurring workload reads: each Begin() collects the previous submission's
          * results, so by the time a frame is recording, the readings from its last trip through
          * the swap chain are already here and this is a plain accessor over them. Reach for
-         * CollectTimer or CollectTimings instead when the results are wanted *now*, in the same
+         * collectTimer or collectTimings instead when the results are wanted *now*, in the same
          * pass that submitted the work.
          *
          * The results persist until the next completed submission replaces them, so a frame that
          * records no timers leaves the previous frame's readings in place rather than blanking them.
          */
-        [[nodiscard]] const std::vector<TimerResult>& getTimings() const { return _timings; }
+        [[nodiscard]] const std::vector<TimerResult>& timings() const { return _timings; }
 
         /**
          * @brief Whether this command buffer's device and queue can timestamp at all.
@@ -197,7 +199,7 @@ namespace kor
         static constexpr glm::u32 MaxTimerScopes = 256;
 
         /** @brief How many commands the last completed recording emitted. */
-        [[nodiscard]] glm::u64 getLastFrameCommandCount() const { return _lastFrameCommandCount; }
+        [[nodiscard]] glm::u64 lastFrameCommandCount() const { return _lastFrameCommandCount; }
 
         // ---- Error railway --------------------------------------------------------------------
 
@@ -244,8 +246,7 @@ namespace kor
          * Determines which queue it is created on. Combine them with Flags when one buffer records
          * more than one kind.
          */
-        enum class Usage
-        {
+        enum class Usage : std::uint8_t {
             eGraphics = 1 << 0, ///< Draws and render passes. Also permits compute and transfers on every device.
             eCompute = 1 << 1,  ///< Compute dispatches, without the graphics pipeline.
             eTransfer = 1 << 2  ///< Copies, blits and clears only. The narrowest, and on discrete GPUs often a dedicated transfer queue.
@@ -459,14 +460,13 @@ namespace kor
          * @brief Binds a descriptor set — the resources a shader reads — to one set index.
          * @param index The set number the shader declares (`set = N` in GLSL, `spaceN` in HLSL/Slang).
          * @param descriptorSet The resources to bind there.
-         * @param debug When true, logs the set's contents as it is bound. A debugging aid; leave it false.
          *
          * The set binds to whichever pipeline type is currently bound, and stays bound for later
          * draws or dispatches until another set replaces it at that index. What the bound sets
          * contain is also how the automatic barriers know what a draw is about to touch.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet, bool debug = false,
+        CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet,
                                          std::source_location where = std::source_location::current());
 
         /**
@@ -488,10 +488,14 @@ namespace kor
          * The fastest way to get a handful of bytes to a shader — no buffer, no descriptor, no
          * synchronisation — but the block is small (guaranteed at least 128 bytes) and the data is
          * gone when the pipeline changes. Anything larger belongs in a uniform buffer.
+         *
+         * Writes the *whole block* at a byte offset, which means the layout is yours to get right.
+         * @see PushConstant(std::string_view, const T&) to write one field by the name the shader
+         * gave it, with its offset and type taken from reflection — which is usually what you want.
          */
         template<typename T> requires std::is_trivially_copyable_v<T>
-        CommandBuffer& PushConstants(const T& data, const glm::u32 offset = 0) {
-            return PushConstants(&data, sizeof(T), offset);
+        CommandBuffer& PushConstantBlock(const T& data, const glm::u32 offset = 0) {
+            return PushConstantBlock(&data, sizeof(T), offset);
         }
 
         /**
@@ -544,7 +548,7 @@ namespace kor
          *
          * @note For a shape the engine knows, the scalar type and dimensions are checked too, so a
          *       `vec3` handed to a `vec4` is refused rather than leaving a component uninitialised.
-         *       @see PushConstants for writing a whole block at one offset.
+         *       @see PushConstantBlock for writing a whole block at one offset.
          */
         template<typename T> requires std::is_trivially_copyable_v<T>
         CommandBuffer& PushConstant(const std::string_view name, const T& data,
@@ -661,7 +665,7 @@ namespace kor
          * whole window first.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& Draw(glm::u64 vertexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0,
+        CommandBuffer& Draw(glm::u64 vertexCount = WholeSize, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0,
                                     std::source_location where = std::source_location::current());
 
         /**
@@ -676,7 +680,7 @@ namespace kor
          * Needs a graphics pipeline and a mesh with an index buffer bound.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& DrawIndexed(glm::u64 indexCount = UINT64_MAX, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0,
+        CommandBuffer& DrawIndexed(glm::u64 indexCount = WholeSize, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0,
                                            std::source_location where = std::source_location::current());
 
         /**
@@ -754,7 +758,7 @@ namespace kor
          * @param size How many bytes to clear; the default runs to the end of the buffer.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& ClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset = 0, glm::u64 size = UINT64_MAX,
+        CommandBuffer& ClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset = 0, glm::u64 size = WholeSize,
                                    std::source_location where = std::source_location::current());
 
         /**
@@ -780,8 +784,35 @@ namespace kor
          * command buffer itself. Larger uploads belong in Buffer::Write.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset = 0, glm::u64 size = UINT64_MAX,
+        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, const void* data, glm::u64 offset = 0,
+                                  glm::u64 size = WholeSize,
                                   std::source_location where = std::source_location::current());
+
+        /**
+         * @brief The same, from a range that carries its own length.
+         * @param buffer Destination.
+         * @param elements What to write. Copied during recording, so it need not outlive the call.
+         * @param offset Byte offset into the buffer.
+         *
+         * What you normally want: the byte count comes from the range, so it cannot be told to read
+         * past the end of your data the way the untyped overload above can. The same shape as
+         * Buffer::Write, and the same handling of a non-contiguous range. @see kor::ContiguousCopy
+         *
+         * @code
+         * cb.FillBuffer(buffer, std::array{ 0u, 0u, 0u, 0u });
+         * cb.FillBuffer(buffer, clearValues, 256);
+         * @endcode
+         */
+        template <typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
+            requires RangeOf<R, T> && std::is_trivially_copyable_v<T>
+        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, R&& elements, const glm::u64 offset = 0,
+                                  const std::source_location where = std::source_location::current())
+        {
+            const ContiguousCopy<T> contiguous(std::forward<R>(elements));
+            const std::span<const T> data = contiguous.view();
+            return FillBuffer(std::move(buffer), data.data(),
+                              offset, data.size() * sizeof(T), where);
+        }
 
         /**
          * @brief Copies bytes between two buffers on the GPU.
@@ -794,7 +825,7 @@ namespace kor
          * Fails the recording if the range would run past either buffer.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size = UINT64_MAX, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0,
+        CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size = WholeSize, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0,
                                   std::source_location where = std::source_location::current());
 
         /**
@@ -806,7 +837,7 @@ namespace kor
          * pipeline — gets its result onto the screen.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& Blit(ResourceRef<const Image> srcImage, kor::Blit blitInfo = {}, std::source_location where = std::source_location::current());
+        CommandBuffer& BlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo = {}, std::source_location where = std::source_location::current());
 
         /**
          * @brief Copies a region between two images, rescaling and reformatting it as needed.
@@ -826,7 +857,7 @@ namespace kor
          * @param resolveInfo Which region to take and where it lands; see kor::Resolve.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& Resolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo = {}, std::source_location where = std::source_location::current());
+        CommandBuffer& ResolveToScreen(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo = {}, std::source_location where = std::source_location::current());
 
         /**
          * @brief Collapses a multisampled image into a single-sampled one.
@@ -834,7 +865,7 @@ namespace kor
          * @param dstImage The single-sampled destination.
          * @param resolveInfo Which region to take and where it lands; see kor::Resolve.
          *
-         * The step that makes an MSAA render target usable as an ordinary texture. The samples are
+         * The step that makes an SampleCount render target usable as an ordinary texture. The samples are
          * combined by the framebuffer's resolve mode, not filtered, so the regions should match in size.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
@@ -1013,7 +1044,7 @@ namespace kor
 
         /// Where a command sits relative to a render pass, so the resolver knows which barriers
         /// have to be hoisted ahead of the record that opens one.
-        enum class PassEdge : glm::u8 {
+        enum class PassEdge : std::uint8_t {
             eNone,      ///< Ordinary command, inside or outside a pass.
             eOpens,     ///< Opens a render pass.
             eCloses     ///< Closes one.
@@ -1024,7 +1055,7 @@ namespace kor
         struct ResourceUse {
             kor::ResourceRef<const Buffer> buffer;
             kor::ResourceRef<const Image>  image;
-            ResourceAccess access = ResourceAccess::AllShaderRead;
+            ResourceAccess access = ResourceAccess::eAllShaderRead;
 
             /// Image subresource range; nullopt means the whole image, matching ImageBarrier.
             std::optional<glm::u32> baseMipLevel;
@@ -1034,7 +1065,7 @@ namespace kor
 
             /// Buffer range.
             glm::u64 offset = 0;
-            glm::u64 size = UINT64_MAX;
+            glm::u64 size = WholeSize;
         };
 
         /// One parked command: what it will do, and what it will touch when it does.
@@ -1213,13 +1244,13 @@ namespace kor
         /// Unimplemented on OpenGL, where it is a no-op.
         virtual CommandBuffer& doDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) { return *this; }
 
-        virtual CommandBuffer& doPushConstants(const void* data, glm::u32 size, glm::u32 offset) = 0;
+        virtual CommandBuffer& doPushConstantBlock(const void* data, glm::u32 size, glm::u32 offset) = 0;
 
         virtual CommandBuffer& doBindComputePipeline(ResourceRef<const ComputePipeline> pipeline) = 0;
         virtual CommandBuffer& doBindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline) = 0;
         /// Defaults to reporting ray tracing as unsupported, like TraceRays; OpenGL leaves it alone.
         virtual CommandBuffer& doBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
-        virtual CommandBuffer& doBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet, bool debug) = 0;
+        virtual CommandBuffer& doBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
         virtual CommandBuffer& doBindMesh(ResourceRef<const Mesh> mesh) = 0;
         virtual CommandBuffer& doBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;
         virtual CommandBuffer& doDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
@@ -1229,14 +1260,14 @@ namespace kor
         virtual CommandBuffer& doDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) { return *this; }
         virtual CommandBuffer& doClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset, glm::u64 size) = 0;
         virtual CommandBuffer& doClearColorImage(ResourceRef<const Image> image, glm::vec4 color) = 0;
-        virtual CommandBuffer& doFillBuffer(ResourceRef<const Buffer> buffer, void* data, glm::u64 offset, glm::u64 size) = 0;
+        virtual CommandBuffer& doFillBuffer(ResourceRef<const Buffer> buffer, const void* data, glm::u64 offset, glm::u64 size) = 0;
         virtual CommandBuffer& doCopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) = 0;
         virtual CommandBuffer& doGenerateMipmaps(ResourceRef<const Image> image);
         virtual CommandBuffer& doCopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo) = 0;
         virtual CommandBuffer& doCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo) = 0;
-        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, kor::Blit blitInfo) = 0;
+        virtual CommandBuffer& doBlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo) = 0;
         virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo) = 0;
-        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) = 0;
+        virtual CommandBuffer& doResolveToScreen(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) = 0;
         virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) = 0;
 
         std::vector<Error> _errors;
@@ -1278,7 +1309,7 @@ namespace kor
          *         flight, or when there was nothing submitted to collect.
          *
          * Idempotent and non-blocking, which is what lets both the recurring path (Begin()) and
-         * the one-shot path (CollectTimer) share it without either having to know about the other.
+         * the one-shot path (collectTimer) share it without either having to know about the other.
          */
         bool collectTimers();
 
@@ -1300,11 +1331,11 @@ namespace kor
         std::vector<TimerScope> _pendingTimers;    ///< Scopes in the recording being built.
         std::vector<TimerScope> _submittedTimers;  ///< Scopes of the submission whose results are still on the GPU.
         std::vector<glm::u32> _timerStack;         ///< Indices into _pendingTimers for the scopes currently open.
-        std::vector<TimerResult> _timings;         ///< Last results that arrived; see getTimings().
+        std::vector<TimerResult> _timings;         ///< Last results that arrived; see timings().
 
         glm::u64 _lastFrameCommandCount = 0;
 
-        CommandBuffer& PushConstants(const void* data, glm::u32 size, glm::u32 offset);
+        CommandBuffer& PushConstantBlock(const void* data, glm::u32 size, glm::u32 offset);
 
         /** @brief Whichever pipeline is bound, of the three kinds, or nullptr when none is. */
         [[nodiscard]] const Pipeline* boundPipeline() const;
@@ -1316,4 +1347,7 @@ namespace kor
         CommandBuffer& PushConstant(std::string_view name, const void* data, glm::u32 size,
                                     ValueShape shape, std::source_location where);
     };
+
+    /** @see enable_flags */
+    template<> struct enable_flags<CommandBuffer::Usage> : std::true_type {};
 }

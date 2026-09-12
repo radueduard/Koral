@@ -91,9 +91,7 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
     for (const auto type : { Buffer::Type::eDeviceLocal, Buffer::Type::eStaging, Buffer::Type::eReadback, Buffer::Type::eDynamic, Buffer::Type::eDeviceDynamic }) {
         Buffer::RawBuilder builder;
         builder.setRawSize(static_cast<glm::i64>(kElements * sizeof(std::uint32_t)))
-               .addUsage(Buffer::Usage::eStorage)
-               .addUsage(Buffer::Usage::eTransferSrc)
-               .addUsage(Buffer::Usage::eTransferDst)
+               .setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
                .setType(type);
         auto buffer = builder.build();
         ASSERT_TRUE(buffer.valid()) << "could not allocate a " << name(type) << " buffer";
@@ -125,7 +123,7 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
         }
 
         auto descriptorSet =
-            DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
+            DescriptorSet::Builder(pipeline, 0)
                 .write(0, buffer)
                 .build();
         ASSERT_TRUE(descriptorSet.valid());
@@ -134,8 +132,8 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
         double gpu = 0.0;
         if (cb->supportsTimers()) {
             cb->Begin();
-            cb->BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
-            cb->BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
+            cb->BindComputePipeline(pipeline);
+            cb->BindDescriptorSet(0, descriptorSet);
             cb->BeginTimer("pass");
             for (int i = 0; i < kDispatches; ++i)
                 cb->Dispatch(static_cast<glm::u32>(kElements / kLocalSize), 1, 1);
@@ -143,7 +141,7 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
             cb->End();
             ASSERT_TRUE(cb->Submit());
             cb->WaitForFence();
-            if (const auto measured = cb->CollectTimer("pass")) gpu = *measured;
+            if (const auto measured = cb->collectTimer("pass")) gpu = *measured;
         }
         // Each dispatch reads and writes every element once.
         const double gpuGiBs = gpu > 0.0 ? megabytes * 2.0 * kDispatches / gpu * 1000.0 / 1024.0 : 0.0;
@@ -175,8 +173,7 @@ TEST_F(GpuTest, DeviceDynamicIsHostWritableAndGpuVisible) {
 
     Buffer::Builder<std::uint32_t> builder;
     builder.setData(source);
-    builder.addUsage(Buffer::Usage::eStorage);
-    builder.addUsage(Buffer::Usage::eTransferSrc);
+    builder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc);
     builder.setType(Buffer::Type::eDeviceDynamic);
     auto buffer = builder.build();
     ASSERT_TRUE(buffer.valid());
@@ -193,7 +190,7 @@ TEST_F(GpuTest, DeviceDynamicIsHostWritableAndGpuVisible) {
     ASSERT_TRUE(pipeline.valid());
 
     auto descriptorSet =
-        DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
+        DescriptorSet::Builder(pipeline, 0)
             .write(0, buffer)
             .build();
     ASSERT_TRUE(descriptorSet.valid());
@@ -201,8 +198,8 @@ TEST_F(GpuTest, DeviceDynamicIsHostWritableAndGpuVisible) {
     // The initial data went in through a host write at build time. If the GPU sees it, the write
     // reached device memory without anyone staging a copy — which is the whole promise of the type.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
-        cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, descriptorSet);
         cb.Dispatch(kCount / kLocalSize, 1, 1);
     }, CommandBuffer::Usage::eCompute);
 

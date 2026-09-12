@@ -29,15 +29,13 @@ TEST_F(GpuTest, DeviceLocalRoundTrip) {
 
     Buffer::Builder<int> b;
     b.setData(src);
-    b.addUsage(Buffer::Usage::eStorage);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eDeviceLocal);
 
     auto buf = b.build();
     ASSERT_TRUE(static_cast<bool>(buf));
-    EXPECT_EQ(buf->getType(), Buffer::Type::eDeviceLocal);
-    EXPECT_EQ(buf->getSize(), src.size() * sizeof(int));
+    EXPECT_EQ(buf->type(), Buffer::Type::eDeviceLocal);
+    EXPECT_EQ(buf->size(), src.size() * sizeof(int));
 
     const std::vector<int> out = buf->Read<int>();
     EXPECT_EQ(out, src);
@@ -49,8 +47,7 @@ TEST_F(GpuTest, StagingRoundTrip) {
 
     Buffer::Builder<float> b;
     b.setData(src);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eStaging);
 
     auto buf = b.build();
@@ -66,9 +63,7 @@ TEST_F(GpuTest, StagingRoundTrip) {
 TEST_F(GpuTest, DeviceLocalWriteAtReadAt) {
     Buffer::Builder<int> b;
     b.setData(iotaVec(16));
-    b.addUsage(Buffer::Usage::eStorage);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eDeviceLocal);
     auto buf = b.build();
 
@@ -84,8 +79,7 @@ TEST_F(GpuTest, PartialRead) {
 
     Buffer::Builder<int> b;
     b.setData(src);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eStaging);
     auto buf = b.build();
 
@@ -99,8 +93,7 @@ TEST_F(GpuTest, PartialRead) {
 TEST_F(GpuTest, OutOfRangeReadThrows) {
     Buffer::Builder<int> b;
     b.setData(iotaVec(8));
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eStaging);
     auto buf = b.build();
 
@@ -118,8 +111,7 @@ TEST_F(GpuTest, UploadsTakeAnyRange) {
 
     Buffer::Builder<int> fromView;
     fromView.setData(squares);
-    fromView.addUsage(Buffer::Usage::eTransferSrc);
-    fromView.addUsage(Buffer::Usage::eTransferDst);
+    fromView.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     fromView.setType(Buffer::Type::eStaging);
     const auto viewBuffer = fromView.build();
     ASSERT_TRUE(viewBuffer.valid()) << (viewBuffer.error() ? viewBuffer.error()->history() : "");
@@ -135,16 +127,14 @@ TEST_F(GpuTest, UploadsTakeAnyRange) {
 
     Buffer::Builder<int> fromVector;
     fromVector.setData(vector);
-    fromVector.addUsage(Buffer::Usage::eTransferSrc);
-    fromVector.addUsage(Buffer::Usage::eTransferDst);
+    fromVector.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     fromVector.setType(Buffer::Type::eStaging);
     const auto vectorBuffer = fromVector.build();
     EXPECT_EQ(vectorBuffer->Read<int>(), vector);
 
     Buffer::Builder<int> fromArray;
     fromArray.setDataView(array);          // viewed where it lies, not copied until build()
-    fromArray.addUsage(Buffer::Usage::eTransferSrc);
-    fromArray.addUsage(Buffer::Usage::eTransferDst);
+    fromArray.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     fromArray.setType(Buffer::Type::eStaging);
     const auto arrayBuffer = fromArray.build();
     ASSERT_TRUE(arrayBuffer.valid());

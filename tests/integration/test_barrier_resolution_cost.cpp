@@ -43,7 +43,7 @@ TEST_F(GpuTest, BarrierResolutionScalesLinearlyWithRecordingLength) {
 
     Buffer::Builder<std::uint32_t> bufBuilder;
     bufBuilder.setData(input);
-    bufBuilder.addUsage(Buffer::Usage::eStorage);
+    bufBuilder.setUsage(Buffer::Usage::eStorage);
     auto buffer = bufBuilder.build();
     ASSERT_TRUE(buffer.valid());
 
@@ -58,7 +58,7 @@ TEST_F(GpuTest, BarrierResolutionScalesLinearlyWithRecordingLength) {
     ASSERT_TRUE(pipeline.valid());
 
     auto descriptorSet =
-        DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
+        DescriptorSet::Builder(pipeline, 0)
             .write(0, buffer)
             .build();
     ASSERT_TRUE(descriptorSet.valid());
@@ -69,8 +69,8 @@ TEST_F(GpuTest, BarrierResolutionScalesLinearlyWithRecordingLength) {
     // submitted: this measures the CPU side of recording, which is what the sort was waiting on.
     const auto timeEnd = [&](const std::uint32_t passes) {
         cb->Begin();
-        cb->BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
-        cb->BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
+        cb->BindComputePipeline(pipeline);
+        cb->BindDescriptorSet(0, descriptorSet);
         for (std::uint32_t pass = 0; pass < passes; ++pass)
             cb->Dispatch(kCount / kLocalSize, 1, 1);
 

@@ -9,7 +9,6 @@
 
 #include <imgui.h>
 #include <cstddef>
-#include <map>
 
 struct ImGui_ImplVulkan_InitInfo;
 
@@ -99,7 +98,7 @@ namespace kor
      *
      * @code
      * // once
-     * _preview = kor::GUI_Image::Create(_offscreenColor);
+     * _preview = kor::GuiImage::Create(_offscreenColor);
      * // every frame, inside RenderUI()
      * ImGui::Image(**_preview, ImVec2(320, 180));
      * @endcode
@@ -107,11 +106,11 @@ namespace kor
      * The image must be in a shader-readable state when ImGui draws, which is the frame's end — so
      * a target rendered this frame needs no special handling.
      */
-    class KORAL_API GUI_Image
+    class KORAL_API GuiImage
     {
         friend class GUI;
     public:
-        virtual ~GUI_Image() = default;
+        virtual ~GuiImage() = default;
 
         /**
          * @brief Displays a different mip level or array layer of the same image.
@@ -132,7 +131,7 @@ namespace kor
          * @param layer Array layer to show.
          * @param level Mip level to show.
          */
-        static kor::Resource<GUI_Image> Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer = 0, glm::u32 level = 0);
+        static kor::Resource<GuiImage> Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer = 0, glm::u32 level = 0);
 
     private:
         /**
@@ -151,13 +150,12 @@ namespace kor
     };
 
     /** @brief The weights of the interface font that Koral loads at startup. */
-    enum class Font
-    {
-        Light,      ///< Light weight.
-        Regular,    ///< Regular weight; what the interface uses by default.
-        Bold,       ///< Bold weight, for emphasis and headings.
-        Italic,     ///< Italic.
-        Black       ///< Heaviest weight.
+    enum class Font : std::uint8_t {
+        eLight,     ///< Light weight.
+        eRegular,   ///< Regular weight; what the interface uses by default.
+        eBold,      ///< Bold weight, for emphasis and headings.
+        eItalic,    ///< Italic.
+        eBlack      ///< Heaviest weight.
     };
 
     /**
@@ -171,7 +169,7 @@ namespace kor
     {
     public:
         /** @brief Creates the ImGui context, loads the fonts and starts the backend. Called once by the window. */
-        static void Init();
+        KORAL_API static void Init();
 
         /**
          * @brief Runs one ImGui frame and records its draws.
@@ -196,7 +194,7 @@ namespace kor
         KORAL_API static void RenderPlatformWindows();
 
         /** @brief Destroys the ImGui context and its backend. Called once by the window. */
-        static void Shutdown();
+        KORAL_API static void Shutdown();
 
         /**
          * @brief One of the loaded interface fonts, for ImGui::PushFont.
@@ -207,8 +205,11 @@ namespace kor
         KORAL_API static ImFont* GetFont(Font font);
 
     private:
-        static void DefineStyle();
-        inline static std::map<Font, ImFont*> _fonts {};
+        KORAL_API static void DefineStyle();
+        // The loaded fonts deliberately do NOT live here. A static data member defined in the
+        // header gives the executable and every scene .so its own copy, so GUI::Init would fill
+        // one map and a module's GetFont would read another and find it empty. The map lives in
+        // gui.cpp and is reached only through the exported accessors above.
     };
 
 

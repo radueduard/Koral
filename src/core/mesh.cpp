@@ -104,14 +104,14 @@ namespace kor {
                                      binding));
                 continue;
             }
-            if (!(buffer->getUsage() & Buffer::Usage::eVertex)) {
+            if (!(buffer->usage() & Buffer::Usage::eVertex)) {
                 addError(ErrorCode::eInvalidArgument,
                          std::format("the buffer set for binding {} was not created with Buffer::Usage::eVertex.",
                                      binding));
                 continue;
             }
 
-            const auto count = buffer->getSize() / stride;
+            const auto count = buffer->size() / stride;
             if (!counted) {
                 vertexCount = count;
                 counted = true;
@@ -156,13 +156,13 @@ namespace kor {
                 if (width == 0) {
                     addError(ErrorCode::eInvalidArgument,
                              "the index type must be ChannelType::eUByte, eUShort or eUInt.");
-                } else if (!((*_indexBuffer)->getUsage() & Buffer::Usage::eIndex)) {
+                } else if (!((*_indexBuffer)->usage() & Buffer::Usage::eIndex)) {
                     addError(ErrorCode::eInvalidArgument,
                              "the index buffer was not created with Buffer::Usage::eIndex.");
                 } else {
                     indexBuffer = *_indexBuffer;
                     indexType = unsignedIndexType(_indexType);
-                    indexCount = static_cast<glm::u32>((*_indexBuffer)->getSize() / width);
+                    indexCount = static_cast<glm::u32>((*_indexBuffer)->size() / width);
                 }
             }
         }

@@ -21,7 +21,7 @@ namespace kimg
     class ImageExportModule final : public kor::Module
     {
     public:
-        static constexpr std::string_view kModuleId      = kimg::kExportModuleId;
-        static constexpr std::uint32_t    kModuleVersion = kimg::kExportModuleVersion;
+        static constexpr std::string_view ModuleId      = kimg::ExportModuleId;
+        static constexpr std::uint32_t    ModuleVersion = kimg::ExportModuleVersion;
     };
 }

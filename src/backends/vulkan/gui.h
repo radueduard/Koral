@@ -14,11 +14,11 @@ namespace kor::vk
 {
     class DescriptorPool;
 
-    class KORAL_API GUI_Image final : public kor::GUI_Image
+    class KORAL_API GuiImage final : public kor::GuiImage
     {
     public:
-        explicit GUI_Image(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
-        ~GUI_Image() override;
+        explicit GuiImage(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
+        ~GuiImage() override;
         void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
         void setImage(kor::ResourceRef<const kor::Image> image) override;
 
@@ -26,7 +26,7 @@ namespace kor::vk
 
     private:
         // Blits the source into this frame's copy of the helper image and leaves it shader-readable.
-        // @see kor::GUI_Image::refresh
+        // @see kor::GuiImage::refresh
         void refresh(kor::CommandBuffer& commandBuffer) override;
 
         // Records that blit into whichever command buffer is given. The frame's, from refresh(); a

@@ -172,7 +172,7 @@ namespace kor::ogl
         glLineWidth(_rasterizationState.lineWidth);
         glCheckError();
 
-        // Multisampling: per-sample shading. GL enables MSAA implicitly for
+        // Multisampling: per-sample shading. GL enables SampleCount implicitly for
         // multisampled framebuffers; sample shading forces per-sample execution.
         if (_multisampleState.sampleShadingEnable) {
             glEnable(GL_SAMPLE_SHADING);
@@ -351,7 +351,7 @@ namespace kor::ogl
         // liniarize descriptors
         glm::u32 nextDescriptorBindingPoint = 0;
         for (const auto& [set, layout] : _setLayouts) {
-            for (const auto& [binding, type, Count] : layout->getBindings()) {
+            for (const auto& binding : layout->bindings() | std::views::keys) {
                 _setAndBindingToBindingPoint[{ set, binding }] = nextDescriptorBindingPoint++;
             }
         }

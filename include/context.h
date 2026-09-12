@@ -3,6 +3,8 @@
 //
 
 #pragma once
+#include <memory>
+#include <cstdint>
 #include "api.h"
 #include <filesystem>
 #include <string>
@@ -69,7 +71,7 @@ namespace kor {
     KORAL_API const std::string& preferredGpu();
 
     /** @brief The graphics backend a context runs on. */
-    enum class API {
+    enum class API : std::uint8_t {
         eOpenGL,    ///< OpenGL. Broadest hardware support; no ray tracing or mesh shaders.
         eVulkan,    ///< Vulkan. The default, and the only backend with ray tracing.
     };
@@ -83,7 +85,7 @@ namespace kor {
      * eWayland force the respective platform when the GLFW build and the running session support it,
      * falling back to automatic selection with a warning when they do not.
      */
-    enum class WindowPlatform {
+    enum class WindowPlatform : std::uint8_t {
         eAuto,
         eX11,
         eWayland,
@@ -96,8 +98,8 @@ namespace kor {
      * process. A scene reaches the pieces it needs through this rather than being handed them:
      *
      * @code
-     * const auto extent = kor::Context::Window().getExtent();
-     * commandBuffer.BeginRendering(kor::Context::DefaultFramebuffer());
+     * const auto extent = kor::Context::Window().extent();
+     * commandBuffer.BeginRendering(kor::Context::defaultFramebuffer());
      * @endcode
      *
      * The accessors are only valid once a context exists — after the window has been built, or
@@ -113,7 +115,7 @@ namespace kor {
         static KORAL_API kor::Window& Window();
 
         /** @brief The frame scheduler: swap chain, frames in flight, and which image is current. */
-        static KORAL_API const kor::Scheduler& Scheduler();
+        static KORAL_API kor::Scheduler& Scheduler();
 
         /**
          * @brief The active graphics backend.
@@ -140,15 +142,15 @@ namespace kor {
         static KORAL_API void ShutdownHeadless();
 
         /** @brief Whether a headless (device-only) context is currently active. */
-        static KORAL_API bool IsHeadless();
+        static KORAL_API bool isHeadless();
 
         /**
          * @brief Whether there is a graphics device at all — a window's, or a headless one's.
          *
          * For code that has to answer a question about the device without being able to assume one
-         * exists yet, such as which image formats it supports. @see Image::IsFormatSupported
+         * exists yet, such as which image formats it supports. @see Image::isFormatSupported
          */
-        [[nodiscard]] static KORAL_API bool HasDevice() noexcept;
+        [[nodiscard]] static KORAL_API bool hasDevice() noexcept;
 
         /**
          * @brief Whether the active device supports ray tracing (acceleration structures + the
@@ -160,7 +162,7 @@ namespace kor {
          * crashing, but this lets a caller decide not to attempt ray tracing at all. False under
          * the OpenGL backend, and before any window/headless context exists.
          */
-        static KORAL_API bool SupportsRayTracing();
+        static KORAL_API bool supportsRayTracing();
 
         /**
          * @brief The framebuffer wrapping the swap-chain image this frame presents.
@@ -168,7 +170,7 @@ namespace kor {
          *         uses when called without one. Recreated on resize, so hold it for a frame rather
          *         than for the run.
          */
-        static KORAL_API kor::ResourceRef<const kor::Framebuffer> DefaultFramebuffer();
+        static KORAL_API kor::ResourceRef<const kor::Framebuffer> defaultFramebuffer();
 
         /**
          * @brief Awaitable that moves the rest of a coroutine onto the main thread.
@@ -209,11 +211,16 @@ namespace kor {
          * registering something of its own for the per-frame update. @ref Repository throws in that
          * situation, which is right for a scene (it cannot happen) and wrong for a library.
          */
-        [[nodiscard]] static KORAL_API bool HasRepository() noexcept;
+        [[nodiscard]] static KORAL_API bool hasRepository() noexcept;
 
     private:
         inline static kor::Window* _window = nullptr;
-        inline static kor::Scheduler* _scheduler = nullptr;
+
+        /// Owned outright, and declared rather than defined here: kor::Scheduler is only
+        /// forward-declared in this header, and unique_ptr's destructor needs the complete type.
+        /// Defined in context.cpp, which is also where the rest of this state ought to live.
+        /// @see the note below.
+        static KORAL_API std::unique_ptr<kor::Scheduler> _scheduler;
 
         inline static API _activeAPI = API::eVulkan;
         inline static bool _headless = false;
@@ -222,5 +229,15 @@ namespace kor {
         inline static BackgroundExecutor* _backgroundExecutor   = nullptr;
 
         inline static kor::Repository* _repository = nullptr;
+
+        // These remaining members are `inline static`, which means the definition sits in this
+        // header and every translation unit that odr-uses one emits its own. Under
+        // -fvisibility=hidden that would give the executable and each loaded module a separate
+        // copy — the hazard that moved GUI's font map into gui.cpp. It is latent rather than live
+        // here, because they are private and nothing outside libKoral touches them: a module only
+        // ever reaches this state through the exported accessors above, which are compiled into
+        // the library and read the library's copy. Keep it that way — anything that needs direct
+        // access belongs in a .cpp inside libKoral, and a new member of this kind should be
+        // declared here and defined there, as _scheduler now is.
     };
 }

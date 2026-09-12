@@ -67,22 +67,22 @@ namespace kor
          * @param index Descriptor set number.
          * @return Descriptor set layout associated with @p index.
          */
-        [[nodiscard]] const DescriptorSetLayout& getSetLayout(glm::u32 index) const;
+        [[nodiscard]] const DescriptorSetLayout& descriptorSetLayout(glm::u32 index) const;
 
         /**
          * @brief Lifetime-tracked reference to the descriptor set layout for @p index.
          *
-         * Prefer this over getSetLayout(): a reload can replace the layout, and a raw reference
+         * Prefer this over descriptorSetLayout(): a reload can replace the layout, and a raw reference
          * into _setLayouts would be left dangling by that. A ResourceRef notices instead.
          */
-        [[nodiscard]] ResourceRef<const DescriptorSetLayout> getSetLayoutRef(glm::u32 index) const;
+        [[nodiscard]] ResourceRef<const DescriptorSetLayout> descriptorSetLayoutRef(glm::u32 index) const;
 
         /**
          * @brief Get push-constant range by byte offset.
          * @param offset Byte offset into declared push constant ranges.
          * @return Push-constant range covering @p offset.
          */
-        [[nodiscard]] const Shader::PushConstant& getPushConstantRange(glm::u32 offset) const;
+        [[nodiscard]] const Shader::PushConstant& pushConstantRange(glm::u32 offset) const;
 
         /**
          * @brief One push constant the pipeline's shaders declare, addressed by name.
@@ -115,7 +115,7 @@ namespace kor
         [[nodiscard]] const PushConstantMember* findPushConstant(std::string_view name) const;
 
         /** @brief Every push constant the pipeline declares, by name. For diagnostics. */
-        [[nodiscard]] const std::map<std::string, PushConstantMember, std::less<>>& getPushConstants() const { return _pushConstants; }
+        [[nodiscard]] const std::map<std::string, PushConstantMember, std::less<>>& pushConstants() const { return _pushConstants; }
 
         /** @brief Repository-driven hot reload hook. */
         void automaticUpdate() override;

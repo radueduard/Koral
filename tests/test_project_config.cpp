@@ -598,7 +598,7 @@ protected:
 
     void writeConfig(const std::string_view contents) const
     {
-        std::ofstream out(_root / ProjectConfig::kFileName);
+        std::ofstream out(_root / ProjectConfig::FileName);
         out << contents;
     }
 
@@ -614,7 +614,7 @@ TEST_F(ProjectConfigFile, IsFoundByWalkingUpFromTheSceneLibrary)
     const auto found = ProjectConfig::find(_root / "cmake-build-debug");
 
     ASSERT_TRUE(found.has_value());
-    EXPECT_EQ(*found, _root / ProjectConfig::kFileName);
+    EXPECT_EQ(*found, _root / ProjectConfig::FileName);
 }
 
 TEST_F(ProjectConfigFile, IsNotFoundWhenThereIsNone)
@@ -629,7 +629,7 @@ TEST_F(ProjectConfigFile, RelativeDirectoriesResolveAgainstTheFile)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"], "shaderDirectories": ["shaders"] } })");
 
     ProjectConfig config;
-    const auto result = config.mergeFile(_root / ProjectConfig::kFileName);
+    const auto result = config.mergeFile(_root / ProjectConfig::FileName);
 
     ASSERT_TRUE(result) << result.error().message;
     ASSERT_EQ(config.assetDirectories.size(), 1u);
@@ -652,10 +652,10 @@ TEST_F(ProjectConfigFile, MalformedFileNamesItselfInTheError)
     writeConfig("{ oops");
 
     ProjectConfig config;
-    const auto result = config.mergeFile(_root / ProjectConfig::kFileName);
+    const auto result = config.mergeFile(_root / ProjectConfig::FileName);
 
     ASSERT_FALSE(result);
-    EXPECT_NE(result.error().message.find(ProjectConfig::kFileName), std::string::npos);
+    EXPECT_NE(result.error().message.find(ProjectConfig::FileName), std::string::npos);
 }
 
 // --- resolution ------------------------------------------------------------------------------
@@ -671,7 +671,7 @@ TEST_F(ProjectConfigFile, RegisteredDirectoriesResolveRelativeAssetPaths)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     EXPECT_EQ(kor::assetPath("textures/wood.png"), _root / "assets" / "textures" / "wood.png");
@@ -684,7 +684,7 @@ TEST_F(ProjectConfigFile, RegisteredDirectoriesResolveRelativeShaderPaths)
     writeConfig(R"({ "paths": { "shaderDirectories": ["shaders"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     EXPECT_EQ(kor::shaderPath("blur.comp.glsl"), _root / "shaders" / "blur.comp.glsl");
@@ -701,7 +701,7 @@ TEST_F(ProjectConfigFile, RegisteringDirectoriesKeepsTheEnginesOwnRoots)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     const auto& roots = kor::assetSearchPaths();
@@ -742,7 +742,7 @@ TEST_F(ProjectConfigFile, AConfigRootBeatsTheWorkingDirectory)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     EXPECT_EQ(kor::assetPath("shared.png"), _root / "assets" / "shared.png");

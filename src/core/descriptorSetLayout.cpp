@@ -133,16 +133,7 @@ namespace kor
         return materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout", where);
     }
 
-    std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> DescriptorSetLayout::getBindings() const
-    {
-        std::vector<std::tuple<glm::u32, DescriptorType, glm::u32>> bindings;
-        for (const auto& [binding, description] : _bindings) {
-            bindings.emplace_back(binding, description.type, description.count);
-        }
-        return bindings;
-    }
-
-    DescriptorType DescriptorSetLayout::getBindingType(const glm::u32 binding) const
+    DescriptorType DescriptorSetLayout::bindingType(const glm::u32 binding) const
     {
         if (!_bindings.contains(binding)) {
             throw std::runtime_error("Binding " + std::to_string(binding) + " does not exist in the layout!");

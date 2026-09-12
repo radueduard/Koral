@@ -27,8 +27,8 @@ namespace kcam
     class CameraModule final : public kor::Module
     {
     public:
-        static constexpr std::string_view kModuleId      = kcam::kModuleId;
-        static constexpr std::uint32_t    kModuleVersion = kcam::kModuleVersion;
+        static constexpr std::string_view ModuleId      = kcam::ModuleId;
+        static constexpr std::uint32_t    ModuleVersion = kcam::ModuleVersion;
     };
 }
 

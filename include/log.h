@@ -42,7 +42,7 @@ namespace kor::log {
      * Keyed on the rendered text, so distinct problems never share a budget and a message
      * with a varying value in it (a resource name, a size) is counted separately per value.
      */
-    enum class Repeat {
+    enum class Repeat : std::uint8_t {
         eShow,      ///< Under the limit; log normally.
         eShowLast,  ///< The last permitted showing; log it with the suppression notice attached.
         eSuppress,  ///< Over the limit; drop it.

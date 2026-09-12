@@ -49,7 +49,7 @@ namespace kimg::detail
      * @brief Copies one subimage out of an image into CPU memory.
      *
      * Main thread: it submits and waits on a single-time transfer. The size comes from
-     * kor::Image::SizeOfRegion, so a block-compressed image is measured in blocks.
+     * kor::Image::sizeOfRegion, so a block-compressed image is measured in blocks.
      */
     std::expected<ReadBack, kor::Error> readBack(const kor::ResourceRef<const kor::Image>& image,
                                                  const Subimage& subimage);

@@ -82,7 +82,7 @@ namespace kor
          * — and every binding must agree on it. The index count follows from the index buffer's
          * size and the width of one index the same way.
          */
-        struct KORAL_API Builder : ::Builder
+        struct KORAL_API Builder : kor::Builder
         {
             /**
              * @brief Sets the vertex buffer feeding one binding of the layout.
@@ -136,6 +136,9 @@ namespace kor
             [[nodiscard]] Resource<Mesh> build(std::source_location where = std::source_location::current()) const;
 
         protected:
+            /// Non-const, unlike every other builder input: a Mesh subclass writes through these.
+            /// kmesh::MeshHeap suballocates out of the buffers it holds and uploads into them, so
+            /// what the mesh keeps has to stay writable. @see kmesh::MeshHeap::upload
             std::vector<ResourceRef<Buffer>> _vertexBuffers {};      ///< Indexed by binding, not by order of setting.
             std::optional<ResourceRef<Buffer>> _indexBuffer = std::nullopt;
             ChannelType _indexType = ChannelType::eUInt;
@@ -155,22 +158,22 @@ namespace kor
         virtual ~Mesh() = default;
 
         /** @brief How many vertices the mesh holds, taken from the vertex buffers' size and stride. */
-        [[nodiscard]] glm::u64 getVertexCount() const { return _vertexCount; }
+        [[nodiscard]] glm::u64 vertexCount() const { return _vertexCount; }
 
         /** @brief Whether the mesh has an index buffer, and so whether it can be drawn indexed. */
         [[nodiscard]] bool hasIndexBuffer() const { return _indexBuffer.has_value(); }
 
         /** @brief How many indices the mesh holds, or nullopt if it has no index buffer. */
-        [[nodiscard]] std::optional<glm::u32> getIndexCount() const { return _indexCount; }
+        [[nodiscard]] std::optional<glm::u32> indexCount() const { return _indexCount; }
 
         /** @brief The width of one index — typically ChannelType::eUShort or eUInt — or nullopt if there is no index buffer. */
-        [[nodiscard]] std::optional<ChannelType> getIndexType() const { return _indexType; }
+        [[nodiscard]] std::optional<ChannelType> indexType() const { return _indexType; }
 
         /**
          * @brief The vertex buffers, in binding order.
          * @return One reference per binding the vertex format declares. Index 0 is binding 0.
          */
-        [[nodiscard]] std::vector<kor::ResourceRef<const Buffer>> getVertexBuffers() const
+        [[nodiscard]] std::vector<kor::ResourceRef<const Buffer>> vertexBuffers() const
         {
             std::vector<kor::ResourceRef<const Buffer>> vertexBuffers;
             vertexBuffers.reserve(_vertexBuffers.size());
@@ -185,7 +188,7 @@ namespace kor
         }
 
         /** @brief The index buffer, or nullopt if the mesh is drawn non-indexed. */
-        [[nodiscard]] std::optional<kor::ResourceRef<const Buffer>> getIndexBuffer() const {
+        [[nodiscard]] std::optional<kor::ResourceRef<const Buffer>> indexBuffer() const {
             if (!_indexBuffer.has_value())
                 return std::nullopt;
             return kor::ResourceRef<const Buffer>(*_indexBuffer);
@@ -197,7 +200,7 @@ namespace kor
          * The description a pipeline is matched against: what the mesh holds, by name, with no
          * shader locations in it. @see VertexLayout
          */
-        [[nodiscard]] const VertexLayout& getVertexLayout() const { return _vertexLayout; }
+        [[nodiscard]] const VertexLayout& vertexLayout() const { return _vertexLayout; }
 
         /**
          * @brief The vertex attribute carrying the vertex position, if the mesh declares one.
@@ -208,7 +211,7 @@ namespace kor
          *         does not say which attribute is the position is taken at its first.
          *         @see VertexLayout::positionAttribute
          */
-        [[nodiscard]] const std::optional<VertexInputAttributeDescription>& getPositionAttribute() const { return _positionAttribute; }
+        [[nodiscard]] const std::optional<VertexInputAttributeDescription>& positionAttribute() const { return _positionAttribute; }
 
     protected:
         /**
@@ -287,14 +290,14 @@ namespace kor
         {
             // Keep final buffers transfer-capable as requested, and usable as ray-tracing
             // acceleration structure build input (implies device address) -- but only when the
-            // device actually supports ray tracing (see Context::SupportsRayTracing): not every
+            // device actually supports ray tracing (see Context::supportsRayTracing): not every
             // GPU does, and requesting a buffer usage tied to an extension that was never enabled
             // is itself a Vulkan validation error.
             auto finalUsage = usage
                 | Buffer::Usage::eTransferDst
                 | Buffer::Usage::eTransferSrc
                 | Buffer::Usage::eStorage;
-            if (kor::Context::SupportsRayTracing()) {
+            if (kor::Context::supportsRayTracing()) {
                 finalUsage |= Buffer::Usage::eAccelerationStructureInput;
             }
 

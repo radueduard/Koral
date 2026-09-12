@@ -29,8 +29,8 @@ namespace kmesh
      */
     struct TLSFAllocation
     {
-        uint64_t offset; ///< Element offset into the backing heap.
-        uint64_t size;   ///< Number of elements actually reserved (may exceed requested due to block granularity).
+        std::uint64_t offset; ///< Element offset into the backing heap.
+        std::uint64_t size;   ///< Number of elements actually reserved (may exceed requested due to block granularity).
     };
 
     /**
@@ -59,14 +59,14 @@ namespace kmesh
         static constexpr int SL_INDEX_COUNT      = 1 << SL_INDEX_COUNT_LOG2; // 32
         static constexpr int FL_INDEX_SHIFT      = SL_INDEX_COUNT_LOG2;
         static constexpr int FL_INDEX_MAX        = 32;                      // supports allocations up to 2^32 elements
-        static constexpr uint64_t MIN_BLOCK_SIZE = SL_INDEX_COUNT;          // 32 elements minimum
+        static constexpr std::uint64_t MIN_BLOCK_SIZE = SL_INDEX_COUNT;          // 32 elements minimum
 
         /**
          * @brief Creates an allocator over a heap of @p capacity elements.
          * @param capacity How many elements the backing heap holds.
          * @throws std::invalid_argument if @p capacity is below MIN_BLOCK_SIZE.
          */
-        explicit TLSFAllocator(uint64_t capacity)
+        explicit TLSFAllocator(std::uint64_t capacity)
             : _capacity(capacity)
         {
             if (capacity < MIN_BLOCK_SIZE)
@@ -79,7 +79,7 @@ namespace kmesh
             // one free block covering the whole capacity.
             _pool.push_back(Block{});   // index 0 = null sentinel
 
-            const uint32_t rootIdx = newBlock();
+            const std::uint32_t rootIdx = newBlock();
             Block& root = _pool[rootIdx];
             root.offset   = 0;
             root.size     = capacity;
@@ -104,25 +104,25 @@ namespace kmesh
          * @return The reserved range, or nullopt when no free block is large enough. The range may
          *         be larger than requested: allocations are rounded up to the block granularity.
          */
-        [[nodiscard]] std::optional<TLSFAllocation> Allocate(uint64_t numElements)
+        [[nodiscard]] std::optional<TLSFAllocation> Allocate(std::uint64_t numElements)
         {
             if (numElements == 0) return std::nullopt;
 
-            const uint64_t size = std::max(numElements, MIN_BLOCK_SIZE);
+            const std::uint64_t size = std::max(numElements, MIN_BLOCK_SIZE);
 
             int fl, sl;
             mappingSearch(size, fl, sl);
 
-            const uint32_t blockIdx = findSuitableBlock(fl, sl);
+            const std::uint32_t blockIdx = findSuitableBlock(fl, sl);
             if (blockIdx == 0) return std::nullopt;
 
             removeFreeBlock(blockIdx);
 
             // Split if the remainder is large enough
-            const uint64_t remaining = _pool[blockIdx].size - size;
+            const std::uint64_t remaining = _pool[blockIdx].size - size;
             if (remaining >= MIN_BLOCK_SIZE)
             {
-                const uint32_t splitIdx = newBlock();
+                const std::uint32_t splitIdx = newBlock();
                 Block& blk   = _pool[blockIdx]; // re-fetch after potential reallocation
                 Block& split = _pool[splitIdx];
 
@@ -155,29 +155,29 @@ namespace kmesh
          */
         void Free(TLSFAllocation alloc)
         {
-            const uint32_t blockIdx = findBlockByOffset(alloc.offset);
+            const std::uint32_t blockIdx = findBlockByOffset(alloc.offset);
             assert(blockIdx != 0 && "TLSFAllocator::Free: invalid offset");
             assert(!_pool[blockIdx].isFree && "TLSFAllocator::Free: double free");
 
             _allocated -= _pool[blockIdx].size;
             _pool[blockIdx].isFree = true;
 
-            const uint32_t merged = mergeBlock(blockIdx);
+            const std::uint32_t merged = mergeBlock(blockIdx);
             insertFreeBlock(merged);
         }
 
         /** @brief How many elements the heap holds in total. */
-        [[nodiscard]] uint64_t Capacity()  const { return _capacity;  }
+        [[nodiscard]] std::uint64_t Capacity()  const { return _capacity;  }
 
         /** @brief How many elements are currently reserved, including block-granularity rounding. */
-        [[nodiscard]] uint64_t Allocated() const { return _allocated; }
+        [[nodiscard]] std::uint64_t Allocated() const { return _allocated; }
 
         /**
          * @brief How many elements are unreserved.
          * @return Capacity minus Allocated. Not a promise that a single allocation of that size will
          *         succeed: the free space may be spread over several blocks.
          */
-        [[nodiscard]] uint64_t Available() const { return _capacity - _allocated; }
+        [[nodiscard]] std::uint64_t Available() const { return _capacity - _allocated; }
 
     private:
         // =====================================================================
@@ -185,50 +185,50 @@ namespace kmesh
         // =====================================================================
         struct Block
         {
-            uint64_t offset   = 0;
-            uint64_t size     = 0;
+            std::uint64_t offset   = 0;
+            std::uint64_t size     = 0;
             bool     isFree   = false;
 
-            uint32_t prevFree = 0; ///< Previous block in the same segregated free list (0 = none)
-            uint32_t nextFree = 0; ///< Next block in the same segregated free list    (0 = none)
+            std::uint32_t prevFree = 0; ///< Previous block in the same segregated free list (0 = none)
+            std::uint32_t nextFree = 0; ///< Next block in the same segregated free list    (0 = none)
 
-            uint32_t prevPhys = 0; ///< Physical predecessor in address order (0 = none)
-            uint32_t nextPhys = 0; ///< Physical successor  in address order  (0 = none)
+            std::uint32_t prevPhys = 0; ///< Physical predecessor in address order (0 = none)
+            std::uint32_t nextPhys = 0; ///< Physical successor  in address order  (0 = none)
         };
 
-        uint64_t _capacity  = 0;
-        uint64_t _allocated = 0;
+        std::uint64_t _capacity  = 0;
+        std::uint64_t _allocated = 0;
 
         // Two-level bitmaps
-        uint32_t _flBitmap = 0;
-        std::array<uint32_t, FL_INDEX_MAX> _slBitmap{};
+        std::uint32_t _flBitmap = 0;
+        std::array<std::uint32_t, FL_INDEX_MAX> _slBitmap{};
 
         // Segregated free lists: _freeLists[fl][sl] = index of head block (0 = empty)
-        std::array<std::array<uint32_t, SL_INDEX_COUNT>, FL_INDEX_MAX> _freeLists{};
+        std::array<std::array<std::uint32_t, SL_INDEX_COUNT>, FL_INDEX_MAX> _freeLists{};
 
         // Block pool (index 0 is null sentinel, never used for real blocks)
         std::vector<Block> _pool;
 
         // Intrusive free-node list for recycling pool slots
-        uint32_t _freeNodeHead = 0;
+        std::uint32_t _freeNodeHead = 0;
 
         // =====================================================================
         // Pool management
         // =====================================================================
-        uint32_t newBlock()
+        std::uint32_t newBlock()
         {
             if (_freeNodeHead != 0)
             {
-                const uint32_t idx = _freeNodeHead;
+                const std::uint32_t idx = _freeNodeHead;
                 _freeNodeHead = _pool[idx].nextFree;
                 _pool[idx] = Block{};
                 return idx;
             }
             _pool.push_back(Block{});
-            return static_cast<uint32_t>(_pool.size() - 1);
+            return static_cast<std::uint32_t>(_pool.size() - 1);
         }
 
-        void recycleBlock(uint32_t idx)
+        void recycleBlock(std::uint32_t idx)
         {
             _pool[idx] = Block{};
             _pool[idx].nextFree = _freeNodeHead;
@@ -238,9 +238,9 @@ namespace kmesh
         // =====================================================================
         // TLSF index mapping
         // =====================================================================
-        static void mappingInsert(uint64_t size, int& fl, int& sl)
+        static void mappingInsert(std::uint64_t size, int& fl, int& sl)
         {
-            if (size < static_cast<uint64_t>(MIN_BLOCK_SIZE))
+            if (size < static_cast<std::uint64_t>(MIN_BLOCK_SIZE))
             {
                 fl = 0;
                 sl = static_cast<int>(size * SL_INDEX_COUNT / MIN_BLOCK_SIZE);
@@ -256,11 +256,11 @@ namespace kmesh
         }
 
         // Round size UP to guarantee a suitable free block is found
-        static void mappingSearch(uint64_t size, int& fl, int& sl)
+        static void mappingSearch(std::uint64_t size, int& fl, int& sl)
         {
-            if (size >= static_cast<uint64_t>(MIN_BLOCK_SIZE))
+            if (size >= static_cast<std::uint64_t>(MIN_BLOCK_SIZE))
             {
-                const uint64_t round = (1ULL << (63 - std::countl_zero(size) - SL_INDEX_COUNT_LOG2)) - 1;
+                const std::uint64_t round = (1ULL << (63 - std::countl_zero(size) - SL_INDEX_COUNT_LOG2)) - 1;
                 size += round;
             }
             mappingInsert(size, fl, sl);
@@ -269,7 +269,7 @@ namespace kmesh
         // =====================================================================
         // Free list management
         // =====================================================================
-        void insertFreeBlock(uint32_t idx)
+        void insertFreeBlock(std::uint32_t idx)
         {
             int fl, sl;
             mappingInsert(_pool[idx].size, fl, sl);
@@ -285,7 +285,7 @@ namespace kmesh
             _slBitmap[fl] |= (1u << sl);
         }
 
-        void removeFreeBlock(uint32_t idx)
+        void removeFreeBlock(std::uint32_t idx)
         {
             int fl, sl;
             mappingInsert(_pool[idx].size, fl, sl);
@@ -312,10 +312,10 @@ namespace kmesh
         // =====================================================================
         // Block search
         // =====================================================================
-        uint32_t findSuitableBlock(int fl, int sl) const
+        std::uint32_t findSuitableBlock(int fl, int sl) const
         {
             // Look in the same fl bucket first, at sl or higher
-            uint32_t slMap = _slBitmap[fl] & (~0u << sl);
+            std::uint32_t slMap = _slBitmap[fl] & (~0u << sl);
             if (slMap != 0)
             {
                 const int foundSl = std::countr_zero(slMap);
@@ -323,7 +323,7 @@ namespace kmesh
             }
 
             // Search higher fl buckets
-            const uint32_t flMap = _flBitmap & (~0u << (fl + 1));
+            const std::uint32_t flMap = _flBitmap & (~0u << (fl + 1));
             if (flMap == 0) return 0; // out of memory
 
             const int foundFl = std::countr_zero(flMap);
@@ -332,9 +332,9 @@ namespace kmesh
         }
 
         // Linear scan by offset — only called on Free(); acceptable cost.
-        uint32_t findBlockByOffset(uint64_t offset) const
+        std::uint32_t findBlockByOffset(std::uint64_t offset) const
         {
-            for (uint32_t i = 1; i < static_cast<uint32_t>(_pool.size()); ++i)
+            for (std::uint32_t i = 1; i < static_cast<std::uint32_t>(_pool.size()); ++i)
             {
                 if (_pool[i].offset == offset && !_pool[i].isFree)
                     return i;
@@ -345,10 +345,10 @@ namespace kmesh
         // =====================================================================
         // Coalescing
         // =====================================================================
-        uint32_t mergeBlock(uint32_t idx)
+        std::uint32_t mergeBlock(std::uint32_t idx)
         {
             // Merge with next physical block if free
-            const uint32_t nextIdx = _pool[idx].nextPhys;
+            const std::uint32_t nextIdx = _pool[idx].nextPhys;
             if (nextIdx != 0 && _pool[nextIdx].isFree)
             {
                 removeFreeBlock(nextIdx);
@@ -360,7 +360,7 @@ namespace kmesh
             }
 
             // Merge with previous physical block if free
-            const uint32_t prevIdx = _pool[idx].prevPhys;
+            const std::uint32_t prevIdx = _pool[idx].prevPhys;
             if (prevIdx != 0 && _pool[prevIdx].isFree)
             {
                 removeFreeBlock(prevIdx);

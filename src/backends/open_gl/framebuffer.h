@@ -19,7 +19,6 @@ namespace kor::ogl {
         GLuint operator*() const;
         void Bind() const override;
         void Unbind() const override;
-        [[nodiscard]] bool hasDepthStencilAttachment() const;
 
     private:
         /// Point every GL attachment at its image's *current* texture, and report the result.

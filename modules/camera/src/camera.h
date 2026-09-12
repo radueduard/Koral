@@ -109,7 +109,7 @@ namespace kcam
          */
         void automaticUpdate() override
         {
-            _controller.update(*this, kor::Time::FrameTime());
+            _controller.update(*this, kor::Time::frameTime());
             _semanticBuffers.refresh(*this);
         }
 
@@ -126,26 +126,26 @@ namespace kcam
         {
             namespace sem = kcam::semantics;
 
-            if (semantic == sem::kViewMatrix)           { slot.set(view()); return true; }
-            if (semantic == sem::kProjectionMatrix)     { slot.set(projection()); return true; }
-            if (semantic == sem::kViewProjectionMatrix) { slot.set(viewProjection()); return true; }
+            if (semantic == sem::ViewMatrix)           { slot.set(view()); return true; }
+            if (semantic == sem::ProjectionMatrix)     { slot.set(projection()); return true; }
+            if (semantic == sem::ViewProjectionMatrix) { slot.set(viewProjection()); return true; }
 
-            if (semantic == sem::kInverseViewMatrix)       { slot.set(glm::inverse(view())); return true; }
-            if (semantic == sem::kInverseProjectionMatrix) { slot.set(glm::inverse(projection())); return true; }
-            if (semantic == sem::kInverseViewProjectionMatrix) {
+            if (semantic == sem::InverseViewMatrix)       { slot.set(glm::inverse(view())); return true; }
+            if (semantic == sem::InverseProjectionMatrix) { slot.set(glm::inverse(projection())); return true; }
+            if (semantic == sem::InverseViewProjectionMatrix) {
                 slot.set(glm::inverse(viewProjection()));
                 return true;
             }
 
-            if (semantic == sem::kPosition) { slot.set(position()); return true; }
-            if (semantic == sem::kForward)  { slot.set(forward()); return true; }
-            if (semantic == sem::kUp)       { slot.set(rotation() * glm::vec3(0.f, 1.f, 0.f)); return true; }
-            if (semantic == sem::kRight)    { slot.set(rotation() * glm::vec3(1.f, 0.f, 0.f)); return true; }
+            if (semantic == sem::Position) { slot.set(position()); return true; }
+            if (semantic == sem::Forward)  { slot.set(forward()); return true; }
+            if (semantic == sem::Up)       { slot.set(rotation() * glm::vec3(0.f, 1.f, 0.f)); return true; }
+            if (semantic == sem::Right)    { slot.set(rotation() * glm::vec3(1.f, 0.f, 0.f)); return true; }
 
             const glm::vec4 depth = depthRange();
-            if (semantic == sem::kNearPlane)  { slot.set(depth.x); return true; }
-            if (semantic == sem::kFarPlane)   { slot.set(depth.y); return true; }
-            if (semantic == sem::kDepthRange) { slot.set(depth); return true; }
+            if (semantic == sem::NearPlane)  { slot.set(depth.x); return true; }
+            if (semantic == sem::FarPlane)   { slot.set(depth.y); return true; }
+            if (semantic == sem::DepthRange) { slot.set(depth); return true; }
 
             return false;   // not ours: reported against the field that asked for it
         }

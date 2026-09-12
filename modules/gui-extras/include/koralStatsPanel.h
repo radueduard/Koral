@@ -50,7 +50,7 @@ namespace kgui
     {
     public:
         /** @brief How many frames of history the plot and the statistics cover. */
-        static constexpr std::size_t kHistory = 240;
+        static constexpr std::size_t History = 240;
 
         /**
          * @brief Draws the window.
@@ -103,10 +103,10 @@ namespace kgui
         /** @brief Records this frame's time, oldest sample falling off the end. */
         void sample()
         {
-            const float milliseconds = kor::Time::FrameTime() * 1000.f;
+            const float milliseconds = kor::Time::frameTime() * 1000.f;
             _frames[_next] = milliseconds;
-            _next = (_next + 1) % kHistory;
-            if (_filled < kHistory) ++_filled;
+            _next = (_next + 1) % History;
+            if (_filled < History) ++_filled;
         }
 
         /** @brief mean, worst, and the 99th percentile of the window, in milliseconds. */
@@ -116,7 +116,7 @@ namespace kgui
         {
             if (_filled == 0) return {};
 
-            std::array<float, kHistory> sorted { };
+            std::array<float, History> sorted { };
             float total = 0.f;
             for (std::size_t i = 0; i < _filled; ++i) {
                 sorted[i] = _frames[i];
@@ -151,14 +151,14 @@ namespace kgui
             // of clipping off the top; the floor keeps a steady run from looking like noise.
             const float ceiling = std::max(summary.worst * 1.2f, 20.f);
             ImGui::PlotLines("##frames", _frames.data(), static_cast<int>(_filled),
-                             static_cast<int>(_next % kHistory), nullptr, 0.f, ceiling, ImVec2(-FLT_MIN, 60.f));
+                             static_cast<int>(_next % History), nullptr, 0.f, ceiling, ImVec2(-FLT_MIN, 60.f));
 
-            ImGui::TextDisabled("%.1f s since the window opened", kor::Time::WindowTime());
+            ImGui::TextDisabled("%.1f s since the window opened", kor::Time::windowTime());
         }
 
         static void drawResources()
         {
-            if (!kor::Context::HasRepository()) {
+            if (!kor::Context::hasRepository()) {
                 ImGui::TextDisabled("no repository yet");
                 return;
             }
@@ -191,7 +191,7 @@ namespace kgui
             ImGui::EndTable();
         }
 
-        std::array<float, kHistory> _frames { };
+        std::array<float, History> _frames { };
         std::size_t _next = 0;
         std::size_t _filled = 0;
         std::map<std::string, std::string> _counters;   // ordered, so rows do not jump about

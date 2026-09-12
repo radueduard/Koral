@@ -70,7 +70,7 @@ TEST(Module, ALinkedModuleIsInTheSetWithoutBeingAskedFor)
     // This binary links koral-mesh, for the vertex formats the layout tests use. Linking is the
     // whole request: the library's registrar ran as it was loaded, so the module is in the set
     // with nothing named in a config and nothing loaded by hand. @see kor::ModuleRegistrar
-    const auto loaded = ModuleHost::LoadedModules();
+    const auto loaded = ModuleHost::loadedModules();
     EXPECT_NE(std::ranges::find(loaded, "koral.mesh"), loaded.end());
 }
 
@@ -89,13 +89,13 @@ namespace
     constexpr kor::ModuleDescriptor kAlone { .id = "test.alone", .version = 1 };
 
     constexpr kor::Dependency kNeedsMissing[] {
-        kor::Dependency{ "test.absent", 1, kor::Dependency::eRequired } };
+        kor::Dependency{ "test.absent", 1, kor::Dependency::Kind::eRequired } };
     constexpr kor::ModuleDescriptor kDependent {
         .id = "test.dependent", .version = 1,
         .dependencies = kNeedsMissing, .dependencyCount = 1 };
 
     constexpr kor::Dependency kOptionalMissing[] {
-        kor::Dependency{ "test.absent", 1, kor::Dependency::eOptional } };
+        kor::Dependency{ "test.absent", 1, kor::Dependency::Kind::eOptional } };
     constexpr kor::ModuleDescriptor kOptionalDependent {
         .id = "test.optional", .version = 1,
         .dependencies = kOptionalMissing, .dependencyCount = 1 };
@@ -112,7 +112,7 @@ TEST_F(ModuleRegistry, RegisteringAModuleMakesItPartOfTheSet)
     ModuleHost::Register(&kAlone, &createTestModule);
     ASSERT_TRUE(ModuleHost::Resolve());
 
-    const auto loaded = ModuleHost::LoadedModules();
+    const auto loaded = ModuleHost::loadedModules();
     ASSERT_EQ(loaded.size(), 1u);
     EXPECT_EQ(loaded.front(), "test.alone");
 }
@@ -124,7 +124,7 @@ TEST_F(ModuleRegistry, RegisteringTheSameModuleTwiceLoadsItOnce)
     ModuleHost::Register(&kAlone, &createTestModule);
 
     ASSERT_TRUE(ModuleHost::Resolve());
-    EXPECT_EQ(ModuleHost::LoadedModules().size(), 1u);
+    EXPECT_EQ(ModuleHost::loadedModules().size(), 1u);
 }
 
 TEST_F(ModuleRegistry, GarbageRegistrationsAreIgnored)
@@ -133,7 +133,7 @@ TEST_F(ModuleRegistry, GarbageRegistrationsAreIgnored)
     ModuleHost::Register(&kAlone, nullptr);
 
     ASSERT_TRUE(ModuleHost::Resolve());
-    EXPECT_TRUE(ModuleHost::LoadedModules().empty());
+    EXPECT_TRUE(ModuleHost::loadedModules().empty());
 }
 
 TEST_F(ModuleRegistry, AMissingRequiredDependencyFailsResolveAndNamesBoth)
@@ -152,5 +152,5 @@ TEST_F(ModuleRegistry, AMissingOptionalDependencyIsFine)
     ModuleHost::Register(&kOptionalDependent, &createTestModule);
 
     ASSERT_TRUE(ModuleHost::Resolve());
-    EXPECT_EQ(ModuleHost::LoadedModules().size(), 1u);
+    EXPECT_EQ(ModuleHost::loadedModules().size(), 1u);
 }

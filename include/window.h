@@ -43,7 +43,7 @@ namespace kor {
      *
      * A scene does not normally construct one. The runtime builds the window from the project's
      * configuration before the first frame and drives it; reach the live one through
-     * Context::Window() and the image being drawn to through getFramebuffer().
+     * Context::Window() and the image being drawn to through framebuffer().
      *
      * There is one window per process. It is neither copyable nor thread-safe: every method here
      * must be called from the thread that created it, which is the thread the scene is driven on.
@@ -221,7 +221,7 @@ namespace kor {
         [[nodiscard]] GLFWwindow* operator*() const { return _window; }
 
         /** @brief Current size of the drawable area in pixels, which is not the window's outer size on a scaled display. */
-        [[nodiscard]] glm::uvec2 getExtent() const { return _extent; }
+        [[nodiscard]] glm::uvec2 extent() const { return _extent; }
 
         /**
          * @brief Whether the window currently has no drawable area, i.e. it is minimized.
@@ -245,16 +245,16 @@ namespace kor {
         void pause() { _paused = true; }
 
         /** @brief Clears the paused state, so rendering resumes. */
-        void unPause() { _paused = false; }
+        void unpause() { _paused = false; }
 
         /** @brief Changes the text in the title bar. */
         void setTitle(const std::string &title);
 
         /** @brief The graphics backend this window was brought up on. */
-        [[nodiscard]] API getAPI() const { return _api; }
+        [[nodiscard]] API aPI() const { return _api; }
 
         /** @brief The text currently in the title bar. */
-        [[nodiscard]] const std::string& getTitle() const { return _title; }
+        [[nodiscard]] const std::string& title() const { return _title; }
 
         /**
          * @brief The file Dear ImGui persists its layout to, or empty for ImGui's own default.
@@ -262,7 +262,7 @@ namespace kor {
          * The string itself backs ImGui's io.IniFilename, which keeps the pointer rather than a
          * copy, so it stays valid for as long as the window does.
          */
-        [[nodiscard]] const std::string& getImguiIniPath() const { return _imguiIni; }
+        [[nodiscard]] const std::string& imguiIniPath() const { return _imguiIni; }
 
         /**
          * @brief The default framebuffer: the swap-chain image this frame is presented from.
@@ -270,7 +270,7 @@ namespace kor {
          * This is what a scene renders into when it opens a pass without naming a framebuffer. It
          * is recreated on resize, so hold the reference for a frame, not for the run.
          */
-        [[nodiscard]] kor::ResourceRef<kor::Framebuffer> getFramebuffer() const;
+        [[nodiscard]] kor::ResourceRef<kor::Framebuffer> framebuffer() const;
 
         /**
          * @brief Whether the drawable area changed size since the last frame.
@@ -282,7 +282,7 @@ namespace kor {
         [[nodiscard]] bool hasResized() const { return _hasResized; }
 
         /** @brief The presentation surface the swap chain was created for. */
-        [[nodiscard]] const kor::Surface& getSurface() const { return *_surface; }
+        [[nodiscard]] const kor::Surface& surface() const { return *_surface; }
 
         /**
          * @brief Loads an image from disk and makes it the window's icon.

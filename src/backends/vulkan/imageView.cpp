@@ -21,9 +21,9 @@ namespace kor::vk
     void ImageView::build() const
     {
         ::vk::ImageAspectFlags aspectMask = ::vk::ImageAspectFlagBits::eColor;
-        if (kor::IsDepthStencilFormat(_image->getFormat())) {
+        if (kor::isDepthStencilFormat(_image->format())) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (kor::IsStencilFormat(_image->getFormat())) {
+            if (kor::isStencilFormat(_image->format())) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         }
@@ -33,7 +33,7 @@ namespace kor::vk
             auto viewInfo = ::vk::ImageViewCreateInfo()
                 .setImage(image)
                 .setViewType(getVkImageViewType(_viewType))
-                .setFormat(getVkFormat(_image->getFormat()))
+                .setFormat(getVkFormat(_image->format()))
                 .setComponents(::vk::ComponentMapping()
                     .setR(getVkComponentSwizzle(_componentMapping.r))
                     .setG(getVkComponentSwizzle(_componentMapping.g))
@@ -75,7 +75,7 @@ namespace kor::vk
     ::vk::ImageView ImageView::operator*() const
     {
         refreshIfStale();
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
         return _imageViews[currentFrame];
     }
 

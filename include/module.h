@@ -23,7 +23,7 @@
  * // in the module's public header, exported with the module's own API macro
  * class KCAM_API PerspectiveCamera : public kor::AutoUpdatable {
  * public:
- *     struct KCAM_API Builder : ::Builder { ... };
+ *     struct KCAM_API Builder : kor::Builder { ... };
  * };
  *
  * // in the module's implementation, once, at namespace scope
@@ -152,15 +152,15 @@ namespace kor
     struct Dependency
     {
         /** @brief Whether the dependent module can run without it. */
-        enum Kind : std::uint8_t
+        enum class Kind : std::uint8_t
         {
             eRequired,  ///< Startup fails, naming both modules, if it is missing.
             eOptional,  ///< Absence is fine; the dependent module copes without it.
         };
 
-        std::string_view id;                ///< The other module's kModuleId.
-        std::uint32_t version = 1;          ///< The other module's kModuleVersion, as compiled against.
-        Kind kind = eRequired;              ///< Whether it may be absent.
+        std::string_view id;                ///< The other module's ModuleId.
+        std::uint32_t version = 1;          ///< The other module's ModuleVersion, as compiled against.
+        Kind kind = Kind::eRequired;        ///< Whether it may be absent.
     };
 
     /**
@@ -252,7 +252,7 @@ namespace kor
         static KORAL_API void Shutdown();
 
         /** @brief Names of the loaded modules, in dependency order. For diagnostics and the GUI. */
-        [[nodiscard]] static KORAL_API std::vector<std::string_view> LoadedModules();
+        [[nodiscard]] static KORAL_API std::vector<std::string_view> loadedModules();
 
         // ---- per-frame dispatch, in the order the run loop calls them ----
         static KORAL_API void Update();
@@ -282,7 +282,7 @@ namespace kor
 /**
  * @brief Declares a module: how it announces itself, and how the runtime constructs it.
  * @param ImplType The concrete class, which must derive from kor::Module and carry
- *        `kModuleId` / `kModuleVersion` (inherited from a base is fine).
+ *        `ModuleId` / `ModuleVersion` (inherited from a base is fine).
  *
  * Expands to three things: a descriptor, a registrar that hands both to the runtime when the
  * library is loaded, and the pair of exported entry points the runtime uses when it loads a module
@@ -301,8 +301,8 @@ namespace kor
  *
  * @code
  * KORAL_DECLARE_MODULE_DEPS(ECSModule,
- *     kor::Dependency{ kcam::kModuleId,  kcam::kModuleVersion },
- *     kor::Dependency{ kphys::kModuleId, kphys::kModuleVersion, kor::Dependency::eOptional })
+ *     kor::Dependency{ kcam::ModuleId,  kcam::ModuleVersion },
+ *     kor::Dependency{ kphys::ModuleId, kphys::ModuleVersion, kor::Dependency::Kind::eOptional })
  * @endcode
  */
 #define KORAL_DECLARE_MODULE_DEPS(ImplType, ...)                                        \
@@ -311,8 +311,8 @@ namespace kor
         /* zero-length array is not a thing; the loader skips those.                 */ \
         constexpr kor::Dependency korModuleDependencies_[] { __VA_ARGS__ };             \
         constexpr kor::ModuleDescriptor korModuleDescriptor_ {                          \
-            ImplType::kModuleId,                                                        \
-            ImplType::kModuleVersion,                                                   \
+            ImplType::ModuleId,                                                        \
+            ImplType::ModuleVersion,                                                   \
             korModuleDependencies_,                                                     \
             sizeof(korModuleDependencies_) / sizeof(kor::Dependency),                   \
         };                                                                              \

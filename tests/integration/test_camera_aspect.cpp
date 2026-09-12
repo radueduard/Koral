@@ -28,7 +28,7 @@ kor::Resource<kor::Image> colorImage(const glm::uvec2 extent)
 {
     return kor::Image::Builder()
         .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .addUsage(kor::Image::Usage::eColorAttachment)
+        .setUsage(kor::Image::Usage::eColorAttachment)
         .setExtent(extent)
         .build();
 }
@@ -59,7 +59,7 @@ TEST_F(CameraAspect, ACameraCanFollowAWholeFramebufferInstead)
     ASSERT_TRUE(color);
     auto view = kor::ImageView::Builder(color).build();
     ASSERT_TRUE(view);
-    auto framebuffer = kor::Framebuffer::Builder().addColorAttachment(view).build();
+    auto framebuffer = kor::Framebuffer::Builder().addColor({ .view = view }).build();
     ASSERT_TRUE(framebuffer);
 
     const auto camera = PerspectiveCamera::Builder{}.followAspectOf(framebuffer).build();

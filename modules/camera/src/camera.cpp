@@ -19,15 +19,15 @@ namespace kcam
             return std::nullopt;
         case Kind::eWindow:
             // A job has no window to follow; the aspect stays as it was configured.
-            if (kor::Context::IsHeadless()) return std::nullopt;
-            return kor::Context::Window().getExtent();
+            if (kor::Context::isHeadless()) return std::nullopt;
+            return kor::Context::Window().extent();
         case Kind::eFramebuffer:
             if (!framebuffer.valid()) return std::nullopt;
-            return framebuffer->getExtent();
+            return framebuffer->extent();
         case Kind::eImage:
             // Depth is not part of a shape on screen; a 3D image is followed by its face.
             if (!image.valid()) return std::nullopt;
-            return glm::uvec2(image->getExtent());
+            return glm::uvec2(image->extent());
         }
         return std::nullopt;
     }

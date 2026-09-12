@@ -23,7 +23,7 @@ namespace kor
     struct BufferDescriptor {
         ResourceRef<const Buffer> _buffer;  ///< The buffer.
         glm::i64 _offset = 0;               ///< Byte offset the shader's view of it starts at.
-        glm::i64 _range = 0;                ///< How many bytes it covers; 0 means the rest of the buffer.
+        glm::i64 _range = 0;                ///< How many bytes it covers; 0 means the rest. @see BufferView::Builder::range
     };
 
     /** @brief An image bound to a shader without a sampler — a storage image, or a separate sampled image. */
@@ -113,34 +113,34 @@ namespace kor
         [[nodiscard]] const std::optional<Error>& error() const { return _error; }
 
         /** @brief The bound buffer. @throws if this descriptor holds something else. */
-        [[nodiscard]] const Buffer& getBuffer() const;
+        [[nodiscard]] const Buffer& buffer() const;
         /** @brief Byte offset into the bound buffer. @throws if this descriptor holds something else. */
-        [[nodiscard]] glm::i64 getOffset() const;
+        [[nodiscard]] glm::i64 offset() const;
         /** @brief How many bytes of the bound buffer are visible. @throws if this descriptor holds something else. */
-        [[nodiscard]] glm::i64 getRange() const;
+        [[nodiscard]] glm::i64 range() const;
         /** @brief The bound image view. @throws if this descriptor holds something else. */
-        [[nodiscard]] const ImageView& getImageView() const;
+        [[nodiscard]] const ImageView& imageView() const;
         /** @brief The bound sampler. @throws if this descriptor holds something else. */
-        [[nodiscard]] const Sampler& getSampler() const;
+        [[nodiscard]] const Sampler& sampler() const;
         /** @brief The bound acceleration structure. @throws if this descriptor holds something else. */
-        [[nodiscard]] const AccelerationStructure& getAccelerationStructure() const;
+        [[nodiscard]] const AccelerationStructure& accelerationStructure() const;
         /** @brief The bound buffer view. @throws if this descriptor holds something else. */
-        [[nodiscard]] const BufferView& getBufferView() const;
+        [[nodiscard]] const BufferView& bufferView() const;
 
         /**
          * @brief The bound buffer, or an empty reference if this descriptor holds something else.
          *
-         * The non-throwing counterpart of getBuffer(), for code that walks a whole set without
+         * The non-throwing counterpart of buffer(), for code that walks a whole set without
          * knowing what each slot holds — the barrier resolver does exactly that, and a bindless
          * array is routinely sparse.
          */
-        [[nodiscard]] ResourceRef<const Buffer> getBufferRef() const;
+        [[nodiscard]] ResourceRef<const Buffer> bufferRef() const;
 
         /** @brief The bound image view, or an empty reference if this descriptor holds something else. */
-        [[nodiscard]] ResourceRef<const ImageView> getImageViewRef() const;
+        [[nodiscard]] ResourceRef<const ImageView> imageViewRef() const;
 
         /** @brief The bound buffer view, or an empty reference if this descriptor holds something else. */
-        [[nodiscard]] ResourceRef<const BufferView> getBufferViewRef() const;
+        [[nodiscard]] ResourceRef<const BufferView> bufferViewRef() const;
 
     protected:
         bool valid = false;

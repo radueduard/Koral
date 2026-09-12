@@ -71,12 +71,11 @@
 namespace kimg
 {
     /** @brief This module's identity, for another module that declares a dependency on it. */
-    inline constexpr std::string_view kExportModuleId = "koral.image.export";
-    inline constexpr std::uint32_t    kExportModuleVersion = 1;
+    inline constexpr std::string_view ExportModuleId = "koral.image.export";
+    inline constexpr std::uint32_t    ExportModuleVersion = 1;
 
     /** @brief Which container to write. The file's extension follows from it. */
-    enum class FileFormat
-    {
+    enum class FileFormat : std::uint8_t {
         ePNG,   ///< 8- or 16-bit, lossless, alpha. The default for a screenshot.
         eJPG,   ///< 8-bit, lossy, no alpha.
         eBMP,

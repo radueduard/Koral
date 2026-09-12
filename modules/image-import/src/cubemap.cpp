@@ -68,13 +68,20 @@ namespace kimg
             // create flag on exactly that shape. @see kor::ImageView::Type::eCube
             warnAboutOpenGlOnce();
 
+            // Sampled as a cube map, uploaded into, and read back when the mip chain is built —
+            // named in full because setUsage replaces the default set rather than adding to it.
+            auto usage = kor::Image::Usage::eSampled
+                       | kor::Image::Usage::eTransferSrc
+                       | kor::Image::Usage::eTransferDst;
+            if (storage) usage |= kor::Image::Usage::eStorage;
+
             auto builder = kor::Image::Builder()
                 .setType(kor::Image::Type::e2D)
                 .setExtent({ faceExtent.x, faceExtent.y, 1 })
                 .setArrayLayers(kFaceCount)
                 .setMipLevels(generateMipmaps ? 0 : 1)
-                .setFormat(format);
-            if (storage) builder.addUsage(kor::Image::Usage::eStorage);
+                .setFormat(format)
+                .setUsage(usage);
             return builder.build();
         }
 
@@ -251,7 +258,7 @@ namespace kimg
             return failure("cannot project an equirectangular image that could not be loaded");
         }
 
-        const auto sourceExtent = equirect->getExtent();
+        const auto sourceExtent = equirect->extent();
         if (faceSize == 0) {
             // A quarter of the panorama's width: the point at which a face's texels are about as
             // dense as the source's, so the projection neither invents nor discards detail.
@@ -269,13 +276,13 @@ namespace kimg
         const auto equirectView = kor::ImageView::Builder(equirect).build();
         // The cube seen as what the shader writes: a six-layer 2D array, top mip only. The same
         // image is *read* later through a cube view — one image, two ways of looking at it.
-        const auto cubeView = kor::ImageView::Builder(kor::ResourceRef<const kor::Image>(cube))
+        const auto cubeView = kor::ImageView::Builder(cube)
             .setViewType(kor::ImageView::Type::e2DArray)
             .setArrayLayerCount(kFaceCount)
             .setMipLevelCount(1)
             .build();
 
-        const auto set = kor::DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
+        const auto set = kor::DescriptorSet::Builder(pipeline, 0)
             .write(0, equirectView)
             .write(1, projectionSampler())
             .write(2, cubeView)
@@ -289,12 +296,12 @@ namespace kimg
         const glm::u32 groups = (faceSize + kLocalSize - 1) / kLocalSize;
 
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
-            commandBuffer.BindComputePipeline(kor::ResourceRef<const kor::ComputePipeline>(pipeline));
-            commandBuffer.BindDescriptorSet(0, kor::ResourceRef<const kor::DescriptorSet>(set));
+            commandBuffer.BindComputePipeline(pipeline);
+            commandBuffer.BindDescriptorSet(0, set);
             commandBuffer.Dispatch(groups, groups, kFaceCount);
         }, kor::CommandBuffer::Usage::eCompute);
 
-        detail::finishUpload(kor::ResourceRef<const kor::Image>(cube), generateMipmaps);
+        detail::finishUpload(cube, generateMipmaps);
         return cube;
     }
 
@@ -304,7 +311,7 @@ namespace kimg
         auto panorama = LoadImage(relativePath);
         if (!panorama) return panorama;   // already poisoned, and already says why
 
-        return EquirectangularToCubemap(kor::ResourceRef<const kor::Image>(panorama), faceSize, generateMipmaps);
+        return EquirectangularToCubemap(panorama, faceSize, generateMipmaps);
     }
 
     kor::Task<kor::Resource<kor::Image>> LoadCubemapFromEquirectangularAsync(std::filesystem::path relativePath,
@@ -316,6 +323,6 @@ namespace kimg
         auto panorama = co_await LoadImageAsync(relativePath);
         if (!panorama) co_return std::move(panorama);
 
-        co_return EquirectangularToCubemap(kor::ResourceRef<const kor::Image>(panorama), faceSize, generateMipmaps);
+        co_return EquirectangularToCubemap(panorama, faceSize, generateMipmaps);
     }
 }

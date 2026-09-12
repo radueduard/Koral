@@ -242,7 +242,7 @@ namespace kor
 
                     const auto it = byId.find(dependency.id);
                     if (it == byId.end()) {
-                        if (dependency.kind == Dependency::eOptional) continue;
+                        if (dependency.kind == Dependency::Kind::eOptional) continue;
                         return loadError(std::format(
                             "module '{}' requires module '{}', which is not loaded — add it to "
                             "\"modules\" in koral.json",
@@ -252,7 +252,7 @@ namespace kor
                     if (const auto& provider = *loaded[it->second].descriptor;
                         provider.version != dependency.version)
                     {
-                        if (dependency.kind == Dependency::eOptional) {
+                        if (dependency.kind == Dependency::Kind::eOptional) {
                             log::warn("[module] '{}' was built against '{}' v{}, but v{} is loaded; "
                                       "treating the optional dependency as absent",
                                       descriptor.id, dependency.id, dependency.version, provider.version);
@@ -462,7 +462,7 @@ namespace kor
         // already run, and they only run once.
     }
 
-    std::vector<std::string_view> ModuleHost::LoadedModules()
+    std::vector<std::string_view> ModuleHost::loadedModules()
     {
         std::vector<std::string_view> ids;
         ids.reserve(modules().size());

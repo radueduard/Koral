@@ -22,7 +22,7 @@ namespace kimg
     class ImageCompressModule final : public kor::Module
     {
     public:
-        static constexpr std::string_view kModuleId      = kimg::kCompressModuleId;
-        static constexpr std::uint32_t    kModuleVersion = kimg::kCompressModuleVersion;
+        static constexpr std::string_view ModuleId      = kimg::CompressModuleId;
+        static constexpr std::uint32_t    ModuleVersion = kimg::CompressModuleVersion;
     };
 }

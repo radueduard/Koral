@@ -29,25 +29,22 @@ namespace kor::vk
             explicit Builder(const Surface& surface) : surface(surface) {}
 
             std::reference_wrapper<const Surface> surface;
-            glm::u32 minImageCount = 2;
             glm::u32 imageCount = 2;
-            MSAA msaa = MSAA::eNone;
+            SampleCount sampleCount = SampleCount::e1;
 
-            Builder& setMinImageCount(const glm::u32 minImageCount) { this->minImageCount = minImageCount; return *this; }
             Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
-            Builder& setMSAA(const kor::MSAA msaa) { this->msaa = msaa; return *this; }
+            Builder& setSampleCount(const kor::SampleCount sampleCount) { this->sampleCount = sampleCount; return *this; }
             std::unique_ptr<SwapChain> build() { return std::make_unique<SwapChain>(*this); }
         };
 
         explicit SwapChain(const Builder& createInfo);
         ~SwapChain() override;
 
-        [[nodiscard]] const glm::uvec2 &getExtent() const { return _extent; }
-        [[nodiscard]] glm::u32 getMinImageCount() const { return _minImageCount; }
-        [[nodiscard]] glm::u32 getImageCount() const { return _imageCount; }
-        [[nodiscard]] ::vk::SampleCountFlagBits getMSAA() const { return getVkSampleCount(_msaa); }
+        [[nodiscard]] const glm::uvec2 &extent() const { return _extent; }
+        [[nodiscard]] glm::u32 imageCount() const { return _imageCount; }
+        [[nodiscard]] ::vk::SampleCountFlagBits getVkSamples() const { return getVkSampleCount(_sampleCount); }
 
-        [[nodiscard]] kor::ResourceRef<const kor::Image> getImage() const { return _swapChainImages; }
+        [[nodiscard]] kor::ResourceRef<const kor::Image> image() const { return _swapChainImages; }
         [[nodiscard]] kor::ResourceRef<const kor::Image> getDepthImage() const { return _depthImages; }
 
         // Tracked refs, not raw references: these become the default framebuffer's attachments, and
@@ -57,11 +54,15 @@ namespace kor::vk
         [[nodiscard]] kor::ResourceRef<const kor::ImageView> getDepthImageViews() const { return _depthImageViews; }
 
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
-        [[nodiscard]] glm::u32 getCurrentImageIndex() const { return _imageIndex; }
+        [[nodiscard]] glm::u32 currentImageIndex() const { return _imageIndex; }
 
     	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinishedSemaphores[_imageIndex]; }
 
         void Resize(const glm::uvec2& newSize);
+
+        /// (Re)builds the per-frame depth target. Call only after the scheduler has adopted
+        /// imageCount(), which is what the target is sized to. @see CreateSwapChain
+        void CreateDepthResources();
         ::vk::Result Acquire(const kor::vk::Frame &frame);
         ::vk::Result Present(const kor::vk::Frame &frame);
 
@@ -73,9 +74,11 @@ namespace kor::vk
 
     private:
         glm::uvec2 _extent;
-        MSAA _msaa = MSAA::e2x;
-        glm::u32 _minImageCount = 0;
-        glm::u32 _imageCount = 0;
+        SampleCount _sampleCount = SampleCount::e1;
+        /// What was asked for, held separately from _imageCount because _imageCount is replaced
+        /// by the driver's actual count — and re-requesting that on a Resize would ratchet it up.
+        glm::u32 _requestedImageCount = 0;
+        glm::u32 _imageCount = 0;   ///< What the driver actually allocated.
         glm::u32 _imageIndex = 0;
 
         std::reference_wrapper<const Surface> _surface;

@@ -202,8 +202,10 @@ namespace kor {
 
         _surface = kor::Surface::Create(*this);
         Context::_scheduler = Scheduler::Builder()
-            .setMinImageCount(2)
-            .setImageCount(3)
+            // A floor, not a promise: the surface may require more and the driver may allocate
+            // more still. Everything per-frame is sized to what was actually allocated, which
+            // Scheduler::Initialize adopts before anything reads it.
+            .setImageCount(2)
             .build();
         Context::_scheduler->Initialize();
         _framebuffer = Framebuffer::CreateDefault();
@@ -255,7 +257,7 @@ namespace kor {
     // Out of line for the same reason, but for kor::Framebuffer: returning the ResourceRef by value
     // instantiates that type's destructor, which needs it complete. This file has it via
     // <framebuffer.h>; window.h does not (see context.h).
-    ResourceRef<Framebuffer> Window::getFramebuffer() const {
+    ResourceRef<Framebuffer> Window::framebuffer() const {
         return _framebuffer;
     }
 
@@ -267,7 +269,7 @@ namespace kor {
         ModuleHost::Shutdown();
         GUI::Shutdown();
         _framebuffer.reset();
-        delete Context::_scheduler;
+        Context::_scheduler.reset();
         delete Context::_repository;
         delete Context::_mainThreadExecutor;
         delete Context::_backgroundExecutor;
@@ -325,7 +327,7 @@ namespace kor {
     	if (width == 0 || height == 0) {
     		app->pause();
     	} else {
-    		app->unPause();
+    		app->unpause();
     	}
     }
 }

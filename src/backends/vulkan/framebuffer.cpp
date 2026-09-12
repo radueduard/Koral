@@ -22,7 +22,7 @@ namespace kor::vk
     Framebuffer::Framebuffer()
     {
         _isDefault = true;
-        _extent = kor::Context::Window().getExtent();
+        _extent = kor::Context::Window().extent();
 
         // Default framebuffer has one color attachment which is the swap chain image, and one depth stencil attachment which is the depth image of the swap chain.
         const auto& scheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
@@ -31,7 +31,7 @@ namespace kor::vk
         auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
 
         // Named, like any other framebuffer's targets, so the image a frame is presented from is
-        // reachable by `DefaultFramebuffer()->image("color")` rather than only by index.
+        // reachable by `defaultFramebuffer()->image("color")` rather than only by index.
         // @see Framebuffer::image
         _colorAttachments.push_back(Attachment{ colorAttachment, {}, "color" });
         _depthAttachment = Attachment{ depthStencilAttachment, {}, "depth" };
@@ -44,10 +44,9 @@ namespace kor::vk
     Framebuffer::Framebuffer(const Framebuffer::Builder& builder) : kor::Framebuffer(builder) {}
     Framebuffer::~Framebuffer() = default;
 
-    void Framebuffer::Resize(const glm::uvec2& newExtent) const
+    void Framebuffer::doResize(const glm::uvec2& newExtent)
     {
-        kor::Framebuffer::Resize(newExtent);
-
+        // The base has already done the shared work (or skipped it, for the default framebuffer).
         if (_isDefault)
         {
             const auto& scheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());

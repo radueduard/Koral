@@ -132,10 +132,10 @@ namespace kmesh
             // Request eAccelerationStructureInput (implies device address) so a heap
             // suballocation can directly back a ray-tracing BLAS; the empty-buffer
             // makeBuffer overload otherwise omits it. Only when the device actually supports ray
-            // tracing, though — not every GPU does (see Context::SupportsRayTracing), and asking
+            // tracing, though — not every GPU does (see Context::supportsRayTracing), and asking
             // for a buffer usage tied to an extension that was never enabled is itself a Vulkan
             // validation error, on every mesh buffer this heap ever allocates.
-            const auto rtInputUsage = kor::Context::SupportsRayTracing()
+            const auto rtInputUsage = kor::Context::supportsRayTracing()
                 ? kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eAccelerationStructureInput)
                 : kor::Flags<kor::Buffer::Usage>{};
 

@@ -46,7 +46,7 @@
  * }
  * @endcode
  *
- * @see kor::Mesh::getVertexLayout, kor::GraphicsPipeline::Builder::setVertexShader
+ * @see kor::Mesh::vertexLayout, kor::GraphicsPipeline::Builder::setVertexShader
  */
 
 #pragma once

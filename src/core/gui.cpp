@@ -22,6 +22,17 @@
 #include <string_view>
 #include <vector>
 #include <GLFW/glfw3.h>
+#include <map>
+
+namespace {
+    // Process-wide, and deliberately not a static data member of GUI: one copy per loaded
+    // module is the bug this exists to avoid. Reached only through kor::GUI's exported
+    // members, so every caller — engine or module — lands on this one.
+    std::map<kor::Font, ImFont*>& fonts() {
+        static std::map<kor::Font, ImFont*> instance;
+        return instance;
+    }
+}
 
 #include "commandBuffer.h"
 #include "input.h"
@@ -213,13 +224,13 @@ void kor::GUI::DefineStyle()
 
 
     auto& io = ImGui::GetIO();
-    _fonts[Font::Regular] = AddFont(kor::assetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
-    _fonts[Font::Bold] = AddFont(kor::assetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
-    _fonts[Font::Italic] = AddFont(kor::assetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
-    _fonts[Font::Black] = AddFont(kor::assetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
-    _fonts[Font::Light] = AddFont(kor::assetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
+    fonts()[Font::eRegular] = AddFont(kor::assetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
+    fonts()[Font::eBold] = AddFont(kor::assetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
+    fonts()[Font::eItalic] = AddFont(kor::assetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
+    fonts()[Font::eBlack] = AddFont(kor::assetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
+    fonts()[Font::eLight] = AddFont(kor::assetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
 
-    io.FontDefault = _fonts[Font::Regular];
+    io.FontDefault = fonts()[Font::eRegular];
     io.FontGlobalScale = .55f;
 
     // When panels can detach into their own OS windows, those windows are real, opaque top-level
@@ -242,10 +253,10 @@ namespace
     // Refs, not owners: a handle belongs to whoever created it, and one that is dropped disappears
     // from here on the next frame. Process-wide and in this translation unit rather than inline in
     // the header, so a handle created by a scene or a module lands in the same list the GUI walks.
-    // @see kor::GUI_Image::refresh
-    std::vector<kor::ResourceRef<kor::GUI_Image>>& liveImages()
+    // @see kor::GuiImage::refresh
+    std::vector<kor::ResourceRef<kor::GuiImage>>& liveImages()
     {
-        static std::vector<kor::ResourceRef<kor::GUI_Image>> images;
+        static std::vector<kor::ResourceRef<kor::GuiImage>> images;
         return images;
     }
 
@@ -269,7 +280,7 @@ namespace
         static std::optional<ImVec2> parked;
 
         ImGuiIO& io = ImGui::GetIO();
-        if (kor::Input::getCursorMode() != kor::Input::CursorMode::eCaptured) {
+        if (kor::Input::cursorMode() != kor::Input::CursorMode::eCaptured) {
             parked.reset();
             return;
         }
@@ -279,15 +290,15 @@ namespace
     }
 }
 
-kor::Resource<kor::GUI_Image> kor::GUI_Image::Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level)
+kor::Resource<kor::GuiImage> kor::GuiImage::Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level)
 {
     auto handle = [&] {
         switch (Context::activeAPI())
         {
         case API::eOpenGL:
-            return kor::MakeBackendResource<kor::GUI_Image, kor::ogl::GUI_Image>(image, layer, level);
+            return kor::MakeBackendResource<kor::GuiImage, kor::ogl::GuiImage>(image, layer, level);
         case API::eVulkan:
-            return kor::MakeBackendResource<kor::GUI_Image, kor::vk::GUI_Image>(image, layer, level);
+            return kor::MakeBackendResource<kor::GuiImage, kor::vk::GuiImage>(image, layer, level);
         default:
             throw std::runtime_error("Unsupported graphics API");
         }
@@ -295,7 +306,7 @@ kor::Resource<kor::GUI_Image> kor::GUI_Image::Create(kor::ResourceRef<const kor:
 
     // Registered so the GUI can bring it up to date each frame. Without this a handle shows whatever
     // its image held at this moment, for ever.
-    if (handle) liveImages().emplace_back(kor::ResourceRef<kor::GUI_Image>(handle));
+    if (handle) liveImages().emplace_back(kor::ResourceRef<kor::GuiImage>(handle));
     return handle;
 }
 
@@ -316,7 +327,7 @@ void kor::GUI::Init()
     // holds the pointer rather than copying, so it must reference storage that outlives the context —
     // the window's own string does. An empty path leaves ImGui's default (imgui.ini in the CWD) in
     // place. ImGui will not create missing directories itself, so make the parent before it saves.
-    if (const std::string& iniPath = Context::Window().getImguiIniPath(); !iniPath.empty()) {
+    if (const std::string& iniPath = Context::Window().imguiIniPath(); !iniPath.empty()) {
         if (const auto parent = std::filesystem::path(iniPath).parent_path(); !parent.empty()) {
             std::error_code ec;
             std::filesystem::create_directories(parent, ec);
@@ -394,7 +405,7 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    ImGui::Begin(Context::Window().getTitle().c_str(), nullptr, window_flags);
+    ImGui::Begin(Context::Window().title().c_str(), nullptr, window_flags);
     ImGui::PopStyleVar(2);
 
     const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
@@ -415,9 +426,9 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
     //
     // Dead handles are dropped here rather than anywhere else — nothing else walks this list, and a
     // scene that creates and drops handles as it runs would otherwise grow it without bound.
-    std::erase_if(liveImages(), [](const ResourceRef<GUI_Image>& handle) { return !handle.alive(); });
+    std::erase_if(liveImages(), [](const ResourceRef<GuiImage>& handle) { return !handle.alive(); });
     for (const auto& handle : liveImages()) {
-        if (handle.valid()) const_cast<GUI_Image&>(*handle).refresh(commandBuffer);
+        if (handle.valid()) const_cast<GuiImage&>(*handle).refresh(commandBuffer);
     }
 
     ImDrawData* draw_data = ImGui::GetDrawData();
@@ -529,5 +540,5 @@ void kor::GUI::Shutdown()
 
 ImFont* kor::GUI::GetFont(const Font font)
 {
-    return _fonts.at(font);
+    return fonts().at(font);
 }

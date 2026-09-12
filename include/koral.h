@@ -14,6 +14,49 @@
  * shaders, pipelines, descriptor sets); the kor::CommandBuffer that records a frame's GPU work;
  * kor::Context, kor::Window and kor::Input for the running application; and kor::Scene or kor::Job
  * as the entry point a project implements.
+ *
+ * ## Naming
+ *
+ * Case carries meaning here, and it is worth knowing which side of the line a name falls on.
+ *
+ * **UpperCamel is a verb somebody performs.** Four kinds of thing qualify, and nothing else does:
+ *  - commands recorded into a command buffer — `Draw`, `SetViewport`, `BindMesh`, `CopyBuffer`;
+ *  - lifecycle hooks the engine calls on you — `Initialize`, `Update`, `Render`, `OnResize`;
+ *  - factories that hand back a new object — `Create`, `CreateDefault`, `MakeResource`;
+ *  - transfers that move data between host and device — `Read`, `Write`, `Map`, `Flush`.
+ *
+ * The command buffer is the reason for the split: a frame reads as a list of instructions, and
+ * those instructions are easier to pick out when they are cased apart from the questions asked
+ * around them.
+ *
+ * **lowerCamel answers a question or sets a value.** Accessors (`extent`, `bindings`),
+ * predicates (`isDefault`, `supportsRayTracing`, `hasDepthAttachment`), queries
+ * (`collectTimings`, `sizeOfRegion`, `frameTime`), every builder setter, and everything on a
+ * builder up to and including `build()`.
+ *
+ * Compile-time constants are UpperCamel with no prefix — `kmesh::semantics::Position`,
+ * `ProjectConfig::FileName`, `CommandBuffer::MaxTimerScopes` — the same casing as a type, since
+ * both are things named rather than things done. A constant local to one translation unit (a test's
+ * `kW`, `kCount`) is not API and keeps whatever reads best there.
+ *
+ * Enumerators take an `e` prefix — `Format::eRGBA8_UNORM`, `Usage::eVertex` — so that an
+ * enumerator never collides with a type or a macro. Every public enumeration states its underlying
+ * type, which is what makes it forward-declarable; an opaque re-declaration has to repeat that type
+ * exactly. Enumerations meant to be combined with `|` opt in through `kor::enable_flags`;
+ * @see flags.h.
+ *
+ * ## Integer types
+ *
+ * GPU-facing surface speaks glm's scalar aliases — `glm::u32` for counts, indices and extents,
+ * `glm::u64` for byte sizes and offsets. The infrastructure underneath it (kor::Resource,
+ * kor::Error, kor::log, kor::Task) speaks `std::uintN_t` and `std::size_t` instead, because none of
+ * those headers otherwise needs glm and pulling it in for a spelling would be a poor trade. The
+ * line is whether the header deals in GPU quantities.
+ *
+ * Sizes go in signed and come out unsigned, which is deliberate. A builder takes `glm::i64`, so a
+ * caller's negative arrives as a negative and is reported — `setRawSize(-1)` fails with a message
+ * rather than allocating sixteen exabytes. An accessor returns `glm::u64`, because by then the
+ * value is stored and cannot be negative.
  */
 
 #pragma once
@@ -23,6 +66,16 @@
 #include "log.h"
 #include "gtime.h"
 #include "task.h"
+// Named here rather than left to arrive through something else: kor::Result and kor::Error are in
+// every builder's signature, kor::RangeOf in every upload, kor::ValueShape in PushConstant and
+// kor::SemanticSerializer in DescriptorSet::Builder::write. They did reach a project transitively,
+// but only because some other header happened to include them — reordering one would have broken a
+// build that had not changed.
+#include "error.h"
+#include "stacktrace.h"
+#include "dataRange.h"
+#include "shaderValue.h"
+#include "semantics.h"
 #include "resource.h"
 #include "builder.h"
 #include "file.h"

@@ -15,6 +15,12 @@ enum class Bit : uint32_t {
     D = 1u << 3,
 };
 
+}  // namespace
+
+template<> struct kor::enable_flags<Bit> : std::true_type {};
+
+namespace {
+
 TEST(Flags, DefaultIsEmpty) {
     Flags<Bit> f;
     EXPECT_EQ(f.value(), 0u);

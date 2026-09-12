@@ -177,7 +177,7 @@ namespace kmdl
                         if (Traits::available(mesh))
                             vertices[v].template get<Idx>() = Traits::get(mesh, v);
                     }.template operator()<I>(), ...);
-                }(std::make_index_sequence<StreamT::kAttributeCount>{});
+                }(std::make_index_sequence<StreamT::AttributeCount>{});
             }
             return vertices;
         }
@@ -187,19 +187,17 @@ namespace kmdl
         {
             return kor::Buffer::Builder<StreamT>()
                 .setDataView(vertices)
-                .addUsage(kor::Buffer::Usage::eVertex)
-                .addUsage(kor::Buffer::Usage::eStorage)
-                // Needed so the buffer's GPU address can be queried — both for
-                // ray-tracing acceleration structure builds and for buffer_reference
-                // access in shaders.
-                .addUsage(kor::Buffer::Usage::eShaderDeviceAddress)
-                // Not every device supports ray tracing (see Context::SupportsRayTracing) — asking
-                // for a buffer usage tied to an extension that was never enabled is itself a
-                // Vulkan validation error, so this is skipped (eNone is a no-op) rather than
-                // requested unconditionally.
-                .addUsage(kor::Context::SupportsRayTracing()
-                    ? kor::Buffer::Usage::eAccelerationStructureInput
-                    : kor::Buffer::Usage::eNone)
+                // eTransferDst is not optional: this is eDeviceLocal with initial data, so the
+                // upload stages through a copy into it. setUsage replaces the default set, so
+                // the transfer roles have to be named here alongside the rest.
+                .setUsage(kor::Buffer::Usage::eVertex
+                        | kor::Buffer::Usage::eStorage
+                        | kor::Buffer::Usage::eShaderDeviceAddress
+                        | kor::Buffer::Usage::eTransferDst
+                        | kor::Buffer::Usage::eTransferSrc
+                        | (kor::Context::supportsRayTracing()
+                            ? kor::Buffer::Usage::eAccelerationStructureInput
+                            : kor::Buffer::Usage::eNone))
                 .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }
@@ -208,14 +206,15 @@ namespace kmdl
         {
             return kor::Buffer::Builder<glm::u32>()
                 .setDataView(indices)
-                .addUsage(kor::Buffer::Usage::eIndex)
-                .addUsage(kor::Buffer::Usage::eStorage)
-                // See uploadVertexBuffer: address-queryable for acceleration structure
-                // builds and buffer_reference access.
-                .addUsage(kor::Buffer::Usage::eShaderDeviceAddress)
-                .addUsage(kor::Context::SupportsRayTracing()
-                    ? kor::Buffer::Usage::eAccelerationStructureInput
-                    : kor::Buffer::Usage::eNone)
+                // See uploadVertexBuffer for why the transfer roles are named here.
+                .setUsage(kor::Buffer::Usage::eIndex
+                        | kor::Buffer::Usage::eStorage
+                        | kor::Buffer::Usage::eShaderDeviceAddress
+                        | kor::Buffer::Usage::eTransferDst
+                        | kor::Buffer::Usage::eTransferSrc
+                        | (kor::Context::supportsRayTracing()
+                            ? kor::Buffer::Usage::eAccelerationStructureInput
+                            : kor::Buffer::Usage::eNone))
                 .setType(kor::Buffer::Type::eDeviceLocal)
                 .build();
         }

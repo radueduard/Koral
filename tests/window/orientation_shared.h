@@ -69,12 +69,12 @@ inline kor::ResourceRef<const kor::Shader> loadShader(const char* file, kor::Sha
 inline std::vector<Pixel> readback(const kor::Resource<kor::Image>& image) {
     kor::Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .addUsage(kor::Buffer::Usage::eTransferDst)
+      .setUsage(kor::Buffer::Usage::eTransferDst)
       .setType(kor::Buffer::Type::eReadback);
     auto buf = rb.build();
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
-        cb.CopyImageToBuffer(kor::ResourceRef<const kor::Image>(image),
-                             kor::ResourceRef<const kor::Buffer>(buf));
+        cb.CopyImageToBuffer(image,
+                             buf);
     }, kor::CommandBuffer::Usage::eTransfer);
     return buf->Read<Pixel>();
 }
@@ -86,7 +86,7 @@ inline void blitToScreen(const kor::Resource<kor::Image>& image) {
     glfwPollEvents();
     kor::Context::DrainMainThread();
     kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        cb.Blit(kor::ResourceRef<const kor::Image>(image));
+        cb.BlitToScreen(image);
     });
 }
 
@@ -97,12 +97,11 @@ inline Result rasterTopHalf() {
                      .setType(kor::Image::Type::e2D)
                      .setFormat(kor::Image::Format::eRGBA8_UNORM)
                      .setExtent(glm::uvec2{kW, kH})
-                     .addUsage(kor::Image::Usage::eColorAttachment)
-                     .addUsage(kor::Image::Usage::eTransferSrc)
+                     .setUsage(kor::Image::Usage::eColorAttachment | kor::Image::Usage::eTransferSrc)
                      .build();
-    auto view = kor::ImageView::Builder(kor::ResourceRef<const kor::Image>(image)).build();
+    auto view = kor::ImageView::Builder(image).build();
     auto fb = kor::Framebuffer::Builder{}
-                  .addColorAttachment(kor::ResourceRef<const kor::ImageView>(view), glm::vec4{0.f, 0.f, 0.f, 1.f})
+                  .addColor({ .view = view, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
                   .build();
 
     const auto vert = loadShader("topHalfQuad.vert.glsl", kor::Shader::Stage::eVertex, "orient.tophalf.vert");
@@ -110,12 +109,12 @@ inline Result rasterTopHalf() {
     auto pipeline = kor::GraphicsPipeline::Builder{}
                         .setVertexShader(vert)
                         .setFragmentShader(frag)
-                        .setFramebuffer(kor::ResourceRef<kor::Framebuffer>(fb))
+                        .setFramebuffer(fb)
                         .build();
 
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
-        cb.BeginRendering(kor::ResourceRef<const kor::Framebuffer>(fb));
-        cb.BindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline>(pipeline));
+        cb.BeginRendering(fb);
+        cb.BindGraphicsPipeline(pipeline);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(6); // two triangles covering the top half of clip space
@@ -133,24 +132,23 @@ inline Result computeTopHalf() {
                      .setType(kor::Image::Type::e2D)
                      .setFormat(kor::Image::Format::eRGBA8_UNORM)
                      .setExtent(glm::uvec2{kW, kH})
-                     .addUsage(kor::Image::Usage::eStorage)
-                     .addUsage(kor::Image::Usage::eTransferSrc)
+                     .setUsage(kor::Image::Usage::eStorage | kor::Image::Usage::eTransferSrc)
                      .build();
-    auto view = kor::ImageView::Builder(kor::ResourceRef<const kor::Image>(image)).build();
+    auto view = kor::ImageView::Builder(image).build();
 
     const auto shader = loadShader("topHalfImage.comp.glsl", kor::Shader::Stage::eCompute, "orient.tophalf.comp");
     auto pipeline = kor::ComputePipeline::Builder{}.setComputeShader(shader).build();
-    auto set = kor::DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
+    auto set = kor::DescriptorSet::Builder(pipeline, 0)
                    .write(0, view)
                    .build();
 
     const kor::ResourceRef<const kor::Image> imgRef(image);
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
-        cb.BindComputePipeline(kor::ResourceRef<const kor::ComputePipeline>(pipeline));
-        cb.BindDescriptorSet(0, kor::ResourceRef<const kor::DescriptorSet>(set));
-        cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::ComputeWrite));
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, set);
+        cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::eComputeWrite));
         cb.Dispatch((kW + 7) / 8, (kH + 7) / 8, 1);
-        cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::TransferSrc));
+        cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::eTransferSrc));
     }, kor::CommandBuffer::Usage::eCompute);
 
     auto px = readback(image);

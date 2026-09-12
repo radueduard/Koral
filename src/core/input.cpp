@@ -167,7 +167,7 @@ namespace kor {
 		state.mouseDelta = { 0.f, 0.f };
 	}
 
-	Input::CursorMode Input::getCursorMode() { return g_input.cursorMode; }
+	Input::CursorMode Input::cursorMode() { return g_input.cursorMode; }
 
 	void Input::attachTo(GLFWwindow* window)
 	{
@@ -193,11 +193,11 @@ namespace kor {
 	std::vector<GLFWwindow*> Input::attachedWindows() { return g_input.attachedWindows; }
 	void Input::update() { g_input.update(); }
 
-    KeyState Input::getKeyState(const Key key) {
+    KeyState Input::keyState(const Key key) {
         return g_input.keyboardKeyStates[key];
     }
 
-    KeyState Input::getMouseButtonState(const MouseButton button) {
+    KeyState Input::mouseButtonState(const MouseButton button) {
         return g_input.mouseButtonStates[button];
     }
 
@@ -277,19 +277,19 @@ namespace kor {
         return ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantCaptureKeyboard;
     }
 
-	const glm::vec2& Input::getMousePosition() {
+	const glm::vec2& Input::mousePosition() {
         return g_input.mousePosition;
     }
 
-    const glm::vec2& Input::getMousePositionDelta() {
+    const glm::vec2& Input::mousePositionDelta() {
         return g_input.mouseDelta;
     }
 
-    const glm::vec2& Input::getMouseScrollDelta() {
+    const glm::vec2& Input::mouseScrollDelta() {
         return g_input.scrollDelta;
     }
 
-    const glm::vec2& Input::getLastMousePosition()
+    const glm::vec2& Input::lastMousePosition()
     {
 		return g_input.lastMousePosition;
     }

@@ -88,7 +88,7 @@ namespace kor
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(kor::ResourceRef<kor::Framebuffer> framebuffer)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(kor::ResourceRef<const kor::Framebuffer> framebuffer)
     {
         this->framebuffer = framebuffer;
         return *this;
@@ -127,7 +127,7 @@ namespace kor
             if (!attributes) {
                 // The shader is what has to be edited, so the error names it as the place to look.
                 return fail(attributes.error().code, "{} (vertex shader '{}')",
-                            attributes.error().message, (*vertexShader)->getSourcePath().string());
+                            attributes.error().message, (*vertexShader)->sourcePath().string());
             }
             resolved.vertexAttributeDescriptions = std::move(*attributes);
             resolved.vertexBindingDescriptions = vertexLayout->bindings;
@@ -174,7 +174,7 @@ namespace kor
         _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),
-        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::DefaultFramebuffer()),
+        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::defaultFramebuffer()),
         _depthStencilState(createInfo.depthStencilState),
         _colorBlendState(createInfo.colorBlendState),
         _vertexAttributeDescriptions(createInfo.vertexAttributeDescriptions),

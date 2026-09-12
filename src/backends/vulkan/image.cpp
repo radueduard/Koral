@@ -18,7 +18,7 @@
 namespace kor::vk
 {
 
-    bool Image::IsFormatSupported(const kor::Image::Format format, const Flags<kor::Image::Usage> usage)
+    bool Image::isFormatSupported(const kor::Image::Format format, const Flags<kor::Image::Usage> usage)
     {
         ::vk::FormatFeatureFlags required {};
         if (usage & kor::Image::Usage::eSampled)        required |= ::vk::FormatFeatureFlagBits::eSampledImage;
@@ -71,14 +71,14 @@ namespace kor::vk
             .setExtent(::vk::Extent3D(_extent.x, _extent.y, _extent.z))
             .setMipLevels(_mipLevels)
             .setArrayLayers(_arrayLayers)
-            .setSamples(getVkSampleCount(_msaa))
+            .setSamples(getVkSampleCount(_sampleCount))
             .setTiling(tiling)
             .setUsage(usage)
             .setSharingMode(::vk::SharingMode::eExclusive)
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(imageCreateFlags);
 
-        const auto frameCount = _isPerFrame ? kor::Context::Scheduler().getImageCount() : 1;
+        const auto frameCount = _isPerFrame ? kor::Context::Scheduler().imageCount() : 1;
         for (uint32_t i = 0; i < frameCount; i++)
         {
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
@@ -102,17 +102,16 @@ namespace kor::vk
         }
     }
 
-    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const MSAA msaa)
+    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const SampleCount msaa)
         : kor::Image(Builder()
             .setIsPerFrame(true)
             .setType(Type::e2D)
             .setExtent(extent)
-            .addUsage(Usage::eTransferDst)
-            .addUsage(Usage::eColorAttachment)
+            .setUsage(Usage::eTransferDst | Usage::eColorAttachment)
             .setArrayLayers(1)
             .setMipLevels(1)
             .setFormat(format)
-            .setMSAA(msaa)) {
+            .setSampleCount(msaa)) {
         _images = surfaceImages;
 
         int frameIndex = 0;
@@ -126,26 +125,26 @@ namespace kor::vk
 
     ::vk::ImageLayout Image::getImageLayout(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _layouts[key];
     }
 
     ::vk::AccessFlags Image::getAccessMask(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _accessMasks[key];
     }
 
     void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
         if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
             _layouts[key] = newLayout;
         }
     }
 
     void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
         if (const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _accessMasks[key] != newAccessMask) {
             _accessMasks[key] = newAccessMask;
         }
@@ -155,7 +154,7 @@ namespace kor::vk
         ::vk::ImageAspectFlags aspectMask = {};
         if (_usage & Usage::eDepthStencilAttachment) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (IsStencilFormat(_format)) {
+            if (isStencilFormat(_format)) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         } else {
@@ -166,13 +165,13 @@ namespace kor::vk
 
     ::vk::Image Image::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
         return _images[currentFrame];
     }
 
     VmaAllocation Image::getAllocation() const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().getCurrentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
         return _allocations[currentFrame];
     }
 
@@ -181,9 +180,9 @@ namespace kor::vk
         const auto _handle = **this;
 
         ::vk::ImageAspectFlags aspectMask = ::vk::ImageAspectFlagBits::eColor;
-        if (IsDepthStencilFormat(_format)) {
+        if (isDepthStencilFormat(_format)) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (IsStencilFormat(_format)) {
+            if (isStencilFormat(_format)) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         }
@@ -237,7 +236,7 @@ namespace kor::vk
             .setExtent(::vk::Extent3D(extent.x, extent.y, extent.z))
             .setMipLevels(_mipLevels)
             .setArrayLayers(_arrayLayers)
-            .setSamples(getVkSampleCount(_msaa))
+            .setSamples(getVkSampleCount(_sampleCount))
             .setTiling(::vk::ImageTiling::eOptimal)
             .setUsage(getVkUsage(_usage))
             .setSharingMode(::vk::SharingMode::eExclusive)

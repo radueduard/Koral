@@ -166,50 +166,50 @@ namespace kor::ogl
         enqueue([renderInfo, this] ()
         {
             if (_state.boundFramebuffer.has_value())  throw std::runtime_error("Another rendering operation is still in progress!");
-            const auto framebuffer = renderInfo.getFramebuffer();
+            const auto framebuffer = renderInfo.framebuffer();
             stateBeginRendering(framebuffer);
             const auto& oglFramebuffer = dynamic_cast<const ogl::Framebuffer&>(*framebuffer);
             framebuffer->Bind();
             resetStateForClear();
 
-            const bool clearsColor = renderInfo.getColorLoadOperation() == LoadOperation::eClear;
-            const bool clearsDepthStencil = renderInfo.getDepthLoadOperation() == LoadOperation::eClear
-                                         || renderInfo.getStencilLoadOperation() == LoadOperation::eClear;
+            const bool clearsColor = renderInfo.colorLoadOperation() == LoadOperation::eClear;
+            const bool clearsDepthStencil = renderInfo.depthLoadOperation() == LoadOperation::eClear
+                                         || renderInfo.stencilLoadOperation() == LoadOperation::eClear;
 
             // The default framebuffer is FBO 0, whose buffers belong to the window: it carries no
             // attachment objects, so there is nothing to ask for a format and nothing to walk. Its
             // colour buffer is always normalised and its depth/stencil always present, which is
             // what the two constants below stand in for.
-            if (framebuffer->IsDefault()) {
+            if (framebuffer->isDefault()) {
                 if (clearsColor) {
                     clearColorBuffer(*oglFramebuffer, 0, kor::Image::Format::eRGBA8_UNORM,
-                                     renderInfo.getClearColor(0));
+                                     renderInfo.clearColor(0));
                     glCheckError();
                 }
                 if (clearsDepthStencil) {
                     glClearNamedFramebufferfi(*oglFramebuffer, GL_DEPTH_STENCIL, 0,
-                                              renderInfo.getClearDepth(), renderInfo.getClearStencil());
+                                              renderInfo.clearDepth(), renderInfo.clearStencil());
                     glCheckError();
                 }
                 return;
             }
 
             glm::u32 i = 0;
-            for (const auto& attachment : framebuffer->getColorAttachments())
+            for (const auto& attachment : framebuffer->colorAttachments())
             {
                 if (clearsColor) {
                     // Clear with the function matching the attachment's data type — an
                     // integer attachment (e.g. the r32ui visibility buffer) must not be
                     // cleared as float or its sentinel never gets written.
-                    const auto format = attachment.view->getImage()->getFormat();
-                    clearColorBuffer(*oglFramebuffer, static_cast<GLint>(i), format, renderInfo.getClearColor(i));
+                    const auto format = attachment.view->image()->format();
+                    clearColorBuffer(*oglFramebuffer, static_cast<GLint>(i), format, renderInfo.clearColor(i));
                 }
                 i++;
             }
-            if (framebuffer->hasDepthStencilAttachment() && clearsDepthStencil)
+            if (framebuffer->hasDepthAttachment() && clearsDepthStencil)
             {
                 glClearNamedFramebufferfi(*oglFramebuffer, GL_DEPTH_STENCIL, 0,
-                                          renderInfo.getClearDepth(), renderInfo.getClearStencil());
+                                          renderInfo.clearDepth(), renderInfo.clearStencil());
                 glCheckError();
             }
         });
@@ -281,9 +281,8 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doBindDescriptorSet(glm::u32 index, kor::ResourceRef<const DescriptorSet> set, bool debug)
+    kor::CommandBuffer& CommandBuffer::doBindDescriptorSet(glm::u32 index, kor::ResourceRef<const DescriptorSet> set)
     {
-        if (debug) set->DebugPrint();
 
         if (_state.boundComputePipeline.has_value())
             _state.boundComputeDescriptorSets.insert_or_assign(index, set);
@@ -304,10 +303,10 @@ namespace kor::ogl
         stateBindMesh(mesh);
         enqueue([mesh, this] () {
             stateBindMesh(mesh);
-            const auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->getVertexBindingDescriptions().value();
-            const auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->getVertexAttributeDescriptions().value();
+            const auto meshVertexBindingDescription = _state.boundGraphicsPipeline.value()->vertexBindingDescriptions().value();
+            const auto meshVertexAttributeDescription = _state.boundGraphicsPipeline.value()->vertexAttributeDescriptions().value();
 
-            const auto vertexBuffers = mesh->getVertexBuffers();
+            const auto vertexBuffers = mesh->vertexBuffers();
             for (size_t i = 0; i < vertexBuffers.size(); ++i)
             {
                 const auto& vertexBuffer = dynamic_cast<const ogl::Buffer&>(*vertexBuffers[i]);
@@ -332,7 +331,7 @@ namespace kor::ogl
                     }
                 }
             }
-            if (const auto indexBuffer = mesh->getIndexBuffer(); indexBuffer.has_value()) {
+            if (const auto indexBuffer = mesh->indexBuffer(); indexBuffer.has_value()) {
                 const auto& oglIndexBuffer = dynamic_cast<const ogl::Buffer&>(*indexBuffer.value());
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *oglIndexBuffer);
                 glCheckError();
@@ -343,48 +342,48 @@ namespace kor::ogl
 
     std::optional<GLbitfield> GetBarrierBits(ResourceAccess dst) {
         switch (dst) {
-            case ResourceAccess::VertexBuffer:
+            case ResourceAccess::eVertexBuffer:
                 return GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT;
 
-            case ResourceAccess::IndexBuffer:
+            case ResourceAccess::eIndexBuffer:
                 return GL_ELEMENT_ARRAY_BARRIER_BIT;
 
-            case ResourceAccess::IndirectBuffer:
+            case ResourceAccess::eIndirectBuffer:
                 return GL_COMMAND_BARRIER_BIT;
 
             // Reads may come through SSBOs, UBOs or sampled textures; cover all three.
-            case ResourceAccess::ComputeRead:
-            case ResourceAccess::VertexShaderRead:
-            case ResourceAccess::FragmentShaderRead:
-            case ResourceAccess::AllShaderRead:
+            case ResourceAccess::eComputeRead:
+            case ResourceAccess::eVertexShaderRead:
+            case ResourceAccess::eFragmentShaderRead:
+            case ResourceAccess::eAllShaderRead:
                 return GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT;
 
-            case ResourceAccess::ComputeWrite:
-            case ResourceAccess::VertexShaderWrite:
-            case ResourceAccess::FragmentShaderWrite:
-            case ResourceAccess::AllShaderWrite:
-            case ResourceAccess::ComputeReadWrite:
-            case ResourceAccess::VertexShaderReadWrite:
-            case ResourceAccess::FragmentShaderReadWrite:
-            case ResourceAccess::AllShaderReadWrite:
+            case ResourceAccess::eComputeWrite:
+            case ResourceAccess::eVertexShaderWrite:
+            case ResourceAccess::eFragmentShaderWrite:
+            case ResourceAccess::eAllShaderWrite:
+            case ResourceAccess::eComputeReadWrite:
+            case ResourceAccess::eVertexShaderReadWrite:
+            case ResourceAccess::eFragmentShaderReadWrite:
+            case ResourceAccess::eAllShaderReadWrite:
                 return GL_SHADER_STORAGE_BARRIER_BIT | GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
 
-            case ResourceAccess::TransferSrc:
-            case ResourceAccess::TransferDst:
+            case ResourceAccess::eTransferSrc:
+            case ResourceAccess::eTransferDst:
                 return GL_TEXTURE_UPDATE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT | GL_PIXEL_BUFFER_BARRIER_BIT;
 
-            case ResourceAccess::ColorAttachment:
-            case ResourceAccess::DepthStencilAttachment:
-            case ResourceAccess::DepthStencilRead:
-            case ResourceAccess::DepthAttachment:
-            case ResourceAccess::DepthRead:
-            case ResourceAccess::StencilAttachment:
-            case ResourceAccess::StencilRead:
+            case ResourceAccess::eColorAttachment:
+            case ResourceAccess::eDepthStencilAttachment:
+            case ResourceAccess::eDepthStencilRead:
+            case ResourceAccess::eDepthAttachment:
+            case ResourceAccess::eDepthRead:
+            case ResourceAccess::eStencilAttachment:
+            case ResourceAccess::eStencilRead:
                 return GL_FRAMEBUFFER_BARRIER_BIT;
 
             // Presentation has no GL analogue (the swap is externally synchronized);
             // no memory barrier is required.
-            case ResourceAccess::Present:
+            case ResourceAccess::ePresent:
                 return std::nullopt;
 
             default:
@@ -397,14 +396,14 @@ namespace kor::ogl
         CheckRecording();
         enqueue([bufferBarriers = std::move(bufferBarriers), imageBarriers = std::move(imageBarriers)] () {
             for (const auto& barrier : bufferBarriers) {
-                GetBarrierBits(barrier.getDstAccess()).and_then([&](GLbitfield bits) {
+                GetBarrierBits(barrier.dstAccess()).and_then([&](GLbitfield bits) {
                     glMemoryBarrier(bits);
                     glCheckError();
                     return std::optional(bits);
                 });
             }
             for (const auto& barrier : imageBarriers) {
-                GetBarrierBits(barrier.getDstAccess()).and_then([&](GLbitfield bits) {
+                GetBarrierBits(barrier.dstAccess()).and_then([&](GLbitfield bits) {
                     glMemoryBarrier(bits);
                     glCheckError();
                     return std::optional(bits);
@@ -474,7 +473,7 @@ namespace kor::ogl
             applyDefaultViewportScissor();
             const auto& oglPipeline = dynamic_cast<const GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*indirectBuffer);
-            const auto indexType = _state.boundMesh.value()->getIndexType().value();
+            const auto indexType = _state.boundMesh.value()->indexType().value();
             // kor::IndirectDrawIndexedCommand matches GL's DrawElementsIndirectCommand layout.
             glBindBuffer(GL_DRAW_INDIRECT_BUFFER, *oglBuffer);
             if (std::getenv("KORAL_DUMP_INDIRECT")) {
@@ -509,9 +508,9 @@ namespace kor::ogl
     {
         glm::uvec2 extent{ 0, 0 };
         if (_state.boundFramebuffer.has_value())
-            extent = _state.boundFramebuffer.value()->getExtent();
+            extent = _state.boundFramebuffer.value()->extent();
         if (extent.x == 0 || extent.y == 0)
-            extent = Context::Window().getExtent();
+            extent = Context::Window().extent();
         return extent;
     }
 
@@ -558,7 +557,7 @@ namespace kor::ogl
             const auto& oglPipeline = dynamic_cast<const GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
             const auto mode = oglPipeline.getMode();
             const auto mesh = _state.boundMesh.value();
-            const auto indexType = mesh->getIndexType().value();
+            const auto indexType = mesh->indexType().value();
             // firstIndex is a texel offset into the index buffer; convert to a byte offset.
             const auto indexSize = indexType == ChannelType::eUShort ? 2 : 4;
             const auto byteOffset = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(firstIndex) * indexSize);
@@ -779,15 +778,15 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doBlit(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
+    kor::CommandBuffer & CommandBuffer::doBlitToScreen(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
 
-        if (srcImage->getMSAA() != MSAA::eNone)
+        if (srcImage->sampleCount() != SampleCount::e1)
             throw std::runtime_error("Source image must not be multisampled for blit operation!");
 
         if (blitInfo.srcExtent == glm::ivec3(-1))
-            blitInfo.srcExtent = srcImage->getExtent();
+            blitInfo.srcExtent = srcImage->extent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = glm::uvec3 { Context::Window().getExtent(), 1 };
+            blitInfo.dstExtent = glm::uvec3 { Context::Window().extent(), 1 };
 
         CheckRecording();
 
@@ -819,15 +818,15 @@ namespace kor::ogl
 
     kor::CommandBuffer& CommandBuffer::doBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo)
     {
-        if (srcImage->getMSAA() != MSAA::eNone)
+        if (srcImage->sampleCount() != SampleCount::e1)
             throw std::runtime_error("Source image must not be multisampled for blit operation!");
-        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+        if (dstImage && dstImage->sampleCount() != SampleCount::e1)
             throw std::runtime_error("Destination image must not be multisampled for blit operation!");
 
         if (blitInfo.srcExtent == glm::ivec3(-1))
-            blitInfo.srcExtent = srcImage->getExtent();
+            blitInfo.srcExtent = srcImage->extent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = dstImage->getExtent();
+            blitInfo.dstExtent = dstImage->extent();
 
         CheckRecording();
         enqueue([srcImage, dstImage, blitInfo] {
@@ -839,7 +838,7 @@ namespace kor::ogl
             glCheckError();
             // Attach the requested mip (and layer for arrays) so GenerateMipmaps'
             // level-to-level blits read/write the right storage.
-            if (srcImage->getArrayLayers() > 1) {
+            if (srcImage->arrayLayers() > 1) {
                 glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, *glSrcImage,
                                           static_cast<GLint>(blitInfo.srcMipLevel), static_cast<GLint>(blitInfo.srcBaseArrayLayer));
             } else {
@@ -851,7 +850,7 @@ namespace kor::ogl
             glGenFramebuffers(1, &dstFramebuffer);
             glBindFramebuffer(GL_FRAMEBUFFER, dstFramebuffer);
             glCheckError();
-            if (dstImage->getArrayLayers() > 1) {
+            if (dstImage->arrayLayers() > 1) {
                 glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, *glDstImage,
                                           static_cast<GLint>(blitInfo.dstMipLevel), static_cast<GLint>(blitInfo.dstBaseArrayLayer));
             } else {
@@ -875,14 +874,14 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doResolve(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+    kor::CommandBuffer & CommandBuffer::doResolveToScreen(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
+        if (srcImage->sampleCount() == SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
-            resolveInfo.srcExtent = srcImage->getExtent();
+            resolveInfo.srcExtent = srcImage->extent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = glm::uvec3 { Context::Window().getExtent(), 1 };
+            resolveInfo.dstExtent = glm::uvec3 { Context::Window().extent(), 1 };
 
         CheckRecording();
         enqueue([srcImage, resolveInfo] {
@@ -892,7 +891,7 @@ namespace kor::ogl
             glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
             glCheckError();
 
-            // glFramebufferTexture works for both single-sample and MSAA textures.
+            // glFramebufferTexture works for both single-sample and SampleCount textures.
             glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, *glSrcImage, 0);
             glCheckError();
 
@@ -912,15 +911,15 @@ namespace kor::ogl
     }
 
     kor::CommandBuffer & CommandBuffer::doResolve(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Resolve resolveInfo) {
-        if (srcImage->getMSAA() == MSAA::eNone)
+        if (srcImage->sampleCount() == SampleCount::e1)
             throw std::runtime_error("Source image must be multisampled for resolve operation!");
-        if (dstImage && dstImage->getMSAA() != MSAA::eNone)
+        if (dstImage && dstImage->sampleCount() != SampleCount::e1)
             throw std::runtime_error("Destination image must not be multisampled for resolve operation!");
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
-            resolveInfo.srcExtent = srcImage->getExtent();
+            resolveInfo.srcExtent = srcImage->extent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = dstImage->getExtent();
+            resolveInfo.dstExtent = dstImage->extent();
 
         CheckRecording();
         enqueue([srcImage, dstImage, resolveInfo] ()
@@ -928,9 +927,9 @@ namespace kor::ogl
             const auto& glSrcImage = dynamic_cast<const ogl::Image&>(*srcImage);
             const auto& glDstImage = dynamic_cast<const ogl::Image&>(*dstImage);
 
-            // Multisample resolve = blit from an MSAA FBO to a single-sample FBO.
+            // Multisample resolve = blit from an SampleCount FBO to a single-sample FBO.
             // Textures cannot be attached to the default framebuffer, so both ends
-            // need a temporary FBO; glFramebufferTexture handles the MSAA target.
+            // need a temporary FBO; glFramebufferTexture handles the SampleCount target.
             GLuint srcFramebuffer = 0, dstFramebuffer = 0;
             glGenFramebuffers(1, &srcFramebuffer);
             glBindFramebuffer(GL_READ_FRAMEBUFFER, srcFramebuffer);
@@ -966,10 +965,10 @@ namespace kor::ogl
         CheckRecording();
         enqueue([image] () {
             // Tolerate a non-image handle: the base blit-based implementation silently
-            // no-ops when getMipLevels() reads as 0 (as it does for a mis-typed handle),
+            // no-ops when mipLevels() reads as 0 (as it does for a mis-typed handle),
             // so match that with a pointer-form cast rather than throwing.
             const auto* oglImage = dynamic_cast<const ogl::Image*>(image.operator->());
-            if (oglImage == nullptr || image->getMipLevels() <= 1) return;
+            if (oglImage == nullptr || image->mipLevels() <= 1) return;
             glGenerateTextureMipmap(**oglImage);
             glCheckError();
         });
@@ -981,8 +980,8 @@ namespace kor::ogl
         enqueue([buffer, offset, size] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
             auto actualSize = size;
-            if (size == UINT64_MAX) {
-                actualSize = oglBuffer.getSize() - offset;
+            if (size == WholeSize) {
+                actualSize = oglBuffer.size() - offset;
             }
             glNamedBufferSubData(*oglBuffer, offset, actualSize, nullptr);
             glCheckError();
@@ -995,7 +994,7 @@ namespace kor::ogl
         enqueue([image, color] () {
             const auto& oglImage = dynamic_cast<const ogl::Image&>(*image);
             const float rgba[4] = { color.r, color.g, color.b, color.a };
-            for (glm::u32 level = 0; level < image->getMipLevels(); ++level) {
+            for (glm::u32 level = 0; level < image->mipLevels(); ++level) {
                 glClearTexImage(*oglImage, static_cast<GLint>(level), GL_RGBA, GL_FLOAT, rgba);
             }
             glCheckError();
@@ -1003,13 +1002,13 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, void *data, glm::u64 offset, glm::u64 size) {
+    kor::CommandBuffer & CommandBuffer::doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, const void* data, glm::u64 offset, glm::u64 size) {
         CheckRecording();
         enqueue([buffer, data, offset, size] () {
             const auto& oglBuffer = dynamic_cast<const ogl::Buffer&>(*buffer);
             auto actualSize = size;
-            if (size == UINT64_MAX) {
-                actualSize = oglBuffer.getSize() - offset;
+            if (size == WholeSize) {
+                actualSize = oglBuffer.size() - offset;
             }
             glNamedBufferSubData(*oglBuffer, offset, actualSize, data);
             glCheckError();
@@ -1023,8 +1022,8 @@ namespace kor::ogl
             const auto& oglSrcBuffer = dynamic_cast<const ogl::Buffer&>(*srcBuffer);
             const auto& oglDstBuffer = dynamic_cast<const ogl::Buffer&>(*dstBuffer);
             auto actualSize = size;
-            if (size == UINT64_MAX) {
-                actualSize = std::min(oglSrcBuffer.getSize() - srcOffset, oglDstBuffer.getSize() - dstOffset);
+            if (size == WholeSize) {
+                actualSize = std::min(oglSrcBuffer.size() - srcOffset, oglDstBuffer.size() - dstOffset);
             }
             glCopyNamedBufferSubData(*oglSrcBuffer, *oglDstBuffer, srcOffset, dstOffset, actualSize);
             glCheckError();
@@ -1046,7 +1045,7 @@ namespace kor::ogl
         // Resolve kor::Copy's sentinel (-1) extent to the image's mip-level extent, and
         // clamp each axis to at least 1 texel. Mirrors the Vulkan backend's defaulting.
         glm::ivec3 resolveCopyExtent(const kor::Image& image, const kor::Copy& copyInfo) {
-            const glm::uvec3 base = image.getExtent();
+            const glm::uvec3 base = image.extent();
             const glm::u32 mip = copyInfo.imageMipLevel;
             glm::ivec3 ext = copyInfo.imageExtent;
             if (ext.x < 0) ext.x = static_cast<glm::i32>(std::max(base.x >> mip, 1u));
@@ -1064,9 +1063,9 @@ namespace kor::ogl
 
             // A compressed format has no base format or data type — the driver is handed blocks, not
             // texels — and asking for them would throw. Resolved only for the uncompressed path.
-            const bool compressed = kor::Image::IsBlockCompressed(image->getFormat());
-            const GLenum baseFormat = compressed ? GL_NONE : ogl::Image::BaseFormatFromImageFormat(image->getFormat());
-            const GLenum dataType = compressed ? GL_NONE : ogl::Image::DataTypeFromImageFormat(image->getFormat());
+            const bool compressed = kor::Image::isBlockCompressed(image->format());
+            const GLenum baseFormat = compressed ? GL_NONE : ogl::Image::BaseFormatFromImageFormat(image->format());
+            const GLenum dataType = compressed ? GL_NONE : ogl::Image::DataTypeFromImageFormat(image->format());
             const glm::ivec3 ext = resolveCopyExtent(*image, copyInfo);
             const GLint mip = static_cast<GLint>(copyInfo.imageMipLevel);
 
@@ -1083,23 +1082,23 @@ namespace kor::ogl
             // A compressed format goes through the glCompressedTextureSubImage* entry points, which
             // take a byte count rather than a format/type pair: the driver is handed blocks it does
             // not unpack. GL_UNPACK_ROW_LENGTH does not apply to them either, so the data must be
-            // tightly packed — which is what SizeOfRegion measures and what every loader produces.
+            // tightly packed — which is what sizeOfRegion measures and what every loader produces.
             if (compressed) {
-                const GLenum internalFormat = ogl::Image::InternalFormatFromImageFormat(image->getFormat());
-                const auto byteCount = static_cast<GLsizei>(kor::Image::SizeOfRegion(
-                    image->getFormat(),
+                const GLenum internalFormat = ogl::Image::InternalFormatFromImageFormat(image->format());
+                const auto byteCount = static_cast<GLsizei>(kor::Image::sizeOfRegion(
+                    image->format(),
                     { static_cast<glm::u32>(ext.x), static_cast<glm::u32>(ext.y), static_cast<glm::u32>(ext.z) },
                     copyInfo.imageLayerCount));
 
-                if (image->getType() == kor::Image::Type::e2D && image->getArrayLayers() == 1) {
+                if (image->type() == kor::Image::Type::e2D && image->arrayLayers() == 1) {
                     glCompressedTextureSubImage2D(*oglImage, mip, copyInfo.imageOffset.x, copyInfo.imageOffset.y,
                                                   ext.x, ext.y, internalFormat, byteCount, ptr);
-                } else if (image->getType() == kor::Image::Type::e2D) {
+                } else if (image->type() == kor::Image::Type::e2D) {
                     glCompressedTextureSubImage3D(*oglImage, mip, copyInfo.imageOffset.x, copyInfo.imageOffset.y,
                                                   static_cast<GLint>(copyInfo.imageBaseArrayLayer),
                                                   ext.x, ext.y, static_cast<GLint>(copyInfo.imageLayerCount),
                                                   internalFormat, byteCount, ptr);
-                } else if (image->getType() == kor::Image::Type::e3D) {
+                } else if (image->type() == kor::Image::Type::e3D) {
                     glCompressedTextureSubImage3D(*oglImage, mip, copyInfo.imageOffset.x, copyInfo.imageOffset.y,
                                                   copyInfo.imageOffset.z, ext.x, ext.y, ext.z,
                                                   internalFormat, byteCount, ptr);
@@ -1115,9 +1114,9 @@ namespace kor::ogl
                 return;
             }
 
-            switch (image->getType()) {
+            switch (image->type()) {
             case kor::Image::Type::e1D:
-                if (image->getArrayLayers() == 1) {
+                if (image->arrayLayers() == 1) {
                     glTextureSubImage1D(*oglImage, mip, copyInfo.imageOffset.x, ext.x, baseFormat, dataType, ptr);
                 } else {
                     glTextureSubImage2D(*oglImage, mip, copyInfo.imageOffset.x, static_cast<GLint>(copyInfo.imageBaseArrayLayer),
@@ -1125,7 +1124,7 @@ namespace kor::ogl
                 }
                 break;
             case kor::Image::Type::e2D:
-                if (image->getArrayLayers() == 1) {
+                if (image->arrayLayers() == 1) {
                     glTextureSubImage2D(*oglImage, mip, copyInfo.imageOffset.x, copyInfo.imageOffset.y,
                                         ext.x, ext.y, baseFormat, dataType, ptr);
                 } else {
@@ -1158,9 +1157,9 @@ namespace kor::ogl
 
             // A compressed format has no base format or data type — the driver is handed blocks, not
             // texels — and asking for them would throw. Resolved only for the uncompressed path.
-            const bool compressed = kor::Image::IsBlockCompressed(image->getFormat());
-            const GLenum baseFormat = compressed ? GL_NONE : ogl::Image::BaseFormatFromImageFormat(image->getFormat());
-            const GLenum dataType = compressed ? GL_NONE : ogl::Image::DataTypeFromImageFormat(image->getFormat());
+            const bool compressed = kor::Image::isBlockCompressed(image->format());
+            const GLenum baseFormat = compressed ? GL_NONE : ogl::Image::BaseFormatFromImageFormat(image->format());
+            const GLenum dataType = compressed ? GL_NONE : ogl::Image::DataTypeFromImageFormat(image->format());
             const glm::ivec3 ext = resolveCopyExtent(*image, copyInfo);
             const GLint mip = static_cast<GLint>(copyInfo.imageMipLevel);
 
@@ -1168,17 +1167,17 @@ namespace kor::ogl
             // y axis (1D arrays); map our offsets/extents accordingly.
             GLint xo = copyInfo.imageOffset.x, yo = copyInfo.imageOffset.y, zo = copyInfo.imageOffset.z;
             GLsizei w = ext.x, h = ext.y, d = ext.z;
-            switch (image->getType()) {
+            switch (image->type()) {
             case kor::Image::Type::e1D:
                 h = 1; d = 1;
-                if (image->getArrayLayers() > 1) {
+                if (image->arrayLayers() > 1) {
                     yo = static_cast<GLint>(copyInfo.imageBaseArrayLayer);
                     h = static_cast<GLsizei>(copyInfo.imageLayerCount);
                 }
                 break;
             case kor::Image::Type::e2D:
                 d = 1;
-                if (image->getArrayLayers() > 1) {
+                if (image->arrayLayers() > 1) {
                     zo = static_cast<GLint>(copyInfo.imageBaseArrayLayer);
                     d = static_cast<GLsizei>(copyInfo.imageLayerCount);
                 }
@@ -1196,7 +1195,7 @@ namespace kor::ogl
             glPixelStorei(GL_PACK_IMAGE_HEIGHT, static_cast<GLint>(copyInfo.bufferImageHeight));
             glCheckError();
 
-            const auto bufSize = static_cast<GLsizei>(oglBuffer.getSize() - copyInfo.bufferOffset);
+            const auto bufSize = static_cast<GLsizei>(oglBuffer.size() - copyInfo.bufferOffset);
             const auto ptr = reinterpret_cast<void*>(static_cast<std::uintptr_t>(copyInfo.bufferOffset));
             // The compressed counterpart of the write path: blocks come back as blocks, so there is
             // no format/type pair to hand over — only how many bytes there is room for.
@@ -1314,7 +1313,7 @@ namespace kor::ogl
         return true;
     }
 
-    kor::CommandBuffer & CommandBuffer::doPushConstants(const void *data, glm::u32 size, glm::u32 offset) {
+    kor::CommandBuffer & CommandBuffer::doPushConstantBlock(const void *data, glm::u32 size, glm::u32 offset) {
         CheckRecording();
         // The caller's `data` is transient, so snapshot it now and upload at replay
         // time. Push constants are emulated as a std140 UBO the pipeline owns (see

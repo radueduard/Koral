@@ -19,6 +19,7 @@
 //                       and buffer-to-buffer copy / fill / clear.
 //   DebugLabels         scoped + single debug-label commands.
 
+#include <array>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -77,7 +78,7 @@ constexpr std::uint32_t kW = 16;
 constexpr std::uint32_t kH = 16;
 
 // Minimal scene: clears the default framebuffer and draws an ImGui overlay with a
-// GUI_Image, driving the GL presentation + ImGui + GUI_Image blit paths per frame.
+// GuiImage, driving the GL presentation + ImGui + GuiImage blit paths per frame.
 class GlOverlayScene : public kor::Scene {
 public:
     void Initialize() override {
@@ -85,14 +86,12 @@ public:
                      .setType(Image::Type::e2D)
                      .setFormat(Image::Format::eRGBA8_UNORM)
                      .setExtent(glm::uvec2{16, 16})
-                     .addUsage(Image::Usage::eTransferSrc)
-                     .addUsage(Image::Usage::eTransferDst)
-                     .addUsage(Image::Usage::eSampled)
+                     .setUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
                      .build();
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-            cb.ClearColorImage(ResourceRef<const Image>(_image), glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
+            cb.ClearColorImage(_image, glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
         }, CommandBuffer::Usage::eGraphics);
-        _guiImage = kor::GUI_Image::Create(ResourceRef<const Image>(_image));
+        _guiImage = kor::GuiImage::Create(_image);
     }
 
     void Update() override { ++updates; }
@@ -118,7 +117,7 @@ public:
 
 private:
     kor::Resource<kor::Image> _image;
-    kor::Resource<kor::GUI_Image> _guiImage;
+    kor::Resource<kor::GuiImage> _guiImage;
 };
 
 void drawFrame(kor::Scene& scene) {
@@ -207,12 +206,11 @@ OffscreenTarget makeTarget(const glm::vec4 clearColor) {
                   .setType(Image::Type::e2D)
                   .setFormat(Image::Format::eRGBA8_UNORM)
                   .setExtent(glm::uvec2{kW, kH})
-                  .addUsage(Image::Usage::eColorAttachment)
-                  .addUsage(Image::Usage::eTransferSrc)
+                  .setUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                   .build();
-    t.view = ImageView::Builder(ResourceRef<const Image>(t.image)).build();
+    t.view = ImageView::Builder(t.image).build();
     t.framebuffer = Framebuffer::Builder{}
-                        .addColorAttachment(ResourceRef<const ImageView>(t.view), clearColor)
+                        .addColor({ .view = t.view, .clear = clearColor })
                         .build();
     return t;
 }
@@ -228,11 +226,11 @@ ResourceRef<const Shader> loadShader(const char* file, const Shader::Stage stage
 std::vector<Pixel> readbackImage(const kor::Resource<Image>& image) {
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .addUsage(Buffer::Usage::eTransferDst)
+      .setUsage(Buffer::Usage::eTransferDst)
       .setType(Buffer::Type::eReadback);
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(readback));
+        cb.CopyImageToBuffer(image, readback);
     }, CommandBuffer::Usage::eTransfer);
     return readback->Read<Pixel>();
 }
@@ -270,12 +268,12 @@ TEST_F(GlTest, RenderParity) {
         auto pipeline = GraphicsPipeline::Builder{}
                             .setVertexShader(vert)
                             .setFragmentShader(frag)
-                            .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                            .setFramebuffer(target.framebuffer)
                             .build();
 
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-            cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-            cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+            cb.BeginRendering(target.framebuffer);
+            cb.BindGraphicsPipeline(pipeline);
             cb.SetViewport(0, 0, kW, kH);
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
@@ -300,14 +298,14 @@ TEST_F(GlTest, RenderParity) {
         auto pipeline = GraphicsPipeline::Builder{}
                             .setVertexShader(vert)
                             .setFragmentShader(frag)
-                            .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                            .setFramebuffer(target.framebuffer)
                             .build();
 
         const glm::vec4 pushed{1.f, 0.f, 1.f, 1.f}; // magenta
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-            cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-            cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
-            cb.PushConstants(pushed);
+            cb.BeginRendering(target.framebuffer);
+            cb.BindGraphicsPipeline(pipeline);
+            cb.PushConstantBlock(pushed);
             cb.SetViewport(0, 0, kW, kH);
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
@@ -338,15 +336,15 @@ TEST_F(GlTest, RenderParity) {
         auto pipeline = GraphicsPipeline::Builder{}
                             .setVertexShader(vert)
                             .setFragmentShader(frag)
-                            .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                            .setFramebuffer(target.framebuffer)
                             .setColorBlendState(blend)
                             .build();
 
         const glm::vec4 halfGreen{0.f, 1.f, 0.f, 0.5f};
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-            cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-            cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
-            cb.PushConstants(halfGreen);
+            cb.BeginRendering(target.framebuffer);
+            cb.BindGraphicsPipeline(pipeline);
+            cb.PushConstantBlock(halfGreen);
             cb.SetViewport(0, 0, kW, kH);
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
@@ -376,12 +374,12 @@ TEST_F(GlTest, RenderParity) {
         auto pipeline = GraphicsPipeline::Builder{}
                             .setVertexShader(vert)
                             .setFragmentShader(frag)
-                            .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                            .setFramebuffer(target.framebuffer)
                             .build();
 
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-            cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-            cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+            cb.BeginRendering(target.framebuffer);
+            cb.BindGraphicsPipeline(pipeline);
             cb.SetViewport(0, 0, kW, kH);
             cb.SetScissor(kSx, kSy, kSw, kSh);
             // dynamic-state overrides must record and not disturb the draw
@@ -428,15 +426,15 @@ TEST_F(GlTest, RenderParity) {
         auto pipeline = GraphicsPipeline::Builder{}
                             .setVertexShader(vert, PosMesh::Layout())
                             .setFragmentShader(frag)
-                            .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                            .setFramebuffer(target.framebuffer)
                             .build();
 
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-            cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-            cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+            cb.BeginRendering(target.framebuffer);
+            cb.BindGraphicsPipeline(pipeline);
             cb.SetViewport(0, 0, kW, kH);
             cb.SetScissor(0, 0, kW, kH);
-            cb.BindMesh(ResourceRef<const kor::Mesh>(mesh));
+            cb.BindMesh(mesh);
             cb.DrawIndexed(); // index count resolved from the bound mesh
             cb.EndRendering();
         }, CommandBuffer::Usage::eGraphics);
@@ -471,26 +469,24 @@ TEST_F(GlTest, ComputeDispatch) {
 
     Buffer::Builder<std::uint32_t> bufBuilder;
     bufBuilder.setData(input);
-    bufBuilder.addUsage(Buffer::Usage::eStorage);
-    bufBuilder.addUsage(Buffer::Usage::eTransferSrc);
-    bufBuilder.addUsage(Buffer::Usage::eTransferDst);
+    bufBuilder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     bufBuilder.setType(Buffer::Type::eDeviceLocal);
     auto buffer = bufBuilder.build();
 
     const auto shader = loadShader("doubleValues.comp.glsl", Shader::Stage::eCompute, "glt.doubleValues");
     auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
 
-    auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
+    auto descriptorSet = DescriptorSet::Builder(pipeline, 0)
                              .write(0, buffer)
                              .build();
 
     const ResourceRef<const Buffer> bufRef(buffer);
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BindComputePipeline(ResourceRef<const ComputePipeline>(pipeline));
-        cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
-        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::ComputeReadWrite));
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, descriptorSet);
+        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::eComputeReadWrite));
         cb.Dispatch(kCount / kLocalSize, 1, 1);
-        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::TransferSrc));
+        cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::eTransferSrc));
     }, CommandBuffer::Usage::eCompute);
 
     const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
@@ -526,12 +522,12 @@ TEST_F(GlTest, SamplersAndDescriptors) {
 
     auto sampledImg = makeImage(kor::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
     auto storageImg = makeImage(kor::Flags(Image::Usage::eStorage) | Image::Usage::eTransferDst);
-    auto sampledView = ImageView::Builder(ResourceRef<const Image>(sampledImg)).build();
-    auto storageView = ImageView::Builder(ResourceRef<const Image>(storageImg)).build();
+    auto sampledView = ImageView::Builder(sampledImg).build();
+    auto storageView = ImageView::Builder(storageImg).build();
     auto sampler = Sampler::Builder{}.build();
 
     Buffer::RawBuilder ub;
-    ub.setRawSize(256).addUsage(Buffer::Usage::eUniform).setType(Buffer::Type::eDynamic);
+    ub.setRawSize(256).setUsage(Buffer::Usage::eUniform).setType(Buffer::Type::eDynamic);
     auto uniform = ub.build();
 
     // eSampledImage / eStorageImage / eCombinedImageSampler / eSampler / eUniformBuffer
@@ -552,8 +548,8 @@ TEST_F(GlTest, SamplersAndDescriptors) {
     ASSERT_TRUE(static_cast<bool>(set));
 
     // Runtime re-write path (separate from the build-time writes above).
-    set->Write(0, sampler, 0);
-    set->Write(3, sampledView, sampler, 0);
+    set->rebind(0, sampler, 0);
+    set->rebind(3, sampledView, sampler, 0);
     SUCCEED();
 }
 
@@ -567,11 +563,10 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
                        .setType(Image::Type::e3D)
                        .setFormat(Image::Format::eRGBA8_UNORM)
                        .setExtent(glm::uvec3{8, 8, 4})
-                       .addUsage(Image::Usage::eTransferDst)
-                       .addUsage(Image::Usage::eSampled)
+                       .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
                        .build();
     ASSERT_TRUE(static_cast<bool>(image3d));
-    auto view3d = ImageView::Builder(ResourceRef<const Image>(image3d))
+    auto view3d = ImageView::Builder(image3d)
                       .setViewType(ImageView::Type::e3D).build();
     ASSERT_TRUE(static_cast<bool>(view3d));
 
@@ -580,8 +575,7 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
                         .setFormat(Image::Format::eR8_UNORM)
                         .setExtent(glm::uvec2{8, 8})
                         .setArrayLayers(3)
-                        .addUsage(Image::Usage::eTransferDst)
-                        .addUsage(Image::Usage::eSampled)
+                        .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
                         .build();
     ASSERT_TRUE(static_cast<bool>(arrayImg));
 
@@ -591,9 +585,7 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
                       .setFormat(Image::Format::eRGBA8_UNORM)
                       .setExtent(glm::uvec2{8, 8})
                       .setMipLevels(4)
-                      .addUsage(Image::Usage::eTransferSrc)
-                      .addUsage(Image::Usage::eTransferDst)
-                      .addUsage(Image::Usage::eSampled)
+                      .setUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
                       .build();
 
     // Blit (down-scale) between two images.
@@ -602,15 +594,14 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
                        .setType(Image::Type::e2D)
                        .setFormat(Image::Format::eRGBA8_UNORM)
                        .setExtent(glm::uvec2{4, 4})
-                       .addUsage(Image::Usage::eTransferDst)
-                       .addUsage(Image::Usage::eTransferSrc)
+                       .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
                        .build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(ResourceRef<const Image>(mipped), glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
-        cb.GenerateMipmaps(ResourceRef<const Image>(mipped));
-        cb.ClearColorImage(ResourceRef<const Image>(blitSrc), glm::vec4{1.f, 1.f, 0.f, 1.f});
-        cb.Blit(ResourceRef<const Image>(blitSrc), ResourceRef<const Image>(blitDst), kor::Blit{
+        cb.ClearColorImage(mipped, glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
+        cb.GenerateMipmaps(mipped);
+        cb.ClearColorImage(blitSrc, glm::vec4{1.f, 1.f, 0.f, 1.f});
+        cb.Blit(blitSrc, blitDst, kor::Blit{
             .srcExtent = {8, 8, 1},
             .dstExtent = {4, 4, 1},
             .filtering = kor::Filter::eLinear,
@@ -621,23 +612,24 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
     std::vector<std::uint32_t> data(64, 7u);
     Buffer::Builder<std::uint32_t> srcB;
     srcB.setData(data);
-    srcB.addUsage(Buffer::Usage::eTransferSrc);
-    srcB.addUsage(Buffer::Usage::eTransferDst);
+    srcB.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     srcB.setType(Buffer::Type::eDeviceLocal);
     auto src = srcB.build();
 
     Buffer::RawBuilder dstB;
     dstB.setRawSize(static_cast<glm::i64>(data.size() * sizeof(std::uint32_t)))
-        .addUsage(Buffer::Usage::eTransferDst)
-        .addUsage(Buffer::Usage::eTransferSrc)
+        .setUsage(Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc)
         .setType(Buffer::Type::eReadback);
     auto dst = dstB.build();
 
-    std::uint32_t fillValue = 0xABCDABCDu;
+    // Eight of them: FillBuffer copies the bytes it is given rather than replicating a value, so
+    // asking for 8 * sizeof(uint32_t) from a single uint32_t read past the end of it.
+    const std::array<std::uint32_t, 8> fillValues { 0xABCDABCDu, 0xABCDABCDu, 0xABCDABCDu, 0xABCDABCDu,
+                                                    0xABCDABCDu, 0xABCDABCDu, 0xABCDABCDu, 0xABCDABCDu };
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.CopyBuffer(ResourceRef<const Buffer>(src), ResourceRef<const Buffer>(dst));
-        cb.FillBuffer(ResourceRef<const Buffer>(src), &fillValue, 0, sizeof(std::uint32_t) * 8);
-        cb.ClearBuffer(ResourceRef<const Buffer>(src));
+        cb.CopyBuffer(src, dst);
+        cb.FillBuffer(src, fillValues);
+        cb.ClearBuffer(src);
     }, CommandBuffer::Usage::eTransfer);
 
     const std::vector<std::uint32_t> out = dst->Read<std::uint32_t>();
@@ -656,9 +648,9 @@ TEST_F(GlTest, TexturedDraw) {
     auto texture = makeImage(kor::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
     const glm::vec4 texColor{0.2f, 0.4f, 0.8f, 1.f};
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(ResourceRef<const Image>(texture), texColor);
+        cb.ClearColorImage(texture, texColor);
     }, CommandBuffer::Usage::eGraphics);
-    auto texView = ImageView::Builder(ResourceRef<const Image>(texture)).build();
+    auto texView = ImageView::Builder(texture).build();
     auto sampler = Sampler::Builder{}
                        .setMinFilter(kor::Filter::eNearest)
                        .setMagFilter(kor::Filter::eNearest)
@@ -670,17 +662,17 @@ TEST_F(GlTest, TexturedDraw) {
     auto pipeline = GraphicsPipeline::Builder{}
                         .setVertexShader(vert)
                         .setFragmentShader(frag)
-                        .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                        .setFramebuffer(target.framebuffer)
                         .build();
 
-    auto set = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
+    auto set = DescriptorSet::Builder(pipeline, 0)
                    .write(0, texView, sampler)
                    .build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
-        cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(set));
+        cb.BeginRendering(target.framebuffer);
+        cb.BindGraphicsPipeline(pipeline);
+        cb.BindDescriptorSet(0, set);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(3);
@@ -712,7 +704,7 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
     auto pipeline = GraphicsPipeline::Builder{}
                         .setVertexShader(vert)
                         .setFragmentShader(frag)
-                        .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                        .setFramebuffer(target.framebuffer)
                         .build();
     ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
 
@@ -724,8 +716,8 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
     EXPECT_TRUE(colorConstant->stages & Shader::Stage::eFragment);
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.BeginRendering(target.framebuffer);
+        cb.BindGraphicsPipeline(pipeline);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
         cb.PushConstant("offset", glm::vec2{0.f, 0.f});
@@ -742,8 +734,8 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
 
     // The vertex stage's half of the block, on its own: shifted clear off the target.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.BeginRendering(target.framebuffer);
+        cb.BindGraphicsPipeline(pipeline);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
         cb.PushConstant("offset", glm::vec2{2.f, 0.f});
@@ -770,7 +762,7 @@ TEST_F(GlTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
     auto pipeline = GraphicsPipeline::Builder{}
                         .setVertexShader(vert)
                         .setFragmentShader(frag)
-                        .setFramebuffer(ResourceRef<Framebuffer>(target.framebuffer))
+                        .setFramebuffer(target.framebuffer)
                         .build();
     ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
 
@@ -788,8 +780,8 @@ TEST_F(GlTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
     const std::array tintsValue{ glm::vec3{0.2f, 0.f, 0.f}, glm::vec3{0.f, 0.2f, 0.f}, glm::vec3{0.f, 0.f, 0.2f} };
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
-        cb.BindGraphicsPipeline(ResourceRef<const GraphicsPipeline>(pipeline));
+        cb.BeginRendering(target.framebuffer);
+        cb.BindGraphicsPipeline(pipeline);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
         cb.PushConstant("basis", basisValue);
@@ -819,7 +811,7 @@ TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .addUsage(Buffer::Usage::eTransferDst)
+      .setUsage(Buffer::Usage::eTransferDst)
       .setType(Buffer::Type::eReadback);
     auto firstPass = rb.build();
     auto secondPass = rb.build();
@@ -827,15 +819,15 @@ TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
     // Both passes in one command buffer, so both lambdas are queued before either runs — which is
     // the arrangement that catches a value read at replay time.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BeginRendering(kor::RenderInfo(ResourceRef<const Framebuffer>(target.framebuffer))
+        cb.BeginRendering(kor::RenderInfo(target.framebuffer)
                               .setClearColor(0, glm::vec4{1.f, 0.f, 0.f, 1.f}));
         cb.EndRendering();
-        cb.CopyImageToBuffer(ResourceRef<const Image>(target.image), ResourceRef<const Buffer>(firstPass));
+        cb.CopyImageToBuffer(target.image, firstPass);
 
-        cb.BeginRendering(kor::RenderInfo(ResourceRef<const Framebuffer>(target.framebuffer))
+        cb.BeginRendering(kor::RenderInfo(target.framebuffer)
                               .setClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
         cb.EndRendering();
-        cb.CopyImageToBuffer(ResourceRef<const Image>(target.image), ResourceRef<const Buffer>(secondPass));
+        cb.CopyImageToBuffer(target.image, secondPass);
     }, CommandBuffer::Usage::eGraphics);
 
     const auto first = firstPass->Read<Pixel>();
@@ -847,7 +839,7 @@ TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
 
     // And a pass that overrides nothing still gets the framebuffer's own value.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BeginRendering(ResourceRef<const Framebuffer>(target.framebuffer));
+        cb.BeginRendering(target.framebuffer);
         cb.EndRendering();
     }, CommandBuffer::Usage::eGraphics);
     EXPECT_EQ(readbackImage(target.image).front(), Pixel(0, 0, 255, 255));
@@ -863,7 +855,7 @@ TEST_F(GlTest, DebugLabels) {
         cb.BeginDebugLabel("outer", glm::vec4{1.f, 0.f, 0.f, 1.f});
         cb.InsertDebugLabel("marker");
         cb.DebugLabel("scoped", [&](CommandBuffer& inner) {
-            inner.ClearColorImage(ResourceRef<const Image>(image), glm::vec4{0.f, 1.f, 0.f, 1.f});
+            inner.ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
         });
         cb.EndDebugLabel();
     }, CommandBuffer::Usage::eGraphics);
@@ -884,8 +876,7 @@ TEST_F(GlTest, DeviceDynamicBufferRoundTrips) {
 
     Buffer::Builder<std::uint32_t> builder;
     builder.setData(source);
-    builder.addUsage(Buffer::Usage::eStorage);
-    builder.addUsage(Buffer::Usage::eTransferSrc);
+    builder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc);
     builder.setType(Buffer::Type::eDeviceDynamic);
     auto buffer = builder.build();
     ASSERT_TRUE(buffer.valid());
@@ -906,7 +897,7 @@ TEST_F(GlTest, DeviceDynamicBufferRoundTrips) {
 TEST_F(GlTest, GpuTimersMeasureFrameWork) {
     auto image = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
 
-    const int budget = static_cast<int>(kor::Context::Scheduler().getImageCount()) + 8;
+    const int budget = static_cast<int>(kor::Context::Scheduler().imageCount()) + 8;
     bool found = false;
     double milliseconds = 0.0;
 
@@ -914,12 +905,12 @@ TEST_F(GlTest, GpuTimersMeasureFrameWork) {
         kor::Context::Scheduler().Draw([&](CommandBuffer& cb) {
             cb.Timer("gl.clears", [&](CommandBuffer& inner) {
                 for (int i = 0; i < 8; ++i)
-                    inner.ClearColorImage(ResourceRef<const Image>(image), glm::vec4{0.f, 1.f, 0.f, 1.f});
+                    inner.ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
             });
         });
 
-        for (const auto& f : kor::Context::Scheduler().getFrames()) {
-            for (const auto& timing : f.get().getCommandBuffer().getTimings()) {
+        for (const auto& f : kor::Context::Scheduler().frames()) {
+            for (const auto& timing : f.get().commandBuffer().timings()) {
                 if (timing.label != "gl.clears") continue;
                 found = true;
                 milliseconds = timing.milliseconds;
@@ -943,20 +934,18 @@ TEST_F(GlTest, GpuTimersMeasureFrameWork) {
 TEST_F(GlTest, CompressedImageUploadRoundTrips) {
     constexpr std::uint32_t kSize = 16;   // 4x4 blocks of BC7
     const auto format = Image::Format::eBC7_UNORM;
-    const auto byteCount = Image::SizeOfRegion(format, { kSize, kSize, 1 });
+    const auto byteCount = Image::sizeOfRegion(format, { kSize, kSize, 1 });
     ASSERT_EQ(byteCount, 256u);
 
     std::vector<std::uint8_t> blocks(byteCount);
     for (std::size_t i = 0; i < blocks.size(); ++i)
-        blocks[i] = static_cast<std::uint8_t>((i / Image::BlockSizeFromImageFormat(format)) + 1);
+        blocks[i] = static_cast<std::uint8_t>((i / Image::blockSize(format)) + 1);
 
     auto image = Image::Builder{}
         .setType(Image::Type::e2D)
         .setFormat(format)
         .setExtent(glm::uvec2{ kSize, kSize })
-        .addUsage(Image::Usage::eTransferDst)
-        .addUsage(Image::Usage::eTransferSrc)
-        .addUsage(Image::Usage::eSampled)
+        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
         .build();
     ASSERT_TRUE(static_cast<bool>(image)) << (image.error() ? image.error()->message : "");
 
@@ -968,16 +957,16 @@ TEST_F(GlTest, CompressedImageUploadRoundTrips) {
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(byteCount))
-      .addUsage(Buffer::Usage::eTransferDst)
+      .setUsage(Buffer::Usage::eTransferDst)
       .setType(Buffer::Type::eReadback);
     auto readback = rb.build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.CopyBufferToImage(ResourceRef<const Buffer>(staging), ResourceRef<const Image>(image), kor::Copy{
+        cb.CopyBufferToImage(staging, image, kor::Copy{
             .imageOffset = { 0, 0, 0 },
             .imageExtent = { kSize, kSize, 1 },
         });
-        cb.CopyImageToBuffer(ResourceRef<const Image>(image), ResourceRef<const Buffer>(readback), kor::Copy{
+        cb.CopyImageToBuffer(image, readback, kor::Copy{
             .imageOffset = { 0, 0, 0 },
             .imageExtent = { kSize, kSize, 1 },
         });
@@ -1021,21 +1010,18 @@ TEST_F(GlTest, TexelBufferFetch) {
 
     Buffer::Builder<float> sourceBuilder;
     sourceBuilder.setData(source)
-                 .addUsage(Buffer::Usage::eTexel)
-                 .addUsage(Buffer::Usage::eTransferDst);
+                 .setUsage(Buffer::Usage::eTexel | Buffer::Usage::eTransferDst);
     auto sourceBuffer = sourceBuilder.build();
     ASSERT_TRUE(sourceBuffer.valid()) << (sourceBuffer.error() ? sourceBuffer.error()->history() : "");
 
-    auto view = kor::BufferView::Builder(ResourceRef<const Buffer>(sourceBuffer))
+    auto view = kor::BufferView::Builder(sourceBuffer)
         .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
         .build();
     ASSERT_TRUE(view.valid()) << (view.error() ? view.error()->history() : "");
 
     Buffer::Builder<float> destBuilder;
     destBuilder.setData(std::vector<float>(kTexels, -1.f))
-               .addUsage(Buffer::Usage::eStorage)
-               .addUsage(Buffer::Usage::eTransferSrc)
-               .addUsage(Buffer::Usage::eTransferDst);
+               .setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     auto destination = destBuilder.build();
     ASSERT_TRUE(destination.valid());
 
@@ -1053,9 +1039,9 @@ TEST_F(GlTest, TexelBufferFetch) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BindComputePipeline(pipeline);
         cb.BindDescriptorSet(0, set);
-        cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::ComputeReadWrite));
+        cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::eComputeReadWrite));
         cb.Dispatch(kTexels / 64, 1, 1);
-        cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::TransferSrc));
+        cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::eTransferSrc));
     }, CommandBuffer::Usage::eCompute);
 
     const std::vector<float> output = destination->Read<float>();

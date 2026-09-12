@@ -32,11 +32,11 @@ namespace kor
         // Asked of the scheduler rather than remembered, so it is always the copy a command recorded
         // now would actually touch.
         if (!_isPerFrame) return 0;
-        if (!Context::HasDevice() || Context::IsHeadless()) return 0;
-        return Context::Scheduler().getCurrentImageIndex();
+        if (!Context::hasDevice() || Context::isHeadless()) return 0;
+        return Context::Scheduler().currentImageIndex();
     }
 
-    std::optional<ResourceAccess> Image::getTrackedAccess(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    std::optional<ResourceAccess> Image::trackedAccess(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
         const auto tracked = _trackedAccess.find(trackingKey(mipLevel, arrayLayer));
         if (tracked == _trackedAccess.end()) return std::nullopt;
@@ -91,12 +91,12 @@ namespace kor
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                 commandBuffer.CopyBufferToImage(staging, imageRef, kor::Copy {
                     .imageBaseArrayLayer = 0,
-                    .imageLayerCount = image->getArrayLayers(),
+                    .imageLayerCount = image->arrayLayers(),
                     .imageMipLevel = 0,
                 });
             });
 
-            if (image->getMipLevels() > 1) {
+            if (image->mipLevels() > 1) {
                 CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                     commandBuffer.GenerateMipmaps(imageRef);
                 });
@@ -105,7 +105,7 @@ namespace kor
             // Leave the image shader-readable: the copy/mip commands leave it in a
             // transfer-destination state, but descriptors bind sampled images as read-only.
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::AllShaderRead }});
+                commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::eAllShaderRead }});
             });
         }
 
@@ -119,7 +119,7 @@ namespace kor
         return materialize<Image>(*this, "Image", where);
     }
 
-    glm::u32 Image::ChannelSizeFromImageFormat(const kor::Image::Format format)
+    glm::u32 Image::channelSize(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -197,7 +197,7 @@ namespace kor
         }
     }
 
-    glm::u32 Image::ChannelCountFromImageFormat(const kor::Image::Format format)
+    glm::u32 Image::channelCount(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -354,20 +354,20 @@ namespace kor
         return ResourceRef<const ImageView>(_defaultViews[slot]);
     }
 
-    bool Image::IsFormatSupported(const kor::Image::Format format, const Flags<Usage> usage)
+    bool Image::isFormatSupported(const kor::Image::Format format, const Flags<Usage> usage)
     {
         // No device, no answer — and "no" is the safe one: a caller choosing a format from what is
         // supported would otherwise pick something that cannot be created a moment later.
-        if (!Context::HasDevice()) return false;
+        if (!Context::hasDevice()) return false;
 
         if (Context::activeAPI() == API::eVulkan)
-            return vk::Image::IsFormatSupported(format, usage);
+            return vk::Image::isFormatSupported(format, usage);
         if (Context::activeAPI() == API::eOpenGL)
-            return ogl::Image::IsFormatSupported(format, usage);
+            return ogl::Image::isFormatSupported(format, usage);
         return false;
     }
 
-    bool Image::IsBlockCompressed(const kor::Image::Format format)
+    bool Image::isBlockCompressed(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -392,7 +392,7 @@ namespace kor
         }
     }
 
-    glm::uvec2 Image::BlockExtentFromImageFormat(const kor::Image::Format format)
+    glm::uvec2 Image::blockExtent(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -403,12 +403,12 @@ namespace kor
             return { 8, 8 };
         default:
             // Every other compressed format is 4x4; an uncompressed one is its own texel, which
-            // makes the block arithmetic in SizeOfRegion the same code for both.
-            return IsBlockCompressed(format) ? glm::uvec2{ 4, 4 } : glm::uvec2{ 1, 1 };
+            // makes the block arithmetic in sizeOfRegion the same code for both.
+            return isBlockCompressed(format) ? glm::uvec2{ 4, 4 } : glm::uvec2{ 1, 1 };
         }
     }
 
-    glm::u32 Image::BlockSizeFromImageFormat(const kor::Image::Format format)
+    glm::u32 Image::blockSize(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -433,14 +433,14 @@ namespace kor
             return 16;
         default:
             // Uncompressed: one texel is the block.
-            return ChannelSizeFromImageFormat(format) * ChannelCountFromImageFormat(format);
+            return channelSize(format) * channelCount(format);
         }
     }
 
-    glm::u64 Image::SizeOfRegion(const kor::Image::Format format, const glm::uvec3 extent,
+    glm::u64 Image::sizeOfRegion(const kor::Image::Format format, const glm::uvec3 extent,
                                  const glm::u32 layerCount)
     {
-        const auto block = BlockExtentFromImageFormat(format);
+        const auto block = blockExtent(format);
         // Round up: a 5-texel row of a 4x4 format still costs two blocks, and a buffer sized for
         // one and a quarter would be short.
         const glm::u64 blocksX = (static_cast<glm::u64>(extent.x) + block.x - 1) / block.x;
@@ -448,7 +448,7 @@ namespace kor
         const glm::u64 depth = std::max(1u, extent.z);
         const glm::u64 layers = std::max(1u, layerCount);
 
-        return blocksX * blocksY * depth * layers * BlockSizeFromImageFormat(format);
+        return blocksX * blocksY * depth * layers * blockSize(format);
     }
 
     Image::Image(const Builder& createInfo) :
@@ -458,14 +458,14 @@ namespace kor
         _extent(createInfo.extent),
         _mipLevels(createInfo.mipLevels),
         _arrayLayers(createInfo.arrayLayers),
-        _msaa(createInfo.msaa),
+        _sampleCount(createInfo.sampleCount),
         _usage(createInfo.usage) {
         if (_mipLevels == 0) {
             _mipLevels = 1 + static_cast<glm::u32>(std::floor(std::log2(std::max(_extent.x, std::max(_extent.y, _extent.z)))));
         }
     }
 
-    bool IsDepthStencilFormat(const Image::Format format)
+    bool isDepthStencilFormat(const Image::Format format)
     {
         switch (format)
         {
@@ -479,7 +479,7 @@ namespace kor
         }
     }
 
-    bool IsStencilFormat(Image::Format format)
+    bool isStencilFormat(Image::Format format)
     {
         switch (format)
         {

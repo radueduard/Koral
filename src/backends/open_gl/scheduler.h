@@ -18,7 +18,7 @@ namespace kor::ogl
     public:
         explicit Scheduler(const Builder& createInfo);
         void Initialize() override;
-        void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const override;
+        void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) override;
 
     protected:
         void createFrames() override;
