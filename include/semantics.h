@@ -33,7 +33,7 @@
  *
  * @code{.cpp}
  * auto set = kor::DescriptorSet::Builder(_pipeline, 1)
- *     .write(0, *_camera)   // the camera answers for every KOR_CAMERA_* / KOR_VIEW_* semantic
+ *     .write("Frame", _camera)   // the camera answers for every KOR_CAMERA_* / KOR_VIEW_* semantic
  *     .build();
  * @endcode
  *

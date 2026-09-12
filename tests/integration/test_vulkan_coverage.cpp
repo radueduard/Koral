@@ -119,7 +119,7 @@ TEST_F(GpuTest, DescriptorTypesBuild) {
     {
         auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eSampler).build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, Descriptor(ResourceRef<const Sampler>(sampler)))
+                       .write(0, sampler)
                        .build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
@@ -127,7 +127,7 @@ TEST_F(GpuTest, DescriptorTypesBuild) {
     {
         auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eSampledImage).build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, Descriptor(ResourceRef<const ImageView>(sampledView)))
+                       .write(0, sampledView)
                        .build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
@@ -135,7 +135,7 @@ TEST_F(GpuTest, DescriptorTypesBuild) {
     {
         auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eStorageImage).build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, Descriptor(ResourceRef<const ImageView>(storageView)))
+                       .write(0, storageView)
                        .build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
@@ -143,7 +143,7 @@ TEST_F(GpuTest, DescriptorTypesBuild) {
     {
         auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eCombinedImageSampler).build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, Descriptor(ResourceRef<const ImageView>(sampledView), ResourceRef<const Sampler>(sampler)))
+                       .write(0, sampledView, sampler)
                        .build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
@@ -154,8 +154,8 @@ TEST_F(GpuTest, DescriptorTypesBuild) {
                           .addBinding(1, DescriptorType::eCombinedImageSampler)
                           .build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, Descriptor(ResourceRef<const Buffer>(uniform)))
-                       .write(1, Descriptor(ResourceRef<const ImageView>(sampledView), ResourceRef<const Sampler>(sampler)))
+                       .write(0, uniform)
+                       .write(1, sampledView, sampler)
                        .build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
@@ -187,23 +187,23 @@ TEST_F(GpuTest, DescriptorRuntimeWrite) {
     // Every layout binding must be written at build time (unwritten bindings hold
     // default-invalid descriptors that the constructor would choke on).
     auto set = DescriptorSet::Builder(*layout)
-                   .write(0, Descriptor(ResourceRef<const Buffer>(storage)))
-                   .write(1, Descriptor(ResourceRef<const ImageView>(view)))
-                   .write(2, Descriptor(ResourceRef<const Sampler>(sampler)))
-                   .write(3, Descriptor(ResourceRef<const ImageView>(view)))
-                   .write(4, Descriptor(ResourceRef<const Buffer>(uniform)))
-                   .write(5, Descriptor(ResourceRef<const ImageView>(view), ResourceRef<const Sampler>(sampler)))
+                   .write(0, storage)
+                   .write(1, view)
+                   .write(2, sampler)
+                   .write(3, view)
+                   .write(4, uniform)
+                   .write(5, view, sampler)
                    .build();
     ASSERT_TRUE(static_cast<bool>(set));
 
     // Now re-issue each binding through the runtime DescriptorSet::Write() path,
     // which is a separate switch from the build-time writes above.
-    set->Write(0, Descriptor(ResourceRef<const Buffer>(storage)), 0);
-    set->Write(1, Descriptor(ResourceRef<const ImageView>(view)), 0);
-    set->Write(2, Descriptor(ResourceRef<const Sampler>(sampler)), 0);
-    set->Write(3, Descriptor(ResourceRef<const ImageView>(view)), 0);
-    set->Write(4, Descriptor(ResourceRef<const Buffer>(uniform)), 0);
-    set->Write(5, Descriptor(ResourceRef<const ImageView>(view), ResourceRef<const Sampler>(sampler)), 0);
+    set->Write(0, storage, 0);
+    set->Write(1, view, 0);
+    set->Write(2, sampler, 0);
+    set->Write(3, view, 0);
+    set->Write(4, uniform, 0);
+    set->Write(5, view, sampler, 0);
     set->DebugPrint(); // exercise the debug dump path
     SUCCEED();
 }

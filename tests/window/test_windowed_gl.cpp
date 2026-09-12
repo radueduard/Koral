@@ -35,6 +35,7 @@
 #include "computePipeline.h"
 #include "context.h"
 #include "descriptor.h"
+#include "bufferView.h"
 #include "descriptorSet.h"
 #include "descriptorSetLayout.h"
 #include "framebuffer.h"
@@ -480,7 +481,7 @@ TEST_F(GlTest, ComputeDispatch) {
     auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
 
     auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-                             .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
+                             .write(0, buffer)
                              .build();
 
     const ResourceRef<const Buffer> bufRef(buffer);
@@ -542,17 +543,17 @@ TEST_F(GlTest, SamplersAndDescriptors) {
                       .addBinding(4, DescriptorType::eUniformBuffer)
                       .build();
     auto set = DescriptorSet::Builder(*layout)
-                   .write(0, Descriptor(ResourceRef<const Sampler>(sampler)))
-                   .write(1, Descriptor(ResourceRef<const ImageView>(sampledView)))
-                   .write(2, Descriptor(ResourceRef<const ImageView>(storageView)))
-                   .write(3, Descriptor(ResourceRef<const ImageView>(sampledView), ResourceRef<const Sampler>(sampler)))
-                   .write(4, Descriptor(ResourceRef<const Buffer>(uniform)))
+                   .write(0, sampler)
+                   .write(1, sampledView)
+                   .write(2, storageView)
+                   .write(3, sampledView, sampler)
+                   .write(4, uniform)
                    .build();
     ASSERT_TRUE(static_cast<bool>(set));
 
     // Runtime re-write path (separate from the build-time writes above).
-    set->Write(0, Descriptor(ResourceRef<const Sampler>(sampler)), 0);
-    set->Write(3, Descriptor(ResourceRef<const ImageView>(sampledView), ResourceRef<const Sampler>(sampler)), 0);
+    set->Write(0, sampler, 0);
+    set->Write(3, sampledView, sampler, 0);
     SUCCEED();
 }
 
@@ -673,7 +674,7 @@ TEST_F(GlTest, TexturedDraw) {
                         .build();
 
     auto set = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-                   .write(0, Descriptor(ResourceRef<const ImageView>(texView), ResourceRef<const Sampler>(sampler)))
+                   .write(0, texView, sampler)
                    .build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -1005,6 +1006,64 @@ TEST_F(GlTest, ComputeTriangleOrientationToScreen) {
     orient::blitToScreen(r.image);
 }
 
+
+// -----------------------------------------------------------------------------
+// Texel buffers on GL, which has no buffer-view object of its own: a
+// kor::BufferView is a GL_TEXTURE_BUFFER texture whose storage is the buffer,
+// and binding it is binding that texture to a unit. This is the whole of the GL
+// half of BufferView, and the only thing that exercises it.
+// -----------------------------------------------------------------------------
+TEST_F(GlTest, TexelBufferFetch) {
+    constexpr std::uint32_t kTexels = 64;
+
+    std::vector<float> source(kTexels * 4, 0.f);
+    for (std::uint32_t i = 0; i < kTexels; ++i) source[i * 4] = static_cast<float>(i);
+
+    Buffer::Builder<float> sourceBuilder;
+    sourceBuilder.setData(source)
+                 .addUsage(Buffer::Usage::eTexel)
+                 .addUsage(Buffer::Usage::eTransferDst);
+    auto sourceBuffer = sourceBuilder.build();
+    ASSERT_TRUE(sourceBuffer.valid()) << (sourceBuffer.error() ? sourceBuffer.error()->history() : "");
+
+    auto view = kor::BufferView::Builder(ResourceRef<const Buffer>(sourceBuffer))
+        .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
+        .build();
+    ASSERT_TRUE(view.valid()) << (view.error() ? view.error()->history() : "");
+
+    Buffer::Builder<float> destBuilder;
+    destBuilder.setData(std::vector<float>(kTexels, -1.f))
+               .addUsage(Buffer::Usage::eStorage)
+               .addUsage(Buffer::Usage::eTransferSrc)
+               .addUsage(Buffer::Usage::eTransferDst);
+    auto destination = destBuilder.build();
+    ASSERT_TRUE(destination.valid());
+
+    const auto shader = loadShader("texelBuffer.comp.glsl", Shader::Stage::eCompute, "glt.texelBuffer");
+    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    auto set = DescriptorSet::Builder(pipeline, 0)
+        .write("source", view)
+        .write("destination", destination)
+        .build();
+    ASSERT_TRUE(set.valid()) << (set.error() ? set.error()->history() : "");
+
+    const ResourceRef<const Buffer> destRef(destination);
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, set);
+        cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::ComputeReadWrite));
+        cb.Dispatch(kTexels / 64, 1, 1);
+        cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::TransferSrc));
+    }, CommandBuffer::Usage::eCompute);
+
+    const std::vector<float> output = destination->Read<float>();
+    ASSERT_EQ(output.size(), static_cast<std::size_t>(kTexels));
+    for (std::uint32_t i = 0; i < kTexels; ++i) {
+        EXPECT_FLOAT_EQ(output[i], static_cast<float>(i)) << "at texel " << i;
+    }
+}
 } // namespace
 
 // Registered before RUN_ALL_TESTS (compatible with gtest_main). gtest owns and

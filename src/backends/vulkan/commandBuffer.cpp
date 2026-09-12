@@ -167,15 +167,15 @@ namespace kor::vk
         glm::u32 i = 0;
         for (auto& colorAttachment : framebuffer->getColorAttachments()) {
             auto attachInfo = ::vk::RenderingAttachmentInfoKHR()
-                .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&colorAttachment.get()))
+                .setImageView(**dynamic_cast<const kor::vk::ImageView*>(colorAttachment.view.get()))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
                 .setClearValue(getVkClearValue(renderInfo.getClearColor(i)))
                 .setLoadOp(getVkLoadOp(renderInfo.getColorLoadOperation()))
                 .setStoreOp(getVkStoreOp(renderInfo.getColorStoreOperation()));
-            if (framebuffer->hasResolveAttachments()) {
+            if (framebuffer->getResolveAttachment(i).valid()) {
                 attachInfo
                     .setResolveImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                    .setResolveImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getResolveAttachment(i)))
+                    .setResolveImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->getResolveAttachment(i).get()))
                     .setResolveMode(getVkResolveMode(framebuffer->getResolveMode()));
             }
             colorAttachmentInfos.push_back(attachInfo);
@@ -188,14 +188,14 @@ namespace kor::vk
             { renderInfo.getClearDepth(), static_cast<glm::u32>(renderInfo.getClearStencil()) });
 
         const auto depthAttachment = framebuffer->hasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getDepthAttachment()))
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->getDepthAttachment().get()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(depthStencilClear)
             .setLoadOp(getVkLoadOp(renderInfo.getDepthLoadOperation()))
             .setStoreOp(getVkStoreOp(renderInfo.getDepthStoreOperation()))) : std::nullopt;
 
         const auto stencilAttachment = framebuffer->hasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(&framebuffer->getStencilAttachment()))
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->getStencilAttachment().get()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(depthStencilClear)
             .setLoadOp(getVkLoadOp(renderInfo.getStencilLoadOperation()))

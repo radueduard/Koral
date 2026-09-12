@@ -5,6 +5,7 @@
 #pragma once
 #include <optional>
 #include <stdexcept>
+#include <variant>
 #include <string>
 #include <glm/glm.hpp>
 
@@ -99,6 +100,31 @@ namespace kor
 
         // Present
         Present,             // COLOR_ATTACHMENT_OUTPUT + 0 (no access mask needed)
+    };
+
+    /**
+     * @brief How an image binding is shaped, as the shader itself declared it.
+     *
+     * `sampler2D`, `samplerCube`, `image3D`, `sampler2DArray` — the shader says which, and this is
+     * where that survives reflection. It matters because an image alone cannot always answer the
+     * question: six array layers are equally a cube map and a six-layer 2D array, and only the
+     * shader knows which one it means to sample. Handing an Image straight to a descriptor set or a
+     * framebuffer relies on this to build the view the binding actually wants.
+     *
+     * Mirrors ImageView::Type, plus @ref eBuffer for a texel buffer and @ref eUnknown for a binding
+     * that is not an image at all. Lives here rather than on Shader so that image.h can name it
+     * without pulling in the whole of shader.h. @see Shader::ImageShape, Image::view
+     */
+    enum class ImageShape : glm::u8 {
+        eUnknown,   ///< Not an image binding, or a shape reflection could not name.
+        e1D,        ///< `sampler1D`, `image1D`.
+        e2D,        ///< `sampler2D`, `image2D`. The ordinary case.
+        e3D,        ///< `sampler3D`, `image3D`.
+        eCube,      ///< `samplerCube`, `imageCube`.
+        e1DArray,   ///< `sampler1DArray`.
+        e2DArray,   ///< `sampler2DArray`.
+        eCubeArray, ///< `samplerCubeArray`.
+        eBuffer,    ///< `samplerBuffer`, `imageBuffer` — a texel buffer, viewed through a BufferView.
     };
 
     enum class DescriptorType {

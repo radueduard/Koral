@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <array>
 #include <memory>
 #include <span>
 #include <vector>
@@ -20,10 +21,15 @@
 #include "structs.h"
 #include "resource.h"
 #include "error.h"
+// For the whole-image views Image::view hands out and owns. imageView.h knows Image only by name,
+// so this direction of the pair is the safe one — and the shape those views are built to lives in
+// structs.h above, rather than on Shader, precisely so this file need not include shader.h.
+#include "imageView.h"
 
 namespace kor
 {
     class Buffer;
+    class ImageView;
     class FramebufferImage;
 
     /**
@@ -248,7 +254,22 @@ namespace kor
             glm::u32 mipLevels = 1;                     ///< Number of mip levels, counting the full-size one.
             glm::u32 arrayLayers = 1;                   ///< Number of layers, for texture arrays.
             MSAA msaa = MSAA::eNone;                    ///< Samples per pixel.
-            Flags<Usage> usage = Usage::eSampled;       ///< Every role it will play.
+
+            /**
+             * @brief Every role the image will play.
+             *
+             * Both transfer roles are included by default, and deliberately: copying an image,
+             * reading it back, blitting it, clearing it or generating its mip chain all need one of
+             * them, they are needed at a moment far from where the image was built, and forgetting
+             * one used to surface as a driver validation message rather than anything naming the
+             * flag. They cost effectively nothing on a desktop GPU — a tiler may give up lossless
+             * compression for eTransferSrc, which is the one case worth taking them off for.
+             *
+             * addUsage() adds to this. setUsage() replaces it outright, which is how an image says
+             * it wants exactly these roles and no others; a transfer attempted on an image that
+             * dropped the flag that way is then reported by name at the command that tried it.
+             */
+            Flags<Usage> usage = Flags<Usage>(Usage::eSampled) | Usage::eTransferSrc | Usage::eTransferDst;
 
             /**
              * @brief Gives the image one copy per frame in flight, for a target written every frame.
@@ -441,6 +462,52 @@ namespace kor
         [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }
 
         /**
+         * @brief How much of the image a default view covers.
+         *
+         * The two roles want different answers, which is why this is a choice and not a default: a
+         * texture wants the whole mip chain, or mip mapping has nothing to select from, while a
+         * render target must name exactly one level — rendering into a view of several is invalid.
+         */
+        enum class ViewCoverage : glm::u8 {
+            eWholeImage,    ///< Every mip level and every array layer. For sampling.
+            eTopLevel,      ///< Mip level 0 only, every array layer. For rendering into.
+        };
+
+        /**
+         * @brief A default view of this image, seen as @p shape, created once and shared.
+         * @param shape How the view presents the image — normally what the shader declared.
+         * @param coverage How much of it the view spans. @see ViewCoverage
+         * @return The view, or an empty ref (having logged why) if the image cannot be seen that
+         *         way: a cube view of an image with fewer than six layers, an array view of an
+         *         image with one.
+         *
+         * What lets an Image be handed straight to a descriptor set or a framebuffer without the
+         * caller constructing a view for it. Note that neither coverage matches
+         * ImageView::Builder's own defaults, which span one mip level of one layer — deliberately,
+         * since a builder is for saying exactly what you want and these are for not having to.
+         *
+         * Cached per shape and coverage, and owned here rather than by whoever asked, so two
+         * descriptor sets binding the same texture share one view and a set rebuilt after a shader
+         * edit does not leak a new one each time. The cache is dropped by Resize, because a resize
+         * replaces the storage and invalidates every view of it.
+         *
+         * Build a view yourself for anything narrower — one mip, one layer, a swizzle. These are
+         * the whole-image defaults, not a replacement for ImageView.
+         */
+        [[nodiscard]] ResourceRef<const ImageView> view(ImageShape shape = ImageShape::e2D,
+                                                        ViewCoverage coverage = ViewCoverage::eWholeImage) const;
+
+        /**
+         * @brief The shape this image most naturally presents as, from its own type and layers.
+         *
+         * What a framebuffer attachment uses, having no shader to ask. A six-layer 2D image comes
+         * back as e2DArray rather than eCube — an attachment is rendered into layer by layer, and
+         * nothing here can know it was meant as a cube map. A descriptor set does not use this: it
+         * has the shader's own word. @see kor::ImageShape
+         */
+        [[nodiscard]] ImageShape naturalShape() const;
+
+        /**
          * @brief Bytes in one channel of @p format — 1 for an 8-bit format, 4 for a 32-bit one.
          * @throws std::runtime_error for a block-compressed format, which has no per-channel size.
          *         Guard with IsBlockCompressed, or use SizeOfRegion, which answers for both kinds.
@@ -547,6 +614,22 @@ namespace kor
                  | arrayLayer;
         }
         mutable std::unordered_map<glm::u64, ResourceAccess> _trackedAccess;
+
+        /// Whole-image views handed out by view(), one per shape asked for. Owned here so that
+        /// everything binding this image shares one, and cleared by Resize, which invalidates them
+        /// all along with the storage they view.
+        ///
+        /// A flat array indexed by the shape rather than a map: Resource is move-only, which the
+        /// standard containers variously refuse to hold or hold only awkwardly, and there is a
+        /// small fixed number of shapes — so one slot each costs a pointer apiece and needs no
+        /// lookup at all. @see view
+        mutable std::array<Resource<ImageView>,
+                           (static_cast<std::size_t>(ImageShape::eBuffer) + 1) * 2> _defaultViews;
+
+        /// Which slot of @ref _defaultViews a (shape, coverage) pair occupies.
+        static constexpr std::size_t viewSlot(const ImageShape shape, const ViewCoverage coverage) {
+            return static_cast<std::size_t>(shape) * 2 + static_cast<std::size_t>(coverage);
+        }
 
         explicit Image(const Builder&);
         bool _isPerFrame = false;

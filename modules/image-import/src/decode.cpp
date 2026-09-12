@@ -478,9 +478,7 @@ namespace kimg::detail
             .setExtent(ktx.extent)
             .setArrayLayers(ktx.arrayLayers)
             .setMipLevels(mipLevels)
-            .setFormat(ktx.format)
-            .addUsage(kor::Image::Usage::eTransferSrc)
-            .addUsage(kor::Image::Usage::eTransferDst)
+            .setFormat(ktx.format)
             .build();
     }
 }

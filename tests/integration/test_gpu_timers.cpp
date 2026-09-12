@@ -62,7 +62,7 @@ struct Workload {
 
         auto descriptorSet =
             DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
-                .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
+                .write(0, buffer)
                 .build();
 
         return Workload{ std::move(buffer), std::move(pipeline), std::move(descriptorSet) };

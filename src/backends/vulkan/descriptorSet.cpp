@@ -14,6 +14,7 @@
 #include "descriptorPool.h"
 #include "descriptorSetLayout.h"
 #include "device.h"
+#include "bufferView.h"
 #include "imageView.h"
 #include "sampler.h"
 #include "vulkanContext.h"
@@ -33,6 +34,7 @@ namespace kor::vk
         std::vector<::vk::DescriptorImageInfo> imageInfos;
         std::vector<::vk::WriteDescriptorSetAccelerationStructureKHR> accelerationStructureInfos;
         std::vector<::vk::AccelerationStructureKHR> accelerationStructureHandles;
+        std::vector<::vk::BufferView> texelBufferViews;
 
         size_t totalDescriptors = 0;
         for (const auto& descriptors : _writes | std::views::values) {
@@ -46,6 +48,7 @@ namespace kor::vk
             imageInfos.reserve(totalDescriptors);
             accelerationStructureInfos.reserve(totalDescriptors);
             accelerationStructureHandles.reserve(totalDescriptors);
+            texelBufferViews.reserve(totalDescriptors);
 
             for (const auto& [binding, descriptors] : _writes)
             {
@@ -162,6 +165,25 @@ namespace kor::vk
                                 .setPNext(&accelerationStructureInfo);
                             break;
                         }
+                    case DescriptorType::eUniformTexelBuffer:
+                    case DescriptorType::eStorageTexelBuffer:
+                        {
+                            // A texel buffer is written through neither a buffer info nor an image
+                            // info but a VkBufferView handle of its own — the one case where the
+                            // handle goes straight into the write.
+                            const auto& bufferView = dynamic_cast<const BufferView&>(descriptor.getBufferView());
+                            const auto& handle = texelBufferViews.emplace_back(
+                                bufferView.isPerFrame() ? bufferView[frame] : bufferView[0]);
+                            writes.emplace_back()
+                                .setDstSet(_descriptorSets[frame])
+                                .setDstBinding(binding)
+                                .setDstArrayElement(i)
+                                .setDescriptorType(type == DescriptorType::eUniformTexelBuffer
+                                    ? ::vk::DescriptorType::eUniformTexelBuffer
+                                    : ::vk::DescriptorType::eStorageTexelBuffer)
+                                .setTexelBufferView(handle);
+                            break;
+                        }
                     default:
                         throw std::runtime_error("Unknown descriptor type for binding " + std::to_string(binding) + " index " + std::to_string(i) + "!");
                     }
@@ -173,6 +195,7 @@ namespace kor::vk
             bufferInfos.clear();
             imageInfos.clear();
             accelerationStructureInfos.clear();
+            texelBufferViews.clear();
             accelerationStructureHandles.clear();
         }
     }

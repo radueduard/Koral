@@ -34,7 +34,21 @@ target_link_libraries(koral-gui-extras PUBLIC Koral)
 # The *header* still has to reach the consumer, which is what the SDK vendoring does. @see the root
 # CMakeLists' KORAL_VENDOR_PUBLIC_DEPS block, and src/imguizmoBinding.cpp for the ImGui context.
 find_package(imguizmo CONFIG REQUIRED)
-target_link_libraries(koral-gui-extras PRIVATE imguizmo::imguizmo)
+
+# On ELF and Mach-O the paragraph above is the whole story. On Windows it is not: a DLL exports only
+# what is marked dllexport, ImGuizmo marks nothing, and so koral-gui-extras.dll re-exported none of
+# it — leaving every consumer that calls ImGuizmo::Manipulate from koralGizmo.h with five unresolved
+# externals. This repository's own gizmo tests were the first to hit it, which is why the
+# integration and window test executables did not link at all.
+#
+# WINDOWS_EXPORT_ALL_SYMBOLS does not fix it: the .def CMake generates covers a target's own object
+# files, not the static libraries linked into it, so ImGuizmo's symbols never appear in it.
+#
+# So an in-tree consumer links the archive itself. BUILD_INTERFACE is what keeps that out of the
+# exported link interface, where `imguizmo::imguizmo` would be a target the consumer's CMake has
+# never heard of and find_package(Koral) would fail outright — the trap the paragraph above is about.
+# An installed SDK gets the archive through the root CMakeLists' vendoring instead, alongside imgui.
+target_link_libraries(koral-gui-extras PUBLIC $<BUILD_INTERFACE:imguizmo::imguizmo>)
 
 # PRIVATE, exactly as for Koral itself: glm appears in this module's public headers, but a
 # consumer gets it from Koral::Koral — in an installed SDK through the vendored copies

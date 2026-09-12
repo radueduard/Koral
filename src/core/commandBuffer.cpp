@@ -206,6 +206,14 @@ namespace kor
         // no recording left to join, and appending here would invalidate emitRecords()' walk. Run it
         // where it stands, which also keeps it in the right order relative to the command that
         // triggered it. This mirrors the OpenGL backend's own `_executing` guard.
+        // Every transfer command already says which resource it reads from and which it writes to,
+        // because the barrier resolver needs exactly that — so the usage those roles require can be
+        // checked here, once, instead of in each of the dozen commands that perform one. A command
+        // added later is covered without knowing about this.
+        if (auto missing = missingTransferUsage(uses, command, where)) {
+            return record(std::move(*missing));
+        }
+
         if (_emitting) {
             emit();
             return *this;
@@ -710,6 +718,46 @@ namespace kor
         _records.clear();
     }
 
+    std::optional<Error> CommandBuffer::missingTransferUsage(const std::vector<ResourceUse>& uses,
+                                                             const char* command,
+                                                             const std::source_location where)
+    {
+        for (const auto& use : uses) {
+            const bool asSource = use.access == ResourceAccess::TransferSrc;
+            const bool asDestination = use.access == ResourceAccess::TransferDst;
+            if (!asSource && !asDestination) continue;
+
+            const char* flag = asSource ? "eTransferSrc" : "eTransferDst";
+            const char* role = asSource ? "read from" : "written to";
+
+            // Both kinds carry the same two flags under the same names, so one message serves both
+            // and simply says which resource it is talking about.
+            const auto complain = [&](const char* kind) {
+                return Error{
+                    .code = ErrorCode::eInvalidArgument,
+                    .message = std::format(
+                        "{} would have this {} {} as a transfer, but it was not created with "
+                        "Usage::{}. Add .addUsage(kor::{}::Usage::{}) where it is built — or, if it "
+                        "called setUsage(), include that flag in the set it names.",
+                        command, kind, role, flag, kind, flag),
+                    .where = where,
+                };
+            };
+
+            if (use.buffer.alive() && use.buffer.valid()) {
+                const auto usage = use.buffer->getUsage();
+                if (!(usage & (asSource ? Buffer::Usage::eTransferSrc : Buffer::Usage::eTransferDst)))
+                    return complain("Buffer");
+            }
+            if (use.image.alive() && use.image.valid()) {
+                const auto usage = use.image->getUsage();
+                if (!(usage & (asSource ? Image::Usage::eTransferSrc : Image::Usage::eTransferDst)))
+                    return complain("Image");
+            }
+        }
+        return std::nullopt;
+    }
+
     CommandBuffer& CommandBuffer::record(const ErrorCode code, std::string message)
     {
         return record(Error{ .code = code, .message = std::move(message) });
@@ -755,7 +803,7 @@ namespace kor
         // it lands in front of the pass instead of illegally inside it.
         std::vector<ResourceUse> uses;
         for (const auto& attachment : framebuffer->getColorAttachments()) {
-            uses.push_back(ResourceUse{ .image = attachment.get().getImage(), .access = ResourceAccess::ColorAttachment });
+            uses.push_back(ResourceUse{ .image = attachment.view->getImage(), .access = ResourceAccess::ColorAttachment });
         }
         // Depth and stencil are declared as one use per *image*, at the combined
         // depth/stencil layout, rather than one per attachment slot.
@@ -770,8 +818,9 @@ namespace kor
         // One layout per image is also the only thing the tracker can represent — its key is
         // image + level + layer, with no aspect — and the combined layout is legal for a
         // depth-only or stencil-only image too, so nothing is given up by using it everywhere.
-        const auto declareDepthStencil = [&](const ImageView& attachment) {
-            auto image = attachment.getImage();
+        const auto declareDepthStencil = [&](const ResourceRef<const ImageView>& attachment) {
+            if (!attachment.valid()) return;
+            auto image = attachment->getImage();
             for (const auto& use : uses) {
                 if (use.image.get() == image.get()) return;  // the other slot, same image
             }
@@ -1337,7 +1386,7 @@ namespace kor
     {
         const auto framebuffer = Context::DefaultFramebuffer();
         if (!framebuffer.valid() || framebuffer->getColorAttachments().empty()) return {};
-        return framebuffer->getColorAttachments()[0].get().getImage();
+        return framebuffer->colorImage(0);
     }
 
     bool CommandBuffer::hasTouched(const kor::ResourceRef<const Image>& image) const

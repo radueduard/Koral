@@ -479,8 +479,7 @@ TEST_F(GpuTest, FeedbackLoopInsideRenderPassIsReported) {
 
     // The attachment, bound as a texture to the pipeline drawing into it.
     auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-                             .write(0, Descriptor(ResourceRef<const ImageView>(colorView),
-                                                  ResourceRef<const Sampler>(sampler)))
+                             .write(0, colorView, sampler)
                              .build();
     ASSERT_TRUE(descriptorSet.valid());
 
@@ -1467,5 +1466,210 @@ TEST_F(GpuTest, APushConstantBlockThatIsNotStd430DoesNotLoad) {
     EXPECT_NE(shader.error()->message.find("std430"), std::string::npos) << shader.error()->message;
 }
 
-} // namespace
 
+// An Image binds straight to a texture binding: the view is built from what the *shader* declared
+// the binding as, and owned by the image, so nothing here constructs an ImageView at all.
+TEST_F(GpuTest, AnImageBindsWithoutAViewBeingBuilt) {
+    constexpr glm::u32 kSize = 8;
+
+    auto texture = Image::Builder{}
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{kSize, kSize})
+        .addUsage(Image::Usage::eSampled)
+        .addUsage(Image::Usage::eTransferDst)
+        .build();
+    ASSERT_TRUE(texture.valid());
+
+    auto sampler = Sampler::Builder{}.build();
+    ASSERT_TRUE(sampler.valid());
+
+    const auto vert = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eVertex)
+        .setPath(kor::shaderPath("sampleTexture.vert.glsl")).getOrBuild("test.imgbind.vert");
+    const auto frag = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eFragment)
+        .setPath(kor::shaderPath("sampleTexture.frag.glsl")).getOrBuild("test.imgbind.frag");
+
+    auto target = Image::Builder{}
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{kSize, kSize})
+        .addUsage(Image::Usage::eColorAttachment)
+        .build();
+    ASSERT_TRUE(target.valid());
+
+    // The framebuffer takes the Image too, and names the target so it can be found again.
+    auto framebuffer = Framebuffer::Builder{}
+        .addColorAttachment("color", ResourceRef<const Image>(target))
+        .build();
+    ASSERT_TRUE(framebuffer.valid()) << (framebuffer.error() ? framebuffer.error()->history() : "");
+
+    auto pipeline = GraphicsPipeline::Builder{}
+        .setVertexShader(vert).setFragmentShader(frag)
+        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer))
+        .build();
+    ASSERT_TRUE(pipeline.valid());
+
+    // `uniform sampler2D tex` — the binding says 2D, so that is the view the image is asked for.
+    auto set = DescriptorSet::Builder(pipeline, 0).write("tex", texture, sampler).build();
+    ASSERT_TRUE(set.valid()) << (set.error() ? set.error()->history() : "");
+
+    // The view is owned by the image and shared, so a second bind of the same texture is the same
+    // view object rather than another one.
+    EXPECT_EQ(texture->view(kor::ImageShape::e2D).get(), texture->view(kor::ImageShape::e2D).get());
+
+    // And the framebuffer hands its target back by name.
+    EXPECT_EQ(framebuffer->image("color").get(), target.get());
+    EXPECT_FALSE(framebuffer->image("nosuchtarget").valid());
+}
+
+// The view an image hands out is a view of *its storage*, and a resize replaces that storage. The
+// cache has to be dropped with it or the next binding gets a view of freed memory.
+TEST_F(GpuTest, ResizingAnImageDropsTheViewsItHandedOut) {
+    auto image = Image::Builder{}
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{8, 8})
+        .addUsage(Image::Usage::eSampled)
+        .addUsage(Image::Usage::eColorAttachment)
+        .build();
+    ASSERT_TRUE(image.valid());
+
+    const auto before = image->view(kor::ImageShape::e2D);
+    ASSERT_TRUE(before.valid());
+    const auto generationBefore = image->generation();
+
+    const_cast<Image&>(*image).Resize({16, 16, 1});
+    ASSERT_NE(image->generation(), generationBefore) << "the resize did not replace the image";
+
+    const auto after = image->view(kor::ImageShape::e2D);
+    ASSERT_TRUE(after.valid());
+    EXPECT_NE(after.get(), before.get())
+        << "the image handed out a view of the storage the resize threw away";
+}
+
+// Binding an image to a binding its usage does not allow says which flag is missing, rather than
+// leaving the driver to complain about usage bits.
+TEST_F(GpuTest, AnImageMissingItsUsageIsReportedWithTheFlagToAdd) {
+    auto texture = Image::Builder{}
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{8, 8})
+        .setUsage(Image::Usage::eColorAttachment)   // deliberately not eSampled
+        .build();
+    ASSERT_TRUE(texture.valid());
+
+    auto sampler = Sampler::Builder{}.build();
+    const auto vert = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eVertex)
+        .setPath(kor::shaderPath("sampleTexture.vert.glsl")).getOrBuild("test.usage.vert");
+    const auto frag = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eFragment)
+        .setPath(kor::shaderPath("sampleTexture.frag.glsl")).getOrBuild("test.usage.frag");
+
+    auto target = Image::Builder{}.setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{8, 8}).addUsage(Image::Usage::eColorAttachment).build();
+    auto framebuffer = Framebuffer::Builder{}.addColorAttachment(ResourceRef<const Image>(target)).build();
+    auto pipeline = GraphicsPipeline::Builder{}
+        .setVertexShader(vert).setFragmentShader(frag)
+        .setFramebuffer(ResourceRef<Framebuffer>(framebuffer)).build();
+    ASSERT_TRUE(pipeline.valid());
+
+    auto set = DescriptorSet::Builder(pipeline, 0).write("tex", texture, sampler).build();
+    ASSERT_FALSE(set.valid()) << "an image with no eSampled usage was bound to a texture binding";
+    ASSERT_NE(set.error(), nullptr);
+    const auto message = set.error()->history();
+    EXPECT_NE(message.find("eSampled"), std::string::npos) << message;
+}
+
+// The transfer usages are on by default, so the commands that need them work without anyone having
+// to have thought about it. This is the case that used to fail as a driver validation message about
+// usage bits, long after the line that actually caused it.
+TEST_F(GpuTest, TransferUsageIsNotSomethingYouHaveToRemember) {
+    // No addUsage at all, and every one of these needs a transfer role: the upload needs
+    // eTransferDst on the image, the mip chain needs both, and the readback needs eTransferSrc.
+    auto texture = Image::Builder{}
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{8, 8})
+        .setData(std::vector<glm::u8vec4>(8 * 8, glm::u8vec4{40, 80, 120, 255}))
+        .build();
+    ASSERT_TRUE(texture.valid()) << (texture.error() ? texture.error()->history() : "");
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(8 * 8 * 4).setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    ASSERT_TRUE(readback.valid()) << (readback.error() ? readback.error()->history() : "");
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(texture, readback);
+        EXPECT_TRUE(cb.ok()) << "a plain image and a plain buffer could not be copied between: "
+                             << (cb.ok() ? "" : cb.result().error().toString());
+    }, CommandBuffer::Usage::eTransfer);
+
+    const auto pixels = readback->Read<glm::u8vec4>();
+    ASSERT_EQ(pixels.size(), static_cast<std::size_t>(8 * 8));
+    EXPECT_EQ(pixels[0], (glm::u8vec4{40, 80, 120, 255}));
+}
+
+// Opting out is still possible, and getting it wrong afterwards is now Koral's error rather than
+// the driver's: it names the flag, the role and the command, at the line that recorded it.
+TEST_F(GpuTest, AMissingTransferUsageIsNamedAtTheCommandThatNeededIt) {
+    auto image = Image::Builder{}
+        .setFormat(Image::Format::eRGBA8_UNORM)
+        .setExtent(glm::uvec2{8, 8})
+        .setUsage(Image::Usage::eSampled)   // exactly this: no transfer roles
+        .build();
+    ASSERT_TRUE(image.valid());
+
+    Buffer::RawBuilder rb;
+    rb.setRawSize(8 * 8 * 4).setType(Buffer::Type::eReadback);
+    auto readback = rb.build();
+    ASSERT_TRUE(readback.valid());
+
+    std::string message;
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(image, readback);
+        EXPECT_FALSE(cb.ok()) << "an image with no eTransferSrc was copied from anyway";
+        if (!cb.ok()) message = cb.result().error().toString();
+    }, CommandBuffer::Usage::eTransfer);
+
+    EXPECT_NE(message.find("eTransferSrc"), std::string::npos) << message;
+    EXPECT_NE(message.find("CopyImageToBuffer"), std::string::npos) << message;
+    // And the fix, spelled the way it would be typed.
+    EXPECT_NE(message.find("addUsage"), std::string::npos) << message;
+}
+
+// eUniform is the one buffer role that cannot simply be on by default: it carries a 64 KiB ceiling
+// checked at build time, so defaulting it would make every larger buffer fail to build over a role
+// it never asked for. It is deduced from the size instead, which is the one piece of information
+// the builder does have.
+TEST_F(GpuTest, UniformUsageIsDeducedFromTheBuffersSize) {
+    // Small enough to be a uniform block, so it is given the role without anyone saying so — this
+    // is the camera-and-constants case, the one people had to remember eUniform for.
+    Buffer::RawBuilder small;
+    small.setRawSize(1024);
+    auto smallBuffer = small.build();
+    ASSERT_TRUE(smallBuffer.valid()) << (smallBuffer.error() ? smallBuffer.error()->history() : "");
+    EXPECT_TRUE(smallBuffer->getUsage() & Buffer::Usage::eUniform);
+
+    // Too large to ever be one, so the role is not added — and, crucially, the buffer still builds.
+    // Blanket-defaulting eUniform is exactly what this would have broken.
+    Buffer::RawBuilder large;
+    large.setRawSize(16 * 1024 * 1024);
+    auto largeBuffer = large.build();
+    ASSERT_TRUE(largeBuffer.valid()) << (largeBuffer.error() ? largeBuffer.error()->history() : "");
+    EXPECT_FALSE(largeBuffer->getUsage() & Buffer::Usage::eUniform);
+    EXPECT_TRUE(largeBuffer->getUsage() & Buffer::Usage::eStorage)
+        << "the free roles should still be on";
+
+    // Asking for it outright on a buffer that cannot hold it is still an error: the caller said
+    // something impossible, and is told so rather than quietly given a buffer that is not what it
+    // asked for.
+    Buffer::RawBuilder impossible;
+    impossible.setRawSize(16 * 1024 * 1024).addUsage(Buffer::Usage::eUniform);
+    auto impossibleBuffer = impossible.build();
+    EXPECT_FALSE(impossibleBuffer.valid()) << "an oversized uniform buffer was accepted";
+
+    // And setUsage still means exactly what it says — no deduction on top of an explicit set.
+    Buffer::RawBuilder exact;
+    exact.setRawSize(1024).setUsage(Buffer::Usage::eStorage);
+    auto exactBuffer = exact.build();
+    ASSERT_TRUE(exactBuffer.valid());
+    EXPECT_FALSE(exactBuffer->getUsage() & Buffer::Usage::eUniform)
+        << "setUsage named an exact set and something was added to it anyway";
+}
+
+} // namespace

@@ -141,7 +141,7 @@ inline Result computeTopHalf() {
     const auto shader = loadShader("topHalfImage.comp.glsl", kor::Shader::Stage::eCompute, "orient.tophalf.comp");
     auto pipeline = kor::ComputePipeline::Builder{}.setComputeShader(shader).build();
     auto set = kor::DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-                   .write(0, kor::Descriptor(kor::ResourceRef<const kor::ImageView>(view)))
+                   .write(0, view)
                    .build();
 
     const kor::ResourceRef<const kor::Image> imgRef(image);

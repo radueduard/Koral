@@ -1069,6 +1069,22 @@ namespace kor
                                bool dereferencesDeviceAddresses = false);
 
         /**
+         * @brief Whether any of @p uses needs a transfer usage its resource was not created with.
+         * @return The error to record, or nullopt when every transfer role is covered.
+         *
+         * Checked once, in enqueue(), rather than in each of the dozen commands that perform a
+         * transfer: every one of them already declares which resource it reads from and which it
+         * writes to, because the barrier resolver needs exactly that. So the declaration that drives
+         * synchronisation drives this too, and a transfer command added later is covered without
+         * knowing about it.
+         *
+         * Both flags are on by default, so this fires only for a resource whose builder called
+         * setUsage() and left one out — a real mistake, and one the message names the flag for.
+         */
+        [[nodiscard]] static std::optional<Error> missingTransferUsage(
+            const std::vector<ResourceUse>& uses, const char* command, std::source_location where);
+
+        /**
          * @brief The extent a draw falls back to when no viewport or scissor was set.
          *
          * The framebuffer the current pass renders into, which is the window's only when the pass

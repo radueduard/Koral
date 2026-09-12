@@ -107,9 +107,7 @@ namespace kimg
             return kor::Image::Builder()
                 .setExtent(decoded.extent)
                 .setFormat(decoded.format)
-                .setMipLevels(generateMipmaps ? 0 : 1)
-                .addUsage(kor::Image::Usage::eTransferSrc)
-                .addUsage(kor::Image::Usage::eTransferDst)
+                .setMipLevels(generateMipmaps ? 0 : 1)
                 .build();
         }
 

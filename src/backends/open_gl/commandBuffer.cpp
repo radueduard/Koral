@@ -201,7 +201,7 @@ namespace kor::ogl
                     // Clear with the function matching the attachment's data type — an
                     // integer attachment (e.g. the r32ui visibility buffer) must not be
                     // cleared as float or its sentinel never gets written.
-                    const auto format = attachment.get().getImage()->getFormat();
+                    const auto format = attachment.view->getImage()->getFormat();
                     clearColorBuffer(*oglFramebuffer, static_cast<GLint>(i), format, renderInfo.getClearColor(i));
                 }
                 i++;

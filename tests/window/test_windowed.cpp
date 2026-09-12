@@ -446,7 +446,7 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
 
     auto set = DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
         .writeSemantic(0, probe)                                    // the semantic block
-        .write(1, Descriptor(ResourceRef<const Buffer>(readback)))  // where it lands
+        .write(1, readback)  // where it lands
         .build();
     ASSERT_TRUE(set.valid()) << set.error()->history();
 
@@ -937,7 +937,7 @@ TEST_F(VkWindowTest, AnUntouchedScreenIsClearedByTheRuntime) {
         const auto framebuffer = kor::Context::DefaultFramebuffer();
         ASSERT_TRUE(framebuffer.valid());
         ASSERT_FALSE(framebuffer->getColorAttachments().empty());
-        const auto screen = framebuffer->getColorAttachments()[0].get().getImage();
+        const auto screen = framebuffer->colorImage(0);
 
         // Nothing has been recorded, so nothing can have touched it.
         EXPECT_FALSE(cb.hasTouched(screen));
@@ -962,7 +962,7 @@ TEST_F(VkWindowTest, ATouchedScreenIsNotClearedAgain) {
 
     kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
         const auto framebuffer = kor::Context::DefaultFramebuffer();
-        const auto screen = framebuffer->getColorAttachments()[0].get().getImage();
+        const auto screen = framebuffer->colorImage(0);
 
         cb.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
         EXPECT_TRUE(cb.hasTouched(screen)) << "a clear is an interaction with the framebuffer";
@@ -997,7 +997,7 @@ TEST_F(VkWindowTest, BlittingToTheScreenCountsAsTouchingIt) {
     kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
         const auto framebuffer = kor::Context::DefaultFramebuffer();
         ASSERT_TRUE(framebuffer.valid());
-        const auto screen = framebuffer->getColorAttachments()[0].get().getImage();
+        const auto screen = framebuffer->colorImage(0);
 
         cb.ClearColorImage(kor::ResourceRef<const kor::Image>(canvas), glm::vec4{0.9f, 0.2f, 0.1f, 1.f})
           .Blit(kor::ResourceRef<const kor::Image>(canvas));
@@ -1031,7 +1031,7 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
             // the moment the chain rotates.
             const auto framebuffer = kor::Context::DefaultFramebuffer();
             ASSERT_TRUE(framebuffer.valid());
-            const auto screen = framebuffer->getColorAttachments()[0].get().getImage();
+            const auto screen = framebuffer->colorImage(0);
 
             cb.Timer("frame.clear", [&](kor::CommandBuffer& inner) {
                 inner.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
@@ -1091,7 +1091,10 @@ TEST_F(VkWindowTest, GuiImageSaysWhyItCannotCopyFromAnImage) {
         .setType(kor::Image::Type::e3D)
         .setFormat(kor::Image::Format::eRGBA8_UNORM)
         .setExtent(glm::uvec3{16, 16, 4})
-        .addUsage(kor::Image::Usage::eSampled)   // sampled, but not readable by a copy
+        // setUsage, not addUsage: the transfer usages are on by default precisely so this is hard
+        // to do by accident, and saying "exactly these roles" is now the only way to end up
+        // without one. Which is the case being tested.
+        .setUsage(kor::Image::Usage::eSampled)   // sampled, but not readable by a copy
         .build();
     ASSERT_TRUE(static_cast<bool>(volume));
 
@@ -1113,6 +1116,36 @@ TEST_F(VkWindowTest, ComputeTriangleOrientationToScreen) {
     auto r = orient::computeTopHalf();
     orient::expectHalfSplit(r.pixels);
     orient::blitToScreen(r.image);
+}
+
+
+// The default framebuffer's targets are reachable like any other framebuffer's: by name, as images,
+// so the swap-chain image a frame is presented from can be copied, read back or shown elsewhere
+// without reaching into the swap chain.
+TEST_F(VkWindowTest, TheDefaultFramebuffersImagesAreReachableByName) {
+    const auto framebuffer = kor::Context::DefaultFramebuffer();
+    ASSERT_TRUE(framebuffer.valid());
+    ASSERT_TRUE(framebuffer->IsDefault());
+
+    const auto colour = framebuffer->image("color");
+    ASSERT_TRUE(colour.valid()) << "the presented image was not reachable by name";
+    // The same image the index-addressed accessor gives, and the same one the command buffer calls
+    // the screen — one image, three ways of asking for it.
+    EXPECT_EQ(colour.get(), framebuffer->colorImage(0).get());
+    EXPECT_EQ(colour.get(), kor::CommandBuffer::screenImage().get());
+    EXPECT_EQ(colour->getExtent().x, framebuffer->getExtent().x);
+    EXPECT_EQ(colour->getExtent().y, framebuffer->getExtent().y);
+
+    // The depth target too, which is what a scene wanting to read the frame's depth needs.
+    const auto depth = framebuffer->image("depth");
+    ASSERT_TRUE(depth.valid());
+    EXPECT_EQ(depth.get(), framebuffer->depthImage().get());
+
+    const auto names = framebuffer->attachmentNames();
+    EXPECT_NE(std::ranges::find(names, "color"), names.end());
+    EXPECT_NE(std::ranges::find(names, "depth"), names.end());
+
+    EXPECT_FALSE(framebuffer->image("nosuchattachment").valid());
 }
 
 } // namespace

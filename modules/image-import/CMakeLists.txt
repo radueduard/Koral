@@ -79,11 +79,16 @@ endif()
 
 # The projection shader has to be findable at runtime, in a *dev* build as much as an installed one.
 # The install rule below covers the second (share/Koral/shaders is a search root); this covers the
-# first, because <libKoral's dir>/shaders is a search root too and libKoral lives at the top of the
-# build tree. Without it the module builds and then cannot compile its own shader.
+# first, because <libKoral's dir>/shaders is a search root too.
+#
+# That directory is asked of the Koral target rather than assumed to be the top of the build tree.
+# The two are the same only under a single-config generator: Visual Studio and Xcode put the library
+# in a per-configuration subdirectory, so staging to ${CMAKE_BINARY_DIR}/shaders left the file one
+# level above the only place the search root looks — and every cubemap test failed with "cannot open
+# file 'equirectToCube.slang'" on Windows while passing on Linux and macOS.
 add_custom_command(TARGET koral-image-import POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-                ${CMAKE_CURRENT_SOURCE_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders
+                ${CMAKE_CURRENT_SOURCE_DIR}/shaders $<TARGET_FILE_DIR:Koral>/shaders
         COMMENT "Staging the image module's shaders where the shader search roots look")
 
 # Ship with the SDK, in the same export set as Koral so a project can link it by name.

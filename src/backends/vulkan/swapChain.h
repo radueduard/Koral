@@ -50,8 +50,11 @@ namespace kor::vk
         [[nodiscard]] kor::ResourceRef<const kor::Image> getImage() const { return _swapChainImages; }
         [[nodiscard]] kor::ResourceRef<const kor::Image> getDepthImage() const { return _depthImages; }
 
-        [[nodiscard]] std::reference_wrapper<const kor::ImageView> getSwapChainImageViews() const { return *_swapChainImageViews; }
-        [[nodiscard]] std::reference_wrapper<const kor::ImageView> getDepthImageViews() const { return *_depthImageViews; }
+        // Tracked refs, not raw references: these become the default framebuffer's attachments, and
+        // a swap chain rebuilt by a resize replaces the views behind them. A ref notices; a
+        // reference would be left pointing at the old ones.
+        [[nodiscard]] kor::ResourceRef<const kor::ImageView> getSwapChainImageViews() const { return _swapChainImageViews; }
+        [[nodiscard]] kor::ResourceRef<const kor::ImageView> getDepthImageViews() const { return _depthImageViews; }
 
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
         [[nodiscard]] glm::u32 getCurrentImageIndex() const { return _imageIndex; }

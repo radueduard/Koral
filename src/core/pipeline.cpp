@@ -128,9 +128,21 @@ namespace kor
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription)
             {
-                builder.addBlockBinding(binding, descriptor.type, descriptor.count,
-                                        descriptor.access, descriptor.stages, descriptor.active,
-                                        descriptor.members, descriptor.blockSize);
+                builder.addBinding(binding, DescriptorSetLayout::Binding{
+                    .type = descriptor.type,
+                    .count = descriptor.count,
+                    .access = descriptor.access,
+                    .stages = descriptor.stages,
+                    .active = descriptor.active,
+                    .members = descriptor.members,
+                    .blockSize = descriptor.blockSize,
+                    // Carried through so a set can be written by the name the shader uses rather
+                    // than by a number restated in C++. @see DescriptorSet::Builder::write
+                    .name = descriptor.name,
+                    .blockName = descriptor.blockName,
+                    // What an Image bound directly at this binding is turned into a view by.
+                    .shape = descriptor.shape,
+                });
             }
 
             if (const auto existing = _setLayouts.find(setIndex);

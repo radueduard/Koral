@@ -13,6 +13,7 @@
 #include "../../include/window.h"
 
 #include "context.h"
+#include "imageView.h"
 
 namespace kor
 {
@@ -278,8 +279,79 @@ namespace kor
         // image's state, decides nothing is required, and the GPU reads an untransitioned image.
         _trackedAccess.clear();
 
+        // The views handed out by view() are views of the storage that has just been replaced. They
+        // cannot be repaired — an ImageView is built against an image and a resize is a new image —
+        // so they are dropped, and the next caller gets a view of the image that now exists. Without
+        // this a resized render target keeps handing out views of freed storage.
+        for (auto& view : _defaultViews) view = {};
+
         // Anything holding a handle to the old image — an image view above all — finds out through this.
         ++_generation;
+    }
+
+    ImageShape Image::naturalShape() const
+    {
+        switch (_type) {
+        case Type::e1D: return _arrayLayers > 1 ? ImageShape::e1DArray : ImageShape::e1D;
+        case Type::e3D: return ImageShape::e3D;   // a volume has no array form
+        // Six layers could be a cube map, and an attachment cannot tell: rendering into a cube is
+        // rendering into its layers, which is what an array view gives. Only a shader's own
+        // declaration settles the other reading, and a descriptor set uses that instead of this.
+        default:        return _arrayLayers > 1 ? ImageShape::e2DArray : ImageShape::e2D;
+        }
+    }
+
+    ResourceRef<const ImageView> Image::view(const ImageShape shape, const ViewCoverage coverage) const
+    {
+        const auto slot = viewSlot(shape, coverage);
+        if (slot >= _defaultViews.size()) return {};
+
+        // A poisoned entry is kept rather than retried: the reason it failed is a disagreement
+        // between this image and the shape asked for, and nothing about a second attempt would
+        // change that. It carries its error, and whoever binds it inherits it.
+        if (_defaultViews[slot].valid() || _defaultViews[slot].poisoned())
+            return ResourceRef<const ImageView>(_defaultViews[slot]);
+
+        // What the shader asked for, mapped onto how a view says it. A shape reflection could not
+        // name leaves nothing to build.
+        const auto type = [shape]() -> std::optional<ImageView::Type> {
+            switch (shape) {
+            case ImageShape::e1D:        return ImageView::Type::e1D;
+            case ImageShape::e2D:        return ImageView::Type::e2D;
+            case ImageShape::e3D:        return ImageView::Type::e3D;
+            case ImageShape::eCube:      return ImageView::Type::eCube;
+            case ImageShape::e1DArray:   return ImageView::Type::e1DArray;
+            case ImageShape::e2DArray:   return ImageView::Type::e2DArray;
+            case ImageShape::eCubeArray: return ImageView::Type::eCubeArray;
+            default:                     return std::nullopt;
+            }
+        }();
+
+        if (!type) {
+            log::error("Cannot make a default view of this image: the binding's shape is not one a "
+                       "view can be built for. Build the view yourself with ImageView::Builder.");
+            return {};
+        }
+
+        // Every layer either way, and every mip level only for a view that will be sampled: a
+        // texture with one mip level has nothing for mip mapping to select from, while a view
+        // rendered into must name exactly one. Neither is ImageView::Builder's own default, which
+        // is one level of one layer — that is for saying precisely what you want, and this is for
+        // not having to. @see Image::ViewCoverage
+        //
+        // An untracked ref to ourselves is sound here, and only here: the view is owned by this
+        // image, so it cannot outlive the thing it points at. Every other route to an image takes a
+        // tracked ref, because every other holder can.
+        auto view = ImageView::Builder(ResourceRef<const Image>(this))
+            .setViewType(*type)
+            .setBaseMipLevel(0)
+            .setMipLevelCount(coverage == ViewCoverage::eWholeImage ? _mipLevels : 1)
+            .setBaseArrayLayer(0)
+            .setArrayLayerCount(_arrayLayers)
+            .build();
+
+        _defaultViews[slot] = std::move(view);
+        return ResourceRef<const ImageView>(_defaultViews[slot]);
     }
 
     bool Image::IsFormatSupported(const kor::Image::Format format, const Flags<Usage> usage)

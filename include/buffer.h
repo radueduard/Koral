@@ -167,7 +167,36 @@ namespace kor
         struct KORAL_API RawBuilder : Builder {
             bool _isPerFrame = false;               ///< Whether the buffer holds one copy per frame in flight.
             glm::i64 _size = 0;                     ///< Size in bytes.
-            Flags<Usage> _usage = Usage::eNone;     ///< Everything the buffer may be used for.
+            /**
+             * @brief Everything the buffer may be used for.
+             *
+             * Every role that costs nothing to declare is on by default, which for a buffer is
+             * nearly all of them: on Vulkan these are plain usage bits that place no constraint on
+             * the allocation, and the OpenGL backend chooses its bind target per call rather than
+             * from these flags. So a buffer that is only ever a uniform block pays nothing for also
+             * claiming it could be a vertex buffer, and the flags stop being something to get right
+             * at a point far from where the mistake shows up.
+             *
+             * Three are deliberately left off, because they are *not* free:
+             *
+             *  - Usage::eUniform carries a 65536-byte ceiling, checked when the buffer is built. On
+             *    by default it would make every larger buffer fail to build over a role it never
+             *    wanted. It is deduced from the size instead — @see create.
+             *  - Usage::eShaderDeviceAddress changes how the buffer is allocated, and is asked for
+             *    only by code that actually takes an address.
+             *  - Usage::eAccelerationStructureInput is tied to an extension. Requesting it on a
+             *    device that never enabled ray tracing is itself a validation error, which is why
+             *    Mesh::makeBuffer asks Context::SupportsRayTracing() before adding it.
+             *
+             * addUsage() adds to this. setUsage() replaces it outright, which is how a buffer says
+             * it wants exactly these roles and no others — and which also switches off the size
+             * deduction, since a caller naming an exact set has already said what it wants.
+             */
+            /// Mutable because create() resolves the size-dependent role into it, and create() is
+            /// const — the same reason DescriptorSet::Builder resolves its writes that way.
+            mutable Flags<Usage> _usage = Flags<Usage>(Usage::eTransferSrc) | Usage::eTransferDst
+                                        | Usage::eStorage
+                                        | Usage::eVertex | Usage::eIndex | Usage::eIndirect;
             Type _type = Type::eDynamic;            ///< Where the memory lives.
 
             /**
@@ -211,6 +240,7 @@ namespace kor
                 }
                 _usage = usage;
                 _usageTouched = true;
+                _usageExact = true;
                 return *this;
             }
 
@@ -240,6 +270,10 @@ namespace kor
 
         protected:
             bool _usageTouched = false; ///< tracks explicit usage edits so setUsage can warn on overwrite
+
+            /// Set only by setUsage: the caller named an exact set, so nothing is deduced on top.
+            /// addUsage does not set it — adding a role says nothing about the ones not mentioned.
+            bool _usageExact = false;
 
             RawBuilder& setSize(const glm::i64 value) {
                 if (value <= 0) {
@@ -969,6 +1003,42 @@ namespace kor
 
         /** @brief The buffer's size in bytes. For a per-frame buffer, the size of one frame's copy. */
         [[nodiscard]] glm::u64 getSize() const { return _size; }
+
+        /**
+         * @brief Part of a buffer, for binding less than the whole of it.
+         *
+         * A shader binding sees a window onto a buffer, and that window is usually the whole thing
+         * — which is what passing the buffer itself means. Say otherwise by slicing it:
+         *
+         * @code
+         * .write("instances", kor::Buffer::slice(instanceBuffer, frameOffset, frameSize))
+         * @endcode
+         *
+         * A size of 0 means "the rest of the buffer from the offset", which is the common case for
+         * a slice that only skips a header. A slice is a description rather than a resource: it
+         * holds a tracked reference and costs nothing to make, so build one at the point of the
+         * write rather than storing it.
+         */
+        struct KORAL_API Slice {
+            ResourceRef<const Buffer> buffer;   ///< The buffer being sliced.
+            glm::i64 offset = 0;                ///< Byte offset the shader's view of it starts at.
+            glm::i64 size = 0;                  ///< How many bytes it covers; 0 means the rest.
+        };
+
+        /**
+         * @brief A window onto part of @p buffer, to bind in place of the whole. @see Slice
+         * @param offset Byte offset the window starts at.
+         * @param size How many bytes it covers; 0 means the rest of the buffer.
+         *
+         * Static, and taking the buffer, rather than a member on it: a buffer cannot hand out a
+         * tracked reference to itself — only its owning Resource knows where its state block is —
+         * and an untracked one in a slice held by a descriptor set's builder is exactly the dangling
+         * reference the whole ResourceRef design exists to prevent.
+         */
+        [[nodiscard]] static Slice slice(ResourceRef<const Buffer> buffer, const glm::i64 offset,
+                                         const glm::i64 size = 0) {
+            return Slice{ std::move(buffer), offset, size };
+        }
 
         /**
          * @brief The access this buffer was last synchronised for.

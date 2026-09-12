@@ -32,8 +32,12 @@
 #include "buffer.h"
 #include "image.h"
 #include "imageView.h"
+#include "bufferView.h"
 #include "sampler.h"
-#include "descriptor.h"
+// descriptor.h is deliberately absent: kor::Descriptor is the record a descriptor set keeps of what
+// is bound where, not something a project constructs. Bind resources through
+// DescriptorSet::Builder::write, which takes them as themselves. The header is still reachable for
+// anything walking a built set's contents.
 #include "descriptorSet.h"
 #include "descriptorSetLayout.h"
 #include "framebuffer.h"

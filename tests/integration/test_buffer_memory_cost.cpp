@@ -126,7 +126,7 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
 
         auto descriptorSet =
             DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
-                .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
+                .write(0, buffer)
                 .build();
         ASSERT_TRUE(descriptorSet.valid());
 
@@ -194,7 +194,7 @@ TEST_F(GpuTest, DeviceDynamicIsHostWritableAndGpuVisible) {
 
     auto descriptorSet =
         DescriptorSet::Builder(ResourceRef<const kor::Pipeline>(pipeline), 0)
-            .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
+            .write(0, buffer)
             .build();
     ASSERT_TRUE(descriptorSet.valid());
 

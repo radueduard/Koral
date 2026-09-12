@@ -73,9 +73,7 @@ namespace kimg
                 .setExtent({ faceExtent.x, faceExtent.y, 1 })
                 .setArrayLayers(kFaceCount)
                 .setMipLevels(generateMipmaps ? 0 : 1)
-                .setFormat(format)
-                .addUsage(kor::Image::Usage::eTransferSrc)
-                .addUsage(kor::Image::Usage::eTransferDst);
+                .setFormat(format);
             if (storage) builder.addUsage(kor::Image::Usage::eStorage);
             return builder.build();
         }
@@ -278,9 +276,9 @@ namespace kimg
             .build();
 
         const auto set = kor::DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-            .write(0, kor::Descriptor(kor::ResourceRef<const kor::ImageView>(equirectView)))
-            .write(1, kor::Descriptor(projectionSampler()))
-            .write(2, kor::Descriptor(kor::ResourceRef<const kor::ImageView>(cubeView)))
+            .write(0, equirectView)
+            .write(1, projectionSampler())
+            .write(2, cubeView)
             .build();
         if (!set) {
             return failure(std::format("the equirectangular projection could not be bound: {}",

@@ -30,9 +30,12 @@ namespace kor::vk
         auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
         auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
 
-        _colorAttachments.emplace_back(colorAttachment);
-        _depthAttachment = depthStencilAttachment;
-        _stencilAttachment = depthStencilAttachment;
+        // Named, like any other framebuffer's targets, so the image a frame is presented from is
+        // reachable by `DefaultFramebuffer()->image("color")` rather than only by index.
+        // @see Framebuffer::image
+        _colorAttachments.push_back(Attachment{ colorAttachment, {}, "color" });
+        _depthAttachment = Attachment{ depthStencilAttachment, {}, "depth" };
+        _stencilAttachment = Attachment{ depthStencilAttachment, {}, "stencil" };
         _clearValues.clearColor.emplace_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
         _clearValues.clearDepth = 1.0f;
         _clearValues.clearStencil = 0;
@@ -53,9 +56,9 @@ namespace kor::vk
 
             _extent = newExtent;
             _colorAttachments.clear();
-            _colorAttachments.emplace_back(colorAttachment);
-            _depthAttachment = depthStencilAttachment;
-            _stencilAttachment = depthStencilAttachment;
+            _colorAttachments.push_back(Attachment{ colorAttachment, {}, "color" });
+            _depthAttachment = Attachment{ depthStencilAttachment, {}, "depth" };
+            _stencilAttachment = Attachment{ depthStencilAttachment, {}, "stencil" };
         }
     }
 }

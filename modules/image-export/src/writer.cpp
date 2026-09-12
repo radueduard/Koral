@@ -95,8 +95,7 @@ namespace kimg
             const auto byteCount = kor::Image::SizeOfRegion(image->getFormat(), subimage.extent);
 
             kor::Buffer::RawBuilder builder;
-            builder.setRawSize(static_cast<glm::i64>(byteCount))
-                .addUsage(kor::Buffer::Usage::eTransferDst)
+            builder.setRawSize(static_cast<glm::i64>(byteCount))
                 .setType(kor::Buffer::Type::eReadback);
             auto staging = builder.build();
             if (!staging) {

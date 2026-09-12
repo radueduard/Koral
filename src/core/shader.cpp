@@ -495,6 +495,26 @@ namespace kor {
     	return count;
     }
 
+	// The shape the shader declared an image binding with. Only the shader knows this: six array
+	// layers are equally a cube map and a 2D array, and picking wrong gives a `samplerCube` a view
+	// it cannot sample. Kept so that binding an Image directly can build the right view.
+	// @see Shader::ImageShape
+	Shader::ImageShape ShapeOf(const spirv_cross::SPIRType& type) {
+		using Shape = Shader::ImageShape;
+		const bool arrayed = type.image.arrayed;
+		switch (type.image.dim) {
+		case spv::Dim1D:     return arrayed ? Shape::e1DArray : Shape::e1D;
+		case spv::Dim2D:     return arrayed ? Shape::e2DArray : Shape::e2D;
+		case spv::Dim3D:     return Shape::e3D;   // a 3D image has no array form
+		case spv::DimCube:   return arrayed ? Shape::eCubeArray : Shape::eCube;
+		case spv::DimBuffer: return Shape::eBuffer;
+		// DimRect and DimSubpassData reach no path that builds a view for the caller, so naming
+		// them here would only invite one to be built. Left unknown, which binding an Image
+		// reports rather than guesses at.
+		default:             return Shape::eUnknown;
+		}
+	}
+
 	// Read/write intent for a resource that can be written, from the NonReadable/NonWritable
 	// decorations. `flags` must come from get_buffer_block_flags for a storage *buffer* (the
 	// decorations sit on the block's members and have to be aggregated) and from
@@ -843,12 +863,13 @@ namespace kor {
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
+			const auto shape = ShapeOf(module.get_type(sampledImage.type_id));
 
 			if (module.get_type(sampledImage.type_id).image.dim == spv::DimBuffer) {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformTexelBuffer, name, count, stage, AccessKind::eRead, isActive(sampledImage) });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformTexelBuffer, name, count, stage, AccessKind::eRead, isActive(sampledImage), {}, 0, {}, shape });
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage, AccessKind::eRead, isActive(sampledImage) });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage, AccessKind::eRead, isActive(sampledImage), {}, 0, {}, shape });
 			}
 		} // eSampledImage and eUniformTexelBuffer
     	for (const auto& sampledImage : resources.sampled_images) {
@@ -856,7 +877,8 @@ namespace kor {
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eCombinedImageSampler, name, count, stage, AccessKind::eRead, isActive(sampledImage) });
+			const auto shape = ShapeOf(module.get_type(sampledImage.type_id));
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eCombinedImageSampler, name, count, stage, AccessKind::eRead, isActive(sampledImage), {}, 0, {}, shape });
 		} // eCombinedImageSampler
 		for (const auto& image : resources.storage_images) {
 			const uint32_t set = module.get_decoration(image.id, spv::DecorationDescriptorSet);
@@ -867,11 +889,12 @@ namespace kor {
 			// block, so readonly/writeonly are attached directly to it.
 			const auto access = AccessFrom(module.get_decoration_bitset(image.id));
 			const bool active = isActive(image);
+			const auto shape = ShapeOf(module.get_type(image.type_id));
 			if (module.get_type(image.type_id).image.dim == spv::DimBuffer) {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageTexelBuffer, name, count, stage, access, active });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageTexelBuffer, name, count, stage, access, active, {}, 0, {}, shape });
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage, access, active });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage, access, active, {}, 0, {}, shape });
 			}
 		} // eStorageImage and eStorageTexelBuffer
 		for (const auto& buffer : resources.uniform_buffers) {
@@ -880,6 +903,7 @@ namespace kor {
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
 			auto descriptor = Descriptor { DescriptorType::eUniformBuffer, name, count, stage, AccessKind::eRead, isActive(buffer) };
+			descriptor.blockName = module.get_name(buffer.base_type_id);
 			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eUniformBuffer
@@ -891,6 +915,7 @@ namespace kor {
 			// Block flags, not the variable's: NonWritable/NonReadable land on the members.
 			const auto access = AccessFrom(module.get_buffer_block_flags(buffer.id));
 			auto descriptor = Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) };
+			descriptor.blockName = module.get_name(buffer.base_type_id);
 			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eStorageBuffer

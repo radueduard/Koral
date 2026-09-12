@@ -313,7 +313,7 @@ namespace kor::vk
     void GUI::Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
         const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*kor::Context::DefaultFramebuffer());
-        const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(vkFramebuffer.getColorAttachments()[0].get());
+        const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(*vkFramebuffer.getColorAttachment(0));
         const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.getImage());
 
         commandBuffer.ImageBarrier({

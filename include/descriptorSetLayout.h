@@ -5,6 +5,8 @@
 #pragma once
 #include <map>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <vector>
 #include <optional>
 
@@ -49,13 +51,33 @@ namespace kor
             std::vector<Shader::BlockMember> members;
             glm::u32 blockSize = 0;
 
+            /// What the shader calls this binding, so a set can be written by name rather than by
+            /// number. @see Shader::Descriptor::name
+            std::string name;
+
+            /// The block type's name, when the binding is a block declared without an instance
+            /// name. Either this or @ref name finds the binding. @see Shader::Descriptor::blockName
+            std::string blockName;
+
+            /// How the shader shaped this image binding — which is what an Image bound directly is
+            /// turned into a view by, since the image alone cannot always say. Outside the
+            /// interface comparison below, like the names. @see Shader::ImageShape
+            Shader::ImageShape shape = Shader::ImageShape::eUnknown;
+
+            /** @brief Whether @p wanted names this binding, under either of the names it has. */
+            [[nodiscard]] bool namedBy(const std::string_view wanted) const {
+                return (!name.empty() && name == wanted) || (!blockName.empty() && blockName == wanted);
+            }
+
             /**
              * @brief Whether two bindings present the same interface.
              *
              * Interface only, on purpose. matches() is what decides whether a shader reload can
              * keep the existing layout object, so letting access, stages or the active flag in here
              * would rebuild the layout — and expire every descriptor set holding it — over an edit
-             * that merely made a storage buffer read-only.
+             * that merely made a storage buffer read-only. The names are out for the same reason
+             * @ref members is: renaming a binding changes nothing the GPU can see, and rebuilding
+             * the layout over it would orphan every set written against the old one.
              */
             bool operator==(const Binding& other) const {
                 return type == other.type && count == other.count;
@@ -79,6 +101,16 @@ namespace kor
             Builder& addBinding(glm::u32 binding, DescriptorType type, glm::u32 count = 1,
                                 Shader::AccessKind access = Shader::AccessKind::eRead,
                                 Flags<Shader::Stage> stages = {}, bool active = true);
+
+            /**
+             * @brief Declares one binding from a fully described @ref Binding.
+             *
+             * What reflection uses, since it has every field to give — the names included, which is
+             * what lets a descriptor set be written by name. A hand-written layout is usually
+             * better served by the overload above, and may name a binding by filling in
+             * Binding::name if it wants to write to it by name too.
+             */
+            Builder& addBinding(glm::u32 binding, Binding description);
 
             /**
              * @brief Declares a buffer binding along with the block's fields.
@@ -117,6 +149,23 @@ namespace kor
 
         /** @brief What kind of resource belongs at @p binding. */
         [[nodiscard]] DescriptorType getBindingType(glm::u32 binding) const;
+
+        /**
+         * @brief The number of the binding the shader calls @p name.
+         * @return The binding number, or nullopt when no binding of this set has that name.
+         *
+         * Matches either name a binding has: the variable's, and — for a block declared without an
+         * instance name — the block type's. @see Binding::namedBy
+         */
+        [[nodiscard]] std::optional<glm::u32> findBinding(std::string_view name) const;
+
+        /**
+         * @brief Every name this set's bindings answer to, in binding order, for a diagnostic.
+         *
+         * What a "no such binding" message lists, so the fix is visible without going back to the
+         * shader to find out what the binding is actually called.
+         */
+        [[nodiscard]] std::vector<std::string> bindingNames() const;
 
         /** @brief Full per-binding description, including what the shader does with it. */
         [[nodiscard]] const std::map<glm::u32, Binding>& getBindingDescriptions() const { return _bindings; }

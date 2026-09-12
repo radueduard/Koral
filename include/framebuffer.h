@@ -19,6 +19,7 @@
 
 namespace kor
 {
+    class Image;
     class ImageView;
 
     /**
@@ -31,18 +32,28 @@ namespace kor
      * without touching the framebuffer everything else shares.
      *
      * @code
-     * kor::Framebuffer::Builder builder;
-     * auto gbuffer = builder
-     *     .addColorAttachment(albedoView, glm::vec4{0, 0, 0, 1})
-     *     .addColorAttachment(normalView)
-     *     .setDepthAttachment(depthView, 1.f)
+     * auto gbuffer = kor::Framebuffer::Builder{}
+     *     .addColorAttachment("albedo", albedoImage, glm::vec4{0, 0, 0, 1})
+     *     .addColorAttachment("normal", normalImage)
+     *     .setDepthAttachment(depthImage, 1.f)
      *     .build();
+     *
+     * auto albedo = gbuffer->image("albedo");   // read it back, sample it, export it
      * @endcode
      *
-     * Attachments are given as ImageViews, so one image can be a target in one pass and a texture
-     * in the next. Every attachment must agree on extent and sample count. For MSAA, give each
-     * attachment a resolve view: the multisampled image is rendered into and collapsed onto the
-     * resolve target as the pass ends, which is cheaper than resolving it afterwards.
+     * Attachments may be given as Images — a view covering the top mip level is made and owned by
+     * the image, which is what an attachment needs — or as ImageViews, when you want to render into
+     * one layer or one level of something larger. Either way one image can be a target in one pass
+     * and a texture in the next.
+     *
+     * Naming an attachment is optional and costs nothing, but it is what lets the targets be
+     * reached afterwards by what they are rather than by the order they happened to be added in.
+     * The order still decides the shader's output locations: the first colour attachment added is
+     * location 0.
+     *
+     * Every attachment must agree on extent and sample count. For MSAA, give each attachment a
+     * resolve view: the multisampled image is rendered into and collapsed onto the resolve target
+     * as the pass ends, which is cheaper than resolving it afterwards.
      */
     class KORAL_API Framebuffer {
     public:
@@ -54,6 +65,26 @@ namespace kor
 
         /** @brief Whether this is the window's default framebuffer, the one presented at the end of the frame. */
         [[nodiscard]] bool IsDefault() const { return _isDefault; }
+
+        /**
+         * @brief One target of a framebuffer: what is rendered into, what it resolves onto, and
+         *        what it is called.
+         *
+         * Held by tracked reference rather than by raw reference, which is what lets a framebuffer
+         * outlive nothing and lets its targets be handed back out — reaching the default
+         * framebuffer's swap-chain image is exactly that. @see Framebuffer::image
+         */
+        struct KORAL_API Attachment
+        {
+            ResourceRef<const ImageView> view;      ///< What is rendered into.
+            ResourceRef<const ImageView> resolve;   ///< Where its samples land, for an MSAA target; empty otherwise.
+            std::string name;                       ///< What it is called, if it was named.
+
+            /** @brief Whether this attachment answers to @p wanted. */
+            [[nodiscard]] bool namedBy(const std::string_view wanted) const {
+                return !name.empty() && name == wanted;
+            }
+        };
 
         /** @brief What each attachment is filled with when a pass opens with LoadOperation::eClear. */
         struct KORAL_API ClearValues
@@ -71,67 +102,72 @@ namespace kor
          * location 0.
          */
         struct KORAL_API Builder : ::Builder {
-            std::vector<std::reference_wrapper<const ImageView>> colorAttachments {};
-            std::optional<std::vector<std::reference_wrapper<const ImageView>>> colorResolveAttachments = std::nullopt;
-            std::optional<std::reference_wrapper<const ImageView>> depthAttachment = std::nullopt;
-            std::optional<std::reference_wrapper<const ImageView>> depthResolveAttachment = std::nullopt;
-            std::optional<std::reference_wrapper<const ImageView>> stencilAttachment = std::nullopt;
-            std::optional<std::reference_wrapper<const ImageView>> stencilResolveAttachment = std::nullopt;
+            std::vector<Attachment> colorAttachments {};
+            std::optional<Attachment> depthAttachment = std::nullopt;
+            std::optional<Attachment> stencilAttachment = std::nullopt;
             ClearValues clearValues;
             std::optional<SampleCount> sampleCount = std::nullopt;
             std::optional<glm::uvec2> extent = std::nullopt;
             ResolveMode resolveMode = ResolveMode::eNone;
 
             /**
-             * @brief Appends a colour target.
-             * @param imageView What to render into. Its image needs Image::Usage::eColorAttachment.
-             * @param clearColor What it is filled with when the pass clears on entry.
-             * @return The builder, for chaining.
+             * @name Colour targets
              *
-             * The order of these calls is the order of the shader's output locations.
+             * The order of these calls is the order of the shader's output locations: the first
+             * added is location 0.
+             *
+             * Give an Image and the view is made for you — the top mip level, every array layer,
+             * which is what an attachment must be — and owned by the image, so the same image
+             * rendered into by two framebuffers shares one. Give an ImageView instead to render
+             * into one level or one layer of something larger.
+             *
+             * A name is optional and is what lets the target be found again by what it is rather
+             * than by the order it was added in. @see Framebuffer::image
+             *
+             * @param clearColor What it is filled with when the pass clears on entry.
+             * @param resolveView For a multisampled target, where its samples are collapsed as the
+             *        pass ends.
              */
+            ///@{
             Builder& addColorAttachment(ResourceRef<const ImageView> imageView, ClearColor clearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f });
-
-            /**
-             * @brief Appends a multisampled colour target and the single-sampled view it resolves onto.
-             * @param imageView The multisampled target that is rendered into.
-             * @param resolveView Where its samples are collapsed as the pass ends.
-             * @param clearColor What the target is filled with when the pass clears on entry.
-             */
             Builder& addColorAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, ClearColor clearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f });
+            Builder& addColorAttachment(ResourceRef<const Image> image, ClearColor clearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f });
+
+            Builder& addColorAttachment(std::string_view name, ResourceRef<const ImageView> imageView, ClearColor clearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f });
+            Builder& addColorAttachment(std::string_view name, ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, ClearColor clearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f });
+            Builder& addColorAttachment(std::string_view name, ResourceRef<const Image> image, ClearColor clearColor = glm::vec4{ 0.f, 0.f, 0.f, 1.f });
+            ///@}
 
             /**
-             * @brief Sets the depth target.
-             * @param imageView What to render depth into. Its image needs a depth format and
-             *        Image::Usage::eDepthStencilAttachment.
-             * @param depth What it is cleared to; 1.0 is the far plane.
-             */
-            Builder& setDepthAttachment(ResourceRef<const ImageView> imageView, float depth = 1.f);
-
-            /** @brief Sets a multisampled depth target and the view its samples resolve onto. */
-            Builder& setDepthAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, float depth = 1.f);
-
-            /**
-             * @brief Sets the stencil target.
-             * @param imageView What to render stencil into. Its image needs a stencil-carrying format.
-             * @param stencil What it is cleared to.
-             */
-            Builder& setStencilAttachment(ResourceRef<const ImageView> imageView, glm::i32 stencil = 0);
-
-            /** @brief Sets a multisampled stencil target and the view its samples resolve onto. */
-            Builder& setStencilAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, glm::i32 stencil = 0);
-
-            /**
-             * @brief Sets one view as both the depth and the stencil target.
-             * @param imageView A view of a combined depth-stencil format, such as
-             *        Image::Format::eD32_SFLOAT_S8_UINT.
-             * @param depth What the depth part is cleared to.
+             * @name Depth and stencil targets
+             *
+             * The same in every respect as the colour targets above, including taking an Image
+             * directly. A depth target's image needs a depth format and
+             * Image::Usage::eDepthStencilAttachment; a stencil target's needs a stencil-carrying
+             * format. The combined form sets one view as both, for a format such as
+             * Image::Format::eD32_SFLOAT_S8_UINT that carries the two together.
+             *
+             * @param depth What the depth part is cleared to; 1.0 is the far plane.
              * @param stencil What the stencil part is cleared to.
              */
-            Builder& setDepthStencilAttachment(ResourceRef<const ImageView> imageView, float depth = 1.f, glm::i32 stencil = 0);
+            ///@{
+            Builder& setDepthAttachment(ResourceRef<const ImageView> imageView, float depth = 1.f);
+            Builder& setDepthAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, float depth = 1.f);
+            Builder& setDepthAttachment(ResourceRef<const Image> image, float depth = 1.f);
+            Builder& setDepthAttachment(std::string_view name, ResourceRef<const ImageView> imageView, float depth = 1.f);
+            Builder& setDepthAttachment(std::string_view name, ResourceRef<const Image> image, float depth = 1.f);
 
-            /** @brief Sets a multisampled combined depth-stencil target and the view it resolves onto. */
+            Builder& setStencilAttachment(ResourceRef<const ImageView> imageView, glm::i32 stencil = 0);
+            Builder& setStencilAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, glm::i32 stencil = 0);
+            Builder& setStencilAttachment(ResourceRef<const Image> image, glm::i32 stencil = 0);
+            Builder& setStencilAttachment(std::string_view name, ResourceRef<const ImageView> imageView, glm::i32 stencil = 0);
+            Builder& setStencilAttachment(std::string_view name, ResourceRef<const Image> image, glm::i32 stencil = 0);
+
+            Builder& setDepthStencilAttachment(ResourceRef<const ImageView> imageView, float depth = 1.f, glm::i32 stencil = 0);
             Builder& setDepthStencilAttachment(ResourceRef<const ImageView> imageView, ResourceRef<const ImageView> resolveView, float depth = 1.f, glm::i32 stencil = 0);
+            Builder& setDepthStencilAttachment(ResourceRef<const Image> image, float depth = 1.f, glm::i32 stencil = 0);
+            Builder& setDepthStencilAttachment(std::string_view name, ResourceRef<const Image> image, float depth = 1.f, glm::i32 stencil = 0);
+            ///@}
 
             /** @brief Sets how samples are combined when resolving — averaged, or one sample taken. @see ResolveMode */
             Builder& setResolveMode(ResolveMode mode);
@@ -145,6 +181,16 @@ namespace kor
              *         extent or sample count.
              */
             [[nodiscard]] kor::Resource<Framebuffer> build(std::source_location where = std::source_location::current()) const;
+
+        private:
+            /**
+             * @brief Takes the extent and sample count from the first attachment that can give them.
+             *
+             * Every attachment has to agree on both, so the first one to arrive settles them and the
+             * rest are checked against that. An unusable attachment answers for neither and is left
+             * to poison the build through adopt(), rather than being dereferenced here.
+             */
+            void adoptGeometry(const ResourceRef<const ImageView>& imageView);
         };
 
         virtual ~Framebuffer() = default;
@@ -162,31 +208,74 @@ namespace kor
         [[nodiscard]] const glm::uvec2& getExtent() const { return _extent; }
 
         /** @brief The colour targets, in the order a fragment shader's output locations address them. */
-        [[nodiscard]] const std::vector<std::reference_wrapper<const ImageView>>& getColorAttachments() const;
+        [[nodiscard]] const std::vector<Attachment>& getColorAttachments() const;
+
+        /** @brief The view rendered into at colour attachment @p index, or an empty ref if there is none. */
+        [[nodiscard]] ResourceRef<const ImageView> getColorAttachment(glm::u32 index) const;
 
         /** @brief Whether it has a depth target, and so whether depth testing is possible in the pass. */
         [[nodiscard]] bool hasDepthAttachment() const;
 
-        /** @brief The depth target. Only call it when hasDepthAttachment() is true. */
-        [[nodiscard]] const ImageView& getDepthAttachment() const;
+        /** @brief The depth target, or an empty ref if there is none. */
+        [[nodiscard]] ResourceRef<const ImageView> getDepthAttachment() const;
 
         /** @brief Whether it has a stencil target. */
         [[nodiscard]] bool hasStencilAttachment() const;
 
-        /** @brief The stencil target. Only call it when hasStencilAttachment() is true. */
-        [[nodiscard]] const ImageView& getStencilAttachment() const;
+        /** @brief The stencil target, or an empty ref if there is none. */
+        [[nodiscard]] ResourceRef<const ImageView> getStencilAttachment() const;
 
         /** @brief Whether it has a depth target. Kept for callers written against the combined depth-stencil naming. */
         [[nodiscard]] bool hasDepthStencilAttachment() const { return hasDepthAttachment(); }
 
         /** @brief The depth target. Kept for callers written against the combined depth-stencil naming. */
-        [[nodiscard]] const ImageView& getDepthStencilAttachment() const { return getDepthAttachment(); }
+        [[nodiscard]] ResourceRef<const ImageView> getDepthStencilAttachment() const { return getDepthAttachment(); }
 
         /** @brief Whether its attachments resolve onto single-sampled views as the pass ends. */
         [[nodiscard]] bool hasResolveAttachments() const;
 
-        /** @brief The resolve target for colour attachment @p index. */
-        [[nodiscard]] const ImageView& getResolveAttachment(glm::u32 index) const;
+        /** @brief The resolve target for colour attachment @p index, or an empty ref if it has none. */
+        [[nodiscard]] ResourceRef<const ImageView> getResolveAttachment(glm::u32 index) const;
+
+        /**
+         * @name Reaching the targets by name
+         *
+         * What a framebuffer renders into is usually wanted afterwards — sampled by the next pass,
+         * read back, exported, shown in a viewport — and asking for it by what it is beats
+         * remembering which index it was added at.
+         *
+         * @code
+         * auto normals = gbuffer->image("normal");
+         * commandBuffer.CopyImageToBuffer(normals, readback);
+         * @endcode
+         *
+         * The default framebuffer names its own targets `"color"` and `"depth"` (with `"stencil"`
+         * aliasing the depth target when the format carries both), so the swap-chain image a frame
+         * is presented from is reachable the same way as any other:
+         *
+         * @code
+         * auto screen = kor::Context::DefaultFramebuffer()->image("color");
+         * @endcode
+         *
+         * An unknown name gives an empty ref rather than throwing — the caller usually wants to
+         * carry on without that target rather than stop.
+         */
+        ///@{
+        /** @brief The view of the attachment called @p name, or an empty ref if there is none. */
+        [[nodiscard]] ResourceRef<const ImageView> attachment(std::string_view name) const;
+
+        /** @brief The image behind the attachment called @p name, or an empty ref if there is none. */
+        [[nodiscard]] ResourceRef<const Image> image(std::string_view name) const;
+
+        /** @brief The image behind colour attachment @p index, or an empty ref if there is none. */
+        [[nodiscard]] ResourceRef<const Image> colorImage(glm::u32 index = 0) const;
+
+        /** @brief The image behind the depth target, or an empty ref if there is none. */
+        [[nodiscard]] ResourceRef<const Image> depthImage() const;
+
+        /** @brief Every name its attachments answer to, in order, for a diagnostic. */
+        [[nodiscard]] std::vector<std::string> attachmentNames() const;
+        ///@}
 
         /** @brief What colour attachment @p index is cleared to. */
         [[nodiscard]] const ClearColor& getClearColor(glm::u32 index) const;
@@ -228,12 +317,9 @@ namespace kor
         explicit Framebuffer(const Builder& createInfo);
 
         mutable glm::uvec2 _extent = { 0, 0 };
-        mutable std::vector<std::reference_wrapper<const ImageView>> _colorAttachments {};
-        mutable std::optional<std::vector<std::reference_wrapper<const ImageView>>> _colorResolveAttachments = std::nullopt;
-        mutable std::optional<std::reference_wrapper<const ImageView>> _depthAttachment = std::nullopt;
-        mutable std::optional<std::reference_wrapper<const ImageView>> _depthResolveAttachment = std::nullopt;
-        mutable std::optional<std::reference_wrapper<const ImageView>> _stencilAttachment = std::nullopt;
-        mutable std::optional<std::reference_wrapper<const ImageView>> _stencilResolveAttachment = std::nullopt;
+        mutable std::vector<Attachment> _colorAttachments {};
+        mutable std::optional<Attachment> _depthAttachment = std::nullopt;
+        mutable std::optional<Attachment> _stencilAttachment = std::nullopt;
         SampleCount _sampleCount = SampleCount::e1;
         ClearValues _clearValues {};
         ResolveMode _resolveMode = ResolveMode::eNone;

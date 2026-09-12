@@ -107,8 +107,8 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
 
     // --- descriptor set: TLAS at 0, storage image at 1 -------------------
     auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-                             .write(0, Descriptor(ResourceRef<const AccelerationStructure>(tlas)))
-                             .write(1, Descriptor(ResourceRef<const ImageView>(outView)))
+                             .write(0, tlas)
+                             .write(1, outView)
                              .build();
 
     // --- trace ------------------------------------------------------------

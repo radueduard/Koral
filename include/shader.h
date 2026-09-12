@@ -118,6 +118,15 @@ namespace kor
         };
 
         /**
+         * @brief How an image binding is shaped, as the shader itself declared it.
+         *
+         * Spelled `Shader::ImageShape` because that is where a reader looks for what reflection
+         * reports, but defined in structs.h so that image.h can name it without including the whole
+         * of this header. @see kor::ImageShape, DescriptorSet::Builder::write
+         */
+        using ImageShape = kor::ImageShape;
+
+        /**
          * @brief One field of a uniform or storage block, as the compiled shader lays it out.
          *
          * What lets the engine fill a block the shader designed rather than one it dictated.
@@ -160,6 +169,25 @@ namespace kor
             /// descriptor set built from the old layout. @see Descriptor::operator<=>
             std::vector<BlockMember> members;
             glm::u32 blockSize = 0;                 ///< The block's total size in bytes.
+
+            /// The block *type's* name, for a uniform or storage buffer; empty for anything else.
+            ///
+            /// A GLSL block may be declared without an instance name — `uniform Model { ... };` —
+            /// and then @ref name is empty, because there is no variable to name it after. The type
+            /// is the only name such a binding has, and it is what its author would call it, so it
+            /// is kept alongside and either one finds the binding.
+            ///
+            /// Last and defaulted, like @ref members, so the positional brace-initialisers that
+            /// build a Descriptor from reflection keep working unchanged. Outside operator<=> for
+            /// the same reason too: it is not part of the binding's interface, and a reload that
+            /// renames a block must not orphan every descriptor set built from the old layout.
+            std::string blockName;
+
+            /// How the shader shaped this image binding, for an image or texel-buffer binding;
+            /// eUnknown for anything else. What lets an Image be bound directly, since it says
+            /// which view the binding wants. Last, defaulted and outside operator<=>, like the
+            /// fields above and for the same reasons. @see ImageShape
+            ImageShape shape = ImageShape::eUnknown;
 
             // Identity is the *interface* only: type, name, count. Access is a function of
             // the type and adds nothing to compare, and stages are unioned across shaders

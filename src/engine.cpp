@@ -235,7 +235,7 @@ namespace kor
                 // interface is the one thing such a scene draws.
                 if (const auto framebuffer = Context::DefaultFramebuffer();
                     framebuffer.valid() && !framebuffer->getColorAttachments().empty()) {
-                    if (const auto screen = framebuffer->getColorAttachments()[0].get().getImage();
+                    if (const auto screen = framebuffer->colorImage(0);
                         !commandBuffer.hasTouched(screen)) {
                         commandBuffer.BeginRendering();
                         commandBuffer.EndRendering();

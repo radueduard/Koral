@@ -24,7 +24,18 @@ namespace kor
         {
             static ComPtr<slang::IGlobalSession> session = [] {
                 ComPtr<slang::IGlobalSession> s;
-                if (SLANG_FAILED(slang::createGlobalSession(s.writeRef()))) {
+
+                // GLSL-flavoured Slang — a shader whose first line is `#version` — resolves its
+                // vec3/mat4/gl_Position against a `glsl` module that exists only when the *global*
+                // session was created with GLSL enabled. SessionDesc::allowGLSLSyntax does not do
+                // it and is not needed once this is set: without the flag below every such shader
+                // fails with "'glsl' module not available", followed by an undefined identifier for
+                // the first vec3 it meets. Enabled unconditionally because the global session is
+                // built once per process, long before any shader has said which flavour it is.
+                SlangGlobalSessionDesc globalDesc = {};
+                globalDesc.enableGLSL = true;
+
+                if (SLANG_FAILED(slang::createGlobalSession(&globalDesc, s.writeRef()))) {
                     throw BackendException(Error{ .code = ErrorCode::eShaderCompileFailed,
                         .message = "Failed to create the Slang global session." });
                 }

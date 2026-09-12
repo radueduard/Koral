@@ -16,6 +16,20 @@ namespace kor
     {
         beginAttempt();
 
+        // The one role that cannot simply be on by default, and the one place a usage is deduced
+        // rather than declared. eUniform is free to hold *except* for its size ceiling, and the size
+        // is known right here — so a buffer small enough to be a uniform block is given the role,
+        // and one too large could never have had it anyway. That covers the camera and per-frame
+        // constant buffers, which are the ones anybody would have had to remember it for.
+        //
+        // Skipped when the caller named an exact set with setUsage: it has already said what it
+        // wants, and quietly adding to that would make setUsage mean something other than it says.
+        if (!_usageExact && _size <= 0xFFFF) {
+            _usage |= Usage::eUniform;
+        }
+
+        // Still an error when the caller asked for it outright on a buffer that cannot hold it —
+        // the deduction above never produces this, so reaching it means eUniform was requested.
         if (_usage & Usage::eUniform && _size > 0xFFFF) {
             addError(ErrorCode::eUniformBufferTooLarge,
                      std::format("Uniform buffer size of {} bytes exceeds the maximum allowed size of 65536 bytes!", _size));

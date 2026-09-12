@@ -89,7 +89,30 @@ namespace kor
         void* openLibrary(const std::filesystem::path& path, std::string& error)
         {
 #if defined(_WIN32)
-            const HMODULE handle = LoadLibraryW(path.wstring().c_str());
+            // A module's dependencies are split across two directories and the loader has to be
+            // told about both, because the installed SDK puts them in different places for good
+            // reasons: third-party libraries go beside the executable in bin/, shared with the
+            // engine so one copy serves everyone, while sibling modules live in bin/modules/ where
+            // the module loader looks for them.
+            //
+            //   LOAD_LIBRARY_SEARCH_DEFAULT_DIRS — the application directory (bin/), plus System32.
+            //                                      Finds assimp, OpenImageIO, ktx.
+            //   LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR — the directory of the DLL being loaded
+            //                                      (bin/modules/). Finds sibling modules.
+            //
+            // Plain LoadLibraryW covers only the first, so a module that links another module —
+            // image-compress needs image-import — loaded only when its sibling already happened to
+            // be in the process, which came down to the order the project listed them in.
+            // LOAD_WITH_ALTERED_SEARCH_PATH is the obvious-looking alternative and is wrong here:
+            // it *replaces* the application directory with the DLL's own, so it would fix the
+            // sibling case by breaking the third-party one.
+            //
+            // Either way the failure is ERROR_MOD_NOT_FOUND — 126 — reported against the module
+            // that was asked for, never naming the dependency that was actually missing.
+            // Absolute path required by these flags, which is what resolve() above returns.
+            const HMODULE handle = LoadLibraryExW(path.wstring().c_str(), nullptr,
+                                                  LOAD_LIBRARY_SEARCH_DEFAULT_DIRS
+                                                  | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
             if (!handle) error = std::format("LoadLibrary failed with error {}", GetLastError());
             return handle;
 #else

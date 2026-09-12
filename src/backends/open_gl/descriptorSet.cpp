@@ -12,6 +12,7 @@
 #include "buffer.h"
 #include "commandBuffer.h"
 #include "descriptor.h"
+#include "bufferView.h"
 #include "imageView.h"
 #include "sampler.h"
 
@@ -170,6 +171,27 @@ namespace kor::ogl
                     {
                         const auto& sampler = dynamic_cast<const ogl::Sampler&>(descriptor.getSampler());
                         glBindSampler(bindingPoint->second, *sampler);
+                        glCheckError();
+                        break;
+                    }
+                case DescriptorType::eUniformTexelBuffer:
+                    {
+                        // A `samplerBuffer` is fetched from a texture whose storage is the buffer,
+                        // so binding it is binding that texture to a unit — no sampler, since a
+                        // texel buffer has no filtering or addressing to configure.
+                        const auto& bufferView = dynamic_cast<const ogl::BufferView&>(descriptor.getBufferView());
+                        glActiveTexture(GL_TEXTURE0 + bindingPoint->second);
+                        glBindTexture(GL_TEXTURE_BUFFER, *bufferView);
+                        glCheckError();
+                        break;
+                    }
+                case DescriptorType::eStorageTexelBuffer:
+                    {
+                        // An `imageBuffer` is an image unit rather than a texture unit, which is the
+                        // same distinction storage images make against sampled ones.
+                        const auto& bufferView = dynamic_cast<const ogl::BufferView&>(descriptor.getBufferView());
+                        glBindImageTexture(bindingPoint->second, *bufferView, 0, GL_FALSE, 0,
+                                           GL_READ_WRITE, bufferView.getFormat());
                         glCheckError();
                         break;
                     }

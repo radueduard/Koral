@@ -12,9 +12,13 @@
 namespace kor::vk
 {
 	class DescriptorSet;
+	class BufferView;
 
 	class Buffer final : public kor::Buffer {
 		friend class kor::vk::DescriptorSet;
+		// A buffer view names one VkBuffer, and a per-frame buffer is several: the view has to see
+		// them all to make one view per copy. @see kor::vk::BufferView
+		friend class kor::vk::BufferView;
     public:
         explicit Buffer(const RawBuilder& builder);
 		~Buffer() override;

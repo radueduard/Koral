@@ -32,7 +32,7 @@ namespace kor::ogl
         std::vector<GLenum> drawAttachments {};
         _attachedColor.clear();
         for (glm::uint i = 0; i < _colorAttachments.size(); ++i) {
-            const auto& imageView = dynamic_cast<const ImageView&>(_colorAttachments[i].get());
+            const auto& imageView = dynamic_cast<const ImageView&>(*_colorAttachments[i].view);
             glNamedFramebufferTexture(_id, GL_COLOR_ATTACHMENT0 + i, *imageView, 0);
             _attachedColor.emplace_back(imageView.getImage()->generation());
             drawAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + i);
@@ -40,14 +40,14 @@ namespace kor::ogl
         }
         _attachedDepth = 0;
         if (_depthAttachment.has_value()) {
-            const auto& imageView = dynamic_cast<const ImageView&>(_depthAttachment->get());
+            const auto& imageView = dynamic_cast<const ImageView&>(*_depthAttachment->view);
             glNamedFramebufferTexture(_id, GL_DEPTH_ATTACHMENT, *imageView, 0);
             _attachedDepth = imageView.getImage()->generation();
             glCheckError();
         }
         _attachedStencil = 0;
-        if (_stencilAttachment.has_value() && (!_depthAttachment.has_value() || &_stencilAttachment->get() != &_depthAttachment->get())) {
-            const auto& imageView = dynamic_cast<const ImageView&>(_stencilAttachment->get());
+        if (_stencilAttachment.has_value() && (!_depthAttachment.has_value() || _stencilAttachment->view.get() != _depthAttachment->view.get())) {
+            const auto& imageView = dynamic_cast<const ImageView&>(*_stencilAttachment->view);
             glNamedFramebufferTexture(_id, GL_STENCIL_ATTACHMENT, *imageView, 0);
             _attachedStencil = imageView.getImage()->generation();
             glCheckError();
@@ -69,12 +69,12 @@ namespace kor::ogl
 
         bool stale = !_attached || _attachedColor.size() != _colorAttachments.size();
         for (glm::uint i = 0; !stale && i < _colorAttachments.size(); ++i)
-            stale = _attachedColor[i] != generationOf(_colorAttachments[i].get());
+            stale = _attachedColor[i] != generationOf(*_colorAttachments[i].view);
         if (!stale && _depthAttachment.has_value())
-            stale = _attachedDepth != generationOf(_depthAttachment->get());
+            stale = _attachedDepth != generationOf(*_depthAttachment->view);
         if (!stale && _stencilAttachment.has_value()
-            && (!_depthAttachment.has_value() || &_stencilAttachment->get() != &_depthAttachment->get()))
-            stale = _attachedStencil != generationOf(_stencilAttachment->get());
+            && (!_depthAttachment.has_value() || _stencilAttachment->view.get() != _depthAttachment->view.get()))
+            stale = _attachedStencil != generationOf(*_stencilAttachment->view);
 
         if (stale) attachAll();
     }

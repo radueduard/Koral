@@ -18,6 +18,7 @@
 #include "computePipeline.h"
 #include "context.h"
 #include "descriptor.h"
+#include "bufferView.h"
 #include "descriptorSet.h"
 #include "shader.h"
 
@@ -63,7 +64,7 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
     // --- descriptor set: bind the storage buffer at set 0, binding 0 ------
     auto descriptorSet =
         DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-            .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
+            .write(0, buffer)
             .build();
 
     // --- record + submit on the compute queue -----------------------------
@@ -119,7 +120,7 @@ TEST_F(GpuTest, BackToBackDispatchesAreSynchronised) {
 
     auto descriptorSet =
         DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-            .write(0, Descriptor(ResourceRef<const Buffer>(buffer)))
+            .write(0, buffer)
             .build();
     ASSERT_TRUE(descriptorSet.valid());
 
@@ -202,6 +203,172 @@ TEST_F(GpuTest, DeviceAddressHazardIsReported) {
     EXPECT_NE(message.find("Dispatch"), std::string::npos) << message;
     EXPECT_NE(message.find("BufferBarrier"), std::string::npos) << message;
     EXPECT_NE(message.find("test_compute_dispatch.cpp"), std::string::npos) << message;
+}
+
+// Writing a binding by the name the shader gives it, rather than by a number restated in C++.
+// doubleValues.comp.glsl declares `layout(set = 0, binding = 0) buffer Data { ... } data;`, so the
+// binding answers to both names it has: the instance's, and the block type's.
+TEST_F(GpuTest, ADescriptorSetCanBeWrittenByBindingName) {
+    std::vector<std::uint32_t> input(kCount);
+    std::iota(input.begin(), input.end(), 1u);
+
+    Buffer::Builder<std::uint32_t> bufBuilder;
+    bufBuilder.setData(input)
+              .addUsage(Buffer::Usage::eStorage)
+              .addUsage(Buffer::Usage::eTransferSrc)
+              .addUsage(Buffer::Usage::eTransferDst);
+    auto buffer = bufBuilder.build();
+    ASSERT_TRUE(buffer.valid());
+
+    const ResourceRef<const Shader> shader =
+        Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eCompute)
+            .setPath(kor::shaderPath("doubleValues.comp.glsl")).getOrBuild("test.named.double");
+
+    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
+    ASSERT_TRUE(pipeline.valid());
+
+    // The instance name. No binding number anywhere in this test.
+    auto byInstance = DescriptorSet::Builder(pipeline, 0).write("data", buffer).build();
+    ASSERT_TRUE(byInstance.valid()) << (byInstance.error() ? byInstance.error()->history() : "");
+
+    // The block type's name finds the same binding, which is what makes a block declared without
+    // an instance name — `buffer Data { ... };` — addressable at all.
+    auto byBlock = DescriptorSet::Builder(pipeline, 0).write("Data", buffer).build();
+    ASSERT_TRUE(byBlock.valid()) << (byBlock.error() ? byBlock.error()->history() : "");
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, byInstance);
+        cb.Dispatch(kCount / kLocalSize, 1, 1);
+    }, CommandBuffer::Usage::eCompute);
+
+    const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
+    ASSERT_EQ(output.size(), input.size());
+    for (std::size_t i = 0; i < input.size(); ++i) {
+        EXPECT_EQ(output[i], input[i] * 2u) << "at index " << i;
+    }
+}
+
+// A name no binding answers to is a mistake worth explaining: the set is poisoned, and the message
+// lists the names that do exist rather than leaving the reader to go and read the shader.
+TEST_F(GpuTest, AnUnknownBindingNameIsReportedWithTheOnesThatExist) {
+    Buffer::Builder<std::uint32_t> bufBuilder;
+    bufBuilder.setData(std::vector<std::uint32_t>(kCount, 1u)).addUsage(Buffer::Usage::eStorage);
+    auto buffer = bufBuilder.build();
+    ASSERT_TRUE(buffer.valid());
+
+    const ResourceRef<const Shader> shader =
+        Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eCompute)
+            .setPath(kor::shaderPath("doubleValues.comp.glsl")).getOrBuild("test.badname.double");
+
+    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
+    ASSERT_TRUE(pipeline.valid());
+
+    auto set = DescriptorSet::Builder(pipeline, 0).write("nosuchthing", buffer).build();
+    ASSERT_FALSE(set.valid()) << "a name nothing answers to was accepted";
+    ASSERT_NE(set.error(), nullptr);
+
+    const auto message = set.error()->history();
+    EXPECT_NE(message.find("nosuchthing"), std::string::npos) << message;
+    EXPECT_NE(message.find("data"), std::string::npos)
+        << "the message did not say what the set actually has: " << message;
+}
+
+// `name[n]` selects an element of an array binding, so an array is addressable by name too rather
+// than falling back to numbers the moment a binding has more than one slot.
+TEST_F(GpuTest, ATrailingSubscriptSelectsAnArrayElementByName) {
+    const ResourceRef<const Shader> shader =
+        Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eCompute)
+            .setPath(kor::shaderPath("doubleValues.comp.glsl")).getOrBuild("test.subscript.double");
+
+    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
+    ASSERT_TRUE(pipeline.valid());
+
+    Buffer::Builder<std::uint32_t> bufBuilder;
+    bufBuilder.setData(std::vector<std::uint32_t>(kCount, 1u)).addUsage(Buffer::Usage::eStorage);
+    auto buffer = bufBuilder.build();
+    ASSERT_TRUE(buffer.valid());
+
+    // `data` is a single (count 1) binding, so element 0 is the only one there is: the subscript is
+    // parsed and honoured rather than being read as part of the name.
+    auto set = DescriptorSet::Builder(pipeline, 0).write("data[0]", buffer).build();
+    EXPECT_TRUE(set.valid()) << (set.error() ? set.error()->history() : "");
+
+    // And one past the end is out of bounds, not a differently-named binding.
+    auto outOfRange = DescriptorSet::Builder(pipeline, 0).write("data[1]", buffer).build();
+    EXPECT_FALSE(outOfRange.valid()) << "element 1 of a single-element binding was accepted";
+}
+
+// A texel buffer: the same bytes a storage buffer would hold, read by the shader as formatted
+// texels through a kor::BufferView. What the view adds over binding the buffer directly is the
+// format — the shader fetches vec4s without declaring a struct for them.
+TEST_F(GpuTest, ATexelBufferIsFetchedThroughABufferView) {
+    constexpr glm::u32 kTexels = 64;
+
+    // Four floats per texel, so texel i is {i, 0, 0, 0} and texelFetch(...).x is i.
+    std::vector<float> source(kTexels * 4, 0.f);
+    for (glm::u32 i = 0; i < kTexels; ++i) source[i * 4] = static_cast<float>(i);
+
+    Buffer::Builder<float> sourceBuilder;
+    sourceBuilder.setData(source)
+                 .addUsage(Buffer::Usage::eTexel)      // what makes a formatted view legal
+                 .addUsage(Buffer::Usage::eTransferDst);
+    auto sourceBuffer = sourceBuilder.build();
+    ASSERT_TRUE(sourceBuffer.valid()) << (sourceBuffer.error() ? sourceBuffer.error()->history() : "");
+
+    auto view = kor::BufferView::Builder(ResourceRef<const Buffer>(sourceBuffer))
+        .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
+        .build();
+    ASSERT_TRUE(view.valid()) << (view.error() ? view.error()->history() : "");
+    EXPECT_EQ(view->getRange(), static_cast<glm::i64>(source.size() * sizeof(float)))
+        << "a range of 0 should have resolved to the rest of the buffer";
+
+    Buffer::Builder<float> destBuilder;
+    destBuilder.setData(std::vector<float>(kTexels, -1.f))
+               .addUsage(Buffer::Usage::eStorage)
+               .addUsage(Buffer::Usage::eTransferSrc)
+               .addUsage(Buffer::Usage::eTransferDst);
+    auto destination = destBuilder.build();
+    ASSERT_TRUE(destination.valid());
+
+    const auto shader = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eCompute)
+        .setPath(kor::shaderPath("texelBuffer.comp.glsl")).getOrBuild("test.texelBuffer");
+    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
+    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+
+    auto set = DescriptorSet::Builder(pipeline, 0)
+        .write("source", view)
+        .write("destination", destination)
+        .build();
+    ASSERT_TRUE(set.valid()) << (set.error() ? set.error()->history() : "");
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BindComputePipeline(pipeline);
+        cb.BindDescriptorSet(0, set);
+        cb.Dispatch(kTexels / 64, 1, 1);
+    }, CommandBuffer::Usage::eCompute);
+
+    const std::vector<float> output = destination->Read<float>();
+    ASSERT_EQ(output.size(), static_cast<std::size_t>(kTexels));
+    for (glm::u32 i = 0; i < kTexels; ++i) {
+        EXPECT_FLOAT_EQ(output[i], static_cast<float>(i)) << "at texel " << i;
+    }
+}
+
+// A buffer without Buffer::Usage::eTexel cannot be viewed as texels, and the message says which
+// flag to add rather than leaving it to the driver's usage-bits complaint.
+TEST_F(GpuTest, ABufferViewNeedsItsBufferCreatedForTexels) {
+    Buffer::Builder<float> builder;
+    builder.setData(std::vector<float>(16, 0.f)).addUsage(Buffer::Usage::eStorage);  // no eTexel
+    auto buffer = builder.build();
+    ASSERT_TRUE(buffer.valid());
+
+    auto view = kor::BufferView::Builder(ResourceRef<const Buffer>(buffer))
+        .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
+        .build();
+    ASSERT_FALSE(view.valid()) << "a buffer with no eTexel usage was viewed as texels";
+    ASSERT_NE(view.error(), nullptr);
+    EXPECT_NE(view.error()->history().find("eTexel"), std::string::npos) << view.error()->history();
 }
 
 } // namespace

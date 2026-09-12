@@ -17,6 +17,7 @@ namespace kor
     class Sampler;
     class ImageView;
     class AccelerationStructure;
+    class BufferView;
 
     /** @brief A buffer bound to a shader, and which part of it. */
     struct BufferDescriptor {
@@ -39,6 +40,11 @@ namespace kor
     struct CombinedImageSamplerDescriptor {
         ResourceRef<const ImageView> _imageView; ///< The texture.
         ResourceRef<const Sampler> _sampler;     ///< How it is filtered and addressed.
+    };
+
+    /** @brief A buffer bound as an array of formatted texels — what a `samplerBuffer` fetches from. */
+    struct TexelBufferDescriptor {
+        ResourceRef<const BufferView> _bufferView;  ///< The view saying how the bytes are read.
     };
 
     /** @brief A ray-tracing acceleration structure bound for a shader to trace against. */
@@ -88,6 +94,9 @@ namespace kor
         /** @brief Binds an acceleration structure for a shader to trace rays against. */
         explicit Descriptor(const ResourceRef<const AccelerationStructure>& accelerationStructure);
 
+        /** @brief Binds a buffer as an array of formatted texels. @see BufferView */
+        explicit Descriptor(const ResourceRef<const BufferView>& bufferView);
+
         Descriptor(const Descriptor& other) = default;
         Descriptor& operator=(const Descriptor& other) = default;
 
@@ -115,6 +124,8 @@ namespace kor
         [[nodiscard]] const Sampler& getSampler() const;
         /** @brief The bound acceleration structure. @throws if this descriptor holds something else. */
         [[nodiscard]] const AccelerationStructure& getAccelerationStructure() const;
+        /** @brief The bound buffer view. @throws if this descriptor holds something else. */
+        [[nodiscard]] const BufferView& getBufferView() const;
 
         /**
          * @brief The bound buffer, or an empty reference if this descriptor holds something else.
@@ -128,6 +139,9 @@ namespace kor
         /** @brief The bound image view, or an empty reference if this descriptor holds something else. */
         [[nodiscard]] ResourceRef<const ImageView> getImageViewRef() const;
 
+        /** @brief The bound buffer view, or an empty reference if this descriptor holds something else. */
+        [[nodiscard]] ResourceRef<const BufferView> getBufferViewRef() const;
+
     protected:
         bool valid = false;
         std::optional<Error> _error;
@@ -137,7 +151,8 @@ namespace kor
             ImageDescriptor,
             SamplerDescriptor,
             CombinedImageSamplerDescriptor,
-            AccelerationStructureDescriptor
+            AccelerationStructureDescriptor,
+            TexelBufferDescriptor
         > _descriptor;
     };
 }

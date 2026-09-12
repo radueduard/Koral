@@ -187,9 +187,7 @@ namespace kmdl
         {
             return kor::Buffer::Builder<StreamT>()
                 .setDataView(vertices)
-                .addUsage(kor::Buffer::Usage::eVertex)
-                .addUsage(kor::Buffer::Usage::eTransferDst)
-                .addUsage(kor::Buffer::Usage::eTransferSrc)
+                .addUsage(kor::Buffer::Usage::eVertex)
                 .addUsage(kor::Buffer::Usage::eStorage)
                 // Needed so the buffer's GPU address can be queried — both for
                 // ray-tracing acceleration structure builds and for buffer_reference
@@ -210,9 +208,7 @@ namespace kmdl
         {
             return kor::Buffer::Builder<glm::u32>()
                 .setDataView(indices)
-                .addUsage(kor::Buffer::Usage::eIndex)
-                .addUsage(kor::Buffer::Usage::eTransferDst)
-                .addUsage(kor::Buffer::Usage::eTransferSrc)
+                .addUsage(kor::Buffer::Usage::eIndex)
                 .addUsage(kor::Buffer::Usage::eStorage)
                 // See uploadVertexBuffer: address-queryable for acceleration structure
                 // builds and buffer_reference access.
