@@ -62,7 +62,7 @@ target_include_directories(koral_tests PRIVATE
         ${CMAKE_SOURCE_DIR})
 
 include(GoogleTest)
-gtest_discover_tests(koral_tests)
+gtest_discover_tests(koral_tests DISCOVERY_MODE PRE_TEST)
 
 # ---------------------------------------------------------------------------
 # Integration tests: these boot a real Vulkan device (through a window) and

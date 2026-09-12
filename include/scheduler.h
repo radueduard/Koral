@@ -71,6 +71,11 @@ namespace kor
 
         virtual ~Scheduler() = default;
 
+        Scheduler(const Scheduler&) = delete;
+        Scheduler& operator=(const Scheduler&) = delete;
+        Scheduler(Scheduler&&) = delete;
+        Scheduler& operator=(Scheduler&&) = delete;
+
         /** @brief Creates the swap chain, the frames and their command buffers. Called once by the window. */
     	virtual void Initialize() = 0;
 
