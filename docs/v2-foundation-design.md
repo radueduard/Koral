@@ -82,6 +82,14 @@ internal `runSingleTimeCommand(..., VkFence, VkSemaphore, VkSemaphore, bool wait
 `wait` bool and the raw handles behind it. Fire-and-forget drops the token; synchronous
 callers use `.wait()`; coroutines `co_await` it.
 
+**Built (2026-09-23).** It no longer blocks, and is `[[nodiscard]]`, so every caller states its
+intent (`.wait()`, `co_await`, or `(void)`). The command buffer is held on a token-keyed retire
+list, released by the next one-off on the recording thread (or flushed at shutdown, before modules
+unload). Resources its commands use are **not** kept alive — same rule as the frame's command
+buffer — until deferred destruction lands. Internal `vk::Device::runSingleTimeCommand` returns a
+token too; its four callers `.wait()` on it, which blocks on that submission alone instead of
+`queue->waitIdle()`.
+
 ## 4. Feature flags — usage-driven registrar (approach A)
 
 We want: **using a feature automatically records it in a per-module flag; the module (DLL)
@@ -154,10 +162,24 @@ external synchronization, so the real v1 contract is **"all command recording on
 thread."** (The async importer honours it by marshaling GPU work back via
 `SwitchToMainThread`.)
 
-**v2:** key `_commandPools` by `(queueId, thread)`; lazily create a per-thread pool under a
-mutex on first touch. After that each thread owns its pool and recording needs no locking.
-`CommandBuffer::Create()` becomes thread-safe for free (it already passes the thread hash).
-Recording then parallelizes across coroutines/threads, each into its own command buffer.
+~~**v2:** key `_commandPools` by `(queueId, thread)`.~~ **Built differently (2026-09-23): a
+pool per command buffer.** A pool must be used by one thread at a time, *recording into its
+buffers included*, and a coroutine can start recording on one pool thread and finish on another
+after a `co_await` — so a per-thread pool would still end up shared. Each command buffer instead
+leases a `(pool, buffer)` pair from a free list (mutex-guarded, keyed by queue); the destructor
+resets the pool and returns the pair. The only rule left is the one callers already follow: one
+thread records a given command buffer at a time. The `thread` argument is gone.
+
+The same step made the rest of the submission path safe to share: one device-wide queue lock
+(`Device::lockQueues()`) around every `vkQueueSubmit`, `vkQueuePresentKHR`, queue/device wait-idle
+(`Device::waitIdle()`) and ImGui's platform-window submits; a mutex on lazy queue creation; and
+one on the descriptor pool. `SeveralThreadsRecordAndSubmitAtOnce` (8 threads) is clean under the
+validation layer's thread-safety checks; with the submit lock removed it reports THREADING errors
+and hangs the queue.
+
+Still single-threaded: **recording the same resource from two threads at once** — the core's
+barrier resolution reads and writes per-resource state (image layouts) at `End()`. That is §6's
+cross-command-buffer problem.
 
 **Vulkan-first.** GL is thread-affine; its deferred-replay backend *could* allow off-thread
 recording if the record-time state mirror is made thread-safe, but replay serializes on the
@@ -181,6 +203,28 @@ So we build **one** seam:
   `Token scheduler.frameSignal()`.
 
 Build it once; it serves all three consumers.
+
+**Built (2026-09-23)** as `Scheduler::Execute(cb, Placement)`, `Scheduler::WaitFor(Token)` and
+`Scheduler::frameCompletion()`.
+
+- *Ordering across command buffers.* The resolver already carries each resource's state from one
+  `End()` to the next, so it is correct whenever End order equals execution order. The seam keeps
+  that true instead of replacing it: executed command buffers are handed over **begun but not
+  ended**, and the frame ends them itself, in execution order (before-frame, the frame, after-frame),
+  then submits all of them in one batch. Recording — the user's code and its validation — runs in
+  parallel; resolving and emitting is serialised by a lock around `End()`, which also makes
+  standalone submits on other threads safe. Submit-time patching (resolve each buffer in isolation,
+  patch entry barriers at submit) was the alternative; it needs Vulkan image layouts decoupled from
+  emission and is only worth it if serialised emission shows up in a profile.
+- *Present rule.* A present may not depend on a semaphore signal that has not been submitted, so a
+  `WaitFor` token the CPU has yet to signal holds up the present (not the recording or the submit).
+  Timelines track the highest value a submitted GPU operation will signal to tell the cases apart.
+  Found by synchronization validation (VUID-vkQueuePresentKHR-pWaitSemaphores-03268).
+- *OpenGL.* The CPU waits for `WaitFor` tokens before submitting; frame completion is a
+  `glFenceSync` polled by the next `Draw`.
+- *Not done:* a real second (async compute) queue. `Execute` refuses a command buffer from another
+  queue; cross-queue work goes through `Submit` + tokens, and needs queue-family ownership
+  transfers once a separate family is used.
 
 ## 7. GPU physics (the driving use case)
 
@@ -226,8 +270,15 @@ job via `koral.json` (which already reserves Hub-only keys like `libraries`).
 - **Physics submission ownership:** does the physics coroutine own its GPU submission
   (per-thread pool + compute queue — full async, designed around) or only produce work the
   main thread submits (a strict subset)?
-- **Token backing:** timeline-semaphore value allocation and how `co_await` integrates with
-  the executor's resume.
+- ~~**Token backing:**~~ **Built (2026-09-23).** `kor::Timeline` is a monotonic counter owned
+  by one in-order producer; `Token` is a value on one (`next()` reserves, `at(n)` names a value
+  without reserving, for rendezvous loops). A timeline gets a `VkSemaphore` lazily, the first
+  time a token of it reaches `Submit({.waitFor, .signal})`; until then it is pure CPU. One
+  reactor thread (`vk::TokenReactor`) waits-any over every GPU-backed timeline with a parked
+  coroutine plus a private wake timeline, and hands due coroutines to the executor they suspended
+  on (main thread → main, else background pool). Submitted tokens are held by the command buffer
+  until it is re-recorded, so fire-and-forget is safe. OpenGL blocks the submitting thread
+  instead. Still open: cancellation (a `Task` destroyed while parked leaves a dangling handle).
 - **Feature enum** finalization and granularity.
 - **Secondary command buffers** under dynamic rendering (intra-pass parallelism) — later /
   optional; separate-pass parallelism via §5 + §6 captures most of the win.
@@ -242,3 +293,21 @@ code change needed, just a doc note. The Windows ImGui single-copy fix, device-l
 and scene-interface cleanup landed here.
 
 **v2 (this branch):** everything in §3–§8.
+
+
+## 10. Built after the plan (2026-09-23)
+
+- **Deferred destruction.** Every Vulkan submission also signals a per-queue *epoch* timeline;
+  `vk::Context::DestroyWhenUnused` holds a destruction until every queue's last submitted epoch is
+  reached. Deliberately not per-resource last-use stamping: epochs need no tracking and cover what
+  descriptor sets and framebuffers reference indirectly, at the cost of freeing a frame or two late.
+  Buffers, images, views, descriptor sets, samplers, acceleration structures and pipelines use it,
+  which removed every `waitIdle` stall their destruction and resize paths had. ImGui textures get a
+  main-thread-only equivalent (ImGui's descriptor pool is not locked). Covers work *submitted*
+  before the destroy — destroying something a not-yet-submitted recording still uses remains a
+  caller error.
+- **Cancelling a waiting coroutine.** Destroying a `Task` whose coroutine waits on a token is safe:
+  the awaiter's destructor cancels its waiter slot, and resumes claim the slot only when they run
+  (`Executor::Post`), so a resume already queued is skipped too. Cooperative cancellation
+  (`Task::cancel()`, `kor::Cancelled`) is not built.
+- **ImGui platform-window hazard** fixed by `vcpkg-overlay-ports/imgui`.
