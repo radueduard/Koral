@@ -80,7 +80,7 @@ namespace kor::vk
 
         kor::CommandBuffer& doRun(const std::function<void(kor::CommandBuffer&)>& command) override;
 
-        kor::VoidResult doSubmit() override;
+        kor::VoidResult doSubmit(const kor::SubmitInfo& info) override;
         void doReset() override;
 
         void doWaitForFence() const override;
@@ -124,6 +124,11 @@ namespace kor::vk
     private:
         const kor::vk::Queue& _queue;
         const ::vk::CommandPool& _parentPool;
+        // The tokens the last submission waits on or signals. Their timeline semaphores must outlive
+        // it, and a caller dropping its token straight after Submit() is the normal fire-and-forget
+        // case, so the buffer holds them until it is re-recorded — the point where the timers above
+        // also conclude the GPU is done with it.
+        std::vector<kor::Token> _inFlight;
         // Completion is reported by the fence alone. There was a semaphore signalled alongside it
         // here, which nothing ever waited on — and a binary semaphore signalled twice with no wait
         // in between is invalid, so re-submitting the same buffer tripped validation for nothing.

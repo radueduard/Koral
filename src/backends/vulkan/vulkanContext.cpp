@@ -9,6 +9,7 @@
 #include "device.h"
 #include "runtime.h"
 #include "scheduler.h"
+#include "timeline.h"
 
 const kor::vk::Runtime& kor::vk::Context::Runtime()
 {
@@ -29,6 +30,13 @@ const kor::vk::Allocator& kor::vk::Context::Allocator()
     if (!_allocator)
         throw std::runtime_error("Allocator is not initialized");
     return *_allocator;
+}
+
+kor::vk::TokenReactor& kor::vk::Context::Tokens()
+{
+    if (!_tokenReactor)
+        throw std::runtime_error("TokenReactor is not initialized");
+    return *_tokenReactor;
 }
 
 const kor::vk::DescriptorPool& kor::vk::Context::DescriptorPool()
@@ -68,11 +76,19 @@ void kor::vk::Context::Init()
         descriptorPoolBuilder.addPoolSize(::vk::DescriptorType::eAccelerationStructureKHR, 1000);
     }
     _descriptorPool = descriptorPoolBuilder.build();
+    _tokenReactor = new kor::vk::TokenReactor;
+}
+
+void kor::vk::Context::StopTokens()
+{
+    if (_tokenReactor) _tokenReactor->shutdown();
 }
 
 void kor::vk::Context::Destroy()
 {
     _device->operator*().waitIdle();
+    delete _tokenReactor;
+    _tokenReactor = nullptr;
     delete _descriptorPool;
     delete _allocator;
     delete _device;

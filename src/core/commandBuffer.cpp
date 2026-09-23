@@ -1354,9 +1354,9 @@ namespace kor
         doEnd();
     }
 
-    VoidResult CommandBuffer::Submit()
+    VoidResult CommandBuffer::Submit(const SubmitInfo& info)
     {
-        return doSubmit();
+        return doSubmit(info);
     }
 
     void CommandBuffer::Reset()

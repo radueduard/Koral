@@ -1214,7 +1214,7 @@ namespace kor::ogl
         return *this;
     }
 
-    kor::VoidResult CommandBuffer::doSubmit()
+    kor::VoidResult CommandBuffer::doSubmit(const kor::SubmitInfo& info)
     {
         if (!_filled)
             return std::unexpected(Error{ .code = ErrorCode::eInvalidArgument, .message = "Cannot submit a command buffer that has not been recorded yet." });
@@ -1223,8 +1223,20 @@ namespace kor::ogl
 
         // Replay. emitRecords sets the core's _emitting flag, which lets commands recorded
         // from within a Run lambda execute in place instead of appending mid-walk.
+        // OpenGL has no way to make the GPU wait for the CPU, or to be told when the GPU is done,
+        // so the calling thread stands in for both.
+        for (const auto& token : info.waitFor) token.wait();
+
         emitRecords();
         _submitted = true;
+
+        if (std::ranges::any_of(info.signal, [](const Token& t) { return t.value() != 0; })) {
+            const GLsync fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            constexpr GLuint64 oneSecond = 1'000'000'000;
+            while (glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, oneSecond) == GL_TIMEOUT_EXPIRED) {}
+            glDeleteSync(fence);
+            for (const auto& token : info.signal) token.signal();
+        }
         return result();
     }
 

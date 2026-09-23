@@ -18,6 +18,7 @@
 #include "rayTracingPipeline.h"
 #include "imageView.h"
 #include "scheduler.h"
+#include "timeline.h"
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
 
@@ -90,6 +91,12 @@ namespace kor::vk
     {
         resetErrors();
         clearRecords();
+        _inFlight.clear();
+        // WaitForFence() resets the fence after waiting, but a caller who waited on a token instead
+        // never went through it, and submitting with a still-signalled fence is invalid. Re-recording
+        // means the last submission is done, so a signalled fence here is simply a stale one.
+        if (Context::Device()->getFenceStatus(_fence) == ::vk::Result::eSuccess)
+            Context::Device()->resetFences(_fence);
         // Before the pool is reset below, which is what destroys the results being collected.
         // Re-recording is proof the GPU is done with the last submission, so this is the earliest
         // moment the previous frame's timestamps can be read — and the reason they are read here.
@@ -1059,11 +1066,49 @@ namespace kor::vk
         return defer("Run", [this, command] { command(*this); });
     }
 
-    kor::VoidResult CommandBuffer::doSubmit()
+    kor::VoidResult CommandBuffer::doSubmit(const kor::SubmitInfo& info)
     {
+        auto& tokens = Context::Tokens();
+
+        std::vector<::vk::Semaphore> waitSemaphores, signalSemaphores;
+        std::vector<std::uint64_t> waitValues, signalValues;
+        std::vector<::vk::PipelineStageFlags> waitStages;
+
+        for (const auto& token : info.waitFor) {
+            // Nothing to hold back for — and skipping it spares the timeline a semaphore.
+            if (token.ready()) continue;
+            const auto [semaphore, value] = tokens.resolve(token);
+            waitSemaphores.push_back(semaphore);
+            waitValues.push_back(value);
+            // The token says nothing about which stage needs it, so none may start early.
+            waitStages.push_back(::vk::PipelineStageFlagBits::eAllCommands);
+            _inFlight.push_back(token);
+        }
+        for (const auto& token : info.signal) {
+            if (token.value() == 0) continue; // a default token: no event to signal
+            if (token.ready()) {
+                // The GPU may only move a timeline forward; signalling where it already is, is
+                // invalid Vulkan rather than a no-op.
+                record(ErrorCode::eInvalidArgument, std::format(
+                    "Submit was asked to signal token {}, whose timeline has already reached it", token.value()));
+                continue;
+            }
+            const auto [semaphore, value] = tokens.resolve(token);
+            signalSemaphores.push_back(semaphore);
+            signalValues.push_back(value);
+            _inFlight.push_back(token);
+        }
+
         const auto commandBuffers = std::array { _handle };
+        auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo()
+            .setWaitSemaphoreValues(waitValues)
+            .setSignalSemaphoreValues(signalValues);
         const auto submitInfo = ::vk::SubmitInfo()
-            .setCommandBuffers(commandBuffers);
+            .setCommandBuffers(commandBuffers)
+            .setWaitSemaphores(waitSemaphores)
+            .setWaitDstStageMask(waitStages)
+            .setSignalSemaphores(signalSemaphores)
+            .setPNext(&timelineInfo);
 
         // Nothing is signalled but the fence. A semaphore was signalled here too, with no waiter
         // anywhere, which made the second submit of any re-recorded buffer invalid: a binary
@@ -1076,6 +1121,10 @@ namespace kor::vk
             _queue->submit(submitInfo, _fence);
         } catch (const std::exception& e) {
             record(ErrorCode::eBackend, e.what());
+            // Nothing reached the GPU, so nothing there will signal these. Signalling them here
+            // lets their waiters see the error rather than wait for ever.
+            for (const auto& token : info.signal)
+                if (token.value() != 0 && !token.ready()) token.signal();
         }
         return result();
     }

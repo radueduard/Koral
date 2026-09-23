@@ -24,6 +24,7 @@
 
 #include "structs.h"
 #include "shaderValue.h"
+#include "token.h"
 
 namespace kor
 {
@@ -36,6 +37,35 @@ namespace kor
     class Framebuffer;
     class Mesh;
     class Pipeline;
+
+    /**
+     * @brief What a submission waits for before it starts, and what it signals once it finishes.
+     *
+     * Orders GPU work against other GPU work and against the CPU, without either side blocking a
+     * thread:
+     *
+     * @code
+     * kor::Token uploaded = kor::Token::Create();
+     * upload->Submit({.signal = {uploaded}});
+     * simulate->Submit({.waitFor = {uploaded}, .signal = {stepDone}});
+     * co_await stepDone;   // a coroutine resumes when the GPU gets there
+     * @endcode
+     *
+     * A token waited on here may be signalled later, from the CPU; the GPU holds the work back until
+     * then. It must be signalled eventually, or the queue never drains and shutdown hangs.
+     *
+     * @warning Submit the work that signals a token before the work that waits for it. A queue runs
+     *          its submissions in turn, so a submission waiting on one that comes after it on the
+     *          same queue waits forever — and everything submitted behind it with it.
+     *
+     * Under OpenGL, which has nothing like this, a submission blocks the calling thread instead:
+     * until every waited token is ready before it starts, and until the GPU is done before
+     * signalling.
+     */
+    struct SubmitInfo {
+        std::vector<Token> waitFor; ///< Held back until all of these have happened.
+        std::vector<Token> signal;  ///< Signalled once the submitted work has finished.
+    };
 
     /**
      * @brief Records the work a frame submits to the GPU.
@@ -295,10 +325,12 @@ namespace kor
          * @brief Submits the recorded work to its queue.
          * @return An empty result on success, or the first error recording produced.
          *
-         * Does not wait for completion. Use WaitForFence() when the results have to be readable on
-         * the CPU.
+         * @param info Tokens to wait for before the work starts, and to signal once it is done.
+         *
+         * Does not wait for completion. Signal a token and wait on it — or co_await it — when the
+         * results have to be readable on the CPU; WaitForFence() does the same, bluntly.
          */
-        VoidResult Submit();
+        VoidResult Submit(const SubmitInfo& info = {});
 
         /** @brief Returns the buffer to its initial state, dropping everything recorded. */
         void Reset();
@@ -1200,7 +1232,7 @@ namespace kor
         // the whole sequence is visible — and each of these supplies only the API call that ends it.
         virtual CommandBuffer& doBegin() = 0;
         virtual void doEnd() = 0;
-        virtual VoidResult doSubmit() = 0;
+        virtual VoidResult doSubmit(const SubmitInfo& info) = 0;
         virtual void doReset() = 0;
         virtual void doWaitForFence() const = 0;
         virtual CommandBuffer& doRun(const std::function<void(CommandBuffer&)>& command) = 0;

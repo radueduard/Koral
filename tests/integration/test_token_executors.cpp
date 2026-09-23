@@ -7,9 +7,13 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
+#include <string>
 #include <thread>
 
+#include "commandBuffer.h"
 #include "context.h"
+#include "log.h"
 #include "task.h"
 #include "token.h"
 
@@ -117,6 +121,154 @@ TEST_F(TokenExecutorTest, TwoTimelinesDriveARecurringRendezvous) {
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     while (!loop.done() && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
     EXPECT_TRUE(loop.done());
+}
+
+}  // namespace
+
+// ---- GPU-backed tokens -----------------------------------------------------------------------
+//
+// Handing a token to Submit() gives its timeline a semaphore; from then on the GPU can move it,
+// and the reactor thread is what notices.
+
+namespace {
+
+std::uint64_t logMark() {
+    const auto history = kor::log::history();
+    return history.empty() ? 0ull : history.back().sequence;
+}
+
+void expectNoValidationErrorsSince(const std::uint64_t since) {
+    for (const auto& record : kor::log::historySince(since)) {
+        if (record.level != kor::log::Level::eError) continue;
+        EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
+    }
+}
+
+std::unique_ptr<CommandBuffer> recordEmpty() {
+    auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
+    cb->Begin();
+    cb->End();
+    return cb;
+}
+
+Task<void> AwaitOnBackgroundThenSignal(Token token, Token done) {
+    co_await Context::SwitchToBackgroundThread();
+    co_await token;
+    done.signal();
+}
+
+TEST_F(TokenExecutorTest, AGpuSignalResumesAParkedCoroutine) {
+    const auto since = logMark();
+    const Token gpuDone = Token::Create();
+    const Token resumed = Token::Create();
+
+    auto task = AwaitOnBackgroundThenSignal(gpuDone, resumed);
+    const auto cb = recordEmpty();
+    ASSERT_TRUE(cb->Submit({.signal = {gpuDone}}));
+
+    resumed.wait();   // only the reactor can get us here
+    EXPECT_TRUE(gpuDone.ready());
+    cb->WaitForFence();
+    expectNoValidationErrorsSince(since);
+}
+
+TEST_F(TokenExecutorTest, TheGpuWaitsForATokenTheCpuSignalsLater) {
+    const auto since = logMark();
+    const Token cpuGo   = Token::Create();
+    const Token gpuDone = Token::Create();
+
+    const auto cb = recordEmpty();
+    ASSERT_TRUE(cb->Submit({.waitFor = {cpuGo}, .signal = {gpuDone}}));
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    EXPECT_FALSE(gpuDone.ready()) << "the GPU ran ahead of a token nobody had signalled";
+
+    cpuGo.signal();
+    gpuDone.wait();
+    EXPECT_TRUE(gpuDone.ready());
+    cb->WaitForFence();
+    expectNoValidationErrorsSince(since);
+}
+
+TEST_F(TokenExecutorTest, SubmissionsChainThroughATokenWithoutTheCpu) {
+    const auto since = logMark();
+    const Token first = Token::Create(), second = Token::Create();
+
+    const auto a = recordEmpty();
+    const auto b = recordEmpty();
+    // In order: both land on the same queue, which runs its submissions in turn, so b waiting on
+    // something only a *later* submission signals would stall the queue for good.
+    ASSERT_TRUE(a->Submit({.signal = {first}}));
+    ASSERT_TRUE(b->Submit({.waitFor = {first}, .signal = {second}}));
+
+    second.wait();
+    EXPECT_TRUE(first.ready());
+    a->WaitForFence();
+    b->WaitForFence();
+    expectNoValidationErrorsSince(since);
+}
+
+TEST_F(TokenExecutorTest, ABlockingWaitStartedBeforeTheGpuGotTheTokenStillReturns) {
+    const Token token = Token::Create();
+    std::atomic<bool> returned{false};
+
+    // Parked on the CPU side, before the token has any semaphore to wait on.
+    std::thread waiter([&] { token.wait(); returned.store(true); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    ASSERT_FALSE(returned.load());
+
+    const auto cb = recordEmpty();
+    ASSERT_TRUE(cb->Submit({.signal = {token}}));
+    waiter.join();
+    EXPECT_TRUE(returned.load());
+    cb->WaitForFence();
+}
+
+TEST_F(TokenExecutorTest, ATimelineCanBeSignalledByTheGpuFrameAfterFrame) {
+    const auto since = logMark();
+    Timeline frames;
+    const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
+
+    for (int n = 1; n <= 8; ++n) {
+        cb->Begin();
+        cb->End();
+        // Fire and forget: the token is a temporary. The buffer keeps its semaphore alive.
+        ASSERT_TRUE(cb->Submit({.signal = {frames.next()}}));
+        frames.at(n).wait();
+    }
+    EXPECT_EQ(frames.value(), 8u);
+    expectNoValidationErrorsSince(since);
+}
+
+TEST_F(TokenExecutorTest, SignallingATokenThatAlreadyHappenedIsAnError) {
+    const Token done = Token::Create();
+    done.signal();
+
+    const auto cb = recordEmpty();
+    EXPECT_FALSE(cb->Submit({.signal = {done}}));
+    cb->WaitForFence();
+}
+
+TEST_F(TokenExecutorTest, TheCpuCanSignalAGpuBackedTimelineToo) {
+    Timeline tl;
+    const auto cb = recordEmpty();
+    ASSERT_TRUE(cb->Submit({.signal = {tl.next()}}));   // value 1, and the timeline now has a semaphore
+    tl.at(1).wait();
+
+    const Token cpuSide = tl.next();                     // value 2, from the CPU
+    std::atomic<int> resumed{0};
+    auto task = [](Token t, std::atomic<int>& r) -> Task<void> {
+        co_await Context::SwitchToBackgroundThread();
+        co_await t;
+        r.store(1);
+    }(cpuSide, resumed);
+
+    cpuSide.signal();
+    tl.at(2).wait();
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (!task.done() && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
+    EXPECT_EQ(resumed.load(), 1);
+    cb->WaitForFence();
 }
 
 }  // namespace

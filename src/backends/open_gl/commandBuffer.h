@@ -83,7 +83,7 @@ namespace kor::ogl
         kor::CommandBuffer& doCopyBufferToImage(ResourceRef<const kor::Buffer> buffer, ResourceRef<const kor::Image> image, kor::Copy copyInfo) override;
         kor::CommandBuffer& doCopyImageToBuffer(ResourceRef<const kor::Image> image, ResourceRef<const kor::Buffer> buffer, kor::Copy copyInfo) override;
 
-        kor::VoidResult doSubmit() override;
+        kor::VoidResult doSubmit(const kor::SubmitInfo& info) override;
         void doReset() override;
 
         const std::map<std::pair<glm::u32, glm::u32>, glm::u32>& getRemappingTableForBoundPipeline() const;

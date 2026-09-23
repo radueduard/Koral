@@ -227,6 +227,8 @@ void kor::Context::ShutdownHeadless()
 {
     if (!_headless) return;
 
+    kor::vk::Context::StopTokens();
+
     // Destroy the repository first: its destructor stops the FileWatcher and waits
     // for that coroutine to finish, which requires the background executor to still
     // be alive so the worker can run the watcher to completion.

@@ -270,6 +270,9 @@ namespace kor {
         GUI::Shutdown();
         _framebuffer.reset();
         Context::_scheduler.reset();
+        if (_api == API::eVulkan) {
+            vk::Context::StopTokens();
+        }
         delete Context::_repository;
         delete Context::_mainThreadExecutor;
         delete Context::_backgroundExecutor;

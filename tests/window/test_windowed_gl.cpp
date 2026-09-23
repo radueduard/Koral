@@ -27,6 +27,8 @@
 #include <numeric>
 #include <span>
 #include <vector>
+#include <thread>
+#include <chrono>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -1056,3 +1058,25 @@ TEST_F(GlTest, TexelBufferFetch) {
 // deletes the environment.
 static ::testing::Environment* const kGlEnv =
     ::testing::AddGlobalTestEnvironment(new GlEnvironment);
+
+// OpenGL has no timeline semaphores, so Submit stands the calling thread in for them: it blocks
+// until every waited token is ready, and signals only once the GPU has finished. Either way, a
+// token signalled by Submit is ready the moment Submit returns.
+TEST_F(GlTest, SubmitWaitsForAndSignalsTokensOnTheCallingThread) {
+    const kor::Token go = kor::Token::Create();
+    const kor::Token done = kor::Token::Create();
+
+    std::thread producer([&] {
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        go.signal();
+    });
+
+    auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
+    cb->Begin();
+    cb->End();
+    ASSERT_TRUE(cb->Submit({.waitFor = {go}, .signal = {done}}));
+    producer.join();
+
+    EXPECT_TRUE(go.ready());
+    EXPECT_TRUE(done.ready());
+}
