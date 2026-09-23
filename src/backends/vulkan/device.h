@@ -84,6 +84,23 @@ namespace kor::vk {
         // land on the same VkQueue), and Vulkan leaves synchronising them to the application.
         [[nodiscard]] std::unique_lock<std::mutex> lockQueues() const { return std::unique_lock(_queueMutex); }
 
+        // Every submission also signals its queue's *epoch* timeline, so "everything submitted so
+        // far" is always a set of tokens — one per queue — whatever the caller asked to signal. It is
+        // what destruction waits on (@see Context::DestroyWhenUnused): no per-resource tracking, and
+        // it covers what descriptor sets and framebuffers reach indirectly for free.
+        //
+        // Call with lockQueues() held, immediately before the submit it describes: a timeline must be
+        // signalled in increasing order, which only holds if values are handed out in submit order.
+        [[nodiscard]] std::pair<::vk::Semaphore, std::uint64_t> nextEpoch(const Queue& queue) const;
+        // The submit that took the last epoch failed, so nothing will signal it: hand it back, still
+        // under the same lock, or everything waiting on "submitted so far" would wait for ever.
+        void abandonEpoch(const Queue& queue) const { --_epochs[queue.getIdentifier()].submitted; }
+        // One token per queue for the last epoch submitted on it.
+        [[nodiscard]] std::vector<kor::Token> submittedSoFar() const;
+        // Submits nothing but an epoch signal, which — coming after them in submission order — also
+        // covers work other code submitted to the queue directly (Dear ImGui's platform windows).
+        void markEpoch(const Queue& queue) const;
+
         Device(const Device &) = delete;
         Device &operator=(const Device &) = delete;
 
@@ -118,6 +135,12 @@ namespace kor::vk {
         mutable std::vector<std::unique_ptr<Queue>> _queuesInUse {};
         mutable std::mutex _queuesMutex;   // guards the lazily filled _queuesInUse
         mutable std::mutex _queueMutex;    // see lockQueues()
+
+        struct Epoch {
+            kor::Timeline timeline;
+            std::uint64_t submitted = 0;   // guarded by _queueMutex
+        };
+        mutable std::map<glm::u32, Epoch> _epochs; // by queue identifier; guarded by _queueMutex
 
         struct PooledCommandBuffer {
             ::vk::CommandPool pool;

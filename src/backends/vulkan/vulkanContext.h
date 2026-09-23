@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <functional>
 #include <thread>
 
 #include <api.h>
@@ -37,6 +38,15 @@ namespace kor::vk
         /** What turns kor::Tokens into timeline semaphores, and wakes their coroutines. */
         static kor::vk::TokenReactor& Tokens();
 
+        /**
+         * Runs `destroy` once the GPU has finished everything submitted so far — the deferred
+         * deletion queue. For anything a submitted command buffer may still be using: buffers,
+         * images and their views, descriptor sets, pipelines, samplers. Captures handles by value;
+         * the object it came from is gone by the time it runs, on whichever thread next collects.
+         * Runs at once when nothing has been submitted, or once the device is shutting down.
+         */
+        static void DestroyWhenUnused(std::function<void()> destroy);
+
     private:
         static void Init();
         static void Destroy();
@@ -49,6 +59,9 @@ namespace kor::vk
         inline static kor::vk::Allocator* _allocator = nullptr;
         inline static kor::vk::DescriptorPool* _descriptorPool = nullptr;
         inline static kor::vk::TokenReactor* _tokenReactor = nullptr;
+        // Set once StopTokens() has drained the device: from then on nothing is in flight and
+        // nothing more is submitted, so destruction no longer needs deferring.
+        inline static bool _destroyImmediately = false;
 
     };
 }

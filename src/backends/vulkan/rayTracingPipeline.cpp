@@ -238,14 +238,14 @@ namespace kor::vk
 
     void RayTracingPipeline::Teardown()
     {
-        const Device& device = Context::Device();
-        device.queuesWaitIdle();
-        if (_sbtBuffer)
-            Context::Allocator().FreeBuffer(_sbtBuffer, _sbtAllocation);
-        if (_pipelineLayout)
-            device->destroyPipelineLayout(_pipelineLayout);
-        if (_handle)
-            device->destroyPipeline(_handle);
+        // Torn down on destruction and on every hot reload, while frames in flight may still be
+        // bound to it — so it goes once the GPU is done, rather than after stalling every queue.
+        Context::DestroyWhenUnused([sbt = _sbtBuffer, sbtAllocation = _sbtAllocation,
+                                    layout = _pipelineLayout, pipeline = _handle] {
+            if (sbt) Context::Allocator().FreeBuffer(sbt, sbtAllocation);
+            if (layout) Context::Device()->destroyPipelineLayout(layout);
+            if (pipeline) Context::Device()->destroyPipeline(pipeline);
+        });
 
         _sbtBuffer = nullptr;
         _sbtAllocation = nullptr;

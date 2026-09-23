@@ -34,6 +34,6 @@ namespace kor::vk
 
     Sampler::~Sampler()
     {
-        vk::Context::Device()->destroySampler(_handle);
+        vk::Context::DestroyWhenUnused([sampler = _handle] { vk::Context::Device()->destroySampler(sampler); });
     }
 }

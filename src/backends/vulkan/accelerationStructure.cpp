@@ -65,12 +65,10 @@ namespace kor::vk
 
     AccelerationStructure::~AccelerationStructure()
     {
-        const Device& device = Context::Device();
-        device.queuesWaitIdle();
-        if (_handle)
-            device->destroyAccelerationStructureKHR(_handle);
-        if (_asBuffer)
-            Context::Allocator().FreeBuffer(_asBuffer, _asAllocation);
+        Context::DestroyWhenUnused([handle = _handle, buffer = _asBuffer, allocation = _asAllocation] {
+            if (handle) Context::Device()->destroyAccelerationStructureKHR(handle);
+            if (buffer) Context::Allocator().FreeBuffer(buffer, allocation);
+        });
     }
 
     void AccelerationStructure::buildBottomLevel(const Builder& createInfo)

@@ -83,10 +83,11 @@ namespace kor::vk
 
 	Buffer::~Buffer() {
 		Unmap();
-		for (int i = 0; i < _buffers.size(); ++i)
-		{
-			Context::Allocator().FreeBuffer(_buffers[i], _allocations[i]);
-		}
+		// Not freed here: a submitted command buffer may still be reading or writing it.
+		Context::DestroyWhenUnused([buffers = _buffers, allocations = _allocations] {
+			for (std::size_t i = 0; i < buffers.size(); ++i)
+				Context::Allocator().FreeBuffer(buffers[i], allocations[i]);
+		});
 	}
 
 	void Buffer::Map() const

@@ -70,19 +70,29 @@ namespace kor::vk {
         // Always chained, and always with a value per semaphore: once any semaphore in the batch is
         // a timeline, Vulkan wants the value arrays to line up with the semaphore arrays one for one,
         // binary semaphores included (their values are ignored).
-        auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo()
-            .setWaitSemaphoreValues(submitInfo.waitValues)
-            .setSignalSemaphoreValues(submitInfo.signalValues);
-        auto submitInfoVulkan = ::vk::SubmitInfo()
-            .setCommandBuffers(submitInfo.commandBuffers)
-            .setWaitSemaphores(submitInfo.waitSemaphores)
-            .setWaitDstStageMask(submitInfo.waitStages)
-            .setSignalSemaphores(submitInfo.signalSemaphores)
-            .setPNext(&timelineInfo);
-
         try {
             const auto lock = Context::Device().lockQueues();
-            _handle.submit(submitInfoVulkan, submitInfo.fence);
+            auto signalSemaphores = submitInfo.signalSemaphores;
+            auto signalValues = submitInfo.signalValues;
+            const auto [epochSemaphore, epochValue] = Context::Device().nextEpoch(*this);
+            signalSemaphores.push_back(epochSemaphore);
+            signalValues.push_back(epochValue);
+
+            auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo()
+                .setWaitSemaphoreValues(submitInfo.waitValues)
+                .setSignalSemaphoreValues(signalValues);
+            const auto submitInfoVulkan = ::vk::SubmitInfo()
+                .setCommandBuffers(submitInfo.commandBuffers)
+                .setWaitSemaphores(submitInfo.waitSemaphores)
+                .setWaitDstStageMask(submitInfo.waitStages)
+                .setSignalSemaphores(signalSemaphores)
+                .setPNext(&timelineInfo);
+            try {
+                _handle.submit(submitInfoVulkan, submitInfo.fence);
+            } catch (...) {
+                Context::Device().abandonEpoch(*this);
+                throw;
+            }
         } catch (const std::runtime_error& e) {
             std::cerr << e.what() << std::endl;
         }
@@ -257,6 +267,33 @@ namespace kor::vk {
         }
     }
 
+    std::pair<::vk::Semaphore, std::uint64_t> Device::nextEpoch(const Queue& queue) const {
+        auto& epoch = _epochs[queue.getIdentifier()];
+        const auto [semaphore, value] = Context::Tokens().resolve(epoch.timeline.at(epoch.submitted + 1));
+        ++epoch.submitted;
+        return {semaphore, value};
+    }
+
+    std::vector<kor::Token> Device::submittedSoFar() const {
+        const auto lock = lockQueues();
+        std::vector<kor::Token> tokens;
+        for (const auto& epoch : _epochs | std::views::values)
+            if (epoch.submitted > 0) tokens.push_back(epoch.timeline.at(epoch.submitted));
+        return tokens;
+    }
+
+    void Device::markEpoch(const Queue& queue) const {
+        const auto lock = lockQueues();
+        const auto [semaphore, value] = nextEpoch(queue);
+        auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(value);
+        try {
+            queue->submit(::vk::SubmitInfo().setSignalSemaphores(semaphore).setPNext(&timelineInfo));
+        } catch (...) {
+            abandonEpoch(queue);
+            throw;
+        }
+    }
+
     void Device::waitIdle() const {
         const auto lock = lockQueues();
         _handle.waitIdle();
@@ -372,16 +409,23 @@ namespace kor::vk {
         const kor::Token done = kor::Token::Create();
         const auto [semaphore, value] = Context::Tokens().resolve(done);
         const auto commandBuffers = std::array { **commandBuffer };
-        auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(value);
-        const auto submitInfo = ::vk::SubmitInfo()
-            .setCommandBuffers(commandBuffers)
-            .setSignalSemaphores(semaphore)
-            .setPNext(&timelineInfo);
 
         try {
             {
                 const auto lock = lockQueues();
-                queue->submit(submitInfo);
+                const auto [epochSemaphore, epochValue] = nextEpoch(queue);
+                const auto semaphores = std::array { semaphore, epochSemaphore };
+                const auto values = std::array { value, epochValue };
+                auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(values);
+                try {
+                    queue->submit(::vk::SubmitInfo()
+                        .setCommandBuffers(commandBuffers)
+                        .setSignalSemaphores(semaphores)
+                        .setPNext(&timelineInfo));
+                } catch (...) {
+                    abandonEpoch(queue);
+                    throw;
+                }
             }
             TokenReactor::noteSubmittedSignal(done);
         } catch (const std::exception& e) {

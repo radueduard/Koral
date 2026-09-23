@@ -515,9 +515,18 @@ void kor::GUI::RenderPlatformWindows()
 
     // ImGui's Vulkan backend submits and presents each platform window on the shared queue itself,
     // so it takes the same lock as every other submit.
-    std::unique_lock<std::mutex> queueLock;
-    if (Context::activeAPI() == API::eVulkan) queueLock = vk::Context::Device().lockQueues();
-    ImGui::RenderPlatformWindowsDefault();
+    {
+        std::unique_lock<std::mutex> queueLock;
+        if (Context::activeAPI() == API::eVulkan) queueLock = vk::Context::Device().lockQueues();
+        ImGui::RenderPlatformWindowsDefault();
+    }
+    // Those submissions bypass the epoch every other one signals, and they draw our images. An
+    // epoch marker after them, in submission order, covers them: nothing they used is destroyed
+    // until the GPU is past it.
+    if (Context::activeAPI() == API::eVulkan && ImGui::GetPlatformIO().Viewports.Size > 1) {
+        const auto& device = vk::Context::Device();
+        device.markEpoch(device.requestQueue(::vk::QueueFlagBits::eGraphics));
+    }
     glfwMakeContextCurrent(backup_ctx);
 }
 

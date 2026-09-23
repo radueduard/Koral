@@ -10,6 +10,7 @@
 #include "runtime.h"
 #include "scheduler.h"
 #include "timeline.h"
+#include "../../core/tokenState.h"
 
 const kor::vk::Runtime& kor::vk::Context::Runtime()
 {
@@ -51,6 +52,7 @@ void initDispatcher();
 void kor::vk::Context::Init()
 {
     initDispatcher();
+    _destroyImmediately = false;
 
     _runtime = new kor::vk::Runtime;
     _runtime->selectPhysicalDevice();
@@ -81,12 +83,28 @@ void kor::vk::Context::Init()
 
 void kor::vk::Context::StopTokens()
 {
-    if (_tokenReactor) _tokenReactor->shutdown();
+    if (_tokenReactor) _tokenReactor->shutdown();   // leaves the device idle
+    // Everything deferred so far can go now, and anything destroyed from here on goes at once.
+    kor::detail::collectRetired(/*all=*/true);
+    _destroyImmediately = true;
+}
+
+void kor::vk::Context::DestroyWhenUnused(std::function<void()> destroy)
+{
+    if (_destroyImmediately || !_device) {
+        destroy();
+        return;
+    }
+    // A shared_ptr whose deleter is the destruction: dropped by the retire list once every
+    // queue's last submitted epoch has been reached, or right here if they all have been.
+    kor::detail::retireAfter(_device->submittedSoFar(),
+        std::shared_ptr<void>(nullptr, [destroy = std::move(destroy)](void*) { destroy(); }));
 }
 
 void kor::vk::Context::Destroy()
 {
     _device->waitIdle();
+    kor::detail::collectRetired(/*all=*/true); // in case StopTokens() was never reached
     delete _tokenReactor;
     _tokenReactor = nullptr;
     delete _descriptorPool;

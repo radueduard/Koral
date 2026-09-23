@@ -18,6 +18,7 @@
 #include "log.h"
 #include "task.h"
 #include "token.h"
+#include "src/backends/vulkan/vulkanContext.h" // DestroyWhenUnused, for the deferred-destruction tests
 
 using namespace kor;
 
@@ -389,6 +390,87 @@ TEST_F(TokenExecutorTest, SeveralThreadsRecordAndSubmitAtOnce) {
         EXPECT_EQ(record.message.find("THREADING"), std::string::npos) << record.message;
         EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
     }
+}
+
+}  // namespace
+
+// ---- Deferred destruction ------------------------------------------------------------------------
+//
+// Destroying something the GPU may still be using hands its frees to the retire list, keyed by
+// "everything submitted so far". A submission that waits on a token the CPU has not signalled yet is
+// guaranteed to still be pending, which makes "still in use" something a test can hold steady.
+
+namespace {
+
+TEST_F(TokenExecutorTest, DestructionWaitsForWorkSubmittedBeforeIt) {
+    const Token go = Token::Create();
+    auto pending = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    pending->Begin();
+    pending->End();
+    const Token pendingDone = Token::Create();
+    ASSERT_TRUE(pending->Submit({.waitFor = {go}, .signal = {pendingDone}}));
+
+    std::atomic<bool> destroyed{false};
+    vk::Context::DestroyWhenUnused([&] { destroyed.store(true); });
+    EXPECT_FALSE(destroyed.load()) << "destroyed while a submission from before it was still pending";
+
+    // Something collects — and must still not free it, since the pending work has not run.
+    auto collector = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    collector->Begin();
+    collector->End();
+    const Token collectorDone = Token::Create();
+    ASSERT_TRUE(collector->Submit({.waitFor = {go}, .signal = {collectorDone}}));
+    EXPECT_FALSE(destroyed.load());
+
+    go.signal();
+    pendingDone.wait();
+    collectorDone.wait();
+
+    // The next collection finds it due.
+    collector->Begin();
+    collector->End();
+    const Token last = Token::Create();
+    ASSERT_TRUE(collector->Submit({.signal = {last}}));
+    EXPECT_TRUE(destroyed.load()) << "never freed after the work it waited for finished";
+    last.wait();
+}
+
+TEST_F(TokenExecutorTest, DestructionWithNothingPendingIsImmediate) {
+    // Drain whatever earlier tests left, so every epoch submitted so far has been reached.
+    CommandBuffer::SingleTimeCommand([](CommandBuffer&) {}).wait();
+    auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    cb->Begin();
+    cb->End();
+    const Token done = Token::Create();
+    ASSERT_TRUE(cb->Submit({.signal = {done}}));
+    done.wait();
+
+    std::atomic<bool> destroyed{false};
+    vk::Context::DestroyWhenUnused([&] { destroyed.store(true); });
+    EXPECT_TRUE(destroyed.load());
+}
+
+// The validation layer reports destroying a buffer that a pending submission uses
+// (VUID-vkDestroyBuffer-buffer-00922), so a clean log is the evidence the free was deferred.
+TEST_F(TokenExecutorTest, ABufferDestroyedWhileInUseIsFreedOnlyOnceTheGpuIsDone) {
+    const auto since = logMark();
+    const Token go = Token::Create();
+    const Token done = Token::Create();
+    auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    {
+        auto buffer = makeDeviceBuffer(std::vector<int>(1024, 7));
+        ASSERT_TRUE(static_cast<bool>(buffer));
+        cb->Begin();
+        cb->ClearBuffer(buffer);
+        cb->End();
+        ASSERT_TRUE(cb->Submit({.waitFor = {go}, .signal = {done}}));
+    }   // destroyed here, with the clear still waiting on `go`
+
+    go.signal();
+    done.wait();
+    // Let the deferred free happen, then look.
+    CommandBuffer::SingleTimeCommand([](CommandBuffer&) {}).wait();
+    expectNoValidationErrorsSince(since);
 }
 
 }  // namespace

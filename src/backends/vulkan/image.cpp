@@ -95,11 +95,12 @@ namespace kor::vk
     }
 
     Image::~Image() {
-        if (!_allocations.empty()) {
-            for (size_t i = 0; i < _images.size(); i++) {
-                Context::Allocator().FreeImage(_images[i], _allocations[i]);
-            }
-        }
+        // Swap-chain images have no allocations: the swap chain owns them.
+        if (_allocations.empty()) return;
+        Context::DestroyWhenUnused([images = _images, allocations = _allocations] {
+            for (std::size_t i = 0; i < images.size(); ++i)
+                if (images[i]) Context::Allocator().FreeImage(images[i], allocations[i]);
+        });
     }
 
     Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const SampleCount msaa)
@@ -216,19 +217,18 @@ namespace kor::vk
     }
 
     void Image::doResize(const glm::uvec3 &extent) {
-        // The frames still in flight may be reading these. A resize is not always between frames —
-        // Scene::Update runs inside the frame's recording, and a window being dragged resizes there,
-        // every frame — so the only safe answer without a deferred-deletion queue is to wait for the
-        // device before freeing. It stalls, and a drag is the one case where that is noticeable; a
-        // graveyard that frees N frames later is the fix if it ever matters, and this is where it goes.
-        Context::Device().waitIdle();
-
+        // The frames still in flight may be reading the old images — a resize is not always between
+        // frames: Scene::Update runs inside the frame's recording, and a window being dragged resizes
+        // there, every frame. So the old ones are freed once the GPU is done with them, instead of
+        // stalling the device here as this used to.
+        //
         // Every copy, not only the one this frame is on. A per-frame image has one per frame in
         // flight, and resizing just the current one leaves the others at the old size — which shows up
         // a frame or two later as a copy or a render pass whose extents disagree.
-        for (std::size_t frame = 0; frame < _images.size(); ++frame) {
-            if (_images[frame]) Context::Allocator().FreeImage(_images[frame], _allocations[frame]);
-        }
+        Context::DestroyWhenUnused([images = _images, allocations = _allocations] {
+            for (std::size_t i = 0; i < images.size(); ++i)
+                if (images[i]) Context::Allocator().FreeImage(images[i], allocations[i]);
+        });
 
         const auto imageCreateInfo = ::vk::ImageCreateInfo()
             .setImageType(getVkImageType(_type))

@@ -54,22 +54,20 @@ namespace kor::vk
     {
         if (!_image.valid() || _imageGeneration == _image->generation()) return;
 
-        // The image was resized, so every view of it names a VkImage that no longer exists. Waiting
-        // for the device is what makes destroying them safe: a resize happens between frames, but the
-        // frames in flight may still hold these handles.
-        vk::Context::Device().waitIdle();
-        for (const auto& imageView : _imageViews) {
-            vk::Context::Device()->destroyImageView(imageView);
-        }
+        // The image was resized, so every view of it names a VkImage that is on its way out. The
+        // frames in flight may still hold these, so they go when the GPU is done with them.
+        vk::Context::DestroyWhenUnused([views = std::move(_imageViews)] {
+            for (const auto& view : views) vk::Context::Device()->destroyImageView(view);
+        });
         _imageViews.clear();
         build();
     }
 
     ImageView::~ImageView()
     {
-        for (const auto& imageView : _imageViews) {
-            vk::Context::Device()->destroyImageView(imageView);
-        }
+        vk::Context::DestroyWhenUnused([views = _imageViews] {
+            for (const auto& view : views) vk::Context::Device()->destroyImageView(view);
+        });
     }
 
     ::vk::ImageView ImageView::operator*() const

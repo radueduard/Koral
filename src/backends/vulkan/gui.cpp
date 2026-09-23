@@ -4,9 +4,12 @@
 
 #include "gui.h"
 
+#include <algorithm>
 #include <iostream>
+#include <vector>
 
 #include "context.h"
+#include "token.h"
 #include "descriptorPool.h"
 #include "device.h"
 #include "runtime.h"
@@ -28,6 +31,34 @@ namespace kor::vk
 {
     namespace
     {
+        // ImGui textures whose descriptor sets are waiting for the GPU to be done with them. The
+        // same deferral as Context::DestroyWhenUnused, but kept apart and drained only on the main
+        // thread: the sets come from ImGui's descriptor pool, which ImGui itself touches from the main
+        // thread without a lock, so freeing them from whichever thread collects would race it.
+        struct PendingRemoval {
+            std::vector<kor::Token> submittedBefore;
+            std::vector<VkDescriptorSet> sets;
+        };
+        std::vector<PendingRemoval> g_pendingRemovals;
+
+        void removeWhenUnused(std::vector<VkDescriptorSet> sets)
+        {
+            if (sets.empty()) return;
+            g_pendingRemovals.push_back({Context::Device().submittedSoFar(), std::move(sets)});
+        }
+
+        void drainPendingRemovals(const bool all)
+        {
+            std::erase_if(g_pendingRemovals, [all](const PendingRemoval& pending) {
+                const bool done = std::ranges::all_of(pending.submittedBefore, [all](const kor::Token& t) {
+                    if (all) t.wait();
+                    return t.ready();
+                });
+                if (done) for (const auto set : pending.sets) ImGui_ImplVulkan_RemoveTexture(set);
+                return done;
+            });
+        }
+
         /**
          * @brief Whether ImGui can sample this image as it is, with no copy in between.
          *
@@ -72,9 +103,8 @@ namespace kor::vk
 
     GuiImage::~GuiImage()
     {
-        for (const auto& descriptorSet : _descriptorSets) {
-            ImGui_ImplVulkan_RemoveTexture(descriptorSet);
-        }
+        // Frames in flight may still be drawing it.
+        removeWhenUnused(std::vector<VkDescriptorSet>(_descriptorSets.begin(), _descriptorSets.end()));
     }
 
     void GuiImage::setLayerAndLevel(const glm::u32 layer, const glm::u32 level)
@@ -153,10 +183,9 @@ namespace kor::vk
 
     void GuiImage::setImage(kor::ResourceRef<const kor::Image> image)
     {
-        Context::Device().waitIdle();
-        for (const auto& descriptorSet : _descriptorSets) {
-            ImGui_ImplVulkan_RemoveTexture(descriptorSet);
-        }
+        // Frames in flight may still be drawing the old binding; it goes once they are done (this
+        // used to stall the whole device, on every resize of the image it shows).
+        removeWhenUnused(std::vector<VkDescriptorSet>(_descriptorSets.begin(), _descriptorSets.end()));
         _descriptorSets.clear();
 
         _image = image;
@@ -306,6 +335,7 @@ namespace kor::vk
 
     void GUI::NewFrame()
     {
+        drainPendingRemovals(/*all=*/false);
         ImGui_ImplGlfw_NewFrame();
         ImGui_ImplVulkan_NewFrame();
     }
@@ -366,6 +396,7 @@ namespace kor::vk
 
     void GUI::Shutdown()
     {
+        drainPendingRemovals(/*all=*/true);
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
 

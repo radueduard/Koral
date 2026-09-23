@@ -29,9 +29,9 @@ namespace kor::vk
 
     BufferView::~BufferView()
     {
-        for (const auto& bufferView : _bufferViews) {
-            vk::Context::Device()->destroyBufferView(bufferView);
-        }
+        vk::Context::DestroyWhenUnused([views = _bufferViews] {
+            for (const auto& view : views) vk::Context::Device()->destroyBufferView(view);
+        });
     }
 
     ::vk::BufferView BufferView::operator*() const

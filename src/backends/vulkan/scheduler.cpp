@@ -6,6 +6,7 @@
 #include "commandBuffer.h"
 #include "log.h"
 #include "timeline.h"
+#include "../../core/tokenState.h"
 #include <framebuffer.h>
 #include <surface.h>
 #include <log.h>
@@ -134,6 +135,9 @@ namespace kor::vk
         }
         // The last submission from this frame is done, and with it everything handed to Execute().
         frame.release();
+        // And whatever was destroyed while the GPU might still have been using it, now that it
+        // no longer is. Once a frame is the natural cadence for the deferred-deletion queue.
+        detail::collectRetired();
 
         while (true) {
             auto result = _swapChain->Acquire(frame);

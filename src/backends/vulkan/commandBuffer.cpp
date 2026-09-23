@@ -19,6 +19,7 @@
 #include "imageView.h"
 #include "scheduler.h"
 #include "timeline.h"
+#include "../../core/tokenState.h"
 #include "vulkanContext.h"
 #include "vk_enum_conversions.h"
 
@@ -1069,6 +1070,9 @@ namespace kor::vk
 
     kor::VoidResult CommandBuffer::doSubmit(const kor::SubmitInfo& info)
     {
+        // Code without a frame — a headless job, a tool — still needs deferred destruction to
+        // drain somewhere; submitting is the one thing it is sure to keep doing.
+        detail::collectRetired();
         auto& tokens = Context::Tokens();
 
         std::vector<::vk::Semaphore> waitSemaphores, signalSemaphores;
@@ -1101,27 +1105,33 @@ namespace kor::vk
         }
 
         const auto commandBuffers = std::array { _handle };
-        auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo()
-            .setWaitSemaphoreValues(waitValues)
-            .setSignalSemaphoreValues(signalValues);
-        const auto submitInfo = ::vk::SubmitInfo()
-            .setCommandBuffers(commandBuffers)
-            .setWaitSemaphores(waitSemaphores)
-            .setWaitDstStageMask(waitStages)
-            .setSignalSemaphores(signalSemaphores)
-            .setPNext(&timelineInfo);
 
-        // Nothing is signalled but the fence. A semaphore was signalled here too, with no waiter
-        // anywhere, which made the second submit of any re-recorded buffer invalid: a binary
-        // semaphore must be unsignalled when the signal operation executes, and nothing was
-        // consuming it to get it back there.
+        // Only timeline semaphores are signalled: the caller's tokens and the queue's epoch. (A
+        // binary semaphore was signalled here once, with no waiter anywhere, which made the second
+        // submit of any re-recorded buffer invalid.)
         //
-        // Submit regardless of recorded errors so the fence still signals (callers
-        // WaitForFence afterwards); report the first error, if any, to the caller.
+        // Submit regardless of recorded errors so the fence and the tokens still signal; report the
+        // first error, if any, to the caller.
         try {
             {
                 const auto lock = Context::Device().lockQueues();
-                _queue->submit(submitInfo, _fence);
+                const auto [epochSemaphore, epochValue] = Context::Device().nextEpoch(_queue);
+                signalSemaphores.push_back(epochSemaphore);
+                signalValues.push_back(epochValue);
+                auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo()
+                    .setWaitSemaphoreValues(waitValues)
+                    .setSignalSemaphoreValues(signalValues);
+                try {
+                    _queue->submit(::vk::SubmitInfo()
+                        .setCommandBuffers(commandBuffers)
+                        .setWaitSemaphores(waitSemaphores)
+                        .setWaitDstStageMask(waitStages)
+                        .setSignalSemaphores(signalSemaphores)
+                        .setPNext(&timelineInfo), _fence);
+                } catch (...) {
+                    Context::Device().abandonEpoch(_queue);
+                    throw;
+                }
             }
             for (const auto& token : info.signal) TokenReactor::noteSubmittedSignal(token);
         } catch (const std::exception& e) {

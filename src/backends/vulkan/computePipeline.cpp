@@ -74,12 +74,14 @@ namespace kor::vk
 
     void ComputePipeline::Teardown()
     {
-        const Device& device = Context::Device();
-        device.queuesWaitIdle();
-        if (_pipelineLayout)
-            device->destroyPipelineLayout(_pipelineLayout);
-        if (_handle)
-            device->destroyPipeline(_handle);
+        // Torn down on destruction and on every hot reload, while frames in flight may still be
+        // bound to it — so it goes once the GPU is done, rather than after stalling every queue.
+        Context::DestroyWhenUnused([layout = _pipelineLayout, pipeline = _handle] {
+            if (layout) Context::Device()->destroyPipelineLayout(layout);
+            if (pipeline) Context::Device()->destroyPipeline(pipeline);
+        });
+        _pipelineLayout = nullptr;
+        _handle = nullptr;
     }
 
     void ComputePipeline::Bind(const kor::CommandBuffer& commandBuffer) const

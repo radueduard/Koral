@@ -206,17 +206,12 @@ namespace kor::vk
         // at teardown: a shader edit that reshapes a block replays the builder, and the *new* set
         // replacing the old one is what destroys it — mid-frame, with the previous frames' command
         // buffers still holding it. Freeing then is a use-after-free the validation layer catches as
-        // "can't be called on VkDescriptorSet ... currently in use by VkCommandBuffer".
-        //
-        // So wait for the device, exactly as a resize does (@see vk::Image::doResize) and for the
-        // same reason: without a deferred-deletion queue there is nowhere else to put the wait. It
-        // stalls, which is only noticeable when sets are destroyed in bulk — a graveyard that frees
-        // N frames later is the fix if it ever matters, and this is the second place it would go.
-        if (!_descriptorSets.empty()) Context::Device().waitIdle();
-
-        for (const auto& descriptorSet : _descriptorSets) {
-            Context::DescriptorPool().Free(descriptorSet);
-        }
+        // "can't be called on VkDescriptorSet ... currently in use by VkCommandBuffer". So they are
+        // freed once the GPU is done with them (this used to stall the whole device instead).
+        if (_descriptorSets.empty()) return;
+        Context::DestroyWhenUnused([sets = _descriptorSets] {
+            for (const auto& set : sets) Context::DescriptorPool().Free(set);
+        });
     }
 
     void DescriptorSet::rebind(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index)
