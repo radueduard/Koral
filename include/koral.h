@@ -66,6 +66,7 @@
 #include "log.h"
 #include "gtime.h"
 #include "task.h"
+#include "token.h"
 // Named here rather than left to arrive through something else: kor::Result and kor::Error are in
 // every builder's signature, kor::RangeOf in every upload, kor::ValueShape in PushConstant and
 // kor::SemanticSerializer in DescriptorSet::Builder::write. They did reach a project transitively,

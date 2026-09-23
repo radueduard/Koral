@@ -4,6 +4,7 @@
 
 #pragma once
 #include <coroutine>
+#include <functional>
 #include <thread>
 
 #include <asio/thread_pool.hpp>
@@ -20,6 +21,10 @@ public:
 
     void Enqueue(std::coroutine_handle<> h) override {
         asio::post(pool_, [h]() mutable { h.resume(); });
+    }
+
+    void Post(std::function<void()> work) override {
+        asio::post(pool_, std::move(work));
     }
 
     void Shutdown() {

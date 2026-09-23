@@ -18,6 +18,7 @@ class MainThreadExecutor;
 class BackgroundExecutor;
 
 namespace kor {
+    namespace detail { struct TimelineState; }
     class GUI;
     class Scheduler;
     class Framebuffer;
@@ -110,6 +111,7 @@ namespace kor {
     {
         friend class kor::Window;
         friend class kor::Scheduler;
+        friend struct kor::detail::TimelineState; // picks the executor an awaiting coroutine resumes on
     public:
         /** @brief The application window. Not valid in a headless context, which has none. */
         static KORAL_API kor::Window& Window();

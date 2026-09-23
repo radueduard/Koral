@@ -31,6 +31,7 @@ add_executable(koral_tests
         test_builder_recoverable.cpp
         test_project_config.cpp
         test_module.cpp
+        test_token.cpp
 )
 
 target_link_libraries(koral_tests PRIVATE

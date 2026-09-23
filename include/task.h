@@ -6,6 +6,7 @@
 
 #include <coroutine>
 #include <exception>
+#include <functional>
 #include <expected>
 #include <optional>
 #include <utility>
@@ -27,6 +28,14 @@ namespace kor {
 
         /** @brief Schedules a suspended coroutine to be resumed on this executor. */
         virtual void Enqueue(std::coroutine_handle<>) = 0;
+
+        /**
+         * @brief Schedules arbitrary work on this executor.
+         *
+         * What a Token uses to resume a coroutine, so it can check, at the moment the work runs,
+         * that the coroutine has not been destroyed while it sat in the queue.
+         */
+        virtual void Post(std::function<void()> work) = 0;
     };
 
     /**

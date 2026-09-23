@@ -4,6 +4,7 @@ add_executable(koral_integration_tests
         test_buffer_roundtrip.cpp
         test_compute_dispatch.cpp
         test_gpu_timers.cpp
+        test_token_executors.cpp
         test_barrier_resolution_cost.cpp
         test_buffer_memory_cost.cpp
         test_image_roundtrip.cpp

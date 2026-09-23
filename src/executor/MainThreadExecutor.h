@@ -4,6 +4,7 @@
 
 #pragma once
 #include <coroutine>
+#include <functional>
 #include <thread>
 
 #include <asio/io_context.hpp>
@@ -21,6 +22,10 @@ public:
 
     void Enqueue(std::coroutine_handle<> h) override {
         asio::post(ctx_, [h]() mutable { h.resume(); });
+    }
+
+    void Post(std::function<void()> work) override {
+        asio::post(ctx_, std::move(work));
     }
 
     // Call once per frame from the main loop (replaces the manual queue drain).
