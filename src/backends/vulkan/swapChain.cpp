@@ -70,7 +70,7 @@ namespace kor::vk
         _surface(createInfo.surface),
         _presentQueue(Context::Device().requestPresentQueue(_surface))
     {
-        vk::Context::Device()->waitIdle();
+        vk::Context::Device().waitIdle();
 
         CreateSwapChain();
     }
@@ -202,7 +202,7 @@ namespace kor::vk
 
     void SwapChain::Resize(const glm::uvec2& newSize) {
         _extent = newSize;
-        Context::Device()->waitIdle();
+        Context::Device().waitIdle();
         CreateSwapChain();
         // Stops here on purpose. The depth target and the default framebuffer are both sized to the
         // image count, which this may just have changed, so the scheduler re-adopts it and finishes
@@ -260,6 +260,7 @@ namespace kor::vk
             .setSwapchains(swapChains)
             .setImageIndices(_imageIndex);
         try {
+        	const auto lock = Context::Device().lockQueues();
         	return _presentQueue->presentKHR(presentInfo);
         } catch (const ::vk::OutOfDateKHRError &) {
             return ::vk::Result::eErrorOutOfDateKHR;

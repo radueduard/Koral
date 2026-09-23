@@ -12,6 +12,8 @@
 
 #include "../backends/open_gl/gui.h"
 #include "../backends/vulkan/gui.h"
+#include "../backends/vulkan/device.h"
+#include "../backends/vulkan/vulkanContext.h"
 
 #include <imgui.h>
 // #include <imguizmo.h>
@@ -511,6 +513,10 @@ void kor::GUI::RenderPlatformWindows()
     // UpdatePlatformWindows, which is what creates and destroys them.
     attachPlatformWindowsToInput();
 
+    // ImGui's Vulkan backend submits and presents each platform window on the shared queue itself,
+    // so it takes the same lock as every other submit.
+    std::unique_lock<std::mutex> queueLock;
+    if (Context::activeAPI() == API::eVulkan) queueLock = vk::Context::Device().lockQueues();
     ImGui::RenderPlatformWindowsDefault();
     glfwMakeContextCurrent(backup_ctx);
 }

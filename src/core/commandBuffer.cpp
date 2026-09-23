@@ -1461,8 +1461,7 @@ namespace kor
     }
 
     Token CommandBuffer::SingleTimeCommand(const std::function<void(kor::CommandBuffer &)> &command, const Usage usage) {
-        // Earlier one-offs the GPU has since finished; releasing them here, on the thread that
-        // records, keeps their command pools touched by one thread only.
+        // Earlier one-offs the GPU has since finished.
         detail::collectRetired();
 
         std::unique_ptr<CommandBuffer> commandBuffer = Create(usage);
@@ -1519,7 +1518,7 @@ namespace kor
         case API::eVulkan:
             {
                 const auto& queue = vk::Context::Device().requestQueue(getQueueFlagsFromUsage(usage));
-                return vk::Context::Device().requestCommandBuffer(queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
+                return vk::Context::Device().requestCommandBuffer(queue);
             }
         default:
             throw std::runtime_error("Unknown API");

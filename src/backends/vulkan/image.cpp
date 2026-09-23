@@ -221,7 +221,7 @@ namespace kor::vk
         // every frame — so the only safe answer without a deferred-deletion queue is to wait for the
         // device before freeing. It stalls, and a drag is the one case where that is noticeable; a
         // graveyard that frees N frames later is the fix if it ever matters, and this is where it goes.
-        Context::Device()->waitIdle();
+        Context::Device().waitIdle();
 
         // Every copy, not only the one this frame is on. A per-frame image has one per frame in
         // flight, and resizing just the current one leaves the others at the old size — which shows up

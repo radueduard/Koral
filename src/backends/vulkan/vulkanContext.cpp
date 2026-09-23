@@ -86,7 +86,7 @@ void kor::vk::Context::StopTokens()
 
 void kor::vk::Context::Destroy()
 {
-    _device->operator*().waitIdle();
+    _device->waitIdle();
     delete _tokenReactor;
     _tokenReactor = nullptr;
     delete _descriptorPool;

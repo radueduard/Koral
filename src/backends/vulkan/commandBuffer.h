@@ -16,11 +16,11 @@ namespace kor::vk
 
     class CommandBuffer : public kor::CommandBuffer, public kor::vk::Wrapper<::vk::CommandBuffer> {
     public:
-        CommandBuffer(const kor::vk::Queue& queue, ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool& parentCommandPool);
+        CommandBuffer(const kor::vk::Queue& queue, ::vk::CommandBuffer commandBuffer, ::vk::CommandPool parentCommandPool);
         ~CommandBuffer() override;
         void Run(const std::function<void(const kor::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore = nullptr) const;
 
-        [[nodiscard]] const ::vk::CommandPool& getParentPool() const { return _parentPool; }
+        [[nodiscard]] ::vk::CommandPool getParentPool() const { return _parentPool; }
         [[nodiscard]] const ::vk::Fence& getFence() const { return _fence; }
         [[nodiscard]] const kor::vk::Queue& getQueue() const { return _queue; }
 
@@ -123,7 +123,7 @@ namespace kor::vk
 
     private:
         const kor::vk::Queue& _queue;
-        const ::vk::CommandPool& _parentPool;
+        ::vk::CommandPool _parentPool; // this buffer's own; see Device::requestCommandBuffer
         // The tokens the last submission waits on or signals. Their timeline semaphores must outlive
         // it, and a caller dropping its token straight after Submit() is the normal fire-and-forget
         // case, so the buffer holds them until it is re-recorded — the point where the timers above

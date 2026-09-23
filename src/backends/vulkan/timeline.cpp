@@ -155,7 +155,7 @@ namespace kor::vk {
         poke();
         _thread.join();
 
-        Context::Device()->waitIdle();
+        Context::Device().waitIdle();
 
         std::vector<std::shared_ptr<detail::TimelineState>> live;
         {

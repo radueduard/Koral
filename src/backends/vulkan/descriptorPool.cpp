@@ -72,6 +72,8 @@ namespace kor::vk
         const auto variableCountInfo = ::vk::DescriptorSetVariableDescriptorCountAllocateInfo()
             .setDescriptorCounts(variableDescriptorCount);
 
+        // The pool, and the counts below, are shared by every thread that builds a descriptor set.
+        std::lock_guard lock(_mutex);
         const auto allocateInfo = ::vk::DescriptorSetAllocateInfo()
             .setPNext(&variableCountInfo)
             .setDescriptorPool(_handle)
@@ -96,6 +98,8 @@ namespace kor::vk
             layoutHandles.emplace_back(*layout);
         }
 
+        // The pool, and the counts below, are shared by every thread that builds a descriptor set.
+        std::lock_guard lock(_mutex);
         const auto allocateInfo = ::vk::DescriptorSetAllocateInfo()
             .setDescriptorPool(_handle)
             .setSetLayouts(layoutHandles);
@@ -115,11 +119,13 @@ namespace kor::vk
 
     void DescriptorPool::Free(const ::vk::DescriptorSet& descriptorSet) const
     {
+        std::lock_guard lock(_mutex);
         Context::Device()->freeDescriptorSets(_handle, descriptorSet);
     }
 
     void DescriptorPool::Free(const std::vector<::vk::DescriptorSet>& descriptorSets) const
     {
+        std::lock_guard lock(_mutex);
         Context::Device()->freeDescriptorSets(_handle, descriptorSets);
     }
 

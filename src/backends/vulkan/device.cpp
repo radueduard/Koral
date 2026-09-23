@@ -82,6 +82,7 @@ namespace kor::vk {
             submitInfoVulkan.setSignalSemaphores(submitInfo.signalSemaphores);
 
         try {
+            const auto lock = Context::Device().lockQueues();
             _handle.submit(submitInfoVulkan, submitInfo.fence);
         } catch (const std::runtime_error& e) {
             std::cerr << e.what() << std::endl;
@@ -249,13 +250,21 @@ namespace kor::vk {
     }
 
     void Device::queuesWaitIdle() const {
+        std::lock_guard queues(_queuesMutex);
+        const auto lock = lockQueues();
         for (const auto& queue : _queuesInUse)
         {
             queue->operator*().waitIdle();
         }
     }
 
+    void Device::waitIdle() const {
+        const auto lock = lockQueues();
+        _handle.waitIdle();
+    }
+
     const Queue& Device::requestQueue(const ::vk::QueueFlags type) const {
+        std::lock_guard lock(_queuesMutex);
         for (const auto& queue : _queuesInUse)
         {
             if ((queue->getFamily().getProperties().queueFlags & type) == type)
@@ -276,9 +285,6 @@ namespace kor::vk {
                 // Masked in the windowed path because requestPresentQueue() populates
                 // _queuesInUse first with a family that also handles Koral/compute/transfer.
                 _queuesInUse.emplace_back(std::move(queue));
-                _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
-                    .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
-                    .setQueueFamilyIndex(queueFamily.getIndex()));
                 return *queueRef;
             } catch (const std::runtime_error&) {}
         }
@@ -286,6 +292,7 @@ namespace kor::vk {
     }
 
     const Queue& Device::requestPresentQueue(const kor::vk::Surface& surface) const {
+        std::lock_guard lock(_queuesMutex);
         for (const auto& queue : _queuesInUse)
         {
             if ((queue->canPresent(surface))) {
@@ -297,9 +304,6 @@ namespace kor::vk {
                 auto queue = queueFamily.RequestPresentQueue(surface);
                 auto* queueRef = queue.get();
                 _queuesInUse.emplace_back(std::move(queue));
-                _commandPools[queueRef->getIdentifier()] = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
-                    .setFlags(::vk::CommandPoolCreateFlagBits::eTransient | ::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
-                    .setQueueFamilyIndex(queueFamily.getIndex()));
                 return *queueRef;
             } catch (const std::runtime_error& err) {
                 std::cerr << err.what() << std::endl;
@@ -309,35 +313,58 @@ namespace kor::vk {
     }
 
     void Device::freeQueues() const {
-        for (const auto& queue : _queuesInUse)
         {
-            _handle.destroyCommandPool(_commandPools.at(queue->getIdentifier()));
+            // Every pool, free or still leased: a command buffer outliving this is already a bug,
+            // and freeCommandBuffer() below notices the pool is gone rather than touch it.
+            std::lock_guard lock(_poolMutex);
+            for (const auto pool : _commandPools) _handle.destroyCommandPool(pool);
+            _commandPools.clear();
+            _freeCommandBuffers.clear();
         }
-         _queuesInUse.clear();
+        std::lock_guard lock(_queuesMutex);
+        _queuesInUse.clear();
     }
 
-    std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const kor::vk::Queue& queue, const glm::u32 thread) const {
-        const auto& commandPool = _commandPools.at(queue.getIdentifier());
-        const auto commandBufferAllocInfo = ::vk::CommandBufferAllocateInfo()
-            .setCommandPool(commandPool)
+    std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const kor::vk::Queue& queue) const {
+        ::vk::CommandPool pool;
+        {
+            std::lock_guard lock(_poolMutex);
+            if (auto& free = _freeCommandBuffers[queue.getIdentifier()]; !free.empty()) {
+                const auto [freePool, freeBuffer] = free.back();
+                free.pop_back();
+                return std::make_unique<CommandBuffer>(queue, freeBuffer, freePool);
+            }
+            pool = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
+                // Reset-per-buffer so re-recording a buffer resets it implicitly on begin.
+                .setFlags(::vk::CommandPoolCreateFlagBits::eResetCommandBuffer)
+                .setQueueFamilyIndex(queue.getFamily().getIndex()));
+            _commandPools.push_back(pool);
+        }
+        // The pool is this buffer's alone from here on, so allocating needs no lock.
+        const auto buffers = _handle.allocateCommandBuffers(::vk::CommandBufferAllocateInfo()
+            .setCommandPool(pool)
             .setLevel(::vk::CommandBufferLevel::ePrimary)
-            .setCommandBufferCount(1);
-        const auto commandBuffers = _handle.allocateCommandBuffers(commandBufferAllocInfo);
-        return std::make_unique<CommandBuffer>(queue, commandBuffers.front(), commandPool);
+            .setCommandBufferCount(1));
+        return std::make_unique<CommandBuffer>(queue, buffers.front(), pool);
     }
 
     void Device::freeCommandBuffer(const CommandBuffer &commandBuffer) const {
-        _handle.freeCommandBuffers(commandBuffer.getParentPool(), *commandBuffer);
+        const auto pool = commandBuffer.getParentPool();
+        std::lock_guard lock(_poolMutex);
+        if (std::ranges::find(_commandPools, pool) == _commandPools.end()) return; // freeQueues() got there first
+        // Still this buffer's alone until it is on the free list, but resetting under the lock
+        // costs nothing that matters and keeps the "gone" check above honest.
+        _handle.resetCommandPool(pool);
+        _freeCommandBuffers[commandBuffer.getQueue().getIdentifier()].push_back({pool, *commandBuffer});
     }
 
     kor::Token Device::runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags) const
     {
-        // Earlier one-offs the GPU has since finished. Released here, on the recording thread,
-        // because freeing a command buffer touches its pool, which only that thread uses.
+        // Earlier one-offs the GPU has since finished.
         detail::collectRetired();
 
         const auto& queue = requestQueue(requiredFlags);
-        std::shared_ptr<CommandBuffer> commandBuffer = requestCommandBuffer(queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
+        std::shared_ptr<CommandBuffer> commandBuffer = requestCommandBuffer(queue);
 
         (*commandBuffer)->begin(::vk::CommandBufferBeginInfo().setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
         command(*commandBuffer);
@@ -353,6 +380,7 @@ namespace kor::vk {
             .setPNext(&timelineInfo);
 
         try {
+            const auto lock = lockQueues();
             queue->submit(submitInfo);
         } catch (const std::exception& e) {
             kor::log::error("[vulkan] single-time command failed to submit: {}", e.what());

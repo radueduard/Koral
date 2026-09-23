@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <mutex>
 #include <unordered_map>
 
 #include <glm/fwd.hpp>
@@ -53,6 +54,7 @@ namespace kor::vk
         void Reset() const;
 
     private:
+        mutable std::mutex _mutex;
         mutable glm::u32 _allocatedSetCount = 0;
         mutable std::unordered_map<DescriptorType, glm::u32> _allocatedBindingCounts;
 

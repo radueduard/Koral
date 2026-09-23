@@ -57,7 +57,7 @@ namespace kor::vk
         // The image was resized, so every view of it names a VkImage that no longer exists. Waiting
         // for the device is what makes destroying them safe: a resize happens between frames, but the
         // frames in flight may still hold these handles.
-        vk::Context::Device()->waitIdle();
+        vk::Context::Device().waitIdle();
         for (const auto& imageView : _imageViews) {
             vk::Context::Device()->destroyImageView(imageView);
         }

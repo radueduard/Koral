@@ -40,7 +40,7 @@ namespace kor::vk
         return usage;
     }
 
-    CommandBuffer::CommandBuffer(const kor::vk::Queue& queue, const ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool& parentCommandPool)
+    CommandBuffer::CommandBuffer(const kor::vk::Queue& queue, const ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool parentCommandPool)
         : kor::CommandBuffer(getCommandBufferUsage(queue)), _queue(queue), _parentPool(parentCommandPool) {
         _handle = commandBuffer;
         _fence = kor::vk::Context::Device()->createFence({});
@@ -81,6 +81,7 @@ namespace kor::vk
                 .setWaitDstStageMask(dstStageMask);
 
         try {
+            const auto lock = Context::Device().lockQueues();
             _queue->submit(submitInfo, _fence);
         } catch (const std::runtime_error& e) {
             std::cerr << e.what() << std::endl;
@@ -1118,6 +1119,7 @@ namespace kor::vk
         // Submit regardless of recorded errors so the fence still signals (callers
         // WaitForFence afterwards); report the first error, if any, to the caller.
         try {
+            const auto lock = Context::Device().lockQueues();
             _queue->submit(submitInfo, _fence);
         } catch (const std::exception& e) {
             record(ErrorCode::eBackend, e.what());

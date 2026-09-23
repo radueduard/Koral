@@ -313,8 +313,7 @@ TEST_F(TokenExecutorTest, ACoroutineCanAwaitAOneOff) {
     ASSERT_TRUE(static_cast<bool>(buffer));
     const Token resumed = Token::Create();
 
-    // Recorded on a pool thread. Command pools are not per-thread yet, so this is only sound
-    // because the main thread records nothing meanwhile — it is blocked on `resumed` below.
+    // Recorded on a pool thread, which is fine: every command buffer has a pool of its own.
     auto task = AwaitOneOff([&](CommandBuffer& cb) { cb.ClearBuffer(buffer); }, resumed);
     resumed.wait();
     EXPECT_EQ(buffer->Read<int>(), std::vector<int>(64, 0));
@@ -337,6 +336,59 @@ TEST_F(TokenExecutorTest, FireAndForgetOneOffsAreReleasedOnlyOnceTheGpuIsDone) {
 
     for (const auto& t : clears) t.wait();
     expectNoValidationErrorsSince(since);
+}
+
+}  // namespace
+
+// ---- Recording and submitting from several threads ---------------------------------------------
+//
+// Every thread records its own command buffers, submits them, and fires one-offs, all at once. The
+// validation layer's thread-safety checks report a pool or a queue touched from two threads at a
+// time ("THREADING ERROR"), so a clean log is the evidence.
+
+namespace {
+
+TEST_F(TokenExecutorTest, SeveralThreadsRecordAndSubmitAtOnce) {
+    constexpr int kThreads = 8;
+    constexpr int kRounds = 40;
+    const auto since = logMark();
+
+    // Resources are built up front, on this thread: the subject is recording and submission.
+    std::vector<Resource<Buffer>> buffers;
+    for (int i = 0; i < kThreads; ++i) {
+        buffers.push_back(makeDeviceBuffer(std::vector<int>(1024, 7)));
+        ASSERT_TRUE(static_cast<bool>(buffers.back()));
+    }
+
+    std::atomic<bool> go{false};
+    std::atomic<int> failures{0};
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&, t] {
+            while (!go.load(std::memory_order_acquire)) std::this_thread::yield();
+            const auto& buffer = buffers[t];
+            for (int round = 0; round < kRounds; ++round) {
+                auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
+                cb->Begin();
+                cb->ClearBuffer(buffer);
+                cb->End();
+                const Token done = Token::Create();
+                if (!cb->Submit({.signal = {done}})) failures.fetch_add(1);
+                done.wait();
+
+                CommandBuffer::SingleTimeCommand([&](CommandBuffer& one) { one.ClearBuffer(buffer); }).wait();
+            }
+        });
+    }
+    go.store(true, std::memory_order_release);
+    for (auto& thread : threads) thread.join();
+
+    EXPECT_EQ(failures.load(), 0);
+    for (const auto& record : kor::log::historySince(since)) {
+        if (record.level != kor::log::Level::eError) continue;
+        EXPECT_EQ(record.message.find("THREADING"), std::string::npos) << record.message;
+        EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
+    }
 }
 
 }  // namespace

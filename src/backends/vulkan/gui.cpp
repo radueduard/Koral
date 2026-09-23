@@ -153,7 +153,7 @@ namespace kor::vk
 
     void GuiImage::setImage(kor::ResourceRef<const kor::Image> image)
     {
-        Context::Device()->waitIdle();
+        Context::Device().waitIdle();
         for (const auto& descriptorSet : _descriptorSets) {
             ImGui_ImplVulkan_RemoveTexture(descriptorSet);
         }
