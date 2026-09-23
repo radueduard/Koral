@@ -94,19 +94,19 @@ namespace kor
                     .imageLayerCount = image->arrayLayers(),
                     .imageMipLevel = 0,
                 });
-            });
+            }).wait();
 
             if (image->mipLevels() > 1) {
                 CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                     commandBuffer.GenerateMipmaps(imageRef);
-                });
+                }).wait();
             }
 
             // Leave the image shader-readable: the copy/mip commands leave it in a
             // transfer-destination state, but descriptors bind sampled images as read-only.
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                 commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::eAllShaderRead }});
-            });
+            }).wait();
         }
 
         return image;

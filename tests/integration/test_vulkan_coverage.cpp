@@ -256,7 +256,7 @@ TEST_F(GpuTest, GenerateMipmapsRuns) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
         cb.GenerateMipmaps(image);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     SUCCEED();
 }
 
@@ -277,7 +277,7 @@ TEST_F(GpuTest, BlitBetweenImages) {
             .dstExtent = {4, 4, 1},
             .filtering = kor::Filter::eLinear,
         });
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     SUCCEED();
 }
 
@@ -304,7 +304,7 @@ TEST_F(GpuTest, BufferTransferOps) {
         cb.CopyBuffer(src, dst);
         cb.FillBuffer(src, fillValues);
         cb.ClearBuffer(src);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<std::uint32_t> out = dst->Read<std::uint32_t>();
     ASSERT_EQ(out.size(), data.size());
@@ -339,7 +339,7 @@ TEST_F(GpuTest, ResolveMultisampleToSingle) {
         cb.BeginRendering(fb);
         cb.EndRendering();
         cb.Resolve(msaa, single);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     SUCCEED();
 }
 
@@ -398,7 +398,7 @@ TEST_F(GpuTest, DebugLabelsRecord) {
             inner.ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
         });
         cb.EndDebugLabel();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     SUCCEED();
 }
 

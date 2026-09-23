@@ -71,7 +71,7 @@ kor::Resource<Image> mippedImage(const std::uint32_t size, const std::uint32_t m
                     .imageLayerCount = 1,
                     .imageMipLevel = mip,
                 });
-            });
+            }).wait();
         }
     }
     return image;
@@ -89,7 +89,7 @@ std::vector<glm::u8vec4> readTexels(const ResourceRef<const Image>& image) {
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(image, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
     return readback->Read<glm::u8vec4>();
 }
 
@@ -188,7 +188,7 @@ TEST_F(GpuTest, ExportKeepsFloatPrecisionInAFloatContainer) {
     // A value no 8-bit container could hold.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, glm::vec4{ 12.5f, 0.25f, 3.f, 1.f });
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const auto saved = kimg::SaveImage(outDir(), "bright", kimg::FileFormat::eEXR, image);
     ASSERT_TRUE(saved.has_value()) << saved.error().message;
@@ -203,7 +203,7 @@ TEST_F(GpuTest, ExportKeepsFloatPrecisionInAFloatContainer) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(reloaded, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const auto texels = readback->Read<glm::vec4>();
     ASSERT_FALSE(texels.empty());
@@ -278,7 +278,7 @@ TEST_F(GpuTest, ExportWritesCompressedBlocksIntoKtx2) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyBufferToImage(staging, image, kor::Copy{
             .imageOffset = { 0, 0, 0 }, .imageExtent = { kSize, kSize, 1 } });
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const auto saved = kimg::SaveImageSet(outDir(), "bc7", image);
     ASSERT_TRUE(saved.has_value()) << saved.error().message;
@@ -298,7 +298,7 @@ TEST_F(GpuTest, ExportWritesCompressedBlocksIntoKtx2) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(reloaded, readback, kor::Copy{
             .imageOffset = { 0, 0, 0 }, .imageExtent = { kSize, kSize, 1 } });
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
     EXPECT_EQ(readback->Read<std::uint8_t>(), blocks);
 }
 

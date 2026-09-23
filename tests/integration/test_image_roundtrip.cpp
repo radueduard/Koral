@@ -45,7 +45,7 @@ std::vector<Pixel> readbackPixels(const kor::Resource<Image>& image, std::uint32
         // CopyImageToBuffer inserts its own image barrier to TransferSrc, so we
         // don't need to transition the image explicitly first.
         cb.CopyImageToBuffer(image, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     return readback->Read<Pixel>();
 }
@@ -98,7 +98,7 @@ TEST_F(GpuTest, ClearColorImageThenReadback) {
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, glm::vec4{1.f, 0.f, 0.f, 1.f});
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     // Separate submit: SingleTimeCommand waits idle between the two, and the copy's
     // internal transition (transfer-dst -> transfer-src) provides the memory
@@ -150,7 +150,7 @@ TEST_F(GpuTest, SubRegionReadback) {
             .imageOffset = { static_cast<int>(kOffX), static_cast<int>(kOffY), 0 },
             .imageExtent = { static_cast<int>(kSubW), static_cast<int>(kSubH), 1 },
         });
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kSubW) * kSubH);
@@ -185,7 +185,7 @@ TEST_F(GpuTest, PartialUploadIntoSubRegion) {
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, glm::vec4{0.f, 0.f, 0.f, 1.f});
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const std::vector<Pixel> patch(kSubW * kSubH, kPatch);
     Buffer::Builder<Pixel> sb;
@@ -199,7 +199,7 @@ TEST_F(GpuTest, PartialUploadIntoSubRegion) {
             .imageOffset = { static_cast<int>(kOffX), static_cast<int>(kOffY), 0 },
             .imageExtent = { static_cast<int>(kSubW), static_cast<int>(kSubH), 1 },
         });
-    });
+    }).wait();
 
     const std::vector<Pixel> out = readbackPixels(image, kW, kH);
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -314,7 +314,7 @@ TEST_F(GpuTest, BlitFilteringIsHonoured) {
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.Blit(source, destination,
                     kor::Blit{ .filtering = filter });
-        }, CommandBuffer::Usage::eGraphics);
+        }, CommandBuffer::Usage::eGraphics).wait();
 
         const std::vector<Pixel> out = readbackPixels(destination, 1, 1);
         EXPECT_EQ(out.size(), 1u);
@@ -349,7 +349,7 @@ TEST_F(GpuTest, PartialRangeImageBarrierStaysInBounds) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ImageBarrier(kor::ImageBarrier(image,
                                           kor::ResourceAccess::eTransferDst, 2u));
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     SUCCEED();
 }
 

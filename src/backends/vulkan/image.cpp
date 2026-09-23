@@ -212,7 +212,7 @@ namespace kor::vk
     void Image::Clear(const ::vk::ClearValue& clearValue) const {
         Context::Device().runSingleTimeCommand([this, clearValue](const kor::vk::CommandBuffer& commandBuffer) {
             Clear(commandBuffer, clearValue);
-        }, ::vk::QueueFlagBits::eGraphics);
+        }, ::vk::QueueFlagBits::eGraphics).wait();
     }
 
     void Image::doResize(const glm::uvec3 &extent) {

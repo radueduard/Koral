@@ -193,7 +193,7 @@ namespace kimg::detail
                 .imageLayerCount = 1,
                 .imageMipLevel = mip,
             });
-        });
+        }).wait();
     }
 
     void finishUpload(const kor::ResourceRef<const kor::Image>& image, const bool generateMipmaps)
@@ -206,7 +206,7 @@ namespace kimg::detail
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
             if (mips) commandBuffer.GenerateMipmaps(image);
             commandBuffer.Barrier({}, {{ image, kor::ResourceAccess::eAllShaderRead }});
-        });
+        }).wait();
     }
 
     // ---- KTX ------------------------------------------------------------------------------------

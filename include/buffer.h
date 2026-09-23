@@ -430,7 +430,7 @@ namespace kor
                             stagingBuffer->Write(data, 0);
                             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                                 commandBuffer.CopyBuffer(stagingRef, bufferRef, byteSize);
-                            }, CommandBuffer::Usage::eTransfer);
+                            }, CommandBuffer::Usage::eTransfer).wait();
                             break;
                         }
                         case Type::eStaging:
@@ -486,7 +486,7 @@ namespace kor
                     const auto stagingBuffer = stagingBuilder.build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, elemBytes, index * elemBytes, 0);
-                    }, CommandBuffer::Usage::eTransfer);
+                    }, CommandBuffer::Usage::eTransfer).wait();
                     return stagingBuffer->ReadAt<T>(0);
                 }
                 case Type::eStaging:
@@ -533,7 +533,7 @@ namespace kor
                     stagingBuffer->WriteAt<T>(0, data);
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), elemBytes, 0, index * elemBytes);
-                    }, CommandBuffer::Usage::eTransfer);
+                    }, CommandBuffer::Usage::eTransfer).wait();
                     break;
                 }
                 case Type::eStaging:
@@ -601,7 +601,7 @@ namespace kor
                     const auto stagingBuffer = stagingBuilder.build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, byteSize, byteOffset, 0);
-                    }, CommandBuffer::Usage::eTransfer);
+                    }, CommandBuffer::Usage::eTransfer).wait();
                     return stagingBuffer->Read<T>(count, 0);
                 }
                 case Type::eStaging:
@@ -667,7 +667,7 @@ namespace kor
                     stagingBuffer->Write(data, 0);
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), byteSize, 0, byteOffset);
-                    }, CommandBuffer::Usage::eTransfer);
+                    }, CommandBuffer::Usage::eTransfer).wait();
                     break;
                 }
                 case Type::eStaging:

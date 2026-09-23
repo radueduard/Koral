@@ -85,7 +85,7 @@ std::filesystem::path writeSourceFile(const std::string& name, const std::uint32
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyBufferToImage(staging, image, kor::Copy{
             .imageOffset = { 0, 0, 0 }, .imageExtent = { size, size, 1 } });
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const auto written = kimg::SaveImage(outDir(), name, kimg::FileFormat::ePNG, image);
     EXPECT_TRUE(written.has_value()) << (written.has_value() ? std::string{} : written.error().message);

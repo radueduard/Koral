@@ -7,10 +7,12 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
 
+#include "buffer.h"
 #include "commandBuffer.h"
 #include "context.h"
 #include "log.h"
@@ -269,6 +271,72 @@ TEST_F(TokenExecutorTest, TheCpuCanSignalAGpuBackedTimelineToo) {
     while (!task.done() && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
     EXPECT_EQ(resumed.load(), 1);
     cb->WaitForFence();
+}
+
+}  // namespace
+
+// ---- SingleTimeCommand returns a token ---------------------------------------------------------
+
+namespace {
+
+Resource<Buffer> makeDeviceBuffer(const std::vector<int>& data) {
+    Buffer::Builder<int> b;
+    b.setData(data);
+    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    b.setType(Buffer::Type::eDeviceLocal);
+    return b.build();
+}
+
+Task<void> AwaitOneOff(std::function<void(CommandBuffer&)> work, Token resumed) {
+    co_await Context::SwitchToBackgroundThread();
+    co_await CommandBuffer::SingleTimeCommand(work);
+    resumed.signal();
+}
+
+TEST_F(TokenExecutorTest, SingleTimeCommandReturnsATokenForItsCompletion) {
+    const auto since = logMark();
+    auto buffer = makeDeviceBuffer(std::vector<int>(64, 7));
+    ASSERT_TRUE(static_cast<bool>(buffer));
+
+    const Token done = CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.ClearBuffer(buffer);
+    });
+    done.wait();
+    EXPECT_TRUE(done.ready());
+    EXPECT_EQ(buffer->Read<int>(), std::vector<int>(64, 0));
+    expectNoValidationErrorsSince(since);
+}
+
+TEST_F(TokenExecutorTest, ACoroutineCanAwaitAOneOff) {
+    const auto since = logMark();
+    auto buffer = makeDeviceBuffer(std::vector<int>(64, 7));
+    ASSERT_TRUE(static_cast<bool>(buffer));
+    const Token resumed = Token::Create();
+
+    // Recorded on a pool thread. Command pools are not per-thread yet, so this is only sound
+    // because the main thread records nothing meanwhile — it is blocked on `resumed` below.
+    auto task = AwaitOneOff([&](CommandBuffer& cb) { cb.ClearBuffer(buffer); }, resumed);
+    resumed.wait();
+    EXPECT_EQ(buffer->Read<int>(), std::vector<int>(64, 0));
+    expectNoValidationErrorsSince(since);
+}
+
+// Fire and forget: nothing is kept that could keep a command buffer alive — a Token holds the
+// timeline, not the submission — so only the retire list stands between each one and being freed
+// while the GPU runs it. That is exactly what the validation layer reports, so a clean log is the
+// evidence. The tokens are kept only so the buffer can outlive every clear aimed at it: two
+// one-offs are unordered, so waiting on the last one would say nothing about the others.
+TEST_F(TokenExecutorTest, FireAndForgetOneOffsAreReleasedOnlyOnceTheGpuIsDone) {
+    const auto since = logMark();
+    auto buffer = makeDeviceBuffer(std::vector<int>(4096, 7));
+    ASSERT_TRUE(static_cast<bool>(buffer));
+
+    std::vector<Token> clears;
+    for (int i = 0; i < 64; ++i)
+        clears.push_back(CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.ClearBuffer(buffer); }));
+
+    for (const auto& t : clears) t.wait();
+    expectNoValidationErrorsSince(since);
 }
 
 }  // namespace

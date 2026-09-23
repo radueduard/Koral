@@ -69,7 +69,7 @@ public:
                      .build();
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
             cb.ClearColorImage(_image, glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
-        }, kor::CommandBuffer::Usage::eGraphics);
+        }, kor::CommandBuffer::Usage::eGraphics).wait();
         _guiImage = kor::GuiImage::Create(_image);
 
         viewportTarget = kor::Image::Builder{}
@@ -458,7 +458,7 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
             cb.BindComputePipeline(pipeline);
             cb.BindDescriptorSet(0, set);
             cb.Dispatch(1, 1, 1);
-        }, CommandBuffer::Usage::eCompute);
+        }, CommandBuffer::Usage::eCompute).wait();
         return readback->Read<glm::vec4>();
     };
 
@@ -915,7 +915,7 @@ TEST_F(VkWindowTest, AResizedViewportTargetIsShownAtItsNewSize) {
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
         cb.CopyImageToBuffer(scene.viewportTarget,
                              readback);
-    }, kor::CommandBuffer::Usage::eTransfer);
+    }, kor::CommandBuffer::Usage::eTransfer).wait();
 
     const auto texels = readback->Read<glm::u8vec4>();
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(96) * 72);

@@ -80,7 +80,7 @@ kor::Resource<Image> solidImage(const glm::vec4 color, const std::uint32_t size 
         .build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, color);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     return image;
 }
 
@@ -103,7 +103,7 @@ std::vector<glm::vec4> readLayerAsFloat(const ResourceRef<const Image>& image, c
             .imageLayerCount = 1,
             .imageMipLevel = 0,
         });
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     return readback->Read<glm::vec4>();
 }
@@ -127,7 +127,7 @@ std::vector<glm::u8vec4> readLayerAsBytes(const ResourceRef<const Image>& image,
             .imageLayerCount = 1,
             .imageMipLevel = 0,
         });
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     return readback->Read<glm::u8vec4>();
 }
@@ -340,7 +340,7 @@ kor::Resource<Image> directionPanorama(const std::uint32_t width, const std::uin
             .imageExtent = { width, height, 1 },
         });
         cb.Barrier({}, {{ ResourceRef<const Image>(image), kor::ResourceAccess::eAllShaderRead }});
-    });
+    }).wait();
     return image;
 }
 
@@ -506,7 +506,7 @@ TEST_F(GpuTest, CompressedImageUploadRoundTrips) {
                 .imageOffset = { 0, 0, 0 },
                 .imageExtent = { kSize, kSize, 1 },
             });
-        }, CommandBuffer::Usage::eTransfer);
+        }, CommandBuffer::Usage::eTransfer).wait();
 
         const auto out = readback->Read<std::uint8_t>();
         ASSERT_EQ(out.size(), blocks.size()) << "format " << static_cast<int>(format);

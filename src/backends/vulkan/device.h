@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "token.h"
+
 #include <functional>
 #include <map>
 #include <memory>
@@ -79,8 +81,10 @@ namespace kor::vk {
         [[nodiscard]] std::unique_ptr<kor::vk::CommandBuffer> requestCommandBuffer(const kor::vk::Queue& queue, uint32_t thread) const;
         void freeCommandBuffer(const kor::vk::CommandBuffer &commandBuffer) const;
 
-        void runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, ::vk::QueueFlags requiredFlags,
-            ::vk::Fence fence = nullptr, ::vk::Semaphore waitSemaphore = nullptr, ::vk::Semaphore signalSemaphore = nullptr, bool wait = true) const;
+        // Records `command` into a fresh command buffer on a queue with `requiredFlags` and submits
+        // it, without waiting. The returned token is signalled when the GPU is done; the command
+        // buffer is kept alive until then.
+        [[nodiscard]] kor::Token runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, ::vk::QueueFlags requiredFlags) const;
 
         // Whether the physical device this Device was created on actually supports ray tracing
         // (acceleration structures + the ray tracing pipeline) — not every GPU does. Resources that

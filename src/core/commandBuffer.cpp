@@ -3,6 +3,7 @@
 //
 
 #include <commandBuffer.h>
+#include "tokenState.h"
 #include <cstring>
 #include <algorithm>
 #include <format>
@@ -98,8 +99,8 @@ namespace kor
         //
         // Acceleration structures are safe for a different reason, and it is worth writing down
         // because it is an assumption rather than a property: a build is submitted through
-        // Device::runSingleTimeCommand, which defaults to wait = true and blocks on
-        // queue->waitIdle() before returning (see AccelerationStructure::Build). The build has
+        // Device::runSingleTimeCommand, and AccelerationStructure::Build waits on the token it
+        // returns before returning itself. The build has
         // therefore fully completed on the GPU before any command buffer that traces against it
         // is even recorded, so no barrier can be missing. Move AS builds onto a user-recorded
         // command buffer — a per-frame TLAS rebuild for dynamic geometry would do it — and that
@@ -1459,15 +1460,22 @@ namespace kor
         return *this;
     }
 
-    void CommandBuffer::SingleTimeCommand(const std::function<void(kor::CommandBuffer &)> &command, const Usage usage) {
-        const auto commandBuffer = Create(usage);
+    Token CommandBuffer::SingleTimeCommand(const std::function<void(kor::CommandBuffer &)> &command, const Usage usage) {
+        // Earlier one-offs the GPU has since finished; releasing them here, on the thread that
+        // records, keeps their command pools touched by one thread only.
+        detail::collectRetired();
+
+        std::unique_ptr<CommandBuffer> commandBuffer = Create(usage);
         commandBuffer->Begin();
         command(*commandBuffer);
         commandBuffer->End();
-        if (auto submitted = commandBuffer->Submit(); !submitted) {
+
+        const Token done = Token::Create();
+        if (auto submitted = commandBuffer->Submit({.signal = {done}}); !submitted) {
             kor::log::error("[command] single-time command failed: {}", submitted.error().toString());
         }
-        commandBuffer->WaitForFence();
+        detail::retireAfter(done, std::shared_ptr<CommandBuffer>(std::move(commandBuffer)));
+        return done;
     }
 
     CommandBuffer& CommandBuffer::DrawMesh(kor::ResourceRef<const Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)

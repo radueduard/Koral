@@ -74,7 +74,7 @@ TEST_F(GpuTest, ComputeDoublesStorageBuffer) {
         // the dispatch reads and writes it (the shader's SSBO carries neither NonReadable nor
         // NonWritable), and that the readback copy that follows needs those writes visible.
         cb.Dispatch(kCount / kLocalSize, 1, 1);
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     // --- verify -----------------------------------------------------------
     const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
@@ -126,7 +126,7 @@ TEST_F(GpuTest, BackToBackDispatchesAreSynchronised) {
         cb.Dispatch(kCount / kLocalSize, 1, 1);
         cb.Dispatch(kCount / kLocalSize, 1, 1);
         EXPECT_TRUE(cb.ok()) << "recording failed: " << cb.result().error().toString();
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
     ASSERT_EQ(output.size(), input.size());
@@ -234,7 +234,7 @@ TEST_F(GpuTest, ADescriptorSetCanBeWrittenByBindingName) {
         cb.BindComputePipeline(pipeline);
         cb.BindDescriptorSet(0, byInstance);
         cb.Dispatch(kCount / kLocalSize, 1, 1);
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
     ASSERT_EQ(output.size(), input.size());
@@ -337,7 +337,7 @@ TEST_F(GpuTest, ATexelBufferIsFetchedThroughABufferView) {
         cb.BindComputePipeline(pipeline);
         cb.BindDescriptorSet(0, set);
         cb.Dispatch(kTexels / 64, 1, 1);
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     const std::vector<float> output = destination->Read<float>();
     ASSERT_EQ(output.size(), static_cast<std::size_t>(kTexels));

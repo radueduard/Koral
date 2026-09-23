@@ -259,7 +259,7 @@ namespace kor::vk
 
         Context::Device().runSingleTimeCommand([&](kor::vk::CommandBuffer& commandBuffer) {
             commandBuffer->buildAccelerationStructuresKHR(buildInfo, rangeInfos);
-        }, ::vk::QueueFlagBits::eCompute);
+        }, ::vk::QueueFlagBits::eCompute).wait();
 
         Context::Allocator().FreeBuffer(scratchBuffer, scratchAllocation);
 

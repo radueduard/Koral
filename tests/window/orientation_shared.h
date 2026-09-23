@@ -75,7 +75,7 @@ inline std::vector<Pixel> readback(const kor::Resource<kor::Image>& image) {
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
         cb.CopyImageToBuffer(image,
                              buf);
-    }, kor::CommandBuffer::Usage::eTransfer);
+    }, kor::CommandBuffer::Usage::eTransfer).wait();
     return buf->Read<Pixel>();
 }
 
@@ -119,7 +119,7 @@ inline Result rasterTopHalf() {
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(6); // two triangles covering the top half of clip space
         cb.EndRendering();
-    }, kor::CommandBuffer::Usage::eGraphics);
+    }, kor::CommandBuffer::Usage::eGraphics).wait();
 
     auto px = readback(image);
     return Result{ std::move(image), std::move(px) };
@@ -149,7 +149,7 @@ inline Result computeTopHalf() {
         cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::eComputeWrite));
         cb.Dispatch((kW + 7) / 8, (kH + 7) / 8, 1);
         cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::eTransferSrc));
-    }, kor::CommandBuffer::Usage::eCompute);
+    }, kor::CommandBuffer::Usage::eCompute).wait();
 
     auto px = readback(image);
     return Result{ std::move(image), std::move(px) };

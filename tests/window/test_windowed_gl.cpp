@@ -92,7 +92,7 @@ public:
                      .build();
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.ClearColorImage(_image, glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
-        }, CommandBuffer::Usage::eGraphics);
+        }, CommandBuffer::Usage::eGraphics).wait();
         _guiImage = kor::GuiImage::Create(_image);
     }
 
@@ -233,7 +233,7 @@ std::vector<Pixel> readbackImage(const kor::Resource<Image>& image) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(image, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
     return readback->Read<Pixel>();
 }
 
@@ -280,7 +280,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics);
+        }, CommandBuffer::Usage::eGraphics).wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -312,7 +312,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics);
+        }, CommandBuffer::Usage::eGraphics).wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -351,7 +351,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics);
+        }, CommandBuffer::Usage::eGraphics).wait();
 
         // 0.5*green + 0.5*red = (0.5, 0.5, 0) -> ~128/128/0 in UNORM8.
         const auto out = readbackImage(target.image);
@@ -391,7 +391,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetRasterizerDiscardEnable(false);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics);
+        }, CommandBuffer::Usage::eGraphics).wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -439,7 +439,7 @@ TEST_F(GlTest, RenderParity) {
             cb.BindMesh(mesh);
             cb.DrawIndexed(); // index count resolved from the bound mesh
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics);
+        }, CommandBuffer::Usage::eGraphics).wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -489,7 +489,7 @@ TEST_F(GlTest, ComputeDispatch) {
         cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::eComputeReadWrite));
         cb.Dispatch(kCount / kLocalSize, 1, 1);
         cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::eTransferSrc));
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
     ASSERT_EQ(output.size(), input.size());
@@ -608,7 +608,7 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
             .dstExtent = {4, 4, 1},
             .filtering = kor::Filter::eLinear,
         });
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     // Buffer-to-buffer copy / fill / clear, then verify the copy round-trips.
     std::vector<std::uint32_t> data(64, 7u);
@@ -632,7 +632,7 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
         cb.CopyBuffer(src, dst);
         cb.FillBuffer(src, fillValues);
         cb.ClearBuffer(src);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<std::uint32_t> out = dst->Read<std::uint32_t>();
     ASSERT_EQ(out.size(), data.size());
@@ -651,7 +651,7 @@ TEST_F(GlTest, TexturedDraw) {
     const glm::vec4 texColor{0.2f, 0.4f, 0.8f, 1.f};
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(texture, texColor);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     auto texView = ImageView::Builder(texture).build();
     auto sampler = Sampler::Builder{}
                        .setMinFilter(kor::Filter::eNearest)
@@ -679,7 +679,7 @@ TEST_F(GlTest, TexturedDraw) {
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const auto out = readbackImage(target.image);
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -726,7 +726,7 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
         cb.PushConstant("color", glm::vec4{1.f, 0.f, 1.f, 1.f});   // magenta
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const auto out = readbackImage(target.image);
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -744,7 +744,7 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
         cb.PushConstant("color", glm::vec4{1.f, 0.f, 1.f, 1.f});
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     EXPECT_EQ(readbackImage(target.image).front(), Pixel(0, 0, 0, 255))
         << "the vertex stage did not read its half of the block";
@@ -790,7 +790,7 @@ TEST_F(GlTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
         cb.PushConstant("tints", tintsValue);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     // The same colour Vulkan produces from the same two calls, which is the whole point.
     const auto out = readbackImage(target.image);
@@ -830,7 +830,7 @@ TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
                               .setClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
         cb.EndRendering();
         cb.CopyImageToBuffer(target.image, secondPass);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const auto first = firstPass->Read<Pixel>();
     const auto second = secondPass->Read<Pixel>();
@@ -843,7 +843,7 @@ TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginRendering(target.framebuffer);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     EXPECT_EQ(readbackImage(target.image).front(), Pixel(0, 0, 255, 255));
 }
 
@@ -860,7 +860,7 @@ TEST_F(GlTest, DebugLabels) {
             inner.ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
         });
         cb.EndDebugLabel();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
     SUCCEED();
 }
 
@@ -972,7 +972,7 @@ TEST_F(GlTest, CompressedImageUploadRoundTrips) {
             .imageOffset = { 0, 0, 0 },
             .imageExtent = { kSize, kSize, 1 },
         });
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const auto out = readback->Read<std::uint8_t>();
     ASSERT_EQ(out.size(), blocks.size());
@@ -1044,7 +1044,7 @@ TEST_F(GlTest, TexelBufferFetch) {
         cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::eComputeReadWrite));
         cb.Dispatch(kTexels / 64, 1, 1);
         cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::eTransferSrc));
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     const std::vector<float> output = destination->Read<float>();
     ASSERT_EQ(output.size(), static_cast<std::size_t>(kTexels));

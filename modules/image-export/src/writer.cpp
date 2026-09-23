@@ -115,7 +115,7 @@ namespace kimg
                     .imageLayerCount = 1,
                     .imageMipLevel = subimage.mipLevel,
                 });
-            }, kor::CommandBuffer::Usage::eTransfer);
+            }, kor::CommandBuffer::Usage::eTransfer).wait();
 
             ReadBack data;
             data.extent = subimage.extent;

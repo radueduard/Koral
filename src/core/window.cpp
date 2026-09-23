@@ -20,6 +20,7 @@
 #include "../backends/vulkan/vulkanContext.h"
 
 #include "../executor/MainThreadExecutor.h"
+#include "tokenState.h"
 #include "../executor/BackgroundExecutor.h"
 
 // initLibs.cpp — seeds GLFW's Vulkan loader; must run before glfwInit().
@@ -263,6 +264,9 @@ namespace kor {
 
     Window::~Window() {
         Context::Scheduler().WaitIdle();
+        // One-off submissions still held for the GPU, before the scene and modules whose resources
+        // their records may keep alive.
+        detail::collectRetired(/*all=*/true);
         // The scene goes first: it holds resources the modules created, and those have to be
         // released while the module that made them is still alive to release them properly.
         _scene.reset();

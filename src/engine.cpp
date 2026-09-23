@@ -24,6 +24,7 @@
 #include "sceneManager.h"
 #include "scheduler.h"
 #include "shader.h"
+#include "core/tokenState.h"
 
 namespace kor
 {
@@ -170,6 +171,9 @@ namespace kor
                     failed = true;
                 }
             } // task destroyed before the executors it may reference
+            // One-off submissions still held for the GPU, while the modules whose resources their
+            // records may keep alive are still loaded.
+            detail::collectRetired(/*all=*/true);
             ModuleHost::Shutdown();
             Context::ShutdownHeadless();
             return failed ? EXIT_FAILURE : EXIT_SUCCESS;

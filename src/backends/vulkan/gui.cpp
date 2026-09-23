@@ -232,7 +232,7 @@ namespace kor::vk
         // rather than a frame later. Every frame after this, refresh() records the same blit.
         Context::Device().runSingleTimeCommand([this](CommandBuffer& commandBuffer) {
             recordBlit(commandBuffer);
-        }, ::vk::QueueFlagBits::eGraphics);
+        }, ::vk::QueueFlagBits::eGraphics).wait();
     }
 
     ImTextureID GuiImage::operator*() const {

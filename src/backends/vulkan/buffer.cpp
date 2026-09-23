@@ -180,7 +180,7 @@ namespace kor::vk
 		// The copy is only ever made into the copy belonging to the frame now being recorded, and that
 		// frame's fence was waited on before recording began — so nothing is reading it and the CPU may
 		// simply write it. Doing it through the GPU instead meant a submit *and*
-		// `queue->waitIdle()` (runSingleTimeCommand waits by default): a full stall of the queue, once
+		// `queue->waitIdle()` (which runSingleTimeCommand used to do): a full stall of the queue, once
 		// per written buffer, on every frame after one was written. A camera writes its uniform block
 		// on every frame it moves, so moving the camera stalled the queue every frame — which is both
 		// slower than the rest of the frame put together and uneven enough to see.
@@ -205,7 +205,7 @@ namespace kor::vk
 			for (const auto&[srcBuffer, copyRegions] : copyRegionsPerBuffer) {
 				commandBuffer->copyBuffer(srcBuffer, dstBuffer, static_cast<uint32_t>(copyRegions.size()), copyRegions.data());
 			}
-		}, ::vk::QueueFlagBits::eTransfer);
+		}, ::vk::QueueFlagBits::eTransfer).wait();
 	}
 
 	VmaAllocation Buffer::getAllocation() const {

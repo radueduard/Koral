@@ -295,15 +295,31 @@ namespace kor
         static std::unique_ptr<CommandBuffer> Create(Flags<Usage> usage);
 
         /**
-         * @brief Records, submits and waits for one throwaway batch of work.
-         * @param command Callback that records into a fresh command buffer.
+         * @brief Records and submits one throwaway batch of work, without waiting for it.
+         * @param command Callback that records into a fresh command buffer. It runs before this
+         *        returns, so capturing by reference is fine.
          * @param usage Which command kinds the callback needs.
+         * @return A token that is signalled once the GPU has finished the work.
          *
-         * Blocks until the GPU has finished, so on return the results are ready to read. That makes
-         * it right for setup and readback and wrong for anything per-frame, which should record
-         * into the frame's own command buffer instead. A failure inside is logged, not thrown.
+         * What happens next is up to the caller:
+         *
+         * @code
+         * kor::CommandBuffer::SingleTimeCommand(copy).wait();   // setup or readback: block until done
+         * co_await kor::CommandBuffer::SingleTimeCommand(copy);  // in a coroutine: suspend until done
+         * (void)kor::CommandBuffer::SingleTimeCommand(clear);    // fire and forget
+         * @endcode
+         *
+         * The command buffer itself is kept alive until the GPU is done with it, so dropping the token
+         * is safe. The resources its commands use are not: keep them alive until the token has
+         * happened, exactly as for the frame's own command buffer.
+         *
+         * Right for setup and readback, wrong for anything per-frame, which should record into the
+         * frame's own command buffer instead. Two one-offs are not ordered against each other unless
+         * one waits for the other's token. A failure inside is logged, not thrown; the token is still
+         * signalled, so nothing waits for it forever.
          */
-        static void SingleTimeCommand(const std::function<void(kor::CommandBuffer&)>& command, Usage usage = Usage::eGraphics);
+        [[nodiscard("wait() on it for results to read, or (void) it to fire and forget")]]
+        static Token SingleTimeCommand(const std::function<void(kor::CommandBuffer&)>& command, Usage usage = Usage::eGraphics);
 
         /**
          * @brief Opens recording, discarding anything recorded before.

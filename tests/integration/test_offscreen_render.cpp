@@ -100,7 +100,7 @@ TEST_F(GpuTest, OffscreenTriangleFillsTarget) {
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(3); // full-screen triangle, no vertex/descriptor inputs
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     // --- read the target back and verify ---------------------------------
     Buffer::RawBuilder rb;
@@ -111,7 +111,7 @@ TEST_F(GpuTest, OffscreenTriangleFillsTarget) {
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(colorImage, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -172,7 +172,7 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
         cb.SetRasterizerDiscardEnable(false);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -182,7 +182,7 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(colorImage, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -261,7 +261,7 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -270,7 +270,7 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -329,7 +329,7 @@ TEST_F(GpuTest, MeshIndexedDraw) {
         cb.BindMesh(mesh);
         cb.DrawIndexed(); // uses the bound mesh's index count
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -338,7 +338,7 @@ TEST_F(GpuTest, MeshIndexedDraw) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -401,7 +401,7 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
         cb.BindMesh(mesh);
         cb.DrawIndexed();
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -410,7 +410,7 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -555,7 +555,7 @@ TEST_F(GpuTest, ADrawWithNoViewportCoversItsOwnFramebuffer) {
           .Draw(3)
           .EndRendering();
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const auto texels = readback->Read<glm::u8vec4>();
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSize) * kSize);
@@ -613,7 +613,7 @@ TEST_F(GpuTest, FramebufferResizeResizesItsAttachments) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginRendering(framebuffer);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kSecond) * kSecond * 4)
@@ -622,7 +622,7 @@ TEST_F(GpuTest, FramebufferResizeResizesItsAttachments) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const auto texels = readback->Read<glm::u8vec4>();
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSecond) * kSecond);
@@ -701,7 +701,7 @@ TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
         cb.PushConstant("color", glm::vec4{0.f, 0.f, 1.f, 1.f});
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -710,7 +710,7 @@ TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
     auto shifted = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, shifted);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     // Shifted two clip units right, the triangle misses the target entirely: the vertex stage
     // really did read its half of the block.
@@ -727,12 +727,12 @@ TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
         cb.PushConstant("color", glm::vec4{0.f, 0.f, 1.f, 1.f});
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     auto covered = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, covered);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = covered->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -881,7 +881,7 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
         cb.PushConstant("weights", weightsValue);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -890,7 +890,7 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     // Blue from the struct's albedo, opaque from the array's third element: both landed where the
     // shader reads them.
@@ -911,12 +911,12 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
         cb.PushConstant("weights", weightsValue);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     auto asStruct = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, asStruct);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     // Green this time, and still opaque: the struct went in whole and left `weights` alone.
     EXPECT_EQ(asStruct->Read<Pixel>().front(), Pixel(0, 255, 0, 255));
@@ -932,12 +932,12 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
         cb.PushConstant("weights[2]", 1.f);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     auto byField = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, byField);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
     EXPECT_EQ(byField->Read<Pixel>().front(), Pixel(255, 0, 0, 255));
 }
 
@@ -996,7 +996,7 @@ TEST_F(GpuTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
         cb.PushConstant("tints", tintsValue);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -1005,7 +1005,7 @@ TEST_F(GpuTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     // (0.2 + 0.2, 0.4 + 0.2, 0.6 + 0.2) — every column and every element accounted for.
     EXPECT_EQ(readback->Read<Pixel>().front(), Pixel(102, 153, 204, 255));
@@ -1091,7 +1091,7 @@ TEST_F(GpuTest, TwoPassesClearOneFramebufferToDifferentColors) {
                               .setClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
         cb.EndRendering();
         cb.CopyImageToBuffer(color, secondPass);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const std::vector<Pixel> first = firstPass->Read<Pixel>();
     const std::vector<Pixel> second = secondPass->Read<Pixel>();
@@ -1125,7 +1125,7 @@ TEST_F(GpuTest, APassWithoutOverridesUsesTheFramebuffersClearValues) {
         cb.BeginRendering(framebuffer);   // a framebuffer converts
         cb.EndRendering();
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -1157,7 +1157,7 @@ TEST_F(GpuTest, AnIntegerAttachmentIsClearedWithAnIntegerOverride) {
                               .setClearColor(0, glm::uvec4{0xFFFFFFFFu}));
         cb.EndRendering();
         cb.CopyImageToBuffer(ids, readback);
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     const std::vector<glm::u32> out = readback->Read<glm::u32>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -1241,7 +1241,7 @@ TEST_F(GpuTest, MeshBuilderDrawsHandWrittenVertexFormat) {
         cb.BindMesh(mesh);
         cb.DrawIndexed();
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -1250,7 +1250,7 @@ TEST_F(GpuTest, MeshBuilderDrawsHandWrittenVertexFormat) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -1319,7 +1319,7 @@ TEST_F(GpuTest, MeshBuilderDrawsALayoutDescribedByLocationAlone) {
         cb.BindMesh(mesh);
         cb.DrawIndexed();
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics);
+    }, CommandBuffer::Usage::eGraphics).wait();
 
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -1328,7 +1328,7 @@ TEST_F(GpuTest, MeshBuilderDrawsALayoutDescribedByLocationAlone) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(color, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -1579,7 +1579,7 @@ TEST_F(GpuTest, TransferUsageIsNotSomethingYouHaveToRemember) {
         cb.CopyImageToBuffer(texture, readback);
         EXPECT_TRUE(cb.ok()) << "a plain image and a plain buffer could not be copied between: "
                              << (cb.ok() ? "" : cb.result().error().toString());
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const auto pixels = readback->Read<glm::u8vec4>();
     ASSERT_EQ(pixels.size(), static_cast<std::size_t>(8 * 8));
@@ -1606,7 +1606,7 @@ TEST_F(GpuTest, AMissingTransferUsageIsNamedAtTheCommandThatNeededIt) {
         cb.CopyImageToBuffer(image, readback);
         EXPECT_FALSE(cb.ok()) << "an image with no eTransferSrc was copied from anyway";
         if (!cb.ok()) message = cb.result().error().toString();
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     EXPECT_NE(message.find("eTransferSrc"), std::string::npos) << message;
     EXPECT_NE(message.find("CopyImageToBuffer"), std::string::npos) << message;

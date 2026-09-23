@@ -201,7 +201,7 @@ TEST_F(GpuTest, DeviceDynamicIsHostWritableAndGpuVisible) {
         cb.BindComputePipeline(pipeline);
         cb.BindDescriptorSet(0, descriptorSet);
         cb.Dispatch(kCount / kLocalSize, 1, 1);
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     // Reading it back is exactly what the type warns against, and it is done here on purpose: the
     // warning is about speed, not correctness, and correctness is what this asserts.

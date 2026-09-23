@@ -21,6 +21,7 @@
 #include "resource.h"
 #include "../executor/BackgroundExecutor.h"
 #include "../executor/MainThreadExecutor.h"
+#include "tokenState.h"
 #include "../backends/vulkan/device.h"
 #include "../backends/vulkan/vulkanContext.h"
 
@@ -227,6 +228,7 @@ void kor::Context::ShutdownHeadless()
 {
     if (!_headless) return;
 
+    detail::collectRetired(/*all=*/true);
     kor::vk::Context::StopTokens();
 
     // Destroy the repository first: its destructor stops the FileWatcher and waits

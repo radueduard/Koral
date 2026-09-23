@@ -6,6 +6,9 @@
 #define VMA_IMPLEMENTATION
 #define VK_ENABLE_BETA_EXTENSIONS
 #include "device.h"
+#include "log.h"
+#include "../../core/tokenState.h"
+#include "timeline.h"
 
 #include <iostream>
 #include <ranges>
@@ -327,38 +330,37 @@ namespace kor::vk {
         _handle.freeCommandBuffers(commandBuffer.getParentPool(), *commandBuffer);
     }
 
-    void Device::runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags,
-        const ::vk::Fence fence, ::vk::Semaphore waitSemaphore, ::vk::Semaphore signalSemaphore, const bool wait) const
+    kor::Token Device::runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags) const
     {
+        // Earlier one-offs the GPU has since finished. Released here, on the recording thread,
+        // because freeing a command buffer touches its pool, which only that thread uses.
+        detail::collectRetired();
+
         const auto& queue = requestQueue(requiredFlags);
-        const auto commandBufferHolder = requestCommandBuffer(queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
-        auto& commandBuffer = *commandBufferHolder.get();
+        std::shared_ptr<CommandBuffer> commandBuffer = requestCommandBuffer(queue, std::hash<std::thread::id>{}(std::this_thread::get_id()));
 
-        commandBuffer->begin(::vk::CommandBufferBeginInfo().setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-        command(commandBuffer);
-        commandBuffer->end();
+        (*commandBuffer)->begin(::vk::CommandBufferBeginInfo().setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+        command(*commandBuffer);
+        (*commandBuffer)->end();
 
-        const auto commandBuffers = std::array { *commandBuffer };
-        const auto dstStageMask = std::vector<::vk::PipelineStageFlags> { ::vk::PipelineStageFlagBits::eAllCommands };
-        auto submitInfo = ::vk::SubmitInfo()
-            .setCommandBuffers(commandBuffers);
-
-        if (waitSemaphore != nullptr)
-            submitInfo
-                .setWaitSemaphores(waitSemaphore)
-                .setWaitDstStageMask(dstStageMask);
-
-        if (signalSemaphore != nullptr)
-            submitInfo.setSignalSemaphores(signalSemaphore);
+        const kor::Token done = kor::Token::Create();
+        const auto [semaphore, value] = Context::Tokens().resolve(done);
+        const auto commandBuffers = std::array { **commandBuffer };
+        auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(value);
+        const auto submitInfo = ::vk::SubmitInfo()
+            .setCommandBuffers(commandBuffers)
+            .setSignalSemaphores(semaphore)
+            .setPNext(&timelineInfo);
 
         try {
-            queue->submit(submitInfo, fence);
-        } catch (const std::runtime_error& e) {
-            std::cerr << e.what() << std::endl;
+            queue->submit(submitInfo);
+        } catch (const std::exception& e) {
+            kor::log::error("[vulkan] single-time command failed to submit: {}", e.what());
+            done.signal(); // nothing on the GPU will; don't leave its waiters hanging
+            return done;
         }
-    	if (wait) {
-			queue->waitIdle();
-		}
+        detail::retireAfter(done, std::move(commandBuffer));
+        return done;
     }
 }
 

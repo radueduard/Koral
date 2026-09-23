@@ -299,7 +299,7 @@ namespace kimg
             commandBuffer.BindComputePipeline(pipeline);
             commandBuffer.BindDescriptorSet(0, set);
             commandBuffer.Dispatch(groups, groups, kFaceCount);
-        }, kor::CommandBuffer::Usage::eCompute);
+        }, kor::CommandBuffer::Usage::eCompute).wait();
 
         detail::finishUpload(cube, generateMipmaps);
         return cube;

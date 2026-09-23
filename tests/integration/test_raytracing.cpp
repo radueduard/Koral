@@ -117,7 +117,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
         // No barrier: the storage image is bound at set 0 binding 1, so the engine transitions
         // it to the layout the raygen shader writes through.
         cb.TraceRays(kW, kH, 1);
-    }, CommandBuffer::Usage::eCompute);
+    }, CommandBuffer::Usage::eCompute).wait();
 
     // --- read the image back and verify the trace ran --------------------
     Buffer::RawBuilder rb;
@@ -127,7 +127,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(outImage, readback);
-    }, CommandBuffer::Usage::eTransfer);
+    }, CommandBuffer::Usage::eTransfer).wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
