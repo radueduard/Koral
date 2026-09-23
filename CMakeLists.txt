@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.28)
 
 # vcpkg-overlay-ports/kubazip renames the mz_* symbol namespace of kubazip's vendored copy of
 # miniz.h, so it no longer collides with minizip-ng (pulled in transitively via OpenColorIO) at
-# link time. Must be set before project() -- that is when the vcpkg toolchain reads it.
+# link time. vcpkg-overlay-ports/imgui is the baseline's 1.91.9 port plus one patch to the Vulkan
+# backend: a platform window's swap-chain transition did not wait for the image to be acquired
+# (see the portfile). Both must be set before project() -- that is when the vcpkg toolchain reads it.
 list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-ports")
 
 # vcpkg-overlay-triplets/arm64-osx.cmake adds VCPKG_OSX_DEPLOYMENT_TARGET to the stock arm64-osx
