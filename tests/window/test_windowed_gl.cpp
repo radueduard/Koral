@@ -56,6 +56,7 @@
 #include "window.h"
 
 #include "orientation_shared.h"
+#include "scheduler_seam_shared.h"
 
 using kor::Buffer;
 using kor::CommandBuffer;
@@ -1053,6 +1054,25 @@ TEST_F(GlTest, TexelBufferFetch) {
     }
 }
 } // namespace
+
+
+// ---- Scheduler seam: Execute / WaitFor / frameCompletion (see scheduler_seam_shared.h) ----------
+
+TEST_F(GlTest, ExecutedWorkRunsInOrderAroundTheFrame) {
+    seam::executedWorkRunsInOrderAroundTheFrame([] { drawFrame(GlEnvironment::scene()); });
+}
+
+TEST_F(GlTest, AnEndedCommandBufferIsRefusedByExecute) {
+    seam::anEndedCommandBufferIsRefused();
+}
+
+TEST_F(GlTest, ACoroutineResumesWhenItsFrameCompletes) {
+    seam::aCoroutineResumesWhenItsFrameCompletes([] { drawFrame(GlEnvironment::scene()); });
+}
+
+TEST_F(GlTest, AFrameWaitsForAToken) {
+    seam::aFrameWaitsForAToken([] { drawFrame(GlEnvironment::scene()); });
+}
 
 // Registered before RUN_ALL_TESTS (compatible with gtest_main). gtest owns and
 // deletes the environment.

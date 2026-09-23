@@ -27,17 +27,29 @@ namespace kor::vk
 
 		void ResetSemaphore() const;
 
+		// What this frame's last submission needs kept alive until its fence says the GPU is done:
+		// the command buffers handed to Scheduler::Execute(), and the tokens it waited on or
+		// signalled (their timeline semaphores). Released once the fence has been waited on.
+		void hold(std::vector<std::unique_ptr<kor::CommandBuffer>> commandBuffers, std::vector<Token> tokens) const;
+		void release() const;
+
 	private:
+		mutable std::vector<std::unique_ptr<kor::CommandBuffer>> _executed;
+		mutable std::vector<Token> _tokens;
 		const Queue& _queue;
 		mutable ::vk::Semaphore _imageAvailable;
     	::vk::Fence _inFlightFence;
 	};
 
+    // One batch: its command buffers run in the order given. Values sit alongside semaphores and
+    // only matter for timeline ones; a binary semaphore's is ignored (pass 0).
     struct SubmitInfo {
-        const CommandBuffer& commandBuffer;
+        std::vector<::vk::CommandBuffer> commandBuffers;
         std::vector<::vk::Semaphore> waitSemaphores;
+        std::vector<std::uint64_t> waitValues;
         std::vector<::vk::PipelineStageFlags> waitStages;
         std::vector<::vk::Semaphore> signalSemaphores;
+        std::vector<std::uint64_t> signalValues;
         ::vk::Fence fence = nullptr;
     };
 

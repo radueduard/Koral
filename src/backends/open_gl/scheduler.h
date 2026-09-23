@@ -5,6 +5,8 @@
 #pragma once
 #include "../../../include/scheduler.h"
 
+#include <vector>
+
 namespace kor::ogl
 {
     class Frame final : public kor::Frame {
@@ -25,5 +27,17 @@ namespace kor::ogl
 
     public:
         void WaitIdle() const override;
+        ~Scheduler() override;
+
+    private:
+        // OpenGL cannot signal a token from the GPU, so each frame leaves a fence behind and the
+        // next Draw() signals the frame's completion once the fence has passed — polled, never
+        // waited on, so the render loop keeps its pipelining.
+        void signalFinishedFrames(bool wait) const;
+        struct InFlight {
+            void* fence; // GLsync, kept opaque so this header need not pull in GL
+            Token completion;
+        };
+        mutable std::vector<InFlight> _inFlight;
     };
 }

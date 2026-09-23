@@ -5,6 +5,7 @@
 #include <commandBuffer.h>
 #include "tokenState.h"
 #include <cstring>
+#include <mutex>
 #include <algorithm>
 #include <format>
 #include <framebuffer.h>
@@ -1344,15 +1345,29 @@ namespace kor
         // Before the backend resets anything the results live in: re-recording is proof the GPU is
         // done with the last submission, so this is the earliest the timestamps can be read.
         retireTimers();
+        _recording = true;
         return doBegin();
+    }
+
+    namespace {
+        // Every resource carries the state the last End() left it in, which the next End() resolves
+        // against — and Vulkan images carry their layouts, which emitting moves along. Two threads
+        // ending command buffers at once would race on both. Recursive because emitting can run
+        // user code (Run's lambda) that ends a command buffer of its own.
+        std::recursive_mutex& resolveMutex() {
+            static std::recursive_mutex mutex;
+            return mutex;
+        }
     }
 
     void CommandBuffer::End()
     {
+        std::lock_guard lock(resolveMutex());
         // Nothing recorded so far has reached the GPU. Work out where the barriers belong now that
         // the whole sequence is visible; the backend then emits, or defers emitting to Submit.
         resolveBarriers();
         doEnd();
+        _recording = false;
     }
 
     VoidResult CommandBuffer::Submit(const SubmitInfo& info)
@@ -1364,6 +1379,7 @@ namespace kor
     {
         _state = {};
         clearRecords();
+        _recording = false;
         doReset();
     }
 

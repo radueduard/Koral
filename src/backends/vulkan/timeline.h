@@ -45,6 +45,15 @@ namespace kor::vk {
          */
         SemaphoreValue resolve(const Token& token);
 
+        /** Records that a submission signalling `token` is now on a queue. */
+        static void noteSubmittedSignal(const Token& token);
+
+        /**
+         * Whether `token` is sure to be reached without the CPU doing anything more: already
+         * reached, or signalled by a submission already on a queue. A present may only wait on those.
+         */
+        [[nodiscard]] static bool signalIsOnItsWay(const Token& token);
+
         /** Interrupts the wait so the next round sees newly parked coroutines. */
         void poke();
 

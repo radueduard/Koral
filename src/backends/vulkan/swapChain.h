@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <atomic>
 #include <memory>
 #include <vector>
 
@@ -79,7 +80,9 @@ namespace kor::vk
         /// by the driver's actual count — and re-requesting that on a Resize would ratchet it up.
         glm::u32 _requestedImageCount = 0;
         glm::u32 _imageCount = 0;   ///< What the driver actually allocated.
-        glm::u32 _imageIndex = 0;
+        // Written by Acquire on the main thread, read by any thread whose End() picks a per-frame
+        // resource's copy (they all go through currentImageIndex()). Atomic so that read is not a race.
+        std::atomic<glm::u32> _imageIndex = 0;
 
         std::reference_wrapper<const Surface> _surface;
         ::vk::SurfaceFormatKHR _surfaceFormat = {};

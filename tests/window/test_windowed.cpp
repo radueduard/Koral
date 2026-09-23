@@ -48,6 +48,7 @@
 #include "window.h"
 
 #include "orientation_shared.h"
+#include "scheduler_seam_shared.h"
 
 // The GUI extras module, drawn from a real scene's RenderUI. imgui.h is already included above, which
 // ImGuizmo.h requires of whoever includes it.
@@ -1148,6 +1149,75 @@ TEST_F(VkWindowTest, TheDefaultFramebuffersImagesAreReachableByName) {
 }
 
 } // namespace
+
+
+// A per-frame resource has one copy per frame in flight, and a command picks its copy when End()
+// writes it out, not when it is recorded. For a command buffer handed to Execute() that is inside
+// the frame it runs in — the frame ends it, after acquiring — so it must see that frame's copy even
+// though it was recorded between frames, on another thread, while the previous frame was current.
+TEST_F(VkWindowTest, AnExecutedCommandBufferUsesTheCopyOfTheFrameItRunsIn) {
+    auto& scene = VkEnvironment::scene();
+    auto& scheduler = kor::Context::Scheduler();
+    ASSERT_GE(scheduler.imageCount(), 2u) << "one copy per frame makes the question moot";
+
+    kor::Buffer::RawBuilder rb;
+    rb.setRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+      .setUsage(kor::Flags(kor::Buffer::Usage::eUniform) | kor::Buffer::Usage::eTransferSrc)
+      .setIsPerFrame(true)
+      .setType(kor::Buffer::Type::eDynamic);
+    auto perFrame = rb.build();
+    ASSERT_TRUE(static_cast<bool>(perFrame));
+
+    kor::Buffer::Builder<glm::u32> db;
+    db.setData(std::vector<glm::u32>{0});
+    db.setUsage(kor::Flags(kor::Buffer::Usage::eStorage) | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst);
+    db.setType(kor::Buffer::Type::eDeviceLocal);
+    auto destination = db.build();
+    ASSERT_TRUE(static_cast<bool>(destination));
+
+    drawFrame(scene);
+    for (glm::u32 value = 1; value <= scheduler.imageCount() * 2; ++value) {
+        std::unique_ptr<kor::CommandBuffer> copy;
+        std::thread([&] {
+            copy = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eGraphics);
+            copy->Begin();
+            copy->CopyBuffer(perFrame, destination);
+        }).join();
+        const kor::Token done = scheduler.Execute(std::move(copy));
+
+        // This frame writes its own copy; the previous frame's still holds the previous value.
+        glfwPollEvents();
+        scheduler.Draw([&](kor::CommandBuffer& cb) {
+            const std::array<glm::u32, 1> v{ value };
+            perFrame->Write(std::span<const glm::u32>(v), 0);
+            scene.Render(cb);
+            kor::GUI::Render(cb, scene);
+        });
+        kor::GUI::RenderPlatformWindows();
+
+        ASSERT_TRUE(seam::drawUntil(done, [&] { drawFrame(scene); }));
+        EXPECT_EQ(destination->Read<glm::u32>(1).front(), value)
+            << "the executed copy read another frame's copy of the per-frame buffer";
+    }
+}
+
+// ---- Scheduler seam: Execute / WaitFor / frameCompletion (see scheduler_seam_shared.h) ----------
+
+TEST_F(VkWindowTest, ExecutedWorkRunsInOrderAroundTheFrame) {
+    seam::executedWorkRunsInOrderAroundTheFrame([] { drawFrame(VkEnvironment::scene()); });
+}
+
+TEST_F(VkWindowTest, AnEndedCommandBufferIsRefusedByExecute) {
+    seam::anEndedCommandBufferIsRefused();
+}
+
+TEST_F(VkWindowTest, ACoroutineResumesWhenItsFrameCompletes) {
+    seam::aCoroutineResumesWhenItsFrameCompletes([] { drawFrame(VkEnvironment::scene()); });
+}
+
+TEST_F(VkWindowTest, AFrameWaitsForAToken) {
+    seam::aFrameWaitsForAToken([] { drawFrame(VkEnvironment::scene()); });
+}
 
 // Registered before RUN_ALL_TESTS (compatible with gtest_main). gtest owns and
 // deletes the environment.

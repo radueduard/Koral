@@ -67,19 +67,18 @@ namespace kor::vk {
 
     void Queue::Submit(const SubmitInfo& submitInfo) const
     {
-        const auto commandBufferHandle = *submitInfo.commandBuffer;
-        const auto commandBuffers = std::array { commandBufferHandle };
+        // Always chained, and always with a value per semaphore: once any semaphore in the batch is
+        // a timeline, Vulkan wants the value arrays to line up with the semaphore arrays one for one,
+        // binary semaphores included (their values are ignored).
+        auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo()
+            .setWaitSemaphoreValues(submitInfo.waitValues)
+            .setSignalSemaphoreValues(submitInfo.signalValues);
         auto submitInfoVulkan = ::vk::SubmitInfo()
-            .setCommandBuffers(commandBuffers);
-
-        if (!submitInfo.waitSemaphores.empty()) {
-            submitInfoVulkan
-                .setWaitSemaphores(submitInfo.waitSemaphores)
-                .setWaitDstStageMask(submitInfo.waitStages);
-        }
-
-        if (!submitInfo.signalSemaphores.empty())
-            submitInfoVulkan.setSignalSemaphores(submitInfo.signalSemaphores);
+            .setCommandBuffers(submitInfo.commandBuffers)
+            .setWaitSemaphores(submitInfo.waitSemaphores)
+            .setWaitDstStageMask(submitInfo.waitStages)
+            .setSignalSemaphores(submitInfo.signalSemaphores)
+            .setPNext(&timelineInfo);
 
         try {
             const auto lock = Context::Device().lockQueues();
@@ -380,8 +379,11 @@ namespace kor::vk {
             .setPNext(&timelineInfo);
 
         try {
-            const auto lock = lockQueues();
-            queue->submit(submitInfo);
+            {
+                const auto lock = lockQueues();
+                queue->submit(submitInfo);
+            }
+            TokenReactor::noteSubmittedSignal(done);
         } catch (const std::exception& e) {
             kor::log::error("[vulkan] single-time command failed to submit: {}", e.what());
             done.signal(); // nothing on the GPU will; don't leave its waiters hanging

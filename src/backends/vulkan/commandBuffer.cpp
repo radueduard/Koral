@@ -1119,8 +1119,11 @@ namespace kor::vk
         // Submit regardless of recorded errors so the fence still signals (callers
         // WaitForFence afterwards); report the first error, if any, to the caller.
         try {
-            const auto lock = Context::Device().lockQueues();
-            _queue->submit(submitInfo, _fence);
+            {
+                const auto lock = Context::Device().lockQueues();
+                _queue->submit(submitInfo, _fence);
+            }
+            for (const auto& token : info.signal) TokenReactor::noteSubmittedSignal(token);
         } catch (const std::exception& e) {
             record(ErrorCode::eBackend, e.what());
             // Nothing reached the GPU, so nothing there will signal these. Signalling them here

@@ -3,6 +3,9 @@
 //
 
 #include "scheduler.h"
+#include "commandBuffer.h"
+#include "log.h"
+#include "timeline.h"
 #include <framebuffer.h>
 #include <surface.h>
 #include <log.h>
@@ -44,6 +47,16 @@ namespace kor::vk
 	Frame::~Frame() {
         Context::Device()->destroySemaphore(_imageAvailable);
         Context::Device()->destroyFence(_inFlightFence);
+    }
+
+    void Frame::hold(std::vector<std::unique_ptr<kor::CommandBuffer>> commandBuffers, std::vector<Token> tokens) const {
+        _executed = std::move(commandBuffers);
+        _tokens = std::move(tokens);
+    }
+
+    void Frame::release() const {
+        _executed.clear();
+        _tokens.clear();
     }
 
     void Frame::ResetSemaphore() const {
@@ -119,6 +132,8 @@ namespace kor::vk
         if (waitResult != ::vk::Result::eSuccess) {
             throw std::runtime_error("Failed to wait fence: " + ::vk::to_string(waitResult));
         }
+        // The last submission from this frame is done, and with it everything handed to Execute().
+        frame.release();
 
         while (true) {
             auto result = _swapChain->Acquire(frame);
@@ -149,17 +164,72 @@ namespace kor::vk
         commandBuffer.Reset();
         commandBuffer.Begin();
         renderFunc(commandBuffer);
-        commandBuffer.End();
 
-        const SubmitInfo submitInfo {
-            .commandBuffer = dynamic_cast<const kor::vk::CommandBuffer&>(commandBuffer),
+        // After the render callback, which may Execute() work of its own.
+        auto pending = takePending();
+
+        SubmitInfo submitInfo {
             .waitSemaphores = { frame.getImageAvailableSemaphore() },
+            .waitValues = { 0 },
             .waitStages = { ::vk::PipelineStageFlagBits::eColorAttachmentOutput },
             .signalSemaphores = { _swapChain->getCurrentRenderFinishedSemaphore() },
+            .signalValues = { 0 },
             .fence = frame.getInFlightFence()
         };
 
+        // Ended here, in exactly the order they run — before-work, the frame, after-work — because
+        // each End() resolves its barriers against where the one before it left every resource.
+        std::vector<std::unique_ptr<kor::CommandBuffer>> executed;
+        const auto endAndAppend = [&](std::vector<std::unique_ptr<kor::CommandBuffer>>& list) {
+            for (auto& external : list) {
+                const auto& vkExternal = dynamic_cast<const kor::vk::CommandBuffer&>(*external);
+                if (vkExternal.getQueue().getIdentifier() != vkCommandBuffer.getQueue().getIdentifier()) {
+                    // Barriers do not reach across queues; running it here would be unsynchronised.
+                    kor::log::error("[scheduler] a command buffer handed to Execute() belongs to a "
+                                    "different queue than the frame's and was not run. Submit it on "
+                                    "its own with a token, and WaitFor() that token instead.");
+                    external->Reset();
+                } else {
+                    external->End();
+                    submitInfo.commandBuffers.push_back(*vkExternal);
+                }
+                executed.push_back(std::move(external));
+            }
+        };
+        endAndAppend(pending.before);
+        commandBuffer.End();
+        submitInfo.commandBuffers.push_back(*vkCommandBuffer);
+        endAndAppend(pending.after);
+
+        std::vector<Token> tokens;
+        auto& reactor = Context::Tokens();
+        for (const auto& token : pending.waits) {
+            if (token.ready()) continue;
+            const auto [semaphore, value] = reactor.resolve(token);
+            submitInfo.waitSemaphores.push_back(semaphore);
+            submitInfo.waitValues.push_back(value);
+            // Nothing says which stage needs it, so nothing may start early.
+            submitInfo.waitStages.push_back(::vk::PipelineStageFlagBits::eAllCommands);
+            tokens.push_back(token);
+        }
+        {
+            const auto [semaphore, value] = reactor.resolve(pending.completion);
+            submitInfo.signalSemaphores.push_back(semaphore);
+            submitInfo.signalValues.push_back(value);
+            tokens.push_back(pending.completion);
+        }
+        frame.hold(std::move(executed), std::move(tokens));
+
         vkCommandBuffer.getQueue().Submit(submitInfo);
+        TokenReactor::noteSubmittedSignal(pending.completion);
+
+        // The frame is submitted and the GPU will hold it until its WaitFor() tokens arrive — but a
+        // present may not depend on a signal nobody has submitted yet. A token the CPU still has to
+        // signal therefore holds up the *present*, here; one a submission already on a queue will
+        // signal does not.
+        for (const auto& token : pending.waits) {
+            if (!TokenReactor::signalIsOnItsWay(token)) token.wait();
+        }
 
         const auto presentResult = _swapChain->Present(frame);
         if (presentResult == ::vk::Result::eErrorDeviceLost) {

@@ -7,10 +7,12 @@
 #include <vector>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <unordered_set>
 
 #include "api.h"
 #include "commandBuffer.h"
+#include "token.h"
 
 namespace kor
 {
@@ -121,6 +123,63 @@ namespace kor
         /** @brief Blocks until the GPU has finished everything submitted so far. Used when tearing down. */
     	virtual void WaitIdle() const = 0;
 
+        // ---- Work from elsewhere --------------------------------------------------------------
+
+        /** @brief Where an executed command buffer runs relative to the frame's own. */
+        enum class Placement : std::uint8_t {
+            eBeforeFrame, ///< Ahead of the scene's rendering: work whose results the frame uses.
+            eAfterFrame,  ///< Behind it: work that uses what the frame produced.
+        };
+
+        /**
+         * @brief Adds a command buffer recorded elsewhere — another thread, a coroutine — to the next frame.
+         * @param commandBuffer Begun and recorded, but **not** ended: the frame ends it, so that its
+         *        barriers are worked out in the order it actually runs. Any thread may hand one over.
+         * @param placement Before or after the frame's own command buffer. Several with the same
+         *        placement run in the order they were handed over.
+         * @return The frame's completion token (see frameCompletion()): the work is done when it is.
+         *
+         * @code
+         * kor::Task<void> Simulate(kor::ResourceRef<const kor::Buffer> particles) {
+         *     co_await kor::Context::SwitchToBackgroundThread();
+         *     auto cb = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eCompute);
+         *     cb->Begin();
+         *     cb->BindComputePipeline(step).BindDescriptorSet(0, set).Dispatch(groups, 1, 1);
+         *     co_await kor::Context::Scheduler().Execute(std::move(cb));
+         *     // the frame that ran it has finished on the GPU
+         * }
+         * @endcode
+         *
+         * The scheduler keeps the command buffer until the GPU is done with it. The resources it
+         * uses are the caller's to keep alive until then, as for the frame's own. Under Vulkan it
+         * must run on the frame's queue, which a command buffer created with Usage::eGraphics or
+         * Usage::eCompute on an ordinary device does.
+         */
+        Token Execute(std::unique_ptr<CommandBuffer> commandBuffer, Placement placement = Placement::eBeforeFrame);
+
+        /**
+         * @brief Holds the next frame back, on the GPU, until @p token has happened.
+         *
+         * The frame is recorded and submitted as usual, and the GPU starts on it once the token is
+         * signalled. It must be signalled, or the frame never finishes.
+         *
+         * Who signals it decides what the CPU does. A token a Submit() already on its way will
+         * signal costs the CPU nothing. One the CPU has yet to signal holds up the frame's
+         * *present* until it does — Vulkan does not let a present depend on a signal nobody has
+         * submitted — so signal it from another thread or a coroutine, never from code that only
+         * runs after this frame. Under OpenGL, which cannot make the GPU wait, the CPU waits
+         * before submitting instead.
+         */
+        void WaitFor(const Token& token);
+
+        /**
+         * @brief A token for the frame now being built, signalled once the GPU has finished it.
+         *
+         * `co_await` it to run code the moment the frame is done — reading back results, say —
+         * without stalling the render loop.
+         */
+        [[nodiscard]] Token frameCompletion();
+
         /**
          * @brief Every frame index except @p index.
          * @return The frames a write to @p index still has to be propagated to; see PendingWrite.
@@ -141,9 +200,31 @@ namespace kor
         explicit Scheduler(const Builder& createInfo);
     	bool _started = false;
 
+        /** @brief What a frame picks up from Execute(), WaitFor() and frameCompletion(). */
+        struct Pending {
+            std::vector<std::unique_ptr<CommandBuffer>> before;
+            std::vector<std::unique_ptr<CommandBuffer>> after;
+            std::vector<Token> waits;
+            Token completion; ///< Signalled by this frame's submission.
+        };
+
+        /**
+         * @brief Takes everything queued for the frame being submitted, and moves on to the next.
+         *
+         * Call once per Draw, after the render callback — which may itself Execute() — and before
+         * ending any command buffer.
+         */
+        Pending takePending();
+
         glm::u32 _imageCount;
 	    glm::u32 _currentFrame = 0;
     	std::vector<std::unique_ptr<Frame>> _frames;
+
+    private:
+        std::mutex _pendingMutex;
+        Pending _pending;
+        Timeline _frameTimeline;
+        std::uint64_t _frameNumber = 1; ///< The frame being built; its completion is _frameTimeline.at() it.
     };
 }
 

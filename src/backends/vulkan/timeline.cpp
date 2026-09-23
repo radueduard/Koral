@@ -93,6 +93,19 @@ namespace kor::vk {
         return {static_cast<const TimelineSemaphore&>(*state->gpu).handle(), token.value()};
     }
 
+    void TokenReactor::noteSubmittedSignal(const Token& token) {
+        const auto& state = detail::TokenAccess::state(token);
+        if (!state) return;
+        auto current = state->submitted.load(std::memory_order_relaxed);
+        while (current < token.value() &&
+               !state->submitted.compare_exchange_weak(current, token.value(), std::memory_order_release)) {}
+    }
+
+    bool TokenReactor::signalIsOnItsWay(const Token& token) {
+        const auto& state = detail::TokenAccess::state(token);
+        return !state || token.ready() || state->submitted.load(std::memory_order_acquire) >= token.value();
+    }
+
     void TokenReactor::poke() {
         std::lock_guard lock(_wakeMutex);
         Context::Device()->signalSemaphore(::vk::SemaphoreSignalInfo(_wake, ++_wakeValue));

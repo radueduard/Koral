@@ -65,14 +65,35 @@ namespace kor::ogl
     void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc)
     {
         kor::Scheduler::Draw(renderFunc);
+        signalFinishedFrames(/*wait=*/false);
+
         const auto& frame = currentFrame();
         auto& commandBuffer = frame.commandBuffer();
         commandBuffer.Reset();
         renderFunc(commandBuffer.Begin());
+
+        // After the render callback, which may Execute() work of its own.
+        auto pending = takePending();
+
+        // The GPU cannot be told to wait, so the CPU does. WaitFor() says as much.
+        for (const auto& token : pending.waits) token.wait();
+
+        // Ended in the order they run, as under Vulkan: each End() resolves its barriers against
+        // where the one before it left every resource. Submitted in the same order after.
+        for (const auto& external : pending.before) external->End();
         commandBuffer.End();
-        if (const auto submitted = commandBuffer.Submit(); !submitted) {
-            kor::log::error("[scheduler] frame submit failed: {}", submitted.error().toString());
-        }
+        for (const auto& external : pending.after) external->End();
+
+        const auto submit = [](kor::CommandBuffer& cb) {
+            if (const auto submitted = cb.Submit(); !submitted) {
+                kor::log::error("[scheduler] frame submit failed: {}", submitted.error().toString());
+            }
+        };
+        for (const auto& external : pending.before) submit(*external);
+        submit(commandBuffer);
+        for (const auto& external : pending.after) submit(*external);
+
+        _inFlight.push_back({glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), pending.completion});
 
         // Debug: dump the final default-framebuffer image to a PPM after N frames.
         // KORAL_SCREENSHOT=<path>[:frame]. Lets us verify rendered output when a live
@@ -115,5 +136,31 @@ namespace kor::ogl
     void Scheduler::WaitIdle() const
     {
         glFinish();
+        signalFinishedFrames(/*wait=*/true);
+    }
+
+    Scheduler::~Scheduler()
+    {
+        // Every frame token signalled, so nothing awaiting one is left hanging past shutdown.
+        WaitIdle();
+    }
+
+    void Scheduler::signalFinishedFrames(const bool wait) const
+    {
+        // In submission order, and stopping at the first one still running: frame n+1 cannot be
+        // done before frame n, and a timeline must be signalled in increasing order anyway.
+        std::size_t done = 0;
+        for (; done < _inFlight.size(); ++done) {
+            const auto fence = static_cast<GLsync>(_inFlight[done].fence);
+            // Polling asks with a zero timeout; waiting loops until the fence is through.
+            GLenum status;
+            do {
+                status = glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, wait ? 1'000'000'000 : 0);
+            } while (wait && status == GL_TIMEOUT_EXPIRED);
+            if (status == GL_TIMEOUT_EXPIRED) break;
+            glDeleteSync(fence);
+            _inFlight[done].completion.signal();
+        }
+        _inFlight.erase(_inFlight.begin(), _inFlight.begin() + static_cast<std::ptrdiff_t>(done));
     }
 }

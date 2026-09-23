@@ -334,8 +334,17 @@ namespace kor
          * This is where the recorded commands are resolved — barriers worked out and inserted —
          * and then emitted in order. Nothing has reached the GPU before this, and nothing is
          * executed by it: Submit() does that.
+         *
+         * The barriers depend on where the previous command buffer left each resource, so
+         * command buffers that share resources must be ended in the order they will execute. The
+         * frame takes care of that for anything handed to Scheduler::Execute() — which is why
+         * those are handed over *without* calling End(). Calls from different threads are
+         * serialised.
          */
         void End();
+
+        /** @brief Whether Begin() has been called and End() has not yet. */
+        [[nodiscard]] bool isRecording() const { return _recording; }
 
         /**
          * @brief Submits the recorded work to its queue.
@@ -1207,6 +1216,7 @@ namespace kor
 
         std::vector<Record> _records;
         bool _emitting = false;  ///< True while End() is walking _records.
+        bool _recording = false; ///< Between Begin() and End().
 
         // ---- Tracked-state updates ------------------------------------------------------------
         //

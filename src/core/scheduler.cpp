@@ -4,6 +4,8 @@
 
 #include <memory>
 
+#include <log.h>
+
 #include <scheduler.h>
 #include <commandBuffer.h>
 #include <window.h>
@@ -34,6 +36,45 @@ namespace kor
 
     Scheduler::Scheduler(const Builder& createInfo) :
         _imageCount(createInfo.imageCount) {}
+
+    Token Scheduler::Execute(std::unique_ptr<CommandBuffer> commandBuffer, const Placement placement)
+    {
+        if (!commandBuffer) {
+            log::error("[scheduler] Execute was handed no command buffer");
+            return {};
+        }
+        if (!commandBuffer->isRecording()) {
+            log::error("[scheduler] Execute needs a command buffer that has been begun and not ended: "
+                       "the frame ends it, so its barriers are resolved in the order it runs. "
+                       "Drop the End() call before handing it over.");
+            return {};
+        }
+        std::lock_guard lock(_pendingMutex);
+        (placement == Placement::eBeforeFrame ? _pending.before : _pending.after).push_back(std::move(commandBuffer));
+        return _frameTimeline.at(_frameNumber);
+    }
+
+    void Scheduler::WaitFor(const Token& token)
+    {
+        if (token.ready()) return;
+        std::lock_guard lock(_pendingMutex);
+        _pending.waits.push_back(token);
+    }
+
+    Token Scheduler::frameCompletion()
+    {
+        std::lock_guard lock(_pendingMutex);
+        return _frameTimeline.at(_frameNumber);
+    }
+
+    Scheduler::Pending Scheduler::takePending()
+    {
+        std::lock_guard lock(_pendingMutex);
+        Pending taken = std::move(_pending);
+        _pending = {};
+        taken.completion = _frameTimeline.at(_frameNumber++);
+        return taken;
+    }
 
 
 }

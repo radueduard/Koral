@@ -255,10 +255,11 @@ namespace kor::vk
             _handle
         };
 
+        const glm::u32 imageIndex = _imageIndex;
         const auto presentInfo = ::vk::PresentInfoKHR()
             .setWaitSemaphores(waitSemaphores)
             .setSwapchains(swapChains)
-            .setImageIndices(_imageIndex);
+            .setImageIndices(imageIndex);
         try {
         	const auto lock = Context::Device().lockQueues();
         	return _presentQueue->presentKHR(presentInfo);
