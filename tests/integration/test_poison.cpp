@@ -88,7 +88,7 @@ TEST_F(GpuTest, PoisonedShaderPoisonsThePipelineWithACauseChain) {
     kor::Resource<ComputePipeline> pipeline;
     ASSERT_NO_THROW({
         pipeline = ComputePipeline::Builder{}
-                       .setComputeShader(kor::ResourceRef<const Shader>(shader))
+                       .setComputeShader(shader)
                        .build();
     });
 
@@ -119,7 +119,7 @@ TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowi
                             .setPath(path)
                             .build();
     const auto pipeline = ComputePipeline::Builder{}
-                              .setComputeShader(kor::ResourceRef<const Shader>(shader))
+                              .setComputeShader(shader)
                               .build();
     ASSERT_TRUE(pipeline.poisoned());
 
@@ -127,7 +127,7 @@ TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowi
 
     ASSERT_NO_THROW({
         cb->Begin()
-           .BindComputePipeline(kor::ResourceRef<const ComputePipeline>(pipeline))
+           .BindComputePipeline(pipeline)
            .Dispatch(1, 1, 1);
         cb->End();
     });
@@ -215,7 +215,7 @@ TEST_F(GpuTest, GoodShaderYieldsAUsablePipeline) {
     ASSERT_TRUE(shader.valid()) << shader.error()->history();
 
     const auto pipeline = ComputePipeline::Builder{}
-                              .setComputeShader(kor::ResourceRef<const Shader>(shader))
+                              .setComputeShader(shader)
                               .build();
     EXPECT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
     EXPECT_FALSE(pipeline.poisoned());

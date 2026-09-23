@@ -61,8 +61,8 @@ namespace kor::vk
         const auto layoutHandle = *layout;
 
         glm::u32 variableDescriptorCount = 0;
-        for (const auto& [_a, _b, count] : layout.getBindings()) {
-            if (count == 0) {
+        for (const auto& description : layout.bindings() | std::views::values) {
+            if (description.count == 0) {
                 // Unbounded (bindless) array: allocate up to the layout's cap.
                 // Must match descriptorSetLayout.cpp's bindless max (256).
                 variableDescriptorCount = 256;
@@ -77,8 +77,8 @@ namespace kor::vk
             .setDescriptorPool(_handle)
             .setSetLayouts({layoutHandle});
 
-        for (const auto& binding : layout.getBindings() | std::views::values) {
-            _allocatedBindingCounts[binding]++;
+        for (const auto& description : layout.bindings() | std::views::values) {
+            _allocatedBindingCounts[description.type]++;
         }
         const auto allocatedSets = Context::Device()->allocateDescriptorSets(allocateInfo);
         if (allocatedSets.empty()) {
@@ -101,8 +101,8 @@ namespace kor::vk
             .setSetLayouts(layoutHandles);
 
         for (const auto &layout : layouts) {
-            for (const auto& binding : layout.getBindings() | std::views::values) {
-                _allocatedBindingCounts[binding]++;
+            for (const auto& description : layout.bindings() | std::views::values) {
+                _allocatedBindingCounts[description.type]++;
             }
         }
         const auto allocatedSets = Context::Device()->allocateDescriptorSets(allocateInfo);

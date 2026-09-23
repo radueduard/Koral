@@ -54,6 +54,15 @@ namespace {
     }
 
     // Process-wide, and deliberately not an inline static in the header: the executable and the
+    // shared library would then each get their own copy, and a preference set by one would be
+    // invisible to the other. Same rule as assetSearchPathsStorage below.
+    std::string& preferredGpuStorage()
+    {
+        static std::string preference;
+        return preference;
+    }
+
+    // Process-wide, and deliberately not an inline static in the header: the executable and the
     // shared library would then each get their own copy, and a root registered by one would be
     // invisible to the other.
     std::vector<std::filesystem::path>& assetSearchPathsStorage()
@@ -64,6 +73,16 @@ namespace {
             kor::detail::dataRoots("assets", "KORAL_ASSETS_DIR", ASSETS_PATH);
         return paths;
     }
+}
+
+void kor::setPreferredGpu(const std::string_view preference)
+{
+    preferredGpuStorage() = preference;
+}
+
+const std::string& kor::preferredGpu()
+{
+    return preferredGpuStorage();
 }
 
 void kor::addAssetSearchPath(const std::filesystem::path& dir, const bool front)
@@ -102,7 +121,9 @@ kor::Window& kor::Context::Window()
     return *_window;
 }
 
-const kor::Scheduler& kor::Context::Scheduler()
+std::unique_ptr<kor::Scheduler> kor::Context::_scheduler {};
+
+kor::Scheduler& kor::Context::Scheduler()
 {
     if (_scheduler == nullptr) {
         throw std::runtime_error("No scheduler is linked to the current thread!");
@@ -110,21 +131,13 @@ const kor::Scheduler& kor::Context::Scheduler()
     return *_scheduler;
 }
 
-kor::ResourceRef<const kor::Framebuffer> kor::Context::DefaultFramebuffer()
+kor::ResourceRef<const kor::Framebuffer> kor::Context::defaultFramebuffer()
 {
     if (_window == nullptr)
     {
         throw std::runtime_error("There is no default framebuffer!");
     }
-    return _window->getFramebuffer();
-}
-
-ImGuiContext* kor::Context::GetCurrentImGuiContext()
-{
-    if (_imguiContext == nullptr) {
-        throw std::runtime_error("ImGui context is not initialized for this thread");
-    }
-    return _imguiContext;
+    return _window->framebuffer();
 }
 
 kor::SwitchAwaiter kor::Context::SwitchToMainThread() {
@@ -148,6 +161,10 @@ void kor::Context::DrainMainThread() {
     _mainThreadExecutor->Drain();
 }
 
+bool kor::Context::hasRepository() noexcept {
+    return _repository != nullptr;
+}
+
 kor::Repository & kor::Context::Repository() {
     if (!_repository) {
         throw std::runtime_error("Resource repository is not initialized for this thread!");
@@ -160,12 +177,17 @@ kor::API kor::Context::activeAPI()
     return _activeAPI;
 }
 
-bool kor::Context::IsHeadless()
+bool kor::Context::isHeadless()
 {
     return _headless;
 }
 
-bool kor::Context::SupportsRayTracing()
+bool kor::Context::hasDevice() noexcept
+{
+    return _window != nullptr || _headless;
+}
+
+bool kor::Context::supportsRayTracing()
 {
     if (_activeAPI != API::eVulkan) return false;
     if (_window == nullptr && !_headless) return false;

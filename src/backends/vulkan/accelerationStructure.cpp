@@ -92,42 +92,42 @@ namespace kor::vk
             glm::u32 positionBinding = 0;
             glm::u32 positionOffset = 0;
             ::vk::Format positionFormat = ::vk::Format::eR32G32B32Sfloat;
-            if (mesh->getPositionAttribute().has_value()) {
-                const auto& positionAttribute = mesh->getPositionAttribute().value();
+            if (mesh->positionAttribute().has_value()) {
+                const auto& positionAttribute = mesh->positionAttribute().value();
                 positionBinding = positionAttribute.binding;
                 positionOffset = positionAttribute.offset;
                 positionFormat = getVkFormat(positionAttribute.channelType, positionAttribute.channelCount);
             }
 
-            const auto& vertexBuffer = dynamic_cast<const Buffer&>(*mesh->getVertexBuffers()[positionBinding]);
-            const auto& indexBuffer = dynamic_cast<const Buffer&>(*mesh->getIndexBuffer().value());
+            const auto& vertexBuffer = dynamic_cast<const Buffer&>(*mesh->vertexBuffers()[positionBinding]);
+            const auto& indexBuffer = dynamic_cast<const Buffer&>(*mesh->indexBuffer().value());
 
             // The mesh's vertex count spans the whole buffer (the heap's capacity for a
             // MeshHeap), so it gives the stride; the geometry's range selects the subset
             // of vertices/indices that belong to this allocation.
-            const glm::u64 bufferVertexCount = mesh->getVertexCount();
-            const glm::u64 vertexStride = vertexBuffer.getSize() / bufferVertexCount;
+            const glm::u64 bufferVertexCount = mesh->vertexCount();
+            const glm::u64 vertexStride = vertexBuffer.size() / bufferVertexCount;
 
             const glm::u64 firstVertex = geometry.firstVertex;
             const glm::u64 vertexCount = geometry.vertexCount != 0
                 ? geometry.vertexCount
                 : bufferVertexCount - firstVertex;
 
-            const ChannelType indexType = mesh->getIndexType().value();
+            const ChannelType indexType = mesh->indexType().value();
             const glm::u32 indexSize = sizeofChannelType(indexType);
             const glm::u64 firstIndex = geometry.firstIndex;
             const glm::u64 indexCount = geometry.indexCount != 0
                 ? geometry.indexCount
-                : mesh->getIndexCount().value();
+                : mesh->indexCount().value();
             const glm::u32 triangleCount = static_cast<glm::u32>(indexCount / 3);
 
             const auto triangles = ::vk::AccelerationStructureGeometryTrianglesDataKHR()
                 .setVertexFormat(positionFormat)
-                .setVertexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(vertexBuffer.getDeviceAddress() + positionOffset))
+                .setVertexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(vertexBuffer.deviceAddress() + positionOffset))
                 .setVertexStride(vertexStride)
                 .setMaxVertex(static_cast<glm::u32>(firstVertex + vertexCount - 1))
                 .setIndexType(getVkIndexType(indexType))
-                .setIndexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(indexBuffer.getDeviceAddress()));
+                .setIndexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(indexBuffer.deviceAddress()));
 
             geometries.push_back(::vk::AccelerationStructureGeometryKHR()
                 .setGeometryType(::vk::GeometryTypeKHR::eTriangles)
@@ -179,14 +179,15 @@ namespace kor::vk
                 .setMask(0xFF)
                 .setInstanceShaderBindingTableRecordOffset(instance.hitGroupIndex)
                 .setFlags(::vk::GeometryInstanceFlagBitsKHR::eTriangleFacingCullDisable)
-                .setAccelerationStructureReference(blas.getDeviceAddress()));
+                .setAccelerationStructureReference(blas.deviceAddress()));
         }
 
         // Upload the instance descriptions to a host-visible build-input buffer.
         const glm::u64 instancesSize = vkInstances.size() * sizeof(::vk::AccelerationStructureInstanceKHR);
         const auto instanceBufferInfo = ::vk::BufferCreateInfo()
             .setSize(instancesSize)
-            .setUsage(::vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR | ::vk::BufferUsageFlagBits::eShaderDeviceAddress)
+            .setUsage(::vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR
+                      | ::vk::BufferUsageFlagBits::eShaderDeviceAddress)
             .setSharingMode(::vk::SharingMode::eExclusive);
         auto [instanceBuffer, instanceAllocation] = Context::Allocator().AllocateBuffer(
             instanceBufferInfo, VMA_MEMORY_USAGE_AUTO,

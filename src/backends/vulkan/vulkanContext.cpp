@@ -56,7 +56,11 @@ void kor::vk::Context::Init()
         .addPoolSize(::vk::DescriptorType::eStorageBuffer, 1000)
         .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
         .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)
-        .addPoolSize(::vk::DescriptorType::eSampler, 1000);
+        .addPoolSize(::vk::DescriptorType::eSampler, 1000)
+        // Texel buffers — what a kor::BufferView binds as. Core Vulkan 1.0, so unlike the
+        // acceleration structure below these need no capability check.
+        .addPoolSize(::vk::DescriptorType::eUniformTexelBuffer, 1000)
+        .addPoolSize(::vk::DescriptorType::eStorageTexelBuffer, 1000);
     // A pool size for a descriptor type Vulkan does not know about (because its extension was
     // never enabled — see Device::supportsRayTracing) is itself a validation error, not just a
     // wasted reservation.

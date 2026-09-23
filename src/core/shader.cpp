@@ -21,6 +21,7 @@
 #include <unordered_set>
 
 #include <spirv_cross.hpp>
+#include <spirv_glsl.hpp>
 
 #include "slangCompiler.h"
 #include "fileWatcher.h"
@@ -182,7 +183,7 @@ namespace kor {
         // built from this shader already refers to, and repairing it in place is what brings
         // all of them back at once.
         if (Context::Repository().contains<Shader>(identifier))
-            return ResourceRef<const Shader>(Context::Repository().getRef<Shader>(identifier));
+            return ResourceRef<const Shader>(Context::Repository().ref<Shader>(identifier));
 
         // Registered whether or not it compiled. A shader that failed to compile has to stay
         // alive, registered and watched — otherwise the file watcher never learns about the
@@ -206,7 +207,7 @@ namespace kor {
             if (!ctx || !shaderRef.alive()) return;
 
             std::vector<std::filesystem::path> dependencies;
-            if (shaderRef.valid()) dependencies = shaderRef->getDependencies();
+            if (shaderRef.valid()) dependencies = shaderRef->dependencies();
             else if (!fallback.empty()) dependencies.push_back(fallback);
 
             for (const auto& dependency : dependencies)
@@ -359,22 +360,35 @@ namespace kor {
         _modified = false;
 
         switch (_lang) {
-        case Lang::eSPIRV:
-            _spirvCode = utils::ReadFileToUIntVector(_path);
+        case Lang::eSPIRV: {
+            auto spirv = utils::ReadFileAsUInts(_path);
+            if (!spirv) throw BackendException(spirv.error());
+            _spirvCode = std::move(*spirv);
             _dependencies = { _path };
             if (_spirvCode.empty())
                 throw BackendException(Error{
                     .code = ErrorCode::eShaderCompileFailed,
-                    .message = std::format("SPIR-V module '{}' is missing or empty.", _path.string()),
+                    .message = std::format("SPIR-V module '{}' is empty.", _path.string()),
                 });
             _valid = true;
             return;
+        }
         case Lang::eSlang: {
             auto result = SlangCompiler::Compile(_module, _entry, searchPaths());
             _spirvCode = std::move(result.spirv);
             _stage = result.stage;                          // auto-detected from [shader(...)]
             if (!result.resolvedPath.empty()) _path = result.resolvedPath; // for hot-reload
             _dependencies = std::move(result.dependencies); // module + imports, for hot-reload
+            _fieldSemantics.clear();                        // [module("SEMANTIC")] annotations
+            for (auto& [field, annotation] : result.fieldSemantics) {
+                _fieldSemantics.emplace(field, FieldSemantic{ std::move(annotation.moduleName),
+                                                              std::move(annotation.semantic) });
+            }
+            _inputSemantics.clear();                        // `: SEMANTIC` on the stage inputs
+            for (auto& [location, annotation] : result.varyingSemantics) {
+                _inputSemantics.emplace(location, FieldSemantic{ std::move(annotation.moduleName),
+                                                                 std::move(annotation.semantic) });
+            }
             if (_spirvCode.empty())
                 throw BackendException(Error{
                     .code = ErrorCode::eShaderCompileFailed,
@@ -388,7 +402,9 @@ namespace kor {
             break; // fall through to the glslang path below
         }
 
-        const auto source = utils::ReadFileAsString(_path);
+        const auto sourceRead = utils::ReadFileAsString(_path);
+        if (!sourceRead) throw BackendException(sourceRead.error());
+        const auto& source = *sourceRead;
         glslang::InitializeProcess();
         const auto eShStage = shaderStageToEShLanguage(_stage);
 
@@ -484,6 +500,43 @@ namespace kor {
     	return count;
     }
 
+	// The shape the shader declared an image binding with. Only the shader knows this: six array
+	// layers are equally a cube map and a 2D array, and picking wrong gives a `samplerCube` a view
+	// it cannot sample. Kept so that binding an Image directly can build the right view.
+	// @see Shader::ImageShape
+	Shader::ImageShape ShapeOf(const spirv_cross::SPIRType& type) {
+		using Shape = Shader::ImageShape;
+		const bool arrayed = type.image.arrayed;
+		switch (type.image.dim) {
+		case spv::Dim1D:     return arrayed ? Shape::e1DArray : Shape::e1D;
+		case spv::Dim2D:     return arrayed ? Shape::e2DArray : Shape::e2D;
+		case spv::Dim3D:     return Shape::e3D;   // a 3D image has no array form
+		case spv::DimCube:   return arrayed ? Shape::eCubeArray : Shape::eCube;
+		case spv::DimBuffer: return Shape::eBuffer;
+		// DimRect and DimSubpassData reach no path that builds a view for the caller, so naming
+		// them here would only invite one to be built. Left unknown, which binding an Image
+		// reports rather than guesses at.
+		default:             return Shape::eUnknown;
+		}
+	}
+
+	// Read/write intent for a resource that can be written, from the NonReadable/NonWritable
+	// decorations. `flags` must come from get_buffer_block_flags for a storage *buffer* (the
+	// decorations sit on the block's members and have to be aggregated) and from
+	// get_decoration_bitset for a storage *image* (they sit on the variable itself).
+	//
+	// SPIR-V does not require either decoration, so an absent pair means "assume both", which
+	// over-synchronises rather than under-synchronises. Slang and GLSL both emit them for the
+	// declarations you would actually write (StructuredBuffer vs RWStructuredBuffer, readonly
+	// vs writeonly), so hand-written SPIR-V is the only realistic source of a miss.
+	Shader::AccessKind AccessFrom(const spirv_cross::Bitset& flags) {
+		const bool readable = !flags.get(spv::DecorationNonReadable);
+		const bool writable = !flags.get(spv::DecorationNonWritable);
+		if (readable && writable) return Shader::AccessKind::eReadWrite;
+		if (writable)             return Shader::AccessKind::eWrite;
+		return Shader::AccessKind::eRead;
+	}
+
 	Shader::Stage StageFrom(const spv::ExecutionModel executionModel) {
 	    switch (executionModel) {
 	    	case spv::ExecutionModelVertex: return Shader::Stage::eVertex;
@@ -504,13 +557,270 @@ namespace kor {
 	    }
     }
 
+    // `#pragma module(SEMANTIC)` on one line, the field it decorates on the next. GLSL has no
+    // attribute syntax, and a pragma is the one thing that can be written inside a block and still
+    // be a directive rather than a comment — glslang accepts and ignores it, so the text is ours
+    // to read. Which is what this does: the compiler discards it, so the annotation is recovered
+    // from the source rather than from the SPIR-V.
+    //
+    // Includes are followed, because a project is expected to keep its shared blocks in a header.
+    void Shader::fetchFieldSemantics(const std::string& rawSource)
+    {
+        // The pragmas that mean something to a compiler rather than to us. Everything else of the
+        // form name(ARG) is read as an annotation, which is what makes the module's own name the
+        // directive: `#pragma camera(VIEW_MATRIX)` needs nothing registered anywhere.
+        static constexpr std::string_view kReserved[] {
+            "once", "optimize", "debug", "STDGL", "pack", "warning", "message", "region", "endregion",
+        };
+
+        // Comments go first, replaced by spaces so every offset still lines up. Without this a
+        // *description* of a pragma — in the header explaining it, or in a project's own shaders —
+        // is read as one, and the semantic it appears to declare is nonsense. Found exactly that way.
+        std::string source = rawSource;
+        for (std::size_t i = 0; i + 1 < source.size(); ++i) {
+            if (source[i] != '/') continue;
+
+            if (source[i + 1] == '/') {
+                while (i < source.size() && source[i] != '\n') source[i++] = ' ';
+            } else if (source[i + 1] == '*') {
+                const std::size_t end = source.find("*/", i + 2);
+                const std::size_t stop = end == std::string::npos ? source.size() : end + 2;
+                for (; i < stop; ++i) if (source[i] != '\n') source[i] = ' ';
+            }
+        }
+
+        static constexpr std::string_view kPragma = "#pragma";
+
+        std::size_t at = 0;
+        while ((at = source.find(kPragma, at)) != std::string::npos) {
+            const std::size_t lineEnd = source.find('\n', at);
+            const std::size_t limit = lineEnd == std::string::npos ? source.size() : lineEnd;
+
+            // module ( SEMANTIC )
+            std::size_t cursor = source.find_first_not_of(" \t", at + kPragma.size());
+            const std::size_t open = source.find('(', cursor);
+            const std::size_t close = source.find(')', open == std::string::npos ? cursor : open);
+            if (cursor == std::string::npos || open == std::string::npos ||
+                close == std::string::npos || open > limit || close > limit) {
+                at = limit;
+                continue;   // not of the annotation shape; some other pragma's business
+            }
+
+            std::string moduleName(source, cursor, open - cursor);
+            std::erase_if(moduleName, [](const unsigned char c) { return std::isspace(c); });
+            if (std::ranges::find(kReserved, moduleName) != std::end(kReserved)) {
+                at = limit;
+                continue;
+            }
+
+            std::string semantic(source, open + 1, close - open - 1);
+            std::erase(semantic, '"');   // accepted so both languages can be written alike
+            std::erase_if(semantic, [](const unsigned char c) { return std::isspace(c); });
+            if (moduleName.empty() || semantic.empty()) { at = limit; continue; }
+
+            // The declaration it decorates: the next line with something on it. Its field name is
+            // the last identifier before the ';' or the '[' of an array.
+            cursor = limit == source.size() ? source.size() : limit + 1;
+            const std::size_t statementEnd = source.find_first_of(";[", cursor);
+            if (statementEnd == std::string::npos) break;
+
+            const std::string declaration(source, cursor, statementEnd - cursor);
+            const std::size_t nameEnd = declaration.find_last_not_of(" \t\r\n");
+            if (nameEnd == std::string::npos) { at = statementEnd; continue; }
+            std::size_t nameStart = declaration.find_last_of(" \t\r\n*&", nameEnd);
+            nameStart = nameStart == std::string::npos ? 0 : nameStart + 1;
+
+            if (std::string field = declaration.substr(nameStart, nameEnd - nameStart + 1); !field.empty()) {
+                _fieldSemantics.emplace(std::move(field), FieldSemantic{ std::move(moduleName), std::move(semantic) });
+            }
+            at = statementEnd;
+        }
+    }
+
+    // The block's fields, as the compiled shader lays them out, plus whatever semantic each was
+    // annotated with. Offsets and types come from the SPIR-V, so they are the same however the
+    // shader was written; only the annotation is language-specific, and that arrives in
+    // _fieldSemantics from whichever front end read it. @see semantics.h
+    void Shader::fetchBlockMembers(const spirv_cross::Compiler& module,
+                                   const spirv_cross::Resource& resource,
+                                   std::vector<BlockMember>& members,
+                                   glm::u32& blockSize) const
+    {
+    	const auto& blockType = module.get_type(resource.base_type_id);
+    	if (blockType.basetype != spirv_cross::SPIRType::Struct) return;
+
+    	blockSize = static_cast<glm::u32>(module.get_declared_struct_size(blockType));
+    	members.reserve(blockType.member_types.size());
+
+    	for (glm::u32 i = 0; i < blockType.member_types.size(); ++i) {
+    		const auto& memberType = module.get_type(blockType.member_types[i]);
+
+    		BlockMember member;
+    		member.name = module.get_member_name(resource.base_type_id, i);
+    		member.offset = module.type_struct_member_offset(blockType, i);
+    		member.size = static_cast<glm::u32>(module.get_declared_struct_member_size(blockType, i));
+    		member.rows = static_cast<glm::u8>(memberType.vecsize);
+    		member.columns = static_cast<glm::u8>(memberType.columns);
+
+    		// Mirrors SemanticSlot::Scalar. Kept as a number here so shader.h does not have to
+    		// include semantics.h, which includes resource.h, which would be a cycle.
+    		switch (memberType.basetype) {
+    		case spirv_cross::SPIRType::Float:  member.scalar = 0; break;
+    		case spirv_cross::SPIRType::Int:    member.scalar = 1; break;
+    		case spirv_cross::SPIRType::UInt:   member.scalar = 2; break;
+    		case spirv_cross::SPIRType::Boolean:member.scalar = 3; break;
+    		case spirv_cross::SPIRType::Double: member.scalar = 4; break;
+    		default:                            member.scalar = 5; break;
+    		}
+
+    		if (const auto it = _fieldSemantics.find(member.name); it != _fieldSemantics.end()) {
+    			member.semanticNamespace = it->second.moduleName;
+    			member.semantic = it->second.semantic;
+    		}
+    		members.push_back(std::move(member));
+    	}
+    }
+
+
+    namespace {
+        // Whether a block's declared offsets and strides are the ones a packing standard
+        // prescribes. spirv-cross implements those rules already and keeps them right across
+        // corner cases (vec3 in arrays, nested struct alignment, matrix columns); the method is
+        // merely protected, so this two-line subclass reaches it rather than writing the rules
+        // out a second time and getting one of them subtly wrong.
+        struct PackingProbe final : spirv_cross::CompilerGLSL {
+            explicit PackingProbe(const std::vector<glm::u32>& spirv) : CompilerGLSL(spirv) {}
+            using CompilerGLSL::buffer_is_packing_standard;
+        };
+    }
+
+    // Every path inside a push-constant block that can be written by itself: each member, each
+    // field of a nested struct, each element of an array. The offsets are the compiler's, so a
+    // value written through one of these lands where the shader reads it however the two languages
+    // disagree about padding — which is the whole point of walking down to the leaves.
+    void Shader::flattenPushConstant(const spirv_cross::Compiler& module,
+                                     const spirv_cross::SPIRType& type,
+                                     const std::string& prefix, const glm::u32 baseOffset,
+                                     std::vector<PushConstantField>& out)
+    {
+    	if (type.basetype != spirv_cross::SPIRType::Struct) return;
+
+    	for (glm::u32 i = 0; i < type.member_types.size(); ++i) {
+    		const auto& memberType = module.get_type(type.member_types[i]);
+    		const auto name = prefix + module.get_member_name(type.self, i);
+    		const auto offset = baseOffset + module.type_struct_member_offset(type, i);
+    		const auto size = static_cast<glm::u32>(module.get_declared_struct_member_size(type, i));
+
+    		PushConstantField field;
+    		field.name = name;
+    		field.offset = offset;
+    		field.size = size;
+    		field.rows = static_cast<glm::u8>(memberType.vecsize);
+    		field.columns = static_cast<glm::u8>(memberType.columns);
+
+    		switch (memberType.basetype) {
+    		case spirv_cross::SPIRType::Float:  field.scalar = 0; break;
+    		case spirv_cross::SPIRType::Int:    field.scalar = 1; break;
+    		case spirv_cross::SPIRType::UInt:   field.scalar = 2; break;
+    		case spirv_cross::SPIRType::Boolean:field.scalar = 3; break;
+    		case spirv_cross::SPIRType::Double: field.scalar = 4; break;
+    		default:                            field.scalar = 5; break;
+    		}
+
+    		const bool isArray = !memberType.array.empty();
+    		const bool isStruct = memberType.basetype == spirv_cross::SPIRType::Struct;
+
+    		if (field.columns > 1)
+    			field.matrixStride = module.type_struct_member_matrix_stride(type, i);
+
+    		if (isArray) {
+    			// The array as a whole first, so it can still be written in one go when the C++
+    			// side happens to be laid out identically, then each element on its own.
+    			field.count = memberType.array[0];
+    			field.arrayStride = module.type_struct_member_array_stride(type, i);
+    			field.aggregate = isStruct;
+    			out.push_back(field);
+
+    			auto elementType = memberType;
+    			elementType.array.clear();
+    			elementType.array_size_literal.clear();
+
+    			for (glm::u32 element = 0; element < field.count; ++element) {
+    				const auto elementOffset = offset + element * field.arrayStride;
+    				const auto elementName = std::format("{}[{}]", name, element);
+
+    				if (isStruct) {
+    					PushConstantField aggregate = field;
+    					aggregate.name = elementName;
+    					aggregate.offset = elementOffset;
+    					aggregate.size = field.arrayStride;
+    					aggregate.count = 1;
+    					aggregate.arrayStride = 0;
+    					aggregate.aggregate = true;
+    					out.push_back(aggregate);
+    					flattenPushConstant(module, elementType, elementName + ".", elementOffset, out);
+    					continue;
+    				}
+
+    				PushConstantField leaf = field;
+    				leaf.name = elementName;
+    				leaf.offset = elementOffset;
+    				leaf.size = field.arrayStride;
+    				leaf.count = 1;
+    				leaf.arrayStride = 0;
+    				out.push_back(leaf);
+    			}
+    			continue;
+    		}
+
+    		if (isStruct) {
+    			// Writable whole when the sizes agree, and field by field when they do not.
+    			field.aggregate = true;
+    			out.push_back(field);
+    			flattenPushConstant(module, memberType, name + ".", offset, out);
+    			continue;
+    		}
+
+    		out.push_back(field);
+    	}
+    }
+
     void Shader::fetchMemoryLayout()
     {
     	if (!_valid) return;
 
+    	// GLSL's annotations live in the source, so they are read once the include set is known —
+    	// a project keeps its shared blocks in a header, and the pragma travels with them. Slang's
+    	// arrive through reflection and are already in place by now.
+    	if (_lang == Lang::eGLSL) {
+    		_fieldSemantics.clear();
+    		for (const auto& dependency : _dependencies) {
+    			// An unreadable dependency is skipped rather than fatal: the shader itself compiled,
+    			// and this pass only harvests field semantics from the files it included.
+    			if (const auto text = utils::ReadFileAsString(dependency); text && !text->empty())
+    				fetchFieldSemantics(*text);
+    		}
+    	}
+
         const auto module = spirv_cross::Compiler(_spirvCode);
         const auto resources = module.get_shader_resources();
     	const auto stage = StageFrom(module.get_execution_model());
+
+    	// Which globals the entry point actually reaches. Recorded per descriptor rather than
+    	// used to filter: an unused binding must stay in the layout (see Descriptor::active).
+    	const auto activeVariables = module.get_active_interface_variables();
+    	const auto isActive = [&](const spirv_cross::Resource& resource) {
+    		return activeVariables.contains(resource.id);
+    	};
+
+    	// Raw-pointer access, which reflection can detect but never attribute to a buffer.
+    	_usesDeviceAddresses = false;
+    	for (const auto capability : module.get_declared_capabilities()) {
+    		if (capability == spv::CapabilityPhysicalStorageBufferAddresses) {
+    			_usesDeviceAddresses = true;
+    			break;
+    		}
+    	}
 
     	MemoryLayout memoryLayout;
 
@@ -521,7 +831,22 @@ namespace kor {
 			const auto& type = module.get_type(input.type_id);
         	const auto[channelType, channelCount] = SPIRTypeConverter(type);
 
-			memoryLayout.inputs.emplace(location, locationSpan, name, channelType, channelCount);
+        	// What the input was annotated with, from whichever half of the language knows: GLSL's
+        	// `#pragma mesh(POSITION)` is read out of the source and keyed by name, Slang's
+        	// `: POSITION` comes through its reflection and is keyed by location, since what Slang
+        	// calls a varying rarely survives into the SPIR-V. @see vertexLayout.h
+        	std::string semanticNamespace;
+        	std::string semantic;
+        	if (const auto byName = _fieldSemantics.find(name); byName != _fieldSemantics.end()) {
+        		semanticNamespace = byName->second.moduleName;
+        		semantic = byName->second.semantic;
+        	} else if (const auto byLocation = _inputSemantics.find(location); byLocation != _inputSemantics.end()) {
+        		semanticNamespace = byLocation->second.moduleName;
+        		semantic = byLocation->second.semantic;
+        	}
+
+			memoryLayout.inputs.emplace(location, locationSpan, name, channelType, channelCount,
+			                            std::move(semanticNamespace), std::move(semantic));
 		} // inputs
 		for (const auto& output : resources.stage_outputs) {
 			auto location = module.get_decoration(output.id, spv::DecorationLocation);
@@ -538,18 +863,20 @@ namespace kor {
 			const uint32_t count = GetCount(module.get_type(sampler.type_id));
 			const auto& name = module.get_name(sampler.id);
 
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampler, name, count, stage });
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampler, name, count, stage, AccessKind::eRead, isActive(sampler) });
 		} // eSampler
 		for (const auto& sampledImage : resources.separate_images) {
 			const uint32_t set = module.get_decoration(sampledImage.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
+			const auto shape = ShapeOf(module.get_type(sampledImage.type_id));
+
 			if (module.get_type(sampledImage.type_id).image.dim == spv::DimBuffer) {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformTexelBuffer, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformTexelBuffer, name, count, stage, AccessKind::eRead, isActive(sampledImage), {}, 0, {}, shape });
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eSampledImage, name, count, stage, AccessKind::eRead, isActive(sampledImage), {}, 0, {}, shape });
 			}
 		} // eSampledImage and eUniformTexelBuffer
     	for (const auto& sampledImage : resources.sampled_images) {
@@ -557,18 +884,24 @@ namespace kor {
 			const uint32_t binding = module.get_decoration(sampledImage.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(sampledImage.type_id));
 			const auto& name = module.get_name(sampledImage.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eCombinedImageSampler, name, count, stage });
+			const auto shape = ShapeOf(module.get_type(sampledImage.type_id));
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eCombinedImageSampler, name, count, stage, AccessKind::eRead, isActive(sampledImage), {}, 0, {}, shape });
 		} // eCombinedImageSampler
 		for (const auto& image : resources.storage_images) {
 			const uint32_t set = module.get_decoration(image.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(image.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(image.type_id));
 			const auto& name = module.get_name(image.id);
+			// The variable's own decorations here, unlike storage buffers: an image is not a
+			// block, so readonly/writeonly are attached directly to it.
+			const auto access = AccessFrom(module.get_decoration_bitset(image.id));
+			const bool active = isActive(image);
+			const auto shape = ShapeOf(module.get_type(image.type_id));
 			if (module.get_type(image.type_id).image.dim == spv::DimBuffer) {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageTexelBuffer, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageTexelBuffer, name, count, stage, access, active, {}, 0, {}, shape });
 			}
 			else {
-				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage });
+				memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageImage, name, count, stage, access, active, {}, 0, {}, shape });
 			}
 		} // eStorageImage and eStorageTexelBuffer
 		for (const auto& buffer : resources.uniform_buffers) {
@@ -576,21 +909,29 @@ namespace kor {
 			const uint32_t binding = module.get_decoration(buffer.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eUniformBuffer, name, count, stage });
+			auto descriptor = Descriptor { DescriptorType::eUniformBuffer, name, count, stage, AccessKind::eRead, isActive(buffer) };
+			descriptor.blockName = module.get_name(buffer.base_type_id);
+			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eUniformBuffer
 		for (const auto& buffer : resources.storage_buffers) {
 			const uint32_t set = module.get_decoration(buffer.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(buffer.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(buffer.type_id));
 			const auto& name = module.get_name(buffer.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eStorageBuffer, name, count, stage });
+			// Block flags, not the variable's: NonWritable/NonReadable land on the members.
+			const auto access = AccessFrom(module.get_buffer_block_flags(buffer.id));
+			auto descriptor = Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) };
+			descriptor.blockName = module.get_name(buffer.base_type_id);
+			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eStorageBuffer
 		for (const auto& accelerationStructure : resources.acceleration_structures) {
 			const uint32_t set = module.get_decoration(accelerationStructure.id, spv::DecorationDescriptorSet);
 			const uint32_t binding = module.get_decoration(accelerationStructure.id, spv::DecorationBinding);
 			const uint32_t count = GetCount(module.get_type(accelerationStructure.type_id));
 			const auto& name = module.get_name(accelerationStructure.id);
-			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eAccelerationStructure, name, count, stage });
+			memoryLayout.descriptorSets[set].descriptors.emplace(binding, Descriptor { DescriptorType::eAccelerationStructure, name, count, stage, AccessKind::eRead, isActive(accelerationStructure) });
 		} // eAccelerationStructure
 
     	for (const auto& pushConstant : resources.push_constant_buffers) {
@@ -609,7 +950,43 @@ namespace kor {
     		const auto offset = start;
     		const auto size = end - start;
 
-			memoryLayout.pushConstants.emplace(offset, PushConstant { name, size, offset, stage });
+			// Push-constant blocks are std430 and nothing else. It is the default in Vulkan GLSL
+			// and what Slang emits, so this only ever catches a block that asked for something
+			// else — and that is worth catching, because the whole point of knowing the layout is
+			// that a C++ struct can be written to match it. Under std140 an array of floats
+			// strides sixteen bytes instead of four, and a matching struct silently writes one
+			// value in four.
+			{
+				PackingProbe probe(_spirvCode);
+				glm::u32 failedIndex = 0;
+				if (const auto& probeType = probe.get_type(pushConstant.base_type_id);
+					!probe.buffer_is_packing_standard(probeType, spirv_cross::BufferPackingStd430, &failedIndex))
+				{
+					const auto member = failedIndex < probeType.member_types.size()
+						? probe.get_member_name(pushConstant.base_type_id, failedIndex)
+						: std::string("<unknown>");
+					// Thrown, not logged and shrugged off: at construction guard() turns this into a
+					// poisoned shader — and so a poisoned pipeline — while a *reload* that
+					// introduces it keeps the last working version, which is the same treatment a
+					// syntax error gets.
+					throw BackendException(Error{
+						.code = ErrorCode::ePushConstantMismatch,
+						.message = std::format(
+							"Push-constant block '{}' in {} is not laid out as std430 — '{}' does not sit "
+							"where std430 puts it. Push constants must be std430, which is the default: "
+							"drop any explicit std140 or scalar qualifier on the block.",
+							name, _path.filename().string(), member),
+					});
+				}
+			}
+
+			// The same members the range was computed from, kept this time and flattened all the
+			// way down: their paths are what CommandBuffer::PushConstant looks a constant up by,
+			// and their offsets are absolute within the range, so each one can be pushed on its own.
+			PushConstant pushConstantBlock { name, size, offset, stage };
+			flattenPushConstant(module, type, {}, 0, pushConstantBlock.members);
+
+			memoryLayout.pushConstants.emplace(offset, std::move(pushConstantBlock));
 		} // push constants
 
     	_memoryLayout = memoryLayout;

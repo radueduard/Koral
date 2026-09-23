@@ -4,6 +4,7 @@
 
 #include "context.h"
 #include "log.h"
+#include "module.h"
 
 namespace {
     bool g_ready = false;
@@ -13,8 +14,17 @@ void GpuEnvironment::SetUp() {
     // Bring up a device-only (headless) context: no window, surface or swap chain,
     // just enough to allocate buffers and run compute/transfer commands. This
     // works anywhere a Vulkan device exists — no display required.
+    //
+    // The module lifecycle is driven in the same order the runtime drives it — resolve before the
+    // device, initialize after, shut down before it goes away. This binary links modules (mesh,
+    // image), and a module that caches GPU resources releases them in Shutdown: without this their
+    // handles outlive the device and vkDestroyDevice reports them as leaks.
     try {
+        if (const auto resolved = kor::ModuleHost::Resolve(); !resolved) {
+            kor::log::error("GPU integration harness: module resolve failed: {}", resolved.error().message);
+        }
         kor::Context::InitHeadless(kor::API::eVulkan);
+        kor::ModuleHost::Initialize();
         g_ready = true;
     } catch (const std::exception& e) {
         kor::log::error("GPU integration harness: headless device init failed: {}", e.what());
@@ -27,6 +37,7 @@ void GpuEnvironment::SetUp() {
 
 void GpuEnvironment::TearDown() {
     if (g_ready) {
+        kor::ModuleHost::Shutdown();
         kor::Context::ShutdownHeadless();
         g_ready = false;
     }

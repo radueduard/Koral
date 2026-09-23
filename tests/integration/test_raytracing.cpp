@@ -7,7 +7,7 @@
 // The ray-tracing extensions are only enabled when the selected device actually
 // advertises them (not every GPU does -- older/integrated GPUs and MoltenVK on
 // macOS commonly do not), so this test additionally skips itself via
-// kor::Context::SupportsRayTracing() on top of the fixture's own "no device at
+// kor::Context::supportsRayTracing() on top of the fixture's own "no device at
 // all" skip.
 
 #include "gpu_fixture.h"
@@ -26,7 +26,7 @@
 #include "image.h"
 #include "imageView.h"
 #include "mesh.h"
-#include "meshLayout.h"
+#include <koralMesh.h>
 #include "rayTracingPipeline.h"
 #include "shader.h"
 
@@ -44,14 +44,14 @@ using kor::Shader;
 namespace {
 
 using Pixel = glm::u8vec4;
-using PosVertex = kor::ParamVertex<kor::Position>;
-using PosMesh = kor::ParamMesh<PosVertex>;
+using PosVertex = kmesh::ParamVertex<kmesh::Position>;
+using PosMesh = kmesh::ParamMesh<PosVertex>;
 
 constexpr std::uint32_t kW = 16;
 constexpr std::uint32_t kH = 16;
 
 TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
-    if (!kor::Context::SupportsRayTracing()) {
+    if (!kor::Context::supportsRayTracing()) {
         GTEST_SKIP() << "Device has no ray tracing support; skipping.";
     }
 
@@ -67,9 +67,9 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
 
     // --- BLAS + TLAS ------------------------------------------------------
     auto blas = AccelerationStructure::Builder{}
-                    .addMesh(ResourceRef<const kor::Mesh>(mesh))
+                    .addMesh(mesh)
                     .build();
-    ASSERT_EQ(blas->getType(), AccelerationStructure::Type::eBottomLevel);
+    ASSERT_EQ(blas->type(), AccelerationStructure::Type::eBottomLevel);
 
     auto tlas = AccelerationStructure::Builder{}
                     .addInstance(AccelerationStructure::Instance{
@@ -77,17 +77,16 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
                         .transform = glm::mat4(1.0f),
                     })
                     .build();
-    ASSERT_EQ(tlas->getType(), AccelerationStructure::Type::eTopLevel);
+    ASSERT_EQ(tlas->type(), AccelerationStructure::Type::eTopLevel);
 
     // --- storage image (ray-tracing output) ------------------------------
     auto outImage = Image::Builder{}
                         .setType(Image::Type::e2D)
                         .setFormat(Image::Format::eRGBA8_UNORM)
                         .setExtent(glm::uvec2{kW, kH})
-                        .addUsage(Image::Usage::eStorage)
-                        .addUsage(Image::Usage::eTransferSrc)
+                        .setUsage(Image::Usage::eStorage | Image::Usage::eTransferSrc)
                         .build();
-    auto outView = ImageView::Builder(ResourceRef<const Image>(outImage)).build();
+    auto outView = ImageView::Builder(outImage).build();
 
     // --- ray-tracing pipeline --------------------------------------------
     const auto raygen = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eRaygen)
@@ -106,27 +105,28 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     ASSERT_TRUE(static_cast<bool>(pipeline));
 
     // --- descriptor set: TLAS at 0, storage image at 1 -------------------
-    auto descriptorSet = DescriptorSet::Builder(kor::ResourceRef<const kor::Pipeline>(pipeline), 0)
-                             .write(0, Descriptor(ResourceRef<const AccelerationStructure>(tlas)))
-                             .write(1, Descriptor(ResourceRef<const ImageView>(outView)))
+    auto descriptorSet = DescriptorSet::Builder(pipeline, 0)
+                             .write(0, tlas)
+                             .write(1, outView)
                              .build();
 
     // --- trace ------------------------------------------------------------
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BindRayTracingPipeline(ResourceRef<const RayTracingPipeline>(pipeline));
-        cb.BindDescriptorSet(0, ResourceRef<const DescriptorSet>(descriptorSet));
-        cb.ImageBarrier(kor::ImageBarrier(ResourceRef<const Image>(outImage), kor::ResourceAccess::AllShaderWrite));
+        cb.BindRayTracingPipeline(pipeline);
+        cb.BindDescriptorSet(0, descriptorSet);
+        // No barrier: the storage image is bound at set 0 binding 1, so the engine transitions
+        // it to the layout the raygen shader writes through.
         cb.TraceRays(kW, kH, 1);
     }, CommandBuffer::Usage::eCompute);
 
     // --- read the image back and verify the trace ran --------------------
     Buffer::RawBuilder rb;
     rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .addUsage(Buffer::Usage::eTransferDst)
+      .setUsage(Buffer::Usage::eTransferDst)
       .setType(Buffer::Type::eReadback);
     auto readback = rb.build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.CopyImageToBuffer(ResourceRef<const Image>(outImage), ResourceRef<const Buffer>(readback));
+        cb.CopyImageToBuffer(outImage, readback);
     }, CommandBuffer::Usage::eTransfer);
 
     const std::vector<Pixel> out = readback->Read<Pixel>();

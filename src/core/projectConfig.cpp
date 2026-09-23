@@ -48,11 +48,14 @@ namespace kor
             std::optional<bool> borderless;     // the inverse of our `decorated`
             std::optional<bool> transparent;
             std::optional<bool> vsync;
+            std::optional<std::string> imguiIni;   // where ImGui persists its layout
         };
 
         struct RenderingDocument
         {
             std::optional<std::string> api;
+            std::optional<std::string> platform;   // Linux windowing system: "auto" | "x11" | "wayland"
+            std::optional<std::string> gpu;        // device index or name substring; Vulkan only
             std::optional<WindowDocument> window;
         };
 
@@ -60,6 +63,7 @@ namespace kor
         {
             std::optional<std::vector<std::string>> assetDirectories;
             std::optional<std::vector<std::string>> shaderDirectories;
+            std::optional<std::vector<std::string>> moduleDirectories;
 
             // The original singular form, kept readable so projects scaffolded before the lists
             // existed still find their content. The list wins when both are present.
@@ -73,6 +77,10 @@ namespace kor
             std::optional<std::string> name;
             std::optional<RenderingDocument> rendering;
             std::optional<PathsDocument> paths;
+
+            // Top level rather than under "paths", because these are not paths: they are the
+            // project's list of optional engine features, which happen to be resolved to files.
+            std::optional<std::vector<std::string>> modules;
         };
     }
 
@@ -95,6 +103,24 @@ namespace kor
 
             if (equalsIgnoringCase("vulkan")) return API::eVulkan;
             if (equalsIgnoringCase("opengl")) return API::eOpenGL;
+            return std::nullopt;
+        }
+
+        std::optional<WindowPlatform> parsePlatform(std::string_view name)
+        {
+            // Accept the enumerator spelling too ("eWayland"), matching parseApi.
+            if (name.starts_with('e') || name.starts_with('E')) name.remove_prefix(1);
+
+            const auto equalsIgnoringCase = [name](const std::string_view other) {
+                return std::ranges::equal(name, other, [](const char a, const char b) {
+                    return std::tolower(static_cast<unsigned char>(a)) ==
+                           std::tolower(static_cast<unsigned char>(b));
+                });
+            };
+
+            if (equalsIgnoringCase("auto"))    return WindowPlatform::eAuto;
+            if (equalsIgnoringCase("x11"))     return WindowPlatform::eX11;
+            if (equalsIgnoringCase("wayland")) return WindowPlatform::eWayland;
             return std::nullopt;
         }
 
@@ -127,12 +153,12 @@ namespace kor
 
             const auto& doc = *document;
 
-            if (doc.schemaVersion && *doc.schemaVersion > ProjectConfig::kSchemaVersion) {
+            if (doc.schemaVersion && *doc.schemaVersion > ProjectConfig::SchemaVersion) {
                 // Forward-compatible on purpose: a newer file may only *add* keys, which we ignore.
                 // Say so once rather than failing, so an old runtime still starts a new project.
                 log::warn("[config] '{}' declares schema {}, this build understands {}; "
                           "unknown settings will be ignored",
-                          source, *doc.schemaVersion, ProjectConfig::kSchemaVersion);
+                          source, *doc.schemaVersion, ProjectConfig::SchemaVersion);
             }
 
             // The project's name is the window title unless the file names one explicitly — which
@@ -149,6 +175,18 @@ namespace kor
                     config.api = *parsed;
                 }
 
+                if (r.platform) {
+                    const auto parsed = parsePlatform(*r.platform);
+                    if (!parsed)
+                        return invalid(std::format("'rendering.platform' is '{}'; expected 'auto', 'x11' or 'wayland'", *r.platform));
+                    config.platform = *parsed;
+                }
+
+                // Not validated here: whether it names a real device is only knowable once the
+                // Vulkan instance exists, and an unmatched preference falls back to the automatic
+                // choice there rather than stopping the run.
+                if (r.gpu) config.gpu = *r.gpu;
+
                 if (r.window) {
                     const auto& w = *r.window;
                     if (w.title)       config.title = *w.title;
@@ -159,6 +197,10 @@ namespace kor
                     if (w.borderless)  config.decorated = !*w.borderless;
                     if (w.transparent) config.transparentFramebuffer = *w.transparent;
                     if (w.vsync)       config.vsync = *w.vsync;
+                    // Like the asset/shader directories, a relative ini path means what it means
+                    // *at the config* — it travels with the project — so it resolves against the
+                    // config's directory, not the working directory.
+                    if (w.imguiIni)    config.imguiIni = resolveAgainst(baseDirectory, *w.imguiIni);
                 }
             }
 
@@ -181,7 +223,13 @@ namespace kor
 
                 if (p.shaderDirectories)  config.shaderDirectories = resolveAll(*p.shaderDirectories);
                 else if (p.shadersDir)    config.shaderDirectories = resolveAll({ *p.shadersDir });
+
+                if (p.moduleDirectories)  config.moduleDirectories = resolveAll(*p.moduleDirectories);
             }
+
+            // Replaced wholesale, like the directory lists and for the same reason: a file that
+            // could only add to the binary's list could never turn a module off.
+            if (doc.modules) config.modules = *doc.modules;
 
             return {};
         }
@@ -274,7 +322,38 @@ namespace kor
                     return invalid(std::format("--api expects 'Vulkan' or 'OpenGL', got '{}'", text));
                 api = *parsed;
             }
-            else if (arg == "--assets" || arg == "--shaders") {
+            else if (arg == "--platform") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --platform");
+                const auto parsed = parsePlatform(text);
+                if (!parsed)
+                    return invalid(std::format("--platform expects 'auto', 'x11' or 'wayland', got '{}'", text));
+                platform = *parsed;
+            }
+            else if (arg == "--gpu") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --gpu");
+                gpu = text;
+            }
+            else if (arg == "--imgui-ini") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --imgui-ini");
+                // A path typed on the command line resolves against the working directory, unlike
+                // the config's, which resolves against the config file — same rule as --assets.
+                std::error_code ec;
+                const auto file = std::filesystem::absolute(std::filesystem::path(text), ec);
+                if (ec) return invalid(std::format("--imgui-ini '{}' is not a usable path", text));
+                imguiIni = file.lexically_normal();
+            }
+            else if (arg == "--module") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --module");
+                // Appended, not prepended: modules are a set, not a search order — the loader sorts
+                // them by their declared dependencies regardless of the order they arrive in.
+                if (std::ranges::find(modules, text) == modules.end())
+                    modules.emplace_back(text);
+            }
+            else if (arg == "--assets" || arg == "--shaders" || arg == "--modules-dir") {
                 std::string_view text;
                 if (!value(text)) return invalid(std::format("missing value for {}", arg));
 
@@ -288,7 +367,9 @@ namespace kor
                 // Inserted at the front, so a directory named on the command line outranks the
                 // config's — and so that among several, the last one typed wins, like every other
                 // flag here.
-                auto& directories = arg == "--assets" ? assetDirectories : shaderDirectories;
+                auto& directories = arg == "--assets"  ? assetDirectories
+                                  : arg == "--shaders" ? shaderDirectories
+                                                       : moduleDirectories;
                 directories.insert(directories.begin(), dir.lexically_normal());
             }
             else {
@@ -309,7 +390,7 @@ namespace kor
         // in a build directory (<project>/cmake-build-debug/libFoo.so), and the config lives at the
         // project root above it.
         for (; !directory.empty(); directory = directory.parent_path()) {
-            if (auto candidate = directory / kFileName; std::filesystem::is_regular_file(candidate, ec))
+            if (auto candidate = directory / FileName; std::filesystem::is_regular_file(candidate, ec))
                 return candidate;
             if (directory.parent_path() == directory) break;  // reached the filesystem root
         }
@@ -344,10 +425,15 @@ namespace kor
             "  --config <file>     Config file to read (default: nearest koral.json above the scene library)\n"
             "  --assets <dir>      Prepend a directory to search for relative asset paths (repeatable)\n"
             "  --shaders <dir>     Prepend a directory to search for relative shader paths (repeatable)\n"
+            "  --module <name>     Load an additional module, by name or path (repeatable)\n"
+            "  --modules-dir <dir> Prepend a directory to search for modules (repeatable)\n"
             "  --title <text>      Window title\n"
             "  --width <n>         Window width\n"
             "  --height <n>        Window height\n"
             "  --api <name>        Graphics backend: Vulkan or OpenGL\n"
+            "  --platform <name>   Linux windowing system: auto, x11 or wayland\n"
+            "  --gpu <which>       GPU to use: an index from the startup listing, or part of a device name (Vulkan only)\n"
+            "  --imgui-ini <file>  Where ImGui saves its layout (default: beside koral.json)\n"
             "  --fullscreen        Open fullscreen             (--no-fullscreen)\n"
             "  --resizable         Allow the window to resize  (--no-resizable)\n"
             "  --borderless        Drop the window decorations (--decorated)\n"

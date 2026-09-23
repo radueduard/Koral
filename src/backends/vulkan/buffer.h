@@ -12,9 +12,13 @@
 namespace kor::vk
 {
 	class DescriptorSet;
+	class BufferView;
 
 	class Buffer final : public kor::Buffer {
 		friend class kor::vk::DescriptorSet;
+		// A buffer view names one VkBuffer, and a per-frame buffer is several: the view has to see
+		// them all to make one view per copy. @see kor::vk::BufferView
+		friend class kor::vk::BufferView;
     public:
         explicit Buffer(const RawBuilder& builder);
 		~Buffer() override;
@@ -37,7 +41,7 @@ namespace kor::vk
 		 * @brief GPU device address of this buffer (current frame if per-frame).
 		 * Requires the buffer to have been created with Usage::eShaderDeviceAddress.
 		 */
-		[[nodiscard]] glm::u64 getDeviceAddress() const override;
+		[[nodiscard]] glm::u64 deviceAddress() const override;
 
 		[[nodiscard]] ::vk::AccessFlags getAccessMask() const;
 		void setAccessMask(::vk::AccessFlags access) const;

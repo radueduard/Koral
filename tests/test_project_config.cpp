@@ -44,10 +44,12 @@ TEST(ProjectConfig, ReadsEveryKey)
         "name": "My Game",
         "rendering": {
             "api": "OpenGL",
+            "platform": "wayland",
             "window": {
                 "width": 1600, "height": 900,
                 "resizable": true, "fullscreen": true, "borderless": true,
-                "transparent": true, "vsync": false
+                "transparent": true, "vsync": false,
+                "imguiIni": "state/imgui.ini"
             }
         },
         "paths": {
@@ -66,6 +68,8 @@ TEST(ProjectConfig, ReadsEveryKey)
     EXPECT_FALSE(config.decorated);
     EXPECT_TRUE(config.transparentFramebuffer);
     EXPECT_FALSE(config.vsync);
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
+    EXPECT_EQ(config.imguiIni, std::filesystem::path("/projects/game/state/imgui.ini"));
 
     ASSERT_EQ(config.assetDirectories.size(), 2u);
     EXPECT_EQ(config.assetDirectories[0], "/projects/game/assets");
@@ -124,6 +128,79 @@ TEST(ProjectConfig, AbsoluteDirectoriesAreLeftAlone)
     EXPECT_EQ(config.assetDirectories[0], "/opt/shared/textures");
 }
 
+// --- modules ---------------------------------------------------------------------------------
+
+TEST(ProjectConfig, ReadsTheModuleList)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({
+        "modules": ["koral-camera", "physics/libphysics.so"],
+        "paths": { "moduleDirectories": ["modules", "/opt/koral/modules"] }
+    })", kBase));
+
+    ASSERT_EQ(config.modules.size(), 2u);
+    EXPECT_EQ(config.modules[0], "koral-camera");
+    EXPECT_EQ(config.modules[1], "physics/libphysics.so");  // names are not paths; kept verbatim
+
+    ASSERT_EQ(config.moduleDirectories.size(), 2u);
+    EXPECT_EQ(config.moduleDirectories[0], "/projects/game/modules");   // relative: resolved
+    EXPECT_EQ(config.moduleDirectories[1], "/opt/koral/modules");       // absolute: left alone
+}
+
+TEST(ProjectConfig, ModuleListDefaultsToEmptyAndIsLeftAloneWhenAbsent)
+{
+    ProjectConfig config;
+    config.modules = { "compiled-in" };
+
+    ASSERT_TRUE(config.merge("{}", kBase));
+    ASSERT_EQ(config.modules.size(), 1u);
+    EXPECT_EQ(config.modules[0], "compiled-in");
+}
+
+TEST(ProjectConfig, ModuleListIsReplacedNotAppended)
+{
+    ProjectConfig config;
+    config.modules = { "compiled-in" };
+
+    ASSERT_TRUE(config.merge(R"({ "modules": ["koral-camera"] })", kBase));
+    ASSERT_EQ(config.modules.size(), 1u);
+    EXPECT_EQ(config.modules[0], "koral-camera");
+}
+
+TEST(ProjectConfig, ModuleFlagAppendsWithoutDuplicating)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "modules": ["koral-camera"] })", kBase));
+
+    ASSERT_TRUE(override_(config, { "--module", "physics", "--module", "koral-camera" }));
+
+    // "physics" was added; "koral-camera" was already there and is not repeated — the list is a
+    // set, and loading the same module twice would be an error the user could not see coming.
+    ASSERT_EQ(config.modules.size(), 2u);
+    EXPECT_EQ(config.modules[0], "koral-camera");
+    EXPECT_EQ(config.modules[1], "physics");
+}
+
+TEST(ProjectConfig, MissingModuleFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--module" });
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
+}
+
+TEST(ProjectConfig, ModulesDirFlagIsPrependedAheadOfTheConfigs)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "paths": { "moduleDirectories": ["modules"] } })", kBase));
+
+    ASSERT_TRUE(override_(config, { "--modules-dir", "/opt/other/modules" }));
+
+    ASSERT_EQ(config.moduleDirectories.size(), 2u);
+    EXPECT_EQ(config.moduleDirectories[0], "/opt/other/modules");
+    EXPECT_EQ(config.moduleDirectories[1], "/projects/game/modules");
+}
+
 TEST(ProjectConfig, UnknownKeysAreIgnored)
 {
     // Forward compatibility: a config written by a newer Hub must still load in an older runtime.
@@ -172,6 +249,142 @@ TEST(ProjectConfig, ApiNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)
             std::string(R"({ "rendering": { "api": ")") + name + R"(" } })", kBase)) << name;
         EXPECT_EQ(config.api, API::eVulkan) << name;
     }
+}
+
+TEST(ProjectConfig, ReadsTheWindowingPlatform)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "platform": "wayland" } })", kBase));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
+}
+
+TEST(ProjectConfig, PlatformDefaultsToAutoAndIsLeftAloneWhenAbsent)
+{
+    ProjectConfig config;                              // default
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eAuto);
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eAuto) << "an absent key must not reset it";
+}
+
+TEST(ProjectConfig, PlatformNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)
+{
+    for (const auto* name : { "x11", "X11", "eX11" }) {
+        ProjectConfig config;
+        ASSERT_TRUE(config.merge(
+            std::string(R"({ "rendering": { "platform": ")") + name + R"(" } })", kBase)) << name;
+        EXPECT_EQ(config.platform, kor::WindowPlatform::eX11) << name;
+    }
+}
+
+TEST(ProjectConfig, UnknownPlatformIsAnErrorAndNamesTheOffendingValue)
+{
+    ProjectConfig config;
+    const auto result = config.merge(R"({ "rendering": { "platform": "mir" } })", kBase);
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eConfigInvalid);
+    EXPECT_NE(result.error().message.find("mir"), std::string::npos);
+}
+
+TEST(ProjectConfig, PlatformFlagOverridesTheFile)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "platform": "x11" } })", kBase));
+    ASSERT_TRUE(override_(config, { "--platform", "wayland" }));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
+}
+
+TEST(ProjectConfig, UnknownPlatformFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--platform", "mir" });
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
+    EXPECT_NE(result.error().message.find("mir"), std::string::npos);
+}
+
+TEST(ProjectConfig, ReadsTheGpuPreference)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
+    EXPECT_EQ(config.gpu, "radeon");
+}
+
+TEST(ProjectConfig, GpuDefaultsToEmptyAndIsLeftAloneWhenAbsent)
+{
+    ProjectConfig config;                              // default
+    EXPECT_TRUE(config.gpu.empty());
+    config.gpu = "radeon";
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    EXPECT_EQ(config.gpu, "radeon") << "an absent key must not reset it";
+}
+
+TEST(ProjectConfig, GpuFlagOverridesTheFile)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
+    ASSERT_TRUE(override_(config, { "--gpu", "1" }));
+    EXPECT_EQ(config.gpu, "1");
+}
+
+TEST(ProjectConfig, MissingGpuFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--gpu" });
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
+    EXPECT_NE(result.error().message.find("--gpu"), std::string::npos);
+}
+
+TEST(ProjectConfig, ImguiIniResolvesAgainstTheConfigDirectory)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "layout/imgui.ini" } } })", kBase));
+    EXPECT_EQ(config.imguiIni, std::filesystem::path("/projects/game/layout/imgui.ini"));
+}
+
+TEST(ProjectConfig, AbsoluteImguiIniIsLeftAlone)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "/var/state/imgui.ini" } } })", kBase));
+    EXPECT_EQ(config.imguiIni, std::filesystem::path("/var/state/imgui.ini"));
+}
+
+TEST(ProjectConfig, ImguiIniIsEmptyByDefault)
+{
+    // The "beside koral.json" default is applied by the runtime once it knows the config file's
+    // location; the config object itself leaves it empty until something sets it.
+    ProjectConfig config;
+    EXPECT_TRUE(config.imguiIni.empty());
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    EXPECT_TRUE(config.imguiIni.empty()) << "an absent key must not invent a path";
+}
+
+TEST(ProjectConfig, ImguiIniFlagResolvesAgainstTheWorkingDirectory)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(override_(config, { "--imgui-ini", "state/ui.ini" }));
+    EXPECT_TRUE(config.imguiIni.is_absolute()) << "a command-line path is made absolute against the cwd";
+    EXPECT_EQ(config.imguiIni.filename(), "ui.ini");
+}
+
+TEST(ProjectConfig, ImguiIniFlagOverridesTheFile)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "from-file.ini" } } })", kBase));
+    ASSERT_TRUE(override_(config, { "--imgui-ini", "from-flag.ini" }));
+    EXPECT_EQ(config.imguiIni.filename(), "from-flag.ini");
+}
+
+TEST(ProjectConfig, MissingImguiIniFlagValueIsAnError)
+{
+    ProjectConfig config;
+    const auto result = override_(config, { "--imgui-ini" });
+
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
 }
 
 // koral.json IS the Hub's project file. The Hub writes it, we read it, and the two share no code —
@@ -385,7 +598,7 @@ protected:
 
     void writeConfig(const std::string_view contents) const
     {
-        std::ofstream out(_root / ProjectConfig::kFileName);
+        std::ofstream out(_root / ProjectConfig::FileName);
         out << contents;
     }
 
@@ -401,7 +614,7 @@ TEST_F(ProjectConfigFile, IsFoundByWalkingUpFromTheSceneLibrary)
     const auto found = ProjectConfig::find(_root / "cmake-build-debug");
 
     ASSERT_TRUE(found.has_value());
-    EXPECT_EQ(*found, _root / ProjectConfig::kFileName);
+    EXPECT_EQ(*found, _root / ProjectConfig::FileName);
 }
 
 TEST_F(ProjectConfigFile, IsNotFoundWhenThereIsNone)
@@ -416,7 +629,7 @@ TEST_F(ProjectConfigFile, RelativeDirectoriesResolveAgainstTheFile)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"], "shaderDirectories": ["shaders"] } })");
 
     ProjectConfig config;
-    const auto result = config.mergeFile(_root / ProjectConfig::kFileName);
+    const auto result = config.mergeFile(_root / ProjectConfig::FileName);
 
     ASSERT_TRUE(result) << result.error().message;
     ASSERT_EQ(config.assetDirectories.size(), 1u);
@@ -439,10 +652,10 @@ TEST_F(ProjectConfigFile, MalformedFileNamesItselfInTheError)
     writeConfig("{ oops");
 
     ProjectConfig config;
-    const auto result = config.mergeFile(_root / ProjectConfig::kFileName);
+    const auto result = config.mergeFile(_root / ProjectConfig::FileName);
 
     ASSERT_FALSE(result);
-    EXPECT_NE(result.error().message.find(ProjectConfig::kFileName), std::string::npos);
+    EXPECT_NE(result.error().message.find(ProjectConfig::FileName), std::string::npos);
 }
 
 // --- resolution ------------------------------------------------------------------------------
@@ -458,7 +671,7 @@ TEST_F(ProjectConfigFile, RegisteredDirectoriesResolveRelativeAssetPaths)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     EXPECT_EQ(kor::assetPath("textures/wood.png"), _root / "assets" / "textures" / "wood.png");
@@ -471,7 +684,7 @@ TEST_F(ProjectConfigFile, RegisteredDirectoriesResolveRelativeShaderPaths)
     writeConfig(R"({ "paths": { "shaderDirectories": ["shaders"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     EXPECT_EQ(kor::shaderPath("blur.comp.glsl"), _root / "shaders" / "blur.comp.glsl");
@@ -488,7 +701,7 @@ TEST_F(ProjectConfigFile, RegisteringDirectoriesKeepsTheEnginesOwnRoots)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     const auto& roots = kor::assetSearchPaths();
@@ -529,7 +742,7 @@ TEST_F(ProjectConfigFile, AConfigRootBeatsTheWorkingDirectory)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::kFileName));
+    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
     config.registerSearchPaths();
 
     EXPECT_EQ(kor::assetPath("shared.png"), _root / "assets" / "shared.png");

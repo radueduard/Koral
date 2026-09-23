@@ -37,8 +37,7 @@ namespace kor
      * Each code maps to a stable one-line description via @ref describe, which is
      * also the source of truth for docs/errors.md. Codes are grouped by domain.
      */
-    enum class ErrorCode
-    {
+    enum class ErrorCode : std::uint8_t {
         eNone = 0,             ///< No error (success sentinel).
 
         // --- generic ---
@@ -56,21 +55,31 @@ namespace kor
         eNoGraphicsPipelineBound,    ///< A graphics command was recorded with no graphics pipeline bound.
         eNoComputePipelineBound,     ///< A compute command was recorded with no compute pipeline bound.
         eNoRayTracingPipelineBound,  ///< A ray-tracing command was recorded with no ray-tracing pipeline bound.
+        eNoPipelineBound,            ///< A command needing any pipeline was recorded with none bound.
         eNoMeshBound,                ///< An indexed/mesh draw was recorded with no mesh bound.
         eMeshHasNoIndexBuffer,       ///< An indexed draw was recorded for a mesh without an index buffer.
         eCopySizeExceedsBuffer,      ///< A copy/clear/fill range exceeds the target buffer size.
         eImageSubresourceOutOfRange, ///< A copy referenced a mip level / array layer outside the image.
         eResolveRequiresMultisample, ///< Resolve requires a multisampled source and single-sampled destination.
         eRayTracingUnsupported,      ///< Ray tracing is not supported on this backend.
+        eMissingBarrier,             ///< A hazard the engine cannot synchronise on its own was left unguarded (see Barrier).
 
         // --- pipeline / shader (populated in later phases) ---
         eMissingShaderStage,   ///< A pipeline is missing a required shader stage.
         eShaderStageMismatch,  ///< A shader was supplied for the wrong pipeline stage.
         eDescriptorConflict,   ///< Descriptor declarations conflict across merged shader stages.
         eShaderCompileFailed,  ///< Shader compilation/linking failed.
+        eVertexLayoutMismatch, ///< A vertex shader asks for a semantic the vertex layout does not carry.
+        ePushConstantMismatch, ///< A push constant was named that the pipeline does not declare, or with the wrong size, or two stages declare one name differently.
 
         // --- configuration ---
         eConfigInvalid,        ///< A koral.json config file is malformed or has a key of the wrong type.
+
+        // --- modules ---
+        eModuleLoadFailed,     ///< A module could not be found, loaded, or ordered against its dependencies.
+
+        // --- files ---
+        eFileNotReadable,      ///< A file could not be opened, or its contents are not the shape expected.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */
@@ -90,10 +99,10 @@ namespace kor
      */
     struct KORAL_API Error
     {
-        ErrorCode code = ErrorCode::eNone;
-        std::string message;
-        std::source_location where = std::source_location::current();
-        std::shared_ptr<const Error> cause;  ///< The error that made our input unusable, if any.
+        ErrorCode code = ErrorCode::eNone;      ///< What kind of failure this is.
+        std::string message;                    ///< What went wrong, in words, with the specifics filled in.
+        std::source_location where = std::source_location::current();   ///< Where it was raised — the caller's build() or record site, not somewhere inside Koral.
+        std::shared_ptr<const Error> cause;     ///< The error that made our input unusable, if any.
 
         /** @brief Format this error alone as "kor::Error(code): message [file:line]". */
         [[nodiscard]] std::string toString() const;
@@ -125,7 +134,9 @@ namespace kor
      */
     struct KORAL_API BackendException : std::runtime_error
     {
-        Error error;
+        Error error;    ///< The structured error being carried.
+
+        /** @param e The error to carry; its message becomes the exception's what(). */
         explicit BackendException(Error e)
             : std::runtime_error(e.message), error(std::move(e)) {}
     };

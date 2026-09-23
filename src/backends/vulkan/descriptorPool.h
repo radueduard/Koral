@@ -10,11 +10,15 @@
 
 #include <vulkan/vulkan.hpp>
 
+#include <cstdint>
+
 #include "vk_wrapper.h"
 
 namespace kor
 {
-    enum class DescriptorType;
+    // Opaque, to keep structs.h out of this header. The underlying type has to match the
+    // definition's exactly, which is one reason every public enum now states one. @see structs.h
+    enum class DescriptorType : std::uint8_t;
 }
 
 namespace kor::vk

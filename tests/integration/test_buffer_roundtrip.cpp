@@ -4,7 +4,9 @@
 
 #include "gpu_fixture.h"
 
+#include <array>
 #include <numeric>
+#include <ranges>
 #include <vector>
 
 #include "buffer.h"
@@ -27,15 +29,13 @@ TEST_F(GpuTest, DeviceLocalRoundTrip) {
 
     Buffer::Builder<int> b;
     b.setData(src);
-    b.addUsage(Buffer::Usage::eStorage);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eDeviceLocal);
 
     auto buf = b.build();
     ASSERT_TRUE(static_cast<bool>(buf));
-    EXPECT_EQ(buf->getType(), Buffer::Type::eDeviceLocal);
-    EXPECT_EQ(buf->getSize(), src.size() * sizeof(int));
+    EXPECT_EQ(buf->type(), Buffer::Type::eDeviceLocal);
+    EXPECT_EQ(buf->size(), src.size() * sizeof(int));
 
     const std::vector<int> out = buf->Read<int>();
     EXPECT_EQ(out, src);
@@ -47,8 +47,7 @@ TEST_F(GpuTest, StagingRoundTrip) {
 
     Buffer::Builder<float> b;
     b.setData(src);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eStaging);
 
     auto buf = b.build();
@@ -64,9 +63,7 @@ TEST_F(GpuTest, StagingRoundTrip) {
 TEST_F(GpuTest, DeviceLocalWriteAtReadAt) {
     Buffer::Builder<int> b;
     b.setData(iotaVec(16));
-    b.addUsage(Buffer::Usage::eStorage);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eDeviceLocal);
     auto buf = b.build();
 
@@ -82,8 +79,7 @@ TEST_F(GpuTest, PartialRead) {
 
     Buffer::Builder<int> b;
     b.setData(src);
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eStaging);
     auto buf = b.build();
 
@@ -97,12 +93,58 @@ TEST_F(GpuTest, PartialRead) {
 TEST_F(GpuTest, OutOfRangeReadThrows) {
     Buffer::Builder<int> b;
     b.setData(iotaVec(8));
-    b.addUsage(Buffer::Usage::eTransferSrc);
-    b.addUsage(Buffer::Usage::eTransferDst);
+    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
     b.setType(Buffer::Type::eStaging);
     auto buf = b.build();
 
     EXPECT_THROW((void)buf->Read<int>(/*count*/4, /*offset*/6), std::out_of_range);
+}
+
+
+// Anything a range can be, an upload can take: a vector, an array, a span, or a view that has no
+// memory behind it at all. The last is the case a span-only API could not express — the elements
+// do not exist until they are walked, so they are gathered into a temporary on the way to the GPU.
+TEST_F(GpuTest, UploadsTakeAnyRange) {
+    // A lazy view: 16 squares, computed as they are read.
+    auto squares = std::views::iota(0, 16) | std::views::transform([](const int i) { return i * i; });
+    static_assert(!std::ranges::contiguous_range<decltype(squares)>, "the interesting case is the one with no buffer");
+
+    Buffer::Builder<int> fromView;
+    fromView.setData(squares);
+    fromView.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    fromView.setType(Buffer::Type::eStaging);
+    const auto viewBuffer = fromView.build();
+    ASSERT_TRUE(viewBuffer.valid()) << (viewBuffer.error() ? viewBuffer.error()->history() : "");
+
+    const auto readBack = viewBuffer->Read<int>();
+    ASSERT_EQ(readBack.size(), 16u);
+    EXPECT_EQ(readBack[3], 9);
+    EXPECT_EQ(readBack.back(), 225);
+
+    // And the contiguous spellings, none of which need a std::span written around them.
+    const std::vector vector{1, 2, 3, 4};
+    const std::array array{5, 6, 7, 8};
+
+    Buffer::Builder<int> fromVector;
+    fromVector.setData(vector);
+    fromVector.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    fromVector.setType(Buffer::Type::eStaging);
+    const auto vectorBuffer = fromVector.build();
+    EXPECT_EQ(vectorBuffer->Read<int>(), vector);
+
+    Buffer::Builder<int> fromArray;
+    fromArray.setDataView(array);          // viewed where it lies, not copied until build()
+    fromArray.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    fromArray.setType(Buffer::Type::eStaging);
+    const auto arrayBuffer = fromArray.build();
+    ASSERT_TRUE(arrayBuffer.valid());
+    EXPECT_EQ(arrayBuffer->Read<int>()[2], 7);
+
+    // Write takes the same variety, including the view.
+    arrayBuffer->Write(std::vector{9, 9, 9, 9});
+    EXPECT_EQ(arrayBuffer->Read<int>()[0], 9);
+    arrayBuffer->Write(std::views::iota(0, 4) | std::views::transform([](const int i) { return i + 100; }));
+    EXPECT_EQ(arrayBuffer->Read<int>()[3], 103);
 }
 
 } // namespace

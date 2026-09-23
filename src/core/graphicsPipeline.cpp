@@ -12,16 +12,20 @@
 #include "../backends/vulkan/graphicsPipeline.h"
 
 #include "context.h"
-#include "meshLayout.h"
 #include "shader.h"
+#include "vertexLayout.h"
 
 namespace kor
 {
-    GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader) {
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader,
+                                                                         const VertexLayout& layout) {
         this->vertexShader = shader;
-        this->vertexAttributeDescriptions = DefaultMeshRegistry::Attributes();
-        this->vertexBindingDescriptions = DefaultMeshRegistry::Bindings();
+        this->vertexLayout = layout;
         return *this;
+    }
+
+    GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader) {
+        return setVertexShader(std::move(shader), VertexLayout::Default());
     }
 
     GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTessellationState(const TessellationState& tessellationState)
@@ -84,7 +88,7 @@ namespace kor
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(kor::ResourceRef<kor::Framebuffer> framebuffer)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(kor::ResourceRef<const kor::Framebuffer> framebuffer)
     {
         this->framebuffer = framebuffer;
         return *this;
@@ -114,12 +118,27 @@ namespace kor
         if (api != API::eOpenGL && api != API::eVulkan)
             return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
+        // The vertex layout becomes locations here rather than when it was set, because the shader
+        // it is matched against can be recompiled underneath us: a reload runs create() again, and
+        // the attributes follow wherever the new shader put its inputs.
+        Builder resolved = *this;
+        if (vertexLayout.has_value() && vertexShader.has_value()) {
+            auto attributes = vertexLayout->resolve(**vertexShader);
+            if (!attributes) {
+                // The shader is what has to be edited, so the error names it as the place to look.
+                return fail(attributes.error().code, "{} (vertex shader '{}')",
+                            attributes.error().message, (*vertexShader)->sourcePath().string());
+            }
+            resolved.vertexAttributeDescriptions = std::move(*attributes);
+            resolved.vertexBindingDescriptions = vertexLayout->bindings;
+        }
+
         // Construction runs Validate() (which may throw BackendException with a specific
         // code) and the backend Setup(); guard() turns any escape into a kor::Error.
         return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<GraphicsPipeline> {
             return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(*this)
-                : kor::MakeBackendPtr<GraphicsPipeline, ogl::GraphicsPipeline>(*this);
+                ? kor::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(resolved)
+                : kor::MakeBackendPtr<GraphicsPipeline, ogl::GraphicsPipeline>(resolved);
         });
     }
 
@@ -155,7 +174,7 @@ namespace kor
         _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),
-        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::DefaultFramebuffer()),
+        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::defaultFramebuffer()),
         _depthStencilState(createInfo.depthStencilState),
         _colorBlendState(createInfo.colorBlendState),
         _vertexAttributeDescriptions(createInfo.vertexAttributeDescriptions),
@@ -199,8 +218,8 @@ namespace kor
         if (_meshShader.has_value()) shaders.push_back(*_meshShader);
 
         // Merge descriptor set layouts and push constants across all stages.
-        if (!buildLayouts(shaders))
-            return fail(ErrorCode::eDescriptorConflict, "Descriptor declarations conflict across the pipeline's shader stages.");
+        if (auto merged = buildLayouts(shaders); !merged)
+            return std::unexpected(merged.error());
 
         return {};
     }

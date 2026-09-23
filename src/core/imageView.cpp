@@ -15,8 +15,8 @@
 namespace kor
 {
     ImageView::Builder::Builder(kor::ResourceRef<const Image> image) : image(image) {
-        arrayLayerCount = image->getArrayLayers();
-        mipLevelCount = image->getMipLevels();
+        arrayLayerCount = image->arrayLayers();
+        mipLevelCount = image->mipLevels();
     }
 
     kor::Result<std::unique_ptr<ImageView>> ImageView::Builder::create() const

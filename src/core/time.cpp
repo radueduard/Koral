@@ -55,17 +55,17 @@ namespace kor
      * @return The time in seconds it took to render the last frame. This is updated at the end of each frame,
      * so it represents the time taken for the previous frame, not the current one.
      */
-    float Time::FrameTime()
+    float Time::frameTime()
     {
         return g_time.frameDeltaTime;
     }
 
-    float Time::FixedDeltaTime()
+    float Time::fixedDeltaTime()
     {
         return g_time.fixedDeltaTime;
     }
 
-    float Time::WindowTime()
+    float Time::windowTime()
     {
         return g_time.timeSinceStart;
     }

@@ -3,241 +3,361 @@
 //
 
 #pragma once
+#include <array>
 #include <memory>
 #include <span>
 #include <vector>
 #include <cstddef>
+#include <optional>
+#include <unordered_map>
 #include <glm/glm.hpp>
 
 #include "flags.h"
 #include "api.h"
+#include "dataRange.h"
 #include <source_location>
 
 #include "builder.h"
 #include "structs.h"
 #include "resource.h"
 #include "error.h"
+// For the whole-image views Image::view hands out and owns. imageView.h knows Image only by name,
+// so this direction of the pair is the safe one — and the shape those views are built to lives in
+// structs.h above, rather than on Shader, precisely so this file need not include shader.h.
+#include "imageView.h"
 
 namespace kor
 {
     class Buffer;
+    class ImageView;
     class FramebufferImage;
 
-    enum class MSAA
-    {
-        eNone = 0,
-        e2x = 2,
-        e4x = 4,
-        e8x = 8,
-        e16x = 16,
-    };
-
+    /**
+     * @brief A texture, render target or storage image: pixels the GPU can sample or write.
+     *
+     * Built through its builder, like every resource:
+     *
+     * @code
+     * kor::Image::Builder builder;
+     * auto texture = builder
+     *     .setFormat(kor::Image::Format::eRGBA8_SRGB)
+     *     .setExtent(glm::uvec2{width, height})
+     *     .setMipLevels(mipCount)
+     *     .setUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eTransferDst)
+     *     .setData(std::span<const glm::u8vec4>(pixels))
+     *     .build();
+     * @endcode
+     *
+     * Three properties decide what an image can do. The **format** fixes what one pixel holds and
+     * how a shader reads it — note that eRGBA8_SRGB and eRGBA8_UNORM store identical bytes but only
+     * the first is converted from sRGB on read, which is the difference between correct and washed
+     * out colour. The **usage** flags declare every role it will play, and a role not declared is
+     * invalid. The **layout** an image must be in for each role is not your problem: the command
+     * buffer tracks it per subresource and transitions it for you.
+     *
+     * @see ImageView for a window onto part of an image, Sampler for how shaders filter it
+     */
     class KORAL_API Image
     {
     public:
-        enum class Type
-        {
-            e1D,
-            e2D,
-            e3D,
+        /** @brief How many dimensions the image has. */
+        enum class Type : std::uint8_t {
+            e1D,    ///< A row of pixels. Gradients and lookup tables.
+            e2D,    ///< The ordinary case: a texture or a render target.
+            e3D,    ///< A volume. Volumetric data and 3D lookup tables.
         };
 
-        enum class Format
-        {
-            // </hint> 8-bit single channel formats
+        /**
+         * @brief What one pixel holds, and how a shader reads it.
+         *
+         * The suffix is the interpretation: UNORM maps the stored integer onto 0..1, SNORM onto
+         * -1..1, UINT and SINT keep it an integer, SFLOAT stores a real float, and SRGB is UNORM
+         * with the sRGB-to-linear conversion applied on read and back on write — which is what
+         * colour textures and colour attachments generally want, and what data textures (normal
+         * maps, masks, height fields) generally do not.
+         *
+         * Not every format is supported by every device for every usage.
+         */
+        enum class Format : std::uint8_t {
+            // 8-bit single channel formats
             eR8_UNORM,
             eR8_SNORM,
             eR8_UINT,
             eR8_SINT,
 
-            // </hint> 8-bit dual channel formats
+            // 8-bit dual channel formats
             eRG8_UNORM,
             eRG8_SNORM,
             eRG8_UINT,
             eRG8_SINT,
 
-            // </hint> 8-bit triple channel formats
+            // 8-bit triple channel formats
             eRGB8_UNORM,
             eRGB8_SNORM,
             eRGB8_UINT,
             eRGB8_SINT,
             eRGB8_SRGB,
 
-            // </hint> 8-bit quad channel formats
+            // 8-bit quad channel formats
             eRGBA8_UNORM,
             eRGBA8_SNORM,
             eRGBA8_UINT,
             eRGBA8_SINT,
             eRGBA8_SRGB,
 
-            // </hint> 16-bit single channel formats
+            // 16-bit single channel formats
             eR16_UNORM,
             eR16_SNORM,
             eR16_UINT,
             eR16_SINT,
             eR16_SFLOAT,
 
-            // </hint> 16-bit dual channel formats
+            // 16-bit dual channel formats
             eRG16_UNORM,
             eRG16_SNORM,
             eRG16_UINT,
             eRG16_SINT,
             eRG16_SFLOAT,
 
-            // </hint> 16-bit triple channel formats
+            // 16-bit triple channel formats
             eRGB16_UNORM,
             eRGB16_SNORM,
             eRGB16_UINT,
             eRGB16_SINT,
             eRGB16_SFLOAT,
 
-            // </hint> 16-bit quad channel formats
+            // 16-bit quad channel formats
             eRGBA16_UNORM,
             eRGBA16_SNORM,
             eRGBA16_UINT,
             eRGBA16_SINT,
             eRGBA16_SFLOAT,
 
-            // </hint> 32-bit single channel formats
+            // 32-bit single channel formats
             eR32_UINT,
             eR32_SINT,
             eR32_SFLOAT,
 
-            // </hint> 32-bit dual channel formats
+            // 32-bit dual channel formats
             eRG32_UINT,
             eRG32_SINT,
             eRG32_SFLOAT,
 
-            // </hint> 32-bit triple channel formats
+            // 32-bit triple channel formats
             eRGB32_UINT,
             eRGB32_SINT,
             eRGB32_SFLOAT,
 
-            // </hint> 32-bit quad channel formats
+            // 32-bit quad channel formats
             eRGBA32_UINT,
             eRGBA32_SINT,
             eRGBA32_SFLOAT,
 
-            // </hint> Depth/stencil formats
+            // Depth/stencil formats. eD32_SFLOAT is the usual depth buffer; the _S8_UINT pairs add a stencil.
             eD16_UNORM,
             eD24_UNORM_S8_UINT,
             eD32_SFLOAT,
             eD32_SFLOAT_S8_UINT,
 
-            // </hint> Surface formats
+            // Surface formats. What a swap chain typically presents; rarely chosen by hand.
             eBGRA8_UNORM,
             eBGRA8_SRGB,
 
-            // </hint> Compressed formats
-            eBC1_RGB_UNORM,
+            // ---- Block-compressed formats ----------------------------------------------------
+            //
+            // Texels are stored in fixed-size blocks — four bytes a texel becomes one byte or less —
+            // which is what lets a scene's textures fit in video memory. The trade is that a block
+            // is the smallest addressable unit: these cannot be rendered into, and a copy's offset
+            // and extent must fall on block boundaries. Ask blockExtent and
+            // blockSize rather than assuming, and size a staging buffer with
+            // sizeOfRegion.
+            //
+            // Which of these a given GPU actually supports varies — BC on desktop, ASTC and ETC2 on
+            // mobile — which is why a compressed texture is normally shipped as a universal KTX2 and
+            // transcoded into whichever of these is available. @see the image modules.
+
+            // S3TC/DXT and friends: the desktop set.
+            eBC1_RGB_UNORM,     ///< RGB, 8 bytes per 4x4 block. The smallest, and the oldest.
             eBC1_RGB_SRGB,
-            eBC1_RGBA_UNORM,
+            eBC1_RGBA_UNORM,    ///< RGB plus one bit of alpha.
             eBC1_RGBA_SRGB,
-            eBC2_UNORM,
+            eBC2_UNORM,         ///< RGB with 4-bit alpha, 16 bytes per block.
             eBC2_SRGB,
-            eBC3_UNORM,
+            eBC3_UNORM,         ///< RGB with interpolated alpha — the classic DXT5.
             eBC3_SRGB,
-            eBC7_UNORM,
+            eBC4_UNORM,         ///< One channel, 8 bytes per block. Masks, heightfields, gloss.
+            eBC4_SNORM,
+            eBC5_UNORM,         ///< Two channels, 16 bytes per block. Tangent-space normal maps.
+            eBC5_SNORM,
+            eBC6H_UFLOAT,       ///< HDR RGB, 16 bytes per block. The compressed home for a sky.
+            eBC6H_SFLOAT,
+            eBC7_UNORM,         ///< RGBA, 16 bytes per block. The best quality of the family.
             eBC7_SRGB,
+
+            // ASTC: one block size per format, all 16 bytes — the bigger the block, the smaller the
+            // texture. Ubiquitous on mobile, uncommon on desktop.
+            eASTC_4x4_UNORM,
+            eASTC_4x4_SRGB,
+            eASTC_6x6_UNORM,
+            eASTC_6x6_SRGB,
+            eASTC_8x8_UNORM,
+            eASTC_8x8_SRGB,
+
+            // ETC2 / EAC: the OpenGL ES baseline, and what a universal texture falls back to.
+            eETC2_RGB8_UNORM,
+            eETC2_RGB8_SRGB,
+            eETC2_RGBA8_UNORM,
+            eETC2_RGBA8_SRGB,
+            eEAC_R11_UNORM,     ///< One channel, 8 bytes per block.
+            eEAC_R11_SNORM,
+            eEAC_RG11_UNORM,    ///< Two channels, 16 bytes per block.
+            eEAC_RG11_SNORM,
         };
 
-        enum class Usage
-        {
-            eTransferSrc = 1 << 0,
-            eTransferDst = 1 << 1,
-            eSampled = 1 << 2,
-            eStorage = 1 << 3,
-            eColorAttachment = 1 << 4,
-            eDepthStencilAttachment = 1 << 5,
+        /**
+         * @brief Every role the image will play. A role not declared here is invalid at runtime.
+         */
+        enum class Usage : std::uint8_t {
+            eTransferSrc = 1 << 0,              ///< Can be copied, blitted or resolved from. Needed to read it back, and to generate mipmaps.
+            eTransferDst = 1 << 1,              ///< Can be copied, blitted or cleared into. Needed to upload pixels.
+            eSampled = 1 << 2,                  ///< Can be sampled by a shader through a sampler — an ordinary texture.
+            eStorage = 1 << 3,                  ///< Can be read and written directly by a shader, without filtering.
+            eColorAttachment = 1 << 4,          ///< Can be rendered into as a colour target.
+            eDepthStencilAttachment = 1 << 5,   ///< Can be rendered into as a depth and/or stencil target.
         };
 
-        struct KORAL_API Builder : ::Builder {
-            bool isPerFrame = false;
-            Type type = Type::e2D;
-            Format format = Format::eRGBA8_UNORM;
-            glm::uvec3 extent = { 1, 1, 1 };
-            glm::u32 mipLevels = 1;
-            glm::u32 arrayLayers = 1;
-            MSAA msaa = MSAA::eNone;
-            Flags<Usage> usage = Usage::eSampled;
+        /** @brief Describes the image to create, and optionally the pixels to fill it with. */
+        struct KORAL_API Builder : kor::Builder {
+            bool isPerFrame = false;                    ///< Whether to allocate one copy per frame in flight.
+            Type type = Type::e2D;                      ///< How many dimensions it has.
+            Format format = Format::eRGBA8_UNORM;       ///< What one pixel holds.
+            glm::uvec3 extent = { 1, 1, 1 };            ///< Size in pixels. Unused dimensions are 1.
+            glm::u32 mipLevels = 1;                     ///< Number of mip levels, counting the full-size one.
+            glm::u32 arrayLayers = 1;                   ///< Number of layers, for texture arrays.
+            SampleCount sampleCount = SampleCount::e1;  ///< Samples per pixel; e1 is an ordinary image.
 
+            /**
+             * @brief Every role the image will play.
+             *
+             * Both transfer roles are included by default, and deliberately: copying an image,
+             * reading it back, blitting it, clearing it or generating its mip chain all need one of
+             * them, they are needed at a moment far from where the image was built, and forgetting
+             * one used to surface as a driver validation message rather than anything naming the
+             * flag. They cost effectively nothing on a desktop GPU — a tiler may give up lossless
+             * compression for eTransferSrc, which is the one case worth taking them off for.
+             *
+             * setUsage() replaces this outright rather than adding to it, which is how an image
+             * says it wants exactly these roles and no others — so an image that names any role
+             * has to name the transfers it needs too. A transfer attempted on an image that
+             * dropped the flag that way is reported by name at the command that tried it.
+             */
+            Flags<Usage> usage = Flags<Usage>(Usage::eSampled) | Usage::eTransferSrc | Usage::eTransferDst;
+
+            /**
+             * @brief Gives the image one copy per frame in flight, for a target written every frame.
+             *
+             * Without it, writing an image the GPU is still reading from an earlier frame corrupts
+             * that frame.
+             */
             Builder& setIsPerFrame(const bool isPerFrame) {
                 this->isPerFrame = isPerFrame;
                 return *this;
             }
 
+            /** @brief Sets how many dimensions the image has. */
             Builder& setType(const Type type) {
                 this->type = type;
                 return *this;
             }
 
+            /** @brief Sets what one pixel holds and how shaders read it. */
             Builder& setFormat(const Format format) {
                 this->format = format;
                 return *this;
             }
 
+            /** @brief Sets a cubic extent, the same size on every axis. */
             Builder& setExtent(const glm::u32& extent) {
                 this->extent = { extent, extent, extent };
                 return *this;
             }
 
+            /** @brief Sets a 2D extent in pixels; depth becomes 1. The usual overload. */
             Builder& setExtent(const glm::uvec2& extent) {
                 this->extent = { extent, 1 };
                 return *this;
             }
 
+            /** @brief Sets a 3D extent in pixels, for a volume image. */
             Builder& setExtent(const glm::uvec3& extent) {
                 this->extent = extent;
                 return *this;
             }
 
+            /**
+             * @brief Sets how many mip levels the image has, counting the full-size one.
+             *
+             * More than one asks for a mip chain; the smaller levels start out empty. Fill them
+             * with CommandBuffer::GenerateMipmaps, which setData() does for you.
+             */
             Builder& setMipLevels(const glm::u32 mipLevels) {
                 this->mipLevels = mipLevels;
                 return *this;
             }
 
+            /** @brief Sets how many layers the image has, making it a texture array. */
             Builder& setArrayLayers(const glm::u32 arrayLayers) {
                 this->arrayLayers = arrayLayers;
                 return *this;
             }
 
-            Builder& setMSAA(const MSAA msaa) {
-                this->msaa = msaa;
-                return *this;
-            }
-
-            // Convenience: set MSAA from a SampleCount value.
+            /**
+             * @brief Sets the samples per pixel, making the image multisampled.
+             *
+             * A multisampled image can be rendered into but not sampled; resolve it to a
+             * single-sampled one first.
+             */
             Builder& setSampleCount(const SampleCount sampleCount) {
-                switch (sampleCount) {
-                case SampleCount::e1:  this->msaa = MSAA::eNone; break;
-                case SampleCount::e2:  this->msaa = MSAA::e2x;   break;
-                case SampleCount::e4:  this->msaa = MSAA::e4x;   break;
-                case SampleCount::e8:  this->msaa = MSAA::e8x;   break;
-                case SampleCount::e16: this->msaa = MSAA::e16x;  break;
-                default:               this->msaa = MSAA::eNone; break;
-                }
+                this->sampleCount = sampleCount;
                 return *this;
             }
 
+            /**
+             * @brief Declares every role the image will play, replacing the default set.
+             *
+             * Name them all at once — the enumerators OR together, so there is one call rather
+             * than one per role:
+             *
+             * @code
+             * .setUsage(Usage::eColorAttachment | Usage::eSampled | Usage::eTransferSrc)
+             * @endcode
+             *
+             * This *replaces*, including the transfer roles the default carries, so an image that
+             * names its roles has to name the transfers it needs too.
+             */
             Builder& setUsage(const Flags<Usage>& usage) {
                 this->usage = usage;
                 return *this;
             }
 
-            Builder& addUsage(const Usage usage) {
-                this->usage |= usage;
-                return *this;
-            }
-
-            // Initial pixel data, uploaded to mip 0 of every array layer when build() runs.
-            // Bytes are laid out layer-major, tightly packed, matching the image's format.
-            // If the image has more than one mip level, the remaining levels are generated.
+            /// Initial pixel data, uploaded to mip 0 of every array layer when build() runs. Bytes
+            /// are laid out layer-major, tightly packed, matching the image's format.
             std::vector<std::byte> data {};
 
-            // Sets initial pixel data from a typed span (e.g. std::span<const glm::u8vec4>).
-            // Implies eTransferDst/eTransferSrc usage so the upload (and mip generation) work.
-            template<typename T>
-            Builder& setData(std::span<const T> pixels) {
+            /**
+             * @brief Fills the image from a typed span of pixels.
+             * @param source The pixels as any range — a vector, an array, a span — of the type one
+             *        texel is, e.g. glm::u8vec4 for an 8-bit RGBA image.
+             *        Copied during this call, and must match the image's format and extent.
+             *
+             * Uploaded to mip 0 of every array layer when build() runs; if the image has more mip
+             * levels, the rest are generated from it. Implies the transfer usages that needs.
+             */
+            template<typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
+                requires RangeOf<R, T>
+            Builder& setData(R&& source) {
+                const ContiguousCopy<T> contiguous(std::forward<R>(source));
+                const std::span<const T> pixels = contiguous.view();
                 const auto bytes = std::as_bytes(pixels);
                 data.assign(bytes.begin(), bytes.end());
                 usage |= Usage::eTransferDst;
@@ -245,7 +365,11 @@ namespace kor
                 return *this;
             }
 
-            // Raw-bytes overload for callers that already have an untyped pixel buffer.
+            /**
+             * @brief Fills the image from an untyped pixel buffer.
+             * @param pixels Start of the pixel data. Copied during this call.
+             * @param sizeBytes How many bytes to take, which must match the image's format and extent.
+             */
             Builder& setData(const void* pixels, const glm::u64 sizeBytes) {
                 const auto* p = static_cast<const std::byte*>(pixels);
                 data.assign(p, p + sizeBytes);
@@ -256,51 +380,246 @@ namespace kor
 
             /** @brief One build attempt. Internal: prefer build(). */
             [[nodiscard]] Result<std::unique_ptr<Image>> create() const;
+
+            /**
+             * @brief Creates the image and uploads any initial data.
+             * @return The image as a Resource, poisoned rather than thrown if the build failed.
+             */
             [[nodiscard]] kor::Resource<Image> build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~Image() = default;
 
-        virtual void Resize(const glm::uvec3& extent) = 0;
+        /**
+         * @brief Reallocates the image at a new size, discarding its contents.
+         * @param extent The new size in pixels.
+         *
+         * For render targets that follow the window. Anything referring to the old storage — image
+         * views, descriptor sets — has to be rebuilt afterwards.
+         */
+        void Resize(const glm::uvec3& extent);
 
-        [[nodiscard]] glm::uvec3 getExtent() const { return _extent; }
+        /**
+         * @brief How many times this image has been rebuilt.
+         *
+         * A resize does not resize an image — it *replaces* it, because the storage a GPU image is
+         * allocated with is immutable. Anything holding a handle to the old one (an image view above
+         * all) is therefore stale, and this is how it finds out. @see Resize
+         */
+        [[nodiscard]] glm::u64 generation() const { return _generation; }
 
-        [[nodiscard]] Type getType() const { return _type; }
-        [[nodiscard]] Format getFormat() const { return _format; }
-        [[nodiscard]] MSAA getMSAA() const { return _msaa; }
+        /** @brief The image's size in pixels. Unused dimensions are 1. */
+        [[nodiscard]] glm::uvec3 extent() const { return _extent; }
 
-        [[nodiscard]] SampleCount getSampleCount() const {
-            switch (_msaa) {
-            case MSAA::eNone:  return SampleCount::e1;
-            case MSAA::e2x:    return SampleCount::e2;
-            case MSAA::e4x:    return SampleCount::e4;
-            case MSAA::e8x:    return SampleCount::e8;
-            case MSAA::e16x:   return SampleCount::e16;
-            default:           return SampleCount::e1;
-            }
-        }
-        [[nodiscard]] Flags<Usage> getUsage() const { return _usage; }
-        [[nodiscard]] glm::u32 getMipLevels() const { return _mipLevels; }
-        [[nodiscard]] glm::u32 getArrayLayers() const { return _arrayLayers; }
+        /** @brief How many dimensions the image has. */
+        [[nodiscard]] Type type() const { return _type; }
+        /** @brief What one pixel holds. */
+        [[nodiscard]] Format format() const { return _format; }
+        /**
+         * @brief The samples per pixel. SampleCount::e1 is an ordinary, non-multisampled image.
+         *
+         * The same type a pipeline's MultisampleState and a framebuffer speak, so the three can be
+         * compared directly. A multisampled image cannot be sampled by a shader: resolve it first,
+         * with CommandBuffer::Resolve or a framebuffer resolve attachment.
+         */
+        [[nodiscard]] SampleCount sampleCount() const { return _sampleCount; }
+        /** @brief Every role the image was created for. */
+        [[nodiscard]] Flags<Usage> usage() const { return _usage; }
+        /** @brief How many mip levels the image has, counting the full-size one. */
+        [[nodiscard]] glm::u32 mipLevels() const { return _mipLevels; }
+        /** @brief How many array layers the image has. */
+        [[nodiscard]] glm::u32 arrayLayers() const { return _arrayLayers; }
 
-        [[nodiscard]] static glm::u32 ChannelSizeFromImageFormat(kor::Image::Format format);
-        [[nodiscard]] static glm::u32 ChannelCountFromImageFormat(kor::Image::Format format);
+        /**
+         * @brief How much of the image a default view covers.
+         *
+         * The two roles want different answers, which is why this is a choice and not a default: a
+         * texture wants the whole mip chain, or mip mapping has nothing to select from, while a
+         * render target must name exactly one level — rendering into a view of several is invalid.
+         */
+        enum class ViewCoverage : std::uint8_t {
+            eWholeImage,    ///< Every mip level and every array layer. For sampling.
+            eTopLevel,      ///< Mip level 0 only, every array layer. For rendering into.
+        };
 
+        /**
+         * @brief A default view of this image, seen as @p shape, created once and shared.
+         * @param shape How the view presents the image — normally what the shader declared.
+         * @param coverage How much of it the view spans. @see ViewCoverage
+         * @return The view, or an empty ref (having logged why) if the image cannot be seen that
+         *         way: a cube view of an image with fewer than six layers, an array view of an
+         *         image with one.
+         *
+         * What lets an Image be handed straight to a descriptor set or a framebuffer without the
+         * caller constructing a view for it. Note that neither coverage matches
+         * ImageView::Builder's own defaults, which span one mip level of one layer — deliberately,
+         * since a builder is for saying exactly what you want and these are for not having to.
+         *
+         * Cached per shape and coverage, and owned here rather than by whoever asked, so two
+         * descriptor sets binding the same texture share one view and a set rebuilt after a shader
+         * edit does not leak a new one each time. The cache is dropped by Resize, because a resize
+         * replaces the storage and invalidates every view of it.
+         *
+         * Build a view yourself for anything narrower — one mip, one layer, a swizzle. These are
+         * the whole-image defaults, not a replacement for ImageView.
+         */
+        [[nodiscard]] ResourceRef<const ImageView> view(ImageShape shape = ImageShape::e2D,
+                                                        ViewCoverage coverage = ViewCoverage::eWholeImage) const;
+
+        /**
+         * @brief The shape this image most naturally presents as, from its own type and layers.
+         *
+         * What a framebuffer attachment uses, having no shader to ask. A six-layer 2D image comes
+         * back as e2DArray rather than eCube — an attachment is rendered into layer by layer, and
+         * nothing here can know it was meant as a cube map. A descriptor set does not use this: it
+         * has the shader's own word. @see kor::ImageShape
+         */
+        [[nodiscard]] ImageShape naturalShape() const;
+
+        /**
+         * @brief Bytes in one channel of @p format — 1 for an 8-bit format, 4 for a 32-bit one.
+         * @throws std::runtime_error for a block-compressed format, which has no per-channel size.
+         *         Guard with isBlockCompressed, or use sizeOfRegion, which answers for both kinds.
+         */
+        [[nodiscard]] static glm::u32 channelSize(kor::Image::Format format);
+        /**
+         * @brief Channels in @p format — 1 for eR8_UNORM, 4 for eRGBA8_UNORM.
+         * @throws std::runtime_error for a block-compressed format. @see channelSize
+         */
+        [[nodiscard]] static glm::u32 channelCount(kor::Image::Format format);
+
+        /**
+         * @brief Whether the active device can hold an image of @p format in the roles @p usage names.
+         * @param format The format to ask about, compressed or not.
+         * @param usage What the image would be for. Only the roles that constrain a format are
+         *        looked at — sampling, storage, and the two attachment kinds.
+         * @return false when the device cannot, and when there is no device yet.
+         *
+         * Which *compressed* formats exist is the question this is really for: BC is desktop, ASTC
+         * and ETC2 are mobile, and a universal texture has to be transcoded into whichever family
+         * the machine actually has. Asking beats assuming — an image created in a format the device
+         * lacks fails at creation, in the driver's words rather than yours.
+         */
+        [[nodiscard]] static bool isFormatSupported(kor::Image::Format format,
+                                                   Flags<Usage> usage = Usage::eSampled);
+
+        /**
+         * @brief Whether @p format stores blocks of texels rather than texels.
+         *
+         * The one question worth asking before doing arithmetic on an image's size: a compressed
+         * format has no texel size, and its rows are counted in blocks.
+         */
+        [[nodiscard]] static bool isBlockCompressed(kor::Image::Format format);
+
+        /**
+         * @brief The texels one block of @p format covers — 4x4 for BC, 8x8 for ASTC 8x8.
+         * @return {1, 1} for an uncompressed format, so the same arithmetic works for both.
+         */
+        [[nodiscard]] static glm::uvec2 blockExtent(kor::Image::Format format);
+
+        /**
+         * @brief Bytes one block of @p format occupies — 8 for BC1, 16 for BC7.
+         * @return For an uncompressed format, the size of one texel, since that is its block.
+         */
+        [[nodiscard]] static glm::u32 blockSize(kor::Image::Format format);
+
+        /**
+         * @brief Bytes a tightly packed region of @p format occupies.
+         * @param format What the texels are.
+         * @param extent The region in *texels*; a partial block at the edge still costs a whole block.
+         * @param layerCount How many array layers the region covers.
+         *
+         * What to size a staging buffer with, and what the copy guards measure against. Correct for
+         * compressed and uncompressed alike, which is the point of it existing.
+         */
+        [[nodiscard]] static glm::u64 sizeOfRegion(kor::Image::Format format, glm::uvec3 extent,
+                                                   glm::u32 layerCount = 1);
+
+        /** @brief Whether the image holds a separate copy per frame in flight. */
         [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
 
+        /**
+         * @brief The access one subresource was last synchronised for.
+         * @param mipLevel Which mip level.
+         * @param arrayLayer Which array layer.
+         * @return The access, or nullopt if that subresource has never been synchronised — an image
+         *         in undefined layout, which always needs a barrier before its first use.
+         *
+         * Read by the command buffer's barrier resolver. Tracked per subresource because a mip
+         * chain legitimately holds several at once while it is being generated.
+         */
+        [[nodiscard]] std::optional<ResourceAccess> trackedAccess(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+
+        /** @brief Records the access a subresource has been synchronised for. Called by the barrier resolver. */
+        void setTrackedAccess(ResourceAccess access, glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+
     protected:
+        /**
+         * @brief Which copy of a per-frame image the tracked access below refers to.
+         *
+         * A per-frame image is several images, one per frame in flight, and they are transitioned
+         * independently — so they have to be *tracked* independently. Keying them together makes the
+         * barrier resolver decide that a copy it has never seen is already in the layout a different
+         * copy reached, and the GPU then samples an untransitioned image. Always 0 for an ordinary
+         * image, which has one copy.
+         */
+        [[nodiscard]] glm::u32 trackingFrame() const;
+
+        /**
+         * @brief Rebuilds the backend's image at the new extent. Called by Resize, never directly.
+         *
+         * Resize is not virtual on purpose: a resize *replaces* the image, and everything that follows
+         * from that — the new extent, a bumped generation, and above all forgetting what the old image
+         * had been synchronised for — belongs to every backend equally. A backend that had to remember
+         * to do all of it would eventually forget one, and forgetting the last leaves the barrier
+         * resolver believing a brand-new image is already in the layout the old one reached.
+         */
+        virtual void doResize(const glm::uvec3& extent) = 0;
+
+        /// Subresource key: which copy, which mip, which layer.
+        [[nodiscard]] glm::u64 trackingKey(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
+            return static_cast<glm::u64>(trackingFrame()) << 48
+                 | static_cast<glm::u64>(mipLevel) << 32
+                 | arrayLayer;
+        }
+        mutable std::unordered_map<glm::u64, ResourceAccess> _trackedAccess;
+
+        /// Whole-image views handed out by view(), one per shape asked for. Owned here so that
+        /// everything binding this image shares one, and cleared by Resize, which invalidates them
+        /// all along with the storage they view.
+        ///
+        /// A flat array indexed by the shape rather than a map: Resource is move-only, which the
+        /// standard containers variously refuse to hold or hold only awkwardly, and there is a
+        /// small fixed number of shapes — so one slot each costs a pointer apiece and needs no
+        /// lookup at all. @see view
+        mutable std::array<Resource<ImageView>,
+                           (static_cast<std::size_t>(ImageShape::eBuffer) + 1) * 2> _defaultViews;
+
+        /// Which slot of @ref _defaultViews a (shape, coverage) pair occupies.
+        static constexpr std::size_t viewSlot(const ImageShape shape, const ViewCoverage coverage) {
+            return static_cast<std::size_t>(shape) * 2 + static_cast<std::size_t>(coverage);
+        }
+
         explicit Image(const Builder&);
         bool _isPerFrame = false;
         Type _type;
         Format _format;
         glm::uvec3 _extent;
+        /// Bumped by a backend's Resize. @see generation
+        glm::u64 _generation = 0;
         glm::u32 _mipLevels;
         glm::u32 _arrayLayers;
-        MSAA _msaa;
+        SampleCount _sampleCount;
         Flags<Usage> _usage;
     };
 
-    bool IsDepthStencilFormat(Image::Format format);
-    bool IsStencilFormat(Image::Format format);
+    /** @brief Whether @p format is a depth and/or stencil format, and so belongs in a depth attachment. */
+    bool isDepthStencilFormat(Image::Format format);
+
+    /** @brief Whether @p format carries a stencil component. */
+    bool isStencilFormat(Image::Format format);
+
+    /** @see enable_flags */
+    template<> struct enable_flags<Image::Usage> : std::true_type {};
 }
 

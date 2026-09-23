@@ -21,17 +21,17 @@ TEST_F(GpuTest, SlangCompilesEntryPointsWithAutoStage) {
                   .setEntryPoint("sample", "vertexMain")
                   .build();
     ASSERT_TRUE(vs.valid()) << vs.error()->history();
-    EXPECT_EQ(vs->getStage(), Shader::Stage::eVertex);
-    EXPECT_EQ(vs->getLang(), Shader::Lang::eSlang);
+    EXPECT_EQ(vs->stage(), Shader::Stage::eVertex);
+    EXPECT_EQ(vs->lang(), Shader::Lang::eSlang);
     // sample.slang imports helpers.slang; both should be tracked for hot-reload.
-    EXPECT_FALSE(vs->getDependencies().empty());
+    EXPECT_FALSE(vs->dependencies().empty());
 
     auto fs = Shader::Builder{}
                   .setLang<Shader::Lang::eSlang>()
                   .setEntryPoint("sample", "fragmentMain")
                   .build();
     ASSERT_TRUE(fs.valid()) << fs.error()->history();
-    EXPECT_EQ(fs->getStage(), Shader::Stage::eFragment);
+    EXPECT_EQ(fs->stage(), Shader::Stage::eFragment);
 }
 
 // getOrBuild caches by "module:entry"; a second call returns the same shader.
@@ -55,13 +55,13 @@ TEST_F(GpuTest, SlangGetOrBuildCaches) {
 TEST_F(GpuTest, ShaderBuilderIsIdenticalAcrossLanguages) {
     auto glsl = Shader::Builder{}.setPath("flatTriangle.vert.glsl").build();
     ASSERT_TRUE(glsl.valid()) << glsl.error()->history();
-    EXPECT_EQ(glsl->getLang(), Shader::Lang::eGLSL);   // inferred from ".glsl"
-    EXPECT_EQ(glsl->getStage(), Shader::Stage::eVertex); // inferred from ".vert."
+    EXPECT_EQ(glsl->lang(), Shader::Lang::eGLSL);   // inferred from ".glsl"
+    EXPECT_EQ(glsl->stage(), Shader::Stage::eVertex); // inferred from ".vert."
 
     auto slang = Shader::Builder{}.setPath("sample.slang").setEntryPoint("vertexMain").build();
     ASSERT_TRUE(slang.valid()) << slang.error()->history();
-    EXPECT_EQ(slang->getLang(), Shader::Lang::eSlang);  // inferred from ".slang"
-    EXPECT_EQ(slang->getStage(), Shader::Stage::eVertex); // from [shader("vertex")]
+    EXPECT_EQ(slang->lang(), Shader::Lang::eSlang);  // inferred from ".slang"
+    EXPECT_EQ(slang->stage(), Shader::Stage::eVertex); // from [shader("vertex")]
 
     // Explicit setters still override every inference.
     auto forced = Shader::Builder{}
@@ -70,7 +70,7 @@ TEST_F(GpuTest, ShaderBuilderIsIdenticalAcrossLanguages) {
                       .setPath(kor::shaderPath("flatTriangle.frag.glsl"))
                       .build();
     ASSERT_TRUE(forced.valid()) << forced.error()->history();
-    EXPECT_EQ(forced->getStage(), Shader::Stage::eFragment);
+    EXPECT_EQ(forced->stage(), Shader::Stage::eFragment);
 }
 
 // getOrBuild derives its cache key from the source, so the no-argument form caches
@@ -87,8 +87,8 @@ TEST_F(GpuTest, ShaderGetOrBuildDefaultsItsIdentifier) {
     ASSERT_TRUE(vs.valid()) << vs.error()->history();
     ASSERT_TRUE(fs.valid()) << fs.error()->history();
     EXPECT_NE(vs.get(), fs.get());
-    EXPECT_EQ(vs->getStage(), Shader::Stage::eVertex);
-    EXPECT_EQ(fs->getStage(), Shader::Stage::eFragment);
+    EXPECT_EQ(vs->stage(), Shader::Stage::eVertex);
+    EXPECT_EQ(fs->stage(), Shader::Stage::eFragment);
 }
 
 // A GLSL name with no stage tag is a clear error, not a silent compile as eCompute.

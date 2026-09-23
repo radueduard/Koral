@@ -2,6 +2,8 @@
 // Created by eduard on 11.03.2026.
 //
 
+#include <memory>
+
 #include <scheduler.h>
 #include <commandBuffer.h>
 #include <window.h>
@@ -18,20 +20,19 @@ namespace kor
         _commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
     }
 
-    Scheduler* Scheduler::Builder::build() const
+    std::unique_ptr<Scheduler> Scheduler::Builder::build() const
     {
         switch (Context::activeAPI()) {
         case API::eOpenGL:
-            return new ogl::Scheduler(*this);
-            case API::eVulkan:
-            return new vk::Scheduler(*this);
+            return std::make_unique<ogl::Scheduler>(*this);
+        case API::eVulkan:
+            return std::make_unique<vk::Scheduler>(*this);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }
     }
 
     Scheduler::Scheduler(const Builder& createInfo) :
-        _minImageCount(createInfo.minImageCount),
         _imageCount(createInfo.imageCount) {}
 
 

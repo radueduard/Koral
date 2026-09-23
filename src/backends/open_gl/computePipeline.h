@@ -20,7 +20,7 @@ namespace kor::ogl
             return _setAndBindingToBindingPoint;
         }
 
-        // Push-constant UBO backing (see CommandBuffer::PushConstants). Zero-sized when
+        // Push-constant UBO backing (see CommandBuffer::PushConstantBlock). Zero-sized when
         // the pipeline declares no push constants.
         [[nodiscard]] bool hasPushConstants() const { return _pushConstantSize > 0; }
         [[nodiscard]] GLuint getPushConstantUBO() const { return _pushConstantUBO; }

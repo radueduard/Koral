@@ -48,7 +48,7 @@ if(APPLE)
     endif()
 endif()
 
-project(Koral VERSION 0.0.5 LANGUAGES C CXX)
+project(Koral VERSION 0.1.0 LANGUAGES C CXX)
 include(GenerateExportHeader)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
@@ -118,6 +118,8 @@ find_package(glm CONFIG REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW CONFIG REQUIRED)
 find_package(glad CONFIG REQUIRED)
+# Assimp is found here but linked only by modules/model-import — the engine itself no longer reads
+# model files. Kept at this level so the module (a subdirectory) sees the imported target.
 find_package(assimp REQUIRED)
 
 # Pin find_package(Vulkan) to the vcpkg-provided headers + loader instead of a
@@ -147,12 +149,30 @@ message(STATUS "Using Vulkan loader:  ${Vulkan_LIBRARIES}")
 # ---------------------------------------------------------------------------
 # Runtime Vulkan loader.
 #
-# We link and ship the vcpkg-built Vulkan-Loader. The manifest requests its WSI
-# features (Wayland + XCB + Xlib on Linux, Win32 is always built; macOS needs no
-# loader feature — MoltenVK supplies its own Metal surface extension as an ICD),
-# so this one loader creates surfaces on every platform and still discovers the
-# user's installed ICDs/drivers and layers through the standard search paths +
-# env vars. No system loader or LD_LIBRARY_PATH override needed.
+# We link the vcpkg-built Vulkan-Loader. The manifest requests its WSI features
+# (Wayland + XCB + Xlib on Linux, Win32 is always built; macOS needs no loader
+# feature — MoltenVK supplies its own Metal surface extension as an ICD), so builds
+# and tests create surfaces on every platform with no system SDK installed.
+#
+# Whether it gets *shipped* depends on which archive, and the two answers differ:
+#
+#   SDK      — yes. libKoral.so carries DT_NEEDED libvulkan.so.1, so anyone linking
+#              against it needs the loader resolvable at link time. Dropping it from
+#              the install tree broke the standalone-consumer check outright: the
+#              release container has no system loader, so ld had nothing to resolve
+#              vkCreateInstance and its ~40 friends against.
+#
+#   runtime  — no, on Linux and Windows. A loader has to match the machine it runs on:
+#              its ICD manifests, its driver interface version, and above all its
+#              *implicit* layers (Steam overlay, gamescope WSI, …), which were built
+#              against whatever loader that machine ships. Ours, given priority by the
+#              $ORIGIN RPATH, is how a package that runs perfectly on the build box
+#              segfaults inside libvulkan on someone else's desktop. The Package step
+#              in .github/workflows/release.yml strips it from the runtime archive;
+#              both loaders have SONAME libvulkan.so.1 and the loader ABI is stable, so
+#              the binary then resolves the system one like every other Vulkan app.
+#              macOS is exempt — there is no system loader there, so the runtime archive
+#              keeps it alongside the MoltenVK ICD installed below.
 #
 # Bundled layer manifest dir (from vcpkg) is handed to the runtime as a compile
 # definition below so it can add it to the loader's search paths at startup —
@@ -235,10 +255,17 @@ target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 target_link_libraries(${PROJECT_NAME} PRIVATE magic_enum::magic_enum)
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW OpenGL::GL)
-target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
+# assimp is deliberately absent: model importing lives in modules/model-import, which links it.
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
 target_link_libraries(${PROJECT_NAME} PRIVATE GPUOpen::VulkanMemoryAllocator)
+
+# Declared here rather than beside the shader/asset paths it was written for, because the
+# validation-layer path just below is the same kind of dev-only absolute path and needs to test
+# it. An option() has to precede every use: read before its declaration it is simply empty, which
+# would silently take the distribution branch in a development build.
+option(KORAL_EMBED_SOURCE_PATHS
+       "Bake the source-tree shader/asset paths in as a development fallback (OFF for distribution)" ON)
 
 # Hand the vcpkg-bundled layer/ICD manifest dirs to the runtime so it can add them
 # to the loader's search paths at startup (see runtime.cpp). This makes validation
@@ -252,8 +279,18 @@ file(GLOB_RECURSE KORAL_VK_LAYER_MANIFEST
 if(KORAL_VK_LAYER_MANIFEST)
     list(GET KORAL_VK_LAYER_MANIFEST 0 KORAL_VK_LAYER_MANIFEST0)
     get_filename_component(KORAL_VK_LAYER_DIR "${KORAL_VK_LAYER_MANIFEST0}" DIRECTORY)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE KORAL_VK_LAYER_PATH="${KORAL_VK_LAYER_DIR}")
-    message(STATUS "Bundled Vulkan validation layers: ${KORAL_VK_LAYER_DIR}")
+    # Dev builds only — same reasoning as KORAL_EMBED_SOURCE_PATHS below, and the same failure
+    # mode: this is an absolute path into *this* machine's build tree, which on a user's machine
+    # names nothing. Harmless there (VK_ADD_LAYER_PATH pointing at a missing directory is
+    # ignored), but a shipped binary should not carry the build machine's filesystem layout, and
+    # a distribution build gets its validation layers from the user's own Vulkan SDK if they
+    # have one.
+    if(KORAL_EMBED_SOURCE_PATHS)
+        target_compile_definitions(${PROJECT_NAME} PRIVATE KORAL_VK_LAYER_PATH="${KORAL_VK_LAYER_DIR}")
+        message(STATUS "Bundled Vulkan validation layers: ${KORAL_VK_LAYER_DIR}")
+    else()
+        message(STATUS "Distribution build: not baking in the bundled validation-layer path")
+    endif()
 else()
     message(WARNING "vcpkg validation-layer manifest not found under ${KORAL_VK_SHARE_DIR}; "
             "portable validation will be unavailable (loader still finds a system SDK if present).")
@@ -272,38 +309,22 @@ target_link_libraries(${PROJECT_NAME} PRIVATE spirv-cross-glsl)
 target_link_libraries(${PROJECT_NAME} PRIVATE slang::slang)
 target_link_libraries(${PROJECT_NAME} PRIVATE reflectcpp::reflectcpp)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${ZLIB_LIBRARIES} ${PNG_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${JASPER_LIBRARIES})
+# ZLIB only: the rest of the codec stack (TIFF/JPEG/PNG/Jasper) came in with OpenImageIO, which
+# moved to the image module along with the code that used it.
+target_link_libraries(${PROJECT_NAME} PRIVATE ${ZLIB_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE imgui::imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
 target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE KTX::ktx)
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenImageIO::OpenImageIO)
+# KTX and OpenImageIO are deliberately absent: image IO lives in modules/image, which links them.
 
 if(UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GLX)
-    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--allow-multiple-definition)
 endif()
 
-# The MSVC counterpart of the --allow-multiple-definition above, and it is there for the same
-# reason: fmt ends up in the link twice.
-#
-# OpenImageIO links fmt::fmt-header-only, which propagates FMT_HEADER_ONLY=1 into every one of our
-# translation units and bakes inline fmt definitions into our objects and into OpenImageIO's own
-# static library. spdlog::spdlog, meanwhile, links the *compiled* fmt::fmt, whose fmt.lib exports
-# the same symbols as strong definitions. GNU ld is told to tolerate that; MSVC instead fails the
-# link with a wall of LNK2005 "already defined in OpenImageIO.lib".
-#
-# This is a band-aid, exactly as the Linux flag is. The real fix is to stop mixing header-only and
-# compiled fmt, which is not simply a matter of switching to spdlog::spdlog_header_only -- that
-# target links fmt::fmt as well, so it would have to be done by overriding an imported target's
-# link interface, and doing that blind would risk the two platforms that currently build. Worth
-# revisiting once the release is out; the duplicate definitions are identical code, so picking the
-# first is safe in practice.
-if(MSVC)
-    target_link_options(${PROJECT_NAME} PRIVATE /FORCE:MULTIPLE /IGNORE:4006 /IGNORE:4088)
-endif()
+# The duplicate-fmt band-aid that used to live here (-Wl,--allow-multiple-definition, and MSVC's
+# /FORCE:MULTIPLE beside it) moved to modules/image along with OpenImageIO, which is what dragged a
+# second copy of fmt into the link. Koral no longer links it, so it no longer needs the flag.
 
 # <windows.h> defines min() and max() as function-like macros, which collide with
 # std::numeric_limits<T>::max() and friends and produce a baffling C2589 rather than anything that
@@ -344,8 +365,6 @@ target_link_libraries(${PROJECT_NAME} PUBLIC $<$<CXX_COMPILER_ID:GNU>:stdc++exp>
 # and wrong for a shipped one: it is an absolute path on the machine that compiled the binary, which
 # on a user's machine names nothing. Release/CI builds turn it off, and then the only way Koral finds
 # its data is the install layout — which is exactly what we want to be testing.
-option(KORAL_EMBED_SOURCE_PATHS
-       "Bake the source-tree shader/asset paths in as a development fallback (OFF for distribution)" ON)
 
 if(KORAL_EMBED_SOURCE_PATHS)
     set(KORAL_ASSETS_PATH "${CMAKE_SOURCE_DIR}/assets/")
@@ -580,17 +599,34 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
             "${KORAL_VCPKG_PREFIX}/include/fmt"
             DESTINATION ${KORAL_VENDOR_INCLUDEDIR})
 
-    # imgui's headers are loose files at the top of include/, not a directory.
+    # imgui's headers are loose files at the top of include/, not a directory. ImGuizmo's header comes
+    # along because the GUI extras module's koralGizmo.h includes it: its *objects* reach a consumer
+    # through that module's shared library, which re-exports them, but the declarations have to be
+    # compiled and so have to be here.
     file(GLOB KORAL_VENDOR_IMGUI_HEADERS
             "${KORAL_VCPKG_PREFIX}/include/imgui*.h"
             "${KORAL_VCPKG_PREFIX}/include/imconfig.h"
-            "${KORAL_VCPKG_PREFIX}/include/imstb_*.h")
+            "${KORAL_VCPKG_PREFIX}/include/imstb_*.h"
+            "${KORAL_VCPKG_PREFIX}/include/ImGuizmo.h")
     install(FILES ${KORAL_VENDOR_IMGUI_HEADERS} DESTINATION ${KORAL_VENDOR_INCLUDEDIR})
 
     # The static archives the consumer must actually link. Order matters for GNU ld: a static lib
     # only resolves symbols demanded by something *earlier* on the command line, and spdlog's
     # headers call into fmt — so spdlog precedes fmt. The Config.cmake below preserves this order.
+    #
+    # Collected per configuration, because vcpkg keeps two trees and they are not interchangeable.
+    # This used to read ${KORAL_VCPKG_PREFIX}/lib unconditionally — the *release* tree — for every
+    # configuration, which nobody noticed while CI only ever packaged Release. A Debug install then
+    # shipped release import libraries: a Debug consumer linked fmt.lib, bound to fmt.dll, and got
+    # a bin/ containing fmtd.dll. It compiled, it linked, and it failed to load with "fmt.dll: cannot
+    # open shared object file" the first time anyone ran it.
+    #
+    # The `d`-suffix fallback is there because the debug name is not the same everywhere: vcpkg's
+    # MSVC builds carry CMake's DEBUG_POSTFIX (fmtd.lib, spdlogd.lib, imguid.lib) while the same
+    # ports on Linux and macOS keep the release name inside debug/lib (libfmt.a). Trying the plain
+    # name first and the suffixed one second covers both without hard-coding a platform rule.
     set(KORAL_VENDOR_LIBS "")
+    set(KORAL_VENDOR_LIBS_DEBUG "")
     foreach(dep spdlog fmt imgui)
         file(GLOB found "${KORAL_VCPKG_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${dep}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         if(found)
@@ -599,8 +635,39 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
             message(WARNING "Vendoring: no static ${dep} under ${KORAL_VCPKG_PREFIX}/lib — "
                             "the installed SDK will not link.")
         endif()
+
+        set(foundDebug "")
+        foreach(candidate "${dep}" "${dep}d")
+            file(GLOB foundDebug "${KORAL_VCPKG_PREFIX}/debug/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${candidate}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+            if(foundDebug)
+                break()
+            endif()
+        endforeach()
+        if(foundDebug)
+            list(APPEND KORAL_VENDOR_LIBS_DEBUG ${foundDebug})
+        else()
+            message(WARNING "Vendoring: no static ${dep} under ${KORAL_VCPKG_PREFIX}/debug/lib — "
+                            "a Debug install of the SDK will not link.")
+        endif()
     endforeach()
-    install(FILES ${KORAL_VENDOR_LIBS} DESTINATION ${KORAL_VENDOR_LIBDIR})
+
+    # Both sets go into the same directory, and on Windows — the only platform where a Debug SDK is
+    # actually built — the DEBUG_POSTFIX keeps their names apart, so installing both configurations
+    # into one prefix is lossless. Where the two names collide (Linux, macOS) the CONFIGURATIONS
+    # guards mean only the configuration being installed is written, so a single-config install tree
+    # is still correct; it is only the both-into-one-prefix case that cannot be represented there,
+    # and no platform but Windows builds one.
+    install(FILES ${KORAL_VENDOR_LIBS} DESTINATION ${KORAL_VENDOR_LIBDIR}
+            CONFIGURATIONS Release RelWithDebInfo MinSizeRel)
+    install(FILES ${KORAL_VENDOR_LIBS_DEBUG} DESTINATION ${KORAL_VENDOR_LIBDIR}
+            CONFIGURATIONS Debug)
+
+    # A single-config generator with no CMAKE_BUILD_TYPE matches neither guard above and would
+    # install no vendored libraries at all. Treat that as Release, which is what the rest of the
+    # build already assumes when the type is unset.
+    if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+        install(FILES ${KORAL_VENDOR_LIBS} DESTINATION ${KORAL_VENDOR_LIBDIR})
+    endif()
 endif()
 
 # The CMake package, so consumers can find_package(Koral).
@@ -635,20 +702,69 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
         get_filename_component(name "${lib}" NAME)
         list(APPEND KORAL_VENDOR_LIB_NAMES "${name}")
     endforeach()
+    set(KORAL_VENDOR_LIB_NAMES_DEBUG "")
+    foreach(lib ${KORAL_VENDOR_LIBS_DEBUG})
+        get_filename_component(name "${lib}" NAME)
+        list(APPEND KORAL_VENDOR_LIB_NAMES_DEBUG "${name}")
+    endforeach()
 
     file(APPEND "${KORAL_INSTALL_CONFIG}"
 "
 # Koral's public headers expose glm, spdlog and imgui, so the SDK ships them; see KORAL_VENDOR_PUBLIC_DEPS
 # in the top-level CMakeLists. Consumers do not name these — they are pulled in by linking Koral.
+#
+# Which set to link is decided here rather than baked in, because the same config file is installed
+# into three shapes of tree and all three have to work:
+#
+#   release only — what the release archives contain, and what a consumer building in Debug against
+#                  a downloaded SDK has always linked. Must keep working: there is no debug set to
+#                  fall back to, and refusing to link one would break every published SDK.
+#   debug only   — a local `cmake --install --config Debug --prefix …`.
+#   both         — Windows, where the DEBUG_POSTFIX keeps the two sets' filenames apart so they can
+#                  share one prefix. Only here is the choice per-configuration, and only here does
+#                  the generator expression below actually decide anything.
+#
+# EXISTS rather than trusting the lists: the names come from the machine that built the SDK, and
+# whether the file is present is a property of the tree the consumer unpacked.
 if(NOT TARGET Koral::vendored)
     add_library(Koral::vendored INTERFACE IMPORTED)
     set_target_properties(Koral::vendored PROPERTIES
             INTERFACE_INCLUDE_DIRECTORIES \"\${KORAL_RELOADED_PREFIX}/${KORAL_VENDOR_INCLUDEDIR}\")
 
-    set(KORAL_RELOADED_VENDORED_LIBS \"\")
+    set(KORAL_RELOADED_VENDORED_RELEASE \"\")
     foreach(name ${KORAL_VENDOR_LIB_NAMES})
-        list(APPEND KORAL_RELOADED_VENDORED_LIBS \"\${KORAL_RELOADED_PREFIX}/${KORAL_VENDOR_LIBDIR}/\${name}\")
+        set(_koral_lib \"\${KORAL_RELOADED_PREFIX}/${KORAL_VENDOR_LIBDIR}/\${name}\")
+        if(EXISTS \"\${_koral_lib}\")
+            list(APPEND KORAL_RELOADED_VENDORED_RELEASE \"\${_koral_lib}\")
+        endif()
     endforeach()
+
+    set(KORAL_RELOADED_VENDORED_DEBUG \"\")
+    foreach(name ${KORAL_VENDOR_LIB_NAMES_DEBUG})
+        set(_koral_lib \"\${KORAL_RELOADED_PREFIX}/${KORAL_VENDOR_LIBDIR}/\${name}\")
+        if(EXISTS \"\${_koral_lib}\")
+            list(APPEND KORAL_RELOADED_VENDORED_DEBUG \"\${_koral_lib}\")
+        endif()
+    endforeach()
+    unset(_koral_lib)
+
+    set(KORAL_RELOADED_VENDORED_LIBS \"\")
+    if(KORAL_RELOADED_VENDORED_RELEASE AND KORAL_RELOADED_VENDORED_DEBUG)
+        # Release first, then debug: only one group survives a given configuration, and within each
+        # the spdlog-before-fmt order the install block established is preserved — which is what
+        # GNU ld needs, since spdlog's headers call into fmt.
+        foreach(lib IN LISTS KORAL_RELOADED_VENDORED_RELEASE)
+            list(APPEND KORAL_RELOADED_VENDORED_LIBS \"\$<\$<NOT:\$<CONFIG:Debug>>:\${lib}>\")
+        endforeach()
+        foreach(lib IN LISTS KORAL_RELOADED_VENDORED_DEBUG)
+            list(APPEND KORAL_RELOADED_VENDORED_LIBS \"\$<\$<CONFIG:Debug>:\${lib}>\")
+        endforeach()
+    elseif(KORAL_RELOADED_VENDORED_DEBUG)
+        set(KORAL_RELOADED_VENDORED_LIBS \${KORAL_RELOADED_VENDORED_DEBUG})
+    else()
+        set(KORAL_RELOADED_VENDORED_LIBS \${KORAL_RELOADED_VENDORED_RELEASE})
+    endif()
+
     if(KORAL_RELOADED_VENDORED_LIBS)
         set_target_properties(Koral::vendored PROPERTIES
                 INTERFACE_LINK_LIBRARIES \"\${KORAL_RELOADED_VENDORED_LIBS}\")
@@ -660,6 +776,36 @@ set_property(TARGET Koral::${PROJECT_NAME} APPEND PROPERTY
         INTERFACE_LINK_LIBRARIES Koral::vendored)
 ")
 endif()
+
+# Runtime DLL placement for consumers (Windows).
+#
+# Windows has no RPATH: an executable resolves its DLLs from its own directory or PATH, nowhere
+# else. Koral is a DLL and pulls in more that must sit beside the consumer's binary at load time —
+# the Vulkan loader, slang, and (because they carry process-global state that cannot be shared
+# across a static link on Windows, see the overlay triplet) imgui and glfw3. All are installed into
+# <prefix>/bin by the GET_RUNTIME_DEPENDENCIES step above. A consumer's freshly built .exe sits in
+# its own build tree with none of them beside it, so it links against the import libs and then
+# fails to start. In our own build vcpkg's applocal deploy copies these automatically; a consumer
+# using the packaged SDK with no vcpkg toolchain gets no such help, which is what this is for.
+#
+# This is deliberately a function the consumer calls, not something bolted onto Koral::Koral's
+# interface: copying DLLs into every target that merely links Koral would be surprising, and a
+# consumer may want them somewhere other than each target's own directory. A no-op off Windows,
+# where the installed libraries carry an $ORIGIN / @loader_path RPATH and find each other unaided.
+file(APPEND "${KORAL_INSTALL_CONFIG}"
+"
+function(koral_copy_runtime_dlls target)
+    if(NOT WIN32)
+        return()
+    endif()
+    file(GLOB _koral_runtime_dlls \"\${KORAL_RELOADED_PREFIX}/${CMAKE_INSTALL_BINDIR}/*.dll\")
+    foreach(_dll IN LISTS _koral_runtime_dlls)
+        add_custom_command(TARGET \${target} POST_BUILD
+                COMMAND \${CMAKE_COMMAND} -E copy_if_different \"\${_dll}\" \"\$<TARGET_FILE_DIR:\${target}>\"
+                VERBATIM)
+    endforeach()
+endfunction()
+")
 
 install(FILES
         "${KORAL_INSTALL_CONFIG}"
@@ -697,6 +843,123 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cmake_export_targets.cmake"
         "include(\"${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/Export/${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}/${PROJECT_NAME}Targets.cmake\" OPTIONAL)
 ")
+
+# ---------------------------------------------------------------------------
+# Modules: optional engine features a project links against (see include/module.h).
+#
+# The projects that demonstrate them are not built here: they are ordinary Koral
+# projects that consume the *installed* SDK, and they live outside this tree
+# (CameraDemo is a Hub project). Building them from here would test a build
+# layout no user has.
+# ---------------------------------------------------------------------------
+option(KORAL_BUILD_MODULES "Build the modules that ship with Koral" ON)
+if(KORAL_BUILD_MODULES)
+    add_subdirectory(modules)
+
+    # The modules' own third-party dependencies.
+    #
+    # The GET_RUNTIME_DEPENDENCIES pass further up scans Koral and Koral_Runtime, and nothing else —
+    # so assimp, OpenImageIO and ktx, which only the modules link, were never bundled. The build tree
+    # hides this: vcpkg's applocal deploy drops them next to each module as a post-build step, so a
+    # dev build loads every module perfectly while the installed SDK cannot load model-import at all.
+    # It fails as ERROR_MOD_NOT_FOUND from LoadLibrary — error 126, which names the module it was
+    # asked for and not the dependency that is actually missing, so it reads like a broken module.
+    #
+    # Same destination as Koral's own bundled dependencies, deliberately. It is where the loader
+    # already looks (beside the executable on Windows; via the $ORIGIN/.. that modules/*/CMakeLists
+    # sets on ELF and Mach-O), and it means a library both a module and the engine need — spdlog,
+    # zlib — is installed once rather than once per consumer.
+    set(KORAL_MODULE_TARGETS
+            koral-camera koral-gui-extras koral-mesh
+            koral-image-import koral-image-export koral-image-compress
+            koral-model-import)
+
+    set(KORAL_MODULE_BINARIES "")
+    foreach(target IN LISTS KORAL_MODULE_TARGETS)
+        list(APPEND KORAL_MODULE_BINARIES "$<TARGET_FILE:${target}>")
+    endforeach()
+
+    install(CODE "
+        set(KORAL_MODULE_DEP_SEARCH_DIRS \"${KORAL_VCPKG_PREFIX}/lib\" \"${KORAL_VCPKG_PREFIX}/bin\")
+        set(KORAL_MODULE_DEP_DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${KORAL_DEP_DESTDIR}\")
+        set(KORAL_MODULE_BINARIES \"${KORAL_MODULE_BINARIES}\")
+    ")
+    install(CODE [[
+        file(GET_RUNTIME_DEPENDENCIES
+                LIBRARIES ${KORAL_MODULE_BINARIES}
+                RESOLVED_DEPENDENCIES_VAR KORAL_MODULE_RESOLVED_DEPS
+                UNRESOLVED_DEPENDENCIES_VAR KORAL_MODULE_UNRESOLVED_DEPS
+                DIRECTORIES ${KORAL_MODULE_DEP_SEARCH_DIRS}
+                PRE_EXCLUDE_REGEXES "api-ms-win-.*" "ext-ms-.*"
+                POST_EXCLUDE_REGEXES
+                    "^/(usr|lib|lib32|lib64)/"          # Linux system libraries
+                    "^/System/Library/" "^/usr/lib/"    # macOS system libraries
+                    "[Ww][Ii][Nn][Dd][Oo][Ww][Ss][/\\]" # Windows system DLLs
+        )
+
+        # Koral resolves as a dependency of every module, and each module as a dependency of the
+        # ones built on it. Both are already installed, with their RPATHs rewritten; copying the
+        # build-tree binary over either would undo that. Skipped by name, the same way the engine's
+        # own pass skips Koral and Koral_Runtime.
+        set(KORAL_MODULE_OWN_BINARIES "")
+        foreach(binary IN LISTS KORAL_MODULE_BINARIES)
+            get_filename_component(binaryName "${binary}" NAME)
+            list(APPEND KORAL_MODULE_OWN_BINARIES "${binaryName}")
+        endforeach()
+
+        foreach(dep IN LISTS KORAL_MODULE_RESOLVED_DEPS)
+            get_filename_component(depName "${dep}" NAME)
+            list(FIND KORAL_MODULE_OWN_BINARIES "${depName}" KORAL_MODULE_OWN_INDEX)
+            if(NOT KORAL_MODULE_OWN_INDEX EQUAL -1)
+                continue()
+            endif()
+            if(EXISTS "${KORAL_MODULE_DEP_DESTINATION}/${depName}")
+                continue()   # the engine's pass already bundled it
+            endif()
+            message(STATUS "Bundling module dependency: ${depName}")
+            file(INSTALL
+                    DESTINATION "${KORAL_MODULE_DEP_DESTINATION}"
+                    TYPE SHARED_LIBRARY
+                    FOLLOW_SYMLINK_CHAIN
+                    FILES "${dep}")
+        endforeach()
+
+        foreach(dep IN LISTS KORAL_MODULE_UNRESOLVED_DEPS)
+            message(STATUS "Leaving to the system loader: ${dep}")
+        endforeach()
+    ]])
+endif()
+
+# ---------------------------------------------------------------------------
+# Staging the SDK: `cmake --build <dir> --target stage --config <cfg>`, or one click from the IDE.
+#
+# `--prefix` rather than CMAKE_INSTALL_PREFIX, because the prefix has to differ per configuration
+# and the cache variable cannot: it is one value for the whole build tree, so a multi-config
+# generator would stage Debug and Release on top of each other. They must not share a prefix —
+# on Windows a Debug SDK is /MDd and a Release one /MD, and a project linking the wrong flavour
+# gets a different std::string layout than the engine, which segfaults rather than failing to link.
+#
+# RelWithDebInfo and MinSizeRel stage as release. That is not a shortcut: they link the release
+# CRT, so the release tree is genuinely the one they belong in.
+#
+# The dependencies are exactly the targets something installs. Naming them rather than relying on
+# ALL has two effects worth keeping: a click builds before it stages, so the tree can never hold
+# binaries older than the source; and the test targets stay out, which matters while
+# koral_integration_tests does not link in Release.
+# ---------------------------------------------------------------------------
+add_custom_target(stage
+        COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}"
+                --config $<CONFIG>
+                --prefix "${CMAKE_SOURCE_DIR}/stage/$<IF:$<CONFIG:Debug>,debug,release>"
+        USES_TERMINAL
+        COMMENT "Staging the $<CONFIG> SDK into stage/$<IF:$<CONFIG:Debug>,debug,release>")
+
+add_dependencies(stage ${PROJECT_NAME} Koral_Runtime)
+if(KORAL_BUILD_MODULES)
+    add_dependencies(stage
+            koral-camera koral-gui-extras koral-mesh
+            koral-image-import koral-image-export koral-image-compress koral-model-import)
+endif()
 
 # ---------------------------------------------------------------------------
 # Unit tests (gtest). Enable with -DGFX_BUILD_TESTS=ON (default ON).

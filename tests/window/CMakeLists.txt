@@ -7,6 +7,11 @@ add_executable(koral_window_tests
 
 target_link_libraries(koral_window_tests PRIVATE
         Koral
+        # Vertex formats come from the mesh module, linked here the way a project links it.
+        koral-mesh
+        # And the GUI extras, whose viewport and panels are drawn from the test scene's RenderUI —
+        # the only place a real ImGui backend is behind them.
+        koral-gui-extras
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum
@@ -41,6 +46,8 @@ add_executable(koral_window_tests_gl
 
 target_link_libraries(koral_window_tests_gl PRIVATE
         Koral
+        # Vertex formats come from the mesh module, linked here the way a project links it.
+        koral-mesh
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum

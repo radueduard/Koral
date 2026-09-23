@@ -62,11 +62,11 @@ namespace kor::ogl
         createFrames();
     }
 
-    void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) const
+    void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc)
     {
         kor::Scheduler::Draw(renderFunc);
-        const auto& currentFrame = getCurrentFrame();
-        auto& commandBuffer = currentFrame.getCommandBuffer();
+        const auto& frame = currentFrame();
+        auto& commandBuffer = frame.commandBuffer();
         commandBuffer.Reset();
         renderFunc(commandBuffer.Begin());
         commandBuffer.End();
@@ -85,7 +85,7 @@ namespace kor::ogl
                 path = spec.substr(0, colon); want = std::atoi(spec.c_str() + colon + 1);
             }
             if (frame++ == want) {
-                const auto ext = Context::Window().getExtent();
+                const auto ext = Context::Window().extent();
                 std::vector<unsigned char> px(static_cast<size_t>(ext.x) * ext.y * 3);
                 glReadBuffer(GL_BACK);
                 glPixelStorei(GL_PACK_ALIGNMENT, 1);

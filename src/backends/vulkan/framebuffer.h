@@ -16,6 +16,6 @@ namespace kor::vk
         explicit Framebuffer(const Framebuffer::Builder& builder);
 
         ~Framebuffer() override;
-        void Resize(const glm::uvec2& newExtent) const override;
+        void doResize(const glm::uvec2& newExtent) override;
     };
 }

@@ -24,17 +24,23 @@ namespace kor
         case ErrorCode::eNoGraphicsPipelineBound:    return "eNoGraphicsPipelineBound";
         case ErrorCode::eNoComputePipelineBound:     return "eNoComputePipelineBound";
         case ErrorCode::eNoRayTracingPipelineBound:  return "eNoRayTracingPipelineBound";
+        case ErrorCode::eNoPipelineBound:            return "eNoPipelineBound";
         case ErrorCode::eNoMeshBound:                return "eNoMeshBound";
         case ErrorCode::eMeshHasNoIndexBuffer:       return "eMeshHasNoIndexBuffer";
         case ErrorCode::eCopySizeExceedsBuffer:      return "eCopySizeExceedsBuffer";
         case ErrorCode::eImageSubresourceOutOfRange: return "eImageSubresourceOutOfRange";
         case ErrorCode::eResolveRequiresMultisample: return "eResolveRequiresMultisample";
         case ErrorCode::eRayTracingUnsupported:      return "eRayTracingUnsupported";
+        case ErrorCode::eMissingBarrier:             return "eMissingBarrier";
         case ErrorCode::eMissingShaderStage:         return "eMissingShaderStage";
         case ErrorCode::eShaderStageMismatch:        return "eShaderStageMismatch";
         case ErrorCode::eDescriptorConflict:         return "eDescriptorConflict";
         case ErrorCode::eShaderCompileFailed:        return "eShaderCompileFailed";
+        case ErrorCode::eVertexLayoutMismatch:       return "eVertexLayoutMismatch";
+        case ErrorCode::ePushConstantMismatch:       return "ePushConstantMismatch";
         case ErrorCode::eConfigInvalid:              return "eConfigInvalid";
+        case ErrorCode::eModuleLoadFailed:           return "eModuleLoadFailed";
+        case ErrorCode::eFileNotReadable:            return "eFileNotReadable";
         }
         return "eUnknown";
     }
@@ -64,6 +70,8 @@ namespace kor
             return "Bind a compute pipeline before dispatching.";
         case ErrorCode::eNoRayTracingPipelineBound:
             return "Bind a ray-tracing pipeline before tracing rays.";
+        case ErrorCode::eNoPipelineBound:
+            return "Bind a pipeline before recording commands that address its interface.";
         case ErrorCode::eNoMeshBound:
             return "Bind a mesh before recording an indexed or mesh draw.";
         case ErrorCode::eMeshHasNoIndexBuffer:
@@ -76,6 +84,8 @@ namespace kor
             return "Resolve needs a multisampled source and a single-sampled destination.";
         case ErrorCode::eRayTracingUnsupported:
             return "Ray tracing is not supported on the active backend.";
+        case ErrorCode::eMissingBarrier:
+            return "A hazard the engine cannot see was left unguarded; add an explicit Barrier().";
         case ErrorCode::eMissingShaderStage:
             return "The pipeline is missing a required shader stage.";
         case ErrorCode::eShaderStageMismatch:
@@ -84,8 +94,16 @@ namespace kor
             return "Descriptor declarations conflict across the pipeline's shader stages.";
         case ErrorCode::eShaderCompileFailed:
             return "Shader compilation or linking failed.";
+        case ErrorCode::eVertexLayoutMismatch:
+            return "The vertex shader asks for a semantic the vertex layout does not carry.";
+        case ErrorCode::ePushConstantMismatch:
+            return "The push constant named is not one this pipeline declares, or not the size it declares it with.";
         case ErrorCode::eConfigInvalid:
             return "The koral.json config file is malformed, or one of its keys has the wrong type.";
+        case ErrorCode::eModuleLoadFailed:
+            return "A module could not be found or loaded, or a module it requires is missing.";
+        case ErrorCode::eFileNotReadable:
+            return "A file could not be opened for reading or writing, or its contents are not the shape expected.";
         }
         return "Unknown error.";
     }
