@@ -614,10 +614,10 @@ namespace kor
     };
 
     /** @brief Whether @p format is a depth and/or stencil format, and so belongs in a depth attachment. */
-    bool IsDepthStencilFormat(Image::Format format);
+    KORAL_API bool IsDepthStencilFormat(Image::Format format);
 
     /** @brief Whether @p format carries a stencil component. */
-    bool IsStencilFormat(Image::Format format);
+    KORAL_API bool IsStencilFormat(Image::Format format);
 
     /** @see enable_flags */
     template<> struct enable_flags<Image::Usage> : std::true_type {};
