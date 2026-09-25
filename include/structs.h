@@ -282,8 +282,8 @@ namespace kor
      * @brief The type of front face. Used to define which faces of polygons are considered front-facing in the graphics pipeline.
      */
     enum class FrontFace : std::uint8_t {
-        eCounterClockwise = false,  ///< Polygons with vertices in counter-clockwise order are considered front-facing. This is the default setting and the most common one.
-        eClockwise = true           ///< Polygons with vertices in clockwise order are considered front-facing. This can be useful if your modeling software exports models with a different winding order than the default.
+        eCounterClockwise,  ///< Polygons with vertices in counter-clockwise order are considered front-facing. This is the default setting and the most common one.
+        eClockwise          ///< Polygons with vertices in clockwise order are considered front-facing. This can be useful if your modeling software exports models with a different winding order than the default.
     };
 
     /**
