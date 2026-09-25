@@ -1250,3 +1250,14 @@ TEST_F(GlTest, AFrameGraphCpuPassRunsBeforeTheGpuPassesThatUseIt) {
         EXPECT_EQ(readback->Read<float>(1).front(), static_cast<float>(frame));
     }
 }
+
+// Only the Vulkan backend opens a second window so far: under OpenGL the builder says so rather than
+// opening a window nothing can draw into.
+TEST_F(GlTest, ASecondWindowIsRefusedUnderOpenGL) {
+    auto second = kor::Window::Builder().SetTitle("second").SetExtent({64, 64}).Build();
+    ASSERT_FALSE(second.Valid());
+    ASSERT_NE(second.Failure(), nullptr);
+    EXPECT_EQ(second.Failure()->code, kor::ErrorCode::eWindowCreationFailed);
+    EXPECT_NE(second.Failure()->message.find("Vulkan"), std::string::npos) << second.Failure()->message;
+    EXPECT_EQ(kor::Context::Windows().size(), 1u);
+}

@@ -15,8 +15,12 @@
 #include "resource.h"
 #include "token.h"
 
+struct GLFWwindow;
+
 namespace kor
 {
+    class Surface;
+
     /**
      * @brief One frame in flight: the swap-chain image it draws into and the command buffer it records with.
      *
@@ -32,7 +36,12 @@ namespace kor
         Frame(const Frame&) = delete;
         Frame& operator=(const Frame&) = delete;
 
-        /** @brief Which swap-chain image this frame presents. Also indexes the per-frame copies of resources. */
+        /**
+         * @brief Which frame in flight this is: the copy of every per-frame resource it uses.
+         *
+         * Not a swap-chain image. Each window's swap chain hands out its images in its own order, and
+         * the image a window shows is the one its swap chain acquired (Image::CopyIndex).
+         */
 		[[nodiscard]] glm::u32 ImageIndex() const { return _imageIndex; }
 
         /** @brief The command buffer this frame's work is recorded into. */
@@ -54,19 +63,18 @@ namespace kor
     class KORAL_API Scheduler
     {
     public:
-        /** @brief How many swap-chain images the scheduler asks for. */
+        /** @brief How many frames the scheduler keeps in flight. */
         struct Builder {
             /**
-             * @brief How many frames in flight to ask for. Two allows double buffering.
+             * @brief How many frames may be in flight at once. Two allows double buffering.
              *
-             * A request, not a guarantee: the surface may require more and the driver may hand out
-             * more still. ImageCount() reports what was actually allocated, and that is the
-             * number everything downstream is sized and indexed by.
+             * Exactly what ImageCount() then reports, and what every per-frame resource is sized to.
+             * Each window's swap chain has however many images its driver gives it, which is a
+             * separate number: those are never indexed by the frame.
              */
-            glm::u32 imageCount = 2;        ///< How many to request; the driver may give more, and the actual count is what ImageCount() reports.
+            glm::u32 imageCount = 2;
 
-            /** @brief Sets the minimum number of swap-chain images. */
-            /** @brief Sets the number of swap-chain images to request. */
+            /** @brief Sets how many frames may be in flight at once. */
             Builder& SetImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
             /**
              * @brief Creates the scheduler for the active backend.
@@ -85,7 +93,7 @@ namespace kor
         /** @brief Creates the swap chain, the frames and their command buffers. Called once by the window. */
     	virtual void Initialize() = 0;
 
-        /** @brief How many frames are in flight — the actual swap-chain image count, which may exceed what was requested. */
+        /** @brief How many frames are in flight: how many copies a per-frame resource has. Fixed for the scheduler's life. */
         [[nodiscard]] glm::u32 ImageCount() const { return _imageCount; }
 
         /**
@@ -134,6 +142,14 @@ namespace kor
 
         /** @brief Blocks until the GPU has finished everything submitted so far. Used when tearing down. */
     	virtual void WaitIdle() const = 0;
+
+        /**
+         * @brief Destroys a closed window's surface and OS window once no frame in flight uses them.
+         *
+         * Called by a second window as it is destroyed — possibly in the middle of the frame that is
+         * still to present it. Internal.
+         */
+        virtual void RetireWindow(std::shared_ptr<Surface> surface, GLFWwindow* window);
 
         // ---- Work from elsewhere --------------------------------------------------------------
 

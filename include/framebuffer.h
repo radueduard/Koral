@@ -21,6 +21,7 @@ namespace kor
 {
     class Image;
     class ImageView;
+    class Window;
 
     /**
      * @brief The set of attachments a render pass draws into.
@@ -211,6 +212,8 @@ namespace kor
 
         /** @brief Creates the window's default framebuffer over the swap chain. Called by the window; use Context::DefaultFramebuffer() to reach it. */
         static Resource<Framebuffer> CreateDefault();
+        /** @brief The same, for @p window: every window has its own. Called by the window. */
+        static Resource<Framebuffer> CreateDefault(const Window& window);
 
         /** @brief How many colour targets it has. */
         [[nodiscard]] glm::u32 ColorAttachmentCount() const;

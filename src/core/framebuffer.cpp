@@ -186,11 +186,15 @@ namespace kor {
     }
 
     kor::Resource<Framebuffer> Framebuffer::CreateDefault() {
+        return CreateDefault(Context::Window());
+    }
+
+    kor::Resource<Framebuffer> Framebuffer::CreateDefault(const Window& window) {
         switch (Context::ActiveAPI()) {
         case API::eOpenGL:
             return kor::MakeBackendResource<Framebuffer, ogl::Framebuffer>();
         case API::eVulkan:
-            return kor::MakeBackendResource<Framebuffer, vk::Framebuffer>();
+            return kor::MakeBackendResource<Framebuffer, vk::Framebuffer>(window);
         default:
             throw std::runtime_error("Unknown graphics API!");
         }

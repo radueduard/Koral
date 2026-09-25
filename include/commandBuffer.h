@@ -903,7 +903,10 @@ namespace kor
                                   std::source_location where = std::source_location::current());
 
         /**
-         * @brief Copies an image onto the swap-chain image this frame presents, rescaling it.
+         * @brief Copies an image onto the main window's swap-chain image this frame, rescaling it.
+         *
+         * For another window, Blit into the image its screen name gives a pass
+         * (PassResources::ImageNamed(window->ScreenName())).
          * @param srcImage The image to present.
          * @param blitInfo Which region to take and where it lands; see kor::Blit.
          *

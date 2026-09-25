@@ -11,7 +11,11 @@
 #include <surface.h>
 #include <log.h>
 
+#include <algorithm>
 #include <iostream>
+
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 #include "surface.h"
 #include "swapChain.h"
@@ -41,12 +45,10 @@ namespace kor::vk
     Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : kor::Frame(imageIndex), _queue(queue)
     {
         _commandBuffer = Context::Device().requestCommandBuffer(_queue);
-        _imageAvailable = vk::Context::Device()->createSemaphore({});
         _inFlightFence = Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
     }
 
 	Frame::~Frame() {
-        Context::Device()->destroySemaphore(_imageAvailable);
         Context::Device()->destroyFence(_inFlightFence);
     }
 
@@ -62,66 +64,69 @@ namespace kor::vk
         _tokens.clear();
     }
 
-    void Frame::ResetSemaphore() const {
-        vk::Context::Device()->destroySemaphore(_imageAvailable);
-        _imageAvailable = vk::Context::Device()->createSemaphore({});
-    }
-
     Scheduler::Scheduler(const Builder& createInfo) : kor::Scheduler(createInfo) {}
 
     void Scheduler::Initialize()
     {
-        _swapChain = kor::vk::SwapChain::Builder(dynamic_cast<const kor::vk::Surface&>(kor::Context::Window().RenderSurface()))
-            .setImageCount(_imageCount)
-            .setSampleCount(SampleCount::e1)
-            .build();
-
-        adoptSwapChainSizing();
-
+        // The frames in flight are what was asked for, and stay that: every per-frame resource is sized
+        // to them. The main window's swap chain has however many images its driver gives it, which is
+        // its own business — its image follows the image it acquired, not the frame.
+        auto& window = kor::Context::Window();
+        dynamic_cast<kor::vk::Surface&>(*window._surface).CreateSwapChain(window, _imageCount);
         CreateFrames();
     }
 
-    void Scheduler::adoptSwapChainSizing()
+    const kor::vk::SwapChain& Scheduler::getSwapChain() const
     {
-        // Adopt the swapchain's *actual* image count before anything is sized to it.
-        // CurrentImageIndex() returns the driver-acquired image index (0..actualCount-1), and
-        // every per-frame resource — the frames, the swap chain's own depth target, and every user
-        // Buffer/Image/ImageView/DescriptorSet built later off ImageCount() — is indexed by it.
-        // Leaving _imageCount at the requested value while the driver hands out more images made all
-        // of those read out of bounds on other GPUs (the render-loop segfault); keeping the two in
-        // step is what makes the acquire index always land in range.
-        _imageCount = _swapChain->imageCount();
-
-        // Only now, because it allocates one copy per _imageCount. This is why it is not built
-        // inside CreateSwapChain: that runs from the SwapChain constructor, before the line above
-        // has ever executed, so it would be sized by whatever was *requested*.
-        _swapChain->CreateDepthResources();
+        return dynamic_cast<const kor::vk::Surface&>(kor::Context::Window().RenderSurface()).swapChain();
     }
 
-    void Scheduler::recreateSwapChain(const glm::uvec2& extent)
+    void Scheduler::recreateSwapChain(kor::Window& window)
     {
-        _swapChain->Resize(extent);
-        // A resize can land on a different image count than the one in force, so re-adopt rather
-        // than assuming Initialize's answer still holds.
-        adoptSwapChainSizing();
-
-        // Last, because it attaches the views the two steps above just replaced. Through the window
+        auto& swapChain = dynamic_cast<kor::vk::Surface&>(*window._surface).swapChain();
+        swapChain.Resize(window.Extent());
+        // Last, because it attaches the views the step above just replaced. Through the window
         // rather than Context::DefaultFramebuffer(): that one hands out a const ref, because reading
         // the default framebuffer is all a project ever does with it. Resizing it is the engine's
         // own job, and this is the place that owns it.
-        kor::Context::Window().DefaultFramebuffer()->Resize(_swapChain->extent());
+        window.DefaultFramebuffer()->Resize(swapChain.extent());
+    }
+
+    void Scheduler::RetireWindow(std::shared_ptr<kor::Surface> surface, GLFWwindow* window)
+    {
+        // Out of sight at once; destroyed once the frame being built — which may still present it —
+        // has finished on the GPU.
+        if (window) glfwHideWindow(window);
+        _retired.push_back({std::move(surface), window, FrameCompletion()});
+    }
+
+    void Scheduler::destroyRetiredWindows(const bool all)
+    {
+        if (all) WaitIdle();
+        std::erase_if(_retired, [all](Retired& retired) {
+            if (!all && !retired.lastUse.Ready()) return false;
+            retired.surface.reset();   // the swap chain, then the surface
+            if (retired.window) glfwDestroyWindow(retired.window);
+            return true;
+        });
     }
 
     Scheduler::~Scheduler() {
         Context::Device().queuesWaitIdle();
+        destroyRetiredWindows(true);
         _frames.clear();
-        _swapChain.reset();
         Context::Device().freeQueues();
     }
 
     void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) {
         kor::Scheduler::Draw(renderFunc);
+        // On to the next frame in flight at the start, not the end: between frames, CurrentImageIndex()
+        // keeps naming the frame just drawn — which is what reading a per-frame resource back after a
+        // frame expects to find.
+        if (_drawnOnce) AdvanceFrame();
+        _drawnOnce = true;
         const auto& frame = dynamic_cast<const kor::vk::Frame&>(CurrentFrame());
+        const glm::u32 slot = frame.ImageIndex();
 
         const auto& fence = frame.getInFlightFence();
         // vulkan-hpp throws on error codes rather than returning them, so a lost device surfaces
@@ -140,26 +145,62 @@ namespace kor::vk
         // And whatever was destroyed while the GPU might still have been using it, now that it
         // no longer is. Once a frame is the natural cadence for the deferred-deletion queue.
         detail::collectRetired();
+        destroyRetiredWindows(false);
 
-        while (true) {
-            auto result = _swapChain->Acquire(frame);
-            if (result == ::vk::Result::eErrorDeviceLost) {
-                reportDeviceLost("swapchain image acquire");
+        // ---- an image from every window ------------------------------------------------------------
+        // Held for the frame: a window a scene closes halfway through it is still presented by it.
+        struct Shown {
+            std::shared_ptr<kor::Surface> surface;
+            kor::vk::SwapChain* swapChain;
+            bool main;
+        };
+        std::vector<Shown> shown;
+        for (kor::Window* window : kor::Context::Windows()) {
+            window->_shownThisFrame = false;
+            auto& swapChain = dynamic_cast<kor::vk::Surface&>(*window->_surface).swapChain();
+            if (window->IsMain()) {
+                while (true) {
+                    auto result = swapChain.Acquire(slot);
+                    if (result == ::vk::Result::eErrorDeviceLost) {
+                        reportDeviceLost("swapchain image acquire");
+                    }
+                    if (result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
+                        _started = false;
+                        recreateSwapChain(*window);
+                        _started = true;
+                        // A failed acquire may leave the semaphore pending: start that slot's over.
+                        swapChain.ResetImageAvailable(slot);
+                        continue;
+                    }
+                    break;
+                }
+            } else {
+                // A second window is simply not shown while it has nothing to show into: minimized, or
+                // not yet sized by its compositor. The frame graph skips the passes drawing into it.
+                if (window->IsPaused()) continue;
+                if (window->HasResized() || swapChain.extent() != window->Extent()) recreateSwapChain(*window);
+                bool acquired = false;
+                for (int attempt = 0; attempt < 2 && !acquired; ++attempt) {
+                    const auto result = swapChain.Acquire(slot);
+                    if (result == ::vk::Result::eErrorDeviceLost) reportDeviceLost("swapchain image acquire");
+                    if (result == ::vk::Result::eSuccess) { acquired = true; break; }
+                    if (result == ::vk::Result::eSuboptimalKHR) {
+                        // Acquired, and signalling: use it this frame, rebuild next.
+                        acquired = true;
+                        break;
+                    }
+                    recreateSwapChain(*window);
+                    swapChain.ResetImageAvailable(slot);
+                }
+                if (!acquired) continue;
             }
-            if (result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
-                _started = false;
-                recreateSwapChain(kor::Context::Window().Extent());
-                _started = true;
-                // recreate the semaphore
-                frame.ResetSemaphore();
-                continue;
-            }
-            break;
+            window->_shownThisFrame = true;
+            shown.push_back({window->_surface, &swapChain, window->IsMain()});
         }
 
-        // Before the fence is reset, and so before anything is queued against this image: the image
-        // we just acquired may still be owned by an older frame whose submit has not finished.
-        _swapChain->ClaimAcquiredImage(fence);
+        // Before the fence is reset, and so before anything is queued against these images: an image
+        // just acquired may still be owned by an older frame whose submit has not finished.
+        for (const auto& s : shown) s.swapChain->ClaimAcquiredImage(fence);
 
         if (const auto result = Context::Device()->resetFences(1, &fence); result != ::vk::Result::eSuccess) {
             throw std::runtime_error("Failed to reset fence: " + ::vk::to_string(result));
@@ -181,14 +222,37 @@ namespace kor::vk
         auto pending = TakePending();
         _buildingFrame = false;
 
-        SubmitInfo submitInfo {
-            .waitSemaphores = { frame.getImageAvailableSemaphore() },
-            .waitValues = { 0 },
-            .waitStages = { ::vk::PipelineStageFlagBits::eColorAttachmentOutput },
-            .signalSemaphores = { _swapChain->getCurrentRenderFinishedSemaphore() },
-            .signalValues = { 0 },
-            .fence = frame.getInFlightFence()
-        };
+        // ---- the other windows' images, made presentable -------------------------------------------
+        // The main window's is left presentable by the interface drawn over it. Another window's is
+        // left by nothing, so it is transitioned here, after everything else this frame — and cleared
+        // first when no pass drew into it, so it never shows what an older frame left in that image.
+        if (std::ranges::any_of(shown, [](const Shown& s) { return !s.main; })) {
+            auto present = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eGraphics);
+            present->Begin();
+            for (const auto& s : shown) {
+                if (s.main) continue;
+                const auto image = s.swapChain->image();
+                const auto touches = [&](const std::vector<std::unique_ptr<kor::CommandBuffer>>& list) {
+                    return std::ranges::any_of(list, [&](const auto& cb) { return cb && cb->HasTouched(image); });
+                };
+                if (!touches(pending.before) && !commandBuffer.HasTouched(image) && !touches(pending.after))
+                    present->ClearColorImage(image, glm::vec4(0.f, 0.f, 0.f, 1.f));
+                present->ImageBarrier({ image, ResourceAccess::ePresent });
+            }
+            pending.after.push_back(std::move(present));
+        }
+
+        SubmitInfo submitInfo { .fence = frame.getInFlightFence() };
+        for (const auto& s : shown) {
+            submitInfo.waitSemaphores.push_back(s.swapChain->getImageAvailableSemaphore(slot));
+            submitInfo.waitValues.push_back(0);
+            // The main window's image is first written as a colour attachment. Another's may be
+            // written by a copy or a blit, which the wait has to hold back as well.
+            submitInfo.waitStages.push_back(s.main ? ::vk::PipelineStageFlags(::vk::PipelineStageFlagBits::eColorAttachmentOutput)
+                                                   : ::vk::PipelineStageFlagBits::eColorAttachmentOutput | ::vk::PipelineStageFlagBits::eTransfer);
+            submitInfo.signalSemaphores.push_back(s.swapChain->getCurrentRenderFinishedSemaphore());
+            submitInfo.signalValues.push_back(0);
+        }
 
         // Ended here, in exactly the order they run — before-work, the frame, after-work — because
         // each End() resolves its barriers against where the one before it left every resource.
@@ -244,18 +308,52 @@ namespace kor::vk
             if (!TokenReactor::signalIsOnItsWay(token)) token.Wait();
         }
 
-        const auto presentResult = _swapChain->Present(frame);
-        if (presentResult == ::vk::Result::eErrorDeviceLost) {
-            reportDeviceLost("present");
-        }
-        if (presentResult == ::vk::Result::eErrorOutOfDateKHR || presentResult == ::vk::Result::eSuboptimalKHR) {
-            _started = false;
-            recreateSwapChain(kor::Context::Window().Extent());
-            _started = true;
-            return;
-        }
+        // ---- every window at once --------------------------------------------------------------------
+        // One present per queue that presents them (on any ordinary device, one for all), so the
+        // windows show the frame together.
+        bool mainOutOfDate = false;
+        std::vector<bool> done(shown.size(), false);
+        for (std::size_t first = 0; first < shown.size(); ++first) {
+            if (done[first]) continue;
+            const auto& queue = shown[first].swapChain->getPresentQueue();
+            std::vector<std::size_t> group;
+            for (std::size_t i = first; i < shown.size(); ++i)
+                if (!done[i] && &shown[i].swapChain->getPresentQueue() == &queue) { group.push_back(i); done[i] = true; }
 
-        AdvanceFrame();
+            std::vector<::vk::Semaphore> waits;
+            std::vector<::vk::SwapchainKHR> swapChains;
+            std::vector<glm::u32> indices;
+            for (const auto i : group) {
+                waits.push_back(shown[i].swapChain->getCurrentRenderFinishedSemaphore());
+                swapChains.push_back(**shown[i].swapChain);
+                indices.push_back(shown[i].swapChain->currentImageIndex());
+            }
+            std::vector<::vk::Result> results(group.size(), ::vk::Result::eSuccess);
+            const auto presentInfo = ::vk::PresentInfoKHR()
+                .setWaitSemaphores(waits)
+                .setSwapchains(swapChains)
+                .setImageIndices(indices)
+                .setResults(results);
+            try {
+                const auto lock = Context::Device().lockQueues();
+                (void)queue->presentKHR(presentInfo);
+            } catch (const ::vk::OutOfDateKHRError &) {
+                // Which one is in `results`.
+            } catch (const ::vk::DeviceLostError &) {
+                reportDeviceLost("present");
+            }
+            for (std::size_t k = 0; k < group.size(); ++k) {
+                if (results[k] == ::vk::Result::eErrorDeviceLost) reportDeviceLost("present");
+                const bool stale = results[k] == ::vk::Result::eErrorOutOfDateKHR || results[k] == ::vk::Result::eSuboptimalKHR;
+                // Another window's is rebuilt when it next acquires; the main one's at once, as always.
+                if (stale && shown[group[k]].main) mainOutOfDate = true;
+            }
+        }
+        if (mainOutOfDate) {
+            _started = false;
+            recreateSwapChain(kor::Context::Window());
+            _started = true;
+        }
     }
 
     void Scheduler::CreateFrames() {

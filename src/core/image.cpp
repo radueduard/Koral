@@ -26,12 +26,14 @@ namespace kor
     // (Scheduler::Draw), so record order is execute order. Should that become several buffers, or
     // several threads, the resolver needs per-buffer entry/exit states reconciled at submit instead
     // of a single value read at record time.
-    glm::u32 Image::TrackingFrame() const
+    glm::u32 Image::TrackingFrame() const { return CopyIndex(); }
+
+    glm::u32 Image::CopyIndex() const
     {
         // Only a per-frame image has more than one copy, and only then does which frame it is matter.
-        // Asked of the scheduler rather than remembered, so it is always the copy a command recorded
-        // now would actually touch.
+        // Asked rather than remembered, so it is always the copy a command recorded now would touch.
         if (!_isPerFrame) return 0;
+        if (_copySelector) return _copySelector();
         if (!Context::HasDevice() || Context::IsHeadless()) return 0;
         return Context::Scheduler().CurrentImageIndex();
     }
@@ -144,6 +146,8 @@ namespace kor
         case Format::eRGBA8_UINT:
         case Format::eRGBA8_SINT:
         case Format::eRGBA8_SRGB:
+        case Format::eBGRA8_UNORM:   // a window's usual format
+        case Format::eBGRA8_SRGB:
             return 1;
         case Format::eR16_UNORM:
         case Format::eR16_SNORM:
@@ -246,6 +250,8 @@ namespace kor
         case Format::eRGBA8_UINT:
         case Format::eRGBA8_SINT:
         case Format::eRGBA8_SRGB:
+        case Format::eBGRA8_UNORM:
+        case Format::eBGRA8_SRGB:
         case Format::eRGBA16_UNORM:
         case Format::eRGBA16_SNORM:
         case Format::eRGBA16_UINT:

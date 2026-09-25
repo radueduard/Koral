@@ -32,8 +32,8 @@ namespace kor::vk
         return availableFormats[0];
     }
 
-    ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes) {
-        if (!kor::Context::Window().IsVSync()) {
+    ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes, const bool vsync) {
+        if (!vsync) {
             // VSync off: present uncapped. Prefer immediate (may tear); Fifo is the
             // guaranteed-available fallback if the driver lacks an immediate mode.
             for (const auto &availablePresentMode : availablePresentModes) {
@@ -64,7 +64,9 @@ namespace kor::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
-        _extent(kor::Context::Window().Extent()),
+        _extent(createInfo.extent),
+        _vsync(createInfo.vsync),
+        _transparent(createInfo.transparent),
         _sampleCount(createInfo.sampleCount),
         _requestedImageCount(createInfo.imageCount),
         _surface(createInfo.surface),
@@ -72,14 +74,17 @@ namespace kor::vk
     {
         vk::Context::Device().waitIdle();
 
+        for (glm::u32 i = 0; i < std::max(createInfo.framesInFlight, 1u); ++i)
+            _imageAvailable.push_back(Context::Device()->createSemaphore({}));
         CreateSwapChain();
+        CreateDepthResources();
     }
 
     void SwapChain::CreateSwapChain() {
         const auto surfaceCapabilities = _surface.get().getCapabilities();
 
         _surfaceFormat = ChooseSurfaceFormat(_surface.get().getFormats());
-        _presentMode = ChoosePresentMode(_surface.get().getPresentModes());
+        _presentMode = ChoosePresentMode(_surface.get().getPresentModes(), _vsync);
         _extent = ChooseExtent(surfaceCapabilities, _extent);
 
         // Request at least what the surface demands. The requested count is our preferred floor, but the
@@ -94,7 +99,7 @@ namespace kor::vk
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
 
-        const auto compositeAlpha = kor::Context::Window().IsFramebufferTransparent() ?
+        const auto compositeAlpha = _transparent ?
 #ifdef _WIN32
         ::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
 #elifdef __APPLE__
@@ -114,7 +119,9 @@ namespace kor::vk
             .setImageColorSpace(_surfaceFormat.colorSpace)
             .setImageExtent({ _extent.x, _extent.y })
             .setImageArrayLayers(1)
-            .setImageUsage(::vk::ImageUsageFlagBits::eColorAttachment | ::vk::ImageUsageFlagBits::eTransferDst)
+            // Transfer source too, so what a window shows can be copied out — a screenshot, a test.
+            .setImageUsage(::vk::ImageUsageFlagBits::eColorAttachment | ::vk::ImageUsageFlagBits::eTransferDst
+                         | ::vk::ImageUsageFlagBits::eTransferSrc)
             .setImageSharingMode(::vk::SharingMode::eExclusive)
             .setQueueFamilyIndices(queueFamilyIndices)
             .setPreTransform(surfaceCapabilities.currentTransform)
@@ -157,7 +164,10 @@ namespace kor::vk
         // recreating, so nothing is in flight and no image has an owner any more.
         _imagesInFlight.assign(swapChainImageHandles.size(), nullptr);
 
-        _swapChainImages = Resource<kor::Image>(std::make_unique<kor::vk::Image>(swapChainImageHandles, _extent, format(_surfaceFormat.format), _sampleCount));
+        // Which of them a command means is the one acquired for this frame — never the frame in flight.
+        _swapChainImages = Resource<kor::Image>(std::make_unique<kor::vk::Image>(
+            swapChainImageHandles, _extent, format(_surfaceFormat.format), _sampleCount,
+            [this] { return _imageIndex.load(); }));
 
         _swapChainImageViews = kor::ImageView::Builder(_swapChainImages)
             .SetViewType(kor::ImageView::Type::e2D)
@@ -165,12 +175,8 @@ namespace kor::vk
     }
 
     void SwapChain::CreateDepthResources() {
-        // Separate from CreateSwapChain, and called only once the scheduler has adopted the count
-        // above, because this is a *per-frame* image: it allocates one copy per
-        // Context::Scheduler().ImageCount(), and is then indexed by the image index the driver
-        // hands back from acquire. Built while the scheduler still reported the requested count, it
-        // comes up short on any driver that allocates more than was asked for — the same
-        // out-of-bounds the semaphores above were fixed for.
+        // A per-frame image: one copy per frame in flight, which is what it is indexed by. It is not
+        // presented, so it has no reason to follow the swap chain's own images.
         _depthImages = Image::Builder()
             .SetIsPerFrame(true)
             .SetExtent(_extent)
@@ -195,6 +201,9 @@ namespace kor::vk
         for (const auto& semaphore : _renderFinishedSemaphores) {
             Context::Device()->destroySemaphore(semaphore);
         }
+        for (const auto& semaphore : _imageAvailable) {
+            Context::Device()->destroySemaphore(semaphore);
+        }
         if (_handle) {
             Context::Device()->destroySwapchainKHR(_handle);
         }
@@ -204,17 +213,21 @@ namespace kor::vk
         _extent = newSize;
         Context::Device().waitIdle();
         CreateSwapChain();
-        // Stops here on purpose. The depth target and the default framebuffer are both sized to the
-        // image count, which this may just have changed, so the scheduler re-adopts it and finishes
-        // the job. @see vk::Scheduler::adoptSwapChainSizing
+        CreateDepthResources();
+        // The window's default framebuffer is re-pointed by whoever resized it. @see vk::Scheduler
     }
 
-    ::vk::Result SwapChain::Acquire(const kor::vk::Frame &frame) {
+    void SwapChain::ResetImageAvailable(const glm::u32 slot) {
+        Context::Device()->destroySemaphore(_imageAvailable[slot]);
+        _imageAvailable[slot] = Context::Device()->createSemaphore({});
+    }
+
+    ::vk::Result SwapChain::Acquire(const glm::u32 slot) {
         try {
             const auto result = Context::Device()->acquireNextImageKHR(
                 _handle,
                 UINT64_MAX,
-                frame.getImageAvailableSemaphore(),
+                _imageAvailable[slot],
                 nullptr);
             _imageIndex = result.value;
             return result.result;
@@ -244,29 +257,5 @@ namespace kor::vk
             }
         }
         _imagesInFlight[_imageIndex] = frameFence;
-    }
-
-    ::vk::Result SwapChain::Present(const kor::vk::Frame &frame) {
-        std::array waitSemaphores = {
-        	_renderFinishedSemaphores[_imageIndex]
-        };
-
-        std::array swapChains = {
-            _handle
-        };
-
-        const glm::u32 imageIndex = _imageIndex;
-        const auto presentInfo = ::vk::PresentInfoKHR()
-            .setWaitSemaphores(waitSemaphores)
-            .setSwapchains(swapChains)
-            .setImageIndices(imageIndex);
-        try {
-        	const auto lock = Context::Device().lockQueues();
-        	return _presentQueue->presentKHR(presentInfo);
-        } catch (const ::vk::OutOfDateKHRError &) {
-            return ::vk::Result::eErrorOutOfDateKHR;
-        } catch (const ::vk::DeviceLostError &) {
-            return ::vk::Result::eErrorDeviceLost;
-        }
     }
 }

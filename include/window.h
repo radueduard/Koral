@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include <filesystem>
@@ -23,6 +24,7 @@ namespace kor
     class Surface;
     class Framebuffer;
     class Engine;
+    namespace vk { class Scheduler; }
 }
 
 struct GLFWmonitor;
@@ -45,7 +47,11 @@ namespace kor {
      * configuration before the first frame and drives it; reach the live one through
      * Context::Window() and the image being drawn to through DefaultFramebuffer().
      *
-     * There is one window per process. It is neither copyable nor thread-safe: every method here
+     * The runtime builds one, the application's, with the scene. A scene may open more with a
+     * builder that has no scene (Builder()): those share the device, the frames and the frame graph,
+     * and are drawn into through their ScreenName(). Context::Windows() lists them all.
+     *
+     * A window is neither copyable nor thread-safe: every method here
      * must be called from the thread that created it, which is the thread the scene is driven on.
      */
     class KORAL_API Window {
@@ -87,6 +93,24 @@ namespace kor {
 
             /** @param scene The scene to run. Ownership passes to the window that is built. */
             explicit Builder(std::unique_ptr<Scene> scene);
+            /**
+             * @brief A window with no scene of its own: a second window, opened by a scene that is
+             *        already running in the main one.
+             *
+             * It shares everything the main window brought up — the device, the frames, the frame
+             * graph — and adds only an OS window, a swap chain and a default framebuffer. The scene
+             * draws into it through the frame graph, by writing its ScreenName().
+             *
+             * @code
+             * top = kor::Window::Builder().SetTitle("Top view").SetExtent({640, 480}).Build();
+             * // a pass: .Write(top->ScreenName(), kor::Image::Usage::eTransferDst), then Blit into it
+             * @endcode
+             *
+             * Only under Vulkan so far; under OpenGL the result is poisoned, saying so. The API, the
+             * platform and the ImGui layout file are the main window's, so their setters do nothing here.
+             * Destroying it closes it, at the end of whatever frame is using it.
+             */
+            Builder();
             ~Builder();
             Builder(Builder&&) noexcept;
             Builder& operator=(Builder&&) noexcept;
@@ -203,8 +227,9 @@ namespace kor {
         Window(const Window &) = delete;
         Window &operator=(const Window &) = delete;
 
-        Window(Window &&);
-        Window &operator=(Window &&);
+        // Not movable: the context lists windows by address.
+        Window(Window &&) = delete;
+        Window &operator=(Window &&) = delete;
 
         /**
          * @brief Whether the window has been asked to close, by the user or by Close().
@@ -287,6 +312,25 @@ namespace kor {
         /** @brief The presentation surface the swap chain was created for. */
         [[nodiscard]] const kor::Surface& RenderSurface() const { return *_surface; }
 
+        /** @brief Whether this is the application's window — the one built with the scene — rather than a second one. */
+        [[nodiscard]] bool IsMain() const { return !_secondary; }
+
+        /**
+         * @brief The name the frame graph knows this window's image by: FrameGraph::Screen for the
+         *        main window, "screen:<n>" for another.
+         *
+         * A pass writes it to draw into the window. Whenever the window is not shown in a frame —
+         * minimized, or opened during it — passes that use it are skipped for that frame, as passes
+         * needing a disabled pass's output are (FrameGraph::SkippedPasses).
+         */
+        [[nodiscard]] const std::string& ScreenName() const { return _screenName; }
+
+        /**
+         * @brief Whether the frame being built draws into this window: it had an image to draw into
+         *        when the frame started. Always true for the main window during a frame.
+         */
+        [[nodiscard]] bool IsShownThisFrame() const { return _shownThisFrame; }
+
         /**
          * @brief Loads an image from disk and makes it the window's icon.
          * @param iconPath Image file to load; anything stb_image reads, converted to RGBA.
@@ -306,11 +350,17 @@ namespace kor {
         void LateUpdate();
 
     private:
+        friend class kor::vk::Scheduler;
+
         /** @brief How far construction got, so Release() undoes exactly that much. */
         enum class Stage : std::uint8_t { eNone, eGlfw, eDevice, eRuntime, eScene };
         Stage _stage = Stage::eNone;
         /** @brief The constructor's work: GLFW, the device, the scheduler, the GUI, the modules, the scene. */
         void BringUp(Builder& createInfo);
+        /** @brief A second window's: its OS window, surface, swap chain and framebuffer, and nothing shared. */
+        void BringUpSecondary(const Builder& createInfo);
+        /** @brief The surface, shared: the scheduler holds a window's for the frame it presents. */
+        [[nodiscard]] std::shared_ptr<kor::Surface> SharedSurface() const { return _surface; }
         /** @brief Tears down whatever has been brought up; the destructor, and a constructor that threw. */
         void Release();
     	static void FramebufferResize(GLFWwindow* handle, int width, int height);
@@ -319,7 +369,10 @@ namespace kor {
         GLFWmonitor* _monitor = nullptr;
         GLFWimage* _icon = nullptr;
         const GLFWvidmode *_videoMode = nullptr;
-        std::unique_ptr<kor::Surface> _surface;
+        std::shared_ptr<kor::Surface> _surface;
+        bool _secondary = false;
+        bool _shownThisFrame = false;
+        std::string _screenName;
 
         std::string _title;
         glm::uvec2 _extent;

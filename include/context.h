@@ -95,8 +95,9 @@ namespace kor {
     /**
      * @brief Process-wide access to whatever the runtime has brought up.
      *
-     * Everything here is static, because there is one window, one device and one scheduler per
-     * process. A scene reaches the pieces it needs through this rather than being handed them:
+     * Everything here is static, because there is one device and one scheduler per process, and one
+     * application window (Window()) — any others a scene opens are listed by Windows(). A scene
+     * reaches the pieces it needs through this rather than being handed them:
      *
      * @code
      * const auto extent = kor::Context::Window().Extent();
@@ -115,6 +116,12 @@ namespace kor {
     public:
         /** @brief The application window. Not valid in a headless context, which has none. */
         static KORAL_API kor::Window& Window();
+
+        /**
+         * @brief Every open window: the application's first, then any a scene opened, in the order
+         *        they were opened. Empty in a headless context.
+         */
+        [[nodiscard]] static KORAL_API std::vector<kor::Window*> Windows();
 
         /** @brief The frame scheduler: swap chain, frames in flight, and which image is current. */
         static KORAL_API kor::Scheduler& Scheduler();
@@ -217,6 +224,8 @@ namespace kor {
 
     private:
         inline static kor::Window* _window = nullptr;
+        /// Every window, main first. Defined in context.cpp, for the reason given at the end of this class.
+        static KORAL_API std::vector<kor::Window*>& WindowList();
 
         /// Declared rather than defined here: kor::Scheduler is only forward-declared in this
         /// header, and destroying the resource needs the complete type. Defined in context.cpp,

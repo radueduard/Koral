@@ -12,6 +12,8 @@
 #include <framebuffer.h>
 #include <surface.h>
 
+#include <GLFW/glfw3.h>
+
 #include "../backends/open_gl/scheduler.h"
 #include "../backends/vulkan/scheduler.h"
 
@@ -32,6 +34,13 @@ namespace kor
         }
         return Resource<Scheduler>::Failed(
             Error{.code = ErrorCode::eUnknownApi, .message = "No scheduler exists for the active graphics API."}, "Scheduler");
+    }
+
+    void Scheduler::RetireWindow(std::shared_ptr<Surface> surface, GLFWwindow* window)
+    {
+        WaitIdle();
+        surface.reset();
+        if (window) glfwDestroyWindow(window);
     }
 
     Scheduler::Scheduler(const Builder& createInfo) :

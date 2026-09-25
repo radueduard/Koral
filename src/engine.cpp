@@ -258,7 +258,7 @@ namespace kor
             // Draw returns. @see GUI::RenderPlatformWindows
             GUI::RenderPlatformWindows();
             Input::Update();
-            window->LateUpdate();
+            for (Window* open : Context::Windows()) open->LateUpdate();
         }
         window.Reset();
         return EXIT_SUCCESS;

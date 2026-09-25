@@ -8,15 +8,18 @@
 
 #include "input.h"
 
+#include <format>
 #include <iostream>
 #include <stb_image.h>
 #include <GLFW/glfw3.h>
 
+#include "frameGraph.h"
 #include "gui.h"
 #include "scene.h"
 #include "module.h"
 #include "scheduler.h"
 #include "surface.h"
+#include "../backends/vulkan/surface.h"
 #include "../backends/vulkan/vulkanContext.h"
 
 #include "../executor/MainThreadExecutor.h"
@@ -30,6 +33,7 @@ namespace kor {
     // Here rather than in the header: window.h forward-declares Scene, so the unique_ptr member's
     // destructor can only be instantiated where Scene is complete.
     Window::Builder::Builder(std::unique_ptr<Scene> scene) : scene(std::move(scene)) {}
+    Window::Builder::Builder() = default;
     Window::Builder::~Builder() = default;
     Window::Builder::Builder(Builder&&) noexcept = default;
     Window::Builder& Window::Builder::operator=(Builder&&) noexcept = default;
@@ -47,7 +51,8 @@ namespace kor {
         _scene(std::move(createInfo.scene))
     {
         try {
-            BringUp(createInfo);
+            if (_scene) BringUp(createInfo);
+            else BringUpSecondary(createInfo);
         } catch (...) {
             // The destructor does not run for a constructor that threw: undo what was set up.
             Release();
@@ -58,6 +63,8 @@ namespace kor {
     void Window::BringUp(Builder& createInfo)
     {
         Context::_window = this;
+        _screenName = std::string(FrameGraph::Screen);
+        Context::WindowList().insert(Context::WindowList().begin(), this);
         Context::_activeAPI = createInfo.api; // backend selection keys off this, not the window
 
         // Choose the windowing platform on Linux (X11 vs Wayland). This is an init hint, so it must
@@ -258,6 +265,65 @@ namespace kor {
         _stage = Stage::eScene;
     }
 
+    void Window::BringUpSecondary(const Builder& createInfo)
+    {
+        _secondary = true;
+        if (Context::_window == nullptr)
+            throw std::runtime_error("A window without a scene is a second window, and there is no first one: "
+                                     "the application's window has to exist before a scene opens another.");
+        if (Context::ActiveAPI() != API::eVulkan)
+            throw std::runtime_error("Only the Vulkan backend opens more than one window so far.");
+        _api = API::eVulkan;
+        _imguiIni.clear();
+
+        // Numbered, not named after the title: a title can repeat and can change, a screen name cannot.
+        static glm::u32 opened = 0;
+        _screenName = std::format("screen:{}", ++opened);
+
+        glfwDefaultWindowHints();
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+        glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
+        glfwWindowHint(GLFW_DECORATED, createInfo.decorated);
+        glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, createInfo.transparentFramebuffer);
+        glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
+        _monitor = createInfo.fullscreen ? glfwGetPrimaryMonitor() : nullptr;
+        if (_monitor) {
+            _videoMode = glfwGetVideoMode(_monitor);
+            _extent = { static_cast<glm::u32>(_videoMode->width), static_cast<glm::u32>(_videoMode->height) };
+        }
+        _window = glfwCreateWindow(static_cast<int>(_extent.x), static_cast<int>(_extent.y),
+                                   createInfo.title.c_str(), _monitor, nullptr);
+        if (_window == nullptr) {
+            const char* description = nullptr;
+            glfwGetError(&description);
+            throw std::runtime_error(std::string("GLFW could not create the window: ")
+                                     + (description ? description : "no reason given"));
+        }
+        glfwSetWindowUserPointer(_window, this);
+        glfwSetFramebufferSizeCallback(_window, FramebufferResize);
+        glfwSetWindowCloseCallback(_window, Input::Callbacks::CloseCallback);
+
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(_window, &width, &height);
+        _extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
+        // Not waited for, unlike the main window's: a scene opens this from inside a frame, and a
+        // compositor that has not sized it yet just means it is not shown until it has.
+        if (width == 0 || height == 0) {
+            _extent = glm::max(_extent, glm::uvec2(1));
+            Pause();
+        }
+
+        _surface = kor::Surface::Create(*this);
+        dynamic_cast<vk::Surface&>(*_surface).CreateSwapChain(*this, Context::Scheduler().ImageCount());
+        _framebuffer = Framebuffer::CreateDefault(*this);
+
+        // Its input goes where the main window's does — it is the same user at the same keyboard.
+        Input::AttachEngineWindow(_window);
+        _focused = glfwGetWindowAttrib(_window, GLFW_FOCUSED) == GLFW_TRUE;
+        Context::WindowList().push_back(this);
+        _stage = Stage::eScene;
+    }
+
     Resource<Window> Window::Builder::Build()
     {
         try {
@@ -267,20 +333,6 @@ namespace kor {
             return Resource<Window>::Failed(Error{.code = ErrorCode::eWindowCreationFailed, .message = e.what()}, title);
         }
     }
-
-    // Defaulted here rather than in the header, and it has to stay that way.
-    //
-    // _surface is a std::unique_ptr to a forward-declared kor::Surface, so anything that destroys
-    // it needs the complete type. Move-assignment destroys the object being overwritten, and the
-    // move constructor needs the destructor available for unwinding, so `= default` in the header
-    // would instantiate std::default_delete<Surface> against an incomplete type. The constructor
-    // and destructor are out of line for the same reason; these two were the ones left behind.
-    //
-    // GCC and Clang happen not to instantiate the deleter here and compile it either way, so this
-    // only ever showed up on MSVC ("can't delete an incomplete type"), the first time the Windows
-    // leg of the release was run.
-    Window::Window(Window &&) = default;
-    Window &Window::operator=(Window &&) = default;
 
     // Out of line for the same reason, but for kor::Framebuffer: returning the ResourceRef by value
     // instantiates that type's destructor, which needs it complete. This file has it via
@@ -292,6 +344,23 @@ namespace kor {
     Window::~Window() { Release(); }
 
     void Window::Release() {
+        std::erase(Context::WindowList(), this);
+        if (_secondary) {
+            // Only what is its own. The frame that last drew into it may still be on its way to the
+            // GPU — the window may even be closing in the middle of the frame being built — so the
+            // surface and the OS window go to the scheduler, which destroys them once that frame is done.
+            if (_window) Input::DetachFrom(_window);
+            _framebuffer.Reset();
+            if (Context::_scheduler.Valid()) {
+                Context::_scheduler->RetireWindow(std::move(_surface), _window);
+            } else {
+                _surface.reset();
+                if (_window) glfwDestroyWindow(_window);
+            }
+            _window = nullptr;
+            _stage = Stage::eNone;
+            return;
+        }
         // Torn down as far as it was brought up: all of it for a window that was built, only the
         // first steps for a constructor that threw part-way.
         if (_stage >= Stage::eRuntime) {

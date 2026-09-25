@@ -73,7 +73,9 @@ namespace kor::vk
     ::vk::ImageView ImageView::operator*() const
     {
         refreshIfStale();
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
+        // Whichever copy the image itself says is current: a swap chain's image follows the image it
+        // acquired, not the frame in flight.
+        const auto currentFrame = _isPerFrame && _image.Valid() ? _image->CopyIndex() : 0;
         return _imageViews[currentFrame];
     }
 

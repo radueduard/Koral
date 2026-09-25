@@ -38,8 +38,22 @@ namespace kor::vk
         _presentModes = physicalDevice->getSurfacePresentModesKHR(_handle);
     }
 
+    void Surface::CreateSwapChain(const kor::Window& window, const glm::u32 framesInFlight)
+    {
+        _swapChain = SwapChain::Builder(*this)
+            .setImageCount(2)
+            .setFramesInFlight(framesInFlight)
+            .setExtent(window.Extent())
+            .setVSync(window.IsVSync())
+            .setTransparent(window.IsFramebufferTransparent())
+            .setSampleCount(SampleCount::e1)
+            .build();
+    }
+
     Surface::~Surface()
     {
+        // The swap chain first: it is made from the surface, and has to go before it does.
+        _swapChain.reset();
         if (_handle) {
             Context::Runtime().getInstance().destroySurfaceKHR(_handle);
         }

@@ -34,7 +34,9 @@ namespace kor::vk
 
     	void DoResize(const glm::uvec3& extent) override;
 
-    	explicit Image(const std::vector<::vk::Image>& surfaceImages, glm::uvec2 extent, Format format, SampleCount msaa);
+    	/** @brief A swap chain's images; @p acquired says which one the frame uses. */
+    	explicit Image(const std::vector<::vk::Image>& surfaceImages, glm::uvec2 extent, Format format, SampleCount msaa,
+    	               std::function<glm::u32()> acquired);
 
     	::vk::Image operator*() const;
     	VmaAllocation getAllocation() const;

@@ -4,6 +4,7 @@
 
 #include "input.h"
 
+#include <algorithm>
 #include <cctype>
 #include <ranges>
 #include <unordered_map>
@@ -49,6 +50,8 @@ namespace kor {
 
 			GLFWwindow* mainWindow = nullptr;
 			std::vector<GLFWwindow*> attachedWindows;
+			/// The application's other windows (Window::Builder()): theirs is a kor::Window, not ImGui's.
+			std::vector<GLFWwindow*> engineWindows;
 			Input::CursorMode cursorMode = Input::CursorMode::eNormal;
 
 			void setup(GLFWwindow* window)
@@ -169,6 +172,36 @@ namespace kor {
 
 	Input::CursorMode Input::CurrentCursorMode() { return g_input.cursorMode; }
 
+	namespace {
+		// The interface lives in the main window and in the windows ImGui opens for undocked panels.
+		// A second application window is neither: a click there is not a click on a panel.
+		bool forwardsToInterface(GLFWwindow* handle) {
+			return std::ranges::find(g_input.engineWindows, handle) == g_input.engineWindows.end();
+		}
+	}
+
+	void Input::AttachEngineWindow(GLFWwindow* window)
+	{
+		if (window == nullptr) return;
+		if (std::ranges::find(g_input.engineWindows, window) == g_input.engineWindows.end())
+			g_input.engineWindows.push_back(window);
+		AttachTo(window);
+	}
+
+	Window* Input::FocusedWindow()
+	{
+		for (Window* window : Context::Windows())
+			if (window->IsFocused()) return window;
+		return nullptr;
+	}
+
+	Window* Input::HoveredWindow()
+	{
+		for (Window* window : Context::Windows())
+			if (glfwGetWindowAttrib(**window, GLFW_HOVERED) == GLFW_TRUE) return window;
+		return nullptr;
+	}
+
 	void Input::AttachTo(GLFWwindow* window)
 	{
 		if (window == nullptr) return;
@@ -186,6 +219,7 @@ namespace kor {
 	{
 		auto& attached = g_input.attachedWindows;
 		std::erase(attached, window);
+		std::erase(g_input.engineWindows, window);
 		// The callbacks are not cleared: this is called for a window ImGui is about to destroy, and
 		// touching a window mid-destruction is worse than leaving pointers on something about to go.
 	}
@@ -295,7 +329,7 @@ namespace kor {
     }
 
     void Input::Callbacks::KeyCallback(GLFWwindow * handle, int key, int scancode, const int action, const int mods) {
-    	ImGui_ImplGlfw_KeyCallback(handle, key, scancode, action, mods);
+    	if (forwardsToInterface(handle)) ImGui_ImplGlfw_KeyCallback(handle, key, scancode, action, mods);
 
     	auto& state = g_input;
     	const auto k = static_cast<Key>(key);
@@ -335,7 +369,7 @@ namespace kor {
     }
 
 	void Input::Callbacks::MouseMoveCallback(GLFWwindow *handle, const double x, const double y) {
-		ImGui_ImplGlfw_CursorPosCallback(handle, x, y);
+		if (forwardsToInterface(handle)) ImGui_ImplGlfw_CursorPosCallback(handle, x, y);
 
 		auto& state = g_input;
 
@@ -364,7 +398,7 @@ namespace kor {
     }
 
 	void Input::Callbacks::MouseButtonCallback(GLFWwindow *handle, int button, const int action, int mods) {
-		ImGui_ImplGlfw_MouseButtonCallback(handle, button, action, mods);
+		if (forwardsToInterface(handle)) ImGui_ImplGlfw_MouseButtonCallback(handle, button, action, mods);
 
 		auto& state = g_input;
     	const auto b = static_cast<MouseButton>(button);
@@ -381,21 +415,21 @@ namespace kor {
     }
 
 	void Input::Callbacks::ScrollCallback(GLFWwindow *handle, const double x, const double y) {
-		ImGui_ImplGlfw_ScrollCallback(handle, x, y);
+		if (forwardsToInterface(handle)) ImGui_ImplGlfw_ScrollCallback(handle, x, y);
 
 		g_input.scrollDelta += glm::vec2 { x, y };
     }
 
 	void Input::Callbacks::FocusCallback(GLFWwindow* handle, int focus)
 	{
-		ImGui_ImplGlfw_WindowFocusCallback(handle, focus);
+		if (forwardsToInterface(handle)) ImGui_ImplGlfw_WindowFocusCallback(handle, focus);
 
 		// Only the engine's own window carries a kor::Window in its user pointer. These callbacks are
 		// installed on other windows too now — an undocked interface panel is one — and ImGui keeps
 		// *its* own data there, so reading a kor::Window out of it would be reading whatever ImGui put
 		// there and writing through it. That was a straight segfault the first time a panel was
 		// undocked. @see Input::AttachTo
-		if (handle != g_input.mainWindow) return;
+		if (handle != g_input.mainWindow && forwardsToInterface(handle)) return;
 
 		if (auto* window = static_cast<Window*>(glfwGetWindowUserPointer(handle))) {
 			window->_focused = focus;
@@ -404,12 +438,12 @@ namespace kor {
 
 	void Input::Callbacks::CharCallback(GLFWwindow* handle, unsigned int codepoint)
 	{
-		ImGui_ImplGlfw_CharCallback(handle, codepoint);
+		if (forwardsToInterface(handle)) ImGui_ImplGlfw_CharCallback(handle, codepoint);
 	}
 
 	void Input::Callbacks::CursorEnterCallback(GLFWwindow* handle, int entered)
 	{
-		ImGui_ImplGlfw_CursorEnterCallback(handle, entered);
+		if (forwardsToInterface(handle)) ImGui_ImplGlfw_CursorEnterCallback(handle, entered);
 	}
 
 	void Input::Callbacks::CloseCallback(GLFWwindow* handle)

@@ -8,6 +8,7 @@
 #include <span>
 #include <vector>
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <unordered_map>
 #include <glm/glm.hpp>
@@ -539,6 +540,16 @@ namespace kor
         [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
 
         /**
+         * @brief Which of its copies a command recorded now uses.
+         *
+         * 0 for an image with one copy. For a per-frame image, the frame in flight being recorded
+         * (Scheduler::CurrentImageIndex). For a window's swap-chain image, the image the swap chain
+         * handed out for this frame — which is not the frame in flight: a swap chain has as many
+         * images as its driver gave it, and every window's hands them out in its own order.
+         */
+        [[nodiscard]] glm::u32 CopyIndex() const;
+
+        /**
          * @brief The access one subresource was last synchronised for.
          * @param mipLevel Which mip level.
          * @param arrayLayer Which array layer.
@@ -602,6 +613,8 @@ namespace kor
 
         explicit Image(const Builder&);
         bool _isPerFrame = false;
+        /// Set for a swap chain's images: which one it acquired for the frame. @see CopyIndex
+        std::function<glm::u32()> _copySelector;
         Type _type;
         Format _format;
         glm::uvec3 _extent;

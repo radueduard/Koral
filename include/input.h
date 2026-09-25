@@ -204,7 +204,8 @@ namespace kor {
      * }
      * @endcode
      *
-     * Everything is static: there is one window, so there is one input state.
+     * Everything is static: there is one keyboard and one mouse, whichever window they are used in, so
+     * there is one input state. FocusedWindow() says which window that is.
      *
      * @note These report the raw device, whether or not Dear ImGui is using it. A scene that reacts
      *       to a click while the user is dragging an ImGui window should check ImGui's own
@@ -351,8 +352,22 @@ namespace kor {
         /** @brief Every window input is currently read from, the main one first. */
         [[nodiscard]] static std::vector<GLFWwindow*> AttachedWindows();
 
+        /**
+         * @brief The application window with keyboard focus — the main one or a second one — or null
+         *        when none has it (an undocked interface panel does, or another application).
+         *
+         * Keys are the same keys whichever window has focus. This is how a scene with several windows
+         * decides which one they are meant for: a camera flown only while its window is focused.
+         */
+        [[nodiscard]] static Window* FocusedWindow();
+
+        /** @brief The application window the pointer is over, or null. @see FocusedWindow */
+        [[nodiscard]] static Window* HoveredWindow();
+
     private:
         static void Setup(GLFWwindow* window);
+        /** @brief Attaches a second application window: its events are the engine's, never the interface's. */
+        static void AttachEngineWindow(GLFWwindow* window);
 
         /** @brief Points a window's GLFW callbacks at the engine's. @see attachTo */
         static void InstallCallbacks(GLFWwindow* window);

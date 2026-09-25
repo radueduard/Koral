@@ -5,6 +5,8 @@
 #include "framebuffer.h"
 
 #include "scheduler.h"
+#include "surface.h"
+#include "swapChain.h"
 #include <window.h>
 #include <framebuffer.h>
 #include <surface.h>
@@ -19,26 +21,30 @@ namespace kor::vk
     {
     }
 
-    Framebuffer::Framebuffer()
+    Framebuffer::Framebuffer(const kor::Window& window)
     {
         _isDefault = true;
-        _extent = kor::Context::Window().Extent();
-
-        // Default framebuffer has one color attachment which is the swap chain image, and one depth stencil attachment which is the depth image of the swap chain.
-        const auto& scheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
-
-        auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
-        auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
-
-        // Named, like any other framebuffer's targets, so the image a frame is presented from is
-        // reachable by `DefaultFramebuffer()->ImageNamed("color")` rather than only by index.
-        // @see Framebuffer::ImageNamed
-        _colorAttachments.push_back(Attachment{ colorAttachment, {}, "color" });
-        _depthAttachment = Attachment{ depthStencilAttachment, {}, "depth" };
-        _stencilAttachment = Attachment{ depthStencilAttachment, {}, "stencil" };
+        _extent = window.Extent();
+        _swapChain = &dynamic_cast<const vk::Surface&>(window.RenderSurface()).swapChain();
+        _extent = _swapChain->extent();
+        attachSwapChain();
         _clearValues.clearColor.emplace_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
         _clearValues.clearDepth = 1.0f;
         _clearValues.clearStencil = 0;
+    }
+
+    void Framebuffer::attachSwapChain()
+    {
+        // One colour attachment, the swap chain's image, and its depth target for depth and stencil.
+        // Named, like any other framebuffer's targets, so the image a frame is presented from is
+        // reachable by `DefaultFramebuffer()->ImageNamed("color")` rather than only by index.
+        // @see Framebuffer::ImageNamed
+        const auto colorAttachment = _swapChain->getSwapChainImageViews();
+        const auto depthStencilAttachment = _swapChain->getDepthImageViews();
+        _colorAttachments.clear();
+        _colorAttachments.push_back(Attachment{ colorAttachment, {}, "color" });
+        _depthAttachment = Attachment{ depthStencilAttachment, {}, "depth" };
+        _stencilAttachment = Attachment{ depthStencilAttachment, {}, "stencil" };
     }
 
     Framebuffer::Framebuffer(const Framebuffer::Builder& builder) : kor::Framebuffer(builder) {}
@@ -49,15 +55,8 @@ namespace kor::vk
         // The base has already done the shared work (or skipped it, for the default framebuffer).
         if (_isDefault)
         {
-            const auto& scheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
-            auto colorAttachment = scheduler.getSwapChain().getSwapChainImageViews();
-            auto depthStencilAttachment = scheduler.getSwapChain().getDepthImageViews();
-
             _extent = newExtent;
-            _colorAttachments.clear();
-            _colorAttachments.push_back(Attachment{ colorAttachment, {}, "color" });
-            _depthAttachment = Attachment{ depthStencilAttachment, {}, "depth" };
-            _stencilAttachment = Attachment{ depthStencilAttachment, {}, "stencil" };
+            attachSwapChain();
         }
     }
 }

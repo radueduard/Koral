@@ -114,6 +114,17 @@ std::filesystem::path kor::ShaderPath(const std::filesystem::path& relativePath)
     return resolveAgainstRoots(relativePath, Shader::SearchPaths());
 }
 
+std::vector<kor::Window*>& kor::Context::WindowList()
+{
+    static std::vector<kor::Window*> windows;
+    return windows;
+}
+
+std::vector<kor::Window*> kor::Context::Windows()
+{
+    return WindowList();
+}
+
 kor::Window& kor::Context::Window()
 {
     if (_window == nullptr) {

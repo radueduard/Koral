@@ -103,17 +103,19 @@ namespace kor::vk
         });
     }
 
-    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const SampleCount msaa)
+    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const SampleCount msaa,
+                 std::function<glm::u32()> acquired)
         : kor::Image(Builder()
             .SetIsPerFrame(true)
             .SetType(Type::e2D)
             .SetExtent(extent)
-            .SetUsage(Usage::eTransferDst | Usage::eColorAttachment)
+            .SetUsage(Usage::eTransferDst | Usage::eTransferSrc | Usage::eColorAttachment)
             .SetArrayLayers(1)
             .SetMipLevels(1)
             .SetFormat(format)
             .SetSampleCount(msaa)) {
         _images = surfaceImages;
+        _copySelector = std::move(acquired);
 
         int frameIndex = 0;
         for (const auto& _ : surfaceImages) {
@@ -126,26 +128,26 @@ namespace kor::vk
 
     ::vk::ImageLayout Image::getImageLayout(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
+        const auto currentFrame = CopyIndex();
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _layouts[key];
     }
 
     ::vk::AccessFlags Image::getAccessMask(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
+        const auto currentFrame = CopyIndex();
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _accessMasks[key];
     }
 
     void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
+        const auto currentFrame = CopyIndex();
         if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
             _layouts[key] = newLayout;
         }
     }
 
     void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
+        const auto currentFrame = CopyIndex();
         if (const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _accessMasks[key] != newAccessMask) {
             _accessMasks[key] = newAccessMask;
         }
@@ -166,13 +168,13 @@ namespace kor::vk
 
     ::vk::Image Image::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
+        const auto currentFrame = CopyIndex();
         return _images[currentFrame];
     }
 
     VmaAllocation Image::getAllocation() const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
+        const auto currentFrame = CopyIndex();
         return _allocations[currentFrame];
     }
 

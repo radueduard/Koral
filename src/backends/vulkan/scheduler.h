@@ -20,12 +20,9 @@ namespace kor::vk
 		Frame(const Frame&) = delete;
 		Frame& operator=(const Frame&) = delete;
 
-		[[nodiscard]] ::vk::Semaphore getImageAvailableSemaphore() const { return _imageAvailable; }
 		[[nodiscard]] ::vk::Fence getInFlightFence() const { return _inFlightFence; }
 
 		[[nodiscard]] const Queue& getQueue() const { return _queue; }
-
-		void ResetSemaphore() const;
 
 		// What this frame's last submission needs kept alive until its fence says the GPU is done:
 		// the command buffers handed to Scheduler::Execute(), and the tokens it waited on or
@@ -37,7 +34,6 @@ namespace kor::vk
 		mutable std::vector<std::unique_ptr<kor::CommandBuffer>> _executed;
 		mutable std::vector<Token> _tokens;
 		const Queue& _queue;
-		mutable ::vk::Semaphore _imageAvailable;
     	::vk::Fence _inFlightFence;
 	};
 
@@ -64,28 +60,29 @@ namespace kor::vk
 
     	void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) override;
 
-    	[[nodiscard]] const kor::vk::SwapChain &getSwapChain() const { return *_swapChain; }
-    	[[nodiscard]] bool isResized() const { return _resized; }
-		glm::u32 CurrentImageIndex() const override { return _swapChain->currentImageIndex(); }
+    	/// The main window's swap chain.
+    	[[nodiscard]] const kor::vk::SwapChain &getSwapChain() const;
 
+    	void RetireWindow(std::shared_ptr<kor::Surface> surface, GLFWwindow* window) override;
 
     private:
-    	std::unique_ptr<kor::vk::SwapChain> _swapChain;
-
-    	/// Takes the swap chain's actual image count as this scheduler's, then (re)builds everything
-    	/// sized to it. Runs at Initialize and again on every resize.
-    	void adoptSwapChainSizing();
-
-    	/// Resize the swap chain, re-adopt its sizing, and re-point the default framebuffer — in that
-    	/// order, because each step feeds the next.
-    	void recreateSwapChain(const glm::uvec2& extent);
+    	/// Rebuild @p window's swap chain at its current size and re-point its default framebuffer.
+    	static void recreateSwapChain(kor::Window& window);
 
     	void CreateFrames() override;
 
+    	/// Destroys the retired windows whose last frame has finished; all of them with @p all.
+    	void destroyRetiredWindows(bool all);
+
+    	struct Retired {
+    		std::shared_ptr<kor::Surface> surface;
+    		GLFWwindow* window = nullptr;
+    		Token lastUse;   // the frame being built when it closed
+    	};
+    	std::vector<Retired> _retired;
+    	bool _drawnOnce = false;
+
     public:
 	    void WaitIdle() const override;
-
-    private:
-	    bool _resized = false;
     };
 }
