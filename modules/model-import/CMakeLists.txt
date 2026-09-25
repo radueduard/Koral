@@ -13,6 +13,7 @@
 
 add_library(koral-model-import SHARED
         src/export.cpp
+        src/gltfLights.cpp
         src/importer.cpp
 )
 
@@ -45,6 +46,8 @@ target_link_libraries(koral-model-import PRIVATE
         spdlog::spdlog
         # Assimp, and only here: the engine no longer links it at all.
         assimp::assimp
+        # Reading what assimp drops from a glTF file (its lights' colour and intensity, separately).
+        reflectcpp::reflectcpp
 )
 
 # Into <libKoral's dir>/modules, where the loader looks without configuration.

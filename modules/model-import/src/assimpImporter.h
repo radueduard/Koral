@@ -10,6 +10,8 @@
 
 #include <koralModelImport.h>
 
+#include "gltfLights.h"
+
 #include <assimp/Importer.hpp>
 #include <assimp/Exporter.hpp>
 #include <assimp/scene.h>
@@ -20,6 +22,9 @@ namespace kmdl {
     class AssimpImporter : public Importer {
     public:
         explicit AssimpImporter(const std::filesystem::path &path);
+
+        /** @brief Whether the file was read and post-processed; nothing else is usable when not. */
+        [[nodiscard]] bool Loaded() const { return _scene != nullptr; }
 
         std::vector<std::string> GetMeshNames() override;
         std::vector<std::string> GetMaterialNames() override;
@@ -80,28 +85,20 @@ namespace kmdl {
 
     inline AssimpImporter::AssimpImporter(const std::filesystem::path &path) {
         _path = path;
-        _scene = _importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_GenBoundingBoxes);
-        std::string format = path.extension().string();
+        // Every step in the one call, so assimp runs them in the order they need: generating UVs or
+        // normals after JoinIdenticalVertices is refused ("post-processing order mismatch"), and a
+        // failed step frees the scene. Each is a no-op for a mesh that already has what it makes —
+        // and each is decided per mesh, not from the first one.
+        _scene = _importer.ReadFile(path.string(),
+            aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_SortByPType | aiProcess_GenBoundingBoxes
+            | aiProcess_GenUVCoords | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_CalcTangentSpace);
 
-        // Assimp returns null when the file is missing or unreadable. Bail out before
-        // touching _scene below, otherwise an invalid path is an outright segfault.
+        // Assimp returns null when the file is missing or unreadable, or a step failed. Bail out
+        // before touching _scene below, otherwise an invalid path is an outright segfault.
         if (_scene == nullptr) {
             std::cerr << "Could not read file: " << path.string()
                       << " (" << _importer.GetErrorString() << ")" << std::endl;
             return;
-        }
-
-        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTextureCoords(0)) {
-            _importer.ApplyPostProcessing(aiProcess_GenUVCoords);
-        }
-        _importer.ApplyPostProcessing(aiProcess_FlipUVs);
-
-        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasNormals()) {
-            _importer.ApplyPostProcessing(aiProcess_GenSmoothNormals);
-        }
-
-        if (_scene->HasMeshes() && !_scene->mMeshes[0]->HasTangentsAndBitangents()) {
-            _importer.ApplyPostProcessing(aiProcess_CalcTangentSpace);
         }
 
         for (unsigned int i = 0; i < _scene->mNumMeshes; ++i) {
@@ -474,6 +471,12 @@ namespace kmdl {
         // Punctual lights (e.g. glTF KHR_lights_punctual). assimp stores each light's
         // position/direction in the local space of the node it is attached to, so we
         // resolve that node's world transform and bake the light into world space.
+        // Assimp multiplies each glTF light's colour by its intensity, which loses the intensity and,
+        // for a light the file switched off (intensity 0), the colour too. A glTF file's own list —
+        // which assimp keeps the order of — gives both back.
+        const std::vector<detail::GltfLight> declared = detail::ReadGltfLights(_path);
+        const bool fromFile = declared.size() == _scene->mNumLights;
+
         result.lights.reserve(_scene->mNumLights);
         for (unsigned int i = 0; i < _scene->mNumLights; ++i) {
             const aiLight* light = _scene->mLights[i];
@@ -497,7 +500,17 @@ namespace kmdl {
             out.name      = light->mName.C_Str();
             out.position  = glm::vec3(pos.x, pos.y, pos.z);
             out.direction = glm::vec3(dir.x, dir.y, dir.z);
-            out.color     = glm::vec3(light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b);
+            if (fromFile) {
+                out.color     = declared[i].color;
+                out.intensity = declared[i].intensity;
+                out.range     = declared[i].range;
+            } else {
+                // Only the product is known: take its brightest channel as the intensity.
+                const glm::vec3 product(light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b);
+                const float brightest = glm::max(product.r, glm::max(product.g, product.b));
+                out.intensity = brightest;
+                out.color     = brightest > 0.f ? product / brightest : glm::vec3(1.f);
+            }
             out.innerConeAngle = light->mAngleInnerCone;
             out.outerConeAngle = light->mAngleOuterCone;
 

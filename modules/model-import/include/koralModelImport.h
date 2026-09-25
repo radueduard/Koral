@@ -182,8 +182,12 @@ namespace kmdl
             Type      type      = Type::ePoint;                 ///< What shape it emits in.
             glm::vec3 position  = glm::vec3(0.0f);              ///< World-space position. Unused by directional lights.
             glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f); ///< World-space direction. Used by spot and directional lights.
-            glm::vec3 color     = glm::vec3(1.0f);              ///< Emitted colour.
-            float     intensity = 1.0f;                         ///< Brightness, in the file's own units.
+            glm::vec3 color     = glm::vec3(1.0f);              ///< Emitted colour, without the intensity in it.
+            /**
+             * Brightness, in the file's own units — for glTF, candela for point and spot lights and
+             * lux for directional ones. 0 is a light the file switched off.
+             */
+            float     intensity = 1.0f;
             float     range          = 0.0f;                    ///< Distance at which it stops contributing; 0 means no limit.
             float     innerConeAngle = 0.0f;                    ///< Spot: the fully lit cone, in radians.
             float     outerConeAngle = 0.0f;                    ///< Spot: where the falloff reaches zero, in radians.

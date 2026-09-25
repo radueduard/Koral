@@ -8,6 +8,8 @@
 #include "gpu_fixture.h"
 
 #include <cstdint>
+#include <fstream>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -80,6 +82,58 @@ TEST_F(GpuTest, ImporterUploadsMeshToGpu) {
 
     auto gpuMesh = kmdl::LoadMesh<Mesh>(scene.meshes.front());
     ASSERT_TRUE(static_cast<bool>(gpuMesh));
+}
+
+// Assimp multiplies a glTF light's colour by its intensity, so on its own a light the file switched
+// off comes through black and every light's intensity is lost. The importer reads the file's own
+// KHR_lights_punctual list to hand both back separately.
+TEST_F(GpuTest, ImporterKeepsAGltfLightsColourAndIntensityApart) {
+    const auto path = std::filesystem::temp_directory_path() / "koral_lights_test.gltf";
+    {
+        std::ofstream out(path);
+        out << R"GLTF({
+  "asset": {"version": "2.0"},
+  "extensionsUsed": ["KHR_lights_punctual"],
+  "extensions": {"KHR_lights_punctual": {"lights": [
+    {"name": "off", "type": "point", "color": [1.0, 0.5, 0.25], "intensity": 0.0},
+    {"name": "sun", "type": "directional", "color": [0.2, 0.4, 1.0], "intensity": 5.0, "range": 12.0}
+  ]}},
+  "scene": 0,
+  "scenes": [{"nodes": [0, 1, 2]}],
+  "nodes": [
+    {"mesh": 0},
+    {"name": "lamp", "translation": [1.0, 2.0, 3.0], "extensions": {"KHR_lights_punctual": {"light": 0}}},
+    {"name": "sunNode", "extensions": {"KHR_lights_punctual": {"light": 1}}}
+  ],
+  "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+  "buffers": [{"byteLength": 36, "uri": "data:application/octet-stream;base64,AAAAAAAAAAAAAAAAAACAPwAAAAAAAAAAAAAAAAAAgD8AAAAA"}],
+  "bufferViews": [{"buffer": 0, "byteLength": 36}],
+  "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3", "min": [0,0,0], "max": [1,1,0]}]
+})GLTF";
+    }
+    auto importer = Importer::Load(path);
+    ASSERT_NE(importer, nullptr);
+    const auto scene = importer->LoadScene();
+    ASSERT_EQ(scene.lights.size(), 2u);
+
+    const auto find = [&](const std::string& name) {
+        for (const auto& light : scene.lights) if (light.name == name) return light;
+        ADD_FAILURE() << "no light named " << name;
+        return Importer::Light{};
+    };
+    const auto lamp = find("lamp");
+    EXPECT_EQ(lamp.type, Importer::Light::Type::ePoint);
+    EXPECT_EQ(lamp.color, glm::vec3(1.f, 0.5f, 0.25f)) << "a switched-off light keeps its colour";
+    EXPECT_EQ(lamp.intensity, 0.f);
+    EXPECT_EQ(lamp.position, glm::vec3(1.f, 2.f, 3.f));
+
+    const auto sun = find("sunNode");
+    EXPECT_EQ(sun.type, Importer::Light::Type::eDirectional);
+    EXPECT_EQ(sun.color, glm::vec3(0.2f, 0.4f, 1.f)) << "the colour, without the intensity multiplied in";
+    EXPECT_EQ(sun.intensity, 5.f);
+    EXPECT_EQ(sun.range, 12.f);
+
+    std::filesystem::remove(path);
 }
 
 } // namespace
