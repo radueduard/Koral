@@ -230,6 +230,28 @@ namespace kor::graph {
             propagate();
         }
 
+        // ---- CPU passes run before the GPU has done anything this frame ------------------------
+        for (std::size_t p = 0; p < n; ++p) {
+            if (!keep[p] || !passes[p].cpu) continue;
+            for (const auto& [pred, resource] : preds[p]) {
+                if (keep[pred] && !passes[pred].cpu)
+                    problems.push_back(std::format("CPU pass '{}' needs '{}' from GPU pass '{}', which has not run yet "
+                                                   "when CPU passes do. Only CPU passes (or imports) can feed one.",
+                                                   passes[p].name, resource, passes[pred].name));
+            }
+        }
+        for (const auto& [p, name] : previousReads) {
+            if (keep[p] && passes[p].cpu)
+                problems.push_back(std::format("CPU pass '{}' reads '{}' from the previous frame, which the GPU may "
+                                               "still be producing. Read it back with a token instead.",
+                                               passes[p].name, name));
+        }
+        if (!problems.empty()) {
+            std::string message;
+            for (const auto& problem : problems) message += (message.empty() ? "" : "\n") + problem;
+            return std::unexpected(Error{.code = ErrorCode::eFrameGraphInvalid, .message = message});
+        }
+
         CompiledGraph out;
         std::vector<std::size_t> position(n, SIZE_MAX);
         for (const auto p : sorted) {
@@ -241,9 +263,14 @@ namespace kor::graph {
 
         // ---- levels -------------------------------------------------------------------------------
         out.level.resize(out.order.size(), 0);
+        out.dependencies.resize(out.order.size());
         for (std::size_t i = 0; i < out.order.size(); ++i) {
-            for (const auto& pred : preds[out.order[i]] | std::views::keys)
-                if (keep[pred]) out.level[i] = std::max(out.level[i], out.level[position[pred]] + 1);
+            for (const auto& pred : preds[out.order[i]] | std::views::keys) {
+                if (!keep[pred]) continue;
+                out.level[i] = std::max(out.level[i], out.level[position[pred]] + 1);
+                out.dependencies[i].push_back(position[pred]);
+            }
+            std::ranges::sort(out.dependencies[i]);
         }
 
         // ---- lifetimes of what the graph creates, per physical resource -----------------------------
@@ -339,5 +366,35 @@ namespace kor::graph {
             compiled->aliases.try_emplace(name, it != compiled->aliases.end() ? it->second : to);
         }
         return compiled;
+    }
+
+    std::vector<std::size_t> packLifetimes(const std::vector<CompiledGraph::Lifetime>& lifetimes,
+                                           const std::vector<std::string>& keys) {
+        std::vector<std::size_t> byStart(lifetimes.size());
+        for (std::size_t i = 0; i < byStart.size(); ++i) byStart[i] = i;
+        std::ranges::stable_sort(byStart, {}, [&](const std::size_t i) { return lifetimes[i].first; });
+
+        struct Slot {
+            std::string key;
+            std::size_t lastUse;
+        };
+        std::vector<Slot> slots;
+        std::vector<std::size_t> out(lifetimes.size());
+        for (const auto i : byStart) {
+            const auto& lifetime = lifetimes[i];
+            const std::string& key = i < keys.size() ? keys[i] : std::string{};
+            std::optional<std::size_t> chosen;
+            if (!key.empty()) {
+                for (std::size_t s = 0; s < slots.size(); ++s)
+                    if (slots[s].key == key && slots[s].lastUse < lifetime.first) { chosen = s; break; }
+            }
+            if (!chosen) {
+                chosen = slots.size();
+                slots.push_back({key, lifetime.last});
+            }
+            slots[*chosen].lastUse = lifetime.last;
+            out[i] = *chosen;
+        }
+        return out;
     }
 }

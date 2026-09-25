@@ -398,6 +398,84 @@ TEST(FrameGraphCompiler, DisablingTheCreatorSkipsThePreviousFrameReader) {
     EXPECT_TRUE(compiled->history.empty());
 }
 
+TEST(FrameGraphCompiler, ListsWhatEachPassWaitsFor) {
+    const auto passes = deferredFrame();
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    ASSERT_EQ(compiled->dependencies.size(), 4u);
+    EXPECT_TRUE(compiled->dependencies[0].empty());                                  // gbuffer
+    EXPECT_EQ(compiled->dependencies[1], (std::vector<std::size_t>{0}));             // ssao
+    EXPECT_EQ(compiled->dependencies[2], (std::vector<std::size_t>{0}));             // ssr
+    EXPECT_EQ(compiled->dependencies[3], (std::vector<std::size_t>{0, 1, 2}));       // composite
+}
+
+PassDecl cpuPass(std::string name, std::vector<Use> uses, const bool sideEffect = false) {
+    auto decl = pass(std::move(name), std::move(uses), sideEffect);
+    decl.cpu = true;
+    return decl;
+}
+
+TEST(FrameGraphCompiler, ACpuPassMayFeedTheGpu) {
+    const std::vector<PassDecl> passes{
+        cpuPass("sort",  {create("list")}),
+        cpuPass("count", {read("list"), create("count")}),
+        pass("draw",     {read("list"), read("count"), write("screen")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(names(passes, compiled->order), (std::vector<std::string>{"sort", "count", "draw"}));
+}
+
+TEST(FrameGraphCompiler, RefusesACpuPassTheGpuFeeds) {
+    const std::vector<PassDecl> passes{
+        pass("gpu",    {create("x")}),
+        cpuPass("cpu", {read("x")}, true),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_FALSE(compiled);
+    EXPECT_NE(compiled.error().message.find("'cpu'"), std::string::npos) << compiled.error().message;
+    EXPECT_NE(compiled.error().message.find("'gpu'"), std::string::npos) << compiled.error().message;
+}
+
+TEST(FrameGraphCompiler, RefusesACpuPassReadingAPreviousFrame) {
+    const std::vector<PassDecl> passes{
+        pass("gpu",    {create("x"), write("screen")}),
+        cpuPass("cpu", {readPrevious("x")}, true),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_FALSE(compiled);
+    EXPECT_NE(compiled.error().message.find("previous frame"), std::string::npos) << compiled.error().message;
+}
+
+TEST(FrameGraphCompiler, ResourcesNeverAliveTogetherShareASlot) {
+    const std::vector<CompiledGraph::Lifetime> lifetimes{
+        {"a", 0, 1},
+        {"b", 2, 3},   // after a: shares
+        {"c", 1, 2},   // overlaps both a (at 1) and b (at 2): its own
+        {"d", 4, 4},   // after b and c: shares with the first free one
+    };
+    const auto slots = packLifetimes(lifetimes, {"k", "k", "k", "k"});
+    ASSERT_EQ(slots.size(), 4u);
+    EXPECT_EQ(slots[0], slots[1]);
+    EXPECT_NE(slots[2], slots[0]);
+    EXPECT_TRUE(slots[3] == slots[0] || slots[3] == slots[2]);
+}
+
+TEST(FrameGraphCompiler, OnlyEqualKeysShareASlot) {
+    const std::vector<CompiledGraph::Lifetime> lifetimes{{"a", 0, 0}, {"b", 1, 1}, {"c", 2, 2}, {"d", 3, 3}};
+    const auto slots = packLifetimes(lifetimes, {"rgba8", "r32f", "", ""});
+    EXPECT_NE(slots[0], slots[1]) << "different shapes";
+    EXPECT_NE(slots[2], slots[3]) << "an empty key never shares";
+    EXPECT_NE(slots[2], slots[0]);
+}
+
+TEST(FrameGraphCompiler, AResourceReadAndAnotherWrittenByOnePassDoNotShare) {
+    // One pass is the last to read a and the first to write b: both are live in that pass.
+    const std::vector<CompiledGraph::Lifetime> lifetimes{{"a", 0, 1}, {"b", 1, 2}};
+    const auto slots = packLifetimes(lifetimes, {"k", "k"});
+    EXPECT_NE(slots[0], slots[1]);
+}
+
 TEST(FrameGraphCompiler, AnEmptyGraphIsFine) {
     const auto compiled = compile({});
     ASSERT_TRUE(compiled);

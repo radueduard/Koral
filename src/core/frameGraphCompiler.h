@@ -61,6 +61,13 @@ namespace kor::graph {
          * something only it creates are skipped along with it (CompiledGraph::skipped).
          */
         bool enabled = true;
+        /**
+         * Runs on the CPU, not the GPU: work whose results GPU passes use — filling a buffer the
+         * CPU writes, working out a draw list. It runs before the GPU has done anything this frame,
+         * so everything it depends on must be CPU work too (or imported), and it cannot read a
+         * previous frame the GPU produced.
+         */
+        bool cpu = false;
     };
 
     struct CompiledGraph {
@@ -82,6 +89,11 @@ namespace kor::graph {
          * Passes on the same level depend on nothing in each other, so their work can overlap.
          */
         std::vector<std::uint32_t> level;
+        /**
+         * One per entry of `order`: the positions in `order` of the passes it has to wait for — what
+         * it reads, writes or consumes comes from them. Ascending.
+         */
+        std::vector<std::vector<std::size_t>> dependencies;
 
         /** A resource the graph creates, and the span of `order` positions that use it. */
         struct Lifetime {
@@ -115,4 +127,19 @@ namespace kor::graph {
      */
     [[nodiscard]] KORAL_API Result<CompiledGraph> compile(const std::vector<PassDecl>& passes,
                                                          const std::set<std::string>& imported = {});
+
+    /**
+     * @brief Which resources can live in the same memory: those never in use at the same time.
+     *
+     * Greedy over the lifetimes in the order they start: each takes the first slot of its own kind
+     * that its previous occupant has finished with — strictly before this one starts, since a pass
+     * that reads one and writes the other needs both at once.
+     *
+     * @param lifetimes As CompiledGraph::lifetimes.
+     * @param keys One per lifetime. Only equal keys share a slot (same format and size, say); an
+     *             empty key never shares.
+     * @return One slot per lifetime, numbered from 0. Lifetimes with the same slot share it.
+     */
+    [[nodiscard]] KORAL_API std::vector<std::size_t> packLifetimes(const std::vector<CompiledGraph::Lifetime>& lifetimes,
+                                                                   const std::vector<std::string>& keys);
 }
