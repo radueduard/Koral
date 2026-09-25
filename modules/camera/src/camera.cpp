@@ -12,6 +12,13 @@ namespace kcam
 {
     // ---- what an aspect is matched to ----------------------------------------------------------
 
+    AspectSource AspectSource::Of(const kor::Window& window)
+    {
+        // Its default framebuffer, which follows its size — and, for a window that has closed,
+        // dangles, which is reported once like any other source that went away.
+        return Of(kor::ResourceRef<const kor::Framebuffer>(window.DefaultFramebuffer()));
+    }
+
     std::optional<glm::uvec2> AspectSource::Extent() const
     {
         switch (kind) {

@@ -7,6 +7,7 @@
 #include <cmath>
 
 #include <input.h>
+#include <window.h>
 
 namespace kcam
 {
@@ -123,6 +124,14 @@ namespace kcam
         // Parked. Not the same as Kind::eNone: the configuration and the angles are all still here,
         // so taking the grip back resumes rather than re-derives.
         if (_released) { applyCursor(false); _looking = false; return; }
+
+        // Another window has the keyboard: the input is meant for whatever that one shows.
+        if (const auto* focused = kor::Input::FocusedWindow();
+            !_controller.window.empty() && (!focused || focused->ScreenName() != _controller.window)) {
+            applyCursor(false);
+            _looking = false;
+            return;
+        }
 
         switch (_controller.kind) {
             case Controller::Kind::eFly:   fly(camera, dt); break;
