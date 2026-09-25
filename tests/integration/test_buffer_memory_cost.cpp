@@ -76,25 +76,25 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
     // The other side of the trade: how fast the *GPU* reaches the same memory. Doubles every
     // element in place, so it both reads and writes the whole buffer once per dispatch.
     Shader::Builder shaderBuilder;
-    shaderBuilder.setPath("doubleValues.comp.glsl");
-    auto shader = shaderBuilder.build();
-    ASSERT_TRUE(shader.valid());
+    shaderBuilder.SetPath("doubleValues.comp.glsl");
+    auto shader = shaderBuilder.Build();
+    ASSERT_TRUE(shader.Valid());
 
     ComputePipeline::Builder pipeBuilder;
-    pipeBuilder.setComputeShader(shader);
-    auto pipeline = pipeBuilder.build();
-    ASSERT_TRUE(pipeline.valid());
+    pipeBuilder.SetComputeShader(shader);
+    auto pipeline = pipeBuilder.Build();
+    ASSERT_TRUE(pipeline.Valid());
 
     constexpr std::uint32_t kLocalSize = 64;
     constexpr int kDispatches = 8;
 
     for (const auto type : { Buffer::Type::eDeviceLocal, Buffer::Type::eStaging, Buffer::Type::eReadback, Buffer::Type::eDynamic, Buffer::Type::eDeviceDynamic }) {
         Buffer::RawBuilder builder;
-        builder.setRawSize(static_cast<glm::i64>(kElements * sizeof(std::uint32_t)))
-               .setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
-               .setType(type);
-        auto buffer = builder.build();
-        ASSERT_TRUE(buffer.valid()) << "could not allocate a " << name(type) << " buffer";
+        builder.SetRawSize(static_cast<glm::i64>(kElements * sizeof(std::uint32_t)))
+               .SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
+               .SetType(type);
+        auto buffer = builder.Build();
+        ASSERT_TRUE(buffer.Valid()) << "could not allocate a " << name(type) << " buffer";
 
         // eDeviceLocal is not host-visible, so it is measured for GPU throughput only — it is the
         // reference the host-visible types are being compared against.
@@ -124,13 +124,13 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
 
         auto descriptorSet =
             DescriptorSet::Builder(pipeline, 0)
-                .write(0, buffer)
-                .build();
-        ASSERT_TRUE(descriptorSet.valid());
+                .Write(0, buffer)
+                .Build();
+        ASSERT_TRUE(descriptorSet.Valid());
 
         const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
         double gpu = 0.0;
-        if (cb->supportsTimers()) {
+        if (cb->SupportsTimers()) {
             cb->Begin();
             cb->BindComputePipeline(pipeline);
             cb->BindDescriptorSet(0, descriptorSet);
@@ -141,7 +141,7 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
             cb->End();
             ASSERT_TRUE(cb->Submit());
             cb->WaitForFence();
-            if (const auto measured = cb->collectTimer("pass")) gpu = *measured;
+            if (const auto measured = cb->CollectTimer("pass")) gpu = *measured;
         }
         // Each dispatch reads and writes every element once.
         const double gpuGiBs = gpu > 0.0 ? megabytes * 2.0 * kDispatches / gpu * 1000.0 / 1024.0 : 0.0;
@@ -172,28 +172,28 @@ TEST_F(GpuTest, DeviceDynamicIsHostWritableAndGpuVisible) {
     std::iota(source.begin(), source.end(), 1u);
 
     Buffer::Builder<std::uint32_t> builder;
-    builder.setData(source);
-    builder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc);
-    builder.setType(Buffer::Type::eDeviceDynamic);
-    auto buffer = builder.build();
-    ASSERT_TRUE(buffer.valid());
-    EXPECT_TRUE(buffer->isHostVisible()) << "eDeviceDynamic must stay mappable on every path";
+    builder.SetData(source);
+    builder.SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc);
+    builder.SetType(Buffer::Type::eDeviceDynamic);
+    auto buffer = builder.Build();
+    ASSERT_TRUE(buffer.Valid());
+    EXPECT_TRUE(buffer->IsHostVisible()) << "eDeviceDynamic must stay mappable on every path";
 
     Shader::Builder shaderBuilder;
-    shaderBuilder.setPath("doubleValues.comp.glsl");
-    auto shader = shaderBuilder.build();
-    ASSERT_TRUE(shader.valid());
+    shaderBuilder.SetPath("doubleValues.comp.glsl");
+    auto shader = shaderBuilder.Build();
+    ASSERT_TRUE(shader.Valid());
 
     ComputePipeline::Builder pipeBuilder;
-    pipeBuilder.setComputeShader(shader);
-    auto pipeline = pipeBuilder.build();
-    ASSERT_TRUE(pipeline.valid());
+    pipeBuilder.SetComputeShader(shader);
+    auto pipeline = pipeBuilder.Build();
+    ASSERT_TRUE(pipeline.Valid());
 
     auto descriptorSet =
         DescriptorSet::Builder(pipeline, 0)
-            .write(0, buffer)
-            .build();
-    ASSERT_TRUE(descriptorSet.valid());
+            .Write(0, buffer)
+            .Build();
+    ASSERT_TRUE(descriptorSet.Valid());
 
     // The initial data went in through a host write at build time. If the GPU sees it, the write
     // reached device memory without anyone staging a copy — which is the whole promise of the type.
@@ -201,7 +201,7 @@ TEST_F(GpuTest, DeviceDynamicIsHostWritableAndGpuVisible) {
         cb.BindComputePipeline(pipeline);
         cb.BindDescriptorSet(0, descriptorSet);
         cb.Dispatch(kCount / kLocalSize, 1, 1);
-    }, CommandBuffer::Usage::eCompute).wait();
+    }, CommandBuffer::Usage::eCompute).Wait();
 
     // Reading it back is exactly what the type warns against, and it is done here on purpose: the
     // warning is about speed, not correctness, and correctness is what this asserts.

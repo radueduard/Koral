@@ -35,6 +35,6 @@ namespace kor::ogl
         GLenum _defaultTarget;
 
     public:
-        void automaticUpdate() override {}
+        void AutomaticUpdate() override {}
     };
 }

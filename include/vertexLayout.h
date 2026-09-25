@@ -24,7 +24,7 @@
  * @endcode
  *
  * @code
- * pipelineBuilder.setVertexShader(vert, MyMesh::Layout());
+ * pipelineBuilder.SetVertexShader(vert, MyMesh::Layout());
  * @endcode
  *
  * The vocabulary — `POSITION`, `COLOR`, and the rest — is not the engine's. It belongs to whoever
@@ -46,7 +46,7 @@
  * }
  * @endcode
  *
- * @see kor::Mesh::vertexLayout, kor::GraphicsPipeline::Builder::setVertexShader
+ * @see kor::Mesh::Layout, kor::GraphicsPipeline::Builder::SetVertexShader
  */
 
 #pragma once
@@ -166,7 +166,7 @@ namespace kor
          *         attributes — in which case the geometry cannot be ray traced. The location is
          *         meaningless here and reported as 0.
          */
-        [[nodiscard]] std::optional<VertexInputAttributeDescription> position() const;
+        [[nodiscard]] std::optional<VertexInputAttributeDescription> Position() const;
 
         /**
          * @brief Matches this layout against a vertex shader's inputs.
@@ -178,7 +178,7 @@ namespace kor
          * Shaders that annotate nothing fall back to declaration order, so a layout still works
          * with a shader written before any of this existed.
          */
-        [[nodiscard]] Result<std::vector<VertexInputAttributeDescription>> resolve(const Shader& vertexShader) const;
+        [[nodiscard]] Result<std::vector<VertexInputAttributeDescription>> Resolve(const Shader& vertexShader) const;
 
         /**
          * @brief Matches this layout against stage inputs already in hand.
@@ -187,7 +187,7 @@ namespace kor
          * What the overload above does once it has read them off the shader. Separate because the
          * matching is worth testing without a compiled shader to hand.
          */
-        [[nodiscard]] Result<std::vector<VertexInputAttributeDescription>> resolve(
+        [[nodiscard]] Result<std::vector<VertexInputAttributeDescription>> Resolve(
             std::span<const ShaderInput> inputs) const;
 
         /**

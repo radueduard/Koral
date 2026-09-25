@@ -26,10 +26,10 @@ namespace
     // applyOverrides takes the arguments alone, as the runtime passes them (argv + 2).
     kor::VoidResult override_(ProjectConfig& config, const std::vector<std::string>& args)
     {
-        return config.applyOverrides(args);
+        return config.ApplyOverrides(args);
     }
 
-    // A base directory that is absolute but need not exist: merge() only joins paths, it does not
+    // A base directory that is absolute but need not exist: Merge() only joins paths, it does not
     // go to the filesystem, and keeping the tests off disk keeps them fast and hermetic.
     const std::filesystem::path kBase = std::filesystem::path("/projects/game").lexically_normal();
 }
@@ -39,7 +39,7 @@ namespace
 TEST(ProjectConfig, ReadsEveryKey)
 {
     ProjectConfig config;
-    const auto result = config.merge(R"({
+    const auto result = config.Merge(R"({
         "schemaVersion": 1,
         "name": "My Game",
         "rendering": {
@@ -88,7 +88,7 @@ TEST(ProjectConfig, AbsentKeysLeaveTheLayerBeneathAlone)
     config.vsync = false;
     config.assetDirectories = { "/compiled/in" };
 
-    const auto result = config.merge(R"({ "rendering": { "window": { "width": 800 } } })", kBase);
+    const auto result = config.Merge(R"({ "rendering": { "window": { "width": 800 } } })", kBase);
 
     ASSERT_TRUE(result) << result.error().message;
     EXPECT_EQ(config.extent.x, 800u);
@@ -103,7 +103,7 @@ TEST(ProjectConfig, AbsentKeysLeaveTheLayerBeneathAlone)
 TEST(ProjectConfig, EmptyDocumentIsValid)
 {
     ProjectConfig config;
-    EXPECT_TRUE(config.merge("{}", kBase));
+    EXPECT_TRUE(config.Merge("{}", kBase));
 }
 
 // A directory list is replaced, not appended to — otherwise a config could never drop a root the
@@ -113,7 +113,7 @@ TEST(ProjectConfig, DirectoryListsAreReplacedNotAppended)
     ProjectConfig config;
     config.assetDirectories = { "/compiled/in" };
 
-    ASSERT_TRUE(config.merge(R"({ "paths": { "assetDirectories": ["assets"] } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "paths": { "assetDirectories": ["assets"] } })", kBase));
 
     ASSERT_EQ(config.assetDirectories.size(), 1u);
     EXPECT_EQ(config.assetDirectories[0], "/projects/game/assets");
@@ -122,7 +122,7 @@ TEST(ProjectConfig, DirectoryListsAreReplacedNotAppended)
 TEST(ProjectConfig, AbsoluteDirectoriesAreLeftAlone)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "paths": { "assetDirectories": ["/opt/shared/textures"] } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "paths": { "assetDirectories": ["/opt/shared/textures"] } })", kBase));
 
     ASSERT_EQ(config.assetDirectories.size(), 1u);
     EXPECT_EQ(config.assetDirectories[0], "/opt/shared/textures");
@@ -133,7 +133,7 @@ TEST(ProjectConfig, AbsoluteDirectoriesAreLeftAlone)
 TEST(ProjectConfig, ReadsTheModuleList)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({
+    ASSERT_TRUE(config.Merge(R"({
         "modules": ["koral-camera", "physics/libphysics.so"],
         "paths": { "moduleDirectories": ["modules", "/opt/koral/modules"] }
     })", kBase));
@@ -152,7 +152,7 @@ TEST(ProjectConfig, ModuleListDefaultsToEmptyAndIsLeftAloneWhenAbsent)
     ProjectConfig config;
     config.modules = { "compiled-in" };
 
-    ASSERT_TRUE(config.merge("{}", kBase));
+    ASSERT_TRUE(config.Merge("{}", kBase));
     ASSERT_EQ(config.modules.size(), 1u);
     EXPECT_EQ(config.modules[0], "compiled-in");
 }
@@ -162,7 +162,7 @@ TEST(ProjectConfig, ModuleListIsReplacedNotAppended)
     ProjectConfig config;
     config.modules = { "compiled-in" };
 
-    ASSERT_TRUE(config.merge(R"({ "modules": ["koral-camera"] })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "modules": ["koral-camera"] })", kBase));
     ASSERT_EQ(config.modules.size(), 1u);
     EXPECT_EQ(config.modules[0], "koral-camera");
 }
@@ -170,7 +170,7 @@ TEST(ProjectConfig, ModuleListIsReplacedNotAppended)
 TEST(ProjectConfig, ModuleFlagAppendsWithoutDuplicating)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "modules": ["koral-camera"] })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "modules": ["koral-camera"] })", kBase));
 
     ASSERT_TRUE(override_(config, { "--module", "physics", "--module", "koral-camera" }));
 
@@ -192,7 +192,7 @@ TEST(ProjectConfig, MissingModuleFlagValueIsAnError)
 TEST(ProjectConfig, ModulesDirFlagIsPrependedAheadOfTheConfigs)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "paths": { "moduleDirectories": ["modules"] } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "paths": { "moduleDirectories": ["modules"] } })", kBase));
 
     ASSERT_TRUE(override_(config, { "--modules-dir", "/opt/other/modules" }));
 
@@ -205,7 +205,7 @@ TEST(ProjectConfig, UnknownKeysAreIgnored)
 {
     // Forward compatibility: a config written by a newer Hub must still load in an older runtime.
     ProjectConfig config;
-    const auto result = config.merge(
+    const auto result = config.Merge(
         R"({ "rendering": { "window": { "width": 640 } }, "somethingNew": { "nested": [1, 2] } })", kBase);
 
     ASSERT_TRUE(result) << result.error().message;
@@ -215,7 +215,7 @@ TEST(ProjectConfig, UnknownKeysAreIgnored)
 TEST(ProjectConfig, MalformedJsonIsAnError)
 {
     ProjectConfig config;
-    const auto result = config.merge("{ not json", kBase);
+    const auto result = config.Merge("{ not json", kBase);
 
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, ErrorCode::eConfigInvalid);
@@ -224,7 +224,7 @@ TEST(ProjectConfig, MalformedJsonIsAnError)
 TEST(ProjectConfig, WrongTypeIsAnError)
 {
     ProjectConfig config;
-    const auto result = config.merge(R"({ "rendering": { "window": { "width": "wide" } } })", kBase);
+    const auto result = config.Merge(R"({ "rendering": { "window": { "width": "wide" } } })", kBase);
 
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, ErrorCode::eConfigInvalid);
@@ -233,7 +233,7 @@ TEST(ProjectConfig, WrongTypeIsAnError)
 TEST(ProjectConfig, UnknownApiIsAnErrorAndNamesTheOffendingValue)
 {
     ProjectConfig config;
-    const auto result = config.merge(R"({ "rendering": { "api": "Metal" } })", kBase);
+    const auto result = config.Merge(R"({ "rendering": { "api": "Metal" } })", kBase);
 
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, ErrorCode::eConfigInvalid);
@@ -245,7 +245,7 @@ TEST(ProjectConfig, ApiNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)
     for (const auto* name : { "Vulkan", "vulkan", "VULKAN", "eVulkan" }) {
         ProjectConfig config;
         config.api = API::eOpenGL;
-        ASSERT_TRUE(config.merge(
+        ASSERT_TRUE(config.Merge(
             std::string(R"({ "rendering": { "api": ")") + name + R"(" } })", kBase)) << name;
         EXPECT_EQ(config.api, API::eVulkan) << name;
     }
@@ -254,7 +254,7 @@ TEST(ProjectConfig, ApiNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)
 TEST(ProjectConfig, ReadsTheWindowingPlatform)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "platform": "wayland" } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "platform": "wayland" } })", kBase));
     EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
 }
 
@@ -262,7 +262,7 @@ TEST(ProjectConfig, PlatformDefaultsToAutoAndIsLeftAloneWhenAbsent)
 {
     ProjectConfig config;                              // default
     EXPECT_EQ(config.platform, kor::WindowPlatform::eAuto);
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
     EXPECT_EQ(config.platform, kor::WindowPlatform::eAuto) << "an absent key must not reset it";
 }
 
@@ -270,7 +270,7 @@ TEST(ProjectConfig, PlatformNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling
 {
     for (const auto* name : { "x11", "X11", "eX11" }) {
         ProjectConfig config;
-        ASSERT_TRUE(config.merge(
+        ASSERT_TRUE(config.Merge(
             std::string(R"({ "rendering": { "platform": ")") + name + R"(" } })", kBase)) << name;
         EXPECT_EQ(config.platform, kor::WindowPlatform::eX11) << name;
     }
@@ -279,7 +279,7 @@ TEST(ProjectConfig, PlatformNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling
 TEST(ProjectConfig, UnknownPlatformIsAnErrorAndNamesTheOffendingValue)
 {
     ProjectConfig config;
-    const auto result = config.merge(R"({ "rendering": { "platform": "mir" } })", kBase);
+    const auto result = config.Merge(R"({ "rendering": { "platform": "mir" } })", kBase);
 
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, ErrorCode::eConfigInvalid);
@@ -289,7 +289,7 @@ TEST(ProjectConfig, UnknownPlatformIsAnErrorAndNamesTheOffendingValue)
 TEST(ProjectConfig, PlatformFlagOverridesTheFile)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "platform": "x11" } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "platform": "x11" } })", kBase));
     ASSERT_TRUE(override_(config, { "--platform", "wayland" }));
     EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
 }
@@ -307,7 +307,7 @@ TEST(ProjectConfig, UnknownPlatformFlagValueIsAnError)
 TEST(ProjectConfig, ReadsTheGpuPreference)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
     EXPECT_EQ(config.gpu, "radeon");
 }
 
@@ -316,14 +316,14 @@ TEST(ProjectConfig, GpuDefaultsToEmptyAndIsLeftAloneWhenAbsent)
     ProjectConfig config;                              // default
     EXPECT_TRUE(config.gpu.empty());
     config.gpu = "radeon";
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
     EXPECT_EQ(config.gpu, "radeon") << "an absent key must not reset it";
 }
 
 TEST(ProjectConfig, GpuFlagOverridesTheFile)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "gpu": "radeon" } })", kBase));
     ASSERT_TRUE(override_(config, { "--gpu", "1" }));
     EXPECT_EQ(config.gpu, "1");
 }
@@ -341,14 +341,14 @@ TEST(ProjectConfig, MissingGpuFlagValueIsAnError)
 TEST(ProjectConfig, ImguiIniResolvesAgainstTheConfigDirectory)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "layout/imgui.ini" } } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "window": { "imguiIni": "layout/imgui.ini" } } })", kBase));
     EXPECT_EQ(config.imguiIni, std::filesystem::path("/projects/game/layout/imgui.ini"));
 }
 
 TEST(ProjectConfig, AbsoluteImguiIniIsLeftAlone)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "/var/state/imgui.ini" } } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "window": { "imguiIni": "/var/state/imgui.ini" } } })", kBase));
     EXPECT_EQ(config.imguiIni, std::filesystem::path("/var/state/imgui.ini"));
 }
 
@@ -358,7 +358,7 @@ TEST(ProjectConfig, ImguiIniIsEmptyByDefault)
     // location; the config object itself leaves it empty until something sets it.
     ProjectConfig config;
     EXPECT_TRUE(config.imguiIni.empty());
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
     EXPECT_TRUE(config.imguiIni.empty()) << "an absent key must not invent a path";
 }
 
@@ -373,7 +373,7 @@ TEST(ProjectConfig, ImguiIniFlagResolvesAgainstTheWorkingDirectory)
 TEST(ProjectConfig, ImguiIniFlagOverridesTheFile)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "rendering": { "window": { "imguiIni": "from-file.ini" } } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "window": { "imguiIni": "from-file.ini" } } })", kBase));
     ASSERT_TRUE(override_(config, { "--imgui-ini", "from-flag.ini" }));
     EXPECT_EQ(config.imguiIni.filename(), "from-flag.ini");
 }
@@ -397,7 +397,7 @@ TEST(ProjectConfig, MissingImguiIniFlagValueIsAnError)
 TEST(ProjectConfig, ParsesADocumentInTheShapeTheHubWrites)
 {
     ProjectConfig config;
-    const auto result = config.merge(R"({
+    const auto result = config.Merge(R"({
       "schemaVersion": 1,
       "name": "MyProject",
       "color": [0.55, 0.72, 0.61],
@@ -444,7 +444,7 @@ TEST(ProjectConfig, ParsesADocumentInTheShapeTheHubWrites)
 TEST(ProjectConfig, TheHubsOwnKeysAreIgnoredNotRejected)
 {
     ProjectConfig config;
-    EXPECT_TRUE(config.merge(
+    EXPECT_TRUE(config.Merge(
         R"({ "kind": "Job", "color": [1,0,0], "frameworkVersion": "9.9.9",
              "libraries": [{ "vcpkgPort": "eigen3", "minVersion": "3.4" }] })", kBase));
 }
@@ -454,7 +454,7 @@ TEST(ProjectConfig, TheHubsOwnKeysAreIgnoredNotRejected)
 TEST(ProjectConfig, TheOriginalSingularPathKeysStillWork)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(
+    ASSERT_TRUE(config.Merge(
         R"({ "paths": { "assetsDir": "assets", "shadersDir": "shaders" } })", kBase));
 
     ASSERT_EQ(config.assetDirectories.size(), 1u);
@@ -468,7 +468,7 @@ TEST(ProjectConfig, TheOriginalSingularPathKeysStillWork)
 TEST(ProjectConfig, FlagsOverrideTheConfigFile)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({
+    ASSERT_TRUE(config.Merge(R"({
         "rendering": {
             "api": "Vulkan",
             "window": { "width": 1280, "height": 720, "vsync": true, "fullscreen": true }
@@ -487,7 +487,7 @@ TEST(ProjectConfig, FlagsOverrideTheConfigFile)
 TEST(ProjectConfig, NegativeFlagsTurnConfigSettingsOff)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({
+    ASSERT_TRUE(config.Merge(R"({
         "rendering": {
             "window": { "fullscreen": true, "resizable": true, "borderless": true, "transparent": true }
         }
@@ -505,7 +505,7 @@ TEST(ProjectConfig, NegativeFlagsTurnConfigSettingsOff)
 TEST(ProjectConfig, DirectoryFlagsArePrependedAheadOfTheConfigs)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.merge(R"({ "paths": { "assetDirectories": ["/from/config"] } })", kBase));
+    ASSERT_TRUE(config.Merge(R"({ "paths": { "assetDirectories": ["/from/config"] } })", kBase));
 
     ASSERT_TRUE(override_(config, { "--assets", "/from/cli" }));
 
@@ -611,7 +611,7 @@ TEST_F(ProjectConfigFile, IsFoundByWalkingUpFromTheSceneLibrary)
 {
     writeConfig(R"({ "rendering": { "window": { "width": 1024 } } })");
 
-    const auto found = ProjectConfig::find(_root / "cmake-build-debug");
+    const auto found = ProjectConfig::Find(_root / "cmake-build-debug");
 
     ASSERT_TRUE(found.has_value());
     EXPECT_EQ(*found, _root / ProjectConfig::FileName);
@@ -619,7 +619,7 @@ TEST_F(ProjectConfigFile, IsFoundByWalkingUpFromTheSceneLibrary)
 
 TEST_F(ProjectConfigFile, IsNotFoundWhenThereIsNone)
 {
-    EXPECT_FALSE(ProjectConfig::find(_root / "cmake-build-debug").has_value());
+    EXPECT_FALSE(ProjectConfig::Find(_root / "cmake-build-debug").has_value());
 }
 
 // The file's own directory is the base for its relative paths, so a project keeps working when it
@@ -629,7 +629,7 @@ TEST_F(ProjectConfigFile, RelativeDirectoriesResolveAgainstTheFile)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"], "shaderDirectories": ["shaders"] } })");
 
     ProjectConfig config;
-    const auto result = config.mergeFile(_root / ProjectConfig::FileName);
+    const auto result = config.MergeFile(_root / ProjectConfig::FileName);
 
     ASSERT_TRUE(result) << result.error().message;
     ASSERT_EQ(config.assetDirectories.size(), 1u);
@@ -641,7 +641,7 @@ TEST_F(ProjectConfigFile, RelativeDirectoriesResolveAgainstTheFile)
 TEST_F(ProjectConfigFile, MissingFileIsAnError)
 {
     ProjectConfig config;
-    const auto result = config.mergeFile(_root / "nope.json");
+    const auto result = config.MergeFile(_root / "nope.json");
 
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, ErrorCode::eConfigInvalid);
@@ -652,7 +652,7 @@ TEST_F(ProjectConfigFile, MalformedFileNamesItselfInTheError)
     writeConfig("{ oops");
 
     ProjectConfig config;
-    const auto result = config.mergeFile(_root / ProjectConfig::FileName);
+    const auto result = config.MergeFile(_root / ProjectConfig::FileName);
 
     ASSERT_FALSE(result);
     EXPECT_NE(result.error().message.find(ProjectConfig::FileName), std::string::npos);
@@ -671,10 +671,10 @@ TEST_F(ProjectConfigFile, RegisteredDirectoriesResolveRelativeAssetPaths)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
-    config.registerSearchPaths();
+    ASSERT_TRUE(config.MergeFile(_root / ProjectConfig::FileName));
+    config.RegisterSearchPaths();
 
-    EXPECT_EQ(kor::assetPath("textures/wood.png"), _root / "assets" / "textures" / "wood.png");
+    EXPECT_EQ(kor::AssetPath("textures/wood.png"), _root / "assets" / "textures" / "wood.png");
 }
 
 TEST_F(ProjectConfigFile, RegisteredDirectoriesResolveRelativeShaderPaths)
@@ -684,27 +684,27 @@ TEST_F(ProjectConfigFile, RegisteredDirectoriesResolveRelativeShaderPaths)
     writeConfig(R"({ "paths": { "shaderDirectories": ["shaders"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
-    config.registerSearchPaths();
+    ASSERT_TRUE(config.MergeFile(_root / ProjectConfig::FileName));
+    config.RegisterSearchPaths();
 
-    EXPECT_EQ(kor::shaderPath("blur.comp.glsl"), _root / "shaders" / "blur.comp.glsl");
+    EXPECT_EQ(kor::ShaderPath("blur.comp.glsl"), _root / "shaders" / "blur.comp.glsl");
 }
 
 // Config roots go in front, but the engine's own stay reachable behind them — a project that
 // brings its own assets must not thereby lose the fonts and shaders that ship with Koral.
 TEST_F(ProjectConfigFile, RegisteringDirectoriesKeepsTheEnginesOwnRoots)
 {
-    const auto enginesOwn = kor::assetSearchPaths();
+    const auto enginesOwn = kor::AssetSearchPaths();
     ASSERT_FALSE(enginesOwn.empty()) << "expected Koral's own assets/ to be registered";
 
     std::filesystem::create_directories(_root / "assets");
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
-    config.registerSearchPaths();
+    ASSERT_TRUE(config.MergeFile(_root / ProjectConfig::FileName));
+    config.RegisterSearchPaths();
 
-    const auto& roots = kor::assetSearchPaths();
+    const auto& roots = kor::AssetSearchPaths();
     EXPECT_EQ(roots.front(), _root / "assets") << "the config's root should be searched first";
     for (const auto& root : enginesOwn)
         EXPECT_NE(std::ranges::find(roots, root), roots.end()) << root.string() << " was dropped";
@@ -713,7 +713,7 @@ TEST_F(ProjectConfigFile, RegisteringDirectoriesKeepsTheEnginesOwnRoots)
 TEST_F(ProjectConfigFile, AbsoluteAssetPathsAreNeverResolved)
 {
     const auto absolute = _root / "somewhere" / "else.png";
-    EXPECT_EQ(kor::assetPath(absolute), absolute);
+    EXPECT_EQ(kor::AssetPath(absolute), absolute);
 }
 
 // Before the search roots existed, a relative path just meant "relative to where you launched
@@ -725,7 +725,7 @@ TEST_F(ProjectConfigFile, WorkingDirectoryIsTheLastResort)
     std::filesystem::current_path(_root);
 
     std::ofstream(_root / "beside-the-cwd.png") << "not really a png";
-    EXPECT_EQ(kor::assetPath("beside-the-cwd.png"), std::filesystem::path("beside-the-cwd.png"));
+    EXPECT_EQ(kor::AssetPath("beside-the-cwd.png"), std::filesystem::path("beside-the-cwd.png"));
 
     std::filesystem::current_path(previous);
 }
@@ -742,10 +742,10 @@ TEST_F(ProjectConfigFile, AConfigRootBeatsTheWorkingDirectory)
     writeConfig(R"({ "paths": { "assetDirectories": ["assets"] } })");
 
     ProjectConfig config;
-    ASSERT_TRUE(config.mergeFile(_root / ProjectConfig::FileName));
-    config.registerSearchPaths();
+    ASSERT_TRUE(config.MergeFile(_root / ProjectConfig::FileName));
+    config.RegisterSearchPaths();
 
-    EXPECT_EQ(kor::assetPath("shared.png"), _root / "assets" / "shared.png");
+    EXPECT_EQ(kor::AssetPath("shared.png"), _root / "assets" / "shared.png");
 
     std::filesystem::current_path(previous);
 }

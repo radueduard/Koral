@@ -5,19 +5,19 @@ resource will throw.
 
 ## Builders: a failure is a resource, not an absence
 
-`build()` returns a `gfx::Resource<T>` directly — there is nothing to unwrap:
+`Build()` returns a `gfx::Resource<T>` directly — there is nothing to unwrap:
 
 ```cpp
-auto pipeline = GraphicsPipeline::Builder{}.setVertexShader(vs).build();
+auto pipeline = GraphicsPipeline::Builder{}.SetVertexShader(vs).Build();
 ```
 
 That resource is one of three things: **valid**, **empty** (default-constructed), or **poisoned** —
 it exists, it has an identity, but it holds a `gfx::Error` instead of the object. Ask it with
-`valid()`, `poisoned()` and `error()`.
+`Valid()`, `Poisoned()` and `Failure()`.
 
 Poison spreads. Hand a poisoned resource to another builder and the resource it produces is poisoned
 too, with the original error linked as its **cause** — so a pipeline that could not be assembled
-reports the shader that would not compile, not merely its own confusion. `error()->history()` prints
+reports the shader that would not compile, not merely its own confusion. `Failure()->History()` prints
 the whole chain, symptom first and root cause last, and that is what gets logged for you:
 
 ```
@@ -43,7 +43,7 @@ reported the same way.
 
 A railway: methods keep returning `CommandBuffer&`, the first error is recorded, and later GPU ops
 become no-ops. Recording with a poisoned resource fails the recording — it never reaches the backend.
-Read `cb.result()` (a `gfx::VoidResult`) or `cb.errors()` after recording; `Submit()` returns a
+Read `cb.Outcome()` (a `gfx::VoidResult`) or `cb.Errors()` after recording; `Submit()` returns a
 `gfx::VoidResult`.
 
 ## Everything else
@@ -55,7 +55,7 @@ Each error carries a `gfx::ErrorCode`, a human `message`, the source location, a
 `cause`. Backend (Vulkan/OpenGL) exceptions never cross the API boundary — they are converted to a
 `gfx::Error` (`eBackend`, with the original message preserved, unless a more specific code applies).
 
-This table is kept in sync with `gfx::describe()` in `src/core/error.cpp`.
+This table is kept in sync with `gfx::Describe()` in `src/core/error.cpp`.
 
 | Code | Description | Typical cause / fix |
 |------|-------------|---------------------|

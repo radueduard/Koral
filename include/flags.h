@@ -159,7 +159,7 @@ namespace kor
         }
 
         /** @brief The raw bits, for handing to a backend API that wants an integer. */
-        UnderlyingType value() const {
+        UnderlyingType Value() const {
             return _flags;
         }
 

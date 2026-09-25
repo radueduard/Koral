@@ -2,7 +2,7 @@
 // (the seam has a Vulkan and an OpenGL implementation, and both must order work the same way).
 //
 // Each check takes the suite's own drawFrame, because a frame is the only thing that runs executed
-// work. Completion is observed by drawing until the token is ready rather than by wait(): OpenGL
+// work. Completion is observed by drawing until the token is ready rather than by Wait(): OpenGL
 // signals a frame's completion from the *next* Draw, so a blocking wait on the main thread would
 // never return there.
 
@@ -32,25 +32,25 @@ using DrawFrame = std::function<void()>;
 
 inline kor::Resource<kor::Buffer> makeBuffer(const int fill) {
     kor::Buffer::Builder<int> b;
-    b.setData(std::vector<int>(64, fill));
-    b.setUsage(kor::Buffer::Usage::eStorage | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst);
-    b.setType(kor::Buffer::Type::eDeviceLocal);
-    return b.build();
+    b.SetData(std::vector<int>(64, fill));
+    b.SetUsage(kor::Buffer::Usage::eStorage | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst);
+    b.SetType(kor::Buffer::Type::eDeviceLocal);
+    return b.Build();
 }
 
 // Draws until the token is ready, or gives up after `limit` frames.
 inline bool drawUntil(const kor::Token& token, const DrawFrame& draw, const int limit = 16) {
-    for (int i = 0; i < limit && !token.ready(); ++i) draw();
-    return token.ready();
+    for (int i = 0; i < limit && !token.Ready(); ++i) draw();
+    return token.Ready();
 }
 
 inline std::uint64_t logMark() {
-    const auto history = kor::log::history();
+    const auto history = kor::log::History();
     return history.empty() ? 0ull : history.back().sequence;
 }
 
 inline void expectNoValidationErrorsSince(const std::uint64_t since) {
-    for (const auto& record : kor::log::historySince(since)) {
+    for (const auto& record : kor::log::HistorySince(since)) {
         if (record.level != kor::log::Level::eError) continue;
         // Dear ImGui's Vulkan backend reuses each platform window's semaphores, so once an earlier
         // test in the same process has floated a panel, every frame can report this against *its*
@@ -94,7 +94,7 @@ inline void executedWorkRunsInOrderAroundTheFrame(const DrawFrame& draw) {
     });
     recorder.join();
 
-    ASSERT_NE(done.value(), 0u) << "Execute refused a command buffer it should have taken";
+    ASSERT_NE(done.Value(), 0u) << "Execute refused a command buffer it should have taken";
     ASSERT_TRUE(drawUntil(done, draw)) << "the frame that ran the work never completed";
     EXPECT_EQ(destination->Read<int>(), std::vector<int>(64, 9));
     expectNoValidationErrorsSince(since);
@@ -105,7 +105,7 @@ inline void anEndedCommandBufferIsRefused() {
     cb->Begin();
     cb->End();
     const kor::Token token = kor::Context::Scheduler().Execute(std::move(cb));
-    EXPECT_EQ(token.value(), 0u) << "an already-ended command buffer would have its barriers resolved out of order";
+    EXPECT_EQ(token.Value(), 0u) << "an already-ended command buffer would have its barriers resolved out of order";
 }
 
 inline kor::Task<void> ResumeWhenTheFrameIsDone(kor::Token frame, std::atomic<bool>& resumed) {
@@ -115,10 +115,10 @@ inline kor::Task<void> ResumeWhenTheFrameIsDone(kor::Token frame, std::atomic<bo
 }
 
 inline void aCoroutineResumesWhenItsFrameCompletes(const DrawFrame& draw) {
-    const kor::Token frame = kor::Context::Scheduler().frameCompletion();
+    const kor::Token frame = kor::Context::Scheduler().FrameCompletion();
     std::atomic<bool> resumed{false};
     auto task = ResumeWhenTheFrameIsDone(frame, resumed);
-    EXPECT_FALSE(frame.ready()) << "the frame being built cannot have finished already";
+    EXPECT_FALSE(frame.Ready()) << "the frame being built cannot have finished already";
 
     ASSERT_TRUE(drawUntil(frame, draw));
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
@@ -133,13 +133,13 @@ inline void aFrameWaitsForAToken(const DrawFrame& draw) {
     const kor::Token go = kor::Token::Create();
     auto& scheduler = kor::Context::Scheduler();
     scheduler.WaitFor(go);
-    const kor::Token frame = scheduler.frameCompletion();
+    const kor::Token frame = scheduler.FrameCompletion();
 
     std::atomic<bool> signalled{false};
     std::thread signaller([&] {
         std::this_thread::sleep_for(std::chrono::milliseconds(30));
         signalled.store(true);
-        go.signal();
+        go.Signal();
     });
 
     draw();

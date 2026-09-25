@@ -89,7 +89,7 @@ namespace kimg
     };
 
     /** @brief The extension @p format is written with, including the dot. */
-    [[nodiscard]] KIMG_EXPORT_API std::string_view extensionFor(FileFormat format);
+    [[nodiscard]] KIMG_EXPORT_API std::string_view ExtensionFor(FileFormat format);
 
     /**
      * @brief Which part of an image to write.

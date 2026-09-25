@@ -32,7 +32,7 @@ namespace kor::log
         }
     }
 
-    Repeat track(const std::string& message)
+    Repeat Track(const std::string& message)
     {
         auto& s = state();
         const std::scoped_lock lock(s.mutex);
@@ -48,33 +48,33 @@ namespace kor::log
         return Repeat::eSuppress;
     }
 
-    bool shouldEmit(const std::string& message)
+    bool ShouldEmit(const std::string& message)
     {
-        return track(message) != Repeat::eSuppress;
+        return Track(message) != Repeat::eSuppress;
     }
 
-    std::string suppressionNotice()
+    std::string SuppressionNotice()
     {
         return std::format("[log] the message above has now been shown {} times and will be "
                            "suppressed from here on (kor::log::setRepeatLimit to change).",
-                           repeatLimit());
+                           RepeatLimit());
     }
 
-    void setRepeatLimit(const std::size_t limit)
+    void SetRepeatLimit(const std::size_t limit)
     {
         auto& s = state();
         const std::scoped_lock lock(s.mutex);
         s.limit = limit;
     }
 
-    std::size_t repeatLimit()
+    std::size_t RepeatLimit()
     {
         auto& s = state();
         const std::scoped_lock lock(s.mutex);
         return s.limit;
     }
 
-    void resetRepeatCounts()
+    void ResetRepeatCounts()
     {
         auto& s = state();
         const std::scoped_lock lock(s.mutex);
@@ -86,7 +86,7 @@ namespace kor::log
     // Its own state, and its own lock: recording a message must not contend with the repeat limiter,
     // and the two are asked different questions. One buffer per *process* — this function lives in
     // libKoral and is exported, which is the whole reason a log panel can see messages that a scene
-    // or a module logged. @see kor::log::record
+    // or a module logged. @see kor::log::Emit
 
     namespace {
         struct History {
@@ -106,7 +106,7 @@ namespace kor::log
         }
     }
 
-    void record(const Level level, std::string message)
+    void Emit(const Level level, std::string message)
     {
         auto& h = history_();
         const std::scoped_lock lock(h.mutex);
@@ -122,14 +122,14 @@ namespace kor::log
         while (h.records.size() > h.limit) h.records.pop_front();
     }
 
-    std::vector<Record> history()
+    std::vector<Record> History()
     {
         auto& h = history_();
         const std::scoped_lock lock(h.mutex);
         return { h.records.begin(), h.records.end() };
     }
 
-    std::vector<Record> historySince(const std::uint64_t sequence)
+    std::vector<Record> HistorySince(const std::uint64_t sequence)
     {
         auto& h = history_();
         const std::scoped_lock lock(h.mutex);
@@ -140,14 +140,14 @@ namespace kor::log
         return { first, h.records.end() };
     }
 
-    std::uint64_t lastSequence()
+    std::uint64_t LastSequence()
     {
         auto& h = history_();
         const std::scoped_lock lock(h.mutex);
         return h.records.empty() ? 0 : h.records.back().sequence;
     }
 
-    void setHistoryLimit(const std::size_t limit)
+    void SetHistoryLimit(const std::size_t limit)
     {
         auto& h = history_();
         const std::scoped_lock lock(h.mutex);
@@ -155,14 +155,14 @@ namespace kor::log
         while (h.records.size() > h.limit) h.records.pop_front();
     }
 
-    std::size_t historyLimit()
+    std::size_t HistoryLimit()
     {
         auto& h = history_();
         const std::scoped_lock lock(h.mutex);
         return h.limit;
     }
 
-    void clearHistory()
+    void ClearHistory()
     {
         auto& h = history_();
         const std::scoped_lock lock(h.mutex);

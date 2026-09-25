@@ -51,8 +51,8 @@ namespace kor::vk
         {
             std::erase_if(g_pendingRemovals, [all](const PendingRemoval& pending) {
                 const bool done = std::ranges::all_of(pending.submittedBefore, [all](const kor::Token& t) {
-                    if (all) t.wait();
-                    return t.ready();
+                    if (all) t.Wait();
+                    return t.Ready();
                 });
                 if (done) for (const auto set : pending.sets) ImGui_ImplVulkan_RemoveTexture(set);
                 return done;
@@ -78,27 +78,27 @@ namespace kor::vk
          */
         bool canSampleDirectly(const kor::Image& image, const glm::u32 layer, const glm::u32 level)
         {
-            return image.type() == kor::Image::Type::e2D
-                && image.sampleCount() == kor::SampleCount::e1
-                && image.format() != kor::Image::Format::eR8_UNORM
-                && (image.usage() & kor::Image::Usage::eSampled)
-                && layer < image.arrayLayers()
-                && level < image.mipLevels();
+            return image.ImageType() == kor::Image::Type::e2D
+                && image.Samples() == kor::SampleCount::e1
+                && image.PixelFormat() != kor::Image::Format::eR8_UNORM
+                && (image.UsageFlags() & kor::Image::Usage::eSampled)
+                && layer < image.ArrayLayers()
+                && level < image.MipLevels();
         }
     }
 
     GuiImage::GuiImage(kor::ResourceRef<const kor::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
         _helperSampler = Sampler::Builder()
-            .setMagFilter(Filter::eNearest)
-            .setMinFilter(Filter::eNearest)
-            .build();
+            .SetMagFilter(Filter::eNearest)
+            .SetMinFilter(Filter::eNearest)
+            .Build();
 
         // Before setImage, not after: which layer and level is shown decides how the image is bound —
         // a view on the direct path — so binding first would build the wrong one and then rebuild it.
         _layer = layer;
         _level = level;
-        setImage(image);
+        SetImage(image);
     }
 
     GuiImage::~GuiImage()
@@ -107,7 +107,7 @@ namespace kor::vk
         removeWhenUnused(std::vector<VkDescriptorSet>(_descriptorSets.begin(), _descriptorSets.end()));
     }
 
-    void GuiImage::setLayerAndLevel(const glm::u32 layer, const glm::u32 level)
+    void GuiImage::SetLayerAndLevel(const glm::u32 layer, const glm::u32 level)
     {
         if (_layer == layer && _level == level && !_descriptorSets.empty()) return;
 
@@ -116,17 +116,17 @@ namespace kor::vk
 
         // Which layer and level is shown decides the binding itself, not just what is copied: on the
         // direct path it *is* the view. So both paths rebind, which setImage does for either.
-        if (_image.valid()) setImage(_image);
+        if (_image.Valid()) SetImage(_image);
     }
 
-    void GuiImage::refresh(kor::CommandBuffer& commandBuffer)
+    void GuiImage::Refresh(kor::CommandBuffer& commandBuffer)
     {
         // A resized image is a *different* image: its views are rebuilt lazily, but the descriptor
         // ImGui samples through was written with the old view and has to be written again. Caught here
         // rather than left to whoever owns the handle — a viewport following a window being dragged
         // resizes every frame, and the frame it forgets is a frame ImGui samples a freed view.
-        if (_image.valid() && _boundGeneration != _image->generation()) {
-            setImage(_image);
+        if (_image.Valid() && _boundGeneration != _image->Generation()) {
+            SetImage(_image);
         }
 
         // Two things at once, and both matter:
@@ -142,7 +142,7 @@ namespace kor::vk
 
     void GuiImage::recordBlit(kor::CommandBuffer& commandBuffer) const
     {
-        if (!_image.valid()) return;
+        if (!_image.Valid()) return;
 
         // Nothing to copy: ImGui reads the image itself, and all it needs is to find it in the layout
         // the descriptor was written with.
@@ -156,19 +156,19 @@ namespace kor::vk
         const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*_image);
         const auto& vkHelperImage = dynamic_cast<const kor::vk::Image&>(*_helperImage);
 
-        const auto imageType = vkImage.type();
+        const auto imageType = vkImage.ImageType();
 
         commandBuffer.Blit(
             _image, _helperImage,
             kor::Blit {
                 .srcOffset = { 0, 0, imageType == Image::Type::e3D ? static_cast<int32_t>(_layer) : 0 },
                 .srcExtent = {
-                    static_cast<glm::i32>(vkImage.extent().x),
-                    static_cast<glm::i32>(vkImage.extent().y),
+                    static_cast<glm::i32>(vkImage.Extent().x),
+                    static_cast<glm::i32>(vkImage.Extent().y),
                     1
                 },
                 .dstOffset = { 0, 0, 0 },
-                .dstExtent = { (vkHelperImage.extent().x), (vkHelperImage.extent().y), 1 },
+                .dstExtent = { (vkHelperImage.Extent().x), (vkHelperImage.Extent().y), 1 },
                 .srcBaseArrayLayer = imageType == Image::Type::e3D ? 0 : _layer,
                 .dstBaseArrayLayer = 0,
                 .layerCount = 1,
@@ -181,7 +181,7 @@ namespace kor::vk
         commandBuffer.ImageBarrier({ _helperImage, ResourceAccess::eFragmentShaderRead });
     }
 
-    void GuiImage::setImage(kor::ResourceRef<const kor::Image> image)
+    void GuiImage::SetImage(kor::ResourceRef<const kor::Image> image)
     {
         // Frames in flight may still be drawing the old binding; it goes once they are done (this
         // used to stall the whole device, on every resize of the image it shows).
@@ -189,7 +189,7 @@ namespace kor::vk
         _descriptorSets.clear();
 
         _image = image;
-        _boundGeneration = image.valid() ? image->generation() : 0;
+        _boundGeneration = image.Valid() ? image->Generation() : 0;
 
         // The direct path: ImGui samples the image itself. No helper, no blit, and — the part a caller
         // notices — no eTransferSrc usage required of an image that only ever wanted to be looked at.
@@ -199,14 +199,14 @@ namespace kor::vk
             // One layer, one level, seen as a plain 2D image: this is the whole of what the helper was
             // copying for, expressed as a view instead.
             _helperImageView = kor::ImageView::Builder(image)
-                .setViewType(ImageView::Type::e2D)
-                .setBaseArrayLayer(_layer)
-                .setArrayLayerCount(1)
-                .setBaseMipLevel(_level)
-                .setMipLevelCount(1)
-                .build();
+                .SetViewType(ImageView::Type::e2D)
+                .SetBaseArrayLayer(_layer)
+                .SetArrayLayerCount(1)
+                .SetBaseMipLevel(_level)
+                .SetMipLevelCount(1)
+                .Build();
 
-            for (int frame = 0; frame < kor::Context::Scheduler().imageCount(); ++frame) {
+            for (int frame = 0; frame < kor::Context::Scheduler().ImageCount(); ++frame) {
                 _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
                     *dynamic_cast<const kor::vk::Sampler&>(*_helperSampler),
                     dynamic_cast<const kor::vk::ImageView&>(*_helperImageView)[frame],
@@ -218,7 +218,7 @@ namespace kor::vk
         // The copying path needs to *read* the image, which an image created without eTransferSrc
         // cannot do. Said once, here, rather than left to the validation layer: the failure is a
         // missing usage flag at creation, and that is not something the messages point at.
-        if (!(image->usage() & kor::Image::Usage::eTransferSrc)) {
+        if (!(image->UsageFlags() & kor::Image::Usage::eTransferSrc)) {
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message =
                 "This image cannot be shown in the GUI. Showing a 3D image, a multisampled one, a "
                 "single-channel one, or one that is not sampleable copies from the image, so it has to "
@@ -227,17 +227,17 @@ namespace kor::vk
         }
 
         _helperImage = kor::Image::Builder()
-            .setIsPerFrame(_image->isPerFrame())
-            .setType(Image::Type::e2D)
-            .setFormat(image->format())
-            .setExtent({ image->extent().x, image->extent().y })
-            .setSampleCount(image->sampleCount())
+            .SetIsPerFrame(_image->IsPerFrame())
+            .SetType(Image::Type::e2D)
+            .SetFormat(image->PixelFormat())
+            .SetExtent({ image->Extent().x, image->Extent().y })
+            .SetSampleCount(image->Samples())
             // The helper is copied into and then sampled by ImGui, so it needs both.
-            .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
-            .build();
+            .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
+            .Build();
 
         auto components = kor::ImageView::ComponentMapping();
-        if (image->format() == Image::Format::eR8_UNORM) {
+        if (image->PixelFormat() == Image::Format::eR8_UNORM) {
             components.r = kor::ImageView::Swizzle::eR;
             components.g = kor::ImageView::Swizzle::eR;
             components.b = kor::ImageView::Swizzle::eR;
@@ -245,11 +245,11 @@ namespace kor::vk
         }
 
         _helperImageView = kor::ImageView::Builder(_helperImage)
-            .setViewType(ImageView::Type::e2D)
-            .setComponentMapping(components)
-            .build();
+            .SetViewType(ImageView::Type::e2D)
+            .SetComponentMapping(components)
+            .Build();
 
-        for (int frame = 0; frame < kor::Context::Scheduler().imageCount(); ++frame) {
+        for (int frame = 0; frame < kor::Context::Scheduler().ImageCount(); ++frame) {
             _descriptorSets.emplace_back(ImGui_ImplVulkan_AddTexture(
                 *dynamic_cast<const kor::vk::Sampler&>(*_helperSampler),
                 dynamic_cast<const kor::vk::ImageView&>(*_helperImageView)[frame],
@@ -258,14 +258,14 @@ namespace kor::vk
 
         // Filled once, now, on its own submit: there may be no frame in progress — a scene creating a
         // handle in Initialize is the ordinary case — and a handle should show something immediately
-        // rather than a frame later. Every frame after this, refresh() records the same blit.
+        // rather than a frame later. Every frame after this, Refresh() records the same blit.
         Context::Device().runSingleTimeCommand([this](CommandBuffer& commandBuffer) {
             recordBlit(commandBuffer);
-        }, ::vk::QueueFlagBits::eGraphics).wait();
+        }, ::vk::QueueFlagBits::eGraphics).Wait();
     }
 
     ImTextureID GuiImage::operator*() const {
-        const auto frameIndex = kor::Context::Scheduler().currentImageIndex();
+        const auto frameIndex = kor::Context::Scheduler().CurrentImageIndex();
         return reinterpret_cast<ImTextureID>(_descriptorSets[frameIndex]);
     }
 
@@ -292,7 +292,7 @@ namespace kor::vk
 
         const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
         static std::vector colorAttachmentFormats = {
-            static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().image()->format()))
+            static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().image()->PixelFormat()))
         };
 
         const auto pipelineRenderingCreateInfo = VkPipelineRenderingCreateInfo {
@@ -315,7 +315,7 @@ namespace kor::vk
             .DescriptorPool = **_descriptorPool,
             .RenderPass = VK_NULL_HANDLE,
             .MinImageCount = 2,
-            .ImageCount = vkScheduler.imageCount(),
+            .ImageCount = vkScheduler.ImageCount(),
             .MSAASamples = static_cast<VkSampleCountFlagBits>(vkScheduler.getSwapChain().getVkSamples()),
             .UseDynamicRendering = true,
             .PipelineRenderingCreateInfo = pipelineRenderingCreateInfo,
@@ -342,12 +342,12 @@ namespace kor::vk
 
     void GUI::Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data)
     {
-        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*kor::Context::defaultFramebuffer());
-        const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(*vkFramebuffer.colorAttachment(0));
-        const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.image());
+        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*kor::Context::DefaultFramebuffer());
+        const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(*vkFramebuffer.ColorAttachment(0));
+        const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.SourceImage());
 
         commandBuffer.ImageBarrier({
-            vkColorImageView.image(),
+            vkColorImageView.SourceImage(),
             ResourceAccess::eColorAttachment
         });
 
@@ -361,7 +361,7 @@ namespace kor::vk
         // leave that pointer dangling by the time this runs. Only handles and plain values are
         // captured, all of which outlive the frame.
         const ::vk::ImageView colorView = *vkColorImageView;
-        const auto extent = vkImage.extent();
+        const auto extent = vkImage.Extent();
         commandBuffer.Run([colorView, extent, draw_data](kor::CommandBuffer& cb) {
             const auto& raw = dynamic_cast<const vk::CommandBuffer&>(cb);
 
@@ -389,7 +389,7 @@ namespace kor::vk
         });
 
         commandBuffer.ImageBarrier({
-            vkColorImageView.image(),
+            vkColorImageView.SourceImage(),
             ResourceAccess::ePresent
         });
     }

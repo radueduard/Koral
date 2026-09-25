@@ -26,7 +26,7 @@
  * @section image_errors When a file cannot be read
  *
  * Nothing here throws. A missing or unreadable file comes back as a *poisoned* kor::Resource that
- * carries the reason — test it with `if (image)` and read `image.error()` — so one bad texture path
+ * carries the reason — test it with `if (image)` and read `image.Failure()` — so one bad texture path
  * does not take down the frame that asked for it.
  *
  * @section image_cubemaps Cubemaps
@@ -40,9 +40,9 @@
  *                                .front = "pz.png", .back   = "nz.png" });
  *
  * auto view = kor::ImageView::Builder(sky)
- *     .setViewType(kor::ImageView::Type::eCube)
- *     .setArrayLayerCount(6)
- *     .build();
+ *     .SetViewType(kor::ImageView::Type::eCube)
+ *     .SetArrayLayerCount(6)
+ *     .Build();
  * @endcode
  *
  * @note The equirectangular projection runs as a compute shader on the GPU. It is verified on
@@ -101,7 +101,7 @@ namespace kimg
         kor::Image::Format format = kor::Image::Format::eRGBA8_UNORM;  ///< What one texel — or block — holds.
 
         /** @brief How many bytes `pixels` holds for this extent and format. */
-        [[nodiscard]] glm::u64 byteCount() const { return kor::Image::sizeOfRegion(format, extent); }
+        [[nodiscard]] glm::u64 ByteCount() const { return kor::Image::SizeOfRegion(format, extent); }
     };
 
     /**
@@ -128,7 +128,7 @@ namespace kimg
      *
      * Blocks until the image is on the GPU. Use LoadImageAsync to keep the frame moving.
      *
-     * @see kor::assetPath, kor::ProjectConfig::assetDirectories
+     * @see kor::AssetPath, kor::ProjectConfig::assetDirectories
      */
     [[nodiscard]] KIMG_IMPORT_API kor::Resource<kor::Image> LoadImage(
         const std::filesystem::path& relativePath, bool generateMipmaps = false);
@@ -160,7 +160,7 @@ namespace kimg
         std::filesystem::path back;     ///< -Z
 
         /** @brief The faces in layer order: +X, -X, +Y, -Y, +Z, -Z. */
-        [[nodiscard]] std::array<std::filesystem::path, 6> inLayerOrder() const
+        [[nodiscard]] std::array<std::filesystem::path, 6> InLayerOrder() const
         {
             return { right, left, top, bottom, front, back };
         }

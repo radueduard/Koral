@@ -29,8 +29,8 @@ namespace kimg::detail
     kor::Resource<kor::Image> poisoned(const std::filesystem::path& path, std::string what)
     {
         auto error = fileError(path, std::move(what));
-        kor::log::error("[image] {}", error.message);
-        return kor::Resource<kor::Image>::failed(std::move(error), "Image");
+        kor::log::Error("[image] {}", error.message);
+        return kor::Resource<kor::Image>::Failed(std::move(error), "Image");
     }
 
     std::expected<kor::Image::Format, kor::Error> formatFrom(const OIIO::TypeDesc& type, const int channels)
@@ -180,10 +180,10 @@ namespace kimg::detail
                      const glm::uvec3 extent, const glm::u32 layer, const glm::u32 mip)
     {
         const auto staging = kor::Buffer::Builder<unsigned char>()
-            .setDataView(bytes)
-            .setUsage(kor::Buffer::Usage::eTransferSrc)
-            .setType(kor::Buffer::Type::eStaging)
-            .build();
+            .SetDataView(bytes)
+            .SetUsage(kor::Buffer::Usage::eTransferSrc)
+            .SetType(kor::Buffer::Type::eStaging)
+            .Build();
 
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
             commandBuffer.CopyBufferToImage(staging, image, kor::Copy {
@@ -193,7 +193,7 @@ namespace kimg::detail
                 .imageLayerCount = 1,
                 .imageMipLevel = mip,
             });
-        }).wait();
+        }).Wait();
     }
 
     void finishUpload(const kor::ResourceRef<const kor::Image>& image, const bool generateMipmaps)
@@ -201,12 +201,12 @@ namespace kimg::detail
         // A compressed image cannot be blitted into, and mips are made by blitting: it carries the
         // chain it was encoded with or it has none. The engine refuses this anyway — skipping it here
         // is what keeps the refusal out of the log for a caller who simply passed `true`.
-        const bool mips = generateMipmaps && !kor::Image::isBlockCompressed(image->format());
+        const bool mips = generateMipmaps && !kor::Image::IsBlockCompressed(image->PixelFormat());
 
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
             if (mips) commandBuffer.GenerateMipmaps(image);
             commandBuffer.Barrier({}, {{ image, kor::ResourceAccess::eAllShaderRead }});
-        }).wait();
+        }).Wait();
     }
 
     // ---- KTX ------------------------------------------------------------------------------------
@@ -357,7 +357,7 @@ namespace kimg::detail
             };
 
             for (const auto& candidate : candidates) {
-                if (kor::Image::isFormatSupported(candidate.format)) return candidate;
+                if (kor::Image::IsFormatSupported(candidate.format)) return candidate;
             }
             // Uncompressed, four times the memory, and always available. Better a texture than none.
             return { KTX_TTF_RGBA32, kor::Image::Format::eRGBA8_UNORM };
@@ -459,28 +459,28 @@ namespace kimg::detail
         // Checked before the image is built rather than after: a format this device does not have
         // fails at creation, and every upload that follows then fails too. One error naming the
         // format is worth more than twenty saying the image is unusable.
-        if (!kor::Image::isFormatSupported(ktx.format)) {
+        if (!kor::Image::IsFormatSupported(ktx.format)) {
             auto error = kor::Error{ .code = kor::ErrorCode::eInvalidArgument,
                 .message = std::format("this device does not support image format {}, which the file is in",
                                        static_cast<int>(ktx.format)) };
-            kor::log::error("[image] {}", error.message);
-            return kor::Resource<kor::Image>::failed(std::move(error), "Image");
+            kor::log::Error("[image] {}", error.message);
+            return kor::Resource<kor::Image>::Failed(std::move(error), "Image");
         }
 
         // The file's own mip chain wins; failing that, generate one if asked — unless the format is
         // compressed, which cannot be blitted into.
         const glm::u32 mipLevels = ktx.fileMipLevels > 1
             ? ktx.fileMipLevels
-            : ((generateMipmaps && !kor::Image::isBlockCompressed(ktx.format)) ? 0u : 1u);
+            : ((generateMipmaps && !kor::Image::IsBlockCompressed(ktx.format)) ? 0u : 1u);
 
         return kor::Image::Builder()
-            .setType(ktx.type)
-            .setExtent(ktx.extent)
-            .setArrayLayers(ktx.arrayLayers)
-            .setMipLevels(mipLevels)
-            .setFormat(ktx.format)
+            .SetType(ktx.type)
+            .SetExtent(ktx.extent)
+            .SetArrayLayers(ktx.arrayLayers)
+            .SetMipLevels(mipLevels)
+            .SetFormat(ktx.format)
 
 
-            .build();
+            .Build();
     }
 }

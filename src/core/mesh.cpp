@@ -36,7 +36,7 @@ namespace kor {
         }
     }
 
-    Mesh::Builder& Mesh::Builder::setVertexBuffer(const glm::u32 binding, ResourceRef<Buffer> vertexBuffer)
+    Mesh::Builder& Mesh::Builder::SetVertexBuffer(const glm::u32 binding, ResourceRef<Buffer> vertexBuffer)
     {
         if (_vertexBuffers.size() <= binding)
             _vertexBuffers.resize(binding + 1);
@@ -44,36 +44,36 @@ namespace kor {
         return *this;
     }
 
-    Mesh::Builder& Mesh::Builder::setVertexBuffer(const glm::u32 binding, Resource<Buffer>&& vertexBuffer)
+    Mesh::Builder& Mesh::Builder::SetVertexBuffer(const glm::u32 binding, Resource<Buffer>&& vertexBuffer)
     {
         auto owned = std::make_shared<Resource<Buffer>>(std::move(vertexBuffer));
-        setVertexBuffer(binding, ResourceRef<Buffer>(*owned));
+        SetVertexBuffer(binding, ResourceRef<Buffer>(*owned));
         _ownedBuffers.push_back(std::move(owned));
         return *this;
     }
 
-    Mesh::Builder& Mesh::Builder::setIndexBuffer(ResourceRef<Buffer> indexBuffer, const ChannelType indexType)
+    Mesh::Builder& Mesh::Builder::SetIndexBuffer(ResourceRef<Buffer> indexBuffer, const ChannelType indexType)
     {
         _indexBuffer = std::move(indexBuffer);
         _indexType = indexType;
         return *this;
     }
 
-    Mesh::Builder& Mesh::Builder::setIndexBuffer(Resource<Buffer>&& indexBuffer, const ChannelType indexType)
+    Mesh::Builder& Mesh::Builder::SetIndexBuffer(Resource<Buffer>&& indexBuffer, const ChannelType indexType)
     {
         auto owned = std::make_shared<Resource<Buffer>>(std::move(indexBuffer));
-        setIndexBuffer(ResourceRef<Buffer>(*owned), indexType);
+        SetIndexBuffer(ResourceRef<Buffer>(*owned), indexType);
         _ownedBuffers.push_back(std::move(owned));
         return *this;
     }
 
-    Mesh::Builder& Mesh::Builder::setVertexLayout(VertexLayout layout)
+    Mesh::Builder& Mesh::Builder::SetVertexLayout(VertexLayout layout)
     {
         _vertexLayout = std::move(layout);
         return *this;
     }
 
-    VoidResult Mesh::Builder::populate(Mesh& mesh) const
+    VoidResult Mesh::Builder::Populate(Mesh& mesh) const
     {
         // Vertex buffers are addressed by binding number, both here and where they are bound: the
         // backends hand the whole list to the API starting at binding 0, so index i *is* binding i.
@@ -87,25 +87,25 @@ namespace kor {
 
         for (const auto& [binding, stride] : _vertexLayout.bindings)
         {
-            if (binding >= _vertexBuffers.size() || !_vertexBuffers[binding].alive()) {
-                addError(ErrorCode::eInvalidArgument,
+            if (binding >= _vertexBuffers.size() || !_vertexBuffers[binding].Alive()) {
+                AddError(ErrorCode::eInvalidArgument,
                          std::format("no vertex buffer was set for binding {}, which the vertex layout declares.",
                                      binding));
                 continue;
             }
 
             const auto& buffer = _vertexBuffers[binding];
-            adopt(buffer, std::format("the vertex buffer for binding {}", binding));
-            if (!buffer.valid()) continue;   // poisoned or destroyed; adopt() has already said so
+            Adopt(buffer, std::format("the vertex buffer for binding {}", binding));
+            if (!buffer.Valid()) continue;   // poisoned or destroyed; Adopt() has already said so
 
             if (stride == 0) {
-                addError(ErrorCode::eInvalidArgument,
+                AddError(ErrorCode::eInvalidArgument,
                          std::format("binding {} declares a stride of 0 bytes, so it describes no vertices.",
                                      binding));
                 continue;
             }
-            if (!(buffer->usage() & Buffer::Usage::eVertex)) {
-                addError(ErrorCode::eInvalidArgument,
+            if (!(buffer->UsageFlags() & Buffer::Usage::eVertex)) {
+                AddError(ErrorCode::eInvalidArgument,
                          std::format("the buffer set for binding {} was not created with Buffer::Usage::eVertex.",
                                      binding));
                 continue;
@@ -116,7 +116,7 @@ namespace kor {
                 vertexCount = count;
                 counted = true;
             } else if (count != vertexCount) {
-                addError(ErrorCode::eInvalidArgument,
+                AddError(ErrorCode::eInvalidArgument,
                          std::format("the vertex buffers disagree on how many vertices there are: binding {} holds "
                                      "{} at a stride of {} bytes, where an earlier binding held {}.",
                                      binding, count, stride, vertexCount));
@@ -129,16 +129,16 @@ namespace kor {
         // A buffer set for a binding the layout says nothing about would never be read, and is far
         // more likely to be a layout that was forgotten or written with the wrong binding numbers.
         for (glm::u32 binding = 0; binding < _vertexBuffers.size(); ++binding) {
-            if (!_vertexBuffers[binding].alive()) continue;
+            if (!_vertexBuffers[binding].Alive()) continue;
             const auto declared = std::ranges::any_of(_vertexLayout.bindings,
                 [binding](const auto& b) { return b.binding == binding; });
             if (declared) continue;
 
             if (_vertexLayout.bindings.empty())
-                addError(ErrorCode::eInvalidArgument,
+                AddError(ErrorCode::eInvalidArgument,
                          "a vertex buffer was set but no vertex layout was: nothing describes what it holds.");
             else
-                addError(ErrorCode::eInvalidArgument,
+                AddError(ErrorCode::eInvalidArgument,
                          std::format("a vertex buffer was set for binding {}, which the vertex layout does not declare.",
                                      binding));
         }
@@ -149,15 +149,15 @@ namespace kor {
 
         if (_indexBuffer.has_value())
         {
-            adopt(*_indexBuffer, "the index buffer");
-            if (_indexBuffer->valid())
+            Adopt(*_indexBuffer, "the index buffer");
+            if (_indexBuffer->Valid())
             {
                 const auto width = indexWidth(_indexType);
                 if (width == 0) {
-                    addError(ErrorCode::eInvalidArgument,
+                    AddError(ErrorCode::eInvalidArgument,
                              "the index type must be ChannelType::eUByte, eUShort or eUInt.");
-                } else if (!((*_indexBuffer)->usage() & Buffer::Usage::eIndex)) {
-                    addError(ErrorCode::eInvalidArgument,
+                } else if (!((*_indexBuffer)->UsageFlags() & Buffer::Usage::eIndex)) {
+                    AddError(ErrorCode::eInvalidArgument,
                              "the index buffer was not created with Buffer::Usage::eIndex.");
                 } else {
                     indexBuffer = *_indexBuffer;
@@ -167,7 +167,7 @@ namespace kor {
             }
         }
 
-        if (auto valid = validate(); !valid) return valid;
+        if (auto valid = Validate(); !valid) return valid;
 
         mesh._vertexCount = vertexCount;
         mesh._vertexBuffers = std::move(vertexBuffers);
@@ -175,21 +175,21 @@ namespace kor {
         mesh._indexCount = indexCount;
         mesh._indexType = indexType;
         mesh._ownedBuffers = _ownedBuffers;
-        mesh.setVertexLayout(_vertexLayout);
+        mesh.SetVertexLayout(_vertexLayout);
         return {};
     }
 
-    Result<std::unique_ptr<Mesh>> Mesh::Builder::create() const
+    Result<std::unique_ptr<Mesh>> Mesh::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
         auto mesh = std::make_unique<Mesh>();
-        if (auto filled = populate(*mesh); !filled) return std::unexpected(filled.error());
+        if (auto filled = Populate(*mesh); !filled) return std::unexpected(filled.error());
         return mesh;
     }
 
-    Resource<Mesh> Mesh::Builder::build(const std::source_location where) const
+    Resource<Mesh> Mesh::Builder::Build(const std::source_location where) const
     {
-        return materialize<Mesh>(*this, "Mesh", where);
+        return Materialize<Mesh>(*this, "Mesh", where);
     }
 }

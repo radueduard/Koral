@@ -45,7 +45,7 @@ namespace kor
     {
     public:
         // Compiles `entry` of `module` to SPIR-V. Throws BackendException(eShaderCompileFailed)
-        // on any failure, so callers wrapping construction in guard() surface a kor::Error.
+        // on any failure, so callers wrapping construction in Guard() surface a kor::Error.
         static SlangCompileResult Compile(const std::string& module,
                                           const std::string& entry,
                                           const std::vector<std::filesystem::path>& searchPaths);

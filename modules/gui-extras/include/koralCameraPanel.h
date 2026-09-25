@@ -86,81 +86,81 @@ namespace kgui
          */
         void Draw(kcam::PerspectiveCamera& camera)
         {
-            if (!header(camera, "perspective")) return;
+            if (!Header(camera, "perspective")) return;
             ImGui::PushID(&camera);
 
-            drawPose(camera);
+            DrawPose(camera);
 
-            float fov = glm::degrees(camera.fovY());
+            float fov = glm::degrees(camera.FovY());
             if (ImGui::SliderFloat("fov", &fov, 10.f, 140.f, "%.0f deg"))
-                camera.setFovY(glm::radians(fov));
+                camera.SetFovY(glm::radians(fov));
 
-            drawAspect(camera);
+            DrawAspect(camera);
 
-            glm::vec2 depth { camera.zNear(), camera.zFar() };
+            glm::vec2 depth { camera.ZNear(), camera.ZFar() };
             if (ImGui::DragFloat2("near / far", &depth.x, 0.1f, 0.001f, 100000.f) &&
                 depth.x > 0.f && depth.y > depth.x)
-                camera.setNearFar(depth.x, depth.y);
+                camera.SetNearFar(depth.x, depth.y);
 
-            drawController(camera);
+            DrawController(camera);
             ImGui::PopID();
         }
 
         /** @brief Draws one orthographic camera's controls, inline. @see Draw(PerspectiveCamera&) */
         void Draw(kcam::OrthographicCamera& camera)
         {
-            if (!header(camera, "orthographic")) return;
+            if (!Header(camera, "orthographic")) return;
             ImGui::PushID(&camera);
 
-            drawPose(camera);
+            DrawPose(camera);
 
-            glm::vec4 bounds = camera.bounds();
+            glm::vec4 bounds = camera.Bounds();
             if (ImGui::DragFloat4("l / r / b / t", &bounds.x, 0.1f))
-                camera.setBounds(bounds.x, bounds.y, bounds.z, bounds.w);
+                camera.SetBounds(bounds.x, bounds.y, bounds.z, bounds.w);
 
-            glm::vec2 depth { camera.zNear(), camera.zFar() };
+            glm::vec2 depth { camera.ZNear(), camera.ZFar() };
             if (ImGui::DragFloat2("near / far", &depth.x, 0.1f, 0.001f, 100000.f) && depth.y > depth.x)
-                camera.setNearFar(depth.x, depth.y);
+                camera.SetNearFar(depth.x, depth.y);
 
-            drawController(camera);
+            DrawController(camera);
             ImGui::PopID();
         }
 
     private:
-        static bool header(const kcam::Camera& camera, const char* kind)
+        static bool Header(const kcam::Camera& camera, const char* kind)
         {
-            return ImGui::CollapsingHeader(std::format("{} ({})", camera.name(), kind).c_str(),
+            return ImGui::CollapsingHeader(std::format("{} ({})", camera.Name(), kind).c_str(),
                                            ImGuiTreeNodeFlags_DefaultOpen);
         }
 
-        static void drawPose(kcam::Camera& camera)
+        static void DrawPose(kcam::Camera& camera)
         {
-            glm::vec3 position = camera.position();
-            if (ImGui::DragFloat3("position", &position.x, 0.1f)) camera.setPosition(position);
+            glm::vec3 position = camera.Position();
+            if (ImGui::DragFloat3("position", &position.x, 0.1f)) camera.SetPosition(position);
         }
 
-        static void drawAspect(kcam::PerspectiveCamera& camera)
+        static void DrawAspect(kcam::PerspectiveCamera& camera)
         {
             // A camera following a framebuffer or an image is following something this panel cannot
             // offer — it has no way to name one — so it says what is happening and gives the way back
             // out, rather than a checkbox that would silently drop the target.
             using Kind = kcam::AspectSource::Kind;
-            const Kind source = camera.aspectSource().kind;
+            const Kind source = camera.AspectSourceSettings().kind;
 
             if (source == Kind::eFramebuffer || source == Kind::eImage) {
                 ImGui::TextUnformatted(source == Kind::eFramebuffer
                     ? "aspect follows a framebuffer" : "aspect follows an image");
                 ImGui::SameLine();
-                if (ImGui::SmallButton("release")) camera.setAspectSource(kcam::AspectSource::none());
+                if (ImGui::SmallButton("release")) camera.SetAspectSource(kcam::AspectSource::None());
             } else {
-                bool follows = camera.followsWindowAspect();
+                bool follows = camera.FollowsWindowAspect();
                 if (ImGui::Checkbox("follow window aspect", &follows))
-                    camera.setFollowWindowAspect(follows);
+                    camera.SetFollowWindowAspect(follows);
             }
 
-            ImGui::BeginDisabled(camera.aspectSource().kind != Kind::eNone);
-            float aspect = camera.aspect();
-            if (ImGui::DragFloat("aspect", &aspect, 0.01f, 0.1f, 10.f, "%.3f")) camera.setAspect(aspect);
+            ImGui::BeginDisabled(camera.AspectSourceSettings().kind != Kind::eNone);
+            float aspect = camera.Aspect();
+            if (ImGui::DragFloat("aspect", &aspect, 0.01f, 0.1f, 10.f, "%.3f")) camera.SetAspect(aspect);
             ImGui::EndDisabled();
         }
 
@@ -170,9 +170,9 @@ namespace kgui
          * One value in, one value out: the panel edits a copy and hands the whole thing back if
          * anything moved, which is exactly what the API offers a project.
          */
-        void drawController(kcam::Camera& camera)
+        void DrawController(kcam::Camera& camera)
         {
-            kcam::Controller controller = camera.controller();
+            kcam::Controller controller = camera.ControllerSettings();
             bool changed = false;
 
             static constexpr const char* kKinds[] { "none", "fly", "orbit" };
@@ -193,20 +193,20 @@ namespace kgui
             if (controller.kind != kcam::Controller::Kind::eNone) {
                 // Whether the camera currently has the cursor, and the way to take it back without
                 // hunting for the release chord.
-                bool released = camera.released();
+                bool released = camera.Released();
                 if (ImGui::Checkbox("released (the cursor is the user's)", &released))
-                    camera.setReleased(released);
+                    camera.SetReleased(released);
 
-                changed |= drawBindings(camera, controller.bindings,
+                changed |= DrawBindings(camera, controller.bindings,
                                         controller.kind == kcam::Controller::Kind::eOrbit);
             }
 
-            if (changed) camera.setController(controller);
+            if (changed) camera.SetController(controller);
         }
 
         // ---- naming things, for the bindings interface -----------------------------------------
 
-        static const char* actionName(const kcam::Action action)
+        static const char* ActionName(const kcam::Action action)
         {
             switch (action) {
             case kcam::Action::eMoveForward: return "forward";
@@ -221,7 +221,7 @@ namespace kgui
             return "?";
         }
 
-        static std::string inputName(const kcam::Input& input)
+        static std::string InputName(const kcam::Input& input)
         {
             std::string prefix;
             if (input.modifiers & kcam::Modifier::eCtrl)  prefix += "Ctrl+";
@@ -233,9 +233,9 @@ namespace kgui
             case kcam::Input::Type::eAlways:
                 return "always on";
             case kcam::Input::Type::eKey:
-                return prefix + kor::Input::describe(static_cast<kor::Key>(input.code));
+                return prefix + kor::Input::Describe(static_cast<kor::Key>(input.code));
             case kcam::Input::Type::eMouseButton:
-                return prefix + kor::Input::describe(static_cast<kor::MouseButton>(input.code));
+                return prefix + kor::Input::Describe(static_cast<kor::MouseButton>(input.code));
             case kcam::Input::Type::eNone:
                 break;
             }
@@ -243,11 +243,11 @@ namespace kgui
         }
 
         /** @brief Which modifiers are held right now, so a rebind captures the whole chord. */
-        static kcam::Modifier heldModifiers()
+        static kcam::Modifier HeldModifiers()
         {
             const auto either = [](const kor::Key left, const kor::Key right) {
-                return kor::Input::isKeyHeld(left) || kor::Input::isKeyPressed(left)
-                    || kor::Input::isKeyHeld(right) || kor::Input::isKeyPressed(right);
+                return kor::Input::IsKeyHeld(left) || kor::Input::IsKeyPressed(left)
+                    || kor::Input::IsKeyHeld(right) || kor::Input::IsKeyPressed(right);
             };
 
             auto modifiers = kcam::Modifier::eNone;
@@ -259,7 +259,7 @@ namespace kgui
         }
 
         /** @brief Whether @p key is one of the modifiers, which cannot be a binding on their own. */
-        static bool isModifier(const kor::Key key)
+        static bool IsModifier(const kor::Key key)
         {
             switch (key) {
             case kor::Key::eLeftControl: case kor::Key::eRightControl:
@@ -280,14 +280,14 @@ namespace kgui
          * count while the pointer is outside every window, so clicking around the panel cannot bind
          * itself by accident.
          */
-        static std::optional<kcam::Input> firstInputPressed()
+        static std::optional<kcam::Input> FirstInputPressed()
         {
-            if (const auto key = kor::Input::firstKeyPressed(); key && !isModifier(*key))
-                return kcam::Input::key(*key, heldModifiers());
+            if (const auto key = kor::Input::FirstKeyPressed(); key && !IsModifier(*key))
+                return kcam::Input::FromKey(*key, HeldModifiers());
 
-            if (!kor::Input::interfaceWantsMouse()) {
-                if (const auto button = kor::Input::firstMouseButtonPressed())
-                    return kcam::Input::mouse(*button, heldModifiers());
+            if (!kor::Input::InterfaceWantsMouse()) {
+                if (const auto button = kor::Input::FirstMouseButtonPressed())
+                    return kcam::Input::FromMouse(*button, HeldModifiers());
             }
             return std::nullopt;
         }
@@ -297,7 +297,7 @@ namespace kgui
          * @param gate Adds an "always on" toggle. A gate is the thing anyone actually wants to switch
          *        off, and "always on" is a state no keypress can arm.
          */
-        bool drawInput(const kcam::Camera& camera, const char* label, kcam::Input& input, const int id,
+        bool DrawInput(const kcam::Camera& camera, const char* label, kcam::Input& input, const int id,
                        const bool gate = false)
         {
             const bool waiting = _arming == &camera && _armed == id;
@@ -307,7 +307,7 @@ namespace kgui
             const bool always = input.type == kcam::Input::Type::eAlways;
 
             ImGui::BeginDisabled(always);
-            if (ImGui::Button(waiting ? "press a key or click the scene..." : inputName(input).c_str(),
+            if (ImGui::Button(waiting ? "press a key or click the scene..." : InputName(input).c_str(),
                               ImVec2(220.f, 0.f)))
             {
                 _arming = &camera;
@@ -321,9 +321,9 @@ namespace kgui
                 if (ImGui::Checkbox("always", &on)) {
                     // Off leaves it unbound rather than restoring what was bound before: the panel
                     // does not keep a shadow copy, and unbound is the honest "nothing opens this".
-                    input = on ? kcam::Input::always() : kcam::Input{};
+                    input = on ? kcam::Input::Always() : kcam::Input{};
                     changed = true;
-                    if (waiting) disarm();
+                    if (waiting) Disarm();
                 }
             }
 
@@ -331,12 +331,12 @@ namespace kgui
             ImGui::TextUnformatted(label);
 
             if (waiting) {
-                if (const auto pressed = firstInputPressed()) {
+                if (const auto pressed = FirstInputPressed()) {
                     // Escape clears the binding rather than binding escape — an unbound input is a
                     // real thing to want, and there is no other way to say it.
-                    input = *pressed == kcam::Input::key(kor::Key::eEsc) ? kcam::Input{} : *pressed;
+                    input = *pressed == kcam::Input::FromKey(kor::Key::eEsc) ? kcam::Input{} : *pressed;
                     changed = true;
-                    disarm();
+                    Disarm();
                 }
             }
             ImGui::PopID();
@@ -344,7 +344,7 @@ namespace kgui
         }
 
         /** @brief One axis: where it reads from, how hard, and which way round. */
-        static bool drawAxis(const char* label, kcam::Axis& axis, const float speed, const char* format)
+        static bool DrawAxis(const char* label, kcam::Axis& axis, const float speed, const char* format)
         {
             bool changed = false;
 
@@ -366,7 +366,7 @@ namespace kgui
         }
 
         /** @brief Everything the controller reads: the gates, the actions, and the axes. */
-        bool drawBindings(const kcam::Camera& camera, kcam::Bindings& bindings, const bool orbiting)
+        bool DrawBindings(const kcam::Camera& camera, kcam::Bindings& bindings, const bool orbiting)
         {
             if (!ImGui::TreeNode("controls")) return false;
 
@@ -374,27 +374,27 @@ namespace kgui
 
             // The gates first: what has to be held for any of the rest to be read at all, and the two
             // that hand the cursor over. Negative ids so they cannot collide with an action's.
-            changed |= drawInput(camera, "enable", bindings.enable, -1, true);
-            changed |= drawInput(camera, "look", bindings.look, -2, true);
-            changed |= drawInput(camera, "release the cursor", bindings.release, -3);
-            changed |= drawInput(camera, "take it back", bindings.engage, -4);
+            changed |= DrawInput(camera, "enable", bindings.enable, -1, true);
+            changed |= DrawInput(camera, "look", bindings.look, -2, true);
+            changed |= DrawInput(camera, "release the cursor", bindings.release, -3);
+            changed |= DrawInput(camera, "take it back", bindings.engage, -4);
             ImGui::Separator();
 
             for (std::uint8_t i = 0; i < static_cast<std::uint8_t>(kcam::Action::eCount); ++i) {
                 const auto action = static_cast<kcam::Action>(i);
-                changed |= drawInput(camera, actionName(action), bindings[action], i);
+                changed |= DrawInput(camera, ActionName(action), bindings[action], i);
             }
 
             ImGui::Separator();
-            changed |= drawAxis("yaw", bindings.yaw, 0.0005f, "%.4f rad");
-            changed |= drawAxis("pitch", bindings.pitch, 0.0005f, "%.4f rad");
-            if (orbiting) changed |= drawAxis("zoom", bindings.zoom, 0.005f, "%.3f");
+            changed |= DrawAxis("yaw", bindings.yaw, 0.0005f, "%.4f rad");
+            changed |= DrawAxis("pitch", bindings.pitch, 0.0005f, "%.4f rad");
+            if (orbiting) changed |= DrawAxis("zoom", bindings.zoom, 0.005f, "%.3f");
 
             ImGui::TreePop();
             return changed;
         }
 
-        void disarm() { _arming = nullptr; _armed = -1; }
+        void Disarm() { _arming = nullptr; _armed = -1; }
 
         /// Which control is waiting for a key, and whose. At most one rebind is ever in flight.
         const kcam::Camera* _arming = nullptr;

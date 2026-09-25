@@ -46,7 +46,7 @@ namespace kor
         ResourceAccess shaderAccess(const Shader::AccessKind kind, const Flags<Shader::Stage> stages)
         {
             const auto only = [&](const Shader::Stage stage) {
-                return stages.value() == Flags<Shader::Stage>(stage).value();
+                return stages.Value() == Flags<Shader::Stage>(stage).Value();
             };
 
             switch (kind) {
@@ -145,15 +145,15 @@ namespace kor
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
-    RenderInfo::RenderInfo() : RenderInfo(Context::defaultFramebuffer()) {}
+    RenderInfo::RenderInfo() : RenderInfo(Context::DefaultFramebuffer()) {}
 
     RenderInfo::RenderInfo(const kor::ResourceRef<const kor::Framebuffer>& framebuffer) : _framebuffer(framebuffer)
     {
         // Sized here so the common case — override one attachment, leave the rest — needs no
         // resizing later. A framebuffer that failed to build has nothing to ask; BeginRendering
         // rejects it by name, and this must not throw before it gets the chance.
-        if (framebuffer.valid())
-            _clearColors.resize(framebuffer->colorAttachmentCount(), std::nullopt);
+        if (framebuffer.Valid())
+            _clearColors.resize(framebuffer->ColorAttachmentCount(), std::nullopt);
     }
 
     RenderInfo::RenderInfo(const kor::ResourceRef<kor::Framebuffer>& framebuffer)
@@ -162,7 +162,7 @@ namespace kor
     RenderInfo::RenderInfo(const kor::Resource<kor::Framebuffer>& framebuffer)
         : RenderInfo(ResourceRef<const Framebuffer>(framebuffer)) {}
 
-    const ClearColor& RenderInfo::clearColor(const glm::u32 index) const
+    const ClearColor& RenderInfo::ClearColorAt(const glm::u32 index) const
     {
         // Opaque black, for an attachment that neither the pass nor the framebuffer describes.
         // Unreachable through BeginRendering, which resolves against the framebuffer first.
@@ -171,18 +171,18 @@ namespace kor
         return *_clearColors[index];
     }
 
-    void RenderInfo::resolveClearValues(const kor::Framebuffer& framebuffer)
+    void RenderInfo::ResolveClearValues(const kor::Framebuffer& framebuffer)
     {
-        const auto declared = framebuffer.clearValues().clearColor.size();
+        const auto declared = framebuffer.Clears().clearColor.size();
         if (_clearColors.size() < declared) _clearColors.resize(declared, std::nullopt);
 
         for (std::size_t i = 0; i < _clearColors.size(); ++i) {
             if (_clearColors[i].has_value()) continue;
-            if (i < declared) _clearColors[i] = framebuffer.clearColor(static_cast<glm::u32>(i));
+            if (i < declared) _clearColors[i] = framebuffer.ClearColorAt(static_cast<glm::u32>(i));
         }
 
-        if (!_clearDepth.has_value()) _clearDepth = framebuffer.clearDepth();
-        if (!_clearStencil.has_value()) _clearStencil = framebuffer.clearStencil();
+        if (!_clearDepth.has_value()) _clearDepth = framebuffer.ClearDepth();
+        if (!_clearStencil.has_value()) _clearStencil = framebuffer.ClearStencil();
     }
 
 
@@ -198,22 +198,22 @@ namespace kor
     // earlier in the frame), and Vulkan forbids a layout transition inside a render pass. Holding
     // the commands lets the resolver insert the barrier at a legal point instead of breaking the
     // pass apart.
-    CommandBuffer& CommandBuffer::enqueue(const char* command, const std::source_location where,
+    CommandBuffer& CommandBuffer::Enqueue(const char* command, const std::source_location where,
                                           std::vector<ResourceUse> uses, const PassEdge pass,
                                           std::function<void()> emit, const bool transitions,
                                           const bool dereferencesDeviceAddresses)
     {
         // Recorded from inside another command's emit — Run()'s lambda calls straight back into the
-        // API, and applyDynamicDefaults() reaches back through the virtual Set* overrides. There is
-        // no recording left to join, and appending here would invalidate emitRecords()' walk. Run it
+        // API, and ApplyDynamicDefaults() reaches back through the virtual Set* overrides. There is
+        // no recording left to join, and appending here would invalidate EmitRecords()' walk. Run it
         // where it stands, which also keeps it in the right order relative to the command that
         // triggered it. This mirrors the OpenGL backend's own `_executing` guard.
         // Every transfer command already says which resource it reads from and which it writes to,
         // because the barrier resolver needs exactly that — so the usage those roles require can be
         // checked here, once, instead of in each of the dozen commands that perform one. A command
         // added later is covered without knowing about this.
-        if (auto missing = missingTransferUsage(uses, command, where)) {
-            return record(std::move(*missing));
+        if (auto missing = MissingTransferUsage(uses, command, where)) {
+            return RecordError(std::move(*missing));
         }
 
         if (_emitting) {
@@ -232,26 +232,26 @@ namespace kor
         return *this;
     }
 
-    bool CommandBuffer::boundPipelineUsesDeviceAddresses() const
+    bool CommandBuffer::BoundPipelineUsesDeviceAddresses() const
     {
-        if (_state.boundComputePipeline.has_value() && _state.boundComputePipeline->alive())
-            return _state.boundComputePipeline.value()->usesDeviceAddresses();
-        if (_state.boundGraphicsPipeline.has_value() && _state.boundGraphicsPipeline->alive())
-            return _state.boundGraphicsPipeline.value()->usesDeviceAddresses();
-        if (_state.boundRayTracingPipeline.has_value() && _state.boundRayTracingPipeline->alive())
-            return _state.boundRayTracingPipeline.value()->usesDeviceAddresses();
+        if (_state.boundComputePipeline.has_value() && _state.boundComputePipeline->Alive())
+            return _state.boundComputePipeline.value()->UsesDeviceAddresses();
+        if (_state.boundGraphicsPipeline.has_value() && _state.boundGraphicsPipeline->Alive())
+            return _state.boundGraphicsPipeline.value()->UsesDeviceAddresses();
+        if (_state.boundRayTracingPipeline.has_value() && _state.boundRayTracingPipeline->Alive())
+            return _state.boundRayTracingPipeline.value()->UsesDeviceAddresses();
         return false;
     }
 
-    const Pipeline* CommandBuffer::boundPipeline() const
+    const Pipeline* CommandBuffer::BoundPipeline() const
     {
         // Only one of the three can be bound at a time; the state helpers clear the others.
-        if (_state.boundComputePipeline.has_value() && _state.boundComputePipeline->valid())
-            return _state.boundComputePipeline.value().get();
-        if (_state.boundGraphicsPipeline.has_value() && _state.boundGraphicsPipeline->valid())
-            return _state.boundGraphicsPipeline.value().get();
-        if (_state.boundRayTracingPipeline.has_value() && _state.boundRayTracingPipeline->valid())
-            return _state.boundRayTracingPipeline.value().get();
+        if (_state.boundComputePipeline.has_value() && _state.boundComputePipeline->Valid())
+            return _state.boundComputePipeline.value().Get();
+        if (_state.boundGraphicsPipeline.has_value() && _state.boundGraphicsPipeline->Valid())
+            return _state.boundGraphicsPipeline.value().Get();
+        if (_state.boundRayTracingPipeline.has_value() && _state.boundRayTracingPipeline->Valid())
+            return _state.boundRayTracingPipeline.value().Get();
         return nullptr;
     }
 
@@ -276,24 +276,24 @@ namespace kor
     {
         if (_failed) return *this;
 
-        const auto* pipeline = boundPipeline();
+        const auto* pipeline = BoundPipeline();
         if (pipeline == nullptr)
-            return record(ErrorCode::eNoPipelineBound,
+            return RecordError(ErrorCode::eNoPipelineBound,
                 std::format("Cannot push the constant '{}': no pipeline is bound to look it up on.", name));
 
-        const auto* member = pipeline->findPushConstant(name);
+        const auto* member = pipeline->FindPushConstant(name);
         if (member == nullptr) {
             // Naming what there is turns "no such constant" into a fix: the usual cause is a
             // rename on one side of the pair, or a field addressed as a whole when the shader
             // nests it (or the other way round).
             std::string available;
-            for (const auto& declared : pipeline->pushConstants() | std::views::keys) {
+            for (const auto& declared : pipeline->PushConstants() | std::views::keys) {
                 if (!available.empty()) available += ", ";
                 available += declared;
             }
             if (available.empty()) available = "none at all";
 
-            return record(ErrorCode::ePushConstantMismatch,
+            return RecordError(ErrorCode::ePushConstantMismatch,
                 std::format("The bound pipeline declares no push constant called '{}'. It declares: {}.",
                             name, available));
         }
@@ -303,7 +303,7 @@ namespace kor
         // has to match exactly: a longer write would run into whatever the shader put next.
         if (!shape.known || member->aggregate) {
             if (member->size != size)
-                return record(ErrorCode::ePushConstantMismatch,
+                return RecordError(ErrorCode::ePushConstantMismatch,
                     std::format("Push constant '{}' is {} bytes in the shader, but {} were given. "
                                 "A struct is copied as it stands, so the two layouts have to agree — "
                                 "or write its fields one at a time, as '{}.field'.",
@@ -313,8 +313,8 @@ namespace kor
 
         const auto declared = ValueShape{ static_cast<ValueScalar>(member->scalar), member->rows,
                                           member->columns, member->count, true };
-        if (!declared.sameAs(shape))
-            return record(ErrorCode::ePushConstantMismatch,
+        if (!declared.SameAs(shape))
+            return RecordError(ErrorCode::ePushConstantMismatch,
                 std::format("Push constant '{}' is declared as {} but a {} was given.",
                             name, describeShape(declared.scalar, declared.rows, declared.columns, declared.count),
                             describeShape(shape.scalar, shape.rows, shape.columns, shape.count)));
@@ -323,7 +323,7 @@ namespace kor
         // columns however its own rules say, and C++ packs them tight. Copying the value straight
         // over is what puts two thirds of a mat3 in the right place and the rest anywhere; so it is
         // reassembled here, one column at a time, into the strides reflection reported.
-        const glm::u32 scalarSize = shape.scalarSize();
+        const glm::u32 scalarSize = shape.ScalarSize();
         const glm::u32 tightColumn = scalarSize * shape.rows;
         const glm::u32 tightElement = tightColumn * shape.columns;
         const glm::u32 columnStride = member->matrixStride > 0 ? member->matrixStride : tightColumn;
@@ -345,7 +345,7 @@ namespace kor
         return PushConstantBlock(laidOut.data(), static_cast<glm::u32>(laidOut.size()), member->offset);
     }
 
-    std::vector<CommandBuffer::ResourceUse> CommandBuffer::usesForBoundResources(const bool includeMesh) const
+    std::vector<CommandBuffer::ResourceUse> CommandBuffer::UsesForBoundResources(const bool includeMesh) const
     {
         std::vector<ResourceUse> uses;
 
@@ -355,12 +355,12 @@ namespace kor
                          : _state.boundRayTracingDescriptorSets;
 
         for (const auto& set : sets | std::views::values) {
-            if (!set.alive() || set.poisoned()) continue;
-            const auto layout = set->layout();
-            if (!layout.alive() || layout.poisoned()) continue;
+            if (!set.Alive() || set.Poisoned()) continue;
+            const auto layout = set->Layout();
+            if (!layout.Alive() || layout.Poisoned()) continue;
 
-            const auto& descriptions = layout->bindings();
-            for (const auto& [binding, written] : set->writes()) {
+            const auto& descriptions = layout->Bindings();
+            for (const auto& [binding, written] : set->Writes()) {
                 const auto description = descriptions.find(binding);
                 if (description == descriptions.end()) continue;
                 if (!description->second.active) continue;
@@ -372,24 +372,24 @@ namespace kor
                 // picks is unknowable, but requiring the same access on all of them is correct
                 // and settles into a no-op once they share that state.
                 for (const auto& descriptor : written) {
-                    if (!descriptor.isValid()) continue;  // sparse bindless slot
+                    if (!descriptor.IsValid()) continue;  // sparse bindless slot
 
-                    if (const auto buffer = descriptor.bufferRef(); buffer.alive() && !buffer.poisoned()) {
+                    if (const auto buffer = descriptor.BufferRef(); buffer.Alive() && !buffer.Poisoned()) {
                         uses.push_back(ResourceUse{ .buffer = buffer, .access = access });
                         continue;
                     }
-                    if (const auto view = descriptor.imageViewRef(); view.alive() && !view.poisoned()) {
-                        const auto image = view->image();
-                        if (!image.alive() || image.poisoned()) continue;
+                    if (const auto view = descriptor.ImageViewRef(); view.Alive() && !view.Poisoned()) {
+                        const auto image = view->SourceImage();
+                        if (!image.Alive() || image.Poisoned()) continue;
                         // The view's own slice, not the whole image: a shadow atlas layer or a
                         // single mip can legitimately be in a different state from its siblings.
                         uses.push_back(ResourceUse{
                             .image = image,
                             .access = access,
-                            .baseMipLevel = view->baseMipLevel(),
-                            .levelCount = view->mipLevelCount(),
-                            .baseArrayLayer = view->baseArrayLayer(),
-                            .layerCount = view->arrayLayerCount(),
+                            .baseMipLevel = view->BaseMipLevel(),
+                            .levelCount = view->MipLevelCount(),
+                            .baseArrayLayer = view->BaseArrayLayer(),
+                            .layerCount = view->ArrayLayerCount(),
                         });
                     }
                 }
@@ -398,13 +398,13 @@ namespace kor
 
         if (includeMesh && _state.boundMesh.has_value()) {
             const auto& mesh = _state.boundMesh.value();
-            if (mesh.alive() && !mesh.poisoned()) {
-                for (const auto& buffer : mesh->vertexBuffers()) {
-                    if (buffer.alive() && !buffer.poisoned())
+            if (mesh.Alive() && !mesh.Poisoned()) {
+                for (const auto& buffer : mesh->VertexBuffers()) {
+                    if (buffer.Alive() && !buffer.Poisoned())
                         uses.push_back(ResourceUse{ .buffer = buffer, .access = ResourceAccess::eVertexBuffer });
                 }
-                if (mesh->hasIndexBuffer()) {
-                    if (const auto index = mesh->indexBuffer().value(); index.alive() && !index.poisoned())
+                if (mesh->HasIndexBuffer()) {
+                    if (const auto index = mesh->IndexBuffer().value(); index.Alive() && !index.Poisoned())
                         uses.push_back(ResourceUse{ .buffer = index, .access = ResourceAccess::eIndexBuffer });
                 }
             }
@@ -413,7 +413,7 @@ namespace kor
         return uses;
     }
 
-    void CommandBuffer::resolveBarriers()
+    void CommandBuffer::ResolveBarriers()
     {
         // Current access per tracked subresource, seeded lazily from the state the resource
         // carries between frames. Keyed by (resource, mip, layer) for images and by resource
@@ -485,7 +485,7 @@ namespace kor
             // a feedback loop — there is no ordering to fix, the read is simply not allowed.
             // Otherwise it is a real producer/consumer pair that just needs the pass split.
             const bool feedbackLoop = openPassAt && writer.at == *openPassAt;
-            CommandBuffer::record(Error{
+            CommandBuffer::RecordError(Error{
                 .code = ErrorCode::eMissingBarrier,
                 .message = feedbackLoop
                     ? std::format(
@@ -520,12 +520,12 @@ namespace kor
             if (record.pass == PassEdge::eOpens) openPassAt = i;
 
             for (const auto& use : record.uses) {
-                if (use.buffer.alive()) {
-                    const Key key{ use.buffer.get(), 0, 0 };
-                    trackedBuffers.emplace(use.buffer.get(), use.buffer);
+                if (use.buffer.Alive()) {
+                    const Key key{ use.buffer.Get(), 0, 0 };
+                    trackedBuffers.emplace(use.buffer.Get(), use.buffer);
                     const auto current = state.find(key);
                     const auto previous = current == state.end()
-                        ? use.buffer->trackedAccess()
+                        ? use.buffer->TrackedAccess()
                         : std::optional(current->second);
 
                     // Never synchronised, a genuine transition, or a second write that has to
@@ -533,7 +533,7 @@ namespace kor
                     if (!record.transitions && (!previous || *previous != use.access || writes(use.access))) {
                         const auto established = establishedAt.find(key);
                         if (openPassAt && established != establishedAt.end() && established->second.at >= *openPassAt) {
-                            reportIntraPass(use.buffer.name(), established->second, record);
+                            reportIntraPass(use.buffer.Name(), established->second, record);
                         } else {
                             batchFor(i).buffers.emplace_back(use.buffer, use.access, use.offset, use.size);
                         }
@@ -541,28 +541,28 @@ namespace kor
                     state[key] = use.access;
                     establishedAt.insert_or_assign(key, Established{ i, record.command, record.where });
 
-                    if (use.buffer->usage() & Buffer::Usage::eShaderDeviceAddress) {
+                    if (use.buffer->UsageFlags() & Buffer::Usage::eShaderDeviceAddress) {
                         if (record.transitions) {
                             // A barrier naming it: from here on it is guarded.
-                            unguardedWrites.erase(use.buffer.get());
+                            unguardedWrites.erase(use.buffer.Get());
                         } else if (writes(use.access)) {
-                            unguardedWrites.insert_or_assign(use.buffer.get(),
+                            unguardedWrites.insert_or_assign(use.buffer.Get(),
                                 UnguardedWrite{ use.buffer, record.command, record.where });
                         }
                     }
                     continue;
                 }
 
-                if (!use.image.alive()) continue;
-                trackedImages.emplace(use.image.get(), use.image);
+                if (!use.image.Alive()) continue;
+                trackedImages.emplace(use.image.Get(), use.image);
 
                 // An absent count means "the rest of the image", so it is measured from the base
                 // rather than from zero. Resolving it to the image's *total* count instead walked
                 // past the last level whenever a base was given without one.
                 const auto baseMip = use.baseMipLevel.value_or(0);
-                const auto mipCount = use.levelCount.value_or(use.image->mipLevels() - baseMip);
+                const auto mipCount = use.levelCount.value_or(use.image->MipLevels() - baseMip);
                 const auto baseLayer = use.baseArrayLayer.value_or(0);
-                const auto layerCount = use.layerCount.value_or(use.image->arrayLayers() - baseLayer);
+                const auto layerCount = use.layerCount.value_or(use.image->ArrayLayers() - baseLayer);
 
                 // Per subresource: a range can straddle subresources sitting in different
                 // states — right after GenerateMipmaps the last mip is still TransferDst while
@@ -572,10 +572,10 @@ namespace kor
                 const Established* blocker = nullptr;
                 for (auto mip = baseMip; mip < baseMip + mipCount; ++mip) {
                     for (auto layer = baseLayer; layer < baseLayer + layerCount; ++layer) {
-                        const Key key{ use.image.get(), mip, layer };
+                        const Key key{ use.image.Get(), mip, layer };
                         const auto current = state.find(key);
                         const auto previous = current == state.end()
-                            ? use.image->trackedAccess(mip, layer)
+                            ? use.image->TrackedAccess(mip, layer)
                             : std::optional(current->second);
                         if (!previous || *previous != use.access || writes(use.access)) {
                             needed = true;
@@ -593,14 +593,14 @@ namespace kor
 
                 if (needed && !record.transitions) {
                     if (blocker) {
-                        reportIntraPass(use.image.name(), *blocker, record);
+                        reportIntraPass(use.image.Name(), *blocker, record);
                     } else {
                         batchFor(i).images.emplace_back(use.image, use.access, baseMip, mipCount, baseLayer, layerCount);
                     }
                 }
                 for (auto mip = baseMip; mip < baseMip + mipCount; ++mip) {
                     for (auto layer = baseLayer; layer < baseLayer + layerCount; ++layer) {
-                        const Key key{ use.image.get(), mip, layer };
+                        const Key key{ use.image.Get(), mip, layer };
                         state[key] = use.access;
                         establishedAt.insert_or_assign(key, Established{ i, record.command, record.where });
                     }
@@ -612,8 +612,8 @@ namespace kor
             // so precisely rather than emit a barrier that might be for the wrong buffer.
             if (record.dereferencesDeviceAddresses && !unguardedWrites.empty()) {
                 for (const auto& write : unguardedWrites | std::views::values) {
-                    const auto name = write.buffer.name();
-                    CommandBuffer::record(Error{
+                    const auto name = write.buffer.Name();
+                    CommandBuffer::RecordError(Error{
                         .code = ErrorCode::eMissingBarrier,
                         .message = std::format(
                             "Missing barrier for buffer '{}' (device-address; the engine cannot see "
@@ -639,9 +639,9 @@ namespace kor
         // resolves against where this one actually left them rather than starting over.
         for (const auto& [key, access] : state) {
             if (const auto image = trackedImages.find(key.resource); image != trackedImages.end()) {
-                image->second->setTrackedAccess(access, key.mip, key.layer);
+                image->second->SetTrackedAccess(access, key.mip, key.layer);
             } else if (const auto buffer = trackedBuffers.find(key.resource); buffer != trackedBuffers.end()) {
-                buffer->second->setTrackedAccess(access);
+                buffer->second->SetTrackedAccess(access);
             }
         }
 
@@ -670,7 +670,7 @@ namespace kor
             if (batch.buffers.empty() && batch.images.empty()) continue;
             merged.push_back(Record{
                 .emit = [this, buffers = std::move(batch.buffers), images = std::move(batch.images)]() mutable {
-                    doBarrier(std::move(buffers), std::move(images));
+                    DoBarrier(std::move(buffers), std::move(images));
                 },
                 .pass = PassEdge::eNone,
                 .command = "Barrier",
@@ -686,7 +686,7 @@ namespace kor
     // needs defaults for) see the values in force at *that* point in the sequence rather than at the
     // end of recording. That replay only lands correctly if it starts from the same blank slate
     // recording did, which is what this restores.
-    void CommandBuffer::resetTrackedState()
+    void CommandBuffer::ResetTrackedState()
     {
         _state.boundFramebuffer = std::nullopt;
         _state.boundComputePipeline = std::nullopt;
@@ -701,11 +701,11 @@ namespace kor
         _state.dynamicStateSet = Flags<DynamicState>{};
     }
 
-    void CommandBuffer::emitRecords()
+    void CommandBuffer::EmitRecords()
     {
         // Rewind the mirrored state so the backends' own replay of it starts where recording
         // did; without this the first emitted command still sees the end-of-recording values.
-        resetTrackedState();
+        ResetTrackedState();
         _emitting = true;
         // Index rather than iterate: an emit closure may enqueue (which runs in place and does
         // not append while _emitting), but Run()'s lambda can reach code paths that append
@@ -720,7 +720,7 @@ namespace kor
         _records.clear();
     }
 
-    std::optional<Error> CommandBuffer::missingTransferUsage(const std::vector<ResourceUse>& uses,
+    std::optional<Error> CommandBuffer::MissingTransferUsage(const std::vector<ResourceUse>& uses,
                                                              const char* command,
                                                              const std::source_location where)
     {
@@ -748,13 +748,13 @@ namespace kor
                 };
             };
 
-            if (use.buffer.alive() && use.buffer.valid()) {
-                const auto usage = use.buffer->usage();
+            if (use.buffer.Alive() && use.buffer.Valid()) {
+                const auto usage = use.buffer->UsageFlags();
                 if (!(usage & (asSource ? Buffer::Usage::eTransferSrc : Buffer::Usage::eTransferDst)))
                     return complain("Buffer");
             }
-            if (use.image.alive() && use.image.valid()) {
-                const auto usage = use.image->usage();
+            if (use.image.Alive() && use.image.Valid()) {
+                const auto usage = use.image->UsageFlags();
                 if (!(usage & (asSource ? Image::Usage::eTransferSrc : Image::Usage::eTransferDst)))
                     return complain("Image");
             }
@@ -762,29 +762,29 @@ namespace kor
         return std::nullopt;
     }
 
-    CommandBuffer& CommandBuffer::record(const ErrorCode code, std::string message)
+    CommandBuffer& CommandBuffer::RecordError(const ErrorCode code, std::string message)
     {
-        return record(Error{ .code = code, .message = std::move(message) });
+        return RecordError(Error{ .code = code, .message = std::move(message) });
     }
 
-    CommandBuffer& CommandBuffer::record(Error error)
+    CommandBuffer& CommandBuffer::RecordError(Error error)
     {
-        // history() rather than toString(): when a command fails because a resource is unusable,
+        // History() rather than ToString(): when a command fails because a resource is unusable,
         // the line the user needs is the root cause (the shader that would not compile), not the
         // symptom (the pipeline that could not be bound).
-        kor::log::error("[command] {}", error.history());
+        kor::log::Error("[command] {}", error.History());
         _errors.push_back(std::move(error));
         _failed = true;
         return *this;
     }
 
-    VoidResult CommandBuffer::result() const
+    VoidResult CommandBuffer::Outcome() const
     {
         if (_errors.empty()) return {};
         return std::unexpected(_errors.front());
     }
 
-    void CommandBuffer::stateBeginRendering(const kor::ResourceRef<const Framebuffer>& framebuffer)
+    void CommandBuffer::StateBeginRendering(const kor::ResourceRef<const Framebuffer>& framebuffer)
     {
         _state.boundFramebuffer = framebuffer;
         _state.boundComputePipeline = std::nullopt;
@@ -798,16 +798,16 @@ namespace kor
     {
         if (_failed) return *this;
 
-        const auto framebuffer = renderInfo.framebuffer();
-        if (reject(framebuffer, "framebuffer")) return *this;
-        stateBeginRendering(framebuffer);
+        const auto framebuffer = renderInfo.Target();
+        if (Reject(framebuffer, "framebuffer")) return *this;
+        StateBeginRendering(framebuffer);
 
         // The attachments, as uses rather than as the hand-rolled barrier the backend used to
         // emit. Declaring them means they batch with whatever else the pass needs, and all of
         // it lands in front of the pass instead of illegally inside it.
         std::vector<ResourceUse> uses;
-        for (const auto& attachment : framebuffer->colorAttachments()) {
-            uses.push_back(ResourceUse{ .image = attachment.view->image(), .access = ResourceAccess::eColorAttachment });
+        for (const auto& attachment : framebuffer->ColorAttachments()) {
+            uses.push_back(ResourceUse{ .image = attachment.view->SourceImage(), .access = ResourceAccess::eColorAttachment });
         }
         // Depth and stencil are declared as one use per *image*, at the combined
         // depth/stencil layout, rather than one per attachment slot.
@@ -823,27 +823,27 @@ namespace kor
         // image + level + layer, with no aspect — and the combined layout is legal for a
         // depth-only or stencil-only image too, so nothing is given up by using it everywhere.
         const auto declareDepthStencil = [&](const ResourceRef<const ImageView>& attachment) {
-            if (!attachment.valid()) return;
-            auto image = attachment->image();
+            if (!attachment.Valid()) return;
+            auto image = attachment->SourceImage();
             for (const auto& use : uses) {
-                if (use.image.get() == image.get()) return;  // the other slot, same image
+                if (use.image.Get() == image.Get()) return;  // the other slot, same image
             }
             uses.push_back(ResourceUse{ .image = std::move(image),
                                         .access = ResourceAccess::eDepthStencilAttachment });
         };
-        if (framebuffer->hasDepthAttachment())   declareDepthStencil(framebuffer->depthAttachment());
-        if (framebuffer->hasStencilAttachment()) declareDepthStencil(framebuffer->stencilAttachment());
+        if (framebuffer->HasDepthAttachment())   declareDepthStencil(framebuffer->DepthAttachment());
+        if (framebuffer->HasStencilAttachment()) declareDepthStencil(framebuffer->StencilAttachment());
 
         // Whatever this pass did not say is taken from the framebuffer *now*, while it is in hand,
-        // and travels with the record. @see RenderInfo::resolveClearValues
+        // and travels with the record. @see RenderInfo::ResolveClearValues
         RenderInfo resolved = renderInfo;
-        resolved.resolveClearValues(*framebuffer);
+        resolved.ResolveClearValues(*framebuffer);
 
-        return enqueue("BeginRendering", where, std::move(uses), PassEdge::eOpens,
-            [this, resolved = std::move(resolved)] { doBeginRendering(resolved); });
+        return Enqueue("BeginRendering", where, std::move(uses), PassEdge::eOpens,
+            [this, resolved = std::move(resolved)] { DoBeginRendering(resolved); });
     }
 
-    void CommandBuffer::stateEndRendering()
+    void CommandBuffer::StateEndRendering()
     {
         _state.boundFramebuffer = std::nullopt;
         _state.boundComputePipeline = std::nullopt;
@@ -853,24 +853,24 @@ namespace kor
 
     CommandBuffer& CommandBuffer::EndRendering()
     {
-        stateEndRendering();
-        return doEndRendering();
+        StateEndRendering();
+        return DoEndRendering();
     }
 
     CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the viewport without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the viewport without a graphics pipeline bound.");
         _state.viewportSet = true;
-        return doSetViewport(x, y, width, height);
+        return DoSetViewport(x, y, width, height);
     }
 
     CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the scissor without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the scissor without a graphics pipeline bound.");
         _state.scissorSet = true;
-        return doSetScissor(x, y, width, height);
+        return DoSetScissor(x, y, width, height);
     }
 
     // ---- Dynamic state --------------------------------------------------
@@ -881,68 +881,68 @@ namespace kor
     // to OpenGL, whose setters chained up to none of this.
 #define KORAL_DYNAMIC_STATE_SETTER_GUARD(bit, name)                                            \
         if (!_state.boundGraphicsPipeline.has_value())                                       \
-            return record(ErrorCode::eNoGraphicsPipelineBound,                               \
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound,                               \
                 "Cannot set " name " without a graphics pipeline bound.");                   \
         _state.dynamicStateSet |= DynamicState::bit;
 
     CommandBuffer& CommandBuffer::SetLineWidth(const float lineWidth)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eLineWidth, "line width") return doSetLineWidth(lineWidth); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eLineWidth, "line width") return DoSetLineWidth(lineWidth); }
 
     CommandBuffer& CommandBuffer::SetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return doSetDepthBias(constantFactor, clamp, slopeFactor); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return DoSetDepthBias(constantFactor, clamp, slopeFactor); }
 
     CommandBuffer& CommandBuffer::SetBlendConstants(const glm::vec4 constants)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return doSetBlendConstants(constants); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return DoSetBlendConstants(constants); }
 
     CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return doSetStencilCompareMask(face, compareMask); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return DoSetStencilCompareMask(face, compareMask); }
 
     CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return doSetStencilWriteMask(face, writeMask); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return DoSetStencilWriteMask(face, writeMask); }
 
     CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const glm::u32 reference)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return doSetStencilReference(face, reference); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return DoSetStencilReference(face, reference); }
 
     CommandBuffer& CommandBuffer::SetCullMode(const Flags<CullMode> cullMode)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eCullMode, "cull mode") return doSetCullMode(cullMode); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eCullMode, "cull mode") return DoSetCullMode(cullMode); }
 
     CommandBuffer& CommandBuffer::SetFrontFace(const FrontFace frontFace)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eFrontFace, "front face") return doSetFrontFace(frontFace); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eFrontFace, "front face") return DoSetFrontFace(frontFace); }
 
     CommandBuffer& CommandBuffer::SetDepthTestEnable(const bool enable)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthTestEnable, "depth test enable") return doSetDepthTestEnable(enable); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthTestEnable, "depth test enable") return DoSetDepthTestEnable(enable); }
 
     CommandBuffer& CommandBuffer::SetDepthWriteEnable(const bool enable)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthWriteEnable, "depth write enable") return doSetDepthWriteEnable(enable); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthWriteEnable, "depth write enable") return DoSetDepthWriteEnable(enable); }
 
     CommandBuffer& CommandBuffer::SetDepthCompareOp(const CompareOp compareOp)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthCompareOp, "depth compare op") return doSetDepthCompareOp(compareOp); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthCompareOp, "depth compare op") return DoSetDepthCompareOp(compareOp); }
 
     CommandBuffer& CommandBuffer::SetStencilTestEnable(const bool enable)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilTestEnable, "stencil test enable") return doSetStencilTestEnable(enable); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilTestEnable, "stencil test enable") return DoSetStencilTestEnable(enable); }
 
     CommandBuffer& CommandBuffer::SetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilOp, "stencil op") return doSetStencilOp(face, failOp, passOp, depthFailOp, compareOp); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilOp, "stencil op") return DoSetStencilOp(face, failOp, passOp, depthFailOp, compareOp); }
 
     CommandBuffer& CommandBuffer::SetDepthBiasEnable(const bool enable)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBiasEnable, "depth bias enable") return doSetDepthBiasEnable(enable); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBiasEnable, "depth bias enable") return DoSetDepthBiasEnable(enable); }
 
     CommandBuffer& CommandBuffer::SetRasterizerDiscardEnable(const bool enable)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eRasterizerDiscardEnable, "rasterizer discard enable") return doSetRasterizerDiscardEnable(enable); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(eRasterizerDiscardEnable, "rasterizer discard enable") return DoSetRasterizerDiscardEnable(enable); }
 
     CommandBuffer& CommandBuffer::SetPrimitiveRestartEnable(const bool enable)
-    { KORAL_DYNAMIC_STATE_SETTER_GUARD(ePrimitiveRestartEnable, "primitive restart enable") return doSetPrimitiveRestartEnable(enable); }
+    { KORAL_DYNAMIC_STATE_SETTER_GUARD(ePrimitiveRestartEnable, "primitive restart enable") return DoSetPrimitiveRestartEnable(enable); }
 
 #undef KORAL_DYNAMIC_STATE_SETTER_GUARD
 
-    void CommandBuffer::applyDynamicDefaults()
+    void CommandBuffer::ApplyDynamicDefaults()
     {
         if (!_state.boundGraphicsPipeline.has_value()) return;
         const auto& pipeline = *_state.boundGraphicsPipeline.value();
-        const RasterizationState& rs = pipeline.rasterizationState();
-        const DepthStencilState&  ds = pipeline.depthStencilState();
-        const ColorBlendState&    cb = pipeline.colorBlendState();
-        const InputAssemblyState& ia = pipeline.inputAssemblyState();
+        const RasterizationState& rs = pipeline.Rasterization();
+        const DepthStencilState&  ds = pipeline.DepthStencil();
+        const ColorBlendState&    cb = pipeline.ColorBlend();
+        const InputAssemblyState& ia = pipeline.InputAssembly();
 
         // Snapshot the mask so setters marking their own bit don't affect sibling
         // decisions (e.g. the front/back pair below).
@@ -990,10 +990,10 @@ namespace kor
             SetPrimitiveRestartEnable(ia.primitiveRestartEnable);
     }
 
-    void CommandBuffer::stateBindComputePipeline(const kor::ResourceRef<const ComputePipeline>& pipeline)
+    void CommandBuffer::StateBindComputePipeline(const kor::ResourceRef<const ComputePipeline>& pipeline)
     {
-        // get(), not &*: comparing identity must not dereference.
-        if (!_state.boundComputePipeline.has_value() || _state.boundComputePipeline->get() != pipeline.get())
+        // Get(), not &*: comparing identity must not dereference.
+        if (!_state.boundComputePipeline.has_value() || _state.boundComputePipeline->Get() != pipeline.Get())
             _state.boundComputeDescriptorSets.clear();
         _state.boundComputePipeline = pipeline;
         _state.boundGraphicsPipeline = std::nullopt;
@@ -1003,17 +1003,17 @@ namespace kor
     CommandBuffer& CommandBuffer::BindComputePipeline(kor::ResourceRef<const ComputePipeline> pipeline, const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(pipeline, "compute pipeline")) return *this;
+        if (Reject(pipeline, "compute pipeline")) return *this;
 
-        stateBindComputePipeline(pipeline);
-        return enqueue("BindComputePipeline", where, {}, PassEdge::eNone,
-            [this, pipeline] { doBindComputePipeline(pipeline); });
+        StateBindComputePipeline(pipeline);
+        return Enqueue("BindComputePipeline", where, {}, PassEdge::eNone,
+            [this, pipeline] { DoBindComputePipeline(pipeline); });
     }
 
-    void CommandBuffer::stateBindGraphicsPipeline(const kor::ResourceRef<const GraphicsPipeline>& pipeline)
+    void CommandBuffer::StateBindGraphicsPipeline(const kor::ResourceRef<const GraphicsPipeline>& pipeline)
     {
-        // get(), not &*: comparing identity must not dereference.
-        if (!_state.boundGraphicsPipeline.has_value() || _state.boundGraphicsPipeline->get() != pipeline.get())
+        // Get(), not &*: comparing identity must not dereference.
+        if (!_state.boundGraphicsPipeline.has_value() || _state.boundGraphicsPipeline->Get() != pipeline.Get())
             _state.boundGraphicsDescriptorSets.clear();
         _state.boundGraphicsPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
@@ -1026,17 +1026,17 @@ namespace kor
     CommandBuffer& CommandBuffer::BindGraphicsPipeline(kor::ResourceRef<const GraphicsPipeline> pipeline, const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(pipeline, "graphics pipeline")) return *this;
+        if (Reject(pipeline, "graphics pipeline")) return *this;
 
-        stateBindGraphicsPipeline(pipeline);
-        return enqueue("BindGraphicsPipeline", where, {}, PassEdge::eNone,
-            [this, pipeline] { doBindGraphicsPipeline(pipeline); });
+        StateBindGraphicsPipeline(pipeline);
+        return Enqueue("BindGraphicsPipeline", where, {}, PassEdge::eNone,
+            [this, pipeline] { DoBindGraphicsPipeline(pipeline); });
     }
 
-    void CommandBuffer::stateBindRayTracingPipeline(const kor::ResourceRef<const RayTracingPipeline>& pipeline)
+    void CommandBuffer::StateBindRayTracingPipeline(const kor::ResourceRef<const RayTracingPipeline>& pipeline)
     {
-        // get(), not &*: comparing identity must not dereference.
-        if (!_state.boundRayTracingPipeline.has_value() || _state.boundRayTracingPipeline->get() != pipeline.get())
+        // Get(), not &*: comparing identity must not dereference.
+        if (!_state.boundRayTracingPipeline.has_value() || _state.boundRayTracingPipeline->Get() != pipeline.Get())
             _state.boundRayTracingDescriptorSets.clear();
         _state.boundRayTracingPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
@@ -1046,35 +1046,35 @@ namespace kor
     CommandBuffer& CommandBuffer::BindRayTracingPipeline(kor::ResourceRef<const RayTracingPipeline> pipeline, const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(pipeline, "ray tracing pipeline")) return *this;
+        if (Reject(pipeline, "ray tracing pipeline")) return *this;
 
-        stateBindRayTracingPipeline(pipeline);
-        return enqueue("BindRayTracingPipeline", where, {}, PassEdge::eNone,
-            [this, pipeline] { doBindRayTracingPipeline(pipeline); });
+        StateBindRayTracingPipeline(pipeline);
+        return Enqueue("BindRayTracingPipeline", where, {}, PassEdge::eNone,
+            [this, pipeline] { DoBindRayTracingPipeline(pipeline); });
     }
 
     CommandBuffer& CommandBuffer::TraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth, const std::source_location where)
     {
         if (_failed) return *this;
         if (!_state.boundRayTracingPipeline.has_value())
-            return record(ErrorCode::eNoRayTracingPipelineBound, "Cannot trace rays without a ray-tracing pipeline bound.");
-        return doTraceRays(width, height, depth, where);
+            return RecordError(ErrorCode::eNoRayTracingPipelineBound, "Cannot trace rays without a ray-tracing pipeline bound.");
+        return DoTraceRays(width, height, depth, where);
     }
 
-    CommandBuffer& CommandBuffer::doTraceRays(glm::u32, glm::u32, glm::u32, std::source_location)
+    CommandBuffer& CommandBuffer::DoTraceRays(glm::u32, glm::u32, glm::u32, std::source_location)
     {
-        return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
+        return RecordError(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
     }
 
-    CommandBuffer& CommandBuffer::doBindRayTracingPipeline(kor::ResourceRef<const RayTracingPipeline>)
+    CommandBuffer& CommandBuffer::DoBindRayTracingPipeline(kor::ResourceRef<const RayTracingPipeline>)
     {
-        return record(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
+        return RecordError(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
     }
 
     // A backend without debug-marker support ignores these; the do* defaults are the no-ops.
-    CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const glm::vec4 color) { return doBeginDebugLabel(label, color); }
-    CommandBuffer& CommandBuffer::EndDebugLabel() { return doEndDebugLabel(); }
-    CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const glm::vec4 color) { return doInsertDebugLabel(label, color); }
+    CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const glm::vec4 color) { return DoBeginDebugLabel(label, color); }
+    CommandBuffer& CommandBuffer::EndDebugLabel() { return DoEndDebugLabel(); }
+    CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const glm::vec4 color) { return DoInsertDebugLabel(label, color); }
 
     // ---- GPU timers ---------------------------------------------------------------------------
     //
@@ -1088,14 +1088,14 @@ namespace kor
         if (_failed) return *this;
         // Nothing to measure with. Silently inert rather than an error: a scene that times itself
         // should still run on a queue that cannot timestamp.
-        if (!supportsTimers()) return *this;
+        if (!SupportsTimers()) return *this;
         // Recorded from inside another command's emit callback — a Run() lambda reaching back into
         // the API. Too late for a scope: the query slots this would need were counted and reset
         // before the walk began, so its timestamps would be written into queries nothing prepared.
         if (_emitting) return *this;
 
         if (_pendingTimers.size() >= MaxTimerScopes) {
-            return record(Error{
+            return RecordError(Error{
                 .code = ErrorCode::eInvalidArgument,
                 .message = std::format("Cannot open the timer '{}': a recording may open at most {} timer scopes.",
                                        label, MaxTimerScopes),
@@ -1111,18 +1111,18 @@ namespace kor
         });
         _timerStack.push_back(scope);
 
-        return enqueue("BeginTimer", where, {}, PassEdge::eNone,
-                       [this, scope] { doWriteTimerTimestamp(scope * 2); });
+        return Enqueue("BeginTimer", where, {}, PassEdge::eNone,
+                       [this, scope] { DoWriteTimerTimestamp(scope * 2); });
     }
 
     CommandBuffer& CommandBuffer::EndTimer(const std::source_location where)
     {
         if (_failed) return *this;
-        if (!supportsTimers()) return *this;
+        if (!SupportsTimers()) return *this;
         if (_emitting) return *this;   // paired with the same guard in BeginTimer
 
         if (_timerStack.empty()) {
-            return record(Error{
+            return RecordError(Error{
                 .code = ErrorCode::eInvalidArgument,
                 .message = "EndTimer without a matching BeginTimer.",
                 .where = where,
@@ -1132,11 +1132,11 @@ namespace kor
         const auto scope = _timerStack.back();
         _timerStack.pop_back();
 
-        return enqueue("EndTimer", where, {}, PassEdge::eNone,
-                       [this, scope] { doWriteTimerTimestamp(scope * 2 + 1); });
+        return Enqueue("EndTimer", where, {}, PassEdge::eNone,
+                       [this, scope] { DoWriteTimerTimestamp(scope * 2 + 1); });
     }
 
-    bool CommandBuffer::collectTimers()
+    bool CommandBuffer::CollectTimers()
     {
         // Already collected: the results are sitting in _timings and _submittedTimers was emptied
         // when they landed. Says yes so a repeated collectTimer keeps working.
@@ -1145,7 +1145,7 @@ namespace kor
         std::vector<double> milliseconds;
         // Not ready is not an error — the results simply stay as they were, which keeps a
         // profiler's readings steady instead of flickering to nothing.
-        if (!doReadTimerTimestamps(static_cast<glm::u32>(_submittedTimers.size()), milliseconds)
+        if (!DoReadTimerTimestamps(static_cast<glm::u32>(_submittedTimers.size()), milliseconds)
             || milliseconds.size() != _submittedTimers.size())
             return false;
 
@@ -1162,47 +1162,47 @@ namespace kor
         return true;
     }
 
-    void CommandBuffer::retireTimers()
+    void CommandBuffer::RetireTimers()
     {
         // The scopes recorded last time round, now that the GPU has had a whole cycle of frames in
         // flight to finish them.
-        collectTimers();
+        CollectTimers();
 
         _pendingTimers.clear();
         _timerStack.clear();
     }
 
-    const std::vector<TimerResult>& CommandBuffer::collectTimings()
+    const std::vector<TimerResult>& CommandBuffer::CollectTimings()
     {
-        collectTimers();
+        CollectTimers();
         return _timings;
     }
 
-    Result<double> CommandBuffer::collectTimer(const std::string_view label)
+    Result<double> CommandBuffer::CollectTimer(const std::string_view label)
     {
-        if (!supportsTimers())
-            return fail(ErrorCode::eInvalidArgument,
+        if (!SupportsTimers())
+            return Fail(ErrorCode::eInvalidArgument,
                         "Cannot read the timer '{}': this command buffer's queue cannot timestamp.", label);
 
         // Distinguishes the two ways there can be no answer, because the caller's fix differs: work
         // still in flight needs a WaitForFence or another try, a name that was never recorded needs
         // the code changed.
-        const bool ready = collectTimers();
+        const bool ready = CollectTimers();
 
         for (const auto& timing : _timings) {
             if (timing.label == label) return timing.milliseconds;
         }
 
         if (!ready)
-            return fail(ErrorCode::eInvalidArgument,
+            return Fail(ErrorCode::eInvalidArgument,
                         "The timer '{}' has no result yet: the GPU has not finished the work it "
                         "measures. Wait for the submission to complete (WaitForFence) or ask again later.", label);
 
-        return fail(ErrorCode::eInvalidArgument,
+        return Fail(ErrorCode::eInvalidArgument,
                     "No timer named '{}' was recorded in the last submission.", label);
     }
 
-    void CommandBuffer::submitTimers()
+    void CommandBuffer::SubmitTimers()
     {
         // An unclosed scope has a begin timestamp and no end, so it can never resolve. Say so at
         // End(), where the whole recording is visible, rather than letting it silently vanish —
@@ -1210,7 +1210,7 @@ namespace kor
         // reported once already.
         if (!_failed) {
             for (const auto scope : _timerStack) {
-                record(Error{
+                RecordError(Error{
                     .code = ErrorCode::eInvalidArgument,
                     .message = std::format("The timer '{}' was never closed with EndTimer.", _pendingTimers[scope].label),
                     .where = _pendingTimers[scope].where,
@@ -1233,7 +1233,7 @@ namespace kor
         _pendingTimers.clear();
     }
 
-    void CommandBuffer::stateBindMesh(const kor::ResourceRef<const Mesh>& mesh)
+    void CommandBuffer::StateBindMesh(const kor::ResourceRef<const Mesh>& mesh)
     {
         _state.boundMesh = mesh;
     }
@@ -1241,15 +1241,15 @@ namespace kor
     CommandBuffer& CommandBuffer::BindMesh(kor::ResourceRef<const Mesh> mesh, const std::source_location where) {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot bind a mesh without a graphics pipeline bound.");
-        if (reject(mesh, "mesh")) return *this;
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot bind a mesh without a graphics pipeline bound.");
+        if (Reject(mesh, "mesh")) return *this;
 
-        stateBindMesh(mesh);
-        return enqueue("BindMesh", where, {}, PassEdge::eNone,
-            [this, mesh] { doBindMesh(mesh); });
+        StateBindMesh(mesh);
+        return Enqueue("BindMesh", where, {}, PassEdge::eNone,
+            [this, mesh] { DoBindMesh(mesh); });
     }
 
-    glm::uvec2 CommandBuffer::defaultViewportExtent() const
+    glm::uvec2 CommandBuffer::DefaultViewportExtent() const
     {
         // The framebuffer being rendered into, not the window.
         //
@@ -1257,69 +1257,69 @@ namespace kor
         // target of its own — a viewport's image, a shadow map, a reflection — would otherwise be
         // rasterised at the window's size and show a crop of a picture drawn for a surface it is not:
         // the symptom is a scene that looks "zoomed in" inside a small target and ignores its size.
-        if (_state.boundFramebuffer.has_value() && _state.boundFramebuffer->valid()) {
-            if (const auto extent = (*_state.boundFramebuffer)->extent(); extent.x > 0 && extent.y > 0)
+        if (_state.boundFramebuffer.has_value() && _state.boundFramebuffer->Valid()) {
+            if (const auto extent = (*_state.boundFramebuffer)->Extent(); extent.x > 0 && extent.y > 0)
                 return extent;
         }
         // No pass, or one whose framebuffer says nothing: the window is the only size left to assume,
         // and it is the right one for the default framebuffer.
-        return Context::Window().extent();
+        return Context::Window().Extent();
     }
 
     CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
 
         // The defaulted vertex count means "as many as the bound mesh holds", resolved here so
         // both backends are handed a number rather than each working the sentinel out again.
         if (vertexCount == WholeSize) {
             if (!_state.boundMesh.has_value())
-                return record(ErrorCode::eNoMeshBound, "Cannot draw with the default vertex count: no mesh is bound to take it from.");
-            vertexCount = _state.boundMesh.value()->vertexCount();
+                return RecordError(ErrorCode::eNoMeshBound, "Cannot draw with the default vertex count: no mesh is bound to take it from.");
+            vertexCount = _state.boundMesh.value()->VertexCount();
         }
 
-        ensureViewportAndScissor();
-        return doDraw(vertexCount, instanceCount, firstVertex, firstInstance, where);
+        EnsureViewportAndScissor();
+        return DoDraw(vertexCount, instanceCount, firstVertex, firstInstance, where);
     }
 
     CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, const glm::u32 instanceCount, const glm::u32 firstIndex, const glm::i32 vertexOffset, const glm::u32 firstInstance, const std::source_location where) {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (!_state.boundMesh.has_value())
-            return record(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
-        if (!_state.boundMesh.value()->hasIndexBuffer())
-            return record(ErrorCode::eMeshHasNoIndexBuffer, "Cannot draw indexed: the bound mesh has no index buffer.");
+            return RecordError(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
+        if (!_state.boundMesh.value()->HasIndexBuffer())
+            return RecordError(ErrorCode::eMeshHasNoIndexBuffer, "Cannot draw indexed: the bound mesh has no index buffer.");
 
         if (indexCount == WholeSize)
-            indexCount = _state.boundMesh.value()->indexCount().value();
+            indexCount = _state.boundMesh.value()->IndexCount().value();
 
-        ensureViewportAndScissor();
-        return doDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, where);
+        EnsureViewportAndScissor();
+        return DoDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, where);
     }
 
     CommandBuffer & CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ, const std::source_location where) {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw mesh tasks without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw mesh tasks without a graphics pipeline bound.");
 
-        ensureViewportAndScissor();
-        return doDrawMeshTasks(taskCountX, taskCountY, taskCountZ, where);
+        EnsureViewportAndScissor();
+        return DoDrawMeshTasks(taskCountX, taskCountY, taskCountZ, where);
     }
 
     // A draw with no viewport or scissor of its own gets the whole target, which is what a
     // full-screen pass means and what every backend needed anyway. Recorded as ordinary Set calls
     // so the tracking bits and the emitted commands stay in step.
-    void CommandBuffer::ensureViewportAndScissor()
+    void CommandBuffer::EnsureViewportAndScissor()
     {
         if (!_state.viewportSet) {
-            const auto extent = defaultViewportExtent();
+            const auto extent = DefaultViewportExtent();
             SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
-            const auto extent = defaultViewportExtent();
+            const auto extent = DefaultViewportExtent();
             SetScissor(0, 0, extent.x, extent.y);
         }
     }
@@ -1328,8 +1328,8 @@ namespace kor
     {
         if (_failed) return *this;
         if (!_state.boundComputePipeline.has_value())
-            return record(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
-        return doDispatch(groupCountX, groupCountY, groupCountZ, where);
+            return RecordError(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
+        return DoDispatch(groupCountX, groupCountY, groupCountZ, where);
     }
 
     // ---- Recording lifecycle --------------------------------------------------------------
@@ -1340,13 +1340,13 @@ namespace kor
 
     CommandBuffer& CommandBuffer::Begin()
     {
-        resetErrors();
-        clearRecords();
+        ResetErrors();
+        ClearRecords();
         // Before the backend resets anything the results live in: re-recording is proof the GPU is
         // done with the last submission, so this is the earliest the timestamps can be read.
-        retireTimers();
+        RetireTimers();
         _recording = true;
-        return doBegin();
+        return DoBegin();
     }
 
     namespace {
@@ -1365,58 +1365,58 @@ namespace kor
         std::lock_guard lock(resolveMutex());
         // Nothing recorded so far has reached the GPU. Work out where the barriers belong now that
         // the whole sequence is visible; the backend then emits, or defers emitting to Submit.
-        resolveBarriers();
-        doEnd();
+        ResolveBarriers();
+        DoEnd();
         _recording = false;
     }
 
     VoidResult CommandBuffer::Submit(const SubmitInfo& info)
     {
-        return doSubmit(info);
+        return DoSubmit(info);
     }
 
     void CommandBuffer::Reset()
     {
         _state = {};
-        clearRecords();
+        ClearRecords();
         _recording = false;
-        doReset();
+        DoReset();
     }
 
     void CommandBuffer::WaitForFence() const
     {
-        doWaitForFence();
+        DoWaitForFence();
     }
 
     CommandBuffer& CommandBuffer::Run(const std::function<void(CommandBuffer&)>& command)
     {
         if (_failed) return *this;
-        return doRun(command);
+        return DoRun(command);
     }
 
     CommandBuffer& CommandBuffer::PushConstantBlock(const void* data, const glm::u32 size, const glm::u32 offset)
     {
         if (_failed) return *this;
-        return doPushConstantBlock(data, size, offset);
+        return DoPushConstantBlock(data, size, offset);
     }
 
 
-    kor::ResourceRef<const Image> CommandBuffer::screenImage()
+    kor::ResourceRef<const Image> CommandBuffer::ScreenImage()
     {
-        const auto framebuffer = Context::defaultFramebuffer();
-        if (!framebuffer.valid() || framebuffer->colorAttachments().empty()) return {};
-        return framebuffer->colorImage(0);
+        const auto framebuffer = Context::DefaultFramebuffer();
+        if (!framebuffer.Valid() || framebuffer->ColorAttachments().empty()) return {};
+        return framebuffer->ColorImage(0);
     }
 
-    bool CommandBuffer::hasTouched(const kor::ResourceRef<const Image>& image) const
+    bool CommandBuffer::HasTouched(const kor::ResourceRef<const Image>& image) const
     {
-        if (!image.alive()) return false;
+        if (!image.Alive()) return false;
 
         // Compared by what they point at: a use holds its own ref to the same image.
-        const auto* target = image.get();
+        const auto* target = image.Get();
         for (const auto& record : _records) {
             for (const auto& use : record.uses) {
-                if (use.image.alive() && use.image.get() == target) return true;
+                if (use.image.Alive() && use.image.Get() == target) return true;
             }
         }
         return false;
@@ -1425,26 +1425,26 @@ namespace kor
     CommandBuffer& CommandBuffer::GenerateMipmaps(kor::ResourceRef<const Image> image)
     {
         if (_failed) return *this;
-        if (reject(image, "image")) return *this;
+        if (Reject(image, "image")) return *this;
 
         // Mips are generated by blitting each level from the one above it, and a block-compressed
         // format cannot be blitted into — the hardware would have to decompress, filter and
         // re-encode. Said here rather than left to the backend, because the fix is upstream: a
         // compressed texture carries the mip chain it was encoded with. @see the image modules
-        if (Image::isBlockCompressed(image->format()))
-            return record(ErrorCode::eInvalidArgument,
+        if (Image::IsBlockCompressed(image->PixelFormat()))
+            return RecordError(ErrorCode::eInvalidArgument,
                 "Mipmaps cannot be generated for a block-compressed image; encode the mip chain "
                 "into the file instead.");
 
-        return doGenerateMipmaps(image);  // expands into Blit records, each declaring its own uses
+        return DoGenerateMipmaps(image);  // expands into Blit records, each declaring its own uses
     }
 
     // Default: blit each mip from the one above it. Vulkan uses this; GL overrides it with
     // glGenerateMipmap. Reached only through the wrapper above, so `image` is always usable.
-    CommandBuffer& CommandBuffer::doGenerateMipmaps(ResourceRef<const Image> image) {
-        const auto& extent = image->extent();
-        const auto mipLevels = image->mipLevels();
-        const auto arrayLayers = image->arrayLayers();
+    CommandBuffer& CommandBuffer::DoGenerateMipmaps(ResourceRef<const Image> image) {
+        const auto& extent = image->Extent();
+        const auto mipLevels = image->MipLevels();
+        const auto arrayLayers = image->ArrayLayers();
 
         auto mipWidth = static_cast<glm::i32>(extent.x);
         auto mipHeight = static_cast<glm::i32>(extent.y);
@@ -1487,7 +1487,7 @@ namespace kor
 
         const Token done = Token::Create();
         if (auto submitted = commandBuffer->Submit({.signal = {done}}); !submitted) {
-            kor::log::error("[command] single-time command failed: {}", submitted.error().toString());
+            kor::log::Error("[command] single-time command failed: {}", submitted.error().ToString());
         }
         detail::retireAfter(done, std::shared_ptr<CommandBuffer>(std::move(commandBuffer)));
         return done;
@@ -1496,13 +1496,13 @@ namespace kor
     CommandBuffer& CommandBuffer::DrawMesh(kor::ResourceRef<const Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
     {
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
-            const auto extent = defaultViewportExtent();
+            const auto extent = DefaultViewportExtent();
             this->SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
-            const auto extent = defaultViewportExtent();
+            const auto extent = DefaultViewportExtent();
             this->SetScissor(0, 0, extent.x, extent.y);
         }
         BindMesh(mesh);
@@ -1512,13 +1512,13 @@ namespace kor
 
     CommandBuffer & CommandBuffer::DrawSubMesh(kor::ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
-            const auto extent = defaultViewportExtent();
+            const auto extent = DefaultViewportExtent();
             this->SetViewport(0, 0, extent.x, extent.y);
         }
         if (!_state.scissorSet) {
-            const auto extent = defaultViewportExtent();
+            const auto extent = DefaultViewportExtent();
             this->SetScissor(0, 0, extent.x, extent.y);
         }
         BindMesh(mesh);
@@ -1528,7 +1528,7 @@ namespace kor
 
     std::unique_ptr<CommandBuffer> CommandBuffer::Create(const Flags<Usage> usage)
     {
-        switch (Context::activeAPI()) {
+        switch (Context::ActiveAPI()) {
         case API::eOpenGL:
             return std::make_unique<ogl::CommandBuffer>(usage);
         case API::eVulkan:
@@ -1541,7 +1541,7 @@ namespace kor
         }
     }
 
-    void CommandBuffer::stateBindDescriptorSet(const glm::u32 index, const kor::ResourceRef<const DescriptorSet>& descriptorSet)
+    void CommandBuffer::StateBindDescriptorSet(const glm::u32 index, const kor::ResourceRef<const DescriptorSet>& descriptorSet)
     {
         // Mirrors the dispatch the backends do: the set belongs to whichever pipeline type is
         // currently bound. With none bound the backends log and drop it, so do nothing here too.
@@ -1558,9 +1558,9 @@ namespace kor
     {
         if (_failed) return *this;
         for (const auto& barrier : bufferBarriers)
-            if (reject(barrier.buffer(), "barrier's buffer")) return *this;
+            if (Reject(barrier.TargetBuffer(), "barrier's buffer")) return *this;
         for (const auto& barrier : imageBarriers)
-            if (reject(barrier.image(), "barrier's image")) return *this;
+            if (Reject(barrier.TargetImage(), "barrier's image")) return *this;
 
         // Describe what this barrier *establishes*, so the resolver advances its tracking past
         // it and emits nothing of its own. A hand-written barrier therefore suppresses the
@@ -1570,21 +1570,21 @@ namespace kor
         uses.reserve(bufferBarriers.size() + imageBarriers.size());
         for (const auto& barrier : bufferBarriers) {
             uses.push_back(ResourceUse{
-                .buffer = barrier.buffer(), .access = barrier.dstAccess(),
-                .offset = barrier.offset(), .size = barrier.size(),
+                .buffer = barrier.TargetBuffer(), .access = barrier.DstAccess(),
+                .offset = barrier.Offset(), .size = barrier.size(),
             });
         }
         for (const auto& barrier : imageBarriers) {
             uses.push_back(ResourceUse{
-                .image = barrier.image(), .access = barrier.dstAccess(),
-                .baseMipLevel = barrier.baseMipLevel(), .levelCount = barrier.levelCount(),
-                .baseArrayLayer = barrier.baseArrayLayer(), .layerCount = barrier.layerCount(),
+                .image = barrier.TargetImage(), .access = barrier.DstAccess(),
+                .baseMipLevel = barrier.BaseMipLevel(), .levelCount = barrier.LevelCount(),
+                .baseArrayLayer = barrier.BaseArrayLayer(), .layerCount = barrier.LayerCount(),
             });
         }
 
-        return enqueue("Barrier", where, std::move(uses), PassEdge::eNone,
+        return Enqueue("Barrier", where, std::move(uses), PassEdge::eNone,
             [this, buffers = std::move(bufferBarriers), images = std::move(imageBarriers)]() mutable {
-                doBarrier(std::move(buffers), std::move(images));
+                DoBarrier(std::move(buffers), std::move(images));
             }, /*transitions=*/true);
     }
 
@@ -1603,8 +1603,8 @@ namespace kor
         ClampedSubresource clampToImage(const Image& image, const glm::u32 baseMip, const glm::u32 mipCount,
                                         const glm::u32 baseLayer, const glm::u32 layerCount)
         {
-            const glm::u32 mips = std::max(image.mipLevels(), 1u);
-            const glm::u32 layers = std::max(image.arrayLayers(), 1u);
+            const glm::u32 mips = std::max(image.MipLevels(), 1u);
+            const glm::u32 layers = std::max(image.ArrayLayers(), 1u);
             const glm::u32 firstMip = std::min(baseMip, mips - 1);
             const glm::u32 firstLayer = std::min(baseLayer, layers - 1);
             return {
@@ -1636,10 +1636,10 @@ namespace kor
                                                     const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(descriptorSet, "descriptor set")) return *this;
-        stateBindDescriptorSet(index, descriptorSet);
-        return enqueue("BindDescriptorSet", where, {}, PassEdge::eNone,
-            [this, index, descriptorSet] { doBindDescriptorSet(index, descriptorSet); });
+        if (Reject(descriptorSet, "descriptor set")) return *this;
+        StateBindDescriptorSet(index, descriptorSet);
+        return Enqueue("BindDescriptorSet", where, {}, PassEdge::eNone,
+            [this, index, descriptorSet] { DoBindDescriptorSet(index, descriptorSet); });
     }
 
     CommandBuffer& CommandBuffer::DispatchIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset,
@@ -1647,14 +1647,14 @@ namespace kor
     {
         if (_failed) return *this;
         if (!_state.boundComputePipeline.has_value())
-            return record(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
-        if (reject(indirectBuffer, "indirect buffer")) return *this;
+            return RecordError(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
+        if (Reject(indirectBuffer, "indirect buffer")) return *this;
 
-        auto uses = usesForBoundResources(false);
+        auto uses = UsesForBoundResources(false);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
-        return enqueue("DispatchIndirect", where, std::move(uses), PassEdge::eNone,
-            [this, indirectBuffer, offset] { doDispatchIndirect(indirectBuffer, offset); },
-            /*transitions=*/false, boundPipelineUsesDeviceAddresses());
+        return Enqueue("DispatchIndirect", where, std::move(uses), PassEdge::eNone,
+            [this, indirectBuffer, offset] { DoDispatchIndirect(indirectBuffer, offset); },
+            /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
     CommandBuffer& CommandBuffer::DrawIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride,
@@ -1662,19 +1662,19 @@ namespace kor
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
-        if (reject(indirectBuffer, "indirect buffer")) return *this;
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+        if (Reject(indirectBuffer, "indirect buffer")) return *this;
 
         if (!_state.viewportSet)
-            SetViewport(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
+            SetViewport(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
         if (!_state.scissorSet)
-            SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
+            SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
 
-        auto uses = usesForBoundResources(true);
+        auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
-        return enqueue("DrawIndirect", where, std::move(uses), PassEdge::eNone,
-            [this, indirectBuffer, offset, drawCount, stride] { doDrawIndirect(indirectBuffer, offset, drawCount, stride); },
-            /*transitions=*/false, boundPipelineUsesDeviceAddresses());
+        return Enqueue("DrawIndirect", where, std::move(uses), PassEdge::eNone,
+            [this, indirectBuffer, offset, drawCount, stride] { DoDrawIndirect(indirectBuffer, offset, drawCount, stride); },
+            /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
     CommandBuffer& CommandBuffer::DrawIndexedIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride,
@@ -1682,21 +1682,21 @@ namespace kor
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (!_state.boundMesh.has_value())
-            return record(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
-        if (reject(indirectBuffer, "indirect buffer")) return *this;
+            return RecordError(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
+        if (Reject(indirectBuffer, "indirect buffer")) return *this;
 
         if (!_state.viewportSet)
-            SetViewport(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
+            SetViewport(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
         if (!_state.scissorSet)
-            SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
+            SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
 
-        auto uses = usesForBoundResources(true);
+        auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
-        return enqueue("DrawIndexedIndirect", where, std::move(uses), PassEdge::eNone,
-            [this, indirectBuffer, offset, drawCount, stride] { doDrawIndexedIndirect(indirectBuffer, offset, drawCount, stride); },
-            /*transitions=*/false, boundPipelineUsesDeviceAddresses());
+        return Enqueue("DrawIndexedIndirect", where, std::move(uses), PassEdge::eNone,
+            [this, indirectBuffer, offset, drawCount, stride] { DoDrawIndexedIndirect(indirectBuffer, offset, drawCount, stride); },
+            /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
     CommandBuffer& CommandBuffer::DrawMeshTasksIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride,
@@ -1704,47 +1704,47 @@ namespace kor
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
-            return record(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
-        if (reject(indirectBuffer, "indirect buffer")) return *this;
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+        if (Reject(indirectBuffer, "indirect buffer")) return *this;
 
         if (!_state.viewportSet)
-            SetViewport(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
+            SetViewport(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
         if (!_state.scissorSet)
-            SetScissor(0, 0, defaultViewportExtent().x, defaultViewportExtent().y);
+            SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
 
-        auto uses = usesForBoundResources(true);
+        auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
-        return enqueue("DrawMeshTasksIndirect", where, std::move(uses), PassEdge::eNone,
-            [this, indirectBuffer, offset, drawCount, stride] { doDrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride); },
-            /*transitions=*/false, boundPipelineUsesDeviceAddresses());
+        return Enqueue("DrawMeshTasksIndirect", where, std::move(uses), PassEdge::eNone,
+            [this, indirectBuffer, offset, drawCount, stride] { DoDrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride); },
+            /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
     CommandBuffer& CommandBuffer::ClearBuffer(kor::ResourceRef<const Buffer> buffer, const glm::u64 offset, const glm::u64 size,
                                               const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(buffer, "buffer")) return *this;
+        if (Reject(buffer, "buffer")) return *this;
         const auto [start, span] = clampToBuffer(*buffer, offset, size);
-        return enqueue("ClearBuffer", where,
+        return Enqueue("ClearBuffer", where,
             { ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferDst, .offset = start, .size = span } },
-            PassEdge::eNone, [this, buffer, offset, size] { doClearBuffer(buffer, offset, size); });
+            PassEdge::eNone, [this, buffer, offset, size] { DoClearBuffer(buffer, offset, size); });
     }
 
     CommandBuffer& CommandBuffer::ClearColorImage(kor::ResourceRef<const Image> image, const glm::vec4 color,
                                                   const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(image, "image")) return *this;
-        return enqueue("ClearColorImage", where,
+        if (Reject(image, "image")) return *this;
+        return Enqueue("ClearColorImage", where,
             { ResourceUse{ .image = image, .access = ResourceAccess::eTransferDst } },
-            PassEdge::eNone, [this, image, color] { doClearColorImage(image, color); });
+            PassEdge::eNone, [this, image, color] { DoClearColorImage(image, color); });
     }
 
     CommandBuffer& CommandBuffer::FillBuffer(kor::ResourceRef<const Buffer> buffer, const void* data, const glm::u64 offset, const glm::u64 size,
                                              const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(buffer, "buffer")) return *this;
+        if (Reject(buffer, "buffer")) return *this;
 
         // Copy the payload rather than the pointer: the caller's storage is very often a
         // temporary, and nothing reaches the GPU until End().
@@ -1753,11 +1753,11 @@ namespace kor
         if (data && byteCount) std::memcpy(bytes.data(), data, byteCount);
 
         const auto [start, span] = clampToBuffer(*buffer, offset, size);
-        return enqueue("FillBuffer", where,
+        return Enqueue("FillBuffer", where,
             { ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferDst, .offset = start, .size = span } },
             PassEdge::eNone,
             [this, buffer, bytes = std::move(bytes), offset, size] () mutable {
-                doFillBuffer(buffer, bytes.data(), offset, size);
+                DoFillBuffer(buffer, bytes.data(), offset, size);
             });
     }
 
@@ -1765,62 +1765,62 @@ namespace kor
                                              const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(srcBuffer, "copy source buffer")) return *this;
-        if (reject(dstBuffer, "copy destination buffer")) return *this;
+        if (Reject(srcBuffer, "copy source buffer")) return *this;
+        if (Reject(dstBuffer, "copy destination buffer")) return *this;
         const auto [srcStart, srcSpan] = clampToBuffer(*srcBuffer, srcOffset, size);
         const auto [dstStart, dstSpan] = clampToBuffer(*dstBuffer, dstOffset, size);
-        return enqueue("CopyBuffer", where, {
+        return Enqueue("CopyBuffer", where, {
                 ResourceUse{ .buffer = srcBuffer, .access = ResourceAccess::eTransferSrc, .offset = srcStart, .size = srcSpan },
                 ResourceUse{ .buffer = dstBuffer, .access = ResourceAccess::eTransferDst, .offset = dstStart, .size = dstSpan },
             }, PassEdge::eNone,
-            [this, srcBuffer, dstBuffer, size, srcOffset, dstOffset] { doCopyBuffer(srcBuffer, dstBuffer, size, srcOffset, dstOffset); });
+            [this, srcBuffer, dstBuffer, size, srcOffset, dstOffset] { DoCopyBuffer(srcBuffer, dstBuffer, size, srcOffset, dstOffset); });
     }
 
     CommandBuffer& CommandBuffer::CopyBufferToImage(kor::ResourceRef<const Buffer> buffer, kor::ResourceRef<const Image> image, const kor::Copy copyInfo,
                                                     const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(buffer, "copy source buffer")) return *this;
-        if (reject(image, "copy destination image")) return *this;
+        if (Reject(buffer, "copy source buffer")) return *this;
+        if (Reject(image, "copy destination image")) return *this;
         const auto range = clampToImage(*image, copyInfo.imageMipLevel, 1u,
                                         copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount);
         const auto [srcOffset, srcSize] = clampToBuffer(*buffer, copyInfo.bufferOffset, WholeSize);
-        return enqueue("CopyBufferToImage", where, {
+        return Enqueue("CopyBufferToImage", where, {
                 ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferSrc, .offset = srcOffset, .size = srcSize },
                 ResourceUse{ .image = image, .access = ResourceAccess::eTransferDst,
                              .baseMipLevel = range.baseMip, .levelCount = range.mipCount,
                              .baseArrayLayer = range.baseLayer, .layerCount = range.layerCount },
             }, PassEdge::eNone,
-            [this, buffer, image, copyInfo] { doCopyBufferToImage(buffer, image, copyInfo); });
+            [this, buffer, image, copyInfo] { DoCopyBufferToImage(buffer, image, copyInfo); });
     }
 
     CommandBuffer& CommandBuffer::CopyImageToBuffer(kor::ResourceRef<const Image> image, kor::ResourceRef<const Buffer> buffer, const kor::Copy copyInfo,
                                                     const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(image, "copy source image")) return *this;
-        if (reject(buffer, "copy destination buffer")) return *this;
+        if (Reject(image, "copy source image")) return *this;
+        if (Reject(buffer, "copy destination buffer")) return *this;
         const auto range = clampToImage(*image, copyInfo.imageMipLevel, 1u,
                                         copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount);
         const auto [dstOffset, dstSize] = clampToBuffer(*buffer, copyInfo.bufferOffset, WholeSize);
-        return enqueue("CopyImageToBuffer", where, {
+        return Enqueue("CopyImageToBuffer", where, {
                 ResourceUse{ .image = image, .access = ResourceAccess::eTransferSrc,
                              .baseMipLevel = range.baseMip, .levelCount = range.mipCount,
                              .baseArrayLayer = range.baseLayer, .layerCount = range.layerCount },
                 ResourceUse{ .buffer = buffer, .access = ResourceAccess::eTransferDst, .offset = dstOffset, .size = dstSize },
             }, PassEdge::eNone,
-            [this, image, buffer, copyInfo] { doCopyImageToBuffer(image, buffer, copyInfo); });
+            [this, image, buffer, copyInfo] { DoCopyImageToBuffer(image, buffer, copyInfo); });
     }
 
     CommandBuffer& CommandBuffer::BlitToScreen(kor::ResourceRef<const Image> srcImage, const kor::Blit blitInfo,
                                        const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(srcImage, "blit source image")) return *this;
+        if (Reject(srcImage, "blit source image")) return *this;
 
         // The destination is the window's framebuffer image, which the backend resolves for itself
         // — but it is *declared* here all the same. Leaving it out made this the one way of drawing
-        // to the screen that hasTouched() could not see, so the runtime decided the frame had not
+        // to the screen that HasTouched() could not see, so the runtime decided the frame had not
         // touched the framebuffer and cleared it (@see the clear in engine.cpp) on top of the blit
         // that had just happened: a scene whose whole output is Blit(image) presented a blank
         // window. Declaring it also puts the destination in front of the barrier resolver rather
@@ -1831,37 +1831,37 @@ namespace kor
                          .baseMipLevel = blitInfo.srcMipLevel, .levelCount = 1u,
                          .baseArrayLayer = blitInfo.srcBaseArrayLayer, .layerCount = blitInfo.layerCount },
         };
-        if (const auto screen = screenImage(); screen.alive()) {
+        if (const auto screen = ScreenImage(); screen.Alive()) {
             uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::eTransferDst,
                                         .baseMipLevel = blitInfo.dstMipLevel, .levelCount = 1u,
                                         .baseArrayLayer = blitInfo.dstBaseArrayLayer, .layerCount = blitInfo.layerCount });
         }
 
-        return enqueue("Blit", where, std::move(uses),
-            PassEdge::eNone, [this, srcImage, blitInfo] { doBlitToScreen(srcImage, blitInfo); });
+        return Enqueue("Blit", where, std::move(uses),
+            PassEdge::eNone, [this, srcImage, blitInfo] { DoBlitToScreen(srcImage, blitInfo); });
     }
 
     CommandBuffer& CommandBuffer::Blit(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Blit blitInfo,
                                        const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(srcImage, "blit source image")) return *this;
-        if (reject(dstImage, "blit destination image")) return *this;
-        return enqueue("Blit", where, {
+        if (Reject(srcImage, "blit source image")) return *this;
+        if (Reject(dstImage, "blit destination image")) return *this;
+        return Enqueue("Blit", where, {
                 ResourceUse{ .image = srcImage, .access = ResourceAccess::eTransferSrc,
                              .baseMipLevel = blitInfo.srcMipLevel, .levelCount = 1u,
                              .baseArrayLayer = blitInfo.srcBaseArrayLayer, .layerCount = blitInfo.layerCount },
                 ResourceUse{ .image = dstImage, .access = ResourceAccess::eTransferDst,
                              .baseMipLevel = blitInfo.dstMipLevel, .levelCount = 1u,
                              .baseArrayLayer = blitInfo.dstBaseArrayLayer, .layerCount = blitInfo.layerCount },
-            }, PassEdge::eNone, [this, srcImage, dstImage, blitInfo] { doBlit(srcImage, dstImage, blitInfo); });
+            }, PassEdge::eNone, [this, srcImage, dstImage, blitInfo] { DoBlit(srcImage, dstImage, blitInfo); });
     }
 
     CommandBuffer& CommandBuffer::ResolveToScreen(kor::ResourceRef<const Image> srcImage, const kor::Resolve resolveInfo,
                                           const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(srcImage, "resolve source image")) return *this;
+        if (Reject(srcImage, "resolve source image")) return *this;
 
         // The window's framebuffer image, declared for the same reason as in Blit above.
         std::vector<ResourceUse> uses {
@@ -1869,29 +1869,29 @@ namespace kor
                          .baseMipLevel = resolveInfo.srcMipLevel, .levelCount = 1u,
                          .baseArrayLayer = resolveInfo.srcBaseArrayLayer, .layerCount = resolveInfo.layerCount },
         };
-        if (const auto screen = screenImage(); screen.alive()) {
+        if (const auto screen = ScreenImage(); screen.Alive()) {
             uses.push_back(ResourceUse{ .image = screen, .access = ResourceAccess::eTransferDst,
                                         .baseMipLevel = resolveInfo.dstMipLevel, .levelCount = 1u,
                                         .baseArrayLayer = resolveInfo.dstBaseArrayLayer, .layerCount = resolveInfo.layerCount });
         }
 
-        return enqueue("Resolve", where, std::move(uses),
-            PassEdge::eNone, [this, srcImage, resolveInfo] { doResolveToScreen(srcImage, resolveInfo); });
+        return Enqueue("Resolve", where, std::move(uses),
+            PassEdge::eNone, [this, srcImage, resolveInfo] { DoResolveToScreen(srcImage, resolveInfo); });
     }
 
     CommandBuffer& CommandBuffer::Resolve(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, const kor::Resolve resolveInfo,
                                           const std::source_location where)
     {
         if (_failed) return *this;
-        if (reject(srcImage, "resolve source image")) return *this;
-        if (reject(dstImage, "resolve destination image")) return *this;
-        return enqueue("Resolve", where, {
+        if (Reject(srcImage, "resolve source image")) return *this;
+        if (Reject(dstImage, "resolve destination image")) return *this;
+        return Enqueue("Resolve", where, {
                 ResourceUse{ .image = srcImage, .access = ResourceAccess::eTransferSrc,
                              .baseMipLevel = resolveInfo.srcMipLevel, .levelCount = 1u,
                              .baseArrayLayer = resolveInfo.srcBaseArrayLayer, .layerCount = resolveInfo.layerCount },
                 ResourceUse{ .image = dstImage, .access = ResourceAccess::eTransferDst,
                              .baseMipLevel = resolveInfo.dstMipLevel, .levelCount = 1u,
                              .baseArrayLayer = resolveInfo.dstBaseArrayLayer, .layerCount = resolveInfo.layerCount },
-            }, PassEdge::eNone, [this, srcImage, dstImage, resolveInfo] { doResolve(srcImage, dstImage, resolveInfo); });
+            }, PassEdge::eNone, [this, srcImage, dstImage, resolveInfo] { DoResolve(srcImage, dstImage, resolveInfo); });
     }
 }

@@ -78,7 +78,7 @@ namespace kor::vk
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(imageCreateFlags);
 
-        const auto frameCount = _isPerFrame ? kor::Context::Scheduler().imageCount() : 1;
+        const auto frameCount = _isPerFrame ? kor::Context::Scheduler().ImageCount() : 1;
         for (uint32_t i = 0; i < frameCount; i++)
         {
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
@@ -105,14 +105,14 @@ namespace kor::vk
 
     Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const SampleCount msaa)
         : kor::Image(Builder()
-            .setIsPerFrame(true)
-            .setType(Type::e2D)
-            .setExtent(extent)
-            .setUsage(Usage::eTransferDst | Usage::eColorAttachment)
-            .setArrayLayers(1)
-            .setMipLevels(1)
-            .setFormat(format)
-            .setSampleCount(msaa)) {
+            .SetIsPerFrame(true)
+            .SetType(Type::e2D)
+            .SetExtent(extent)
+            .SetUsage(Usage::eTransferDst | Usage::eColorAttachment)
+            .SetArrayLayers(1)
+            .SetMipLevels(1)
+            .SetFormat(format)
+            .SetSampleCount(msaa)) {
         _images = surfaceImages;
 
         int frameIndex = 0;
@@ -126,26 +126,26 @@ namespace kor::vk
 
     ::vk::ImageLayout Image::getImageLayout(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _layouts[key];
     }
 
     ::vk::AccessFlags Image::getAccessMask(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _accessMasks[key];
     }
 
     void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
             _layouts[key] = newLayout;
         }
     }
 
     void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         if (const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _accessMasks[key] != newAccessMask) {
             _accessMasks[key] = newAccessMask;
         }
@@ -155,7 +155,7 @@ namespace kor::vk
         ::vk::ImageAspectFlags aspectMask = {};
         if (_usage & Usage::eDepthStencilAttachment) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (isStencilFormat(_format)) {
+            if (IsStencilFormat(_format)) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         } else {
@@ -166,13 +166,13 @@ namespace kor::vk
 
     ::vk::Image Image::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         return _images[currentFrame];
     }
 
     VmaAllocation Image::getAllocation() const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         return _allocations[currentFrame];
     }
 
@@ -181,9 +181,9 @@ namespace kor::vk
         const auto _handle = **this;
 
         ::vk::ImageAspectFlags aspectMask = ::vk::ImageAspectFlagBits::eColor;
-        if (isDepthStencilFormat(_format)) {
+        if (IsDepthStencilFormat(_format)) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (isStencilFormat(_format)) {
+            if (IsStencilFormat(_format)) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         }
@@ -213,10 +213,10 @@ namespace kor::vk
     void Image::Clear(const ::vk::ClearValue& clearValue) const {
         Context::Device().runSingleTimeCommand([this, clearValue](const kor::vk::CommandBuffer& commandBuffer) {
             Clear(commandBuffer, clearValue);
-        }, ::vk::QueueFlagBits::eGraphics).wait();
+        }, ::vk::QueueFlagBits::eGraphics).Wait();
     }
 
-    void Image::doResize(const glm::uvec3 &extent) {
+    void Image::DoResize(const glm::uvec3 &extent) {
         // The frames still in flight may be reading the old images — a resize is not always between
         // frames: Scene::Update runs inside the frame's recording, and a window being dragged resizes
         // there, every frame. So the old ones are freed once the GPU is done with them, instead of

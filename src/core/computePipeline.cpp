@@ -17,42 +17,42 @@
 
 namespace kor
 {
-    ComputePipeline::Builder& ComputePipeline::Builder::setComputeShader(ResourceRef<const Shader> computeShader)
+    ComputePipeline::Builder& ComputePipeline::Builder::SetComputeShader(ResourceRef<const Shader> computeShader)
     {
         this->computeShader = computeShader;
         return *this;
     }
 
-    kor::Result<std::unique_ptr<ComputePipeline>> ComputePipeline::Builder::create() const
+    kor::Result<std::unique_ptr<ComputePipeline>> ComputePipeline::Builder::Create() const
     {
-        beginAttempt();
-        if (computeShader) adopt(*computeShader, "compute shader");
+        BeginAttempt();
+        if (computeShader) Adopt(*computeShader, "compute shader");
 
-        if (auto v = validate(); !v) return std::unexpected(v.error());
+        if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const auto api = Context::activeAPI();
+        const auto api = Context::ActiveAPI();
         if (api != API::eOpenGL && api != API::eVulkan)
-            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+            return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
-        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<ComputePipeline> {
+        return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<ComputePipeline> {
             return (api == API::eVulkan)
                 ? kor::MakeBackendPtr<ComputePipeline, vk::ComputePipeline>(*this)
                 : kor::MakeBackendPtr<ComputePipeline, ogl::ComputePipeline>(*this);
         });
     }
 
-    kor::Resource<ComputePipeline> ComputePipeline::Builder::build(const std::source_location where) const
+    kor::Resource<ComputePipeline> ComputePipeline::Builder::Build(const std::source_location where) const
     {
-        auto pipeline = materialize<ComputePipeline>(*this, "ComputePipeline", where);
+        auto pipeline = Materialize<ComputePipeline>(*this, "ComputePipeline", where);
         // Registered even when poisoned: the Repository is what drives the retry that brings it
         // back once its shader compiles again.
-        Context::Repository().addRef(ResourceRef<const ComputePipeline>(pipeline));
+        Context::Repository().AddRef(ResourceRef<const ComputePipeline>(pipeline));
         return pipeline;
     }
 
     ComputePipeline::~ComputePipeline()
     {
-        if (_shader.has_value()) unsubscribeReload(*_shader);
+        if (_shader.has_value()) UnsubscribeReload(*_shader);
     }
 
     void ComputePipeline::Bind(const kor::CommandBuffer& commandBuffer) const
@@ -68,12 +68,12 @@ namespace kor
     VoidResult ComputePipeline::Validate()
     {
         if (!_shader.has_value())
-            return fail(ErrorCode::eMissingShaderStage, "A compute pipeline must have a compute shader.");
-        if ((*_shader)->stage() != Shader::Stage::eCompute)
-            return fail(ErrorCode::eShaderStageMismatch, "The shader provided to a compute pipeline must be a compute shader.");
+            return Fail(ErrorCode::eMissingShaderStage, "A compute pipeline must have a compute shader.");
+        if ((*_shader)->ShaderStage() != Shader::Stage::eCompute)
+            return Fail(ErrorCode::eShaderStageMismatch, "The shader provided to a compute pipeline must be a compute shader.");
 
         const std::array shaders = { *_shader };
-        if (auto merged = buildLayouts(shaders); !merged)
+        if (auto merged = BuildLayouts(shaders); !merged)
             return std::unexpected(merged.error());
         return {};
     }
@@ -85,6 +85,6 @@ namespace kor
     {
         if (auto v = Validate(); !v) throw BackendException(v.error());
 
-        if (_shader.has_value()) subscribeReload(*_shader);
+        if (_shader.has_value()) SubscribeReload(*_shader);
     }
 }

@@ -65,7 +65,7 @@ namespace kor::ogl
         glm::u32 _pushConstantSize = 0;
 
         // GL_ARB_bindless_texture material arrays declared by this pipeline's shaders,
-        // with uniform locations resolved after link. See DescriptorSet::bind.
+        // with uniform locations resolved after link. See DescriptorSet::Bind.
         std::vector<BindlessSamplerArray> _bindlessArrays;
     };
 }

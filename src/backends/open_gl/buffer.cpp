@@ -26,7 +26,7 @@ namespace kor::ogl
             glCreateBuffers(1, &_id);
             glNamedBufferStorage(_id, createInfo._size, nullptr, storageFlags | GL_CLIENT_STORAGE_BIT);
             if (glGetError() != GL_NO_ERROR)
-                kor::log::error("[buffer] failed to allocate {} bytes even from host storage", createInfo._size);
+                kor::log::Error("[buffer] failed to allocate {} bytes even from host storage", createInfo._size);
         }
     }
 
@@ -39,7 +39,7 @@ namespace kor::ogl
     void Buffer::Map() const
     {
         if (_type == Type::eDeviceLocal) {
-            kor::log::error("Attempted to map a device-local buffer! Buffer ID: {}. Device-local buffers are not mappable, as they reside in GPU-only memory. Please use a staging buffer for data transfer to or from device-local buffers.", _id);
+            kor::log::Error("Attempted to map a device-local buffer! Buffer ID: {}. Device-local buffers are not mappable, as they reside in GPU-only memory. Please use a staging buffer for data transfer to or from device-local buffers.", _id);
             return;
         }
 
@@ -136,7 +136,7 @@ namespace kor::ogl
         if (usage & Usage::eTexel) {
             return GL_TEXTURE_BUFFER;
         }
-        kor::log::error("Unknown buffer usage flags specified! Defaulting to GL_ARRAY_BUFFER. Usage value: {}", static_cast<int>(usage));
+        kor::log::Error("Unknown buffer usage flags specified! Defaulting to GL_ARRAY_BUFFER. Usage value: {}", static_cast<int>(usage));
         return GL_ARRAY_BUFFER;
     }
 
@@ -162,7 +162,7 @@ namespace kor::ogl
             case Type::eDeviceDynamic:
                 return GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_READ_BIT;
             default:
-                kor::log::error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
+                kor::log::Error("Unknown buffer type specified! Defaulting to GL_DYNAMIC_STORAGE_BIT. Type value: {}", static_cast<int>(type));
                 return GL_DYNAMIC_STORAGE_BIT;
         }
     }

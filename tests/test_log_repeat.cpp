@@ -25,13 +25,13 @@ public:
         logger->set_level(spdlog::level::trace);
         logger->set_pattern("%v");
         spdlog::set_default_logger(logger);
-        kor::log::resetRepeatCounts();
+        kor::log::ResetRepeatCounts();
     }
 
     ~CapturedLog()
     {
         spdlog::set_default_logger(_previous);
-        kor::log::resetRepeatCounts();
+        kor::log::ResetRepeatCounts();
     }
 
     [[nodiscard]] std::string text() { spdlog::default_logger()->flush(); return _stream.str(); }
@@ -54,9 +54,9 @@ private:
 
 TEST(LogRepeat, IdenticalErrorsStopAtTheLimit) {
     CapturedLog log;
-    ASSERT_EQ(kor::log::repeatLimit(), 10u);
+    ASSERT_EQ(kor::log::RepeatLimit(), 10u);
 
-    for (int i = 0; i < 1000; ++i) kor::log::error("poisoned resource dereferenced");
+    for (int i = 0; i < 1000; ++i) kor::log::Error("poisoned resource dereferenced");
 
     // Ten showings and no more, however many times the frame loop hits it.
     EXPECT_EQ(log.count("poisoned resource dereferenced"), 10u);
@@ -68,8 +68,8 @@ TEST(LogRepeat, DistinctMessagesGetSeparateBudgets) {
     CapturedLog log;
 
     for (int i = 0; i < 50; ++i) {
-        kor::log::error("first problem");
-        kor::log::error("second problem");
+        kor::log::Error("first problem");
+        kor::log::Error("second problem");
     }
 
     EXPECT_EQ(log.count("first problem"), 10u);
@@ -83,7 +83,7 @@ TEST(LogRepeat, FormattedValuesAreCountedSeparately) {
 
     for (int i = 0; i < 50; ++i)
         for (const auto* name : {"a.vert.glsl", "b.frag.glsl"})
-            kor::log::error("shader '{}' failed", name);
+            kor::log::Error("shader '{}' failed", name);
 
     EXPECT_EQ(log.count("shader 'a.vert.glsl' failed"), 10u);
     EXPECT_EQ(log.count("shader 'b.frag.glsl' failed"), 10u);
@@ -91,33 +91,33 @@ TEST(LogRepeat, FormattedValuesAreCountedSeparately) {
 
 TEST(LogRepeat, WarningsAreCappedToo) {
     CapturedLog log;
-    for (int i = 0; i < 50; ++i) kor::log::warn("a recurring warning");
+    for (int i = 0; i < 50; ++i) kor::log::Warn("a recurring warning");
     EXPECT_EQ(log.count("a recurring warning"), 10u);
 }
 
 TEST(LogRepeat, LimitIsConfigurableAndZeroDisablesSuppression) {
     {
         CapturedLog log;
-        kor::log::setRepeatLimit(3);
-        for (int i = 0; i < 50; ++i) kor::log::error("thrice only");
+        kor::log::SetRepeatLimit(3);
+        for (int i = 0; i < 50; ++i) kor::log::Error("thrice only");
         EXPECT_EQ(log.count("thrice only"), 3u);
     }
     {
         CapturedLog log;
-        kor::log::setRepeatLimit(0);
-        for (int i = 0; i < 25; ++i) kor::log::error("never suppressed");
+        kor::log::SetRepeatLimit(0);
+        for (int i = 0; i < 25; ++i) kor::log::Error("never suppressed");
         EXPECT_EQ(log.count("never suppressed"), 25u);
     }
-    kor::log::setRepeatLimit(10);   // restore the default for the rest of the suite
+    kor::log::SetRepeatLimit(10);   // restore the default for the rest of the suite
 }
 
 TEST(LogRepeat, ResetRestoresTheBudget) {
     CapturedLog log;
-    for (int i = 0; i < 50; ++i) kor::log::error("recurring");
+    for (int i = 0; i < 50; ++i) kor::log::Error("recurring");
     EXPECT_EQ(log.count("recurring"), 10u);
 
-    kor::log::resetRepeatCounts();
-    for (int i = 0; i < 50; ++i) kor::log::error("recurring");
+    kor::log::ResetRepeatCounts();
+    for (int i = 0; i < 50; ++i) kor::log::Error("recurring");
     EXPECT_EQ(log.count("recurring"), 20u);
 }
 

@@ -41,7 +41,7 @@ namespace kor::ogl
         //   * Viewport/scissor rects stay in GL's bottom-left window space, so the top-left
         //     rects the API takes are converted in CommandBuffer::SetViewport/SetScissor.
         //   * gl_FragCoord.y still counts from the bottom; a shader that reads it needs
-        //     `layout(origin_upper_left) in vec4 gl_FragCoord;` to match Vulkan.
+        //     `Layout(origin_upper_left) in vec4 gl_FragCoord;` to match Vulkan.
         //
         // Consequence worth knowing: an offscreen target's rows land in memory bottom-up
         // relative to Vulkan's. That is invisible to a render→sample→present chain (every
@@ -59,7 +59,7 @@ namespace kor::ogl
         auto globalVAO = 0u;
         glGenVertexArrays(1, &globalVAO);
         glBindVertexArray(globalVAO);
-        createFrames();
+        CreateFrames();
     }
 
     void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc)
@@ -67,16 +67,16 @@ namespace kor::ogl
         kor::Scheduler::Draw(renderFunc);
         signalFinishedFrames(/*wait=*/false);
 
-        const auto& frame = currentFrame();
-        auto& commandBuffer = frame.commandBuffer();
+        const auto& frame = CurrentFrame();
+        auto& commandBuffer = frame.Commands();
         commandBuffer.Reset();
         renderFunc(commandBuffer.Begin());
 
         // After the render callback, which may Execute() work of its own.
-        auto pending = takePending();
+        auto pending = TakePending();
 
         // The GPU cannot be told to wait, so the CPU does. WaitFor() says as much.
-        for (const auto& token : pending.waits) token.wait();
+        for (const auto& token : pending.waits) token.Wait();
 
         // Ended in the order they run, as under Vulkan: each End() resolves its barriers against
         // where the one before it left every resource. Submitted in the same order after.
@@ -86,7 +86,7 @@ namespace kor::ogl
 
         const auto submit = [](kor::CommandBuffer& cb) {
             if (const auto submitted = cb.Submit(); !submitted) {
-                kor::log::error("[scheduler] frame submit failed: {}", submitted.error().toString());
+                kor::log::Error("[scheduler] frame submit failed: {}", submitted.error().ToString());
             }
         };
         for (const auto& external : pending.before) submit(*external);
@@ -106,7 +106,7 @@ namespace kor::ogl
                 path = spec.substr(0, colon); want = std::atoi(spec.c_str() + colon + 1);
             }
             if (frame++ == want) {
-                const auto ext = Context::Window().extent();
+                const auto ext = Context::Window().Extent();
                 std::vector<unsigned char> px(static_cast<size_t>(ext.x) * ext.y * 3);
                 glReadBuffer(GL_BACK);
                 glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -116,16 +116,16 @@ namespace kor::ogl
                     for (glm::i32 y = static_cast<glm::i32>(ext.y) - 1; y >= 0; --y) // GL origin bottom-left → flip
                         std::fwrite(px.data() + static_cast<size_t>(y) * ext.x * 3, 1, static_cast<size_t>(ext.x) * 3, f);
                     std::fclose(f);
-                    kor::log::info("[screenshot] wrote {} ({}x{})", path, ext.x, ext.y);
+                    kor::log::Info("[screenshot] wrote {} ({}x{})", path, ext.x, ext.y);
                 }
             }
         }
 
         glfwSwapBuffers(Context::Window().operator*());
-        advanceFrame();
+        AdvanceFrame();
     }
 
-    void Scheduler::createFrames()
+    void Scheduler::CreateFrames()
     {
         _frames.clear();
         for (glm::u32 i = 0; i < _imageCount; ++i) {
@@ -159,7 +159,7 @@ namespace kor::ogl
             } while (wait && status == GL_TIMEOUT_EXPIRED);
             if (status == GL_TIMEOUT_EXPIRED) break;
             glDeleteSync(fence);
-            _inFlight[done].completion.signal();
+            _inFlight[done].completion.Signal();
         }
         _inFlight.erase(_inFlight.begin(), _inFlight.begin() + static_cast<std::ptrdiff_t>(done));
     }

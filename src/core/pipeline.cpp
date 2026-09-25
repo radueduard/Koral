@@ -18,27 +18,27 @@ namespace kor
 {
     Pipeline::~Pipeline() = default;
 
-    const DescriptorSetLayout& Pipeline::descriptorSetLayout(const glm::u32 index) const
+    const DescriptorSetLayout& Pipeline::SetLayout(const glm::u32 index) const
     {
         if (!_setLayouts.contains(index))
             throw std::runtime_error("This pipeline does not contain a set with that index!");
         return *_setLayouts.at(index);
     }
 
-    ResourceRef<const DescriptorSetLayout> Pipeline::descriptorSetLayoutRef(const glm::u32 index) const
+    ResourceRef<const DescriptorSetLayout> Pipeline::SetLayoutRef(const glm::u32 index) const
     {
         if (!_setLayouts.contains(index))
             throw std::runtime_error("This pipeline does not contain a set with that index!");
         return ResourceRef<const DescriptorSetLayout>(_setLayouts.at(index));
     }
 
-    const Pipeline::PushConstantMember* Pipeline::findPushConstant(const std::string_view name) const
+    const Pipeline::PushConstantMember* Pipeline::FindPushConstant(const std::string_view name) const
     {
         const auto it = _pushConstants.find(name);
         return it == _pushConstants.end() ? nullptr : &it->second;
     }
 
-    const Shader::PushConstant& Pipeline::pushConstantRange(const glm::u32 offset) const
+    const Shader::PushConstant& Pipeline::PushConstantRange(const glm::u32 offset) const
     {
         // The range *containing* the offset, not the one that starts at it. A push writes some
         // part of a block — one named constant out of several — so it is only the first field of
@@ -49,14 +49,14 @@ namespace kor
         throw std::runtime_error("This pipeline declares no push-constant range covering that offset!");
     }
 
-    VoidResult Pipeline::buildLayouts(const std::span<const ResourceRef<const Shader>> shaders)
+    VoidResult Pipeline::BuildLayouts(const std::span<const ResourceRef<const Shader>> shaders)
     {
         // The first conflict found, kept so the pipeline's failure names what actually went wrong
         // rather than reporting every kind of merge problem as a descriptor conflict. The scan
         // continues past it, so one build logs every conflict there is.
         std::optional<Error> failure;
         const auto conflict = [&failure](const ErrorCode code, std::string message) {
-            kor::log::error("{}", message);
+            kor::log::Error("{}", message);
             if (!failure) failure = Error{ .code = code, .message = std::move(message) };
         };
 
@@ -70,7 +70,7 @@ namespace kor
         std::vector<const Shader::PushConstant*> declaredPushConstants;
         for (const auto& shader : shaders)
         {
-            const auto& memoryLayout = shader->memoryLayout();
+            const auto& memoryLayout = shader->BlockLayout();
             for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
             {
                 for (const auto& [binding, descriptor] : setDescription.descriptors)
@@ -111,7 +111,7 @@ namespace kor
 
         _usesDeviceAddresses = false;
         for (const auto& shader : shaders) {
-            if (shader.alive() && !shader.poisoned() && shader->usesDeviceAddresses())
+            if (shader.Alive() && !shader.Poisoned() && shader->UsesDeviceAddresses())
                 _usesDeviceAddresses = true;
         }
 
@@ -128,7 +128,7 @@ namespace kor
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription)
             {
-                builder.addBinding(binding, DescriptorSetLayout::Binding{
+                builder.AddBinding(binding, DescriptorSetLayout::Binding{
                     .type = descriptor.type,
                     .count = descriptor.count,
                     .access = descriptor.access,
@@ -137,7 +137,7 @@ namespace kor
                     .members = descriptor.members,
                     .blockSize = descriptor.blockSize,
                     // Carried through so a set can be written by the name the shader uses rather
-                    // than by a number restated in C++. @see DescriptorSet::Builder::write
+                    // than by a number restated in C++. @see DescriptorSet::Builder::Write
                     .name = descriptor.name,
                     .blockName = descriptor.blockName,
                     // What an Image bound directly at this binding is turned into a view by.
@@ -146,23 +146,23 @@ namespace kor
             }
 
             if (const auto existing = _setLayouts.find(setIndex);
-                existing != _setLayouts.end() && existing->second.valid() &&
-                existing->second->matches(builder))
+                existing != _setLayouts.end() && existing->second.Valid() &&
+                existing->second->Matches(builder))
             {
                 // The interface is unchanged, so the layout object — and every descriptor set
                 // holding it — stays valid. Its *blocks* may still have been reshaped by the edit
                 // (a field added to a uniform block changes no binding), and those are what a
                 // semantic-filled binding was built from: adopt them, and say so, so the sets
                 // built against this layout rebuild themselves against the new shape.
-                if (existing->second->refreshBlocks(builder)) existing->second.markChanged();
+                if (existing->second->RefreshBlocks(builder)) existing->second.MarkChanged();
                 rebuilt[setIndex] = std::move(existing->second);
                 continue;
             }
 
-            auto layout = builder.build();
-            if (!layout.valid()) {
-                // materialize() already logged the full history; just fail the pipeline.
-                if (!failure) failure = layout.error() ? *layout.error()
+            auto layout = builder.Build();
+            if (!layout.Valid()) {
+                // Materialize() already logged the full history; just fail the pipeline.
+                if (!failure) failure = layout.Failure() ? *layout.Failure()
                                                        : Error{ .code = ErrorCode::eDescriptorConflict,
                                                                 .message = "A descriptor set layout could not be built." };
                 continue;
@@ -251,13 +251,13 @@ namespace kor
         return {};
     }
 
-    void Pipeline::subscribeReload(const ResourceRef<const Shader>& shader)
+    void Pipeline::SubscribeReload(const ResourceRef<const Shader>& shader)
     {
         const glm::u64 id = const_cast<Shader&>(*shader).RegisterReloadCallback([this] { _shouldReload = true; });
         _shaderReloadCallbackIds[&*shader] = id;
     }
 
-    void Pipeline::unsubscribeReload(const ResourceRef<const Shader>& shader)
+    void Pipeline::UnsubscribeReload(const ResourceRef<const Shader>& shader)
     {
         if (!shader) return; // shader already destroyed; its callbacks are gone with it
         if (const auto it = _shaderReloadCallbackIds.find(&*shader); it != _shaderReloadCallbackIds.end()) {
@@ -270,14 +270,14 @@ namespace kor
         if (!_shouldReload) return;
         _shouldReload = false;
         if (auto v = Validate(); !v) {
-            kor::log::error("Pipeline validation failed during reload: {}", v.error().toString());
+            kor::log::Error("Pipeline validation failed during reload: {}", v.error().ToString());
             return;
         }
         Teardown();
         Setup();
     }
 
-    void Pipeline::automaticUpdate()
+    void Pipeline::AutomaticUpdate()
     {
         Reload();
     }

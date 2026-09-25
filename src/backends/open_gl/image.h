@@ -16,12 +16,12 @@ namespace kor::ogl {
 
         GLuint operator*() const { return _id; }
 
-        void doResize(const glm::uvec3 &extent) override;
+        void DoResize(const glm::uvec3 &extent) override;
 
         GLenum getGLFormat() const { return InternalFormatFromImageFormat(_format); }
 
         // Whether the driver has this format at all, asked through glGetInternalformativ rather
-        // than assumed from an extension string. @see kor::Image::isFormatSupported
+        // than assumed from an extension string. @see kor::Image::IsFormatSupported
         [[nodiscard]] static bool isFormatSupported(kor::Image::Format format, Flags<kor::Image::Usage> usage);
 
         [[nodiscard]] static GLenum InternalFormatFromImageFormat(kor::Image::Format format);

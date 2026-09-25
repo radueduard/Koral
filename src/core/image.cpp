@@ -26,42 +26,42 @@ namespace kor
     // (Scheduler::Draw), so record order is execute order. Should that become several buffers, or
     // several threads, the resolver needs per-buffer entry/exit states reconciled at submit instead
     // of a single value read at record time.
-    glm::u32 Image::trackingFrame() const
+    glm::u32 Image::TrackingFrame() const
     {
         // Only a per-frame image has more than one copy, and only then does which frame it is matter.
         // Asked of the scheduler rather than remembered, so it is always the copy a command recorded
         // now would actually touch.
         if (!_isPerFrame) return 0;
-        if (!Context::hasDevice() || Context::isHeadless()) return 0;
-        return Context::Scheduler().currentImageIndex();
+        if (!Context::HasDevice() || Context::IsHeadless()) return 0;
+        return Context::Scheduler().CurrentImageIndex();
     }
 
-    std::optional<ResourceAccess> Image::trackedAccess(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    std::optional<ResourceAccess> Image::TrackedAccess(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
-        const auto tracked = _trackedAccess.find(trackingKey(mipLevel, arrayLayer));
+        const auto tracked = _trackedAccess.find(TrackingKey(mipLevel, arrayLayer));
         if (tracked == _trackedAccess.end()) return std::nullopt;
         return tracked->second;
     }
 
-    void Image::setTrackedAccess(const ResourceAccess access, const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    void Image::SetTrackedAccess(const ResourceAccess access, const glm::u32 mipLevel, const glm::u32 arrayLayer) const
     {
-        _trackedAccess[trackingKey(mipLevel, arrayLayer)] = access;
+        _trackedAccess[TrackingKey(mipLevel, arrayLayer)] = access;
     }
 
-    kor::Result<std::unique_ptr<Image>> Image::Builder::create() const
+    kor::Result<std::unique_ptr<Image>> Image::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
-        if (auto v = validate(); !v) return std::unexpected(v.error());
+        if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const auto api = Context::activeAPI();
+        const auto api = Context::ActiveAPI();
         if (api != API::eOpenGL && api != API::eVulkan)
-            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+            return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
-        // Construct and (optionally) upload inside guard(): any backend exception becomes a
+        // Construct and (optionally) upload inside Guard(): any backend exception becomes a
         // kor::Error, and a staging-buffer failure is re-thrown with its own cause attached.
-        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Image> {
-        // The object, not a Resource: materialize() builds the owning Resource around it. The
+        return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Image> {
+        // The object, not a Resource: Materialize() builds the owning Resource around it. The
         // upload below needs a ResourceRef, so it takes an unsafe (untracked) one — sound here
         // because the image cannot outlive this scope before we hand it over.
         std::unique_ptr<Image> image = (api == API::eVulkan)
@@ -70,43 +70,43 @@ namespace kor
 
         const auto imageRef = ResourceRef<const Image>(image.get());
 
-        // Upload initial pixel data, if any was supplied via setData(). Uses the same
+        // Upload initial pixel data, if any was supplied via SetData(). Uses the same
         // staging-buffer + copy path as the importer, so it works on both backends.
         if (!data.empty()) {
             const auto staging = kor::Buffer::Builder<std::byte>()
-                .setDataView(std::span<const std::byte>(data))
-                .setUsage(kor::Buffer::Usage::eTransferSrc)
-                .setType(kor::Buffer::Type::eStaging)
-                .build();
+                .SetDataView(std::span<const std::byte>(data))
+                .SetUsage(kor::Buffer::Usage::eTransferSrc)
+                .SetType(kor::Buffer::Type::eStaging)
+                .Build();
 
             // The staging buffer is an internal detail of the upload, so its failure is *our*
-            // failure — rethrow it so guard() turns it back into our error, with the allocation
+            // failure — rethrow it so Guard() turns it back into our error, with the allocation
             // failure kept as the cause the user actually needs to see.
-            if (!staging.valid()) {
-                throw BackendException(causedBy(
+            if (!staging.Valid()) {
+                throw BackendException(CausedBy(
                     Error{ .code = ErrorCode::eBackend, .message = "Could not stage the image's initial pixel data." },
-                    staging.errorPtr()));
+                    staging.ErrorPtr()));
             }
 
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                 commandBuffer.CopyBufferToImage(staging, imageRef, kor::Copy {
                     .imageBaseArrayLayer = 0,
-                    .imageLayerCount = image->arrayLayers(),
+                    .imageLayerCount = image->ArrayLayers(),
                     .imageMipLevel = 0,
                 });
-            }).wait();
+            }).Wait();
 
-            if (image->mipLevels() > 1) {
+            if (image->MipLevels() > 1) {
                 CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                     commandBuffer.GenerateMipmaps(imageRef);
-                }).wait();
+                }).Wait();
             }
 
             // Leave the image shader-readable: the copy/mip commands leave it in a
             // transfer-destination state, but descriptors bind sampled images as read-only.
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                 commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::eAllShaderRead }});
-            }).wait();
+            }).Wait();
         }
 
         return image;
@@ -114,12 +114,12 @@ namespace kor
     }
 
 
-    kor::Resource<Image> Image::Builder::build(const std::source_location where) const
+    kor::Resource<Image> Image::Builder::Build(const std::source_location where) const
     {
-        return materialize<Image>(*this, "Image", where);
+        return Materialize<Image>(*this, "Image", where);
     }
 
-    glm::u32 Image::channelSize(const kor::Image::Format format)
+    glm::u32 Image::ChannelSize(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -197,7 +197,7 @@ namespace kor
         }
     }
 
-    glm::u32 Image::channelCount(const kor::Image::Format format)
+    glm::u32 Image::ChannelCount(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -271,7 +271,7 @@ namespace kor
 
         // The extent first, since a backend builds the new image from it.
         _extent = extent;
-        doResize(extent);
+        DoResize(extent);
 
         // A replaced image is a *new* image: it starts in an undefined layout with nothing to wait on,
         // whatever the one before it had been transitioned to. Forgetting that here is what makes the
@@ -279,7 +279,7 @@ namespace kor
         // image's state, decides nothing is required, and the GPU reads an untransitioned image.
         _trackedAccess.clear();
 
-        // The views handed out by view() are views of the storage that has just been replaced. They
+        // The views handed out by View() are views of the storage that has just been replaced. They
         // cannot be repaired — an ImageView is built against an image and a resize is a new image —
         // so they are dropped, and the next caller gets a view of the image that now exists. Without
         // this a resized render target keeps handing out views of freed storage.
@@ -289,7 +289,7 @@ namespace kor
         ++_generation;
     }
 
-    ImageShape Image::naturalShape() const
+    ImageShape Image::NaturalShape() const
     {
         switch (_type) {
         case Type::e1D: return _arrayLayers > 1 ? ImageShape::e1DArray : ImageShape::e1D;
@@ -301,15 +301,15 @@ namespace kor
         }
     }
 
-    ResourceRef<const ImageView> Image::view(const ImageShape shape, const ViewCoverage coverage) const
+    ResourceRef<const ImageView> Image::View(const ImageShape shape, const ViewCoverage coverage) const
     {
-        const auto slot = viewSlot(shape, coverage);
+        const auto slot = ViewSlot(shape, coverage);
         if (slot >= _defaultViews.size()) return {};
 
         // A poisoned entry is kept rather than retried: the reason it failed is a disagreement
         // between this image and the shape asked for, and nothing about a second attempt would
         // change that. It carries its error, and whoever binds it inherits it.
-        if (_defaultViews[slot].valid() || _defaultViews[slot].poisoned())
+        if (_defaultViews[slot].Valid() || _defaultViews[slot].Poisoned())
             return ResourceRef<const ImageView>(_defaultViews[slot]);
 
         // What the shader asked for, mapped onto how a view says it. A shape reflection could not
@@ -328,7 +328,7 @@ namespace kor
         }();
 
         if (!type) {
-            log::error("Cannot make a default view of this image: the binding's shape is not one a "
+            log::Error("Cannot make a default view of this image: the binding's shape is not one a "
                        "view can be built for. Build the view yourself with ImageView::Builder.");
             return {};
         }
@@ -343,31 +343,31 @@ namespace kor
         // image, so it cannot outlive the thing it points at. Every other route to an image takes a
         // tracked ref, because every other holder can.
         auto view = ImageView::Builder(ResourceRef<const Image>(this))
-            .setViewType(*type)
-            .setBaseMipLevel(0)
-            .setMipLevelCount(coverage == ViewCoverage::eWholeImage ? _mipLevels : 1)
-            .setBaseArrayLayer(0)
-            .setArrayLayerCount(_arrayLayers)
-            .build();
+            .SetViewType(*type)
+            .SetBaseMipLevel(0)
+            .SetMipLevelCount(coverage == ViewCoverage::eWholeImage ? _mipLevels : 1)
+            .SetBaseArrayLayer(0)
+            .SetArrayLayerCount(_arrayLayers)
+            .Build();
 
         _defaultViews[slot] = std::move(view);
         return ResourceRef<const ImageView>(_defaultViews[slot]);
     }
 
-    bool Image::isFormatSupported(const kor::Image::Format format, const Flags<Usage> usage)
+    bool Image::IsFormatSupported(const kor::Image::Format format, const Flags<Usage> usage)
     {
         // No device, no answer — and "no" is the safe one: a caller choosing a format from what is
         // supported would otherwise pick something that cannot be created a moment later.
-        if (!Context::hasDevice()) return false;
+        if (!Context::HasDevice()) return false;
 
-        if (Context::activeAPI() == API::eVulkan)
+        if (Context::ActiveAPI() == API::eVulkan)
             return vk::Image::isFormatSupported(format, usage);
-        if (Context::activeAPI() == API::eOpenGL)
+        if (Context::ActiveAPI() == API::eOpenGL)
             return ogl::Image::isFormatSupported(format, usage);
         return false;
     }
 
-    bool Image::isBlockCompressed(const kor::Image::Format format)
+    bool Image::IsBlockCompressed(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -392,7 +392,7 @@ namespace kor
         }
     }
 
-    glm::uvec2 Image::blockExtent(const kor::Image::Format format)
+    glm::uvec2 Image::BlockExtent(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -404,11 +404,11 @@ namespace kor
         default:
             // Every other compressed format is 4x4; an uncompressed one is its own texel, which
             // makes the block arithmetic in sizeOfRegion the same code for both.
-            return isBlockCompressed(format) ? glm::uvec2{ 4, 4 } : glm::uvec2{ 1, 1 };
+            return IsBlockCompressed(format) ? glm::uvec2{ 4, 4 } : glm::uvec2{ 1, 1 };
         }
     }
 
-    glm::u32 Image::blockSize(const kor::Image::Format format)
+    glm::u32 Image::BlockSize(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -433,14 +433,14 @@ namespace kor
             return 16;
         default:
             // Uncompressed: one texel is the block.
-            return channelSize(format) * channelCount(format);
+            return ChannelSize(format) * ChannelCount(format);
         }
     }
 
-    glm::u64 Image::sizeOfRegion(const kor::Image::Format format, const glm::uvec3 extent,
+    glm::u64 Image::SizeOfRegion(const kor::Image::Format format, const glm::uvec3 extent,
                                  const glm::u32 layerCount)
     {
-        const auto block = blockExtent(format);
+        const auto block = BlockExtent(format);
         // Round up: a 5-texel row of a 4x4 format still costs two blocks, and a buffer sized for
         // one and a quarter would be short.
         const glm::u64 blocksX = (static_cast<glm::u64>(extent.x) + block.x - 1) / block.x;
@@ -448,7 +448,7 @@ namespace kor
         const glm::u64 depth = std::max(1u, extent.z);
         const glm::u64 layers = std::max(1u, layerCount);
 
-        return blocksX * blocksY * depth * layers * blockSize(format);
+        return blocksX * blocksY * depth * layers * BlockSize(format);
     }
 
     Image::Image(const Builder& createInfo) :
@@ -465,7 +465,7 @@ namespace kor
         }
     }
 
-    bool isDepthStencilFormat(const Image::Format format)
+    bool IsDepthStencilFormat(const Image::Format format)
     {
         switch (format)
         {
@@ -479,7 +479,7 @@ namespace kor
         }
     }
 
-    bool isStencilFormat(Image::Format format)
+    bool IsStencilFormat(Image::Format format)
     {
         switch (format)
         {

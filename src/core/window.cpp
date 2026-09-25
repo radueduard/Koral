@@ -146,8 +146,8 @@ namespace kor {
         // Register only the window-management callbacks now (before the
         // framebuffer-ready wait loop). Input callbacks are registered later,
         // after GUI::Init(), because they explicitly forward events to ImGui.
-        glfwSetFramebufferSizeCallback(_window, framebufferResize);
-        glfwSetWindowCloseCallback(_window, Input::Callbacks::closeCallback);
+        glfwSetFramebufferSizeCallback(_window, FramebufferResize);
+        glfwSetWindowCloseCallback(_window, Input::Callbacks::CloseCallback);
 
         // On Wayland the framebuffer size isn't valid until the compositor has sent
         // at least one xdg_surface.configure. Pump events and wait until we have a
@@ -206,8 +206,8 @@ namespace kor {
             // A floor, not a promise: the surface may require more and the driver may allocate
             // more still. Everything per-frame is sized to what was actually allocated, which
             // Scheduler::Initialize adopts before anything reads it.
-            .setImageCount(2)
-            .build();
+            .SetImageCount(2)
+            .Build();
         Context::_scheduler->Initialize();
         _framebuffer = Framebuffer::CreateDefault();
         kor::GUI::Init();
@@ -216,11 +216,11 @@ namespace kor {
         // safely forward events to ImGui. We use install_callbacks=false in
         // ImGui's init (see vulkan/gui.cpp and open_gl/gui.cpp) so ImGui does
         // NOT install its own GLFW callbacks; our callbacks are the sole chain.
-        Time::setup();
-        Input::setup(_window);
+        Time::Setup();
+        Input::Setup(_window);
         // Through the same path an undocked panel's window takes, so there is one way in rather than
-        // two that can drift apart. @see Input::attachTo
-        Input::attachTo(_window);
+        // two that can drift apart. @see Input::AttachTo
+        Input::AttachTo(_window);
 
         Context::_mainThreadExecutor = new MainThreadExecutor();
         Context::_backgroundExecutor = new BackgroundExecutor();
@@ -236,7 +236,7 @@ namespace kor {
         _scene->Initialize();
     }
 
-    std::unique_ptr<Window> Window::Builder::build()
+    std::unique_ptr<Window> Window::Builder::Build()
     {
         return std::make_unique<Window>(*this);
     }
@@ -258,7 +258,7 @@ namespace kor {
     // Out of line for the same reason, but for kor::Framebuffer: returning the ResourceRef by value
     // instantiates that type's destructor, which needs it complete. This file has it via
     // <framebuffer.h>; window.h does not (see context.h).
-    ResourceRef<Framebuffer> Window::framebuffer() const {
+    ResourceRef<Framebuffer> Window::DefaultFramebuffer() const {
         return _framebuffer;
     }
 
@@ -272,7 +272,7 @@ namespace kor {
         _scene.reset();
         ModuleHost::Shutdown();
         GUI::Shutdown();
-        _framebuffer.reset();
+        _framebuffer.Reset();
         Context::_scheduler.reset();
         if (_api == API::eVulkan) {
             vk::Context::StopTokens();
@@ -288,22 +288,22 @@ namespace kor {
         glfwTerminate();
     }
 
-    bool Window::shouldClose() const
+    bool Window::ShouldClose() const
     { return glfwWindowShouldClose(_window); }
 
-    void Window::close()
+    void Window::Close()
     {
         glfwSetWindowShouldClose(_window, GLFW_TRUE);
         _closed = true;
     }
 
-    void Window::setTitle(const std::string& title)
+    void Window::SetTitle(const std::string& title)
     {
         _title = title;
         glfwSetWindowTitle(_window, title.c_str());
     }
 
-    void Window::setIcon(const std::filesystem::path& iconPath)
+    void Window::SetIcon(const std::filesystem::path& iconPath)
     {
         const auto image = new GLFWimage;
         const std::string iconPathStr = iconPath.string();
@@ -325,16 +325,16 @@ namespace kor {
         _hasResized = false;
     }
 
-    void Window::framebufferResize(GLFWwindow* handle, const int width, const int height) {
+    void Window::FramebufferResize(GLFWwindow* handle, const int width, const int height) {
     	const auto app = static_cast<Window*>(glfwGetWindowUserPointer(handle));
 
         app->_hasResized = true;
 
     	app->_extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
     	if (width == 0 || height == 0) {
-    		app->pause();
+    		app->Pause();
     	} else {
-    		app->unpause();
+    		app->Unpause();
     	}
     }
 }

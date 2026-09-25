@@ -16,14 +16,14 @@
  * kgui::Viewport _viewport;
  *
  * void MyScene::Initialize() {
- *     _viewport.setImage(_colorTarget);   // once
+ *     _viewport.SetImage(_colorTarget);   // once
  * }
  *
  * void MyScene::Update() {
  *     // The viewport asked for a size last frame; give it one. Resizing the target is the whole of
  *     // the answer — the viewport notices that the image was replaced and follows.
- *     if (_viewport.resized()) framebuffer->Resize(_viewport.size());
- *     if (_viewport.isHovered()) _camera->controller().enable();   // input only over the image
+ *     if (_viewport.Resized()) framebuffer->Resize(_viewport.size());
+ *     if (_viewport.IsHovered()) _camera->ControllerSettings().enable();   // input only over the image
  * }
  *
  * void MyScene::RenderUI() { _viewport.Draw("Scene"); }
@@ -121,22 +121,22 @@ namespace kgui
          * only its own render target to re-create. Call this again to show a *different* image, and
          * calling it every frame with the same one is cheap.
          */
-        void setImage(kor::ResourceRef<const kor::Image> image)
+        void SetImage(kor::ResourceRef<const kor::Image> image)
         {
             // Compared by what they point at, since a ResourceRef is a handle and two of them to the
             // same image are the same image. Cheap enough to be called every frame with the same one,
             // which is how a scene naturally uses it.
-            if (_image.alive() && image.alive() && _image.get() == image.get()
-                && _handleGeneration == image->generation()) return;
+            if (_image.Alive() && image.Alive() && _image.Get() == image.Get()
+                && _handleGeneration == image->Generation()) return;
 
             _image = std::move(image);
             _handle = {};
             _reportedHandleFailure = false;   // a different image deserves its own diagnosis
-            rebuildHandle();
+            RebuildHandle();
         }
 
         /** @brief The image currently being displayed, if any. */
-        [[nodiscard]] const kor::ResourceRef<const kor::Image>& image() const { return _image; }
+        [[nodiscard]] const kor::ResourceRef<const kor::Image>& DisplayedImage() const { return _image; }
 
         /**
          * @brief Whether the viewport is actually showing an image.
@@ -144,11 +144,11 @@ namespace kgui
          * False when it has none, when the one it had was destroyed, and when the backend could not
          * make a texture handle for it — the three cases where Draw puts up a placeholder instead.
          */
-        [[nodiscard]] bool showing() const { return _handle.operator bool() && _image.alive(); }
+        [[nodiscard]] bool Showing() const { return _handle.operator bool() && _image.Alive(); }
 
         /** @brief How the image is fitted into the window. @see Fit */
-        void setFit(const Fit fit) { _fit = fit; }
-        [[nodiscard]] Fit fit() const { return _fit; }
+        void SetFit(const Fit fit) { _fit = fit; }
+        [[nodiscard]] Fit FitMode() const { return _fit; }
 
         /**
          * @brief Draws the window.
@@ -187,10 +187,10 @@ namespace kgui
             // Before the layout, which reads the image's extent, and before the draw, which needs a
             // handle that matches it: a target the scene resized last frame is picked up here rather
             // than being handed back by the scene. @see refreshHandle
-            refreshHandle();
+            RefreshHandle();
 
-            _rect = layout(available);
-            drawImage();
+            _rect = Layout(available);
+            DrawImage();
 
             // Read *after* the image, so they describe the item just drawn rather than the window.
             _hovered = ImGui::IsItemHovered();
@@ -214,13 +214,13 @@ namespace kgui
          * The one thing that makes a viewport more than an ImGui::Image call: a render target has to
          * be re-created when this is true, and a scene checks it once per frame.
          */
-        [[nodiscard]] bool resized() const { return _resized; }
+        [[nodiscard]] bool Resized() const { return _resized; }
 
         /** @brief Whether the pointer is over the image. What to gate camera and picking input on. */
-        [[nodiscard]] bool isHovered() const { return _hovered; }
+        [[nodiscard]] bool IsHovered() const { return _hovered; }
 
         /** @brief Whether the pointer is resize handle shaped. */
-        [[nodiscard]] bool isResizing() const
+        [[nodiscard]] bool IsResizing() const
         {
             if (!_hovered) return false;
             const ImVec2 mouse = ImGui::GetMousePos();
@@ -230,10 +230,10 @@ namespace kgui
         }
 
         /** @brief Whether the viewport's window has keyboard focus. */
-        [[nodiscard]] bool isFocused() const { return _focused; }
+        [[nodiscard]] bool IsFocused() const { return _focused; }
 
         /** @brief Where the image was drawn on screen, for anything that draws over it. @see BeginGizmo */
-        [[nodiscard]] const Rect& rect() const { return _rect; }
+        [[nodiscard]] const Rect& ScreenRect() const { return _rect; }
 
         /**
          * @brief The pointer's position in the image's own pixels.
@@ -242,7 +242,7 @@ namespace kgui
          * What a pick needs: the texel under the cursor, whatever the window's size or the fit did to
          * get it there.
          */
-        [[nodiscard]] std::optional<glm::vec2> mousePosition() const
+        [[nodiscard]] std::optional<glm::vec2> MousePosition() const
         {
             if (!_hovered || _rect.size.x <= 0.f || _rect.size.y <= 0.f) return std::nullopt;
 
@@ -254,7 +254,7 @@ namespace kgui
                 return std::nullopt;
 
             // Scaled to the *image's* extent, which under eContain is not the window's.
-            const auto extent = _image.alive() ? _image->extent() : glm::uvec3(_content, 1);
+            const auto extent = _image.Alive() ? _image->Extent() : glm::uvec3(_content, 1);
             return glm::vec2(normalized.x * static_cast<float>(extent.x),
                              normalized.y * static_cast<float>(extent.y));
         }
@@ -278,22 +278,22 @@ namespace kgui
          * because the caller is Scene::RenderUI and a viewport that cannot show its image should draw
          * a placeholder, not take the frame down with it.
          */
-        void rebuildHandle()
+        void RebuildHandle()
         {
             // Stamped even when the build below fails, so a failure is not retried every frame — the
             // next attempt comes with the next image, or the next resize.
-            _handleGeneration = _image.alive() ? _image->generation() : 0;
+            _handleGeneration = _image.Alive() ? _image->Generation() : 0;
             _handle = { };
-            if (!_image.alive()) return;
+            if (!_image.Alive()) return;
 
-            auto created = kor::guard(kor::ErrorCode::eBackend, [this] {
+            auto created = kor::Guard(kor::ErrorCode::eBackend, [this] {
                 return kor::GuiImage::Create(_image);
             });
             if (created) {
                 _handle = std::move(*created);
             } else if (!_reportedHandleFailure) {
                 _reportedHandleFailure = true;
-                kor::log::warn("[viewport] the image cannot be shown: {}", created.error().message);
+                kor::log::Warn("[viewport] the image cannot be shown: {}", created.error().message);
             }
         }
 
@@ -303,21 +303,21 @@ namespace kgui
          * Resizing an image does not resize it — it allocates a new one and bumps its generation,
          * which is precisely how anything holding a handle to the old one is meant to find out. So a
          * scene that resizes its render target has to do nothing else: it does not have to hand the
-         * viewport an image it never changed, and it cannot forget to. @see kor::Image::generation
+         * viewport an image it never changed, and it cannot forget to. @see kor::Image::Generation
          */
-        void refreshHandle()
+        void RefreshHandle()
         {
-            if (_image.alive() && _image->generation() != _handleGeneration) rebuildHandle();
+            if (_image.Alive() && _image->Generation() != _handleGeneration) RebuildHandle();
         }
 
         /** @brief Where to put the image inside @p available, given the fit. */
-        [[nodiscard]] Rect layout(const ImVec2 available) const
+        [[nodiscard]] Rect Layout(const ImVec2 available) const
         {
             const ImVec2 cursor = ImGui::GetCursorScreenPos();
-            if (_fit == Fit::eStretch || !_image.alive())
+            if (_fit == Fit::eStretch || !_image.Alive())
                 return Rect{ cursor, available };
 
-            const auto extent = _image->extent();
+            const auto extent = _image->Extent();
             if (extent.x == 0 || extent.y == 0) return Rect{ cursor, available };
 
             const float imageAspect = static_cast<float>(extent.x) / static_cast<float>(extent.y);
@@ -333,9 +333,9 @@ namespace kgui
             return Rect{ position, size };
         }
 
-        void drawImage() const
+        void DrawImage() const
         {
-            if (!_handle || !_image.alive()) {
+            if (!_handle || !_image.Alive()) {
                 // No image, or one that has been destroyed: say so instead of drawing a dangling
                 // texture. A scene that re-creates its targets passes through this for one frame.
                 ImGui::Dummy(ImGui::GetContentRegionAvail());

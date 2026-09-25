@@ -34,7 +34,7 @@ namespace kor
      *
      * @code
      * kor::ComputePipeline::Builder builder;
-     * auto cull = builder.setComputeShader(cullShader).build();
+     * auto cull = builder.SetComputeShader(cullShader).Build();
      *
      * commandBuffer.BindComputePipeline(cull).Dispatch(groupsX, 1, 1);
      * @endcode
@@ -52,7 +52,7 @@ namespace kor
             std::optional<ResourceRef<const Shader>> computeShader;    ///< The shader to run.
 
             /** @brief Sets the compute shader. Required. */
-            Builder& setComputeShader(ResourceRef<const Shader> computeShader);
+            Builder& SetComputeShader(ResourceRef<const Shader> computeShader);
 
             /**
              * @brief Bakes a specialization constant into the shader.
@@ -66,7 +66,7 @@ namespace kor
              * @throws std::runtime_error if the accumulated constants exceed the internal buffer.
              */
             template<typename T> requires std::is_trivially_copyable_v<T>
-            Builder& setSpecializationConstant(glm::u32 id, T value) {
+            Builder& SetSpecializationConstant(glm::u32 id, T value) {
                 const glm::u32 valueSize = sizeof(T);
                 if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
                     throw std::runtime_error("Exceeded maximum specialization constant data size");
@@ -77,15 +77,15 @@ namespace kor
                 return *this;
             }
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<ComputePipeline>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<ComputePipeline>> Create() const;
 
             /**
              * @brief Compiles the pipeline.
              * @return It as a Resource; poisoned rather than thrown when the shader fails to
              *         compile, and repaired automatically when it is fixed.
              */
-            [[nodiscard]] kor::Resource<ComputePipeline> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<ComputePipeline> Build(std::source_location where = std::source_location::current()) const;
 
             std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));

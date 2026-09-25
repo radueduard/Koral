@@ -62,16 +62,16 @@ namespace kgui
          */
         void Draw(const char* title = "Statistics", bool* open = nullptr)
         {
-            sample();
+            Sample();
 
             if (!ImGui::Begin(title, open)) { ImGui::End(); return; }
 
-            drawFrameTime();
+            DrawFrameTime();
             ImGui::Separator();
-            drawResources();
+            DrawResources();
             if (!_counters.empty()) {
                 ImGui::Separator();
-                drawCounters();
+                DrawCounters();
             }
 
             ImGui::End();
@@ -101,9 +101,9 @@ namespace kgui
 
     private:
         /** @brief Records this frame's time, oldest sample falling off the end. */
-        void sample()
+        void Sample()
         {
-            const float milliseconds = kor::Time::frameTime() * 1000.f;
+            const float milliseconds = kor::Time::FrameTime() * 1000.f;
             _frames[_next] = milliseconds;
             _next = (_next + 1) % History;
             if (_filled < History) ++_filled;
@@ -112,7 +112,7 @@ namespace kgui
         /** @brief mean, worst, and the 99th percentile of the window, in milliseconds. */
         struct Summary { float mean = 0.f, worst = 0.f, percentile99 = 0.f; };
 
-        [[nodiscard]] Summary summarise() const
+        [[nodiscard]] Summary Summarise() const
         {
             if (_filled == 0) return {};
 
@@ -134,9 +134,9 @@ namespace kgui
             return summary;
         }
 
-        void drawFrameTime() const
+        void DrawFrameTime() const
         {
-            const auto summary = summarise();
+            const auto summary = Summarise();
             const float fps = summary.mean > 0.f ? 1000.f / summary.mean : 0.f;
 
             ImGui::Text("%.1f fps", fps);
@@ -153,19 +153,19 @@ namespace kgui
             ImGui::PlotLines("##frames", _frames.data(), static_cast<int>(_filled),
                              static_cast<int>(_next % History), nullptr, 0.f, ceiling, ImVec2(-FLT_MIN, 60.f));
 
-            ImGui::TextDisabled("%.1f s since the window opened", kor::Time::windowTime());
+            ImGui::TextDisabled("%.1f s since the window opened", kor::Time::WindowTime());
         }
 
-        static void drawResources()
+        static void DrawResources()
         {
-            if (!kor::Context::hasRepository()) {
+            if (!kor::Context::HasRepository()) {
                 ImGui::TextDisabled("no repository yet");
                 return;
             }
 
             const auto& repository = kor::Context::Repository();
-            const auto tracked = repository.trackedResources();
-            const auto unusable = repository.unusableResources();
+            const auto tracked = repository.TrackedResources();
+            const auto unusable = repository.UnusableResources();
 
             ImGui::Text("%zu resources tracked", tracked);
             if (unusable > 0) {
@@ -178,7 +178,7 @@ namespace kgui
             }
         }
 
-        void drawCounters() const
+        void DrawCounters() const
         {
             if (!ImGui::BeginTable("##counters", 2, ImGuiTableFlags_SizingStretchProp)) return;
             for (const auto& [name, value] : _counters) {

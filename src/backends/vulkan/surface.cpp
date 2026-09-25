@@ -28,7 +28,7 @@ namespace kor::vk
             // surface. Fail fast with a clear message instead of continuing with a
             // null handle (which later trips validation and crashes).
             const auto msg = "Failed to create window surface: " + ::vk::to_string(static_cast<::vk::Result>(result));
-            kor::log::error("[vulkan] {}", msg);
+            kor::log::Error("[vulkan] {}", msg);
             throw std::runtime_error(msg);
         }
         _handle = surface;

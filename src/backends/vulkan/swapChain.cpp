@@ -33,7 +33,7 @@ namespace kor::vk
     }
 
     ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes) {
-        if (!kor::Context::Window().isVSync()) {
+        if (!kor::Context::Window().IsVSync()) {
             // VSync off: present uncapped. Prefer immediate (may tear); Fifo is the
             // guaranteed-available fallback if the driver lacks an immediate mode.
             for (const auto &availablePresentMode : availablePresentModes) {
@@ -64,7 +64,7 @@ namespace kor::vk
     }
 
     SwapChain::SwapChain(const Builder& createInfo) :
-        _extent(kor::Context::Window().extent()),
+        _extent(kor::Context::Window().Extent()),
         _sampleCount(createInfo.sampleCount),
         _requestedImageCount(createInfo.imageCount),
         _surface(createInfo.surface),
@@ -94,7 +94,7 @@ namespace kor::vk
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
 
-        const auto compositeAlpha = kor::Context::Window().isFramebufferTransparent() ?
+        const auto compositeAlpha = kor::Context::Window().IsFramebufferTransparent() ?
 #ifdef _WIN32
         ::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
 #elifdef __APPLE__
@@ -160,35 +160,35 @@ namespace kor::vk
         _swapChainImages = Resource<kor::Image>(std::make_unique<kor::vk::Image>(swapChainImageHandles, _extent, format(_surfaceFormat.format), _sampleCount));
 
         _swapChainImageViews = kor::ImageView::Builder(_swapChainImages)
-            .setViewType(kor::ImageView::Type::e2D)
-            .build();
+            .SetViewType(kor::ImageView::Type::e2D)
+            .Build();
     }
 
     void SwapChain::CreateDepthResources() {
         // Separate from CreateSwapChain, and called only once the scheduler has adopted the count
         // above, because this is a *per-frame* image: it allocates one copy per
-        // Context::Scheduler().imageCount(), and is then indexed by the image index the driver
+        // Context::Scheduler().ImageCount(), and is then indexed by the image index the driver
         // hands back from acquire. Built while the scheduler still reported the requested count, it
         // comes up short on any driver that allocates more than was asked for — the same
         // out-of-bounds the semaphores above were fixed for.
         _depthImages = Image::Builder()
-            .setIsPerFrame(true)
-            .setExtent(_extent)
-            .setFormat(kor::Image::Format::eD32_SFLOAT_S8_UINT)
-            .setType(kor::Image::Type::e2D)
+            .SetIsPerFrame(true)
+            .SetExtent(_extent)
+            .SetFormat(kor::Image::Format::eD32_SFLOAT_S8_UINT)
+            .SetType(kor::Image::Type::e2D)
             // Projects reach this through the default framebuffer and may sample or blit it, so
             // it keeps the roles the old permissive default gave it rather than just the one
             // the swap chain itself needs.
-            .setUsage(kor::Image::Usage::eDepthStencilAttachment
+            .SetUsage(kor::Image::Usage::eDepthStencilAttachment
                     | kor::Image::Usage::eSampled
                     | kor::Image::Usage::eTransferSrc
                     | kor::Image::Usage::eTransferDst)
-            .setSampleCount(_sampleCount)
-            .build();
+            .SetSampleCount(_sampleCount)
+            .Build();
 
         _depthImageViews = ImageView::Builder(_depthImages)
-            .setViewType(kor::ImageView::Type::e2D)
-            .build();
+            .SetViewType(kor::ImageView::Type::e2D)
+            .Build();
     }
 
     SwapChain::~SwapChain() {

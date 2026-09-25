@@ -24,7 +24,7 @@ namespace kor {
         virtual ~Executor() = default;
 
         /** @brief Whether this executor resumes work on the thread the run loop drives. */
-        virtual bool isMainThread() const noexcept { return false; }
+        virtual bool IsMainThread() const noexcept { return false; }
 
         /** @brief Schedules a suspended coroutine to be resumed on this executor. */
         virtual void Enqueue(std::coroutine_handle<>) = 0;
@@ -135,7 +135,7 @@ namespace kor {
         }
 
         /** @brief Whether the coroutine has run to completion (or was never started). */
-        [[nodiscard]] bool done() const noexcept {
+        [[nodiscard]] bool Done() const noexcept {
             return !_handle || _handle.done();
         }
 
@@ -146,7 +146,7 @@ namespace kor {
          *         reported here rather than propagating.
          * @note Consumes the task: calling it twice reports that there is nothing to take.
          */
-        std::expected<void, std::string> take() {
+        std::expected<void, std::string> Take() {
             if (!_handle) return std::unexpected("No task to take from");
             if (!_handle.done()) return std::unexpected("Task is not completed yet");
 
@@ -223,7 +223,7 @@ namespace kor {
         }
 
         /** @brief Whether the coroutine has run to completion (or was never started). */
-        [[nodiscard]] bool done() const noexcept {
+        [[nodiscard]] bool Done() const noexcept {
             return !_handle || _handle.done();
         }
 
@@ -234,7 +234,7 @@ namespace kor {
          *         escaped the coroutine is caught and reported here rather than propagating.
          * @note Consumes the task: calling it twice reports that there is nothing to take.
          */
-        std::expected<T, std::string> take() {
+        std::expected<T, std::string> Take() {
             if (!_handle) return std::unexpected("No task to take from");
             if (!_handle.done()) return std::unexpected("Task is not completed yet");
 

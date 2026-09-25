@@ -29,9 +29,9 @@ namespace kor
      * @code
      * kor::ImageView::Builder builder(texture);
      * auto view = builder
-     *     .setViewType(kor::ImageView::Type::e2D)
-     *     .setMipLevelCount(texture->mipLevels())
-     *     .build();
+     *     .SetViewType(kor::ImageView::Type::e2D)
+     *     .SetMipLevelCount(texture->MipLevels())
+     *     .Build();
      * @endcode
      *
      * The view keeps a reference to its image, so the image outlives it.
@@ -79,22 +79,22 @@ namespace kor
             Swizzle a = Swizzle::eIdentity; ///< Source of the alpha channel.
 
             /** @brief Sets where the red channel comes from. */
-            ComponentMapping& setR(const Swizzle swizzle) {
+            ComponentMapping& SetR(const Swizzle swizzle) {
                 r = swizzle;
                 return *this;
             }
             /** @brief Sets where the green channel comes from. */
-            ComponentMapping& setG(const Swizzle swizzle) {
+            ComponentMapping& SetG(const Swizzle swizzle) {
                 g = swizzle;
                 return *this;
             }
             /** @brief Sets where the blue channel comes from. */
-            ComponentMapping& setB(const Swizzle swizzle) {
+            ComponentMapping& SetB(const Swizzle swizzle) {
                 b = swizzle;
                 return *this;
             }
             /** @brief Sets where the alpha channel comes from. */
-            ComponentMapping& setA(const Swizzle swizzle) {
+            ComponentMapping& SetA(const Swizzle swizzle) {
                 a = swizzle;
                 return *this;
             }
@@ -114,13 +114,13 @@ namespace kor
             explicit Builder(kor::ResourceRef<const Image> image);
 
             /** @brief Sets how the image is seen — 2D, cube, array. Must be compatible with the image. */
-            Builder& setViewType(Type viewType) {
+            Builder& SetViewType(Type viewType) {
                 this->type = viewType;
                 return *this;
             }
 
             /** @brief Sets the first mip level the view covers, so a shader can be given one level of a chain. */
-            Builder& setBaseMipLevel(glm::u32 baseMipLevel) {
+            Builder& SetBaseMipLevel(glm::u32 baseMipLevel) {
                 this->baseMipLevel = baseMipLevel;
                 return *this;
             }
@@ -131,55 +131,55 @@ namespace kor
              * A sampled texture wants the whole chain, or mip mapping has nothing to select from; a
              * render target wants exactly one.
              */
-            Builder& setMipLevelCount(glm::u32 mipLevelCount) {
+            Builder& SetMipLevelCount(glm::u32 mipLevelCount) {
                 this->mipLevelCount = mipLevelCount;
                 return *this;
             }
 
             /** @brief Sets the first array layer the view covers. */
-            Builder& setBaseArrayLayer(glm::u32 baseArrayLayer) {
+            Builder& SetBaseArrayLayer(glm::u32 baseArrayLayer) {
                 this->baseArrayLayer = baseArrayLayer;
                 return *this;
             }
 
             /** @brief Sets how many array layers the view covers. Six, with Type::eCube, makes a cube map. */
-            Builder& setArrayLayerCount(glm::u32 arrayLayerCount) {
+            Builder& SetArrayLayerCount(glm::u32 arrayLayerCount) {
                 this->arrayLayerCount = arrayLayerCount;
                 return *this;
             }
 
             /** @brief Rewires which image channel feeds which output channel. */
-            Builder& setComponentMapping(const ComponentMapping& componentMapping) {
+            Builder& SetComponentMapping(const ComponentMapping& componentMapping) {
                 this->componentMapping = componentMapping;
                 return *this;
             }
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<ImageView>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<ImageView>> Create() const;
 
             /** @brief Creates the view. Poisoned rather than thrown if the image and the view type disagree. */
-            [[nodiscard]] kor::Resource<ImageView> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<ImageView> Build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~ImageView() = default;
 
         /** @brief The image this is a view of. */
-        [[nodiscard]] kor::ResourceRef<const Image> image() const { return _image; }
+        [[nodiscard]] kor::ResourceRef<const Image> SourceImage() const { return _image; }
         /** @brief How the image is seen through this view. */
-        [[nodiscard]] Type viewType() const { return _viewType; }
+        [[nodiscard]] Type ViewType() const { return _viewType; }
         /** @brief First mip level the view covers. */
-        [[nodiscard]] glm::u32 baseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] glm::u32 BaseMipLevel() const { return _baseMipLevel; }
         /** @brief How many mip levels the view covers. */
-        [[nodiscard]] glm::u32 mipLevelCount() const { return _mipLevelCount; }
+        [[nodiscard]] glm::u32 MipLevelCount() const { return _mipLevelCount; }
         /** @brief First array layer the view covers. */
-        [[nodiscard]] glm::u32 baseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] glm::u32 BaseArrayLayer() const { return _baseArrayLayer; }
         /** @brief How many array layers the view covers. */
-        [[nodiscard]] glm::u32 arrayLayerCount() const { return _arrayLayerCount; }
+        [[nodiscard]] glm::u32 ArrayLayerCount() const { return _arrayLayerCount; }
         /** @brief The channel rewiring applied when sampling through this view. */
-        [[nodiscard]] ComponentMapping componentMapping() const { return _componentMapping; }
+        [[nodiscard]] ComponentMapping Components() const { return _componentMapping; }
 
         /** @brief Whether the view follows a per-frame image, and so has one instance per frame in flight. */
-        [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
+        [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
 
     protected:
         explicit ImageView(const Builder& createInfo);

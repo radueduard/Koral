@@ -109,7 +109,7 @@ namespace kor
             //
             // Either way the failure is ERROR_MOD_NOT_FOUND — 126 — reported against the module
             // that was asked for, never naming the dependency that was actually missing.
-            // Absolute path required by these flags, which is what resolve() above returns.
+            // Absolute path required by these flags, which is what Resolve() above returns.
             const HMODULE handle = LoadLibraryExW(path.wstring().c_str(), nullptr,
                                                   LOAD_LIBRARY_SEARCH_DEFAULT_DIRS
                                                   | LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
@@ -253,7 +253,7 @@ namespace kor
                         provider.version != dependency.version)
                     {
                         if (dependency.kind == Dependency::Kind::eOptional) {
-                            log::warn("[module] '{}' was built against '{}' v{}, but v{} is loaded; "
+                            log::Warn("[module] '{}' was built against '{}' v{}, but v{} is loaded; "
                                       "treating the optional dependency as absent",
                                       descriptor.id, dependency.id, dependency.version, provider.version);
                             continue;
@@ -292,7 +292,7 @@ namespace kor
     void ModuleHost::Register(const ModuleDescriptor* descriptor, const CreateModuleFn create)
     {
         if (!descriptor || descriptor->id.empty() || !create) {
-            log::error("[module] a module registered itself with no descriptor or no factory; "
+            log::Error("[module] a module registered itself with no descriptor or no factory; "
                        "ignoring it");
             return;
         }
@@ -311,7 +311,7 @@ namespace kor
                               .create = create });
 
         if (resolved()) {
-            log::warn("[module] '{}' registered after startup; its lifecycle hooks will not run. "
+            log::Warn("[module] '{}' registered after startup; its lifecycle hooks will not run. "
                       "A module has to be loaded before the scene is initialized.", descriptor->id);
         }
     }
@@ -404,7 +404,7 @@ namespace kor
             // Initialize() can reach any other module, in any direction.
             moduleIndex()[entry.descriptor->id] = i;
 
-            log::info("[module] loaded '{}' v{} ({})", entry.descriptor->id, entry.descriptor->version,
+            log::Info("[module] loaded '{}' v{} ({})", entry.descriptor->id, entry.descriptor->version,
                       entry.path.empty() ? "linked" : entry.path.string());
         }
 
@@ -416,7 +416,7 @@ namespace kor
     {
         if (!resolved()) {
             if (const auto result = Resolve(); !result)
-                log::error("[module] {}", result.error().message);
+                log::Error("[module] {}", result.error().message);
         }
         forEach([](Module& m) { m.Initialize(); });
     }
@@ -462,7 +462,7 @@ namespace kor
         // already run, and they only run once.
     }
 
-    std::vector<std::string_view> ModuleHost::loadedModules()
+    std::vector<std::string_view> ModuleHost::LoadedModules()
     {
         std::vector<std::string_view> ids;
         ids.reserve(modules().size());

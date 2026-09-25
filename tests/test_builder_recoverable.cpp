@@ -1,7 +1,7 @@
 // Guards the recoverable/unrecoverable split that decides whether a resource keeps a copy of its
 // builder around to retry with.
 //
-// This is a memory-safety invariant, not a stylistic one. Builder::materialize() retains the
+// This is a memory-safety invariant, not a stylistic one. Builder::Materialize() retains the
 // builder only when Recoverable is true. A builder that owns the resource's initial data —
 // Buffer::Builder<T>::_ownedData is a copy of the buffer's contents, Image::Builder::data is a copy
 // of the texture's pixels — would pin that data in host memory for the whole life of the resource
@@ -74,15 +74,15 @@ TEST(BufferBuilder, CopyDoesNotAliasTheSourcesData) {
     const std::vector<std::uint32_t> data{1, 2, 3, 4};
 
     auto original = std::make_unique<kor::Buffer::Builder<std::uint32_t>>();
-    original->setData(data);  // copies the data in; the view must point at *our* copy
+    original->SetData(data);  // copies the data in; the view must point at *our* copy
 
     const kor::Buffer::Builder<std::uint32_t> copy = *original;
 
     // Kill the source. A stored span would now dangle.
     original.reset();
 
-    ASSERT_EQ(copy.dataView().size(), data.size());
-    EXPECT_TRUE(std::ranges::equal(copy.dataView(), data));
+    ASSERT_EQ(copy.DataView().size(), data.size());
+    EXPECT_TRUE(std::ranges::equal(copy.DataView(), data));
 }
 
 // A view onto memory the caller owns (setDataView) must stay pointing at the caller's memory, not
@@ -91,12 +91,12 @@ TEST(BufferBuilder, ExternalViewSurvivesACopyAndStillAliasesTheCaller) {
     std::vector<std::uint32_t> data{7, 8, 9};
 
     kor::Buffer::Builder<std::uint32_t> original;
-    original.setDataView(std::span<const std::uint32_t>(data));
+    original.SetDataView(std::span<const std::uint32_t>(data));
 
     const kor::Buffer::Builder<std::uint32_t> copy = original;
 
-    ASSERT_EQ(copy.dataView().size(), data.size());
-    EXPECT_EQ(copy.dataView().data(), data.data());  // still the caller's memory, not a copy
+    ASSERT_EQ(copy.DataView().size(), data.size());
+    EXPECT_EQ(copy.DataView().data(), data.data());  // still the caller's memory, not a copy
 }
 
 } // namespace

@@ -29,12 +29,12 @@ namespace kor
     /**
      * @brief A compiled shader stage, its reflected interface, and its hot-reload watch.
      *
-     * Shaders are named by source file and, for Slang, an entry point. getOrBuild() is the usual
+     * Shaders are named by source file and, for Slang, an entry point. GetOrBuild() is the usual
      * way in: it compiles on first use and hands back the cached shader afterwards.
      *
      * @code
-     * auto vert = kor::Shader::Builder{}.setPath("flatTriangle.vert.glsl").getOrBuild();
-     * auto frag = kor::Shader::Builder{}.setPath("sample.slang").setEntryPoint("fragmentMain").getOrBuild();
+     * auto vert = kor::Shader::Builder{}.SetPath("flatTriangle.vert.glsl").GetOrBuild();
+     * auto frag = kor::Shader::Builder{}.SetPath("sample.slang").SetEntryPoint("fragmentMain").GetOrBuild();
      * @endcode
      *
      * Compiling also reflects the shader: the descriptor sets, push constants and vertex inputs it
@@ -123,7 +123,7 @@ namespace kor
          *
          * Spelled `Shader::ImageShape` because that is where a reader looks for what reflection
          * reports, but defined in structs.h so that image.h can name it without including the whole
-         * of this header. @see kor::ImageShape, DescriptorSet::Builder::write
+         * of this header. @see kor::ImageShape, DescriptorSet::Builder::Write
          */
         using ImageShape = kor::ImageShape;
 
@@ -192,7 +192,7 @@ namespace kor
 
             // Identity is the *interface* only: type, name, count. Access is a function of
             // the type and adds nothing to compare, and stages are unioned across shaders
-            // rather than compared. Keeping this narrow is what lets Pipeline::buildLayouts
+            // rather than compared. Keeping this narrow is what lets Pipeline::BuildLayouts
             // recognise an unchanged set across a shader reload and keep the existing
             // layout object alive, along with every descriptor set built from it.
             auto operator<=>(const Descriptor& other) const {
@@ -283,18 +283,18 @@ namespace kor
          * point:
          *
          * @code
-         * Shader::Builder{}.setPath("flatTriangle.vert.glsl").getOrBuild();
-         * Shader::Builder{}.setPath("sample.slang").setEntryPoint("vertexMain").getOrBuild();
+         * Shader::Builder{}.SetPath("flatTriangle.vert.glsl").GetOrBuild();
+         * Shader::Builder{}.SetPath("sample.slang").SetEntryPoint("vertexMain").GetOrBuild();
          * @endcode
          *
          * Everything else is inferred, and every inference has a setter that overrides it:
          *
-         * - **language** — from the file extension (.slang / .spv / anything else GLSL); setLang().
+         * - **language** — from the file extension (.slang / .spv / anything else GLSL); SetLang().
          * - **stage** — Slang reads its entry point's `[shader("...")]` attribute; GLSL and SPIR-V
-         *   read the filename's stage tag ("x.vert.glsl", "x.comp.glsl"); setStage().
+         *   read the filename's stage tag ("x.vert.glsl", "x.comp.glsl"); SetStage().
          * - **path** — a relative path is resolved against the shader search roots, so callers do
-         *   not have to wrap it in kor::shaderPath() themselves.
-         * - **identifier** — getOrBuild() defaults it to "path" or "path:entry".
+         *   not have to wrap it in kor::ShaderPath() themselves.
+         * - **identifier** — GetOrBuild() defaults it to "path" or "path:entry".
          */
         struct KORAL_API Builder : kor::Builder {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
@@ -313,20 +313,20 @@ namespace kor
             bool langExplicit  = false;
 
             /** @brief Sets the pipeline stage explicitly, overriding what would be inferred. */
-            Builder& setStage(const Stage stage) {
+            Builder& SetStage(const Stage stage) {
                 this->stage = stage;
                 this->stageExplicit = true;
                 return *this;
             }
 
             /** @brief Sets the source file. A relative path is resolved against the shader search roots. */
-            Builder& setPath(std::filesystem::path path) {
+            Builder& SetPath(std::filesystem::path path) {
                 this->path = std::move(path);
                 return *this;
             }
 
             /** @brief Sets the entry point to compile. Slang modules have many; GLSL has one, "main". */
-            Builder& setEntryPoint(std::string entry) {
+            Builder& SetEntryPoint(std::string entry) {
                 this->entry = std::move(entry);
                 return *this;
             }
@@ -334,45 +334,45 @@ namespace kor
             /**
              * @brief Names a Slang module and one of its entry points.
              *
-             * Equivalent to setPath(module).setEntryPoint(entry): the module is resolved by name
+             * Equivalent to setPath(module).SetEntryPoint(entry): the module is resolved by name
              * across the shader search roots either way.
              */
-            Builder& setEntryPoint(std::string module, std::string entry) {
+            Builder& SetEntryPoint(std::string module, std::string entry) {
                 this->module = std::move(module);
                 this->entry = std::move(entry);
                 return *this;
             }
 
             /** @brief Sets the source language explicitly, overriding what the extension implies. */
-            Builder& setLang(const Lang lang) {
+            Builder& SetLang(const Lang lang) {
                 this->lang = lang;
                 this->langExplicit = true;
                 return *this;
             }
 
             /** @brief Sets the source language as a template argument, for use in a chain. */
-            template<Lang L> Builder& setLang() { return setLang(L); }
+            template<Lang L> Builder& SetLang() { return SetLang(L); }
 
             /**
              * @brief A copy of this builder with every inference applied.
              * @return The builder with language, Slang module name, entry point and stage filled
              *         in, and a relative path resolved against the search roots. Idempotent.
              */
-            [[nodiscard]] Builder resolved() const;
+            [[nodiscard]] Builder Resolved() const;
 
-            /** @brief The cache key getOrBuild() uses when none is given: "path" or "path:entry". */
-            [[nodiscard]] std::string defaultIdentifier() const;
+            /** @brief The cache key GetOrBuild() uses when none is given: "path" or "path:entry". */
+            [[nodiscard]] std::string DefaultIdentifier() const;
 
-            /** @brief One compile attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<Shader>> create() const;
+            /** @brief One compile attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<Shader>> Create() const;
 
             /**
              * @brief Compiles the shader unconditionally, without consulting the cache.
              * @return It as a Resource; poisoned rather than thrown if compilation fails.
              *
-             * Prefer getOrBuild(), which caches and enables hot reload.
+             * Prefer GetOrBuild(), which caches and enables hot reload.
              */
-            [[nodiscard]] kor::Resource<Shader> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<Shader> Build(std::source_location where = std::source_location::current()) const;
 
             /**
              * @brief Returns the shader registered under @p identifier, compiling it on first use.
@@ -388,20 +388,20 @@ namespace kor
              * file watcher and fixing the source could never bring it, or the pipelines built from
              * it, back.
              */
-            [[nodiscard]] ResourceRef<const Shader> getOrBuild(std::string identifier = {},
+            [[nodiscard]] ResourceRef<const Shader> GetOrBuild(std::string identifier = {},
                                                               std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~Shader() = default;
 
         /** @brief Which pipeline stage this shader runs at. */
-        [[nodiscard]] Stage stage() const { return _stage; }
+        [[nodiscard]] Stage ShaderStage() const { return _stage; }
 
         /** @brief The language it was compiled from. */
-        [[nodiscard]] Lang lang() const { return _lang; }
+        [[nodiscard]] Lang Language() const { return _lang; }
 
         /** @brief The resolved path of its source file. */
-        [[nodiscard]] const std::filesystem::path& sourcePath() const { return _path; }
+        [[nodiscard]] const std::filesystem::path& SourcePath() const { return _path; }
 
         /**
          * @brief Every source file the compiled shader depends on.
@@ -409,7 +409,7 @@ namespace kor
          *         (Slang). All of them are watched, so editing an included file reloads the shaders
          *         that include it.
          */
-        [[nodiscard]] const std::vector<std::filesystem::path>& dependencies() const { return _dependencies; }
+        [[nodiscard]] const std::vector<std::filesystem::path>& Dependencies() const { return _dependencies; }
 
         /**
          * @brief Registers a directory to resolve shader paths and Slang module names against.
@@ -421,10 +421,10 @@ namespace kor
          * Koral's own shaders/ is always a root. A project adds its own here — or, more usually,
          * declares them in koral.json under "shaderDirectories" and lets the runtime do it.
          */
-        static void addSearchPath(const std::filesystem::path& dir, bool front = false);
+        static void AddSearchPath(const std::filesystem::path& dir, bool front = false);
 
         /** @brief The shader search roots, in the order they are consulted. */
-        static const std::vector<std::filesystem::path>& searchPaths();
+        static const std::vector<std::filesystem::path>& SearchPaths();
 
         /**
          * @brief Compiles the source to SPIR-V.
@@ -435,10 +435,10 @@ namespace kor
         void Compile();
 
         /** @brief Reflects the compiled SPIR-V into the memory layout. Called after Compile(). */
-        void fetchMemoryLayout();
+        void FetchMemoryLayout();
 
         /** @brief One block's fields — a descriptor's or a push constant's. @see semantics.h */
-        void fetchBlockMembers(const spirv_cross::Compiler& module,
+        void FetchBlockMembers(const spirv_cross::Compiler& module,
                                const spirv_cross::Resource& resource,
                                std::vector<BlockMember>& members,
                                glm::u32& blockSize) const;
@@ -453,7 +453,7 @@ namespace kor
          * to match the shader's: whatever the layouts disagree about, each leaf is written where
          * the shader put it. @see PushConstantField
          */
-        static void flattenPushConstant(const spirv_cross::Compiler& module,
+        static void FlattenPushConstant(const spirv_cross::Compiler& module,
                                         const spirv_cross::SPIRType& type,
                                         const std::string& prefix, glm::u32 baseOffset,
                                         std::vector<PushConstantField>& out);
@@ -466,10 +466,10 @@ namespace kor
          * Slang carries them as `[Kor(NAME)]`, which its reflection reports directly, so that path
          * fills this from the compiler instead of re-reading the file.
          */
-        void fetchFieldSemantics(const std::string& source);
+        void FetchFieldSemantics(const std::string& source);
 
         /** @brief The shader's reflected interface: its sets, push constants and stage inputs and outputs. */
-        const MemoryLayout& memoryLayout() const { return _memoryLayout; }
+        const MemoryLayout& BlockLayout() const { return _memoryLayout; }
 
         /**
          * @brief Whether this shader reaches buffers through raw device addresses.
@@ -478,9 +478,9 @@ namespace kor
          * buffer_reference / BufferPointer in the source compiles to. Reflection can say that
          * such dereferences happen but not *which* buffer any of them lands on, so the engine
          * cannot synchronise them: this flag is what lets it say so out loud instead of
-         * silently under-synchronising. See CommandBuffer::resolveBarriers.
+         * silently under-synchronising. See CommandBuffer::ResolveBarriers.
          */
-        [[nodiscard]] bool usesDeviceAddresses() const { return _usesDeviceAddresses; }
+        [[nodiscard]] bool UsesDeviceAddresses() const { return _usesDeviceAddresses; }
 
         /**
          * @brief Asks to be told when this shader is recompiled.

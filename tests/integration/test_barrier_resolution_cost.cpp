@@ -42,26 +42,26 @@ TEST_F(GpuTest, BarrierResolutionScalesLinearlyWithRecordingLength) {
     std::iota(input.begin(), input.end(), 1u);
 
     Buffer::Builder<std::uint32_t> bufBuilder;
-    bufBuilder.setData(input);
-    bufBuilder.setUsage(Buffer::Usage::eStorage);
-    auto buffer = bufBuilder.build();
-    ASSERT_TRUE(buffer.valid());
+    bufBuilder.SetData(input);
+    bufBuilder.SetUsage(Buffer::Usage::eStorage);
+    auto buffer = bufBuilder.Build();
+    ASSERT_TRUE(buffer.Valid());
 
     Shader::Builder shaderBuilder;
-    shaderBuilder.setPath("doubleValues.comp.glsl");
-    auto shader = shaderBuilder.build();
-    ASSERT_TRUE(shader.valid());
+    shaderBuilder.SetPath("doubleValues.comp.glsl");
+    auto shader = shaderBuilder.Build();
+    ASSERT_TRUE(shader.Valid());
 
     ComputePipeline::Builder pipeBuilder;
-    pipeBuilder.setComputeShader(shader);
-    auto pipeline = pipeBuilder.build();
-    ASSERT_TRUE(pipeline.valid());
+    pipeBuilder.SetComputeShader(shader);
+    auto pipeline = pipeBuilder.Build();
+    ASSERT_TRUE(pipeline.Valid());
 
     auto descriptorSet =
         DescriptorSet::Builder(pipeline, 0)
-            .write(0, buffer)
-            .build();
-    ASSERT_TRUE(descriptorSet.valid());
+            .Write(0, buffer)
+            .Build();
+    ASSERT_TRUE(descriptorSet.Valid());
 
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
 

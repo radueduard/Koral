@@ -63,7 +63,7 @@ namespace kor
 
         // Named imguiModule, not module: `module` is a context-sensitive keyword since C++20 and
         // MSVC pre-scans for it at the start of a line, which is where a statement using it lands.
-        KORAL_API void registerImGuiModule(const ImGuiModule& imguiModule);
+        KORAL_API void RegisterImGuiModule(const ImGuiModule& imguiModule);
 
         // Deliberately neither KORAL_API nor defined out of line: this has to be compiled into the
         // module that includes the header rather than imported from Koral, or every module would
@@ -72,7 +72,7 @@ namespace kor
         {
             ImGuiModuleRegistrar()
             {
-                registerImGuiModule({
+                RegisterImGuiModule({
                     IMGUI_VERSION,
                     sizeof(ImGuiIO),
                     sizeof(ImGuiStyle),
@@ -117,10 +117,10 @@ namespace kor
          * @param layer Array layer to show.
          * @param level Mip level to show.
          */
-        virtual void setLayerAndLevel(glm::u32 layer, glm::u32 level) = 0;
+        virtual void SetLayerAndLevel(glm::u32 layer, glm::u32 level) = 0;
 
         /** @brief Points this handle at a different image, keeping the handle itself valid. */
-        virtual void setImage(kor::ResourceRef<const Image> image) = 0;
+        virtual void SetImage(kor::ResourceRef<const Image> image) = 0;
 
         /** @brief The ImGui texture handle, to pass to ImGui::Image and friends. */
         virtual ImTextureID operator*() const = 0;
@@ -146,7 +146,7 @@ namespace kor
          * when the handle was made. Recorded into the frame's command buffer rather than submitted on
          * its own, which is also what lets the engine's barriers see that the image is read here.
          */
-        virtual void refresh(kor::CommandBuffer& commandBuffer) {}
+        virtual void Refresh(kor::CommandBuffer& commandBuffer) {}
     };
 
     /** @brief The weights of the interface font that Koral loads at startup. */

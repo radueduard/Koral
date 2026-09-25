@@ -69,7 +69,7 @@ namespace kor::vk
             VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
 
             // Mesh/task shaders — Turing and later only. Optional because they are an opt-in
-            // pipeline option (GraphicsPipeline::Builder::setMeshShader) that no default render
+            // pipeline option (GraphicsPipeline::Builder::SetMeshShader) that no default render
             // path uses; requiring them turned away every pre-RTX card for nothing.
             VK_EXT_MESH_SHADER_EXTENSION_NAME,
         };

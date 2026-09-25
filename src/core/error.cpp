@@ -8,7 +8,7 @@
 
 namespace kor
 {
-    // Symbolic name of a code, for logs / toString(). Kept next to describe() so
+    // Symbolic name of a code, for logs / ToString(). Kept next to Describe() so
     // both are updated together when ErrorCode grows.
     static std::string_view name(const ErrorCode code)
     {
@@ -45,7 +45,7 @@ namespace kor
         return "eUnknown";
     }
 
-    std::string_view describe(const ErrorCode code)
+    std::string_view Describe(const ErrorCode code)
     {
         switch (code) {
         case ErrorCode::eNone:
@@ -108,13 +108,13 @@ namespace kor
         return "Unknown error.";
     }
 
-    std::string Error::toString() const
+    std::string Error::ToString() const
     {
         return std::format("kor::Error({}): {} [{}:{}]",
                            name(code), message, where.file_name(), where.line());
     }
 
-    std::size_t Error::depth() const
+    std::size_t Error::Depth() const
     {
         std::size_t d = 0;
         for (const Error* e = cause.get(); e != nullptr; e = e->cause.get())
@@ -122,14 +122,14 @@ namespace kor
         return d;
     }
 
-    const Error& Error::root() const
+    const Error& Error::Root() const
     {
         const Error* e = this;
         while (e->cause) e = e->cause.get();
         return *e;
     }
 
-    std::string Error::history() const
+    std::string Error::History() const
     {
         // The symptom first, then one "caused by" per level, indented so a deep chain
         // still reads top-down. The deepest line is the thing the user has to fix.
@@ -145,7 +145,7 @@ namespace kor
         return out;
     }
 
-    Error causedBy(Error e, std::shared_ptr<const Error> cause)
+    Error CausedBy(Error e, std::shared_ptr<const Error> cause)
     {
         e.cause = std::move(cause);
         return e;

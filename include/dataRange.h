@@ -12,8 +12,8 @@
  * concepts let those functions say what they actually need: a range of the right element type.
  *
  * @code
- * mesh.makeBuffer(vertices, usage);                    // a vector
- * mesh.makeBuffer(std::array{a, b, c}, usage);         // an array
+ * mesh.MakeBuffer(vertices, usage);                    // a vector
+ * mesh.MakeBuffer(std::array{a, b, c}, usage);         // an array
  * buffer->Write(positions | std::views::transform(toDevice));   // a view, materialised here
  * @endcode
  *
@@ -74,7 +74,7 @@ namespace kor
         ContiguousCopy& operator=(const ContiguousCopy&) = delete;
 
         /** @brief The elements, contiguous. Empty for an empty range. */
-        [[nodiscard]] std::span<const T> view() const {
+        [[nodiscard]] std::span<const T> View() const {
             // Recomputed rather than returned from _view when we own the data: a move would have
             // left the stored span pointing at the old vector's buffer.
             return _owned.empty() ? _view : std::span<const T>(_owned);

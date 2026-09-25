@@ -41,7 +41,7 @@ namespace kor
     /**
      * @brief Whether a resource type is something a shader binding can hold directly.
      *
-     * What tells DescriptorSet::Builder::write which of its two jobs it is being asked to do: bind
+     * What tells DescriptorSet::Builder::Write which of its two jobs it is being asked to do: bind
      * a resource at a binding, or fill a block from an object that answers for semantics. Declared
      * as a trait rather than a concept so that it costs no includes — the specialisations below
      * name types this header only forward-declares, and a caller pays for the definition of the one
@@ -64,9 +64,9 @@ namespace kor
      *
      * @code
      * auto frameSet = kor::DescriptorSet::Builder(pipeline, 0)
-     *     .write("camera", cameraBuffer)
-     *     .write("albedo", albedoView, sampler)
-     *     .build();
+     *     .Write("camera", cameraBuffer)
+     *     .Write("albedo", albedoView, sampler)
+     *     .Build();
      *
      * commandBuffer.BindDescriptorSet(0, frameSet);
      * @endcode
@@ -155,7 +155,7 @@ namespace kor
             /**
              * @brief One authored write, kept as written until an attempt resolves it.
              *
-             * Nothing is resolved at write() time, because none of the answers are stable: a
+             * Nothing is resolved at Write() time, because none of the answers are stable: a
              * binding addressed by name may sit at a different number after a reload, an array may
              * have grown, and which buffer answers for a semantic block depends on the shape of the
              * block. Keeping what the caller *said* — and working out what it means once per
@@ -191,10 +191,10 @@ namespace kor
              * The explicit form, and the only one that can bind part of a buffer — everything else
              * is better served by the overloads below, which take the resource itself.
              */
-            Builder& write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index = 0);
+            Builder& Write(glm::u32 binding, const Descriptor& descriptor, glm::u32 index = 0);
 
-            /** @brief Puts a resource at the binding the shader calls @p name. @see write(std::string_view, const ResourceRef<const Buffer>&, glm::u32) */
-            Builder& write(std::string_view name, const Descriptor& descriptor);
+            /** @brief Puts a resource at the binding the shader calls @p name. @see Write(std::string_view, const ResourceRef<const Buffer>&, glm::u32) */
+            Builder& Write(std::string_view name, const Descriptor& descriptor);
 
             /**
              * @name Binding a resource
@@ -202,11 +202,11 @@ namespace kor
              * One overload per kind of thing a binding can hold, so the resource goes in as itself:
              *
              * @code
-             * .write(0, cameraBuffer)               // uniform or storage buffer
-             * .write(1, albedoView, linearSampler)  // combined image sampler
-             * .write(2, storageView)                // storage image, or a separate sampled image
-             * .write(3, linearSampler)              // a sampler on its own
-             * .write(4, tlas)                       // acceleration structure
+             * .Write(0, cameraBuffer)               // uniform or storage buffer
+             * .Write(1, albedoView, linearSampler)  // combined image sampler
+             * .Write(2, storageView)                // storage image, or a separate sampled image
+             * .Write(3, linearSampler)              // a sampler on its own
+             * .Write(4, tlas)                       // acceleration structure
              * @endcode
              *
              * Which kind the binding actually expects is checked against the layout, so binding a
@@ -217,14 +217,14 @@ namespace kor
              * @param index Which element, for an array binding. Zero otherwise.
              */
             ///@{
-            Builder& write(glm::u32 binding, const ResourceRef<const Buffer>& buffer, glm::u32 index = 0);
-            Builder& write(glm::u32 binding, const Buffer::Slice& slice, glm::u32 index = 0);
-            Builder& write(glm::u32 binding, const ResourceRef<const BufferView>& bufferView, glm::u32 index = 0);
-            Builder& write(glm::u32 binding, const ResourceRef<const ImageView>& imageView, glm::u32 index = 0);
-            Builder& write(glm::u32 binding, const ResourceRef<const ImageView>& imageView,
+            Builder& Write(glm::u32 binding, const ResourceRef<const Buffer>& buffer, glm::u32 index = 0);
+            Builder& Write(glm::u32 binding, const Buffer::Slice& slice, glm::u32 index = 0);
+            Builder& Write(glm::u32 binding, const ResourceRef<const BufferView>& bufferView, glm::u32 index = 0);
+            Builder& Write(glm::u32 binding, const ResourceRef<const ImageView>& imageView, glm::u32 index = 0);
+            Builder& Write(glm::u32 binding, const ResourceRef<const ImageView>& imageView,
                            const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
-            Builder& write(glm::u32 binding, const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
-            Builder& write(glm::u32 binding, const ResourceRef<const AccelerationStructure>& accelerationStructure,
+            Builder& Write(glm::u32 binding, const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
+            Builder& Write(glm::u32 binding, const ResourceRef<const AccelerationStructure>& accelerationStructure,
                            glm::u32 index = 0);
             ///@}
 
@@ -232,15 +232,15 @@ namespace kor
              * @name Binding an image, without constructing a view for it
              *
              * @code
-             * .write(0, albedoTexture, linearSampler)   // a texture, straight from the Image
-             * .write(1, storageImage)                   // a storage image, likewise
+             * .Write(0, albedoTexture, linearSampler)   // a texture, straight from the Image
+             * .Write(1, storageImage)                   // a storage image, likewise
              * @endcode
              *
              * Nothing binds an image to a shader directly — a view does — but which view is a
              * question the shader has already answered, so there is no reason to make you answer it
              * again. The binding's declaration says whether it wants a 2D texture, a cube map, an
              * array or a volume, and the view is built to match and owned by the image, so two sets
-             * binding the same texture share one. @see Image::view
+             * binding the same texture share one. @see Image::View
              *
              * Reach for ImageView yourself when you want less than the whole image: one mip level,
              * one layer of an array, a channel swizzle. This covers the whole-image case, which is
@@ -250,11 +250,11 @@ namespace kor
              * @param index Which element, for an array binding. Zero otherwise.
              */
             ///@{
-            Builder& write(glm::u32 binding, const ResourceRef<const Image>& image, glm::u32 index = 0);
-            Builder& write(glm::u32 binding, const ResourceRef<const Image>& image,
+            Builder& Write(glm::u32 binding, const ResourceRef<const Image>& image, glm::u32 index = 0);
+            Builder& Write(glm::u32 binding, const ResourceRef<const Image>& image,
                            const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
-            Builder& write(std::string_view name, const ResourceRef<const Image>& image);
-            Builder& write(std::string_view name, const ResourceRef<const Image>& image,
+            Builder& Write(std::string_view name, const ResourceRef<const Image>& image);
+            Builder& Write(std::string_view name, const ResourceRef<const Image>& image,
                            const ResourceRef<const Sampler>& sampler);
             ///@}
 
@@ -264,9 +264,9 @@ namespace kor
              * The same, addressed the way the shader reads rather than by a number restated in C++:
              *
              * @code
-             * .write("camera", cameraBuffer)
-             * .write("albedo", albedoView, linearSampler)
-             * .write("textures[3]", detailView, linearSampler)   // one element of an array binding
+             * .Write("camera", cameraBuffer)
+             * .Write("albedo", albedoView, linearSampler)
+             * .Write("textures[3]", detailView, linearSampler)   // one element of an array binding
              * @endcode
              *
              * A trailing `[n]` selects an element of an array binding; without one the write goes to
@@ -280,14 +280,14 @@ namespace kor
              * where it now is, which a number written in C++ could not do.
              */
             ///@{
-            Builder& write(std::string_view name, const ResourceRef<const Buffer>& buffer);
-            Builder& write(std::string_view name, const Buffer::Slice& slice);
-            Builder& write(std::string_view name, const ResourceRef<const BufferView>& bufferView);
-            Builder& write(std::string_view name, const ResourceRef<const ImageView>& imageView);
-            Builder& write(std::string_view name, const ResourceRef<const ImageView>& imageView,
+            Builder& Write(std::string_view name, const ResourceRef<const Buffer>& buffer);
+            Builder& Write(std::string_view name, const Buffer::Slice& slice);
+            Builder& Write(std::string_view name, const ResourceRef<const BufferView>& bufferView);
+            Builder& Write(std::string_view name, const ResourceRef<const ImageView>& imageView);
+            Builder& Write(std::string_view name, const ResourceRef<const ImageView>& imageView,
                            const ResourceRef<const Sampler>& sampler);
-            Builder& write(std::string_view name, const ResourceRef<const Sampler>& sampler);
-            Builder& write(std::string_view name, const ResourceRef<const AccelerationStructure>& accelerationStructure);
+            Builder& Write(std::string_view name, const ResourceRef<const Sampler>& sampler);
+            Builder& Write(std::string_view name, const ResourceRef<const AccelerationStructure>& accelerationStructure);
             ///@}
 
             /**
@@ -295,7 +295,7 @@ namespace kor
              *        declares — a camera, a light, anything implementing kor::SemanticSerializer.
              *
              * @code
-             * .write(0, _camera)
+             * .Write(0, _camera)
              * @endcode
              *
              * The buffer is created here, laid out exactly as the shader declared the block, and
@@ -312,94 +312,94 @@ namespace kor
              *
              * Constrained away from the resource kinds a binding can hold directly, and only from
              * those. Without that this template is an *exact* match for any Resource or
-             * ResourceRef, so `.write(0, someBuffer)` — the obvious thing to write — bound here,
+             * ResourceRef, so `.Write(0, someBuffer)` — the obvious thing to write — bound here,
              * compiled, and failed at runtime complaining that a Buffer cannot fill a semantic
              * block. Anything that is not a bindable resource still arrives here and still gets
              * that answer at runtime, which is the point of the paragraph above.
              */
             template<typename T>
                 requires (!IsBindableResource<std::remove_const_t<T>>::value)
-            Builder& write(const glm::u32 binding, const ResourceRef<T>& object)
+            Builder& Write(const glm::u32 binding, const ResourceRef<T>& object)
             {
-                if (!object.alive())
-                    return rejectSemantic(binding, "<destroyed>", true);
-                if (!object.valid())
-                    return rejectSemantic(binding, object.name().c_str(), true);
+                if (!object.Alive())
+                    return RejectSemantic(binding, "<destroyed>", true);
+                if (!object.Valid())
+                    return RejectSemantic(binding, object.Name().c_str(), true);
 
                 // const_cast: filling a block does not change what the object *is*, but it does
                 // hand out storage the object owns, and SemanticBuffers is not const. Every other
                 // route to a resource is const-agnostic in the same way.
                 auto& mutableObject = const_cast<std::remove_const_t<T>&>(*object);
                 if (!dynamic_cast<SemanticSerializer*>(&mutableObject))
-                    return rejectSemantic(binding, typeid(std::remove_const_t<T>).name(), false);
+                    return RejectSemantic(binding, typeid(std::remove_const_t<T>).name(), false);
 
                 // Recorded rather than resolved. The ref is captured by value, so it is the object's
                 // own lifetime that decides whether a later attempt can still read it.
-                return recordSemantic(binding, [object]() -> SemanticSerializer* {
-                    if (!object.valid()) return nullptr;
+                return RecordSemantic(binding, [object]() -> SemanticSerializer* {
+                    if (!object.Valid()) return nullptr;
                     return dynamic_cast<SemanticSerializer*>(
-                        const_cast<std::remove_const_t<T>*>(object.get()));
-                }, object.name());
+                        const_cast<std::remove_const_t<T>*>(object.Get()));
+                }, object.Name());
             }
 
-            /** @brief The same, from an owning resource. @see write(glm::u32, const ResourceRef<T>&) */
+            /** @brief The same, from an owning resource. @see Write(glm::u32, const ResourceRef<T>&) */
             template<typename T>
                 requires (!IsBindableResource<std::remove_const_t<T>>::value)
-            Builder& write(const glm::u32 binding, const Resource<T>& object)
+            Builder& Write(const glm::u32 binding, const Resource<T>& object)
             {
-                return write(binding, ResourceRef<const T>(object));
+                return Write(binding, ResourceRef<const T>(object));
             }
 
             /**
              * @brief Fills the block the shader calls @p name from a semantic serializer.
-             * @see write(glm::u32, const ResourceRef<T>&) for what filling a block means,
+             * @see Write(glm::u32, const ResourceRef<T>&) for what filling a block means,
              *      and the named overloads above for how the name is resolved.
              */
             template<typename T>
                 requires (!IsBindableResource<std::remove_const_t<T>>::value)
-            Builder& write(const std::string_view name, const ResourceRef<T>& object)
+            Builder& Write(const std::string_view name, const ResourceRef<T>& object)
             {
-                if (!object.alive())
-                    return rejectSemantic(name, "<destroyed>", true);
-                if (!object.valid())
-                    return rejectSemantic(name, object.name().c_str(), true);
+                if (!object.Alive())
+                    return RejectSemantic(name, "<destroyed>", true);
+                if (!object.Valid())
+                    return RejectSemantic(name, object.Name().c_str(), true);
 
                 auto& mutableObject = const_cast<std::remove_const_t<T>&>(*object);
                 if (!dynamic_cast<SemanticSerializer*>(&mutableObject))
-                    return rejectSemantic(name, typeid(std::remove_const_t<T>).name(), false);
+                    return RejectSemantic(name, typeid(std::remove_const_t<T>).name(), false);
 
-                return recordSemantic(name, [object]() -> SemanticSerializer* {
-                    if (!object.valid()) return nullptr;
+                return RecordSemantic(name, [object]() -> SemanticSerializer* {
+                    if (!object.Valid()) return nullptr;
                     return dynamic_cast<SemanticSerializer*>(
-                        const_cast<std::remove_const_t<T>*>(object.get()));
-                }, object.name());
+                        const_cast<std::remove_const_t<T>*>(object.Get()));
+                }, object.Name());
             }
 
-            /** @brief The same, from an owning resource. @see write(std::string_view, const ResourceRef<T>&) */
+            /** @brief The same, from an owning resource. @see Write(std::string_view, const ResourceRef<T>&) */
             template<typename T>
                 requires (!IsBindableResource<std::remove_const_t<T>>::value)
-            Builder& write(const std::string_view name, const Resource<T>& object)
+            Builder& Write(const std::string_view name, const Resource<T>& object)
             {
-                return write(name, ResourceRef<const T>(object));
+                return Write(name, ResourceRef<const T>(object));
             }
 
             /**
-             * @brief The semantic half of write(), for a serializer held by raw reference.
+             * @brief The semantic half of Write(), for a serializer held by raw reference.
              *
              * Prefer write(binding, resource): a reference cannot be lifetime-tracked, so if this
              * set is rebuilt after the object is gone, the resolver has nothing to check.
              */
-            Builder& writeSemantic(glm::u32 binding, SemanticSerializer& serializer);
+            Builder& WriteSemantic(glm::u32 binding, SemanticSerializer& serializer);
 
-            /** @brief The same, for the block the shader calls @p name. @see writeSemantic(glm::u32, SemanticSerializer&) */
-            Builder& writeSemantic(std::string_view name, SemanticSerializer& serializer);
+            /** @brief The same, for the block the shader calls @p name. @see WriteSemantic(glm::u32, SemanticSerializer&) */
+            Builder& WriteSemantic(std::string_view name, SemanticSerializer& serializer);
 
             /** @brief Records a binding to be filled from whatever @p resolve yields, per attempt. */
-            Builder& recordSemantic(glm::u32 binding, std::function<SemanticSerializer*()> resolve,
+            Builder& RecordSemantic(glm::u32 binding, std::function<SemanticSerializer*()> resolve,
                                     std::string what);
 
-            /** @brief The same, addressing the binding by name. @see recordSemantic(glm::u32, std::function<SemanticSerializer*()>, std::string) */
-            Builder& recordSemantic(std::string_view name, std::function<SemanticSerializer*()> resolve,
+            /** @brief The same, addressing the binding by name. @see RecordSemantic(glm::u32, std::function<SemanticSerializer*()>, std::string) */
+            Builder& RecordSemantic(std::string_view name, std::function<SemanticSerializer*()> resolve,
                                     std::string what);
 
             /**
@@ -407,24 +407,24 @@ namespace kor
              * @param unusable Whether it was destroyed or poisoned, rather than simply the wrong
              *        kind of thing — two different mistakes that deserve different sentences.
              */
-            Builder& rejectSemantic(glm::u32 binding, const char* what, bool unusable);
+            Builder& RejectSemantic(glm::u32 binding, const char* what, bool unusable);
 
-            /** @brief The same, for a binding named rather than numbered. @see rejectSemantic(glm::u32, const char*, bool) */
-            Builder& rejectSemantic(std::string_view name, const char* what, bool unusable);
+            /** @brief The same, for a binding named rather than numbered. @see RejectSemantic(glm::u32, const char*, bool) */
+            Builder& RejectSemantic(std::string_view name, const char* what, bool unusable);
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<DescriptorSet>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<DescriptorSet>> Create() const;
 
             /**
              * @brief Allocates the set and writes the resources into it.
              * @return The set as a Resource; poisoned rather than thrown if a descriptor is invalid
              *         or does not match the binding it was written to.
              */
-            [[nodiscard]] kor::Resource<DescriptorSet> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<DescriptorSet> Build(std::source_location where = std::source_location::current()) const;
 
         private:
             /** @brief Records one authored write, whatever it addresses and whatever it holds. */
-            Builder& record(PendingWrite write);
+            Builder& Record(PendingWrite write);
 
             /**
              * @brief Re-reads the layout and rebuilds @ref writes from @ref pending for this
@@ -435,17 +435,17 @@ namespace kor
              * of it against the layout as it stands now, because all of it can change when a shader
              * is edited.
              */
-            [[nodiscard]] VoidResult resolve() const;
+            [[nodiscard]] VoidResult Resolve() const;
 
             /**
              * @brief Seeds @ref writes with one empty slot per declared binding, for one attempt.
              *
-             * Run from resolve() rather than from the constructors, because the layout it reads is
+             * Run from Resolve() rather than from the constructors, because the layout it reads is
              * the one this attempt found — a reload that added a binding or lengthened an array
              * gives a different shape, and seeding once at construction would keep filling the old
              * one.
              */
-            void initWrites() const;
+            void InitWrites() const;
 
             mutable std::optional<Error> _error;
         };
@@ -453,7 +453,7 @@ namespace kor
         virtual ~DescriptorSet() = default;
 
         /** @brief Binds the set at @p index. Called by the backend; a scene uses CommandBuffer::BindDescriptorSet. */
-        virtual void bind(const CommandBuffer& commandBuffer, glm::u32 index) const {};
+        virtual void Bind(const CommandBuffer& commandBuffer, glm::u32 index) const {};
 
         /**
          * @brief Points one binding at something else, after the set was built.
@@ -461,7 +461,7 @@ namespace kor
          * @param descriptor The new resource.
          * @param index Which element, for an array binding.
          *
-         * The counterpart to Builder::write, which binds while the set is being assembled. Named
+         * The counterpart to Builder::Write, which binds while the set is being assembled. Named
          * apart from it on purpose: the two take identical arguments, and one letter's difference
          * in case would be a typo that silently compiled into the other.
          *
@@ -469,7 +469,7 @@ namespace kor
          *          submitted. Rewriting a set the GPU may still be reading is a race; give
          *          per-frame data a per-frame buffer, or a set per frame in flight.
          */
-        virtual void rebind(glm::u32 binding, const Descriptor& descriptor, glm::u32 index) = 0;
+        virtual void Rebind(glm::u32 binding, const Descriptor& descriptor, glm::u32 index) = 0;
 
         /**
          * @name Rewriting a binding with the resource itself
@@ -477,8 +477,8 @@ namespace kor
          * The same overloads the builder takes, for a set that is already built:
          *
          * @code
-         * set->rebind(0, newCameraBuffer);
-         * set->rebind("albedo", newView, sampler);
+         * set->Rebind(0, newCameraBuffer);
+         * set->Rebind("albedo", newView, sampler);
          * @endcode
          *
          * Not virtual — each one is the matching kor::Descriptor and a call to the overload above,
@@ -488,32 +488,32 @@ namespace kor
          * @param index Which element, for an array binding. A name may carry `[n]` instead.
          */
         ///@{
-        void rebind(glm::u32 binding, const ResourceRef<const Buffer>& buffer, glm::u32 index = 0);
-        void rebind(glm::u32 binding, const Buffer::Slice& slice, glm::u32 index = 0);
-        void rebind(glm::u32 binding, const ResourceRef<const BufferView>& bufferView, glm::u32 index = 0);
-        void rebind(glm::u32 binding, const ResourceRef<const ImageView>& imageView, glm::u32 index = 0);
-        void rebind(glm::u32 binding, const ResourceRef<const ImageView>& imageView,
+        void Rebind(glm::u32 binding, const ResourceRef<const Buffer>& buffer, glm::u32 index = 0);
+        void Rebind(glm::u32 binding, const Buffer::Slice& slice, glm::u32 index = 0);
+        void Rebind(glm::u32 binding, const ResourceRef<const BufferView>& bufferView, glm::u32 index = 0);
+        void Rebind(glm::u32 binding, const ResourceRef<const ImageView>& imageView, glm::u32 index = 0);
+        void Rebind(glm::u32 binding, const ResourceRef<const ImageView>& imageView,
                    const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
-        void rebind(glm::u32 binding, const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
-        void rebind(glm::u32 binding, const ResourceRef<const AccelerationStructure>& accelerationStructure,
+        void Rebind(glm::u32 binding, const ResourceRef<const Sampler>& sampler, glm::u32 index = 0);
+        void Rebind(glm::u32 binding, const ResourceRef<const AccelerationStructure>& accelerationStructure,
                    glm::u32 index = 0);
 
-        void rebind(std::string_view name, const Descriptor& descriptor);
-        void rebind(std::string_view name, const ResourceRef<const Buffer>& buffer);
-        void rebind(std::string_view name, const Buffer::Slice& slice);
-        void rebind(std::string_view name, const ResourceRef<const BufferView>& bufferView);
-        void rebind(std::string_view name, const ResourceRef<const ImageView>& imageView);
-        void rebind(std::string_view name, const ResourceRef<const ImageView>& imageView,
+        void Rebind(std::string_view name, const Descriptor& descriptor);
+        void Rebind(std::string_view name, const ResourceRef<const Buffer>& buffer);
+        void Rebind(std::string_view name, const Buffer::Slice& slice);
+        void Rebind(std::string_view name, const ResourceRef<const BufferView>& bufferView);
+        void Rebind(std::string_view name, const ResourceRef<const ImageView>& imageView);
+        void Rebind(std::string_view name, const ResourceRef<const ImageView>& imageView,
                    const ResourceRef<const Sampler>& sampler);
-        void rebind(std::string_view name, const ResourceRef<const Sampler>& sampler);
-        void rebind(std::string_view name, const ResourceRef<const AccelerationStructure>& accelerationStructure);
+        void Rebind(std::string_view name, const ResourceRef<const Sampler>& sampler);
+        void Rebind(std::string_view name, const ResourceRef<const AccelerationStructure>& accelerationStructure);
         ///@}
 
         /** @brief Logs what the set currently holds, binding by binding. A debugging aid. */
         virtual void DebugPrint() const {};
 
         /** @brief The layout this set was allocated against — what each binding is, and what shaders do with it. */
-        [[nodiscard]] ResourceRef<const DescriptorSetLayout> layout() const { return _layout; }
+        [[nodiscard]] ResourceRef<const DescriptorSetLayout> Layout() const { return _layout; }
 
         /**
          * @brief What is currently written into the set, by binding.
@@ -521,33 +521,33 @@ namespace kor
          *         array binding. Together with the layout, this is what tells the barrier resolver
          *         which resources a draw will touch.
          */
-        [[nodiscard]] const std::map<glm::u32, std::vector<Descriptor>>& writes() const { return _writes; }
+        [[nodiscard]] const std::map<glm::u32, std::vector<Descriptor>>& Writes() const { return _writes; }
 
     protected:
         explicit DescriptorSet(const Builder &builder);
         bool _isPerFrame = false;
         // A ref, not a reference: a shader reload can replace the pipeline's layouts, and a raw
-        // reference into that map would be silently left dangling. See Pipeline::buildLayouts.
+        // reference into that map would be silently left dangling. See Pipeline::BuildLayouts.
         kor::ResourceRef<const kor::DescriptorSetLayout> _layout;
         std::map<glm::u32, std::vector<Descriptor>> _writes;
 
         /**
          * @brief Splits `"textures[3]"` into the name and the element it selects.
          *
-         * Shared by the builder and by rebind(): both address a binding the same way, so both take
+         * Shared by the builder and by Rebind(): both address a binding the same way, so both take
          * the subscript off the name the same way. Anything that is not a well-formed trailing
          * subscript is left as part of the name.
          */
-        static std::pair<std::string_view, glm::u32> splitIndex(std::string_view name);
+        static std::pair<std::string_view, glm::u32> SplitIndex(std::string_view name);
 
         /**
-         * @brief The binding this set's layout calls @p name, for a rebind() addressed by name.
+         * @brief The binding this set's layout calls @p name, for a Rebind() addressed by name.
          * @return The binding number, or nullopt — after logging why — when there is no such
          *         binding, or no usable layout to ask.
          *
-         * rebind() returns void and is called on a live set, so a bad name cannot poison anything:
+         * Rebind() returns void and is called on a live set, so a bad name cannot poison anything:
          * it is reported and the write is dropped, rather than throwing through a setter.
          */
-        [[nodiscard]] std::optional<glm::u32> resolveWriteTarget(std::string_view name) const;
+        [[nodiscard]] std::optional<glm::u32> ResolveWriteTarget(std::string_view name) const;
     };
 }

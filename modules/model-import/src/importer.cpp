@@ -18,6 +18,6 @@ namespace kmdl
         // Resolving the model here is what lets its *textures* resolve too: AssimpImporter reads
         // material texture paths relative to the model file, so it needs the real one, not the
         // relative name the scene asked for.
-        return std::make_unique<AssimpImporter>(kor::assetPath(relativePath));
+        return std::make_unique<AssimpImporter>(kor::AssetPath(relativePath));
     }
 }

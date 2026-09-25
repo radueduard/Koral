@@ -41,6 +41,6 @@ namespace
     // Registered as this library loads, exactly as the inline registrar in gui.h does for the library
     // itself. Two registrations from one image is fine: they name different copies of the globals.
     const struct Registrar {
-        Registrar() { kor::detail::registerImGuiModule(kImGuizmoBinding); }
+        Registrar() { kor::detail::RegisterImGuiModule(kImGuizmoBinding); }
     } registrar;
 }

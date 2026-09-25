@@ -351,7 +351,7 @@ namespace kor::ogl
         // liniarize descriptors
         glm::u32 nextDescriptorBindingPoint = 0;
         for (const auto& [set, layout] : _setLayouts) {
-            for (const auto& binding : layout->bindings() | std::views::keys) {
+            for (const auto& binding : layout->Bindings() | std::views::keys) {
                 _setAndBindingToBindingPoint[{ set, binding }] = nextDescriptorBindingPoint++;
             }
         }

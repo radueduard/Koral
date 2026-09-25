@@ -30,7 +30,7 @@
  * KORAL_DECLARE_MODULE(CameraModule)
  *
  * // in a scene, which links the module like any other library
- * _camera = kcam::PerspectiveCamera::Builder{}.setFovY(glm::radians(70.f)).build();
+ * _camera = kcam::PerspectiveCamera::Builder{}.SetFovY(glm::radians(70.f)).Build();
  * @endcode
  *
  * @section module_loading How a module gets into the process
@@ -252,7 +252,7 @@ namespace kor
         static KORAL_API void Shutdown();
 
         /** @brief Names of the loaded modules, in dependency order. For diagnostics and the GUI. */
-        [[nodiscard]] static KORAL_API std::vector<std::string_view> loadedModules();
+        [[nodiscard]] static KORAL_API std::vector<std::string_view> LoadedModules();
 
         // ---- per-frame dispatch, in the order the run loop calls them ----
         static KORAL_API void Update();

@@ -14,7 +14,7 @@ namespace kor {
      * @brief The presentable surface of a window: what the swap chain draws into.
      *
      * Created by the window as it is built and owned by it — reach the live one through
-     * Window::surface(). What it wraps depends on the backend and the platform, and none of that
+     * Window::RenderSurface(). What it wraps depends on the backend and the platform, and none of that
      * is exposed here: a scene never has to name a surface to render to the screen.
      */
     class KORAL_API Surface {

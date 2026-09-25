@@ -19,13 +19,13 @@
  * void MyScene::RenderUI() {
  *     _viewport.Draw("Scene");   // its image was set once, at Initialize
  *
- *     if (_gizmo.Manipulate(_viewport, _camera->view(), _camera->projection(), _transform))
+ *     if (_gizmo.Manipulate(_viewport, _camera->View(), _camera->Projection(), _transform))
  *         onTransformEdited(_transform);
  * }
  * @endcode
  *
  * Keyboard shortcuts and a mode toggle are not here: which key means "rotate" is a project's decision,
- * and @ref kgui::Gizmo::setOperation is how you make it.
+ * and @ref kgui::Gizmo::SetOperation is how you make it.
  */
 
 #pragma once
@@ -49,7 +49,7 @@ namespace kgui
      */
     inline bool BeginGizmo(const Viewport& viewport)
     {
-        const auto& rect = viewport.rect();
+        const auto& rect = viewport.ScreenRect();
         if (rect.size.x <= 0.f || rect.size.y <= 0.f) return false;
 
         // Into *this* window's draw list, or the gizmo is drawn behind the image; and over the image's
@@ -75,25 +75,25 @@ namespace kgui
         /** @brief Whether the handle is aligned to the object or to the world. */
         enum class Space : std::uint8_t { eLocal, eWorld };
 
-        void setOperation(const Operation operation) { _operation = operation; }
-        [[nodiscard]] Operation operation() const { return _operation; }
+        void SetOperation(const Operation operation) { _operation = operation; }
+        [[nodiscard]] Operation CurrentOperation() const { return _operation; }
 
-        void setSpace(const Space space) { _space = space; }
-        [[nodiscard]] Space space() const { return _space; }
+        void SetSpace(const Space space) { _space = space; }
+        [[nodiscard]] Space CurrentSpace() const { return _space; }
 
         /**
          * @brief Snaps the handle's steps: metres for translate, degrees for rotate, factor for scale.
          *
          * One value per axis. Zero — the default — snaps nothing.
          */
-        void setSnap(const glm::vec3 snap) { _snap = snap; }
-        [[nodiscard]] glm::vec3 snap() const { return _snap; }
+        void SetSnap(const glm::vec3 snap) { _snap = snap; }
+        [[nodiscard]] glm::vec3 Snap() const { return _snap; }
 
         /** @brief Whether the handle is being dragged right now. Gate camera input on the inverse. */
-        [[nodiscard]] bool isUsing() const { return ImGuizmo::IsUsing(); }
+        [[nodiscard]] bool IsUsing() const { return ImGuizmo::IsUsing(); }
 
         /** @brief Whether the pointer is over any part of the handle. */
-        [[nodiscard]] bool isHovered() const { return ImGuizmo::IsOver(); }
+        [[nodiscard]] bool IsHovered() const { return ImGuizmo::IsOver(); }
 
         /**
          * @brief Draws the handle over @p viewport and edits @p transform.
@@ -115,7 +115,7 @@ namespace kgui
             glm::mat4 delta { 1.f };
             const bool changed = ImGuizmo::Manipulate(
                 &view[0][0], &projection[0][0],
-                toImGuizmo(_operation), toImGuizmo(_space),
+                ToImGuizmo(_operation), ToImGuizmo(_space),
                 &transform[0][0], &delta[0][0],
                 _snap == glm::vec3(0.f) ? nullptr : &_snap.x);
 
@@ -124,7 +124,7 @@ namespace kgui
         }
 
     private:
-        static ImGuizmo::OPERATION toImGuizmo(const Operation operation)
+        static ImGuizmo::OPERATION ToImGuizmo(const Operation operation)
         {
             switch (operation) {
             case Operation::eRotate:    return ImGuizmo::ROTATE;
@@ -134,7 +134,7 @@ namespace kgui
             }
         }
 
-        static ImGuizmo::MODE toImGuizmo(const Space space)
+        static ImGuizmo::MODE ToImGuizmo(const Space space)
         {
             return space == Space::eWorld ? ImGuizmo::WORLD : ImGuizmo::LOCAL;
         }

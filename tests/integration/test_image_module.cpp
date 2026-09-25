@@ -61,11 +61,11 @@ std::filesystem::path tempDir() {
  */
 template<typename T>
 T runToCompletion(kor::Task<T> task) {
-    while (!task.done()) {
+    while (!task.Done()) {
         kor::Context::DrainMainThread();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    auto result = task.take();
+    auto result = task.Take();
     EXPECT_TRUE(result.has_value()) << (result.has_value() ? std::string{} : result.error());
     return result.has_value() ? std::move(*result) : T{};
 }
@@ -73,27 +73,27 @@ T runToCompletion(kor::Task<T> task) {
 /** @brief An 8x8 image of one colour, on the GPU, ready to be saved or read. */
 kor::Resource<Image> solidImage(const glm::vec4 color, const std::uint32_t size = 8) {
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec2{ size, size })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec2{ size, size })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
+        .Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, color);
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
     return image;
 }
 
 /** @brief Reads one mip-0 layer of an image back as floats, whatever it is stored as. */
 std::vector<glm::vec4> readLayerAsFloat(const ResourceRef<const Image>& image, const std::uint32_t layer) {
-    const auto extent = image->extent();
+    const auto extent = image->Extent();
     const auto texels = static_cast<std::size_t>(extent.x) * extent.y;
 
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(texels * sizeof(glm::vec4)))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(texels * sizeof(glm::vec4)))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(image, readback, kor::Copy{
@@ -103,21 +103,21 @@ std::vector<glm::vec4> readLayerAsFloat(const ResourceRef<const Image>& image, c
             .imageLayerCount = 1,
             .imageMipLevel = 0,
         });
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     return readback->Read<glm::vec4>();
 }
 
 /** @brief Reads one mip-0 layer of an 8-bit image back. */
 std::vector<glm::u8vec4> readLayerAsBytes(const ResourceRef<const Image>& image, const std::uint32_t layer) {
-    const auto extent = image->extent();
+    const auto extent = image->Extent();
     const auto texels = static_cast<std::size_t>(extent.x) * extent.y;
 
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(texels * sizeof(glm::u8vec4)))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(texels * sizeof(glm::u8vec4)))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(image, readback, kor::Copy{
@@ -127,7 +127,7 @@ std::vector<glm::u8vec4> readLayerAsBytes(const ResourceRef<const Image>& image,
             .imageLayerCount = 1,
             .imageMipLevel = 0,
         });
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     return readback->Read<glm::u8vec4>();
 }
@@ -137,28 +137,28 @@ std::vector<glm::u8vec4> readLayerAsBytes(const ResourceRef<const Image>& image,
 // Decode one of the helmet's textures off disk and upload it, with and without a generated mip
 // chain — exercises kimg::LoadImage end to end.
 TEST_F(GpuTest, ImageModuleLoadsFromDisk) {
-    const auto path = kor::assetPath("DamagedHelmet/Default_albedo.jpg");
+    const auto path = kor::AssetPath("DamagedHelmet/Default_albedo.jpg");
 
     auto image = kimg::LoadImage(path);
     ASSERT_TRUE(static_cast<bool>(image));
-    const glm::uvec3 extent = image->extent();
+    const glm::uvec3 extent = image->Extent();
     EXPECT_GT(extent.x, 0u);
     EXPECT_GT(extent.y, 0u);
 
     auto mipped = kimg::LoadImage(path, /*generateMipmaps=*/true);
     ASSERT_TRUE(static_cast<bool>(mipped));
-    EXPECT_EQ(mipped->extent(), extent);
-    EXPECT_GT(mipped->mipLevels(), 1u);
+    EXPECT_EQ(mipped->Extent(), extent);
+    EXPECT_GT(mipped->MipLevels(), 1u);
 }
 
 // The same file through the coroutine path. Run to completion here rather than across frames:
 // what is being checked is that it arrives, not that it interleaves.
 TEST_F(GpuTest, ImageModuleLoadsFromDiskAsync) {
-    const auto path = kor::assetPath("DamagedHelmet/Default_albedo.jpg");
+    const auto path = kor::AssetPath("DamagedHelmet/Default_albedo.jpg");
 
     auto image = runToCompletion(kimg::LoadImageAsync(path));
     ASSERT_TRUE(static_cast<bool>(image));
-    EXPECT_GT(image->extent().x, 0u);
+    EXPECT_GT(image->Extent().x, 0u);
 }
 
 // A file that is not there must poison its own resource and say so, not throw and not come back
@@ -166,8 +166,8 @@ TEST_F(GpuTest, ImageModuleLoadsFromDiskAsync) {
 TEST_F(GpuTest, ImageModuleReportsAMissingFile) {
     auto image = kimg::LoadImage("no/such/texture.png");
     EXPECT_FALSE(static_cast<bool>(image));
-    ASSERT_TRUE(image.error());
-    EXPECT_NE(image.error()->message.find("texture.png"), std::string::npos);
+    ASSERT_TRUE(image.Failure());
+    EXPECT_NE(image.Failure()->message.find("texture.png"), std::string::npos);
 }
 
 // Save a GPU image to disk and read it back, verifying the pixels survive the round-trip. Drives
@@ -188,7 +188,7 @@ TEST_F(GpuTest, ImageModuleSaveRoundTrips) {
 
     auto reloaded = kimg::LoadImage(outPath);
     ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(kSize, kSize, 1));
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
 
     const auto texels = readLayerAsBytes(reloaded, 0);
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSize) * kSize);
@@ -210,7 +210,7 @@ struct SixFaces {
 
     void remove() const {
         std::error_code ec;
-        for (const auto& path : faces.inLayerOrder()) std::filesystem::remove(path, ec);
+        for (const auto& path : faces.InLayerOrder()) std::filesystem::remove(path, ec);
     }
 };
 
@@ -246,8 +246,8 @@ SixFaces writeSixFaces(const std::string& prefix, const std::uint32_t size = 8) 
 
 void expectFacesInOrder(const kor::Resource<Image>& cube, const SixFaces& source) {
     ASSERT_TRUE(static_cast<bool>(cube));
-    EXPECT_EQ(cube->arrayLayers(), kFaceCount);
-    EXPECT_EQ(cube->extent(), glm::uvec3(8, 8, 1));
+    EXPECT_EQ(cube->ArrayLayers(), kFaceCount);
+    EXPECT_EQ(cube->Extent(), glm::uvec3(8, 8, 1));
 
     for (std::uint32_t face = 0; face < kFaceCount; ++face) {
         const auto texels = readLayerAsBytes(cube, face);
@@ -284,8 +284,8 @@ TEST_F(GpuTest, CubemapRejectsMismatchedFaces) {
 
     auto cube = kimg::LoadCubemap(source.faces);
     EXPECT_FALSE(static_cast<bool>(cube));
-    ASSERT_TRUE(cube.error());
-    EXPECT_NE(cube.error()->message.find("every face must match"), std::string::npos);
+    ASSERT_TRUE(cube.Failure());
+    EXPECT_NE(cube.Failure()->message.find("every face must match"), std::string::npos);
 
     std::error_code ec;
     std::filesystem::remove(oddPath, ec);
@@ -322,17 +322,17 @@ kor::Resource<Image> directionPanorama(const std::uint32_t width, const std::uin
     }
 
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eRGBA32_SFLOAT)
-        .setExtent(glm::uvec2{ width, height })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eRGBA32_SFLOAT)
+        .SetExtent(glm::uvec2{ width, height })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
+        .Build();
 
     const auto staging = Buffer::Builder<glm::vec4>()
-        .setDataView(std::span<const glm::vec4>(texels))
-        .setUsage(Buffer::Usage::eTransferSrc)
-        .setType(Buffer::Type::eStaging)
-        .build();
+        .SetDataView(std::span<const glm::vec4>(texels))
+        .SetUsage(Buffer::Usage::eTransferSrc)
+        .SetType(Buffer::Type::eStaging)
+        .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyBufferToImage(staging, image, kor::Copy{
@@ -340,7 +340,7 @@ kor::Resource<Image> directionPanorama(const std::uint32_t width, const std::uin
             .imageExtent = { width, height, 1 },
         });
         cb.Barrier({}, {{ ResourceRef<const Image>(image), kor::ResourceAccess::eAllShaderRead }});
-    }).wait();
+    }).Wait();
     return image;
 }
 
@@ -350,11 +350,11 @@ TEST_F(GpuTest, EquirectangularProjectsOntoTheRightFaces) {
 
     constexpr std::uint32_t kFaceSize = 32;
     auto cube = kimg::EquirectangularToCubemap(panorama, kFaceSize);
-    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.error() ? cube.error()->message : "");
-    EXPECT_EQ(cube->arrayLayers(), kFaceCount);
-    EXPECT_EQ(cube->extent(), glm::uvec3(kFaceSize, kFaceSize, 1));
+    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.Failure() ? cube.Failure()->message : "");
+    EXPECT_EQ(cube->ArrayLayers(), kFaceCount);
+    EXPECT_EQ(cube->Extent(), glm::uvec3(kFaceSize, kFaceSize, 1));
     // 32-bit float whatever the panorama was, so an HDR source keeps its range.
-    EXPECT_EQ(cube->format(), Image::Format::eRGBA32_SFLOAT);
+    EXPECT_EQ(cube->PixelFormat(), Image::Format::eRGBA32_SFLOAT);
 
     for (std::uint32_t face = 0; face < kFaceCount; ++face) {
         const auto texels = readLayerAsFloat(cube, face);
@@ -380,7 +380,7 @@ TEST_F(GpuTest, EquirectangularKeepsFaceCornersConsistent) {
     auto panorama = directionPanorama(256, 128);
     constexpr std::uint32_t kFaceSize = 32;
     auto cube = kimg::EquirectangularToCubemap(panorama, kFaceSize);
-    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.error() ? cube.error()->message : "");
+    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.Failure() ? cube.Failure()->message : "");
 
     for (std::uint32_t face = 0; face < kFaceCount; ++face) {
         const auto texels = readLayerAsFloat(cube, face);
@@ -416,20 +416,20 @@ TEST_F(GpuTest, EquirectangularFromFile) {
     // The file has to carry the panorama, not merely exist: an .hdr decodes back to floats, and a
     // texel in the middle of the top row looks nearly straight up.
     auto reloaded = kimg::LoadImage(outPath);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(128, 64, 1));
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(128, 64, 1));
     const auto rows = readLayerAsFloat(reloaded, 0);
     ASSERT_EQ(rows.size(), static_cast<std::size_t>(128) * 64);
     EXPECT_GT(rows[64].y, 0.9f) << "the top row of the panorama should look up";
 
     auto cube = kimg::LoadCubemapFromEquirectangular(outPath, 16);
-    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.error() ? cube.error()->message : "");
-    EXPECT_EQ(cube->arrayLayers(), kFaceCount);
-    EXPECT_EQ(cube->extent(), glm::uvec3(16, 16, 1));
+    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.Failure() ? cube.Failure()->message : "");
+    EXPECT_EQ(cube->ArrayLayers(), kFaceCount);
+    EXPECT_EQ(cube->Extent(), glm::uvec3(16, 16, 1));
 
     auto async = runToCompletion(kimg::LoadCubemapFromEquirectangularAsync(outPath, 16));
-    ASSERT_TRUE(static_cast<bool>(async)) << (async.error() ? async.error()->message : "");
-    EXPECT_EQ(async->arrayLayers(), kFaceCount);
+    ASSERT_TRUE(static_cast<bool>(async)) << (async.Failure() ? async.Failure()->message : "");
+    EXPECT_EQ(async->ArrayLayers(), kFaceCount);
 
     std::filesystem::remove(outPath, ec);
 }
@@ -439,8 +439,8 @@ TEST_F(GpuTest, EquirectangularFromFile) {
 TEST_F(GpuTest, EquirectangularDefaultsFaceSizeToAQuarterOfTheWidth) {
     auto panorama = directionPanorama(128, 64);
     auto cube = kimg::EquirectangularToCubemap(panorama);
-    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.error() ? cube.error()->message : "");
-    EXPECT_EQ(cube->extent(), glm::uvec3(32, 32, 1));
+    ASSERT_TRUE(static_cast<bool>(cube)) << (cube.Failure() ? cube.Failure()->message : "");
+    EXPECT_EQ(cube->Extent(), glm::uvec3(32, 32, 1));
 }
 
 // A cubemap is only useful if it can be *sampled* as one, which needs the image to be
@@ -451,10 +451,10 @@ TEST_F(GpuTest, CubemapCanBeViewedAsACube) {
     ASSERT_TRUE(static_cast<bool>(cube));
 
     auto view = kor::ImageView::Builder(cube)
-        .setViewType(kor::ImageView::Type::eCube)
-        .setArrayLayerCount(kFaceCount)
-        .build();
-    EXPECT_TRUE(static_cast<bool>(view)) << (view.error() ? view.error()->message : "");
+        .SetViewType(kor::ImageView::Type::eCube)
+        .SetArrayLayerCount(kFaceCount)
+        .Build();
+    EXPECT_TRUE(static_cast<bool>(view)) << (view.Failure() ? view.Failure()->message : "");
 
     source.remove();
 }
@@ -469,33 +469,33 @@ TEST_F(GpuTest, CubemapCanBeViewedAsACube) {
 TEST_F(GpuTest, CompressedImageUploadRoundTrips) {
     for (const auto format : { Image::Format::eBC7_UNORM, Image::Format::eBC1_RGB_UNORM }) {
         constexpr std::uint32_t kSize = 16;   // 4x4 blocks
-        const auto byteCount = Image::sizeOfRegion(format, { kSize, kSize, 1 });
+        const auto byteCount = Image::SizeOfRegion(format, { kSize, kSize, 1 });
         EXPECT_EQ(byteCount, format == Image::Format::eBC7_UNORM ? 256u : 128u);
 
         // Recognisable bytes: block n is filled with n, so a misplaced block is visible.
         std::vector<std::uint8_t> blocks(byteCount);
         for (std::size_t i = 0; i < blocks.size(); ++i)
-            blocks[i] = static_cast<std::uint8_t>((i / Image::blockSize(format)) + 1);
+            blocks[i] = static_cast<std::uint8_t>((i / Image::BlockSize(format)) + 1);
 
         auto image = Image::Builder{}
-            .setType(Image::Type::e2D)
-            .setFormat(format)
-            .setExtent(glm::uvec2{ kSize, kSize })
-            .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
-            .build();
-        ASSERT_TRUE(static_cast<bool>(image)) << (image.error() ? image.error()->message : "");
+            .SetType(Image::Type::e2D)
+            .SetFormat(format)
+            .SetExtent(glm::uvec2{ kSize, kSize })
+            .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
+            .Build();
+        ASSERT_TRUE(static_cast<bool>(image)) << (image.Failure() ? image.Failure()->message : "");
 
         const auto staging = Buffer::Builder<std::uint8_t>()
-            .setDataView(std::span<const std::uint8_t>(blocks))
-            .setUsage(Buffer::Usage::eTransferSrc)
-            .setType(Buffer::Type::eStaging)
-            .build();
+            .SetDataView(std::span<const std::uint8_t>(blocks))
+            .SetUsage(Buffer::Usage::eTransferSrc)
+            .SetType(Buffer::Type::eStaging)
+            .Build();
 
         Buffer::RawBuilder rb;
-        rb.setRawSize(static_cast<glm::i64>(byteCount))
-          .setUsage(Buffer::Usage::eTransferDst)
-          .setType(Buffer::Type::eReadback);
-        auto readback = rb.build();
+        rb.SetRawSize(static_cast<glm::i64>(byteCount))
+          .SetUsage(Buffer::Usage::eTransferDst)
+          .SetType(Buffer::Type::eReadback);
+        auto readback = rb.Build();
 
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.CopyBufferToImage(staging, image, kor::Copy{
@@ -506,7 +506,7 @@ TEST_F(GpuTest, CompressedImageUploadRoundTrips) {
                 .imageOffset = { 0, 0, 0 },
                 .imageExtent = { kSize, kSize, 1 },
             });
-        }, CommandBuffer::Usage::eTransfer).wait();
+        }, CommandBuffer::Usage::eTransfer).Wait();
 
         const auto out = readback->Read<std::uint8_t>();
         ASSERT_EQ(out.size(), blocks.size()) << "format " << static_cast<int>(format);
@@ -518,12 +518,12 @@ TEST_F(GpuTest, CompressedImageUploadRoundTrips) {
 // to say so rather than let the backend produce a wall of validation errors.
 TEST_F(GpuTest, CompressedImageRefusesGeneratedMipmaps) {
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eBC7_UNORM)
-        .setExtent(glm::uvec2{ 16, 16 })
-        .setMipLevels(5)
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eBC7_UNORM)
+        .SetExtent(glm::uvec2{ 16, 16 })
+        .SetMipLevels(5)
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
+        .Build();
     ASSERT_TRUE(static_cast<bool>(image));
 
     auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
@@ -531,10 +531,10 @@ TEST_F(GpuTest, CompressedImageRefusesGeneratedMipmaps) {
     cb->GenerateMipmaps(image);
     cb->End();
 
-    EXPECT_FALSE(cb->ok());
-    ASSERT_FALSE(cb->errors().empty());
-    EXPECT_EQ(cb->errors().front().code, kor::ErrorCode::eInvalidArgument);
-    EXPECT_NE(cb->errors().front().message.find("block-compressed"), std::string::npos);
+    EXPECT_FALSE(cb->Ok());
+    ASSERT_FALSE(cb->Errors().empty());
+    EXPECT_EQ(cb->Errors().front().code, kor::ErrorCode::eInvalidArgument);
+    EXPECT_NE(cb->Errors().front().message.find("block-compressed"), std::string::npos);
 }
 
 } // namespace

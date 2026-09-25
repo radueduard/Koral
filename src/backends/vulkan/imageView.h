@@ -21,7 +21,7 @@ namespace kor::vk
 
     private:
         // (Re)creates one view per copy of the image. Called by the constructor, and again by the
-        // accessors when the image has been rebuilt underneath them. @see kor::Image::generation
+        // accessors when the image has been rebuilt underneath them. @see kor::Image::Generation
         void build() const;
 
         /**

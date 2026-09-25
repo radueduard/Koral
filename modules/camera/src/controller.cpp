@@ -20,7 +20,7 @@ namespace kcam
             // Both states, not just eHeld: a key is ePressed on the frame it arrives and eHeld only
             // from the next one. Asking for eHeld alone costs a frame on every action and, worse,
             // makes a chord depend on the order its keys happened to be polled in.
-            return kor::Input::isKeyPressed(key) || kor::Input::isKeyHeld(key);
+            return kor::Input::IsKeyPressed(key) || kor::Input::IsKeyHeld(key);
         }
 
         /** @brief Whether every modifier @p required names is down. Left and right count the same. */
@@ -48,8 +48,8 @@ namespace kcam
             case Input::Type::eKey:
                 return down(static_cast<kor::Key>(input.code)) && modifiersHeld(input.modifiers);
             case Input::Type::eMouseButton:
-                return (kor::Input::isMouseButtonPressed(static_cast<kor::MouseButton>(input.code)) ||
-                        kor::Input::isMouseButtonHeld(static_cast<kor::MouseButton>(input.code)))
+                return (kor::Input::IsMouseButtonPressed(static_cast<kor::MouseButton>(input.code)) ||
+                        kor::Input::IsMouseButtonHeld(static_cast<kor::MouseButton>(input.code)))
                     && modifiersHeld(input.modifiers);
             case Input::Type::eNone:
                 break;
@@ -62,10 +62,10 @@ namespace kcam
         {
             float raw = 0.f;
             switch (axis.source) {
-            case AxisSource::eMouseX:  raw = kor::Input::mousePositionDelta().x; break;
-            case AxisSource::eMouseY:  raw = kor::Input::mousePositionDelta().y; break;
-            case AxisSource::eScrollX: raw = kor::Input::mouseScrollDelta().x; break;
-            case AxisSource::eScrollY: raw = kor::Input::mouseScrollDelta().y; break;
+            case AxisSource::eMouseX:  raw = kor::Input::MousePositionDelta().x; break;
+            case AxisSource::eMouseY:  raw = kor::Input::MousePositionDelta().y; break;
+            case AxisSource::eScrollX: raw = kor::Input::MouseScrollDelta().x; break;
+            case AxisSource::eScrollY: raw = kor::Input::MouseScrollDelta().y; break;
             case AxisSource::eNone:    return 0.f;
             }
             return raw * axis.sensitivity * (axis.invert ? -1.f : 1.f);
@@ -137,7 +137,7 @@ namespace kcam
 
     void CameraController::deriveAngles(const Camera& camera)
     {
-        const glm::vec3 f = camera.forward();
+        const glm::vec3 f = camera.Forward();
         _pitch = std::asin(glm::clamp(f.y, -1.f, 1.f));
         _yaw = std::atan2(-f.x, -f.z);
         _anglesValid = true;
@@ -145,7 +145,7 @@ namespace kcam
 
     void CameraController::applyAngles(Camera& camera) const
     {
-        camera.setRotation(glm::angleAxis(_yaw, glm::vec3(0.f, 1.f, 0.f)) *
+        camera.SetRotation(glm::angleAxis(_yaw, glm::vec3(0.f, 1.f, 0.f)) *
                            glm::angleAxis(_pitch, glm::vec3(1.f, 0.f, 0.f)));
     }
 
@@ -164,12 +164,12 @@ namespace kcam
 
         if (looking) {
             _holdingCursor = true;
-            kor::Input::setCursorMode(_controller.cursor == Controller::Cursor::eHide
+            kor::Input::SetCursorMode(_controller.cursor == Controller::Cursor::eHide
                 ? kor::Input::CursorMode::eHidden
                 : kor::Input::CursorMode::eCaptured);
         } else {
             _holdingCursor = false;
-            kor::Input::setCursorMode(kor::Input::CursorMode::eNormal);
+            kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
         }
     }
 
@@ -186,7 +186,7 @@ namespace kcam
             // the mouse as soon as the pointer is over any window, so without this a look that began on
             // the scene would end the moment the pointer crossed a panel.
             if (_looking) return true;
-            return !kor::Input::interfaceWantsMouse();
+            return !kor::Input::InterfaceWantsMouse();
         }
         }
     }
@@ -213,11 +213,11 @@ namespace kcam
 
         // The keyboard is only ever ImGui's while something is being typed into, which is a question
         // the scene has no better answer to — so this one stays automatic even when input does not.
-        if (kor::Input::interfaceWantsKeyboard() && _controller.input != Controller::Input::eEnabled) return;
+        if (kor::Input::InterfaceWantsKeyboard() && _controller.input != Controller::Input::eEnabled) return;
         if (_controller.input == Controller::Input::eDisabled) return;
 
         glm::vec3 move { 0.f };
-        const glm::quat rotation = camera.rotation();
+        const glm::quat rotation = camera.Rotation();
         const glm::vec3 forward = rotation * glm::vec3(0.f, 0.f, -1.f);
         const glm::vec3 right   = rotation * glm::vec3(1.f, 0.f, 0.f);
         constexpr glm::vec3 up { 0.f, 1.f, 0.f };
@@ -232,7 +232,7 @@ namespace kcam
         if (glm::dot(move, move) < 1e-12f) return;
 
         const float boost = held(bindings.boost) ? bindings.boostFactor : 1.f;
-        camera.setPosition(camera.position() + glm::normalize(move) * _controller.speed * boost * dt);
+        camera.SetPosition(camera.Position() + glm::normalize(move) * _controller.speed * boost * dt);
     }
 
     void CameraController::orbit(Camera& camera)
@@ -248,7 +248,7 @@ namespace kcam
 
         if (!_anglesValid) deriveAngles(camera);
 
-        float distance = glm::distance(camera.position(), _controller.orbitTarget);
+        float distance = glm::distance(camera.Position(), _controller.orbitTarget);
         if (distance < 1e-3f) distance = 1e-3f;
 
         if (ownsMouse()) {
@@ -265,7 +265,7 @@ namespace kcam
 
         // The camera sits on a sphere around the target, at yaw/pitch, looking inward.
         applyAngles(camera);
-        const glm::vec3 back = camera.rotation() * glm::vec3(0.f, 0.f, 1.f);
-        camera.setPosition(_controller.orbitTarget + back * distance);
+        const glm::vec3 back = camera.Rotation() * glm::vec3(0.f, 0.f, 1.f);
+        camera.SetPosition(_controller.orbitTarget + back * distance);
     }
 }

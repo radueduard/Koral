@@ -81,7 +81,7 @@ namespace kor::vk
 
         for (const auto& geometry : createInfo.geometries) {
             const auto& mesh = geometry.mesh;
-            if (!mesh->hasIndexBuffer()) {
+            if (!mesh->HasIndexBuffer()) {
                 throw std::runtime_error("A mesh used to build an acceleration structure must have an index buffer!");
             }
 
@@ -90,20 +90,20 @@ namespace kor::vk
             glm::u32 positionBinding = 0;
             glm::u32 positionOffset = 0;
             ::vk::Format positionFormat = ::vk::Format::eR32G32B32Sfloat;
-            if (mesh->positionAttribute().has_value()) {
-                const auto& positionAttribute = mesh->positionAttribute().value();
+            if (mesh->PositionAttribute().has_value()) {
+                const auto& positionAttribute = mesh->PositionAttribute().value();
                 positionBinding = positionAttribute.binding;
                 positionOffset = positionAttribute.offset;
                 positionFormat = getVkFormat(positionAttribute.channelType, positionAttribute.channelCount);
             }
 
-            const auto& vertexBuffer = dynamic_cast<const Buffer&>(*mesh->vertexBuffers()[positionBinding]);
-            const auto& indexBuffer = dynamic_cast<const Buffer&>(*mesh->indexBuffer().value());
+            const auto& vertexBuffer = dynamic_cast<const Buffer&>(*mesh->VertexBuffers()[positionBinding]);
+            const auto& indexBuffer = dynamic_cast<const Buffer&>(*mesh->IndexBuffer().value());
 
             // The mesh's vertex count spans the whole buffer (the heap's capacity for a
             // MeshHeap), so it gives the stride; the geometry's range selects the subset
             // of vertices/indices that belong to this allocation.
-            const glm::u64 bufferVertexCount = mesh->vertexCount();
+            const glm::u64 bufferVertexCount = mesh->VertexCount();
             const glm::u64 vertexStride = vertexBuffer.size() / bufferVertexCount;
 
             const glm::u64 firstVertex = geometry.firstVertex;
@@ -111,21 +111,21 @@ namespace kor::vk
                 ? geometry.vertexCount
                 : bufferVertexCount - firstVertex;
 
-            const ChannelType indexType = mesh->indexType().value();
-            const glm::u32 indexSize = sizeofChannelType(indexType);
+            const ChannelType indexType = mesh->IndexType().value();
+            const glm::u32 indexSize = SizeofChannelType(indexType);
             const glm::u64 firstIndex = geometry.firstIndex;
             const glm::u64 indexCount = geometry.indexCount != 0
                 ? geometry.indexCount
-                : mesh->indexCount().value();
+                : mesh->IndexCount().value();
             const glm::u32 triangleCount = static_cast<glm::u32>(indexCount / 3);
 
             const auto triangles = ::vk::AccelerationStructureGeometryTrianglesDataKHR()
                 .setVertexFormat(positionFormat)
-                .setVertexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(vertexBuffer.deviceAddress() + positionOffset))
+                .setVertexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(vertexBuffer.DeviceAddress() + positionOffset))
                 .setVertexStride(vertexStride)
                 .setMaxVertex(static_cast<glm::u32>(firstVertex + vertexCount - 1))
                 .setIndexType(getVkIndexType(indexType))
-                .setIndexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(indexBuffer.deviceAddress()));
+                .setIndexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(indexBuffer.DeviceAddress()));
 
             geometries.push_back(::vk::AccelerationStructureGeometryKHR()
                 .setGeometryType(::vk::GeometryTypeKHR::eTriangles)
@@ -257,7 +257,7 @@ namespace kor::vk
 
         Context::Device().runSingleTimeCommand([&](kor::vk::CommandBuffer& commandBuffer) {
             commandBuffer->buildAccelerationStructuresKHR(buildInfo, rangeInfos);
-        }, ::vk::QueueFlagBits::eCompute).wait();
+        }, ::vk::QueueFlagBits::eCompute).Wait();
 
         Context::Allocator().FreeBuffer(scratchBuffer, scratchAllocation);
 

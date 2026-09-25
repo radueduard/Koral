@@ -119,7 +119,7 @@ namespace kor
      *
      * Mirrors ImageView::Type, plus @ref eBuffer for a texel buffer and @ref eUnknown for a binding
      * that is not an image at all. Lives here rather than on Shader so that image.h can name it
-     * without pulling in the whole of shader.h. @see Shader::ImageShape, Image::view
+     * without pulling in the whole of shader.h. @see Shader::ImageShape, Image::View
      */
     enum class ImageShape : std::uint8_t {
         eUnknown,   ///< Not an image binding, or a shape reflection could not name.
@@ -218,7 +218,7 @@ namespace kor
      * @param channelType The type of the channel. For example, if the vertex attribute is a vec3 of floats, the channel type would be eFloat.
      * @return The size in bytes of a single channel of the given channel type. For example, if the channel type is eFloat, this function will return 4.
      */
-    inline glm::u32 sizeofChannelType(const ChannelType channelType) {
+    inline glm::u32 SizeofChannelType(const ChannelType channelType) {
         switch (channelType) {
         case ChannelType::eFloat: return sizeof(float);
         case ChannelType::eInt: return sizeof(int);
@@ -552,9 +552,9 @@ namespace kor
             glm::u64 offset = 0,
             glm::u64 size = WholeSize);
 
-        [[nodiscard]] kor::ResourceRef<const kor::Buffer> buffer() const { return _buffer; }
-        [[nodiscard]] ResourceAccess dstAccess() const { return _dstAccess; }
-        [[nodiscard]] glm::u64 offset() const { return _offset; }
+        [[nodiscard]] kor::ResourceRef<const kor::Buffer> TargetBuffer() const { return _buffer; }
+        [[nodiscard]] ResourceAccess DstAccess() const { return _dstAccess; }
+        [[nodiscard]] glm::u64 Offset() const { return _offset; }
         [[nodiscard]] glm::u64 size() const { return _size; }
 
     private:
@@ -595,12 +595,12 @@ namespace kor
             std::optional<glm::u32> baseArrayLayer = std::nullopt,
             std::optional<glm::u32> layerCount = std::nullopt);
 
-        [[nodiscard]] kor::ResourceRef<const kor::Image> image() const { return _image; }
-        [[nodiscard]] ResourceAccess dstAccess() const { return _dstAccess; }
-        [[nodiscard]] std::optional<glm::u32> baseMipLevel() const { return _baseMipLevel; }
-        [[nodiscard]] std::optional<glm::u32> levelCount() const { return _levelCount; }
-        [[nodiscard]] std::optional<glm::u32> baseArrayLayer() const { return _baseArrayLayer; }
-        [[nodiscard]] std::optional<glm::u32> layerCount() const { return _layerCount; }
+        [[nodiscard]] kor::ResourceRef<const kor::Image> TargetImage() const { return _image; }
+        [[nodiscard]] ResourceAccess DstAccess() const { return _dstAccess; }
+        [[nodiscard]] std::optional<glm::u32> BaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] std::optional<glm::u32> LevelCount() const { return _levelCount; }
+        [[nodiscard]] std::optional<glm::u32> BaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] std::optional<glm::u32> LayerCount() const { return _layerCount; }
 
     private:
         kor::ResourceRef<const kor::Image> _image;
@@ -728,9 +728,9 @@ namespace kor
      * commandBuffer.BeginRendering(gBuffer);                       // clear to the framebuffer's own values
      *
      * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer)        // or override them, this pass only
-     *     .setClearColor(0, glm::vec4{0.1f, 0.1f, 0.12f, 1.f})
-     *     .setClearColor(2, glm::uvec4{~0u})                       // an integer attachment's sentinel
-     *     .setDepthStoreOperation(kor::StoreOperation::eDontCare));
+     *     .SetClearColor(0, glm::vec4{0.1f, 0.1f, 0.12f, 1.f})
+     *     .SetClearColor(2, glm::uvec4{~0u})                       // an integer attachment's sentinel
+     *     .SetDepthStoreOperation(kor::StoreOperation::eDontCare));
      *
      * commandBuffer.BeginRendering();                              // the screen, with its own values
      * @endcode
@@ -752,12 +752,12 @@ namespace kor
         RenderInfo(const kor::ResourceRef<kor::Framebuffer>& framebuffer);
         RenderInfo(const kor::Resource<kor::Framebuffer>& framebuffer);
 
-        RenderInfo& setColorLoadOperation(const kor::LoadOperation op) { _colorLoadOperation = op; return *this; }
-        RenderInfo& setDepthLoadOperation(const kor::LoadOperation op) { _depthLoadOperation = op; return *this; }
-        RenderInfo& setStencilLoadOperation(const kor::LoadOperation op) { _stencilLoadOperation = op; return *this; }
-        RenderInfo& setColorStoreOperation(const kor::StoreOperation op) { _colorStoreOperation = op; return *this; }
-        RenderInfo& setDepthStoreOperation(const kor::StoreOperation op) { _depthStoreOperation = op; return *this; }
-        RenderInfo& setStencilStoreOperation(const kor::StoreOperation op) { _stencilStoreOperation = op; return *this; }
+        RenderInfo& SetColorLoadOperation(const kor::LoadOperation op) { _colorLoadOperation = op; return *this; }
+        RenderInfo& SetDepthLoadOperation(const kor::LoadOperation op) { _depthLoadOperation = op; return *this; }
+        RenderInfo& SetStencilLoadOperation(const kor::LoadOperation op) { _stencilLoadOperation = op; return *this; }
+        RenderInfo& SetColorStoreOperation(const kor::StoreOperation op) { _colorStoreOperation = op; return *this; }
+        RenderInfo& SetDepthStoreOperation(const kor::StoreOperation op) { _depthStoreOperation = op; return *this; }
+        RenderInfo& SetStencilStoreOperation(const kor::StoreOperation op) { _stencilStoreOperation = op; return *this; }
 
         /**
          * @brief What colour attachment @p index is cleared to, for this pass only.
@@ -767,7 +767,7 @@ namespace kor
          * Attachments not named here keep the framebuffer's own clear value, so overriding one of
          * five means writing one line, not five.
          */
-        RenderInfo& setClearColor(const glm::u32 index, const ClearColor &color)
+        RenderInfo& SetClearColor(const glm::u32 index, const ClearColor &color)
         {
             if (index >= _clearColors.size()) {
                 _clearColors.resize(index + 1, std::nullopt);
@@ -775,32 +775,32 @@ namespace kor
             _clearColors[index] = color;
             return *this;
         }
-        RenderInfo& setClearDepth(const float depth) { _clearDepth = depth; return *this; }
-        RenderInfo& setClearStencil(const glm::i32 stencil) { _clearStencil = stencil; return *this; }
+        RenderInfo& SetClearDepth(const float depth) { _clearDepth = depth; return *this; }
+        RenderInfo& SetClearStencil(const glm::i32 stencil) { _clearStencil = stencil; return *this; }
 
-        [[nodiscard]] kor::ResourceRef<const kor::Framebuffer> framebuffer() const { return _framebuffer; }
+        [[nodiscard]] kor::ResourceRef<const kor::Framebuffer> Target() const { return _framebuffer; }
 
-        [[nodiscard]] kor::LoadOperation colorLoadOperation() const { return _colorLoadOperation; }
-        [[nodiscard]] kor::LoadOperation depthLoadOperation() const { return _depthLoadOperation; }
-        [[nodiscard]] kor::LoadOperation stencilLoadOperation() const { return _stencilLoadOperation; }
-        [[nodiscard]] kor::StoreOperation colorStoreOperation() const { return _colorStoreOperation; }
-        [[nodiscard]] kor::StoreOperation depthStoreOperation() const { return _depthStoreOperation; }
-        [[nodiscard]] kor::StoreOperation stencilStoreOperation() const { return _stencilStoreOperation; }
+        [[nodiscard]] kor::LoadOperation ColorLoadOperation() const { return _colorLoadOperation; }
+        [[nodiscard]] kor::LoadOperation DepthLoadOperation() const { return _depthLoadOperation; }
+        [[nodiscard]] kor::LoadOperation StencilLoadOperation() const { return _stencilLoadOperation; }
+        [[nodiscard]] kor::StoreOperation ColorStoreOperation() const { return _colorStoreOperation; }
+        [[nodiscard]] kor::StoreOperation DepthStoreOperation() const { return _depthStoreOperation; }
+        [[nodiscard]] kor::StoreOperation StencilStoreOperation() const { return _stencilStoreOperation; }
 
         /**
          * @brief What colour attachment @p index will be cleared to.
          *
-         * The value this pass was given, or the framebuffer's own once resolveClearValues() has
+         * The value this pass was given, or the framebuffer's own once ResolveClearValues() has
          * run. Black for an attachment neither of them describes, which cannot happen for a pass
          * recorded through BeginRendering.
          */
-        [[nodiscard]] const ClearColor& clearColor(glm::u32 index) const;
+        [[nodiscard]] const ClearColor& ClearColorAt(glm::u32 index) const;
 
         /** @brief What the depth attachment will be cleared to; the far plane if nothing said. */
-        [[nodiscard]] float clearDepth() const { return _clearDepth.value_or(1.f); }
+        [[nodiscard]] float ClearDepth() const { return _clearDepth.value_or(1.f); }
 
         /** @brief What the stencil attachment will be cleared to; 0 if nothing said. */
-        [[nodiscard]] glm::i32 clearStencil() const { return _clearStencil.value_or(0); }
+        [[nodiscard]] glm::i32 ClearStencil() const { return _clearStencil.value_or(0); }
 
         /**
          * @brief Fills in every clear value this pass did not set from @p framebuffer's own.
@@ -811,7 +811,7 @@ namespace kor
          * then — the last one written, for every pass in the frame — rather than what each pass was
          * recorded with. Resolving here makes both backends agree.
          */
-        void resolveClearValues(const kor::Framebuffer& framebuffer);
+        void ResolveClearValues(const kor::Framebuffer& framebuffer);
 
     private:
         kor::ResourceRef<const kor::Framebuffer> _framebuffer;        ///< The framebuffer the pass will render to. Its attachments determine which of the load/store ops below are used.
@@ -832,7 +832,7 @@ namespace kor
     /**
      * @brief What one CommandBuffer::BeginTimer / EndTimer scope cost on the GPU.
      *
-     * Produced by CommandBuffer::timings(), in the order the scopes were opened. The time is
+     * Produced by CommandBuffer::Timings(), in the order the scopes were opened. The time is
      * measured on the device, so it is what the GPU spent, not what the recording thread did.
      *
      * @see CommandBuffer::BeginTimer
@@ -864,7 +864,7 @@ namespace kor
      * new graphics pipeline is bound. What the tracking buys is that a pipeline's baked defaults are
      * applied lazily, before the first draw that needs them, instead of being re-sent on every bind.
      *
-     * @see CommandBuffer::applyDynamicDefaults
+     * @see CommandBuffer::ApplyDynamicDefaults
      */
     enum class DynamicState : std::uint16_t {
         eLineWidth              = 1 << 0,   ///< @see CommandBuffer::SetLineWidth

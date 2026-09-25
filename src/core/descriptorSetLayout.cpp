@@ -17,10 +17,10 @@
 
 namespace kor
 {
-    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::addBinding(glm::u32 binding, DescriptorType type,
+    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBinding(glm::u32 binding, DescriptorType type,
         glm::u32 count, Shader::AccessKind access, Flags<Shader::Stage> stages, bool active)
     {
-        // Defer the failure to build() (which returns a Result) rather than throwing here.
+        // Defer the failure to Build() (which returns a Result) rather than throwing here.
         if (_bindings.contains(binding)) {
             if (!_error) _error = Error{ .code = ErrorCode::eInvalidArgument,
                 .message = std::format("Binding {} already exists in the layout.", binding) };
@@ -30,9 +30,9 @@ namespace kor
         return *this;
     }
 
-    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::addBinding(const glm::u32 binding, Binding description)
+    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBinding(const glm::u32 binding, Binding description)
     {
-        // Same deferral as the overload above: report at build(), which can return it.
+        // Same deferral as the overload above: report at Build(), which can return it.
         if (_bindings.contains(binding)) {
             if (!_error) _error = Error{ .code = ErrorCode::eInvalidArgument,
                 .message = std::format("Binding {} already exists in the layout.", binding) };
@@ -42,12 +42,12 @@ namespace kor
         return *this;
     }
 
-    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::addBlockBinding(
+    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBlockBinding(
         const glm::u32 binding, const DescriptorType type, const glm::u32 count,
         const Shader::AccessKind access, const Flags<Shader::Stage> stages, const bool active,
         std::vector<Shader::BlockMember> members, const glm::u32 blockSize)
     {
-        addBinding(binding, type, count, access, stages, active);
+        AddBinding(binding, type, count, access, stages, active);
         if (const auto it = _bindings.find(binding); it != _bindings.end()) {
             it->second.members = std::move(members);
             it->second.blockSize = blockSize;
@@ -55,17 +55,17 @@ namespace kor
         return *this;
     }
 
-    bool DescriptorSetLayout::matches(const Builder& builder) const
+    bool DescriptorSetLayout::Matches(const Builder& builder) const
     {
         return _bindings == builder._bindings;
     }
 
-    bool DescriptorSetLayout::refreshBlocks(const Builder& builder)
+    bool DescriptorSetLayout::RefreshBlocks(const Builder& builder)
     {
         bool changed = false;
         for (auto& [binding, description] : _bindings) {
             const auto it = builder._bindings.find(binding);
-            if (it == builder._bindings.end()) continue;   // matches() guarantees there is one
+            if (it == builder._bindings.end()) continue;   // Matches() guarantees there is one
 
             // The names ride along with the blocks, and for the same reason: they are outside the
             // layout's identity, so a reload that only renames a binding keeps this object — but
@@ -89,16 +89,16 @@ namespace kor
         return changed;
     }
 
-    std::optional<glm::u32> DescriptorSetLayout::findBinding(const std::string_view name) const
+    std::optional<glm::u32> DescriptorSetLayout::FindBinding(const std::string_view name) const
     {
         if (name.empty()) return std::nullopt;
         for (const auto& [binding, description] : _bindings) {
-            if (description.namedBy(name)) return binding;
+            if (description.NamedBy(name)) return binding;
         }
         return std::nullopt;
     }
 
-    std::vector<std::string> DescriptorSetLayout::bindingNames() const
+    std::vector<std::string> DescriptorSetLayout::BindingNames() const
     {
         std::vector<std::string> names;
         for (const auto& [binding, description] : _bindings) {
@@ -111,29 +111,29 @@ namespace kor
         return names;
     }
 
-    Result<std::unique_ptr<DescriptorSetLayout>> DescriptorSetLayout::Builder::create() const
+    Result<std::unique_ptr<DescriptorSetLayout>> DescriptorSetLayout::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
         if (_error) return std::unexpected(*_error);
-        if (auto v = validate(); !v) return std::unexpected(v.error());
+        if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const auto api = Context::activeAPI();
+        const auto api = Context::ActiveAPI();
         if (api != API::eOpenGL && api != API::eVulkan)
-            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+            return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
-        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<DescriptorSetLayout> {
+        return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<DescriptorSetLayout> {
             return (api == API::eVulkan)
                 ? kor::MakeBackendPtr<DescriptorSetLayout, vk::DescriptorSetLayout>(*this)
                 : std::unique_ptr<DescriptorSetLayout>(std::make_unique<DescriptorSetLayout>(*this));
         });
     }
 
-    kor::Resource<DescriptorSetLayout> DescriptorSetLayout::Builder::build(const std::source_location where) const
+    kor::Resource<DescriptorSetLayout> DescriptorSetLayout::Builder::Build(const std::source_location where) const
     {
-        return materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout", where);
+        return Materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout", where);
     }
 
-    DescriptorType DescriptorSetLayout::bindingType(const glm::u32 binding) const
+    DescriptorType DescriptorSetLayout::BindingType(const glm::u32 binding) const
     {
         if (!_bindings.contains(binding)) {
             throw std::runtime_error("Binding " + std::to_string(binding) + " does not exist in the layout!");

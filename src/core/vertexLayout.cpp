@@ -55,7 +55,7 @@ namespace kor
         }
     }
 
-    std::optional<VertexInputAttributeDescription> VertexLayout::position() const
+    std::optional<VertexInputAttributeDescription> VertexLayout::Position() const
     {
         if (attributes.empty()) return std::nullopt;
 
@@ -74,13 +74,13 @@ namespace kor
         };
     }
 
-    Result<std::vector<VertexInputAttributeDescription>> VertexLayout::resolve(const Shader& vertexShader) const
+    Result<std::vector<VertexInputAttributeDescription>> VertexLayout::Resolve(const Shader& vertexShader) const
     {
         // A view over the shader's reflection, so the matching below needs nothing of the shader
         // but what it declared. The strings are the shader's own and outlive this call.
         std::vector<ShaderInput> inputs;
-        inputs.reserve(vertexShader.memoryLayout().inputs.size());
-        for (const auto& input : vertexShader.memoryLayout().inputs) {
+        inputs.reserve(vertexShader.BlockLayout().inputs.size());
+        for (const auto& input : vertexShader.BlockLayout().inputs) {
             inputs.push_back(ShaderInput{
                 .location          = input.startingLocation,
                 .name              = input.name,
@@ -88,10 +88,10 @@ namespace kor
                 .semantic          = input.semantic,
             });
         }
-        return resolve(inputs);
+        return Resolve(inputs);
     }
 
-    Result<std::vector<VertexInputAttributeDescription>> VertexLayout::resolve(
+    Result<std::vector<VertexInputAttributeDescription>> VertexLayout::Resolve(
         const std::span<const ShaderInput> inputs) const
     {
         const bool annotated = std::ranges::any_of(inputs, [](const ShaderInput& input) {
@@ -121,7 +121,7 @@ namespace kor
             // The usual cause is a layout that numbers some of its attributes and leaves the rest
             // to fall back onto a number already taken.
             if (const auto clash = duplicateLocation(resolved)) {
-                return fail(ErrorCode::eVertexLayoutMismatch,
+                return Fail(ErrorCode::eVertexLayoutMismatch,
                     "Two vertex attributes are described at location {}. A layout that gives any "
                     "attribute an explicit location should give them all one: the rest fall back to "
                     "their position in the list, which is what collided here.",
@@ -150,7 +150,7 @@ namespace kor
                 if (!match && input.location < attributes.size())
                     match = &attributes[input.location];
                 if (!match) {
-                    return fail(ErrorCode::eVertexLayoutMismatch,
+                    return Fail(ErrorCode::eVertexLayoutMismatch,
                         "Vertex input '{}' at location {} carries no semantic, and the vertex layout "
                         "has no attribute at that location to fall back to.",
                         input.name, input.location);
@@ -176,14 +176,14 @@ namespace kor
                     // describes its attributes by location, and the shader is asking it a question
                     // it cannot answer in principle.
                     if (available.empty()) {
-                        return fail(ErrorCode::eVertexLayoutMismatch,
+                        return Fail(ErrorCode::eVertexLayoutMismatch,
                             "Vertex input '{}' asks for {}, but the vertex layout names no semantics at "
                             "all — it describes its {} attribute(s) by location. Either annotate nothing "
                             "in the shader, or give the layout's attributes semantics.",
                             input.name, describe(input.semanticNamespace, input.semantic), attributes.size());
                     }
 
-                    return fail(ErrorCode::eVertexLayoutMismatch,
+                    return Fail(ErrorCode::eVertexLayoutMismatch,
                         "Vertex input '{}' asks for {}, which the vertex layout does not carry. It has: {}.",
                         input.name, describe(input.semanticNamespace, input.semantic), available);
                 }

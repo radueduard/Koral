@@ -66,7 +66,7 @@ namespace kmesh
             std::optional<Identifier> indexIdentifier  = std::nullopt;      ///< The index range, if the mesh is indexed.
 
             Allocation() = default;
-            ~Allocation() { reset(); }
+            ~Allocation() { Reset(); }
 
             Allocation(const Allocation&)            = delete;
             Allocation& operator=(const Allocation&) = delete;
@@ -83,7 +83,7 @@ namespace kmesh
             {
                 if (this != &other)
                 {
-                    reset();
+                    Reset();
                     vertexIdentifier = other.vertexIdentifier;
                     indexIdentifier  = other.indexIdentifier;
                     _heap            = other._heap;
@@ -93,11 +93,11 @@ namespace kmesh
             }
 
             /** @brief Frees the suballocation back to its heap, leaving this handle empty. */
-            void reset()
+            void Reset()
             {
                 if (_heap)
                 {
-                    _heap->free(vertexIdentifier, indexIdentifier);
+                    _heap->Free(vertexIdentifier, indexIdentifier);
                     _heap = nullptr;
                 }
             }
@@ -132,22 +132,22 @@ namespace kmesh
             // Request eAccelerationStructureInput (implies device address) so a heap
             // suballocation can directly back a ray-tracing BLAS; the empty-buffer
             // makeBuffer overload otherwise omits it. Only when the device actually supports ray
-            // tracing, though — not every GPU does (see Context::supportsRayTracing), and asking
+            // tracing, though — not every GPU does (see Context::SupportsRayTracing), and asking
             // for a buffer usage tied to an extension that was never enabled is itself a Vulkan
             // validation error, on every mesh buffer this heap ever allocates.
-            const auto rtInputUsage = kor::Context::supportsRayTracing()
+            const auto rtInputUsage = kor::Context::SupportsRayTracing()
                 ? kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eAccelerationStructureInput)
                 : kor::Flags<kor::Buffer::Usage>{};
 
             // The heap owns its buffers: every mesh in it is a range of these, so they outlive any
             // one suballocation and are kept alive by the heap itself.
             _vertexBuffers.reserve(sizeof...(Streams));
-            (adoptVertexBuffer(
-                makeBuffer<Streams>(vertexCapacity,
+            (AdoptVertexBuffer(
+                MakeBuffer<Streams>(vertexCapacity,
                     kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eVertex) | rtInputUsage)), ...);
 
             if (indexCapacity.has_value()) {
-                adoptIndexBuffer(makeBuffer<glm::u32>(*indexCapacity,
+                AdoptIndexBuffer(MakeBuffer<glm::u32>(*indexCapacity,
                     kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eIndex) | rtInputUsage),
                     kor::ChannelType::eUInt);
             }
@@ -155,7 +155,7 @@ namespace kmesh
             // The heap's own vertex layout, which is what a pipeline drawing out of it is matched
             // against — and which says where the position sits, so a suballocation can back a
             // ray-tracing acceleration structure.
-            setVertexLayout(MakeVertexLayout<Streams...>());
+            SetVertexLayout(MakeVertexLayout<Streams...>());
         }
 
         ~MeshHeap() override = default;
@@ -237,7 +237,7 @@ namespace kmesh
                 return std::nullopt;
 
             // Upload each vertex stream into its respective buffer
-            uploadStreams(alloc->vertexIdentifier.offset, streams...,
+            UploadStreams(alloc->vertexIdentifier.offset, streams...,
                           std::index_sequence_for<Streams...>{});
 
             // Upload indices
@@ -264,7 +264,7 @@ namespace kmesh
     private:
         // Returns a suballocation's space to the heap. Const because the allocators
         // are mutable; called by Allocation's destructor through its heap pointer.
-        void free(const Identifier& vertexId, const std::optional<Identifier>& indexId) const
+        void Free(const Identifier& vertexId, const std::optional<Identifier>& indexId) const
         {
             _vertexAllocator.Free({ vertexId.offset, vertexId.size });
             if (indexId.has_value() && _indexAllocator)
@@ -276,7 +276,7 @@ namespace kmesh
 
         // Upload each span into _vertexBuffers[I] at elementOffset
         template<std::size_t... I>
-        void uploadStreams(
+        void UploadStreams(
             const glm::u64 elementOffset,
             std::span<const Streams>... streams,
             std::index_sequence<I...>) const

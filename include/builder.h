@@ -6,12 +6,12 @@
  * @file builder.h
  * @brief Common base for every Koral builder: diagnostics, input adoption, and materialization.
  *
- * A builder collects problems as it is configured (@ref Builder::addError from a setter) and
- * as it is built (@ref Builder::adopt on each resource input), then turns itself into a
+ * A builder collects problems as it is configured (@ref Builder::AddError from a setter) and
+ * as it is built (@ref Builder::Adopt on each resource input), then turns itself into a
  * @ref kor::Resource that is either valid or *poisoned* — carrying the reason it could not be
  * built rather than throwing.
  *
- * Builders are values, and @ref Builder::materialize captures a copy of the builder inside the
+ * Builders are values, and @ref Builder::Materialize captures a copy of the builder inside the
  * resource it produces. That copy is what a poisoned resource is later retried with: fix the
  * shader, and the pipeline built from it can rebuild itself from the very same configuration.
  */
@@ -35,7 +35,7 @@
 /**
  * @brief The base every Koral builder derives from.
  *
- * Builders are configured by chained setters and turned into a resource by build(). Nothing they
+ * Builders are configured by chained setters and turned into a resource by Build(). Nothing they
  * do throws: a problem found while configuring, or while building, is recorded and comes back as a
  * poisoned Resource that names what went wrong and where.
  *
@@ -72,7 +72,7 @@ namespace kor
         static constexpr bool RebuildsOnInputChange = false;
 
         /** @brief Whether anything recorded so far will make the build fail. */
-        [[nodiscard]] bool hasErrors() const noexcept {
+        [[nodiscard]] bool HasErrors() const noexcept {
             for (const auto& d : _diagnostics) {
                 if (d.severity == Severity::eError) return true;
             }
@@ -105,14 +105,14 @@ namespace kor
          * @param message What went wrong.
          * @param cause The input error responsible, when this failure is inherited from one.
          */
-        void addError(const kor::ErrorCode code, std::string message,
+        void AddError(const kor::ErrorCode code, std::string message,
                       std::shared_ptr<const kor::Error> cause = nullptr) const {
             _diagnostics.push_back({Severity::eError, code, std::move(message),
                                     kor::Stacktrace::current(2), std::move(cause)});
         }
 
-        /** @brief Records something worth mentioning that does not prevent the build. Logged by validate(). */
-        void warn(std::string message) const {
+        /** @brief Records something worth mentioning that does not prevent the build. Logged by Validate(). */
+        void Warn(std::string message) const {
             _diagnostics.push_back({Severity::eWarning, kor::ErrorCode::eNone, std::move(message),
                                     kor::Stacktrace::current(2), nullptr});
         }
@@ -124,7 +124,7 @@ namespace kor
          * usable input, so there is nothing for a retry to recover. Without this, a retried builder
          * would accumulate a fresh copy of its inputs' problems on every attempt.
          */
-        void beginAttempt() const {
+        void BeginAttempt() const {
             if (!_configWatermark) {
                 _configWatermark = _diagnostics.size();
                 _depWatermark = _deps.size();
@@ -144,24 +144,24 @@ namespace kor
          * noticed.
          */
         template<typename T>
-        void adopt(const kor::ResourceRef<T>& input, const std::string_view what) const {
-            if (!input.alive()) {
-                addError(kor::ErrorCode::eInvalidArgument, std::format("{} has been destroyed.", what));
+        void Adopt(const kor::ResourceRef<T>& input, const std::string_view what) const {
+            if (!input.Alive()) {
+                AddError(kor::ErrorCode::eInvalidArgument, std::format("{} has been destroyed.", what));
                 return;
             }
-            if (input.poisoned()) {
-                const auto name = input.name();
-                addError(input.error()->code,
+            if (input.Poisoned()) {
+                const auto name = input.Name();
+                AddError(input.Failure()->code,
                          std::format("{} '{}' is unusable.", what, name.empty() ? "<unnamed>" : name),
-                         input.errorPtr());
+                         input.ErrorPtr());
             }
-            _deps.emplace_back(input.state(), input.generation());
+            _deps.emplace_back(input.State(), input.Generation());
         }
 
-        /** @brief Consumes an owned resource as an input. @see adopt(const kor::ResourceRef<T>&, std::string_view) */
+        /** @brief Consumes an owned resource as an input. @see Adopt(const kor::ResourceRef<T>&, std::string_view) */
         template<typename T>
-        void adopt(const kor::Resource<T>& input, const std::string_view what) const {
-            adopt(kor::ResourceRef<const T>(input), what);
+        void Adopt(const kor::Resource<T>& input, const std::string_view what) const {
+            Adopt(kor::ResourceRef<const T>(input), what);
         }
 
         /**
@@ -169,22 +169,22 @@ namespace kor
          * @return An empty result when nothing failed, otherwise the first error with its cause chain
          *         attached.
          *
-         * Errors are not logged here: they end up poisoning the resource, and materialize() prints the
+         * Errors are not logged here: they end up poisoning the resource, and Materialize() prints the
          * complete history in one piece rather than a line per level.
          */
-        [[nodiscard]] kor::VoidResult validate() const {
+        [[nodiscard]] kor::VoidResult Validate() const {
             std::optional<kor::Error> firstError;
             for (const auto& [severity, code, message, trace, cause] : _diagnostics) {
                 if (severity == Severity::eError) {
                     if (!firstError) {
                         firstError = kor::Error{
                             .code = code,
-                            .message = std::format("{}\n{}", message, formatTrace(trace)),
+                            .message = std::format("{}\n{}", message, FormatTrace(trace)),
                             .cause = cause,
                         };
                     }
                 } else {
-                    kor::log::warn("[builder] {}\n{}", message, formatTrace(trace));
+                    kor::log::Warn("[builder] {}\n{}", message, FormatTrace(trace));
                 }
             }
 
@@ -195,7 +195,7 @@ namespace kor
         /**
          * @brief Turn a builder into a Resource<T>: valid on success, poisoned on failure.
          *
-         * @p SelfBuilder must expose `kor::Result<std::unique_ptr<T>> create() const`, which performs
+         * @p SelfBuilder must expose `kor::Result<std::unique_ptr<T>> Create() const`, which performs
          * one build attempt. A copy of the builder is stored inside the resource so that a poisoned
          * resource can be rebuilt later from the same configuration, once whatever broke it is fixed.
          *
@@ -204,16 +204,16 @@ namespace kor
          *
          * @param self The builder to attempt, and to keep for retries when it is recoverable.
          * @param name What is being built, for diagnostics.
-         * @param where The caller's build() site, so an error names the project's file and line rather
-         *        than somewhere inside Koral. Every build() forwards its own defaulted argument here.
+         * @param where The caller's Build() site, so an error names the project's file and line rather
+         *        than somewhere inside Koral. Every Build() forwards its own defaulted argument here.
          */
         template<typename T, typename SelfBuilder>
-        [[nodiscard]] kor::Resource<T> materialize(const SelfBuilder& self, std::string name,
+        [[nodiscard]] kor::Resource<T> Materialize(const SelfBuilder& self, std::string name,
                                                    const std::source_location where = std::source_location::current()) const {
             kor::Resource<T> resource;
 
             // Re-stamp only the symptom. Causes keep the location they were raised at — which is the
-            // caller's build() site for the input that actually broke, and that is the line to fix.
+            // caller's Build() site for the input that actually broke, and that is the line to fix.
             const auto attribute = [where](kor::Error e) {
                 e.where = where;
                 return e;
@@ -225,41 +225,41 @@ namespace kor
                 // builder that will actually be replayed. Safe to retain only because a recoverable
                 // builder holds nothing but small, lifetime-tracked inputs (shader refs, pipeline state).
                 auto attempt = std::make_shared<SelfBuilder>(self);
-                auto created = attempt->create();
+                auto created = attempt->Create();
 
                 resource = created
                     ? kor::Resource<T>(std::move(*created), name)
-                    : kor::Resource<T>::failed(attribute(std::move(created.error())), name);
+                    : kor::Resource<T>::Failed(attribute(std::move(created.error())), name);
 
                 for (const auto& [state, generation] : attempt->_deps) {
-                    resource.addDependency(state.lock(), generation);
+                    resource.AddDependency(state.lock(), generation);
                 }
-                resource.setRebuild([attempt] { return attempt->create(); });
-                resource.setRebuildsOnInputChange(SelfBuilder::RebuildsOnInputChange);
-                // create() re-adopts the builder's inputs on every run, so reading _deps back after an
+                resource.SetRebuild([attempt] { return attempt->Create(); });
+                resource.SetRebuildsOnInputChange(SelfBuilder::RebuildsOnInputChange);
+                // Create() re-adopts the builder's inputs on every run, so reading _deps back after an
                 // attempt is what keeps the dependency list (and its generations) honest across repairs.
-                resource.setDependencyProbe([attempt] { return attempt->_deps; });
+                resource.SetDependencyProbe([attempt] { return attempt->_deps; });
             } else {
                 // Build straight off the caller's builder and keep nothing. This resource cannot be
                 // repaired at runtime, so a rebuild closure would never fire — and holding the builder
                 // would pin its initial data (the buffer's contents, the image's pixels) in host memory
                 // for as long as the resource lives.
-                auto created = self.create();
+                auto created = self.Create();
 
                 resource = created
                     ? kor::Resource<T>(std::move(*created), name)
-                    : kor::Resource<T>::failed(attribute(std::move(created.error())), name);
+                    : kor::Resource<T>::Failed(attribute(std::move(created.error())), name);
 
                 for (const auto& [state, generation] : self._deps) {
-                    resource.addDependency(state.lock(), generation);
+                    resource.AddDependency(state.lock(), generation);
                 }
             }
 
             // Report the failure once, here, with its whole history — the symptom the caller hit and
             // the root cause they have to go and fix. Retries are gated on a dependency actually
             // changing, so this does not become per-frame spam.
-            if (resource.poisoned()) {
-                kor::log::error("Could not build {}:\n{}", name, resource.error()->history());
+            if (resource.Poisoned()) {
+                kor::log::Error("Could not build {}:\n{}", name, resource.Failure()->History());
             }
 
             return resource;
@@ -279,7 +279,7 @@ namespace kor
         //   "kor::"     — demangled frames, which is what std::stacktrace yields.
         //   "_ZN3kor"   — the same namespace still mangled, which is what backtrace_symbols(3) yields.
         //   "libKoral"  — the module name that prefixes each backtrace_symbols line.
-        static bool isLibraryFrame(const kor::Stacktrace::value_type& frame) {
+        static bool IsLibraryFrame(const kor::Stacktrace::value_type& frame) {
             const auto symbol = frame.description();
             for (const std::string_view marker : {"kor::", "_ZN3kor", "libKoral"}) {
                 if (symbol.find(marker) != std::string::npos) return true;
@@ -287,13 +287,13 @@ namespace kor
             return false;
         }
 
-        static std::string formatTrace(const kor::Stacktrace& trace) {
+        static std::string FormatTrace(const kor::Stacktrace& trace) {
             constexpr std::size_t maxFrames = 10;
 
             std::string out;
             std::size_t shown = 0;
             for (const auto& frame : trace) {
-                if (isLibraryFrame(frame)) continue;         // the caller's code is what they can fix
+                if (IsLibraryFrame(frame)) continue;         // the caller's code is what they can fix
                 out += std::format("    at {} ({}:{})\n",
                                    frame.description(), frame.source_file(), frame.source_line());
                 if (++shown == maxFrames) break;

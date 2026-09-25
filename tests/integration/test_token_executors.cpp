@@ -29,7 +29,7 @@ class TokenExecutorTest : public GpuTest {};
 Task<void> AwaitAndRecordThread(Token token, std::thread::id& resumedOn, Token done) {
     co_await token;
     resumedOn = std::this_thread::get_id();
-    done.signal();
+    done.Signal();
 }
 
 TEST_F(TokenExecutorTest, AwaitOnTheMainThreadResumesOnTheNextDrain) {
@@ -39,13 +39,13 @@ TEST_F(TokenExecutorTest, AwaitOnTheMainThreadResumesOnTheNextDrain) {
     std::thread::id resumedOn;
 
     auto task = AwaitAndRecordThread(token, resumedOn, done);
-    ASSERT_FALSE(task.done());
+    ASSERT_FALSE(task.Done());
 
-    std::thread([&] { token.signal(); }).join();
-    EXPECT_FALSE(task.done()) << "a main-thread waiter must not be resumed on the signalling thread";
+    std::thread([&] { token.Signal(); }).join();
+    EXPECT_FALSE(task.Done()) << "a main-thread waiter must not be resumed on the signalling thread";
 
     Context::DrainMainThread();
-    EXPECT_TRUE(task.done());
+    EXPECT_TRUE(task.Done());
     EXPECT_EQ(resumedOn, mainThread);
 }
 
@@ -53,7 +53,7 @@ Task<void> AwaitOnBackground(Token token, std::thread::id& resumedOn, Token done
     co_await Context::SwitchToBackgroundThread();
     co_await token;
     resumedOn = std::this_thread::get_id();
-    done.signal();
+    done.Signal();
 }
 
 TEST_F(TokenExecutorTest, AwaitOnABackgroundThreadResumesOnThePool) {
@@ -62,8 +62,8 @@ TEST_F(TokenExecutorTest, AwaitOnABackgroundThreadResumesOnThePool) {
     std::thread::id resumedOn;
 
     auto task = AwaitOnBackground(token, resumedOn, done);
-    token.signal();  // from the main thread
-    done.wait();
+    token.Signal();  // from the main thread
+    done.Wait();
 
     EXPECT_NE(resumedOn, std::this_thread::get_id());
     EXPECT_NE(resumedOn, std::thread::id{});
@@ -87,9 +87,9 @@ TEST_F(TokenExecutorTest, ACoroutineDestroyedWhileItsResumeIsQueuedIsSkipped) {
     std::atomic<int> destroyed{0}, resumed{0};
     {
         auto task = WaitOnTheMainThread(token, destroyed, resumed);
-        ASSERT_FALSE(task.done());
-        token.signal();            // queues the resume on the main thread; nothing runs yet
-        ASSERT_FALSE(task.done());
+        ASSERT_FALSE(task.Done());
+        token.Signal();            // queues the resume on the main thread; nothing runs yet
+        ASSERT_FALSE(task.Done());
     }                              // destroyed with its resume still queued
     EXPECT_EQ(destroyed.load(), 1);
 
@@ -102,9 +102,9 @@ TEST_F(TokenExecutorTest, ACoroutineDestroyedWhileItsResumeIsQueuedIsSkipped) {
 Task<void> StepLoop(Timeline& requests, Timeline& done, const int steps, std::atomic<int>& state) {
     co_await Context::SwitchToBackgroundThread();
     for (int n = 1; n <= steps; ++n) {
-        co_await requests.at(n);
+        co_await requests.At(n);
         state.store(n);
-        done.at(n).signal();
+        done.At(n).Signal();
     }
 }
 
@@ -115,15 +115,15 @@ TEST_F(TokenExecutorTest, TwoTimelinesDriveARecurringRendezvous) {
 
     auto loop = StepLoop(requests, done, kSteps, state);
     for (int n = 1; n <= kSteps; ++n) {
-        requests.at(n).signal();
-        done.at(n).wait();
+        requests.At(n).Signal();
+        done.At(n).Wait();
         ASSERT_EQ(state.load(), n);
     }
 
     // The loop signalled its last step before returning; give it a moment to reach final_suspend.
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    while (!loop.done() && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
-    EXPECT_TRUE(loop.done());
+    while (!loop.Done() && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
+    EXPECT_TRUE(loop.Done());
 }
 
 }  // namespace
@@ -136,12 +136,12 @@ TEST_F(TokenExecutorTest, TwoTimelinesDriveARecurringRendezvous) {
 namespace {
 
 std::uint64_t logMark() {
-    const auto history = kor::log::history();
+    const auto history = kor::log::History();
     return history.empty() ? 0ull : history.back().sequence;
 }
 
 void expectNoValidationErrorsSince(const std::uint64_t since) {
-    for (const auto& record : kor::log::historySince(since)) {
+    for (const auto& record : kor::log::HistorySince(since)) {
         if (record.level != kor::log::Level::eError) continue;
         EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
     }
@@ -157,7 +157,7 @@ std::unique_ptr<CommandBuffer> recordEmpty() {
 Task<void> AwaitOnBackgroundThenSignal(Token token, Token done) {
     co_await Context::SwitchToBackgroundThread();
     co_await token;
-    done.signal();
+    done.Signal();
 }
 
 TEST_F(TokenExecutorTest, AGpuSignalResumesAParkedCoroutine) {
@@ -169,8 +169,8 @@ TEST_F(TokenExecutorTest, AGpuSignalResumesAParkedCoroutine) {
     const auto cb = recordEmpty();
     ASSERT_TRUE(cb->Submit({.signal = {gpuDone}}));
 
-    resumed.wait();   // only the reactor can get us here
-    EXPECT_TRUE(gpuDone.ready());
+    resumed.Wait();   // only the reactor can get us here
+    EXPECT_TRUE(gpuDone.Ready());
     cb->WaitForFence();
     expectNoValidationErrorsSince(since);
 }
@@ -184,11 +184,11 @@ TEST_F(TokenExecutorTest, TheGpuWaitsForATokenTheCpuSignalsLater) {
     ASSERT_TRUE(cb->Submit({.waitFor = {cpuGo}, .signal = {gpuDone}}));
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    EXPECT_FALSE(gpuDone.ready()) << "the GPU ran ahead of a token nobody had signalled";
+    EXPECT_FALSE(gpuDone.Ready()) << "the GPU ran ahead of a token nobody had signalled";
 
-    cpuGo.signal();
-    gpuDone.wait();
-    EXPECT_TRUE(gpuDone.ready());
+    cpuGo.Signal();
+    gpuDone.Wait();
+    EXPECT_TRUE(gpuDone.Ready());
     cb->WaitForFence();
     expectNoValidationErrorsSince(since);
 }
@@ -204,8 +204,8 @@ TEST_F(TokenExecutorTest, SubmissionsChainThroughATokenWithoutTheCpu) {
     ASSERT_TRUE(a->Submit({.signal = {first}}));
     ASSERT_TRUE(b->Submit({.waitFor = {first}, .signal = {second}}));
 
-    second.wait();
-    EXPECT_TRUE(first.ready());
+    second.Wait();
+    EXPECT_TRUE(first.Ready());
     a->WaitForFence();
     b->WaitForFence();
     expectNoValidationErrorsSince(since);
@@ -216,7 +216,7 @@ TEST_F(TokenExecutorTest, ABlockingWaitStartedBeforeTheGpuGotTheTokenStillReturn
     std::atomic<bool> returned{false};
 
     // Parked on the CPU side, before the token has any semaphore to wait on.
-    std::thread waiter([&] { token.wait(); returned.store(true); });
+    std::thread waiter([&] { token.Wait(); returned.store(true); });
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     ASSERT_FALSE(returned.load());
 
@@ -236,16 +236,16 @@ TEST_F(TokenExecutorTest, ATimelineCanBeSignalledByTheGpuFrameAfterFrame) {
         cb->Begin();
         cb->End();
         // Fire and forget: the token is a temporary. The buffer keeps its semaphore alive.
-        ASSERT_TRUE(cb->Submit({.signal = {frames.next()}}));
-        frames.at(n).wait();
+        ASSERT_TRUE(cb->Submit({.signal = {frames.Next()}}));
+        frames.At(n).Wait();
     }
-    EXPECT_EQ(frames.value(), 8u);
+    EXPECT_EQ(frames.Value(), 8u);
     expectNoValidationErrorsSince(since);
 }
 
 TEST_F(TokenExecutorTest, SignallingATokenThatAlreadyHappenedIsAnError) {
     const Token done = Token::Create();
-    done.signal();
+    done.Signal();
 
     const auto cb = recordEmpty();
     EXPECT_FALSE(cb->Submit({.signal = {done}}));
@@ -255,10 +255,10 @@ TEST_F(TokenExecutorTest, SignallingATokenThatAlreadyHappenedIsAnError) {
 TEST_F(TokenExecutorTest, TheCpuCanSignalAGpuBackedTimelineToo) {
     Timeline tl;
     const auto cb = recordEmpty();
-    ASSERT_TRUE(cb->Submit({.signal = {tl.next()}}));   // value 1, and the timeline now has a semaphore
-    tl.at(1).wait();
+    ASSERT_TRUE(cb->Submit({.signal = {tl.Next()}}));   // value 1, and the timeline now has a semaphore
+    tl.At(1).Wait();
 
-    const Token cpuSide = tl.next();                     // value 2, from the CPU
+    const Token cpuSide = tl.Next();                     // value 2, from the CPU
     std::atomic<int> resumed{0};
     auto task = [](Token t, std::atomic<int>& r) -> Task<void> {
         co_await Context::SwitchToBackgroundThread();
@@ -266,10 +266,10 @@ TEST_F(TokenExecutorTest, TheCpuCanSignalAGpuBackedTimelineToo) {
         r.store(1);
     }(cpuSide, resumed);
 
-    cpuSide.signal();
-    tl.at(2).wait();
+    cpuSide.Signal();
+    tl.At(2).Wait();
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    while (!task.done() && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
+    while (!task.Done() && std::chrono::steady_clock::now() < deadline) std::this_thread::yield();
     EXPECT_EQ(resumed.load(), 1);
     cb->WaitForFence();
 }
@@ -282,16 +282,16 @@ namespace {
 
 Resource<Buffer> makeDeviceBuffer(const std::vector<int>& data) {
     Buffer::Builder<int> b;
-    b.setData(data);
-    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    b.setType(Buffer::Type::eDeviceLocal);
-    return b.build();
+    b.SetData(data);
+    b.SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    b.SetType(Buffer::Type::eDeviceLocal);
+    return b.Build();
 }
 
 Task<void> AwaitOneOff(std::function<void(CommandBuffer&)> work, Token resumed) {
     co_await Context::SwitchToBackgroundThread();
     co_await CommandBuffer::SingleTimeCommand(work);
-    resumed.signal();
+    resumed.Signal();
 }
 
 TEST_F(TokenExecutorTest, SingleTimeCommandReturnsATokenForItsCompletion) {
@@ -302,8 +302,8 @@ TEST_F(TokenExecutorTest, SingleTimeCommandReturnsATokenForItsCompletion) {
     const Token done = CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearBuffer(buffer);
     });
-    done.wait();
-    EXPECT_TRUE(done.ready());
+    done.Wait();
+    EXPECT_TRUE(done.Ready());
     EXPECT_EQ(buffer->Read<int>(), std::vector<int>(64, 0));
     expectNoValidationErrorsSince(since);
 }
@@ -316,7 +316,7 @@ TEST_F(TokenExecutorTest, ACoroutineCanAwaitAOneOff) {
 
     // Recorded on a pool thread, which is fine: every command buffer has a pool of its own.
     auto task = AwaitOneOff([&](CommandBuffer& cb) { cb.ClearBuffer(buffer); }, resumed);
-    resumed.wait();
+    resumed.Wait();
     EXPECT_EQ(buffer->Read<int>(), std::vector<int>(64, 0));
     expectNoValidationErrorsSince(since);
 }
@@ -335,7 +335,7 @@ TEST_F(TokenExecutorTest, FireAndForgetOneOffsAreReleasedOnlyOnceTheGpuIsDone) {
     for (int i = 0; i < 64; ++i)
         clears.push_back(CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.ClearBuffer(buffer); }));
 
-    for (const auto& t : clears) t.wait();
+    for (const auto& t : clears) t.Wait();
     expectNoValidationErrorsSince(since);
 }
 
@@ -375,9 +375,9 @@ TEST_F(TokenExecutorTest, SeveralThreadsRecordAndSubmitAtOnce) {
                 cb->End();
                 const Token done = Token::Create();
                 if (!cb->Submit({.signal = {done}})) failures.fetch_add(1);
-                done.wait();
+                done.Wait();
 
-                CommandBuffer::SingleTimeCommand([&](CommandBuffer& one) { one.ClearBuffer(buffer); }).wait();
+                CommandBuffer::SingleTimeCommand([&](CommandBuffer& one) { one.ClearBuffer(buffer); }).Wait();
             }
         });
     }
@@ -385,7 +385,7 @@ TEST_F(TokenExecutorTest, SeveralThreadsRecordAndSubmitAtOnce) {
     for (auto& thread : threads) thread.join();
 
     EXPECT_EQ(failures.load(), 0);
-    for (const auto& record : kor::log::historySince(since)) {
+    for (const auto& record : kor::log::HistorySince(since)) {
         if (record.level != kor::log::Level::eError) continue;
         EXPECT_EQ(record.message.find("THREADING"), std::string::npos) << record.message;
         EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
@@ -422,9 +422,9 @@ TEST_F(TokenExecutorTest, DestructionWaitsForWorkSubmittedBeforeIt) {
     ASSERT_TRUE(collector->Submit({.waitFor = {go}, .signal = {collectorDone}}));
     EXPECT_FALSE(destroyed.load());
 
-    go.signal();
-    pendingDone.wait();
-    collectorDone.wait();
+    go.Signal();
+    pendingDone.Wait();
+    collectorDone.Wait();
 
     // The next collection finds it due.
     collector->Begin();
@@ -432,18 +432,18 @@ TEST_F(TokenExecutorTest, DestructionWaitsForWorkSubmittedBeforeIt) {
     const Token last = Token::Create();
     ASSERT_TRUE(collector->Submit({.signal = {last}}));
     EXPECT_TRUE(destroyed.load()) << "never freed after the work it waited for finished";
-    last.wait();
+    last.Wait();
 }
 
 TEST_F(TokenExecutorTest, DestructionWithNothingPendingIsImmediate) {
     // Drain whatever earlier tests left, so every epoch submitted so far has been reached.
-    CommandBuffer::SingleTimeCommand([](CommandBuffer&) {}).wait();
+    CommandBuffer::SingleTimeCommand([](CommandBuffer&) {}).Wait();
     auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
     cb->Begin();
     cb->End();
     const Token done = Token::Create();
     ASSERT_TRUE(cb->Submit({.signal = {done}}));
-    done.wait();
+    done.Wait();
 
     std::atomic<bool> destroyed{false};
     vk::Context::DestroyWhenUnused([&] { destroyed.store(true); });
@@ -466,10 +466,10 @@ TEST_F(TokenExecutorTest, ABufferDestroyedWhileInUseIsFreedOnlyOnceTheGpuIsDone)
         ASSERT_TRUE(cb->Submit({.waitFor = {go}, .signal = {done}}));
     }   // destroyed here, with the clear still waiting on `go`
 
-    go.signal();
-    done.wait();
+    go.Signal();
+    done.Wait();
     // Let the deferred free happen, then look.
-    CommandBuffer::SingleTimeCommand([](CommandBuffer&) {}).wait();
+    CommandBuffer::SingleTimeCommand([](CommandBuffer&) {}).Wait();
     expectNoValidationErrorsSince(since);
 }
 

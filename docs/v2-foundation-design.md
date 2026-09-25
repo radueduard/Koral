@@ -44,9 +44,9 @@ timeline semaphore can be waited on by **both** CPU and GPU. A `Token` is:
 
 - **co_awaitable** — `co_await token` suspends the coroutine until signalled (by another
   coroutine *or* by GPU completion), resuming it on a pool thread.
-- **blocking-waitable** — `token.wait()` for synchronous, non-coroutine code (e.g. the
+- **blocking-waitable** — `token.Wait()` for synchronous, non-coroutine code (e.g. the
   builder-side buffer upload paths in `buffer.h`).
-- **pollable** — `token.ready()`.
+- **pollable** — `token.Ready()`.
 - **GPU-schedulable** — handed to the scheduler as a wait/signal (§6).
 
 ### Bidirectional token (long-lived loops)
@@ -80,14 +80,14 @@ Task<void> physicsLoop(BiToken& sync) {
 `CommandBuffer::SingleTimeCommand(command, usage)` returns a `Token` instead of `void`; the
 internal `runSingleTimeCommand(..., VkFence, VkSemaphore, VkSemaphore, bool wait)` loses the
 `wait` bool and the raw handles behind it. Fire-and-forget drops the token; synchronous
-callers use `.wait()`; coroutines `co_await` it.
+callers use `.Wait()`; coroutines `co_await` it.
 
 **Built (2026-09-23).** It no longer blocks, and is `[[nodiscard]]`, so every caller states its
-intent (`.wait()`, `co_await`, or `(void)`). The command buffer is held on a token-keyed retire
+intent (`.Wait()`, `co_await`, or `(void)`). The command buffer is held on a token-keyed retire
 list, released by the next one-off on the recording thread (or flushed at shutdown, before modules
 unload). Resources its commands use are **not** kept alive — same rule as the frame's command
 buffer — until deferred destruction lands. Internal `vk::Device::runSingleTimeCommand` returns a
-token too; its four callers `.wait()` on it, which blocks on that submission alone instead of
+token too; its four callers `.Wait()` on it, which blocks on that submission alone instead of
 `queue->waitIdle()`.
 
 ## 4. Feature flags — usage-driven registrar (approach A)
@@ -205,7 +205,7 @@ So we build **one** seam:
 Build it once; it serves all three consumers.
 
 **Built (2026-09-23)** as `Scheduler::Execute(cb, Placement)`, `Scheduler::WaitFor(Token)` and
-`Scheduler::frameCompletion()`.
+`Scheduler::FrameCompletion()`.
 
 - *Ordering across command buffers.* The resolver already carries each resource's state from one
   `End()` to the next, so it is correct whenever End order equals execution order. The seam keeps
@@ -271,7 +271,7 @@ job via `koral.json` (which already reserves Hub-only keys like `libraries`).
   (per-thread pool + compute queue — full async, designed around) or only produce work the
   main thread submits (a strict subset)?
 - ~~**Token backing:**~~ **Built (2026-09-23).** `kor::Timeline` is a monotonic counter owned
-  by one in-order producer; `Token` is a value on one (`next()` reserves, `at(n)` names a value
+  by one in-order producer; `Token` is a value on one (`Next()` reserves, `At(n)` names a value
   without reserving, for rendezvous loops). A timeline gets a `VkSemaphore` lazily, the first
   time a token of it reaches `Submit({.waitFor, .signal})`; until then it is pure CPU. One
   reactor thread (`vk::TokenReactor`) waits-any over every GPU-backed timeline with a parked
@@ -309,5 +309,5 @@ and scene-interface cleanup landed here.
 - **Cancelling a waiting coroutine.** Destroying a `Task` whose coroutine waits on a token is safe:
   the awaiter's destructor cancels its waiter slot, and resumes claim the slot only when they run
   (`Executor::Post`), so a resume already queued is skipped too. Cooperative cancellation
-  (`Task::cancel()`, `kor::Cancelled`) is not built.
+  (`Task::Cancel()`, `kor::Cancelled`) is not built.
 - **ImGui platform-window hazard** fixed by `vcpkg-overlay-ports/imgui`.

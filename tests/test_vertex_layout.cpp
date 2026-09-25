@@ -1,4 +1,4 @@
-// Unit tests for kor::VertexLayout::resolve — matching a vertex format against the inputs a
+// Unit tests for kor::VertexLayout::Resolve — matching a vertex format against the inputs a
 // vertex shader declares. This is the engine half of the mesh split: the layout says what the
 // vertices hold, the shader says what it wants, and this decides which bytes reach which location.
 // No shader is compiled here; the reflection is handed in directly.
@@ -40,7 +40,7 @@ TEST(VertexLayoutResolve, UnannotatedShaderIsMatchedByOrder) {
         { .location = 1, .name = "inNormal" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
 
     // Every attribute is described, whether the shader reads it or not.
@@ -61,7 +61,7 @@ TEST(VertexLayoutResolve, SemanticsBeatDeclarationOrder) {
         { .location = 1, .name = "pos", .semanticNamespace = "mesh", .semantic = "POSITION" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
 
     // Only what the shader asked for, each fed from the right offset.
@@ -79,7 +79,7 @@ TEST(VertexLayoutResolve, SemanticsAreCaseInsensitive) {
         { .location = 0, .name = "p", .semantic = "position" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
     ASSERT_EQ(resolved->size(), 1u);
     EXPECT_EQ((*resolved)[0].offset, 0u);
@@ -92,7 +92,7 @@ TEST(VertexLayoutResolve, ABareSemanticMatchesAnyVocabulary) {
         { .location = 0, .name = "p", .semantic = "POSITION" },
     };
 
-    EXPECT_TRUE(layout.resolve(inputs).has_value());
+    EXPECT_TRUE(layout.Resolve(inputs).has_value());
 }
 
 TEST(VertexLayoutResolve, AnotherModulesSemanticIsNotAnswered) {
@@ -101,7 +101,7 @@ TEST(VertexLayoutResolve, AnotherModulesSemanticIsNotAnswered) {
         { .location = 0, .name = "p", .semanticNamespace = "sprite", .semantic = "POSITION" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_FALSE(resolved.has_value());
     EXPECT_EQ(resolved.error().code, kor::ErrorCode::eVertexLayoutMismatch);
     EXPECT_NE(resolved.error().message.find("sprite(POSITION)"), std::string::npos);
@@ -113,7 +113,7 @@ TEST(VertexLayoutResolve, AnUnknownSemanticNamesWhatIsAvailable) {
         { .location = 0, .name = "t", .semanticNamespace = "mesh", .semantic = "TANGENT" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_FALSE(resolved.has_value());
     EXPECT_EQ(resolved.error().code, kor::ErrorCode::eVertexLayoutMismatch);
     // The message has to be enough to fix the shader with: what was asked for, and what there is.
@@ -129,7 +129,7 @@ TEST(VertexLayoutResolve, AnUnannotatedInputAmongAnnotatedOnesFallsBackToItsLoca
         { .location = 1, .name = "whatever" },   // no semantic: takes attribute 1
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
     ASSERT_EQ(resolved->size(), 2u);
     EXPECT_EQ((*resolved)[1].offset, 16u);
@@ -142,7 +142,7 @@ TEST(VertexLayoutResolve, AnUnannotatedInputPastTheLayoutIsAnError) {
         { .location = 7, .name = "stray" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_FALSE(resolved.has_value());
     EXPECT_EQ(resolved.error().code, kor::ErrorCode::eVertexLayoutMismatch);
 }
@@ -170,7 +170,7 @@ TEST(VertexLayoutResolve, ExplicitLocationsBeatDeclarationOrder) {
         { .location = 1, .name = "inColor" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
 
     ASSERT_EQ(resolved->size(), 2u);
@@ -187,7 +187,7 @@ TEST(VertexLayoutResolve, AnAttributeWithNoLocationStillFallsBackToItsPlace) {
     layout.attributes.push_back(VertexLayout::Attribute::AtLocation(5, 0, 0, ChannelType::eFloat, 3));
     layout.attributes.push_back({ .binding = 0, .offset = 12, .channelType = ChannelType::eFloat, .channelCount = 3 });
 
-    const auto resolved = layout.resolve(std::vector<VertexLayout::ShaderInput>{
+    const auto resolved = layout.Resolve(std::vector<VertexLayout::ShaderInput>{
         { .location = 5, .name = "a" }, { .location = 1, .name = "b" },
     });
     ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
@@ -202,7 +202,7 @@ TEST(VertexLayoutResolve, TwoAttributesAtOneLocationIsAnError) {
     layout.attributes.push_back(VertexLayout::Attribute::AtLocation(1, 0, 0, ChannelType::eFloat, 3));
     layout.attributes.push_back({ .binding = 0, .offset = 12, .channelType = ChannelType::eFloat, .channelCount = 3 });
 
-    const auto resolved = layout.resolve(std::vector<VertexLayout::ShaderInput>{
+    const auto resolved = layout.Resolve(std::vector<VertexLayout::ShaderInput>{
         { .location = 0, .name = "a" }, { .location = 1, .name = "b" },
     });
     ASSERT_FALSE(resolved.has_value());
@@ -219,7 +219,7 @@ TEST(VertexLayoutResolve, AnnotatedInputsFindTheAttributeThatNamesTheirLocation)
                                   .channelType = ChannelType::eFloat, .channelCount = 3 });
     layout.attributes.push_back(VertexLayout::Attribute::AtLocation(4, 0, 12, ChannelType::eFloat, 3));
 
-    const auto resolved = layout.resolve(std::vector<VertexLayout::ShaderInput>{
+    const auto resolved = layout.Resolve(std::vector<VertexLayout::ShaderInput>{
         { .location = 0, .name = "p", .semanticNamespace = "mesh", .semantic = "POSITION" },
         { .location = 4, .name = "extra" },
     });
@@ -235,7 +235,7 @@ TEST(VertexLayoutResolve, ASemanticAskedOfALocationOnlyLayoutSaysSo) {
         { .location = 0, .name = "p", .semanticNamespace = "mesh", .semantic = "POSITION" },
     };
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_FALSE(resolved.has_value());
     EXPECT_EQ(resolved.error().code, kor::ErrorCode::eVertexLayoutMismatch);
     // Naming no semantics is a different problem from missing one, and reads differently.
@@ -246,7 +246,7 @@ TEST(VertexLayoutResolve, AnEmptyLayoutResolvesToNothing) {
     const VertexLayout layout;
     const std::vector<VertexLayout::ShaderInput> inputs;
 
-    const auto resolved = layout.resolve(inputs);
+    const auto resolved = layout.Resolve(inputs);
     ASSERT_TRUE(resolved.has_value());
     EXPECT_TRUE(resolved->empty());
 }

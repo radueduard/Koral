@@ -67,25 +67,25 @@ TEST_F(GpuTest, RunIsDeferredUntilEnd) {
 TEST_F(GpuTest, SamplerBuildVariants) {
     auto linear =
         Sampler::Builder{}
-            .setMinFilter(kor::Filter::eLinear)
-            .setMagFilter(kor::Filter::eLinear)
-            .setMipmapMode(Sampler::MipmapMode::eLinear)
-            .setAddressModeU(Sampler::AddressMode::eRepeat)
-            .setAddressModeV(Sampler::AddressMode::eMirroredRepeat)
-            .setAddressModeW(Sampler::AddressMode::eClampToEdge)
-            .setMaxLod(4.f)
-            .build();
+            .SetMinFilter(kor::Filter::eLinear)
+            .SetMagFilter(kor::Filter::eLinear)
+            .SetMipmapMode(Sampler::MipmapMode::eLinear)
+            .SetAddressModeU(Sampler::AddressMode::eRepeat)
+            .SetAddressModeV(Sampler::AddressMode::eMirroredRepeat)
+            .SetAddressModeW(Sampler::AddressMode::eClampToEdge)
+            .SetMaxLod(4.f)
+            .Build();
     ASSERT_TRUE(static_cast<bool>(linear));
 
     auto nearest =
         Sampler::Builder{}
-            .setMinFilter(kor::Filter::eNearest)
-            .setMagFilter(kor::Filter::eNearest)
-            .setMipmapMode(Sampler::MipmapMode::eNearest)
-            .setAddressModeU(Sampler::AddressMode::eClampToBorder)
-            .setCompareEnable(true)
-            .setCompareOp(kor::CompareOp::eLess)
-            .build();
+            .SetMinFilter(kor::Filter::eNearest)
+            .SetMagFilter(kor::Filter::eNearest)
+            .SetMipmapMode(Sampler::MipmapMode::eNearest)
+            .SetAddressModeU(Sampler::AddressMode::eClampToBorder)
+            .SetCompareEnable(true)
+            .SetCompareOp(kor::CompareOp::eLess)
+            .Build();
     ASSERT_TRUE(static_cast<bool>(nearest));
 }
 
@@ -93,11 +93,11 @@ TEST_F(GpuTest, SamplerBuildVariants) {
 kor::Resource<Image> makeImage(kor::Flags<Image::Usage> usage,
                                Image::Format format = Image::Format::eRGBA8_UNORM) {
     return Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(format)
-        .setExtent(glm::uvec2{8, 8})
-        .setUsage(usage)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(format)
+        .SetExtent(glm::uvec2{8, 8})
+        .SetUsage(usage)
+        .Build();
 }
 
 // Build a descriptor set for each non-buffer/non-RT binding type. This drives the
@@ -107,104 +107,104 @@ kor::Resource<Image> makeImage(kor::Flags<Image::Usage> usage,
 TEST_F(GpuTest, DescriptorTypesBuild) {
     auto sampledImg = makeImage(kor::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
     auto storageImg = makeImage(kor::Flags(Image::Usage::eStorage) | Image::Usage::eTransferDst);
-    auto sampledView = ImageView::Builder(sampledImg).build();
-    auto storageView = ImageView::Builder(storageImg).build();
+    auto sampledView = ImageView::Builder(sampledImg).Build();
+    auto storageView = ImageView::Builder(storageImg).Build();
 
-    auto sampler = Sampler::Builder{}.build();
+    auto sampler = Sampler::Builder{}.Build();
 
     Buffer::RawBuilder ub;
-    ub.setRawSize(256).setUsage(Buffer::Usage::eUniform).setType(Buffer::Type::eDynamic);
-    auto uniform = ub.build();
+    ub.SetRawSize(256).SetUsage(Buffer::Usage::eUniform).SetType(Buffer::Type::eDynamic);
+    auto uniform = ub.Build();
 
     // --- eSampler ---------------------------------------------------------
     {
-        auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eSampler).build();
+        auto layout = DescriptorSetLayout::Builder{}.AddBinding(0, DescriptorType::eSampler).Build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, sampler)
-                       .build();
+                       .Write(0, sampler)
+                       .Build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
     // --- eSampledImage ----------------------------------------------------
     {
-        auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eSampledImage).build();
+        auto layout = DescriptorSetLayout::Builder{}.AddBinding(0, DescriptorType::eSampledImage).Build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, sampledView)
-                       .build();
+                       .Write(0, sampledView)
+                       .Build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
     // --- eStorageImage ----------------------------------------------------
     {
-        auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eStorageImage).build();
+        auto layout = DescriptorSetLayout::Builder{}.AddBinding(0, DescriptorType::eStorageImage).Build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, storageView)
-                       .build();
+                       .Write(0, storageView)
+                       .Build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
     // --- eCombinedImageSampler -------------------------------------------
     {
-        auto layout = DescriptorSetLayout::Builder{}.addBinding(0, DescriptorType::eCombinedImageSampler).build();
+        auto layout = DescriptorSetLayout::Builder{}.AddBinding(0, DescriptorType::eCombinedImageSampler).Build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, sampledView, sampler)
-                       .build();
+                       .Write(0, sampledView, sampler)
+                       .Build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
     // --- eUniformBuffer + multi-binding set -------------------------------
     {
         auto layout = DescriptorSetLayout::Builder{}
-                          .addBinding(0, DescriptorType::eUniformBuffer)
-                          .addBinding(1, DescriptorType::eCombinedImageSampler)
-                          .build();
+                          .AddBinding(0, DescriptorType::eUniformBuffer)
+                          .AddBinding(1, DescriptorType::eCombinedImageSampler)
+                          .Build();
         auto set = DescriptorSet::Builder(*layout)
-                       .write(0, uniform)
-                       .write(1, sampledView, sampler)
-                       .build();
+                       .Write(0, uniform)
+                       .Write(1, sampledView, sampler)
+                       .Build();
         ASSERT_TRUE(static_cast<bool>(set));
     }
 }
 
-// Exercise the runtime DescriptorSet::rebind() path (as opposed to writes baked in
+// Exercise the runtime DescriptorSet::Rebind() path (as opposed to writes baked in
 // at build time), which is a second, separate switch in the backend.
 TEST_F(GpuTest, DescriptorRuntimeWrite) {
-    auto sampler = Sampler::Builder{}.build();
+    auto sampler = Sampler::Builder{}.Build();
     auto img = makeImage(kor::Flags(Image::Usage::eStorage) | Image::Usage::eSampled | Image::Usage::eTransferDst);
-    auto view = ImageView::Builder(img).build();
+    auto view = ImageView::Builder(img).Build();
 
     Buffer::RawBuilder sb;
-    sb.setRawSize(256).setUsage(Buffer::Usage::eStorage).setType(Buffer::Type::eDynamic);
-    auto storage = sb.build();
+    sb.SetRawSize(256).SetUsage(Buffer::Usage::eStorage).SetType(Buffer::Type::eDynamic);
+    auto storage = sb.Build();
     Buffer::RawBuilder ub;
-    ub.setRawSize(256).setUsage(Buffer::Usage::eUniform).setType(Buffer::Type::eDynamic);
-    auto uniform = ub.build();
+    ub.SetRawSize(256).SetUsage(Buffer::Usage::eUniform).SetType(Buffer::Type::eDynamic);
+    auto uniform = ub.Build();
 
     auto layout = DescriptorSetLayout::Builder{}
-                      .addBinding(0, DescriptorType::eStorageBuffer)
-                      .addBinding(1, DescriptorType::eStorageImage)
-                      .addBinding(2, DescriptorType::eSampler)
-                      .addBinding(3, DescriptorType::eSampledImage)
-                      .addBinding(4, DescriptorType::eUniformBuffer)
-                      .addBinding(5, DescriptorType::eCombinedImageSampler)
-                      .build();
+                      .AddBinding(0, DescriptorType::eStorageBuffer)
+                      .AddBinding(1, DescriptorType::eStorageImage)
+                      .AddBinding(2, DescriptorType::eSampler)
+                      .AddBinding(3, DescriptorType::eSampledImage)
+                      .AddBinding(4, DescriptorType::eUniformBuffer)
+                      .AddBinding(5, DescriptorType::eCombinedImageSampler)
+                      .Build();
 
     // Every layout binding must be written at build time (unwritten bindings hold
     // default-invalid descriptors that the constructor would choke on).
     auto set = DescriptorSet::Builder(*layout)
-                   .write(0, storage)
-                   .write(1, view)
-                   .write(2, sampler)
-                   .write(3, view)
-                   .write(4, uniform)
-                   .write(5, view, sampler)
-                   .build();
+                   .Write(0, storage)
+                   .Write(1, view)
+                   .Write(2, sampler)
+                   .Write(3, view)
+                   .Write(4, uniform)
+                   .Write(5, view, sampler)
+                   .Build();
     ASSERT_TRUE(static_cast<bool>(set));
 
-    // Now re-issue each binding through the runtime DescriptorSet::rebind() path,
+    // Now re-issue each binding through the runtime DescriptorSet::Rebind() path,
     // which is a separate switch from the build-time writes above.
-    set->rebind(0, storage, 0);
-    set->rebind(1, view, 0);
-    set->rebind(2, sampler, 0);
-    set->rebind(3, view, 0);
-    set->rebind(4, uniform, 0);
-    set->rebind(5, view, sampler, 0);
+    set->Rebind(0, storage, 0);
+    set->Rebind(1, view, 0);
+    set->Rebind(2, sampler, 0);
+    set->Rebind(3, view, 0);
+    set->Rebind(4, uniform, 0);
+    set->Rebind(5, view, sampler, 0);
     set->DebugPrint(); // exercise the debug dump path
     SUCCEED();
 }
@@ -213,32 +213,32 @@ TEST_F(GpuTest, DescriptorRuntimeWrite) {
 // and view-creation paths that a plain 2D RGBA8 image never reaches.
 TEST_F(GpuTest, ImageDimensionVariety) {
     auto image3d = Image::Builder{}
-                       .setType(Image::Type::e3D)
-                       .setFormat(Image::Format::eRGBA8_UNORM)
-                       .setExtent(glm::uvec3{8, 8, 4})
-                       .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
-                       .build();
+                       .SetType(Image::Type::e3D)
+                       .SetFormat(Image::Format::eRGBA8_UNORM)
+                       .SetExtent(glm::uvec3{8, 8, 4})
+                       .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
+                       .Build();
     ASSERT_TRUE(static_cast<bool>(image3d));
-    EXPECT_EQ(image3d->extent(), glm::uvec3(8, 8, 4));
+    EXPECT_EQ(image3d->Extent(), glm::uvec3(8, 8, 4));
 
     auto view3d = ImageView::Builder(image3d)
-                      .setViewType(ImageView::Type::e3D)
-                      .build();
+                      .SetViewType(ImageView::Type::e3D)
+                      .Build();
     ASSERT_TRUE(static_cast<bool>(view3d));
 
     auto arrayImg = Image::Builder{}
-                        .setType(Image::Type::e2D)
-                        .setFormat(Image::Format::eR8_UNORM)
-                        .setExtent(glm::uvec2{8, 8})
-                        .setArrayLayers(3)
-                        .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
-                        .build();
+                        .SetType(Image::Type::e2D)
+                        .SetFormat(Image::Format::eR8_UNORM)
+                        .SetExtent(glm::uvec2{8, 8})
+                        .SetArrayLayers(3)
+                        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
+                        .Build();
     ASSERT_TRUE(static_cast<bool>(arrayImg));
 
     auto arrayView = ImageView::Builder(arrayImg)
-                         .setViewType(ImageView::Type::e2DArray)
-                         .setArrayLayerCount(3)
-                         .build();
+                         .SetViewType(ImageView::Type::e2DArray)
+                         .SetArrayLayerCount(3)
+                         .Build();
     ASSERT_TRUE(static_cast<bool>(arrayView));
 }
 
@@ -246,17 +246,17 @@ TEST_F(GpuTest, ImageDimensionVariety) {
 // per-level barriers — a large uncovered stretch of the command buffer.
 TEST_F(GpuTest, GenerateMipmapsRuns) {
     auto image = Image::Builder{}
-                     .setType(Image::Type::e2D)
-                     .setFormat(Image::Format::eRGBA8_UNORM)
-                     .setExtent(glm::uvec2{8, 8})
-                     .setMipLevels(4) // 8 -> 4 -> 2 -> 1
-                     .setUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
-                     .build();
+                     .SetType(Image::Type::e2D)
+                     .SetFormat(Image::Format::eRGBA8_UNORM)
+                     .SetExtent(glm::uvec2{8, 8})
+                     .SetMipLevels(4) // 8 -> 4 -> 2 -> 1
+                     .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
+                     .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
         cb.GenerateMipmaps(image);
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
     SUCCEED();
 }
 
@@ -264,11 +264,11 @@ TEST_F(GpuTest, GenerateMipmapsRuns) {
 TEST_F(GpuTest, BlitBetweenImages) {
     auto src = makeImage(kor::Flags(Image::Usage::eTransferSrc) | Image::Usage::eTransferDst);
     auto dst = Image::Builder{}
-                   .setType(Image::Type::e2D)
-                   .setFormat(Image::Format::eRGBA8_UNORM)
-                   .setExtent(glm::uvec2{4, 4})
-                   .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
-                   .build();
+                   .SetType(Image::Type::e2D)
+                   .SetFormat(Image::Format::eRGBA8_UNORM)
+                   .SetExtent(glm::uvec2{4, 4})
+                   .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
+                   .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(src, glm::vec4{1.f, 1.f, 0.f, 1.f});
@@ -277,7 +277,7 @@ TEST_F(GpuTest, BlitBetweenImages) {
             .dstExtent = {4, 4, 1},
             .filtering = kor::Filter::eLinear,
         });
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
     SUCCEED();
 }
 
@@ -285,16 +285,16 @@ TEST_F(GpuTest, BlitBetweenImages) {
 TEST_F(GpuTest, BufferTransferOps) {
     std::vector<std::uint32_t> data(64, 7u);
     Buffer::Builder<std::uint32_t> srcB;
-    srcB.setData(data);
-    srcB.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    srcB.setType(Buffer::Type::eDeviceLocal);
-    auto src = srcB.build();
+    srcB.SetData(data);
+    srcB.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    srcB.SetType(Buffer::Type::eDeviceLocal);
+    auto src = srcB.Build();
 
     Buffer::RawBuilder dstB;
-    dstB.setRawSize(static_cast<glm::i64>(data.size() * sizeof(std::uint32_t)))
-        .setUsage(Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc)
-        .setType(Buffer::Type::eReadback);
-    auto dst = dstB.build();
+    dstB.SetRawSize(static_cast<glm::i64>(data.size() * sizeof(std::uint32_t)))
+        .SetUsage(Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc)
+        .SetType(Buffer::Type::eReadback);
+    auto dst = dstB.Build();
 
     // Eight of them, because FillBuffer copies the bytes it is given rather than replicating a
     // value: asking for 8 * sizeof(uint32_t) from a single uint32_t read past the end of it.
@@ -304,7 +304,7 @@ TEST_F(GpuTest, BufferTransferOps) {
         cb.CopyBuffer(src, dst);
         cb.FillBuffer(src, fillValues);
         cb.ClearBuffer(src);
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     const std::vector<std::uint32_t> out = dst->Read<std::uint32_t>();
     ASSERT_EQ(out.size(), data.size());
@@ -315,12 +315,12 @@ TEST_F(GpuTest, BufferTransferOps) {
 // image. Drives the two-argument Resolve path and the MSAA image-creation branch.
 TEST_F(GpuTest, ResolveMultisampleToSingle) {
     auto msaa = Image::Builder{}
-                    .setType(Image::Type::e2D)
-                    .setFormat(Image::Format::eRGBA8_UNORM)
-                    .setExtent(glm::uvec2{8, 8})
-                    .setSampleCount(kor::SampleCount::e4)
-                    .setUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
-                    .build();
+                    .SetType(Image::Type::e2D)
+                    .SetFormat(Image::Format::eRGBA8_UNORM)
+                    .SetExtent(glm::uvec2{8, 8})
+                    .SetSampleCount(kor::SampleCount::e4)
+                    .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
+                    .Build();
     ASSERT_TRUE(static_cast<bool>(msaa));
 
     auto single = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
@@ -329,17 +329,17 @@ TEST_F(GpuTest, ResolveMultisampleToSingle) {
     // Vulkan forbids destroying objects a pending command buffer references, and
     // MoltenVK's deferred encoding only dereferences the VkImageView at submit
     // time (it segfaults if these are locals inside the recording lambda).
-    auto view = ImageView::Builder(msaa).build();
+    auto view = ImageView::Builder(msaa).Build();
     auto fb = kor::Framebuffer::Builder{}
-                  .addColor({ .view = view, .clear = glm::vec4{0.2f, 0.4f, 0.6f, 1.f} })
-                  .build();
+                  .AddColor({ .view = view, .clear = glm::vec4{0.2f, 0.4f, 0.6f, 1.f} })
+                  .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         // Give the MSAA image a defined layout/content via a render clear.
         cb.BeginRendering(fb);
         cb.EndRendering();
         cb.Resolve(msaa, single);
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
     SUCCEED();
 }
 
@@ -348,25 +348,25 @@ TEST_F(GpuTest, ResolveMultisampleToSingle) {
 // manually-created command buffer and inspected without submitting.
 TEST_F(GpuTest, CopyValidationBranches) {
     auto image = Image::Builder{}
-                     .setType(Image::Type::e2D)
-                     .setFormat(Image::Format::eRGBA8_UNORM)
-                     .setExtent(glm::uvec2{8, 8})
-                     .setUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst)
-                     .build();
+                     .SetType(Image::Type::e2D)
+                     .SetFormat(Image::Format::eRGBA8_UNORM)
+                     .SetExtent(glm::uvec2{8, 8})
+                     .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst)
+                     .Build();
 
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(8) * 8 * 4)
-      .setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eStaging);
-    auto buf = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(8) * 8 * 4)
+      .SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eStaging);
+    auto buf = rb.Build();
 
     const auto expectReject = [&](auto&& record) {
         auto cb = CommandBuffer::Create(CommandBuffer::Usage::eTransfer);
         cb->Begin();
         record(*cb);
         cb->End();
-        EXPECT_FALSE(cb->ok());
-        EXPECT_FALSE(cb->errors().empty());
+        EXPECT_FALSE(cb->Ok());
+        EXPECT_FALSE(cb->Errors().empty());
     };
 
     // mip level out of range
@@ -398,7 +398,7 @@ TEST_F(GpuTest, DebugLabelsRecord) {
             inner.ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
         });
         cb.EndDebugLabel();
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
     SUCCEED();
 }
 
@@ -420,7 +420,7 @@ TEST_F(GpuTest, ResubmittingACommandBufferIsValid) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
 
     const auto since = [] {
-        const auto history = kor::log::history();
+        const auto history = kor::log::History();
         return history.empty() ? 0ull : history.back().sequence;
     }();
 
@@ -434,7 +434,7 @@ TEST_F(GpuTest, ResubmittingACommandBufferIsValid) {
         cb->WaitForFence();
     }
 
-    for (const auto& record : kor::log::historySince(since)) {
+    for (const auto& record : kor::log::HistorySince(since)) {
         if (record.level != kor::log::Level::eError) continue;
         EXPECT_EQ(record.message.find("VUID"), std::string::npos)
             << "the validation layer objected to re-submitting a command buffer: " << record.message;

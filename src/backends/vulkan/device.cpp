@@ -153,7 +153,7 @@ namespace kor::vk {
             return supported;
         };
 
-        // Mesh/task shaders are an opt-in pipeline option (GraphicsPipeline::Builder::setMeshShader),
+        // Mesh/task shaders are an opt-in pipeline option (GraphicsPipeline::Builder::SetMeshShader),
         // never used by a default render path — so they are gated on the extension rather than
         // required. Note the feature struct is only legal to chain in when the extension itself is
         // enabled, which it previously was not.
@@ -269,7 +269,7 @@ namespace kor::vk {
 
     std::pair<::vk::Semaphore, std::uint64_t> Device::nextEpoch(const Queue& queue) const {
         auto& epoch = _epochs[queue.getIdentifier()];
-        const auto [semaphore, value] = Context::Tokens().resolve(epoch.timeline.at(epoch.submitted + 1));
+        const auto [semaphore, value] = Context::Tokens().resolve(epoch.timeline.At(epoch.submitted + 1));
         ++epoch.submitted;
         return {semaphore, value};
     }
@@ -278,7 +278,7 @@ namespace kor::vk {
         const auto lock = lockQueues();
         std::vector<kor::Token> tokens;
         for (const auto& epoch : _epochs | std::views::values)
-            if (epoch.submitted > 0) tokens.push_back(epoch.timeline.at(epoch.submitted));
+            if (epoch.submitted > 0) tokens.push_back(epoch.timeline.At(epoch.submitted));
         return tokens;
     }
 
@@ -429,8 +429,8 @@ namespace kor::vk {
             }
             TokenReactor::noteSubmittedSignal(done);
         } catch (const std::exception& e) {
-            kor::log::error("[vulkan] single-time command failed to submit: {}", e.what());
-            done.signal(); // nothing on the GPU will; don't leave its waiters hanging
+            kor::log::Error("[vulkan] single-time command failed to submit: {}", e.what());
+            done.Signal(); // nothing on the GPU will; don't leave its waiters hanging
             return done;
         }
         detail::retireAfter(done, std::move(commandBuffer));

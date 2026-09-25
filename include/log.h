@@ -19,7 +19,7 @@
  * Formatting follows std::format, through spdlog:
  *
  * @code
- * kor::log::info("loaded {} meshes in {:.1f} ms", count, elapsed);
+ * kor::log::Info("loaded {} meshes in {:.1f} ms", count, elapsed);
  * @endcode
  *
  * Output goes to the default logger the *application* configured. Emission deliberately happens in
@@ -28,7 +28,7 @@
  */
 namespace kor::log {
     /** @brief Initialises the default logger. Called once by the runtime at startup. */
-    void init();
+    void Init();
 
     /**
      * @brief Repeat suppression for warnings and errors.
@@ -56,19 +56,19 @@ namespace kor::log {
      * from inside libKoral would go to a *different* default logger than the one the application
      * configured, and would vanish from its log.
      */
-    [[nodiscard]] KORAL_API Repeat track(const std::string& message);
+    [[nodiscard]] KORAL_API Repeat Track(const std::string& message);
 
-    /** @brief Whether @p message should be shown at all. Equivalent to track() != eSuppress. */
-    [[nodiscard]] KORAL_API bool shouldEmit(const std::string& message);
+    /** @brief Whether @p message should be shown at all. Equivalent to Track() != eSuppress. */
+    [[nodiscard]] KORAL_API bool ShouldEmit(const std::string& message);
 
     /** @brief Times an identical message is shown before suppression. 0 disables suppression. */
-    KORAL_API void setRepeatLimit(std::size_t limit);
+    KORAL_API void SetRepeatLimit(std::size_t limit);
 
     /** @brief The current repeat limit. */
-    [[nodiscard]] KORAL_API std::size_t repeatLimit();
+    [[nodiscard]] KORAL_API std::size_t RepeatLimit();
 
     /** @brief Forget every message seen so far, restoring a full budget to all of them. */
-    KORAL_API void resetRepeatCounts();
+    KORAL_API void ResetRepeatCounts();
 
     /** @brief How serious a recorded message was. */
     enum class Level : std::uint8_t { eInfo, eWarn, eError };
@@ -95,7 +95,7 @@ namespace kor::log {
      *
      * Thread-safe: background threads log too.
      */
-    KORAL_API void record(Level level, std::string message);
+    KORAL_API void Emit(Level level, std::string message);
 
     /**
      * @brief A copy of the messages still in the history, oldest first.
@@ -106,7 +106,7 @@ namespace kor::log {
      *          panel cost most of a frame at a few hundred messages; a reader drawn every frame wants
      *          @ref historySince instead.
      */
-    [[nodiscard]] KORAL_API std::vector<Record> history();
+    [[nodiscard]] KORAL_API std::vector<Record> History();
 
     /**
      * @brief Only the messages recorded after @p sequence, oldest first.
@@ -116,19 +116,19 @@ namespace kor::log {
      * What a panel drawn every frame should use: it keeps what it has already been given and asks only
      * for the new, so a quiet frame costs a lock and a comparison rather than a copy of the whole log.
      */
-    [[nodiscard]] KORAL_API std::vector<Record> historySince(std::uint64_t sequence);
+    [[nodiscard]] KORAL_API std::vector<Record> HistorySince(std::uint64_t sequence);
 
     /** @brief The sequence number of the most recent record, or 0 if nothing has been logged. */
-    [[nodiscard]] KORAL_API std::uint64_t lastSequence();
+    [[nodiscard]] KORAL_API std::uint64_t LastSequence();
 
     /** @brief How many messages are kept. Older ones are dropped; 0 disables the history entirely. */
-    KORAL_API void setHistoryLimit(std::size_t limit);
+    KORAL_API void SetHistoryLimit(std::size_t limit);
 
     /** @brief The current history limit. Defaults to 2048. */
-    [[nodiscard]] KORAL_API std::size_t historyLimit();
+    [[nodiscard]] KORAL_API std::size_t HistoryLimit();
 
     /** @brief Throws away every message in the history. */
-    KORAL_API void clearHistory();
+    KORAL_API void ClearHistory();
 
     /**
      * @brief Logs an informational message.
@@ -139,14 +139,14 @@ namespace kor::log {
      * find out would cost more than it saves.
      */
     template<typename... Args>
-    void info (spdlog::format_string_t<Args...> fmt, Args&&... args) {
+    void Info (spdlog::format_string_t<Args...> fmt, Args&&... args) {
         auto message = fmt::format(fmt, std::forward<Args>(args)...);
-        record(Level::eInfo, message);
+        Emit(Level::eInfo, message);
         spdlog::info("{}", message);
     }
 
     /** @brief The note appended to the final showing of a recurring message. */
-    [[nodiscard]] KORAL_API std::string suppressionNotice();
+    [[nodiscard]] KORAL_API std::string SuppressionNotice();
 
     /**
      * @brief Logs a warning: something is wrong but the frame can continue.
@@ -157,13 +157,13 @@ namespace kor::log {
      * which means two warnings differing only in a resource name are counted separately.
      */
     template<typename... Args>
-    void warn (spdlog::format_string_t<Args...> fmt, Args&&... args) {
+    void Warn (spdlog::format_string_t<Args...> fmt, Args&&... args) {
         const auto message = fmt::format(fmt, std::forward<Args>(args)...);
         // Recorded on exactly the occasions it is shown, so the panel and the terminal agree about
         // what happened — including agreeing that a flood was suppressed.
-        switch (track(message)) {
-        case Repeat::eShow:     record(Level::eWarn, message); spdlog::warn("{}", message); break;
-        case Repeat::eShowLast: record(Level::eWarn, message); spdlog::warn("{}\n{}", message, suppressionNotice()); break;
+        switch (Track(message)) {
+        case Repeat::eShow:     Emit(Level::eWarn, message); spdlog::warn("{}", message); break;
+        case Repeat::eShowLast: Emit(Level::eWarn, message); spdlog::warn("{}\n{}", message, SuppressionNotice()); break;
         case Repeat::eSuppress: break;
         }
     }
@@ -173,14 +173,14 @@ namespace kor::log {
      * @param fmt A std::format-style format string, checked at compile time.
      * @param args Values for its placeholders.
      *
-     * Repeat-suppressed on the rendered text, exactly as warn() is.
+     * Repeat-suppressed on the rendered text, exactly as Warn() is.
      */
     template<typename... Args>
-    void error (spdlog::format_string_t<Args...> fmt, Args&&... args) {
+    void Error (spdlog::format_string_t<Args...> fmt, Args&&... args) {
         const auto message = fmt::format(fmt, std::forward<Args>(args)...);
-        switch (track(message)) {
-        case Repeat::eShow:     record(Level::eError, message); spdlog::error("{}", message); break;
-        case Repeat::eShowLast: record(Level::eError, message); spdlog::error("{}\n{}", message, suppressionNotice()); break;
+        switch (Track(message)) {
+        case Repeat::eShow:     Emit(Level::eError, message); spdlog::error("{}", message); break;
+        case Repeat::eShowLast: Emit(Level::eError, message); spdlog::error("{}\n{}", message, SuppressionNotice()); break;
         case Repeat::eSuppress: break;
         }
     }
@@ -201,7 +201,7 @@ namespace kor::log {
 #ifdef NDEBUG
     #define KORAL_ASSERT(condition, msg, ...)                          \
     do { if (!(condition))                                       \
-    kor::log::error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); } while(0)
+    kor::log::Error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); } while(0)
 
     #define KORAL_BREAK() []{}();
 #else
@@ -213,7 +213,7 @@ namespace kor::log {
 
     #define KORAL_ASSERT(condition, msg, ...)                          \
     do { if (!(condition)) {                                     \
-    kor::log::error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); \
+    kor::log::Error("[assert] " msg __VA_OPT__(,) __VA_ARGS__); \
     KORAL_BREAK();                                             \
     }} while(0)
 #endif

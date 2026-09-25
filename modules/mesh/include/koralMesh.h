@@ -16,7 +16,7 @@
  * using MyMesh = kmesh::ParamMesh<Vertex>;
  *
  * auto mesh = MyMesh::Create(vertices, indices);
- * pipelineBuilder.setVertexShader(vertexShader, MyMesh::Layout());
+ * pipelineBuilder.SetVertexShader(vertexShader, MyMesh::Layout());
  * @endcode
  *
  * The binding stride, each attribute's offset, its channel type and count are all computed from the
@@ -214,10 +214,10 @@ namespace kmesh
         constexpr ParamVertex(const typename Attrs::ValueType&... values) : storage(values...) {}
 
         template<std::size_t I>
-        constexpr auto& get() { return StorageGet<I>(storage); }
+        constexpr auto& Get() { return StorageGet<I>(storage); }
 
         template<std::size_t I>
-        constexpr const auto& get() const { return StorageGet<I>(storage); }
+        constexpr const auto& Get() const { return StorageGet<I>(storage); }
 
         static constexpr glm::u32 AttributeCount = static_cast<glm::u32>(sizeof...(Attrs));  ///< How many attributes this vertex has.
         static constexpr glm::u32 Stride = static_cast<glm::u32>(sizeof(Storage));           ///< Bytes from one vertex to the next.
@@ -228,7 +228,7 @@ namespace kmesh
         {
             ParamVertex v{};
             const auto* base = reinterpret_cast<const unsigned char*>(&v.storage);
-            const auto* elem = reinterpret_cast<const unsigned char*>(&v.template get<I>());
+            const auto* elem = reinterpret_cast<const unsigned char*>(&v.template Get<I>());
             return static_cast<glm::u32>(elem - base);
         }
     };
@@ -259,7 +259,7 @@ namespace kmesh
     template<typename Attr>
     struct AttributeSemanticTraits
     {
-        static std::string semantic()
+        static std::string Semantic()
         {
             if constexpr (requires { Attr::Semantic; }) return std::string(Attr::Semantic);
             else return {};
@@ -285,9 +285,9 @@ namespace kmesh
     template<VertexAttributeType Attr, std::size_t Channel>
     struct AttributeSemanticTraits<IndexedAttribute<Attr, Channel>>
     {
-        static std::string semantic()
+        static std::string Semantic()
         {
-            auto base = AttributeSemanticTraits<Attr>::semantic();
+            auto base = AttributeSemanticTraits<Attr>::Semantic();
             if (base.empty()) return base;
             return base + std::to_string(Channel);
         }
@@ -297,7 +297,7 @@ namespace kmesh
     {
         /** @brief Appends one stream's binding and attributes to a layout being built. */
         template<typename Stream>
-        void appendStream(kor::VertexLayout& layout, const glm::u32 binding)
+        void AppendStream(kor::VertexLayout& layout, const glm::u32 binding)
         {
             if constexpr (ReflectableStream<Stream>) {
                 layout.bindings.push_back(kor::VertexInputBindingDescription{
@@ -319,7 +319,7 @@ namespace kmesh
                         }
 
                         layout.attributes.push_back(kor::VertexLayout::Attribute{
-                            .semantic          = AttributeSemanticTraits<Attr>::semantic(),
+                            .semantic          = AttributeSemanticTraits<Attr>::Semantic(),
                             .semanticNamespace = std::string(semantics::Namespace),
                             .binding           = binding,
                             .offset            = Stream::template OffsetOf<Idx>(),
@@ -360,7 +360,7 @@ namespace kmesh
         layout.bindings.reserve(sizeof...(Streams));
 
         glm::u32 binding = 0;
-        (detail::appendStream<Streams>(layout, binding++), ...);
+        (detail::AppendStream<Streams>(layout, binding++), ...);
         return layout;
     }
 
@@ -451,7 +451,7 @@ namespace kmesh
              * @param indexType The width of one index; the count follows from the buffer's size.
              */
             Builder& SetIndexBuffer(kor::Resource<kor::Buffer> indexBuffer, const kor::ChannelType indexType) {
-                this->indexCount = static_cast<glm::u32>(indexBuffer->size() / kor::sizeofChannelType(indexType));
+                this->indexCount = static_cast<glm::u32>(indexBuffer->size() / kor::SizeofChannelType(indexType));
                 this->indexBuffer = std::move(indexBuffer);
                 this->indexType = indexType;
                 return *this;
@@ -472,13 +472,13 @@ namespace kmesh
             // The buffers were created for this mesh alone, so it takes them over: adopting keeps
             // each one alive and appends it in binding order, which is the order they are in here.
             for (auto& vertexBuffer : createInfo.vertexBuffers)
-                adoptVertexBuffer(std::move(vertexBuffer));
+                AdoptVertexBuffer(std::move(vertexBuffer));
             if (createInfo.indexBuffer.has_value())
-                adoptIndexBuffer(std::move(*createInfo.indexBuffer),
+                AdoptIndexBuffer(std::move(*createInfo.indexBuffer),
                                  createInfo.indexType.value_or(kor::ChannelType::eUInt));
             _indexCount = createInfo.indexCount;
 
-            setVertexLayout(Layout());
+            SetVertexLayout(Layout());
         }
 
         /** @brief This format's layout: its bindings, and what each attribute holds and is called. */
@@ -565,7 +565,7 @@ namespace kmesh
         static kor::Resource<Self> Create(std::span<const Streams>... streams)
         {
             Builder builder;
-            setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
+            SetVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
             return builder.Build();
         }
 
@@ -578,12 +578,12 @@ namespace kmesh
         static kor::Resource<Self> Create(std::span<const Streams>... streams, std::span<const IndexT> indices)
         {
             Builder builder;
-            setVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
+            SetVertexBuffers(builder, std::tuple<std::span<const Streams>...>{streams...}, std::index_sequence_for<Streams...>{});
 
             if (!indices.empty())
             {
-                auto indexBuffer = kor::Mesh::makeBuffer(indices, kor::Buffer::Usage::eIndex);
-                builder.SetIndexBuffer(std::move(indexBuffer), indexChannelType<IndexT>());
+                auto indexBuffer = kor::Mesh::MakeBuffer(indices, kor::Buffer::Usage::eIndex);
+                builder.SetIndexBuffer(std::move(indexBuffer), IndexChannelType<IndexT>());
             }
 
             return builder.Build();
@@ -618,14 +618,14 @@ namespace kmesh
 
     private:
         template<typename Tuple, std::size_t... I>
-        static void setVertexBuffers(Builder& builder, const Tuple& streamTuple, std::index_sequence<I...>)
+        static void SetVertexBuffers(Builder& builder, const Tuple& streamTuple, std::index_sequence<I...>)
         {
             (builder.SetVertexBuffer(static_cast<glm::u32>(I),
-                kor::Mesh::makeBuffer(std::get<I>(streamTuple), kor::Buffer::Usage::eVertex)), ...);
+                kor::Mesh::MakeBuffer(std::get<I>(streamTuple), kor::Buffer::Usage::eVertex)), ...);
         }
 
         template<typename IndexT>
-        static consteval kor::ChannelType indexChannelType()
+        static consteval kor::ChannelType IndexChannelType()
         {
             using T = std::remove_cv_t<IndexT>;
 

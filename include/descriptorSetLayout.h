@@ -46,7 +46,7 @@ namespace kor
             bool active = true;                                         ///< Whether the entry point actually uses it; an unused binding needs no synchronisation.
 
             /// The block's fields, for a buffer binding. What lets a semantic-filled descriptor
-            /// know the shape the shader asked for. Outside matches(), for the same reason the
+            /// know the shape the shader asked for. Outside Matches(), for the same reason the
             /// rest of the non-interface state is. @see semantics.h
             std::vector<Shader::BlockMember> members;
             glm::u32 blockSize = 0;
@@ -65,14 +65,14 @@ namespace kor
             Shader::ImageShape shape = Shader::ImageShape::eUnknown;
 
             /** @brief Whether @p wanted names this binding, under either of the names it has. */
-            [[nodiscard]] bool namedBy(const std::string_view wanted) const {
+            [[nodiscard]] bool NamedBy(const std::string_view wanted) const {
                 return (!name.empty() && name == wanted) || (!blockName.empty() && blockName == wanted);
             }
 
             /**
              * @brief Whether two bindings present the same interface.
              *
-             * Interface only, on purpose. matches() is what decides whether a shader reload can
+             * Interface only, on purpose. Matches() is what decides whether a shader reload can
              * keep the existing layout object, so letting access, stages or the active flag in here
              * would rebuild the layout — and expire every descriptor set holding it — over an edit
              * that merely made a storage buffer read-only. The names are out for the same reason
@@ -98,7 +98,7 @@ namespace kor
              * @param stages Which shader stages reach it.
              * @param active Whether the entry point actually uses it.
              */
-            Builder& addBinding(glm::u32 binding, DescriptorType type, glm::u32 count = 1,
+            Builder& AddBinding(glm::u32 binding, DescriptorType type, glm::u32 count = 1,
                                 Shader::AccessKind access = Shader::AccessKind::eRead,
                                 Flags<Shader::Stage> stages = {}, bool active = true);
 
@@ -110,7 +110,7 @@ namespace kor
              * better served by the overload above, and may name a binding by filling in
              * Binding::name if it wants to write to it by name too.
              */
-            Builder& addBinding(glm::u32 binding, Binding description);
+            Builder& AddBinding(glm::u32 binding, Binding description);
 
             /**
              * @brief Declares a buffer binding along with the block's fields.
@@ -118,15 +118,15 @@ namespace kor
              * Only reflection calls this — the members come out of the compiled shader, and a
              * hand-written layout has none to give. @see semantics.h
              */
-            Builder& addBlockBinding(glm::u32 binding, DescriptorType type, glm::u32 count,
+            Builder& AddBlockBinding(glm::u32 binding, DescriptorType type, glm::u32 count,
                                      Shader::AccessKind access, Flags<Shader::Stage> stages, bool active,
                                      std::vector<Shader::BlockMember> members, glm::u32 blockSize);
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<DescriptorSetLayout>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<DescriptorSetLayout>> Create() const;
 
             /** @brief Creates the layout, poisoned rather than thrown if a binding is contradictory. */
-            [[nodiscard]] kor::Resource<DescriptorSetLayout> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<DescriptorSetLayout> Build(std::source_location where = std::source_location::current()) const;
         private:
             std::map<glm::u32, Binding> _bindings;
             std::optional<Error> _error;
@@ -146,19 +146,19 @@ namespace kor
          * matter and `| std::views::values` for the descriptions, and note that a lookup by
          * binding number is a find() on this rather than a scan.
          */
-        [[nodiscard]] const std::map<glm::u32, Binding>& bindings() const { return _bindings; }
+        [[nodiscard]] const std::map<glm::u32, Binding>& Bindings() const { return _bindings; }
 
         /** @brief What kind of resource belongs at @p binding. */
-        [[nodiscard]] DescriptorType bindingType(glm::u32 binding) const;
+        [[nodiscard]] DescriptorType BindingType(glm::u32 binding) const;
 
         /**
          * @brief The number of the binding the shader calls @p name.
          * @return The binding number, or nullopt when no binding of this set has that name.
          *
          * Matches either name a binding has: the variable's, and — for a block declared without an
-         * instance name — the block type's. @see Binding::namedBy
+         * instance name — the block type's. @see Binding::NamedBy
          */
-        [[nodiscard]] std::optional<glm::u32> findBinding(std::string_view name) const;
+        [[nodiscard]] std::optional<glm::u32> FindBinding(std::string_view name) const;
 
         /**
          * @brief Every name this set's bindings answer to, in binding order, for a diagnostic.
@@ -166,15 +166,15 @@ namespace kor
          * What a "no such binding" message lists, so the fix is visible without going back to the
          * shader to find out what the binding is actually called.
          */
-        [[nodiscard]] std::vector<std::string> bindingNames() const;
+        [[nodiscard]] std::vector<std::string> BindingNames() const;
 
         /**
          * @brief Whether @p builder describes exactly this layout.
          *
-         * Lets Pipeline::buildLayouts keep an existing layout object when a shader reload did not
+         * Lets Pipeline::BuildLayouts keep an existing layout object when a shader reload did not
          * change the set's interface — which keeps every descriptor set built from it alive.
          */
-        [[nodiscard]] bool matches(const Builder& builder) const;
+        [[nodiscard]] bool Matches(const Builder& builder) const;
 
         /**
          * @brief Adopts @p builder's block descriptions, keeping this layout's identity.
@@ -184,10 +184,10 @@ namespace kor
          * the *interface* identical — same binding, same descriptor type — so the Vulkan object and
          * every descriptor set holding it stay valid, and rebuilding would needlessly dangle them.
          * But the block's fields are exactly what a semantic-filled binding is built from, so they
-         * have to be brought up to date here. The caller announces the change (Resource::markChanged)
+         * have to be brought up to date here. The caller announces the change (Resource::MarkChanged)
          * so that the sets built against it rebuild themselves.
          */
-        bool refreshBlocks(const Builder& builder);
+        bool RefreshBlocks(const Builder& builder);
 
     protected:
 

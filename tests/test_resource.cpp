@@ -52,7 +52,7 @@ TEST(Resource, MoveTransfersOwnership) {
 
 TEST(Resource, ResetClearsOwnership) {
     Resource<Foo> r = MakeResource<Foo>(1);
-    r.reset();
+    r.Reset();
     EXPECT_FALSE(static_cast<bool>(r));
 }
 
@@ -133,47 +133,47 @@ TEST(ResourceRef, UnsafeRefFromPointerDoesNotThrow) {
 // instead of the object. It is a value, not an exception — nothing throws.
 // -----------------------------------------------------------------------------
 TEST(Resource, PoisonedIsInvalidButCarriesItsError) {
-    auto r = Resource<Foo>::failed(
+    auto r = Resource<Foo>::Failed(
         Error{ .code = ErrorCode::eShaderCompileFailed, .message = "undeclared identifier 'colour'" },
         "shaders/forward.frag.glsl");
 
-    EXPECT_FALSE(r.valid());
+    EXPECT_FALSE(r.Valid());
     EXPECT_FALSE(static_cast<bool>(r));
-    EXPECT_TRUE(r.poisoned());
-    ASSERT_NE(r.error(), nullptr);
-    EXPECT_EQ(r.error()->code, ErrorCode::eShaderCompileFailed);
-    EXPECT_EQ(r.name(), "shaders/forward.frag.glsl");
+    EXPECT_TRUE(r.Poisoned());
+    ASSERT_NE(r.Failure(), nullptr);
+    EXPECT_EQ(r.Failure()->code, ErrorCode::eShaderCompileFailed);
+    EXPECT_EQ(r.Name(), "shaders/forward.frag.glsl");
 }
 
 TEST(Resource, PoisonedIsDistinctFromEmpty) {
     Resource<Foo> empty;
-    EXPECT_FALSE(empty.valid());
-    EXPECT_FALSE(empty.poisoned());     // nothing went wrong; there is just nothing here
-    EXPECT_EQ(empty.error(), nullptr);
+    EXPECT_FALSE(empty.Valid());
+    EXPECT_FALSE(empty.Poisoned());     // nothing went wrong; there is just nothing here
+    EXPECT_EQ(empty.Failure(), nullptr);
 
-    auto bad = Resource<Foo>::failed(Error{ .code = ErrorCode::eBackend, .message = "out of memory" });
-    EXPECT_FALSE(bad.valid());
-    EXPECT_TRUE(bad.poisoned());        // something went wrong, and we know what
+    auto bad = Resource<Foo>::Failed(Error{ .code = ErrorCode::eBackend, .message = "out of memory" });
+    EXPECT_FALSE(bad.Valid());
+    EXPECT_TRUE(bad.Poisoned());        // something went wrong, and we know what
 }
 
 TEST(ResourceRef, PoisonPropagatesThroughRef) {
-    auto bad = Resource<Foo>::failed(Error{ .code = ErrorCode::eBackend, .message = "boom" }, "foo");
+    auto bad = Resource<Foo>::Failed(Error{ .code = ErrorCode::eBackend, .message = "boom" }, "foo");
     ResourceRef<const Foo> ref = bad;
 
-    EXPECT_TRUE(ref.alive());      // the resource exists...
-    EXPECT_TRUE(ref.poisoned());   // ...it is just unusable
-    EXPECT_FALSE(ref.valid());
-    EXPECT_EQ(ref.get(), nullptr);
-    ASSERT_NE(ref.errorPtr(), nullptr);
-    EXPECT_EQ(ref.errorPtr()->code, ErrorCode::eBackend);
+    EXPECT_TRUE(ref.Alive());      // the resource exists...
+    EXPECT_TRUE(ref.Poisoned());   // ...it is just unusable
+    EXPECT_FALSE(ref.Valid());
+    EXPECT_EQ(ref.Get(), nullptr);
+    ASSERT_NE(ref.ErrorPtr(), nullptr);
+    EXPECT_EQ(ref.ErrorPtr()->code, ErrorCode::eBackend);
 }
 
 // A poisoned resource must not throw on dereference: the whole point is that an
-// unusable resource flows through the API as a value. get() reports the absence.
+// unusable resource flows through the API as a value. Get() reports the absence.
 TEST(ResourceRef, PoisonedDerefDoesNotThrow) {
-    auto bad = Resource<Foo>::failed(Error{ .code = ErrorCode::eBackend, .message = "boom" }, "foo");
+    auto bad = Resource<Foo>::Failed(Error{ .code = ErrorCode::eBackend, .message = "boom" }, "foo");
     ResourceRef<const Foo> ref = bad;
-    EXPECT_NO_THROW({ EXPECT_EQ(ref.get(), nullptr); });
+    EXPECT_NO_THROW({ EXPECT_EQ(ref.Get(), nullptr); });
 }
 
 // -----------------------------------------------------------------------------
@@ -184,52 +184,52 @@ TEST(ResourceRef, PoisonedDerefDoesNotThrow) {
 // and the pipeline comes back" would be impossible.
 // -----------------------------------------------------------------------------
 TEST(Resource, RetryRepairsPoisonedResourceInPlace) {
-    auto r = Resource<Foo>::failed(Error{ .code = ErrorCode::eShaderCompileFailed, .message = "broken" }, "foo");
-    ASSERT_FALSE(r.valid());
+    auto r = Resource<Foo>::Failed(Error{ .code = ErrorCode::eShaderCompileFailed, .message = "broken" }, "foo");
+    ASSERT_FALSE(r.Valid());
 
     // Hand out a ref *while poisoned* — as a scene or a renderer would.
     ResourceRef<const Foo> ref = r;
-    EXPECT_FALSE(ref.valid());
+    EXPECT_FALSE(ref.Valid());
 
     bool fixed = false;
-    r.setRebuild([&fixed]() -> Result<std::unique_ptr<Foo>> {
-        if (!fixed) return fail(ErrorCode::eShaderCompileFailed, "still broken");
+    r.SetRebuild([&fixed]() -> Result<std::unique_ptr<Foo>> {
+        if (!fixed) return Fail(ErrorCode::eShaderCompileFailed, "still broken");
         return std::make_unique<Foo>(99);
     });
 
     // Still broken: the retry fails and the resource keeps its (refreshed) error.
-    EXPECT_FALSE(r.retry());
-    EXPECT_TRUE(r.poisoned());
-    EXPECT_FALSE(ref.valid());
+    EXPECT_FALSE(r.Retry());
+    EXPECT_TRUE(r.Poisoned());
+    EXPECT_FALSE(ref.Valid());
 
     // The user fixes the source and the retry succeeds.
     fixed = true;
-    EXPECT_TRUE(r.retry());
-    EXPECT_TRUE(r.valid());
-    EXPECT_FALSE(r.poisoned());
+    EXPECT_TRUE(r.Retry());
+    EXPECT_TRUE(r.Valid());
+    EXPECT_FALSE(r.Poisoned());
 
     // The ref issued back when the resource was broken now sees the new object,
     // without having been re-issued. This is the load-bearing assertion.
-    EXPECT_TRUE(ref.valid());
-    ASSERT_NE(ref.get(), nullptr);
+    EXPECT_TRUE(ref.Valid());
+    ASSERT_NE(ref.Get(), nullptr);
     EXPECT_EQ(ref->x, 99);
 }
 
 TEST(Resource, RepairBumpsGenerationSoDependentsCanNotice) {
-    auto r = Resource<Foo>::failed(Error{ .code = ErrorCode::eBackend, .message = "broken" });
-    const auto before = r.generation();
+    auto r = Resource<Foo>::Failed(Error{ .code = ErrorCode::eBackend, .message = "broken" });
+    const auto before = r.Generation();
 
-    r.setRebuild([]() -> Result<std::unique_ptr<Foo>> { return std::make_unique<Foo>(1); });
-    ASSERT_TRUE(r.retry());
+    r.SetRebuild([]() -> Result<std::unique_ptr<Foo>> { return std::make_unique<Foo>(1); });
+    ASSERT_TRUE(r.Retry());
 
     // A consumer that recorded `before` at build time can see it must rebuild.
-    EXPECT_GT(r.generation(), before);
+    EXPECT_GT(r.Generation(), before);
 }
 
 TEST(Resource, PoisonedWithoutRebuilderIsUnrecoverable) {
-    auto r = Resource<Foo>::failed(Error{ .code = ErrorCode::eBackend, .message = "out of memory" });
-    EXPECT_FALSE(r.retry());   // nothing to retry with; a failed allocation is not fixable
-    EXPECT_TRUE(r.poisoned());
+    auto r = Resource<Foo>::Failed(Error{ .code = ErrorCode::eBackend, .message = "out of memory" });
+    EXPECT_FALSE(r.Retry());   // nothing to retry with; a failed allocation is not fixable
+    EXPECT_TRUE(r.Poisoned());
 }
 
 // A moved-from Resource has no state block at all. Accessing it must report the misuse, not
@@ -238,29 +238,29 @@ TEST(Resource, MovedFromIsInertNotFatal) {
     Resource<Foo> r = MakeResource<Foo>(5);
     Resource<Foo> moved = std::move(r);
 
-    EXPECT_FALSE(r.valid());        // NOLINT(bugprone-use-after-move) — that is the point
-    EXPECT_FALSE(r.poisoned());
-    EXPECT_EQ(r.get(), nullptr);
-    EXPECT_EQ(r.error(), nullptr);
-    EXPECT_EQ(r.generation(), 0u);
+    EXPECT_FALSE(r.Valid());        // NOLINT(bugprone-use-after-move) — that is the point
+    EXPECT_FALSE(r.Poisoned());
+    EXPECT_EQ(r.Get(), nullptr);
+    EXPECT_EQ(r.Failure(), nullptr);
+    EXPECT_EQ(r.Generation(), 0u);
     EXPECT_NO_THROW({ EXPECT_EQ(r.operator->(), nullptr); });
-    EXPECT_FALSE(r.retry());
+    EXPECT_FALSE(r.Retry());
 
-    EXPECT_TRUE(moved.valid());     // and the destination is unharmed
+    EXPECT_TRUE(moved.Valid());     // and the destination is unharmed
     EXPECT_EQ(moved->x, 5);
 }
 
 // A repair replaces the underlying object, so an upcast ref must re-read it
 // rather than hold a pointer adjusted from the old one.
 TEST(ResourceRef, UpcastRefSurvivesRepair) {
-    auto r = Resource<Derived>::failed(Error{ .code = ErrorCode::eBackend, .message = "broken" });
+    auto r = Resource<Derived>::Failed(Error{ .code = ErrorCode::eBackend, .message = "broken" });
     ResourceRef<const Base> base = r;
-    EXPECT_FALSE(base.valid());
+    EXPECT_FALSE(base.Valid());
 
-    r.setRebuild([]() -> Result<std::unique_ptr<Derived>> { return std::make_unique<Derived>(); });
-    ASSERT_TRUE(r.retry());
+    r.SetRebuild([]() -> Result<std::unique_ptr<Derived>> { return std::make_unique<Derived>(); });
+    ASSERT_TRUE(r.Retry());
 
-    ASSERT_TRUE(base.valid());
+    ASSERT_TRUE(base.Valid());
     EXPECT_EQ(base->tag(), 2);   // virtual dispatch still reaches Derived
 }
 

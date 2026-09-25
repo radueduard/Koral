@@ -71,21 +71,21 @@ std::filesystem::path writeSourceFile(const std::string& name, const std::uint32
     const auto source = gradientSource(size);
 
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec2{ size, size })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec2{ size, size })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
+        .Build();
 
     const auto staging = Buffer::Builder<unsigned char>()
-        .setDataView(std::span<const unsigned char>(source.pixels))
-        .setUsage(Buffer::Usage::eTransferSrc)
-        .setType(Buffer::Type::eStaging)
-        .build();
+        .SetDataView(std::span<const unsigned char>(source.pixels))
+        .SetUsage(Buffer::Usage::eTransferSrc)
+        .SetType(Buffer::Type::eStaging)
+        .Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyBufferToImage(staging, image, kor::Copy{
             .imageOffset = { 0, 0, 0 }, .imageExtent = { size, size, 1 } });
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     const auto written = kimg::SaveImage(outDir(), name, kimg::FileFormat::ePNG, image);
     EXPECT_TRUE(written.has_value()) << (written.has_value() ? std::string{} : written.error().message);
@@ -94,10 +94,10 @@ std::filesystem::path writeSourceFile(const std::string& name, const std::uint32
 
 /** @brief Whether the device has any block-compressed format at all. */
 bool deviceHasBlockCompression() {
-    return Image::isFormatSupported(Image::Format::eBC7_UNORM)
-        || Image::isFormatSupported(Image::Format::eBC3_UNORM)
-        || Image::isFormatSupported(Image::Format::eASTC_4x4_UNORM)
-        || Image::isFormatSupported(Image::Format::eETC2_RGBA8_UNORM);
+    return Image::IsFormatSupported(Image::Format::eBC7_UNORM)
+        || Image::IsFormatSupported(Image::Format::eBC3_UNORM)
+        || Image::IsFormatSupported(Image::Format::eASTC_4x4_UNORM)
+        || Image::IsFormatSupported(Image::Format::eETC2_RGBA8_UNORM);
 }
 
 // ---- encoding ----------------------------------------------------------------------------------
@@ -118,17 +118,17 @@ TEST_F(GpuTest, CompressUastcRoundTripsThroughTheLoader) {
     EXPECT_LT(std::filesystem::file_size(*written), rawBytes);
 
     auto reloaded = kimg::LoadImage(*written);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(kSize, kSize, 1));
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
     // A mip chain, because the encoder was asked for one and a compressed texture cannot be given
     // one afterwards. 64 -> 1 is seven levels.
-    EXPECT_EQ(reloaded->mipLevels(), 7u);
+    EXPECT_EQ(reloaded->MipLevels(), 7u);
 
     // On any device with block compression the loader must have transcoded into one of them rather
     // than falling back to uncompressed.
     if (deviceHasBlockCompression()) {
-        EXPECT_TRUE(Image::isBlockCompressed(reloaded->format()))
-            << "transcoded to format " << static_cast<int>(reloaded->format());
+        EXPECT_TRUE(Image::IsBlockCompressed(reloaded->PixelFormat()))
+            << "transcoded to format " << static_cast<int>(reloaded->PixelFormat());
     }
 }
 
@@ -145,8 +145,8 @@ TEST_F(GpuTest, CompressEtc1sIsSmallerThanUastc) {
     EXPECT_LT(std::filesystem::file_size(*etc1s), std::filesystem::file_size(*uastc));
 
     auto reloaded = kimg::LoadImage(*etc1s);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(kSize, kSize, 1));
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
 }
 
 // ASTC is encoded directly rather than transcoded, so the file names a real GPU format — and can only
@@ -159,11 +159,11 @@ TEST_F(GpuTest, CompressAstcWritesARealGpuFormat) {
     ASSERT_TRUE(std::filesystem::exists(*written));
 
     auto reloaded = kimg::LoadImage(*written);
-    if (Image::isFormatSupported(Image::Format::eASTC_4x4_SRGB)
-        || Image::isFormatSupported(Image::Format::eASTC_4x4_UNORM)) {
-        ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-        EXPECT_EQ(reloaded->extent(), glm::uvec3(32, 32, 1));
-        EXPECT_TRUE(Image::isBlockCompressed(reloaded->format()));
+    if (Image::IsFormatSupported(Image::Format::eASTC_4x4_SRGB)
+        || Image::IsFormatSupported(Image::Format::eASTC_4x4_UNORM)) {
+        ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+        EXPECT_EQ(reloaded->Extent(), glm::uvec3(32, 32, 1));
+        EXPECT_TRUE(Image::IsBlockCompressed(reloaded->PixelFormat()));
     } else {
         // No ASTC here — a desktop GPU, most likely. The file is still valid; this device simply
         // cannot hold it, and the loader has to say so rather than crash.
@@ -181,8 +181,8 @@ TEST_F(GpuTest, CompressCanBeAskedForNoMipmaps) {
     ASSERT_TRUE(written.has_value()) << written.error().message;
 
     auto reloaded = kimg::LoadImage(*written);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-    EXPECT_EQ(reloaded->mipLevels(), 1u);
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+    EXPECT_EQ(reloaded->MipLevels(), 1u);
 }
 
 // Supercompression shrinks the file without changing what the GPU gets.
@@ -201,9 +201,9 @@ TEST_F(GpuTest, CompressSupercompressionShrinksTheFile) {
     // ...and both still load, to the same size.
     auto a = kimg::LoadImage(*plain);
     auto b = kimg::LoadImage(*zstd);
-    ASSERT_TRUE(static_cast<bool>(a)) << (a.error() ? a.error()->message : "");
-    ASSERT_TRUE(static_cast<bool>(b)) << (b.error() ? b.error()->message : "");
-    EXPECT_EQ(a->extent(), b->extent());
+    ASSERT_TRUE(static_cast<bool>(a)) << (a.Failure() ? a.Failure()->message : "");
+    ASSERT_TRUE(static_cast<bool>(b)) << (b.Failure() ? b.Failure()->message : "");
+    EXPECT_EQ(a->Extent(), b->Extent());
 }
 
 // ---- from a file, which is how a build step uses it ---------------------------------------------
@@ -220,9 +220,9 @@ TEST_F(GpuTest, CompressReadsAnImageFileAndNamesTheOutputAfterIt) {
 
     // Compressed, and far smaller than the same texture uncompressed on the GPU would be.
     auto reloaded = kimg::LoadImage(*written);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
     if (deviceHasBlockCompression()) {
-        EXPECT_TRUE(Image::isBlockCompressed(reloaded->format()));
+        EXPECT_TRUE(Image::IsBlockCompressed(reloaded->PixelFormat()));
     }
 }
 
@@ -231,11 +231,11 @@ TEST_F(GpuTest, CompressRunsAsynchronously) {
     const auto source = writeSourceFile("async-source", 32);
 
     auto task = kimg::CompressToKtxAsync(source, outDir(), { .codec = kimg::Codec::eETC1S, .quality = 1 });
-    while (!task.done()) {
+    while (!task.Done()) {
         kor::Context::DrainMainThread();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    auto result = task.take();
+    auto result = task.Take();
     ASSERT_TRUE(result.has_value()) << result.error();
     ASSERT_TRUE(result->has_value()) << (*result).error().message;
     EXPECT_TRUE(std::filesystem::exists(**result));

@@ -20,7 +20,7 @@ namespace kor::vk
     public:
         // Whether the physical device can hold this format in these roles, from
         // vkGetPhysicalDeviceFormatProperties' optimal-tiling features. Static: the question is
-        // about the device, and is asked before any image exists. @see kor::Image::isFormatSupported
+        // about the device, and is asked before any image exists. @see kor::Image::IsFormatSupported
         static bool isFormatSupported(kor::Image::Format format, Flags<kor::Image::Usage> usage);
 
         explicit Image(const kor::Image::Builder& builder);
@@ -32,7 +32,7 @@ namespace kor::vk
     	void Clear(const kor::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const;
     	void Clear(const ::vk::ClearValue& clearValue) const;
 
-    	void doResize(const glm::uvec3& extent) override;
+    	void DoResize(const glm::uvec3& extent) override;
 
     	explicit Image(const std::vector<::vk::Image>& surfaceImages, glm::uvec2 extent, Format format, SampleCount msaa);
 

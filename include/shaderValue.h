@@ -45,12 +45,12 @@ namespace kor
         bool known = false;         ///< Whether this is a shape the engine can lay out itself.
 
         /** @brief Bytes one scalar occupies in C++ *and* in the shader — they agree on this much. */
-        [[nodiscard]] constexpr std::uint32_t scalarSize() const {
+        [[nodiscard]] constexpr std::uint32_t ScalarSize() const {
             return scalar == ValueScalar::eDouble ? 8u : 4u;
         }
 
         /** @brief Whether two shapes describe the same thing, ignoring how either is padded. */
-        [[nodiscard]] constexpr bool sameAs(const ValueShape& other) const {
+        [[nodiscard]] constexpr bool SameAs(const ValueShape& other) const {
             return scalar == other.scalar && rows == other.rows
                 && columns == other.columns && count == other.count;
         }
@@ -74,7 +74,7 @@ namespace kor
 
     namespace detail
     {
-        template<typename T> constexpr ValueScalar scalarOf() {
+        template<typename T> constexpr ValueScalar ScalarOf() {
             if constexpr (std::is_same_v<T, float>)         return ValueScalar::eFloat;
             else if constexpr (std::is_same_v<T, double>)   return ValueScalar::eDouble;
             else if constexpr (std::is_same_v<T, bool>)     return ValueScalar::eBool;
@@ -87,16 +87,16 @@ namespace kor
     /// Every glm vector: vec2/3/4 and their integer, unsigned, double and boolean forms.
     template<glm::length_t L, typename T, glm::qualifier Q>
     struct ShaderValueTraits<glm::vec<L, T, Q>> {
-        static constexpr ValueShape shape{ detail::scalarOf<T>(), static_cast<std::uint8_t>(L), 1, 1,
-                                           detail::scalarOf<T>() != ValueScalar::eOther };
+        static constexpr ValueShape shape{ detail::ScalarOf<T>(), static_cast<std::uint8_t>(L), 1, 1,
+                                           detail::ScalarOf<T>() != ValueScalar::eOther };
     };
 
     /// Every glm matrix, square or not. C is the column count, R the rows — glm's own order.
     template<glm::length_t C, glm::length_t R, typename T, glm::qualifier Q>
     struct ShaderValueTraits<glm::mat<C, R, T, Q>> {
-        static constexpr ValueShape shape{ detail::scalarOf<T>(), static_cast<std::uint8_t>(R),
+        static constexpr ValueShape shape{ detail::ScalarOf<T>(), static_cast<std::uint8_t>(R),
                                            static_cast<std::uint8_t>(C), 1,
-                                           detail::scalarOf<T>() != ValueScalar::eOther };
+                                           detail::ScalarOf<T>() != ValueScalar::eOther };
     };
 
     /// A std::array of anything the engine already knows: an array of that, N elements long.
@@ -111,5 +111,5 @@ namespace kor
 
     /** @brief The shape of @p T, or an unknown shape for a type the engine cannot lay out. */
     template<typename T>
-    constexpr ValueShape shapeOf() { return ShaderValueTraits<std::remove_cvref_t<T>>::shape; }
+    constexpr ValueShape ShapeOf() { return ShaderValueTraits<std::remove_cvref_t<T>>::shape; }
 }

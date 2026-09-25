@@ -72,7 +72,7 @@ namespace kor
          * @brief Called once per frame, before Render.
          *
          * Where per-frame logic goes: input, animation, camera. Scale anything rate-dependent by
-         * Time::frameTime(). Optional; a scene that only draws need not override it.
+         * Time::FrameTime(). Optional; a scene that only draws need not override it.
          */
         virtual void Update() {}
 

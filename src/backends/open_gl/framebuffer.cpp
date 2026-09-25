@@ -34,7 +34,7 @@ namespace kor::ogl
         for (glm::uint i = 0; i < _colorAttachments.size(); ++i) {
             const auto& imageView = dynamic_cast<const ImageView&>(*_colorAttachments[i].view);
             glNamedFramebufferTexture(_id, GL_COLOR_ATTACHMENT0 + i, *imageView, 0);
-            _attachedColor.emplace_back(imageView.image()->generation());
+            _attachedColor.emplace_back(imageView.SourceImage()->Generation());
             drawAttachments.emplace_back(GL_COLOR_ATTACHMENT0 + i);
             glCheckError();
         }
@@ -42,14 +42,14 @@ namespace kor::ogl
         if (_depthAttachment.has_value()) {
             const auto& imageView = dynamic_cast<const ImageView&>(*_depthAttachment->view);
             glNamedFramebufferTexture(_id, GL_DEPTH_ATTACHMENT, *imageView, 0);
-            _attachedDepth = imageView.image()->generation();
+            _attachedDepth = imageView.SourceImage()->Generation();
             glCheckError();
         }
         _attachedStencil = 0;
-        if (_stencilAttachment.has_value() && (!_depthAttachment.has_value() || _stencilAttachment->view.get() != _depthAttachment->view.get())) {
+        if (_stencilAttachment.has_value() && (!_depthAttachment.has_value() || _stencilAttachment->view.Get() != _depthAttachment->view.Get())) {
             const auto& imageView = dynamic_cast<const ImageView&>(*_stencilAttachment->view);
             glNamedFramebufferTexture(_id, GL_STENCIL_ATTACHMENT, *imageView, 0);
-            _attachedStencil = imageView.image()->generation();
+            _attachedStencil = imageView.SourceImage()->Generation();
             glCheckError();
         }
         glNamedFramebufferDrawBuffers(_id, static_cast<GLsizei>(drawAttachments.size()), drawAttachments.data());
@@ -64,7 +64,7 @@ namespace kor::ogl
     void Framebuffer::Refresh() const
     {
         const auto generationOf = [](const auto& attachment) -> glm::u64 {
-            return dynamic_cast<const ImageView&>(attachment).image()->generation();
+            return dynamic_cast<const ImageView&>(attachment).SourceImage()->Generation();
         };
 
         bool stale = !_attached || _attachedColor.size() != _colorAttachments.size();
@@ -73,7 +73,7 @@ namespace kor::ogl
         if (!stale && _depthAttachment.has_value())
             stale = _attachedDepth != generationOf(*_depthAttachment->view);
         if (!stale && _stencilAttachment.has_value()
-            && (!_depthAttachment.has_value() || _stencilAttachment->view.get() != _depthAttachment->view.get()))
+            && (!_depthAttachment.has_value() || _stencilAttachment->view.Get() != _depthAttachment->view.Get()))
             stale = _attachedStencil != generationOf(*_stencilAttachment->view);
 
         if (stale) attachAll();

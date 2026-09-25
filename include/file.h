@@ -30,7 +30,7 @@ namespace kor::utils
     {
         std::ifstream file(filePath);
         if (!file.is_open()) {
-            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file: {}", filePath.string());
+            return kor::Fail(kor::ErrorCode::eFileNotReadable, "Failed to open file: {}", filePath.string());
         }
 
         std::string buffer;
@@ -55,7 +55,7 @@ namespace kor::utils
     {
         std::ofstream file(filePath);
         if (!file.is_open()) {
-            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file for writing: {}", filePath.string());
+            return kor::Fail(kor::ErrorCode::eFileNotReadable, "Failed to open file for writing: {}", filePath.string());
         }
 
         file.write(data.data(), data.size());
@@ -75,13 +75,13 @@ namespace kor::utils
         std::ifstream file(filePath, std::ios::binary | std::ios::ate);
         if (!file.is_open())
         {
-            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file: {}", filePath.string());
+            return kor::Fail(kor::ErrorCode::eFileNotReadable, "Failed to open file: {}", filePath.string());
         }
 
         const auto fileSize = static_cast<std::size_t>(file.tellg());
         if (fileSize % sizeof(glm::u32) != 0)
         {
-            return kor::fail(kor::ErrorCode::eFileNotReadable,
+            return kor::Fail(kor::ErrorCode::eFileNotReadable,
                              "File size {} is not a multiple of 4 bytes: {}", fileSize, filePath.string());
         }
 
@@ -104,7 +104,7 @@ namespace kor::utils
         std::ofstream file(filePath, std::ios::binary);
         if (!file.is_open())
         {
-            return kor::fail(kor::ErrorCode::eFileNotReadable, "Failed to open file for writing: {}", filePath.string());
+            return kor::Fail(kor::ErrorCode::eFileNotReadable, "Failed to open file for writing: {}", filePath.string());
         }
 
         file.write(reinterpret_cast<const char*>(data.data()), data.size() * sizeof(glm::u32));

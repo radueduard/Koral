@@ -63,43 +63,43 @@ class OverlayScene : public kor::Scene {
 public:
     void Initialize() override {
         _image = kor::Image::Builder{}
-                     .setType(kor::Image::Type::e2D)
-                     .setFormat(kor::Image::Format::eRGBA8_UNORM)
-                     .setExtent(glm::uvec2{16, 16})
-                     .setUsage(kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst | kor::Image::Usage::eSampled)
-                     .build();
+                     .SetType(kor::Image::Type::e2D)
+                     .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+                     .SetExtent(glm::uvec2{16, 16})
+                     .SetUsage(kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst | kor::Image::Usage::eSampled)
+                     .Build();
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
             cb.ClearColorImage(_image, glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
-        }, kor::CommandBuffer::Usage::eGraphics).wait();
+        }, kor::CommandBuffer::Usage::eGraphics).Wait();
         _guiImage = kor::GuiImage::Create(_image);
 
         viewportTarget = kor::Image::Builder{}
-            .setType(kor::Image::Type::e2D)
-            .setFormat(kor::Image::Format::eRGBA8_UNORM)
-            .setExtent(glm::uvec2{64, 64})
-            .setIsPerFrame(true)            // one copy per frame in flight, like a real render target
+            .SetType(kor::Image::Type::e2D)
+            .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+            .SetExtent(glm::uvec2{64, 64})
+            .SetIsPerFrame(true)            // one copy per frame in flight, like a real render target
             // eTransferSrc because AResizedViewportTargetIsShownAtItsNewSize copies it back out;
             // setUsage names the whole set, so it has to be listed with the other two.
-            .setUsage(kor::Image::Usage::eColorAttachment | kor::Image::Usage::eSampled
+            .SetUsage(kor::Image::Usage::eColorAttachment | kor::Image::Usage::eSampled
                     | kor::Image::Usage::eTransferSrc)
-            .build();
+            .Build();
         sampledOnlyTarget = kor::Image::Builder{}
-            .setType(kor::Image::Type::e2D)
-            .setFormat(kor::Image::Format::eRGBA8_UNORM)
-            .setExtent(glm::uvec2{32, 32})
-            .setIsPerFrame(true)
-            .setUsage(kor::Image::Usage::eSampled)
-            .build();
+            .SetType(kor::Image::Type::e2D)
+            .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+            .SetExtent(glm::uvec2{32, 32})
+            .SetIsPerFrame(true)
+            .SetUsage(kor::Image::Usage::eSampled)
+            .Build();
 
         // Once, here — deliberately not every frame in RenderUI like the two below. Resizing a target
         // replaces the image, and the viewport is supposed to notice that by itself; a scene that
-        // handed it back every frame would hide a viewport that could not. @see kgui::Viewport::setImage
-        directViewport.setImage(viewportTarget);
+        // handed it back every frame would hide a viewport that could not. @see kgui::Viewport::SetImage
+        directViewport.SetImage(viewportTarget);
 
-        viewportTargetView = kor::ImageView::Builder(viewportTarget).build();
+        viewportTargetView = kor::ImageView::Builder(viewportTarget).Build();
         viewportFramebuffer = kor::Framebuffer::Builder{}
-            .addColor({ .view = viewportTargetView, .clear = glm::vec4{0.2f, 0.f, 0.4f, 1.f} })
-            .build();
+            .AddColor({ .view = viewportTargetView, .clear = glm::vec4{0.2f, 0.f, 0.4f, 1.f} })
+            .Build();
     }
 
     void Update() override {
@@ -144,11 +144,11 @@ public:
             }
             directViewport.Draw("Direct");   // image set once, at Initialize
 
-            sampledOnlyViewport.setImage(sampledOnlyTarget);
+            sampledOnlyViewport.SetImage(sampledOnlyTarget);
             sampledOnlyViewport.Draw("SampledOnly");
         }
 
-        viewport.setImage(_image);
+        viewport.SetImage(_image);
         if (viewport.Draw("Scene")) {
             ImGui::Begin("Scene");
             gizmo.Manipulate(viewport, glm::mat4(1.f), glm::mat4(1.f), transform);
@@ -204,7 +204,7 @@ void drawFrame(kor::Scene& scene) {
     glfwPollEvents();
     kor::Context::DrainMainThread();
     kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        kor::Context::Repository().update();
+        kor::Context::Repository().Update();
         scene.Update();
         scene.Render(cb);
         kor::GUI::Render(cb, scene);
@@ -227,17 +227,17 @@ public:
         s_scene = scenePtr.get();
         try {
             s_window = kor::Window::Builder(std::move(scenePtr))
-                           .setTitle("Koral windowed test")
-                           .setExtent({320, 240})
-                           .setResizable(true)
-                           .setVSync(false)
-                           .setAPI(kor::API::eVulkan)
+                           .SetTitle("Koral windowed test")
+                           .SetExtent({320, 240})
+                           .SetResizable(true)
+                           .SetVSync(false)
+                           .SetAPI(kor::API::eVulkan)
                            // X11 deliberately: ImGui's multi-viewport needs to place a window at an
                            // absolute screen position, which Wayland denies, so viewports — and with
                            // them everything about *undocked* panels — are off there. Testing them at
                            // all means asking for the platform that has them.
-                           .setPlatform(kor::WindowPlatform::eX11)
-                           .build();
+                           .SetPlatform(kor::WindowPlatform::eX11)
+                           .Build();
         } catch (const std::exception& e) {
             s_reason = e.what();
             s_window.reset();
@@ -274,7 +274,7 @@ protected:
         if (!VkEnvironment::ready()) {
             GTEST_SKIP() << "windowed Vulkan context unavailable: " << VkEnvironment::reason();
         }
-        EXPECT_EQ(kor::Context::activeAPI(), kor::API::eVulkan);
+        EXPECT_EQ(kor::Context::ActiveAPI(), kor::API::eVulkan);
     }
 };
 
@@ -290,7 +290,7 @@ TEST_F(VkWindowTest, RenderResizeAndPresent) {
     (void)kor::GUI::GetFont(kor::Font::eRegular);
 
     // Phase 1: render enough frames to cycle every in-flight frame slot twice.
-    for (int i = 0; i < 8 && !window.shouldClose(); ++i) {
+    for (int i = 0; i < 8 && !window.ShouldClose(); ++i) {
         drawFrame(scene);
         window.LateUpdate();
     }
@@ -301,7 +301,7 @@ TEST_F(VkWindowTest, RenderResizeAndPresent) {
     // path in the scheduler and swap chain.
     glfwSetWindowSize(*window, 480, 360);
     for (int i = 0; i < 20; ++i) glfwPollEvents();
-    for (int i = 0; i < 12 && !window.shouldClose(); ++i) {
+    for (int i = 0; i < 12 && !window.ShouldClose(); ++i) {
         drawFrame(scene);
         window.LateUpdate();
     }
@@ -329,8 +329,8 @@ using kor::Shader;
 // set was built, and neither is fixed by rebuilding the pipeline.
 //
 // The chain: file → Shader::OnReload → Pipeline::Reload → the layout adopts the new block
-// description in place and says so (Resource::markChanged) → the descriptor set, which is
-// recoverable and rebuilds when an input changes, is replayed → SemanticBuffers::acquire is asked
+// description in place and says so (Resource::MarkChanged) → the descriptor set, which is
+// recoverable and rebuilds when an input changes, is replayed → SemanticBuffers::Acquire is asked
 // for the *new* shape → a new buffer, filled by the same object, lands at the binding.
 //
 // Here rather than in the headless suite for one reason worth knowing: a semantic block's buffer is
@@ -353,20 +353,20 @@ public:
     glm::vec4 beta  { 5.f, 6.f, 7.f, 8.f };
     glm::vec4 gamma { 9.f, 10.f, 11.f, 12.f };
 
-    [[nodiscard]] std::string_view semanticNamespace() const override { return "probe"; }
+    [[nodiscard]] std::string_view SemanticNamespace() const override { return "probe"; }
 
-    bool serialize(const std::string_view semantic, kor::SemanticSlot& slot) const override
+    bool Serialize(const std::string_view semantic, kor::SemanticSlot& slot) const override
     {
         // The return says whether this object *answers for* the semantic, not whether the write
         // landed: a shape mismatch is recorded on the slot and reported with the rest. Returning
         // the write's result here would report a type error as "no such semantic".
-        if (semantic == "ALPHA") { slot.set(alpha); return true; }
-        if (semantic == "BETA")  { slot.set(beta);  return true; }
-        if (semantic == "GAMMA") { slot.set(gamma); return true; }
+        if (semantic == "ALPHA") { slot.Set(alpha); return true; }
+        if (semantic == "BETA")  { slot.Set(beta);  return true; }
+        if (semantic == "GAMMA") { slot.Set(gamma); return true; }
         return false;   // anything else: this object does not answer for it
     }
 
-    kor::SemanticBuffers& semanticBuffers() override { return _buffers; }
+    kor::SemanticBuffers& SemanticStorage() override { return _buffers; }
 
 private:
     kor::SemanticBuffers _buffers;
@@ -429,37 +429,37 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
     // Somewhere for the shader to put what it was given, big enough for the field that does not
     // exist yet — the test reads it back to see whether it arrived.
     auto readback = Buffer::Builder<glm::vec4>()
-        .setData(std::vector<glm::vec4>(4, glm::vec4(0.f)))
-        .setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
-        .setType(Buffer::Type::eDeviceLocal)
-        .build();
-    ASSERT_TRUE(readback.valid()) << readback.error()->history();
+        .SetData(std::vector<glm::vec4>(4, glm::vec4(0.f)))
+        .SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
+        .SetType(Buffer::Type::eDeviceLocal)
+        .Build();
+    ASSERT_TRUE(readback.Valid()) << readback.Failure()->History();
 
     const auto shader = Shader::Builder{}
-        .setLang<Shader::Lang::eGLSL>()
-        .setStage(Shader::Stage::eCompute)
-        .setPath(path)
-        .getOrBuild("test.semanticReload");
-    ASSERT_TRUE(shader.valid()) << shader.error()->history();
+        .SetLang<Shader::Lang::eGLSL>()
+        .SetStage(Shader::Stage::eCompute)
+        .SetPath(path)
+        .GetOrBuild("test.semanticReload");
+    ASSERT_TRUE(shader.Valid()) << shader.Failure()->History();
 
-    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
-    ASSERT_TRUE(pipeline.valid()) << pipeline.error()->history();
+    auto pipeline = ComputePipeline::Builder{}.SetComputeShader(shader).Build();
+    ASSERT_TRUE(pipeline.Valid()) << pipeline.Failure()->History();
 
     auto set = DescriptorSet::Builder(pipeline, 0)
-        .writeSemantic(0, probe)                                    // the semantic block
-        .write(1, readback)  // where it lands
-        .build();
-    ASSERT_TRUE(set.valid()) << set.error()->history();
+        .WriteSemantic(0, probe)                                    // the semantic block
+        .Write(1, readback)  // where it lands
+        .Build();
+    ASSERT_TRUE(set.Valid()) << set.Failure()->History();
 
     // One shape asked for, one buffer made for it.
-    EXPECT_EQ(probe.semanticBuffers().blockCount(), 1u);
+    EXPECT_EQ(probe.SemanticStorage().BlockCount(), 1u);
 
     const auto dispatch = [&] {
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.BindComputePipeline(pipeline);
             cb.BindDescriptorSet(0, set);
             cb.Dispatch(1, 1, 1);
-        }, CommandBuffer::Usage::eCompute).wait();
+        }, CommandBuffer::Usage::eCompute).Wait();
         return readback->Read<glm::vec4>();
     };
 
@@ -471,7 +471,7 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
         EXPECT_EQ(values[2], glm::vec4(0.f)) << "nothing has written a third field yet";
     }
 
-    const auto setGeneration = set.generation();
+    const auto setGeneration = set.Generation();
 
     // The edit.
     std::ofstream(path) << kThreeFields;
@@ -484,15 +484,15 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
     // in one frame and the descriptor set is replayed in the next.
     auto& scene = VkEnvironment::scene();
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    while (probe.semanticBuffers().blockCount() != 2u && std::chrono::steady_clock::now() < deadline) {
+    while (probe.SemanticStorage().BlockCount() != 2u && std::chrono::steady_clock::now() < deadline) {
         drawFrame(scene);
         std::this_thread::sleep_for(std::chrono::milliseconds(25));
     }
-    ASSERT_EQ(probe.semanticBuffers().blockCount(), 2u)
+    ASSERT_EQ(probe.SemanticStorage().BlockCount(), 2u)
         << "the reshaped block never reached the object that fills it";
 
-    EXPECT_GT(set.generation(), setGeneration) << "the descriptor set was not rebuilt";
-    ASSERT_TRUE(set.valid()) << set.error()->history();
+    EXPECT_GT(set.Generation(), setGeneration) << "the descriptor set was not rebuilt";
+    ASSERT_TRUE(set.Valid()) << set.Failure()->History();
 
     {
         const auto values = dispatch();
@@ -504,7 +504,7 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
 
     // The old shape's buffer is still there — kept, not leaked: two shapes have been asked for over
     // this run, and a block is keyed by shape rather than by shader.
-    EXPECT_EQ(probe.semanticBuffers().blockCount(), 2u);
+    EXPECT_EQ(probe.SemanticStorage().BlockCount(), 2u);
 
     std::filesystem::remove(path);
 }
@@ -524,20 +524,20 @@ TEST_F(VkWindowTest, GuiExtrasDrawInARealFrame) {
 
     for (int i = 0; i < 4; ++i) drawFrame(scene);
 
-    EXPECT_TRUE(scene.viewport.showing())
+    EXPECT_TRUE(scene.viewport.Showing())
         << "the backend produced no texture handle for the viewport's image";
     // The case a scene actually hits: a per-frame, sampled-only colour target, shown with no copy and
     // no transfer usage. Several frames have gone by, so every swap-chain image has been used —
     // which is what the layout error was about.
-    EXPECT_TRUE(scene.directViewport.showing())
+    EXPECT_TRUE(scene.directViewport.Showing())
         << "a sampled-only per-frame target could not be shown";
     EXPECT_GT(scene.viewport.size().x, 0u);
     EXPECT_GT(scene.viewport.size().y, 0u);
-    EXPECT_FALSE(scene.gizmo.isUsing()) << "nothing was dragged";
+    EXPECT_FALSE(scene.gizmo.IsUsing()) << "nothing was dragged";
 
     // The window has been drawn at some size, so the image's rectangle is inside it.
-    EXPECT_GT(scene.viewport.rect().size.x, 0.f);
-    EXPECT_GT(scene.viewport.rect().size.y, 0.f);
+    EXPECT_GT(scene.viewport.ScreenRect().size.x, 0.f);
+    EXPECT_GT(scene.viewport.ScreenRect().size.y, 0.f);
 }
 
 // Resizing a viewport's target every frame — what dragging a floating window's edge does — must not
@@ -552,17 +552,17 @@ TEST_F(VkWindowTest, GuiExtrasDrawInARealFrame) {
 //
 // It also covers the viewport keeping up *without being told*: `directViewport` is given its image
 // once, at Initialize, so the only thing that can rebuild its handle across these twelve resizes is
-// the viewport noticing for itself. The obvious assertion for that does not work — `showing()` stays
+// the viewport noticing for itself. The obvious assertion for that does not work — `Showing()` stays
 // true with a *stale* handle, since the handle object still exists and merely names a destroyed
-// VkImage — so the layer is the only witness. Disabling Viewport::refreshHandle turns this check into
+// VkImage — so the layer is the only witness. Disabling Viewport::RefreshHandle turns this check into
 // 40 errors of "Invalid VkDescriptorSet Object".
 TEST_F(VkWindowTest, ResizingAViewportTargetEveryFrameIsClean) {
     auto& scene = VkEnvironment::scene();
 
     // Settle first: the frames before this may legitimately have transitioned things.
     for (int i = 0; i < 3; ++i) drawFrame(scene);
-    kor::log::clearHistory();
-    kor::log::resetRepeatCounts();
+    kor::log::ClearHistory();
+    kor::log::ResetRepeatCounts();
 
     scene.resizeTargetEveryFrame = true;
     for (int i = 0; i < 12; ++i) drawFrame(scene);
@@ -578,7 +578,7 @@ TEST_F(VkWindowTest, ResizingAViewportTargetEveryFrameIsClean) {
     constexpr std::string_view imguiViewportSemaphoreReuse = "may still be in use by VkSwapchainKHR";
 
     std::vector<std::string> complaints;
-    for (const auto& record : kor::log::history()) {
+    for (const auto& record : kor::log::History()) {
         if (record.level != kor::log::Level::eError) continue;
         if (record.message.find(imguiViewportSemaphoreReuse) != std::string::npos) continue;
         complaints.push_back(record.message);
@@ -596,15 +596,15 @@ TEST_F(VkWindowTest, ResizingAViewportTargetEveryFrameIsClean) {
 // alternating old and new values: the view trembles at the frame-in-flight period.
 TEST_F(VkWindowTest, APerFrameBufferPropagatesAWriteToEveryCopy) {
     auto& scene = VkEnvironment::scene();
-    const auto copies = kor::Context::Scheduler().imageCount();
+    const auto copies = kor::Context::Scheduler().ImageCount();
     ASSERT_GE(copies, 2u) << "nothing to propagate to with a single copy";
 
     kor::Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
-      .setUsage(kor::Buffer::Usage::eUniform)
-      .setIsPerFrame(true)
-      .setType(kor::Buffer::Type::eDynamic);
-    auto buffer = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+      .SetUsage(kor::Buffer::Usage::eUniform)
+      .SetIsPerFrame(true)
+      .SetType(kor::Buffer::Type::eDynamic);
+    auto buffer = rb.Build();
     ASSERT_TRUE(static_cast<bool>(buffer));
 
     // Written once, on whichever frame is current — exactly what a camera does when it stops moving.
@@ -634,11 +634,11 @@ TEST_F(VkWindowTest, APerFrameBufferWrittenEveryFrameReadsBackWhatItWasGiven) {
     auto& scene = VkEnvironment::scene();
 
     kor::Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
-      .setUsage(kor::Buffer::Usage::eUniform)
-      .setIsPerFrame(true)
-      .setType(kor::Buffer::Type::eDynamic);
-    auto buffer = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+      .SetUsage(kor::Buffer::Usage::eUniform)
+      .SetIsPerFrame(true)
+      .SetType(kor::Buffer::Type::eDynamic);
+    auto buffer = rb.Build();
     ASSERT_TRUE(static_cast<bool>(buffer));
 
     for (glm::u32 i = 1; i <= 12; ++i) {
@@ -665,10 +665,10 @@ TEST_F(VkWindowTest, MeasureWhereTheFrameGoes) {
 
     // A fixed, realistic log, filled *before* any timing: letting it grow between phases was what made
     // an earlier version of this measurement compare two different workloads and report nonsense.
-    kor::log::clearHistory();
-    kor::log::setRepeatLimit(0);          // no suppression: every one of these must land
-    for (int i = 0; i < 2000; ++i) kor::log::info("a log line with some text in it, number {}", i);
-    kor::log::setRepeatLimit(10);
+    kor::log::ClearHistory();
+    kor::log::SetRepeatLimit(0);          // no suppression: every one of these must land
+    for (int i = 0; i < 2000; ++i) kor::log::Info("a log line with some text in it, number {}", i);
+    kor::log::SetRepeatLimit(10);
 
     const auto time = [&](const int count) {
         for (int i = 0; i < 3; ++i) drawFrame(scene);
@@ -688,7 +688,7 @@ TEST_F(VkWindowTest, MeasureWhereTheFrameGoes) {
     }
     scene.drawLogPanel = true;
 
-    std::cout << "[ MEASURE  ] " << kor::log::history().size() << " records: "
+    std::cout << "[ MEASURE  ] " << kor::log::History().size() << " records: "
               << withoutPanel << " ms/frame without the log panel, " << withPanel << " with it ("
               << (withPanel - withoutPanel) << " ms is the panel)" << std::endl;
     SUCCEED();
@@ -698,11 +698,11 @@ TEST_F(VkWindowTest, MeasurePerFrameBufferWriteCost) {
     auto& scene = VkEnvironment::scene();
 
     kor::Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
-      .setUsage(kor::Buffer::Usage::eUniform)
-      .setIsPerFrame(true)
-      .setType(kor::Buffer::Type::eDynamic);
-    auto buffer = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+      .SetUsage(kor::Buffer::Usage::eUniform)
+      .SetIsPerFrame(true)
+      .SetType(kor::Buffer::Type::eDynamic);
+    auto buffer = rb.Build();
 
     const auto time = [&](const int count, const bool writing) {
         for (int i = 0; i < 3; ++i) drawFrame(scene);
@@ -746,11 +746,11 @@ TEST_F(VkWindowTest, AViewportSurvivesBeingGivenItsOwnWindow) {
     scene.floatViewportOutsideMainWindow = true;
     for (int i = 0; i < 8; ++i) drawFrame(scene);      // create the platform window and live with it
 
-    EXPECT_TRUE(scene.directViewport.showing()) << "the floating panel lost its image";
+    EXPECT_TRUE(scene.directViewport.Showing()) << "the floating panel lost its image";
 
     scene.floatViewportOutsideMainWindow = false;
     for (int i = 0; i < 8; ++i) drawFrame(scene);      // and back again, destroying it
-    EXPECT_TRUE(scene.directViewport.showing());
+    EXPECT_TRUE(scene.directViewport.Showing());
 }
 
 // The cursor mode is a mode of *every* window input is read from, and a change to it must not arrive
@@ -760,35 +760,35 @@ TEST_F(VkWindowTest, AViewportSurvivesBeingGivenItsOwnWindow) {
 // camera the instant aiming began, which is the classic version of this bug.
 TEST_F(VkWindowTest, CapturingTheCursorReportsNoMovementForIt) {
     auto& scene = VkEnvironment::scene();
-    ASSERT_EQ(kor::Input::cursorMode(), kor::Input::CursorMode::eNormal);
+    ASSERT_EQ(kor::Input::CurrentCursorMode(), kor::Input::CursorMode::eNormal);
 
     for (int i = 0; i < 3; ++i) drawFrame(scene);
 
-    kor::Input::setCursorMode(kor::Input::CursorMode::eCaptured);
-    EXPECT_EQ(kor::Input::cursorMode(), kor::Input::CursorMode::eCaptured);
+    kor::Input::SetCursorMode(kor::Input::CursorMode::eCaptured);
+    EXPECT_EQ(kor::Input::CurrentCursorMode(), kor::Input::CursorMode::eCaptured);
     EXPECT_EQ(glfwGetInputMode(*kor::Context::Window(), GLFW_CURSOR), GLFW_CURSOR_DISABLED);
 
     drawFrame(scene);
-    EXPECT_EQ(kor::Input::mousePositionDelta(), glm::vec2(0.f, 0.f))
+    EXPECT_EQ(kor::Input::MousePositionDelta(), glm::vec2(0.f, 0.f))
         << "the warp that capturing performs was reported as movement";
 
-    kor::Input::setCursorMode(kor::Input::CursorMode::eNormal);
+    kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
     EXPECT_EQ(glfwGetInputMode(*kor::Context::Window(), GLFW_CURSOR), GLFW_CURSOR_NORMAL);
 
     drawFrame(scene);
-    EXPECT_EQ(kor::Input::mousePositionDelta(), glm::vec2(0.f, 0.f))
+    EXPECT_EQ(kor::Input::MousePositionDelta(), glm::vec2(0.f, 0.f))
         << "releasing the cursor was reported as movement";
 
     // Hidden is the middle setting: invisible, but still free to move.
-    kor::Input::setCursorMode(kor::Input::CursorMode::eHidden);
+    kor::Input::SetCursorMode(kor::Input::CursorMode::eHidden);
     EXPECT_EQ(glfwGetInputMode(*kor::Context::Window(), GLFW_CURSOR), GLFW_CURSOR_HIDDEN);
-    kor::Input::setCursorMode(kor::Input::CursorMode::eNormal);
+    kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
 }
 
 // A window attached while the cursor is captured has to arrive in the same mode, or the cursor
 // reappears the moment the pointer crosses into an undocked panel.
 TEST_F(VkWindowTest, AWindowAttachedWhileCapturedArrivesCaptured) {
-    kor::Input::setCursorMode(kor::Input::CursorMode::eCaptured);
+    kor::Input::SetCursorMode(kor::Input::CursorMode::eCaptured);
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -796,13 +796,13 @@ TEST_F(VkWindowTest, AWindowAttachedWhileCapturedArrivesCaptured) {
     ASSERT_NE(second, nullptr);
     EXPECT_EQ(glfwGetInputMode(second, GLFW_CURSOR), GLFW_CURSOR_NORMAL) << "not attached yet";
 
-    kor::Input::attachTo(second);
+    kor::Input::AttachTo(second);
     EXPECT_EQ(glfwGetInputMode(second, GLFW_CURSOR), GLFW_CURSOR_DISABLED);
 
-    kor::Input::setCursorMode(kor::Input::CursorMode::eNormal);
+    kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
     EXPECT_EQ(glfwGetInputMode(second, GLFW_CURSOR), GLFW_CURSOR_NORMAL) << "and follows a change";
 
-    kor::Input::detachFrom(second);
+    kor::Input::DetachFrom(second);
     glfwDestroyWindow(second);
 }
 
@@ -819,11 +819,11 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
     // asserting on the list's *size* made this test fail for a reason that has nothing to do with
     // what it covers.
     const auto timesAttached = [](GLFWwindow* window) {
-        const auto attached = kor::Input::attachedWindows();
+        const auto attached = kor::Input::AttachedWindows();
         return std::ranges::count(attached, window);
     };
 
-    const auto before = kor::Input::attachedWindows();
+    const auto before = kor::Input::AttachedWindows();
     ASSERT_FALSE(before.empty()) << "the main window should be attached";
     EXPECT_EQ(before.front(), *kor::Context::Window());
 
@@ -832,10 +832,10 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
     GLFWwindow* second = glfwCreateWindow(64, 64, "second", nullptr, nullptr);
     ASSERT_NE(second, nullptr);
 
-    kor::Input::attachTo(second);
+    kor::Input::AttachTo(second);
     EXPECT_EQ(timesAttached(second), 1);
     // Attaching twice is not an error and does not double up — the GUI calls it every frame.
-    kor::Input::attachTo(second);
+    kor::Input::AttachTo(second);
     EXPECT_EQ(timesAttached(second), 1);
 
     // A frame with the extra window attached must be no different from one without.
@@ -843,7 +843,7 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
     for (int i = 0; i < 3; ++i) drawFrame(scene);
     EXPECT_EQ(timesAttached(second), 1) << "a frame must not disturb a window attached by hand";
 
-    kor::Input::detachFrom(second);
+    kor::Input::DetachFrom(second);
     EXPECT_EQ(timesAttached(second), 0);
     EXPECT_EQ(timesAttached(*kor::Context::Window()), 1) << "and must leave the main window attached";
     glfwDestroyWindow(second);
@@ -854,7 +854,7 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
 // A per-frame image that is only ever *sampled* — never written — shown through a viewport across
 // enough frames to come round to every copy in flight.
 //
-// It passes both with and without the frame-index fix to Image::trackingKey, and the reason is worth
+// It passes both with and without the frame-index fix to Image::TrackingKey, and the reason is worth
 // recording: a viewport's refresh uses an explicit ImageBarrier, and an explicit barrier is emitted
 // unconditionally (Record::transitions), so every copy is transitioned whatever the tracker believes.
 // The tracker's frame-blindness can therefore only bite an *implicit* barrier — one inferred from a
@@ -865,8 +865,8 @@ TEST_F(VkWindowTest, APerFrameImageThatIsOnlySampledIsShownCleanly) {
 
     // Enough frames to come round to every copy at least twice.
     for (int i = 0; i < 3; ++i) drawFrame(scene);
-    kor::log::clearHistory();
-    kor::log::resetRepeatCounts();
+    kor::log::ClearHistory();
+    kor::log::ResetRepeatCounts();
 
     for (int i = 0; i < 10; ++i) drawFrame(scene);
     kor::Context::Scheduler().WaitIdle();
@@ -882,14 +882,14 @@ TEST_F(VkWindowTest, APerFrameImageThatIsOnlySampledIsShownCleanly) {
     constexpr std::string_view imguiViewportSemaphoreReuse = "may still be in use by VkSwapchainKHR";
 
     std::vector<std::string> complaints;
-    for (const auto& record : kor::log::history()) {
+    for (const auto& record : kor::log::History()) {
         if (record.level != kor::log::Level::eError) continue;
         if (record.message.find(imguiViewportSemaphoreReuse) != std::string::npos) continue;
         complaints.push_back(record.message);
     }
     EXPECT_TRUE(complaints.empty())
         << complaints.size() << " error(s), first: " << (complaints.empty() ? "" : complaints.front());
-    EXPECT_TRUE(scene.sampledOnlyViewport.showing());
+    EXPECT_TRUE(scene.sampledOnlyViewport.Showing());
 }
 
 // ...and the picture is actually *there* after a resize settles: the target is rendered into at its new
@@ -909,21 +909,21 @@ TEST_F(VkWindowTest, AResizedViewportTargetIsShownAtItsNewSize) {
     scene.viewportFramebuffer->Resize(glm::uvec2{ 96, 72 });
     for (int i = 0; i < 3; ++i) drawFrame(scene);
 
-    EXPECT_EQ(scene.viewportTarget->extent(), glm::uvec3(96, 72, 1));
-    EXPECT_TRUE(scene.directViewport.showing()) << "the handle did not survive the resize";
+    EXPECT_EQ(scene.viewportTarget->Extent(), glm::uvec3(96, 72, 1));
+    EXPECT_TRUE(scene.directViewport.Showing()) << "the handle did not survive the resize";
 
     // The target holds what the pass cleared it to, at the new size — so it was rendered into after
     // being replaced, not left undefined.
     kor::Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(96) * 72 * 4)
-      .setUsage(kor::Buffer::Usage::eTransferDst)
-      .setType(kor::Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(96) * 72 * 4)
+      .SetUsage(kor::Buffer::Usage::eTransferDst)
+      .SetType(kor::Buffer::Type::eReadback);
+    auto readback = rb.Build();
 
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
         cb.CopyImageToBuffer(scene.viewportTarget,
                              readback);
-    }, kor::CommandBuffer::Usage::eTransfer).wait();
+    }, kor::CommandBuffer::Usage::eTransfer).Wait();
 
     const auto texels = readback->Read<glm::u8vec4>();
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(96) * 72);
@@ -942,20 +942,20 @@ TEST_F(VkWindowTest, AnUntouchedScreenIsClearedByTheRuntime) {
     bool cleared = false;
 
     kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        const auto framebuffer = kor::Context::defaultFramebuffer();
-        ASSERT_TRUE(framebuffer.valid());
-        ASSERT_FALSE(framebuffer->colorAttachments().empty());
-        const auto screen = framebuffer->colorImage(0);
+        const auto framebuffer = kor::Context::DefaultFramebuffer();
+        ASSERT_TRUE(framebuffer.Valid());
+        ASSERT_FALSE(framebuffer->ColorAttachments().empty());
+        const auto screen = framebuffer->ColorImage(0);
 
         // Nothing has been recorded, so nothing can have touched it.
-        EXPECT_FALSE(cb.hasTouched(screen));
+        EXPECT_FALSE(cb.HasTouched(screen));
 
         cb.BeginRendering();
         cb.EndRendering();
         cleared = true;
 
         // ...and now it has, which is what stops the runtime clearing it a second time.
-        EXPECT_TRUE(cb.hasTouched(screen));
+        EXPECT_TRUE(cb.HasTouched(screen));
 
         kor::GUI::Render(cb, scene);
     });
@@ -969,11 +969,11 @@ TEST_F(VkWindowTest, ATouchedScreenIsNotClearedAgain) {
     auto& scene = VkEnvironment::scene();
 
     kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        const auto framebuffer = kor::Context::defaultFramebuffer();
-        const auto screen = framebuffer->colorImage(0);
+        const auto framebuffer = kor::Context::DefaultFramebuffer();
+        const auto screen = framebuffer->ColorImage(0);
 
         cb.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
-        EXPECT_TRUE(cb.hasTouched(screen)) << "a clear is an interaction with the framebuffer";
+        EXPECT_TRUE(cb.HasTouched(screen)) << "a clear is an interaction with the framebuffer";
 
         kor::GUI::Render(cb, scene);
     });
@@ -985,7 +985,7 @@ TEST_F(VkWindowTest, ATouchedScreenIsNotClearedAgain) {
 // written.
 //
 // The screen-targeting Blit resolves its destination inside the backend, so it used to declare only
-// its *source* as a use. That made it the one way of drawing to the screen that hasTouched() could
+// its *source* as a use. That made it the one way of drawing to the screen that HasTouched() could
 // not see: the runtime concluded the frame had never touched the framebuffer and cleared it on top
 // of the blit, leaving a blank window with the interface still drawn over it. Nothing caught it
 // because every other screen test reaches the framebuffer through BeginRendering or a clear, both
@@ -994,22 +994,22 @@ TEST_F(VkWindowTest, BlittingToTheScreenCountsAsTouchingIt) {
     auto& scene = VkEnvironment::scene();
 
     const auto canvas = kor::Image::Builder{}
-        .setType(kor::Image::Type::e2D)
-        .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec2{64, 64})
-        .setUsage(kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst)
-        .build();
+        .SetType(kor::Image::Type::e2D)
+        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec2{64, 64})
+        .SetUsage(kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst)
+        .Build();
     ASSERT_TRUE(canvas);
 
     kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        const auto framebuffer = kor::Context::defaultFramebuffer();
-        ASSERT_TRUE(framebuffer.valid());
-        const auto screen = framebuffer->colorImage(0);
+        const auto framebuffer = kor::Context::DefaultFramebuffer();
+        ASSERT_TRUE(framebuffer.Valid());
+        const auto screen = framebuffer->ColorImage(0);
 
         cb.ClearColorImage(canvas, glm::vec4{0.9f, 0.2f, 0.1f, 1.f})
           .BlitToScreen(canvas);
 
-        EXPECT_TRUE(cb.hasTouched(screen))
+        EXPECT_TRUE(cb.HasTouched(screen))
             << "a blit to the screen is the whole output of a compute-rasterizer scene; if the "
                "runtime cannot see it, it clears the picture away";
 
@@ -1027,7 +1027,7 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
 
     // Long enough for a frame that recorded a timer to complete and be recorded into again, which
     // takes a full cycle of the frames in flight.
-    const int budget = static_cast<int>(kor::Context::Scheduler().imageCount()) + 4;
+    const int budget = static_cast<int>(kor::Context::Scheduler().ImageCount()) + 4;
     bool found = false;
     double milliseconds = 0.0;
 
@@ -1036,9 +1036,9 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
             // Fetched per frame: the default framebuffer's colour attachment is the swap-chain
             // image this frame presents, so a reference taken once outside the loop goes stale
             // the moment the chain rotates.
-            const auto framebuffer = kor::Context::defaultFramebuffer();
-            ASSERT_TRUE(framebuffer.valid());
-            const auto screen = framebuffer->colorImage(0);
+            const auto framebuffer = kor::Context::DefaultFramebuffer();
+            ASSERT_TRUE(framebuffer.Valid());
+            const auto screen = framebuffer->ColorImage(0);
 
             cb.Timer("frame.clear", [&](kor::CommandBuffer& inner) {
                 inner.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
@@ -1047,8 +1047,8 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
         });
         kor::GUI::RenderPlatformWindows();
 
-        for (const auto& f : kor::Context::Scheduler().frames()) {
-            for (const auto& timing : f.get().commandBuffer().timings()) {
+        for (const auto& f : kor::Context::Scheduler().Frames()) {
+            for (const auto& timing : f.get().Commands().Timings()) {
                 if (timing.label != "frame.clear") continue;
                 found = true;
                 milliseconds = timing.milliseconds;
@@ -1066,12 +1066,12 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
 // eTransferSrc and blit the whole image every frame.
 TEST_F(VkWindowTest, GuiImageShowsAMipOrLayerWithoutCopying) {
     auto mipped = kor::Image::Builder{}
-        .setType(kor::Image::Type::e2D)
-        .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec2{32, 32})
-        .setMipLevels(3)
-        .setUsage(kor::Image::Usage::eSampled)   // sampled only: no transfer usage at all
-        .build();
+        .SetType(kor::Image::Type::e2D)
+        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec2{32, 32})
+        .SetMipLevels(3)
+        .SetUsage(kor::Image::Usage::eSampled)   // sampled only: no transfer usage at all
+        .Build();
     ASSERT_TRUE(static_cast<bool>(mipped));
 
     auto level0 = kor::GuiImage::Create(mipped);
@@ -1080,12 +1080,12 @@ TEST_F(VkWindowTest, GuiImageShowsAMipOrLayerWithoutCopying) {
     EXPECT_TRUE(static_cast<bool>(level2));
 
     auto layered = kor::Image::Builder{}
-        .setType(kor::Image::Type::e2D)
-        .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec2{32, 32})
-        .setArrayLayers(6)
-        .setUsage(kor::Image::Usage::eSampled)
-        .build();
+        .SetType(kor::Image::Type::e2D)
+        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec2{32, 32})
+        .SetArrayLayers(6)
+        .SetUsage(kor::Image::Usage::eSampled)
+        .Build();
     auto face = kor::GuiImage::Create(layered, 4, 0);
     EXPECT_TRUE(static_cast<bool>(face));
 }
@@ -1095,14 +1095,14 @@ TEST_F(VkWindowTest, GuiImageShowsAMipOrLayerWithoutCopying) {
 // is one error that says which flag and why.
 TEST_F(VkWindowTest, GuiImageSaysWhyItCannotCopyFromAnImage) {
     auto volume = kor::Image::Builder{}
-        .setType(kor::Image::Type::e3D)
-        .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec3{16, 16, 4})
+        .SetType(kor::Image::Type::e3D)
+        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec3{16, 16, 4})
         // Naming the roles at all is what does it: the transfer usages are on by default, and
         // setUsage replaces that default rather than adding to it, so an image that says
         // "exactly these roles" ends up without them. Which is the case being tested.
-        .setUsage(kor::Image::Usage::eSampled)   // sampled, but not readable by a copy
-        .build();
+        .SetUsage(kor::Image::Usage::eSampled)   // sampled, but not readable by a copy
+        .Build();
     ASSERT_TRUE(static_cast<bool>(volume));
 
     try {
@@ -1130,29 +1130,29 @@ TEST_F(VkWindowTest, ComputeTriangleOrientationToScreen) {
 // so the swap-chain image a frame is presented from can be copied, read back or shown elsewhere
 // without reaching into the swap chain.
 TEST_F(VkWindowTest, TheDefaultFramebuffersImagesAreReachableByName) {
-    const auto framebuffer = kor::Context::defaultFramebuffer();
-    ASSERT_TRUE(framebuffer.valid());
-    ASSERT_TRUE(framebuffer->isDefault());
+    const auto framebuffer = kor::Context::DefaultFramebuffer();
+    ASSERT_TRUE(framebuffer.Valid());
+    ASSERT_TRUE(framebuffer->IsDefault());
 
-    const auto colour = framebuffer->image("color");
-    ASSERT_TRUE(colour.valid()) << "the presented image was not reachable by name";
+    const auto colour = framebuffer->ImageNamed("color");
+    ASSERT_TRUE(colour.Valid()) << "the presented image was not reachable by name";
     // The same image the index-addressed accessor gives, and the same one the command buffer calls
     // the screen — one image, three ways of asking for it.
-    EXPECT_EQ(colour.get(), framebuffer->colorImage(0).get());
-    EXPECT_EQ(colour.get(), kor::CommandBuffer::screenImage().get());
-    EXPECT_EQ(colour->extent().x, framebuffer->extent().x);
-    EXPECT_EQ(colour->extent().y, framebuffer->extent().y);
+    EXPECT_EQ(colour.Get(), framebuffer->ColorImage(0).Get());
+    EXPECT_EQ(colour.Get(), kor::CommandBuffer::ScreenImage().Get());
+    EXPECT_EQ(colour->Extent().x, framebuffer->Extent().x);
+    EXPECT_EQ(colour->Extent().y, framebuffer->Extent().y);
 
     // The depth target too, which is what a scene wanting to read the frame's depth needs.
-    const auto depth = framebuffer->image("depth");
-    ASSERT_TRUE(depth.valid());
-    EXPECT_EQ(depth.get(), framebuffer->depthImage().get());
+    const auto depth = framebuffer->ImageNamed("depth");
+    ASSERT_TRUE(depth.Valid());
+    EXPECT_EQ(depth.Get(), framebuffer->DepthImage().Get());
 
-    const auto names = framebuffer->attachmentNames();
+    const auto names = framebuffer->AttachmentNames();
     EXPECT_NE(std::ranges::find(names, "color"), names.end());
     EXPECT_NE(std::ranges::find(names, "depth"), names.end());
 
-    EXPECT_FALSE(framebuffer->image("nosuchattachment").valid());
+    EXPECT_FALSE(framebuffer->ImageNamed("nosuchattachment").Valid());
 }
 
 } // namespace
@@ -1165,25 +1165,25 @@ TEST_F(VkWindowTest, TheDefaultFramebuffersImagesAreReachableByName) {
 TEST_F(VkWindowTest, AnExecutedCommandBufferUsesTheCopyOfTheFrameItRunsIn) {
     auto& scene = VkEnvironment::scene();
     auto& scheduler = kor::Context::Scheduler();
-    ASSERT_GE(scheduler.imageCount(), 2u) << "one copy per frame makes the question moot";
+    ASSERT_GE(scheduler.ImageCount(), 2u) << "one copy per frame makes the question moot";
 
     kor::Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
-      .setUsage(kor::Flags(kor::Buffer::Usage::eUniform) | kor::Buffer::Usage::eTransferSrc)
-      .setIsPerFrame(true)
-      .setType(kor::Buffer::Type::eDynamic);
-    auto perFrame = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+      .SetUsage(kor::Flags(kor::Buffer::Usage::eUniform) | kor::Buffer::Usage::eTransferSrc)
+      .SetIsPerFrame(true)
+      .SetType(kor::Buffer::Type::eDynamic);
+    auto perFrame = rb.Build();
     ASSERT_TRUE(static_cast<bool>(perFrame));
 
     kor::Buffer::Builder<glm::u32> db;
-    db.setData(std::vector<glm::u32>{0});
-    db.setUsage(kor::Flags(kor::Buffer::Usage::eStorage) | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst);
-    db.setType(kor::Buffer::Type::eDeviceLocal);
-    auto destination = db.build();
+    db.SetData(std::vector<glm::u32>{0});
+    db.SetUsage(kor::Flags(kor::Buffer::Usage::eStorage) | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst);
+    db.SetType(kor::Buffer::Type::eDeviceLocal);
+    auto destination = db.Build();
     ASSERT_TRUE(static_cast<bool>(destination));
 
     drawFrame(scene);
-    for (glm::u32 value = 1; value <= scheduler.imageCount() * 2; ++value) {
+    for (glm::u32 value = 1; value <= scheduler.ImageCount() * 2; ++value) {
         std::unique_ptr<kor::CommandBuffer> copy;
         std::thread([&] {
             copy = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eGraphics);

@@ -44,7 +44,7 @@ namespace
             << "CreateProjectConfig(), then from its koral.json, then from the options below —\n"
             << "each layer overriding the one before it.\n\n"
             << "Options:\n"
-            << kor::ProjectConfig::usage()
+            << kor::ProjectConfig::Usage()
             << "  --help              Show this message\n";
     }
 }

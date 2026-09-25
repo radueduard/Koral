@@ -31,10 +31,10 @@ namespace kor {
      * onto the first root, so the caller's "file not found" names somewhere the user can look
      * instead of an empty string.
      */
-    KORAL_API std::filesystem::path assetPath(const std::filesystem::path& relativePath);
+    KORAL_API std::filesystem::path AssetPath(const std::filesystem::path& relativePath);
 
-    /** @brief The same, against the shader search roots (see Shader::searchPaths). */
-    KORAL_API std::filesystem::path shaderPath(const std::filesystem::path& relativePath);
+    /** @brief The same, against the shader search roots (see Shader::SearchPaths). */
+    KORAL_API std::filesystem::path ShaderPath(const std::filesystem::path& relativePath);
 
     /**
      * @brief Register a directory to resolve relative asset paths against.
@@ -46,10 +46,10 @@ namespace kor {
      *              config uses: a project's own assets take precedence over the engine's,
      *              so it can shadow a built-in by name without ever losing access to the rest.
      */
-    KORAL_API void addAssetSearchPath(const std::filesystem::path& dir, bool front = false);
+    KORAL_API void AddAssetSearchPath(const std::filesystem::path& dir, bool front = false);
 
-    /** @brief The asset search roots, in the order assetPath() consults them. */
-    KORAL_API const std::vector<std::filesystem::path>& assetSearchPaths();
+    /** @brief The asset search roots, in the order AssetPath() consults them. */
+    KORAL_API const std::vector<std::filesystem::path>& AssetSearchPaths();
 
     /**
      * @brief Which GPU the Vulkan backend should pick, instead of its automatic choice.
@@ -66,10 +66,10 @@ namespace kor {
      * or the `--gpu` flag; call it directly only when embedding Koral without the runtime.
      * The OpenGL backend cannot choose a device and ignores this.
      */
-    KORAL_API void setPreferredGpu(std::string_view preference);
+    KORAL_API void SetPreferredGpu(std::string_view preference);
 
     /** @brief The preference set by @ref setPreferredGpu; empty means automatic. */
-    KORAL_API const std::string& preferredGpu();
+    KORAL_API const std::string& PreferredGpu();
 
     /** @brief The graphics backend a context runs on. */
     enum class API : std::uint8_t {
@@ -99,8 +99,8 @@ namespace kor {
      * process. A scene reaches the pieces it needs through this rather than being handed them:
      *
      * @code
-     * const auto extent = kor::Context::Window().extent();
-     * commandBuffer.BeginRendering(kor::Context::defaultFramebuffer());
+     * const auto extent = kor::Context::Window().Extent();
+     * commandBuffer.BeginRendering(kor::Context::DefaultFramebuffer());
      * @endcode
      *
      * The accessors are only valid once a context exists — after the window has been built, or
@@ -126,7 +126,7 @@ namespace kor {
          * across the API keys off this rather than the window, so device-only
          * (headless) sessions work without one.
          */
-        static KORAL_API API activeAPI();
+        static KORAL_API API ActiveAPI();
 
         /**
          * @brief Create a device-only context with no window, surface or swap chain.
@@ -144,15 +144,15 @@ namespace kor {
         static KORAL_API void ShutdownHeadless();
 
         /** @brief Whether a headless (device-only) context is currently active. */
-        static KORAL_API bool isHeadless();
+        static KORAL_API bool IsHeadless();
 
         /**
          * @brief Whether there is a graphics device at all — a window's, or a headless one's.
          *
          * For code that has to answer a question about the device without being able to assume one
-         * exists yet, such as which image formats it supports. @see Image::isFormatSupported
+         * exists yet, such as which image formats it supports. @see Image::IsFormatSupported
          */
-        [[nodiscard]] static KORAL_API bool hasDevice() noexcept;
+        [[nodiscard]] static KORAL_API bool HasDevice() noexcept;
 
         /**
          * @brief Whether the active device supports ray tracing (acceleration structures + the
@@ -164,7 +164,7 @@ namespace kor {
          * crashing, but this lets a caller decide not to attempt ray tracing at all. False under
          * the OpenGL backend, and before any window/headless context exists.
          */
-        static KORAL_API bool supportsRayTracing();
+        static KORAL_API bool SupportsRayTracing();
 
         /**
          * @brief The framebuffer wrapping the swap-chain image this frame presents.
@@ -172,7 +172,7 @@ namespace kor {
          *         uses when called without one. Recreated on resize, so hold it for a frame rather
          *         than for the run.
          */
-        static KORAL_API kor::ResourceRef<const kor::Framebuffer> defaultFramebuffer();
+        static KORAL_API kor::ResourceRef<const kor::Framebuffer> DefaultFramebuffer();
 
         /**
          * @brief Awaitable that moves the rest of a coroutine onto the main thread.
@@ -213,7 +213,7 @@ namespace kor {
          * registering something of its own for the per-frame update. @ref Repository throws in that
          * situation, which is right for a scene (it cannot happen) and wrong for a library.
          */
-        [[nodiscard]] static KORAL_API bool hasRepository() noexcept;
+        [[nodiscard]] static KORAL_API bool HasRepository() noexcept;
 
     private:
         inline static kor::Window* _window = nullptr;

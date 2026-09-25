@@ -30,7 +30,7 @@ namespace kor::vk
 
         std::vector<::vk::DescriptorSetLayout> setLayouts = {};
         for (const auto& layout : _setLayouts | std::views::values) {
-            setLayouts.push_back(**dynamic_cast<const DescriptorSetLayout*>(layout.get()));
+            setLayouts.push_back(**dynamic_cast<const DescriptorSetLayout*>(layout.Get()));
         }
 
         std::vector<::vk::PushConstantRange> pushConstantRanges = {};

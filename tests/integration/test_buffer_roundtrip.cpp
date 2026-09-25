@@ -21,20 +21,20 @@ std::vector<int> iotaVec(std::size_t n, int start = 0) {
     return v;
 }
 
-// Device-local buffers can't be mapped: build() uploads through a staging buffer
+// Device-local buffers can't be mapped: Build() uploads through a staging buffer
 // and a transfer-queue copy, and Read() copies back the same way. A correct
 // round-trip proves that whole path works.
 TEST_F(GpuTest, DeviceLocalRoundTrip) {
     const std::vector<int> src = iotaVec(256);
 
     Buffer::Builder<int> b;
-    b.setData(src);
-    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    b.setType(Buffer::Type::eDeviceLocal);
+    b.SetData(src);
+    b.SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    b.SetType(Buffer::Type::eDeviceLocal);
 
-    auto buf = b.build();
+    auto buf = b.Build();
     ASSERT_TRUE(static_cast<bool>(buf));
-    EXPECT_EQ(buf->type(), Buffer::Type::eDeviceLocal);
+    EXPECT_EQ(buf->MemoryType(), Buffer::Type::eDeviceLocal);
     EXPECT_EQ(buf->size(), src.size() * sizeof(int));
 
     const std::vector<int> out = buf->Read<int>();
@@ -46,11 +46,11 @@ TEST_F(GpuTest, StagingRoundTrip) {
     const std::vector<float> src = {1.5f, -2.0f, 3.25f, 42.0f, 0.0f};
 
     Buffer::Builder<float> b;
-    b.setData(src);
-    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    b.setType(Buffer::Type::eStaging);
+    b.SetData(src);
+    b.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    b.SetType(Buffer::Type::eStaging);
 
-    auto buf = b.build();
+    auto buf = b.Build();
     const std::vector<float> out = buf->Read<float>();
     ASSERT_EQ(out.size(), src.size());
     for (std::size_t i = 0; i < src.size(); ++i) {
@@ -62,10 +62,10 @@ TEST_F(GpuTest, StagingRoundTrip) {
 // through its own staging buffer + transfer submit).
 TEST_F(GpuTest, DeviceLocalWriteAtReadAt) {
     Buffer::Builder<int> b;
-    b.setData(iotaVec(16));
-    b.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    b.setType(Buffer::Type::eDeviceLocal);
-    auto buf = b.build();
+    b.SetData(iotaVec(16));
+    b.SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    b.SetType(Buffer::Type::eDeviceLocal);
+    auto buf = b.Build();
 
     buf->WriteAt<int>(7, 12345);
     EXPECT_EQ(buf->ReadAt<int>(7), 12345);
@@ -78,10 +78,10 @@ TEST_F(GpuTest, PartialRead) {
     const std::vector<int> src = iotaVec(100);
 
     Buffer::Builder<int> b;
-    b.setData(src);
-    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    b.setType(Buffer::Type::eStaging);
-    auto buf = b.build();
+    b.SetData(src);
+    b.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    b.SetType(Buffer::Type::eStaging);
+    auto buf = b.Build();
 
     const std::vector<int> mid = buf->Read<int>(/*count*/10, /*offset*/50);
     ASSERT_EQ(mid.size(), 10u);
@@ -92,10 +92,10 @@ TEST_F(GpuTest, PartialRead) {
 // A too-large read is rejected before touching the GPU.
 TEST_F(GpuTest, OutOfRangeReadThrows) {
     Buffer::Builder<int> b;
-    b.setData(iotaVec(8));
-    b.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    b.setType(Buffer::Type::eStaging);
-    auto buf = b.build();
+    b.SetData(iotaVec(8));
+    b.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    b.SetType(Buffer::Type::eStaging);
+    auto buf = b.Build();
 
     EXPECT_THROW((void)buf->Read<int>(/*count*/4, /*offset*/6), std::out_of_range);
 }
@@ -110,11 +110,11 @@ TEST_F(GpuTest, UploadsTakeAnyRange) {
     static_assert(!std::ranges::contiguous_range<decltype(squares)>, "the interesting case is the one with no buffer");
 
     Buffer::Builder<int> fromView;
-    fromView.setData(squares);
-    fromView.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    fromView.setType(Buffer::Type::eStaging);
-    const auto viewBuffer = fromView.build();
-    ASSERT_TRUE(viewBuffer.valid()) << (viewBuffer.error() ? viewBuffer.error()->history() : "");
+    fromView.SetData(squares);
+    fromView.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    fromView.SetType(Buffer::Type::eStaging);
+    const auto viewBuffer = fromView.Build();
+    ASSERT_TRUE(viewBuffer.Valid()) << (viewBuffer.Failure() ? viewBuffer.Failure()->History() : "");
 
     const auto readBack = viewBuffer->Read<int>();
     ASSERT_EQ(readBack.size(), 16u);
@@ -126,18 +126,18 @@ TEST_F(GpuTest, UploadsTakeAnyRange) {
     const std::array array{5, 6, 7, 8};
 
     Buffer::Builder<int> fromVector;
-    fromVector.setData(vector);
-    fromVector.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    fromVector.setType(Buffer::Type::eStaging);
-    const auto vectorBuffer = fromVector.build();
+    fromVector.SetData(vector);
+    fromVector.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    fromVector.SetType(Buffer::Type::eStaging);
+    const auto vectorBuffer = fromVector.Build();
     EXPECT_EQ(vectorBuffer->Read<int>(), vector);
 
     Buffer::Builder<int> fromArray;
-    fromArray.setDataView(array);          // viewed where it lies, not copied until build()
-    fromArray.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    fromArray.setType(Buffer::Type::eStaging);
-    const auto arrayBuffer = fromArray.build();
-    ASSERT_TRUE(arrayBuffer.valid());
+    fromArray.SetDataView(array);          // viewed where it lies, not copied until Build()
+    fromArray.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    fromArray.SetType(Buffer::Type::eStaging);
+    const auto arrayBuffer = fromArray.Build();
+    ASSERT_TRUE(arrayBuffer.Valid());
     EXPECT_EQ(arrayBuffer->Read<int>()[2], 7);
 
     // Write takes the same variety, including the view.

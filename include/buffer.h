@@ -72,12 +72,12 @@ namespace kor
      * @code
      * Buffer::Builder<glm::mat4> builder;
      * auto cameraBuffer = builder
-     *     .setInstanceCount(1)
-     *     .setUsage(Buffer::Usage::eUniform | Buffer::Usage::eTransferSrc
+     *     .SetInstanceCount(1)
+     *     .SetUsage(Buffer::Usage::eUniform | Buffer::Usage::eTransferSrc
      *             | Buffer::Usage::eTransferDst)
-     *     .setType(Buffer::Type::eDynamic)
-     *     .setIsPerFrame(true)
-     *     .build();
+     *     .SetType(Buffer::Type::eDynamic)
+     *     .SetIsPerFrame(true)
+     *     .Build();
      * @endcode
      *
      * Two choices decide how a buffer behaves, and both are worth getting right:
@@ -187,15 +187,15 @@ namespace kor
              *    only by code that actually takes an address.
              *  - Usage::eAccelerationStructureInput is tied to an extension. Requesting it on a
              *    device that never enabled ray tracing is itself a validation error, which is why
-             *    Mesh::makeBuffer asks Context::supportsRayTracing() before adding it.
+             *    Mesh::MakeBuffer asks Context::SupportsRayTracing() before adding it.
              *
-             * setUsage() replaces this outright rather than adding to it, which is how a buffer
+             * SetUsage() replaces this outright rather than adding to it, which is how a buffer
              * says it wants exactly these roles and no others — and which also switches off the
              * size deduction, since a caller naming an exact set has already said what it wants.
              * So a buffer that names any role has to name every role it needs, the transfers
-             * included. Leave setUsage() alone entirely to keep the set above.
+             * included. Leave SetUsage() alone entirely to keep the set above.
              */
-            /// Mutable because create() resolves the size-dependent role into it, and create() is
+            /// Mutable because Create() resolves the size-dependent role into it, and Create() is
             /// const — the same reason DescriptorSet::Builder resolves its writes that way.
             mutable Flags<Usage> _usage = Flags<Usage>(Usage::eTransferSrc) | Usage::eTransferDst
                                         | Usage::eStorage
@@ -207,9 +207,9 @@ namespace kor
              * @param size Byte count; must be greater than zero, or the build fails with
              *        ErrorCode::eBufferSizeInvalid.
              */
-            RawBuilder& setRawSize(const glm::i64 size) {
+            RawBuilder& SetRawSize(const glm::i64 size) {
                 if (size <= 0) {
-                    addError(ErrorCode::eBufferSizeInvalid, "size must be > 0");
+                    AddError(ErrorCode::eBufferSizeInvalid, "size must be > 0");
                 } else {
                     _size = size;
                 }
@@ -223,7 +223,7 @@ namespace kor
              * frames come round, which is what stops a write from landing in memory the GPU is
              * still reading. Adds the transfer usages that propagation needs.
              */
-            RawBuilder& setIsPerFrame(const bool value) {
+            RawBuilder& SetIsPerFrame(const bool value) {
                 _isPerFrame = value;
                 _usage |= Usage::eTransferSrc;
                 _usage |= Usage::eTransferDst;
@@ -238,7 +238,7 @@ namespace kor
              * than one per role:
              *
              * @code
-             * .setUsage(Usage::eVertex | Usage::eStorage | Usage::eTransferDst)
+             * .SetUsage(Usage::eVertex | Usage::eStorage | Usage::eTransferDst)
              * @endcode
              *
              * This *replaces*. A buffer that names its roles gets exactly those and nothing else:
@@ -247,9 +247,9 @@ namespace kor
              * want. So include the transfers you need, or a later copy or readback fails naming
              * the flag that is missing.
              */
-            RawBuilder& setUsage(const Flags<Usage> usage) {
+            RawBuilder& SetUsage(const Flags<Usage> usage) {
                 if (_usageTouched) {
-                    warn("setUsage discards the usage flags setIsPerFrame added; "
+                    Warn("setUsage discards the usage flags setIsPerFrame added; "
                          "include eTransferSrc and eTransferDst if the buffer is still per-frame");
                 }
                 _usage = usage;
@@ -259,13 +259,13 @@ namespace kor
             }
 
             /** @brief Chooses where the memory lives, and so how it can be read and written. */
-            RawBuilder& setType(const Type type) {
+            RawBuilder& SetType(const Type type) {
                 _type = type;
                 return *this;
             }
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] virtual Result<std::unique_ptr<Buffer>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] virtual Result<std::unique_ptr<Buffer>> Create() const;
 
             /**
              * @brief Creates the buffer.
@@ -273,7 +273,7 @@ namespace kor
              *         than throwing: it can be held and passed around, and only fails the command
              *         buffer that tries to use it, naming this call site.
              */
-            [[nodiscard]] virtual Resource<Buffer> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] virtual Resource<Buffer> Build(std::source_location where = std::source_location::current()) const;
 
         protected:
             bool _usageTouched = false; ///< tracks explicit usage edits so setUsage can warn on overwrite
@@ -282,9 +282,9 @@ namespace kor
             /// A builder that never calls it keeps the permissive default and the deduction.
             bool _usageExact = false;
 
-            RawBuilder& setSize(const glm::i64 value) {
+            RawBuilder& SetSize(const glm::i64 value) {
                 if (value <= 0) {
-                    addError(ErrorCode::eBufferSizeInvalid, "RawBuilder::size must be > 0");
+                    AddError(ErrorCode::eBufferSizeInvalid, "RawBuilder::size must be > 0");
                 } else {
                     _size = value;
                 }
@@ -324,7 +324,7 @@ namespace kor
              * Derived on each call rather than stored, so that copying the builder cannot leave the
              * copy pointing at the original's vector.
              */
-            [[nodiscard]] std::span<const T> dataView() const {
+            [[nodiscard]] std::span<const T> DataView() const {
                 return _ownedData.empty() ? _externalView : std::span<const T>(_ownedData);
             }
 
@@ -332,9 +332,9 @@ namespace kor
              * @brief Sizes the buffer to hold @p value elements of T, without giving it contents.
              * @param value Element count; must not be negative.
              */
-            Builder& setInstanceCount(const glm::i64 value) {
+            Builder& SetInstanceCount(const glm::i64 value) {
                 if (value < 0) {
-                    addError(ErrorCode::eBufferSizeInvalid, "instanceCount must be >= 0");
+                    AddError(ErrorCode::eBufferSizeInvalid, "instanceCount must be >= 0");
                 }
                 _instanceCount = value;
                 _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
@@ -346,7 +346,7 @@ namespace kor
              *
              * The copy is taken here, so the argument may be a temporary.
              */
-            Builder& setData(const T& value) {
+            Builder& SetData(const T& value) {
                 _ownedData.assign(1, value);
                 _externalView = {};
                 _instanceCount = 1;
@@ -363,13 +363,13 @@ namespace kor
              * ErrorCode::eBufferSizeInvalid.
              */
             template <RangeOf<T> R>
-            Builder& setData(R&& data) {
+            Builder& SetData(R&& data) {
                 _ownedData.clear();
                 if constexpr (std::ranges::sized_range<R>) _ownedData.reserve(std::ranges::size(data));
                 for (const auto& element : data) _ownedData.push_back(element);
 
                 if (_ownedData.empty()) {
-                    addError(ErrorCode::eBufferSizeInvalid, "Data container must have size > 0");
+                    AddError(ErrorCode::eBufferSizeInvalid, "Data container must have size > 0");
                 }
                 _externalView = {};
                 _instanceCount = static_cast<glm::i64>(_ownedData.size());
@@ -382,11 +382,11 @@ namespace kor
              * @param view The source data: any contiguous range of T. Something that is not
              *        contiguous cannot be viewed — pass it to setData, which copies.
              *
-             * @warning Nothing is copied until build(). The memory @p view refers to must still be
+             * @warning Nothing is copied until Build(). The memory @p view refers to must still be
              *          alive then. Use setData when it might not be.
              */
             template <ContiguousRangeOf<T> R>
-            Builder& setDataView(R&& view) {
+            Builder& SetDataView(R&& view) {
                 _ownedData.clear();
                 _externalView = std::span<const T>(std::ranges::data(view), std::ranges::size(view));
                 _instanceCount = static_cast<glm::i64>(_externalView.size());
@@ -394,33 +394,33 @@ namespace kor
                 return *this;
             }
 
-            /** @brief One build attempt, including the upload of any initial data. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<Buffer>> create() const override {
-                auto created = RawBuilder::create();
+            /** @brief One build attempt, including the upload of any initial data. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<Buffer>> Create() const override {
+                auto created = RawBuilder::Create();
                 if (!created) return created;
                 std::unique_ptr<Buffer> buffer = std::move(*created);
 
-                const auto data = dataView();
+                const auto data = DataView();
                 if (!data.empty()) {
                     // The upload needs a ResourceRef; an unsafe (untracked) one is sound here
                     // because the buffer cannot outlive this scope before we hand it over.
                     const auto bufferRef = ResourceRef<const Buffer>(buffer.get());
 
-                    switch (buffer->type()) {
+                    switch (buffer->MemoryType()) {
                         case Type::eDeviceLocal: {
-                            const auto byteSize = checkedByteSize<T>(static_cast<glm::u64>(_instanceCount), "Builder::build");
+                            const auto byteSize = CheckedByteSize<T>(static_cast<glm::u64>(_instanceCount), "Builder::build");
                             Builder<std::byte> stagingBuilder;
                             stagingBuilder
-                                .setInstanceCount(toBuilderSize(byteSize, "Builder::build"))
-                                .setUsage(Usage::eTransferSrc)
-                                .setType(Type::eStaging);
+                                .SetInstanceCount(ToBuilderSize(byteSize, "Builder::build"))
+                                .SetUsage(Usage::eTransferSrc)
+                                .SetType(Type::eStaging);
 
                             // The staging buffer is an internal detail of this upload, so its
                             // failure is ours — inherit it as our cause rather than reporting a
                             // second, unrelated-looking error.
-                            auto staging = stagingBuilder.create();
+                            auto staging = stagingBuilder.Create();
                             if (!staging) {
-                                return failCausedBy(ErrorCode::eBackend,
+                                return FailCausedBy(ErrorCode::eBackend,
                                     std::make_shared<const Error>(std::move(staging.error())),
                                     "Could not stage the buffer's initial data.");
                             }
@@ -430,7 +430,7 @@ namespace kor
                             stagingBuffer->Write(data, 0);
                             CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                                 commandBuffer.CopyBuffer(stagingRef, bufferRef, byteSize);
-                            }, CommandBuffer::Usage::eTransfer).wait();
+                            }, CommandBuffer::Usage::eTransfer).Wait();
                             break;
                         }
                         case Type::eStaging:
@@ -449,9 +449,9 @@ namespace kor
              * @brief Creates the buffer, uploads any initial data, and registers it for automatic updates.
              * @return The buffer as a Resource, poisoned rather than thrown if the build failed.
              */
-            [[nodiscard]] Resource<Buffer> build(std::source_location where = std::source_location::current()) const override {
-                auto buffer = materialize<Buffer>(*this, "Buffer", where);
-                Context::Repository().addRef(ResourceRef<const Buffer>(buffer));
+            [[nodiscard]] Resource<Buffer> Build(std::source_location where = std::source_location::current()) const override {
+                auto buffer = Materialize<Buffer>(*this, "Buffer", where);
+                Context::Repository().AddRef(ResourceRef<const Buffer>(buffer));
                 return buffer;
             }
         };
@@ -472,7 +472,7 @@ namespace kor
         template <typename T> requires std::is_trivially_copyable_v<T>
         [[nodiscard]] T ReadAt(const glm::u64 index = 0) const
         {
-            validateElementRange<T>(index, 1, "ReadAt");
+            ValidateElementRange<T>(index, 1, "ReadAt");
 
             switch (_type) {
                 case Type::eDeviceLocal:
@@ -480,13 +480,13 @@ namespace kor
                     constexpr glm::u64 elemBytes = sizeof(T);
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
-                        .setInstanceCount(toBuilderSize(elemBytes, "ReadAt"))
-                        .setUsage(Usage::eTransferDst)
-                        .setType(Type::eStaging);
-                    const auto stagingBuffer = stagingBuilder.build();
+                        .SetInstanceCount(ToBuilderSize(elemBytes, "ReadAt"))
+                        .SetUsage(Usage::eTransferDst)
+                        .SetType(Type::eStaging);
+                    const auto stagingBuffer = stagingBuilder.Build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, elemBytes, index * elemBytes, 0);
-                    }, CommandBuffer::Usage::eTransfer).wait();
+                    }, CommandBuffer::Usage::eTransfer).Wait();
                     return stagingBuffer->ReadAt<T>(0);
                 }
                 case Type::eStaging:
@@ -517,7 +517,7 @@ namespace kor
         template <typename T> requires std::is_trivially_copyable_v<T>
         void WriteAt(const glm::u64 index, const T& data)
         {
-            validateElementRange<T>(index, 1, "WriteAt");
+            ValidateElementRange<T>(index, 1, "WriteAt");
 
             switch (_type) {
                 case Type::eDeviceLocal:
@@ -525,15 +525,15 @@ namespace kor
                     constexpr glm::u64 elemBytes = sizeof(T);
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
-                        .setInstanceCount(toBuilderSize(elemBytes, "WriteAt"))
-                        .setUsage(Usage::eTransferSrc)
-                        .setType(Type::eStaging);
-                    const auto stagingBuffer = stagingBuilder.build();
+                        .SetInstanceCount(ToBuilderSize(elemBytes, "WriteAt"))
+                        .SetUsage(Usage::eTransferSrc)
+                        .SetType(Type::eStaging);
+                    const auto stagingBuffer = stagingBuilder.Build();
 
                     stagingBuffer->WriteAt<T>(0, data);
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), elemBytes, 0, index * elemBytes);
-                    }, CommandBuffer::Usage::eTransfer).wait();
+                    }, CommandBuffer::Usage::eTransfer).Wait();
                     break;
                 }
                 case Type::eStaging:
@@ -566,15 +566,15 @@ namespace kor
         {
             const auto elemCapacity = static_cast<glm::u64>(_size / sizeof(T));
             if (offset > elemCapacity) {
-                kor::log::error("Read: offset exceeds buffer elements. capacity={}, requestedOffset={}", elemCapacity, offset);
+                kor::log::Error("Read: offset exceeds buffer elements. capacity={}, requestedOffset={}", elemCapacity, offset);
                 throw std::out_of_range("Offset exceeds buffer element capacity");
             }
             if (count == WholeSize) {
                 count = elemCapacity - offset;
             }
-            validateElementRange<T>(offset, count, "Read");
+            ValidateElementRange<T>(offset, count, "Read");
 
-            const auto byteSize = checkedByteSize<T>(count, "Read");
+            const auto byteSize = CheckedByteSize<T>(count, "Read");
             const auto byteOffset = offset * static_cast<glm::u64>(sizeof(T));
 
             // Not an error — it works, it is simply orders of magnitude slower than it looks, and
@@ -582,7 +582,7 @@ namespace kor
             // certainly picked the wrong type, and would otherwise be left wondering why a readback
             // that takes a millisecond elsewhere takes most of a second here.
             if (_type == Type::eDeviceDynamic) {
-                kor::log::warn("Read() on a Type::eDeviceDynamic buffer, which is a type asked for "
+                kor::log::Warn("Read() on a Type::eDeviceDynamic buffer, which is a type asked for "
                                "on the promise that the CPU only writes it. Where that lands in "
                                "write-combined device memory — a discrete GPU with a resizable BAR "
                                "— this read is uncached, crosses the bus, and runs hundreds of "
@@ -595,13 +595,13 @@ namespace kor
                 {
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
-                        .setInstanceCount(toBuilderSize(byteSize, "Read"))
-                        .setUsage(Usage::eTransferDst)
-                        .setType(Type::eStaging);
-                    const auto stagingBuffer = stagingBuilder.build();
+                        .SetInstanceCount(ToBuilderSize(byteSize, "Read"))
+                        .SetUsage(Usage::eTransferDst)
+                        .SetType(Type::eStaging);
+                    const auto stagingBuffer = stagingBuilder.Build();
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), stagingBuffer, byteSize, byteOffset, 0);
-                    }, CommandBuffer::Usage::eTransfer).wait();
+                    }, CommandBuffer::Usage::eTransfer).Wait();
                     return stagingBuffer->Read<T>(count, 0);
                 }
                 case Type::eStaging:
@@ -638,20 +638,20 @@ namespace kor
             // Contiguous where it lies, copied into a temporary where it is not — either way what
             // reaches the GPU below is one block of bytes. @see kor::ContiguousCopy
             const ContiguousCopy<T> contiguous(std::forward<R>(elements));
-            const std::span<const T> data = contiguous.view();
+            const std::span<const T> data = contiguous.View();
             const auto count = static_cast<glm::u64>(data.size());
-            validateElementRange<T>(offset, count, "Write");
+            ValidateElementRange<T>(offset, count, "Write");
 
-            const auto byteSize = checkedByteSize<T>(count, "Write");
+            const auto byteSize = CheckedByteSize<T>(count, "Write");
             const auto byteOffset = offset * sizeof(T);
 
             if (_isMappedMutably) {
-                kor::log::error("Attempted to call Write() on a buffer that is already mapped mutably! You cannot call Write() while a mutable mapping is active, as it may cause synchronization issues. Please use the MutableMapping returned by Map() to write data to the buffer while it is mapped.", _size, offset, offset + count);
+                kor::log::Error("Attempted to call Write() on a buffer that is already mapped mutably! You cannot call Write() while a mutable mapping is active, as it may cause synchronization issues. Please use the MutableMapping returned by Map() to write data to the buffer while it is mapped.", _size, offset, offset + count);
                 throw std::runtime_error("Buffer is already mapped mutably");
             }
 
             if (_constMapCount > 0) {
-                kor::log::error("Attempted to call Write() on a buffer that is already mapped const! You cannot call Write() while a const mapping is active, as it may cause synchronization issues. Please use the ConstMapping returned by Map() to read data from the buffer while it is mapped.", _size, offset, offset + count);
+                kor::log::Error("Attempted to call Write() on a buffer that is already mapped const! You cannot call Write() while a const mapping is active, as it may cause synchronization issues. Please use the ConstMapping returned by Map() to read data from the buffer while it is mapped.", _size, offset, offset + count);
                 throw std::runtime_error("Buffer is already mapped const");
             }
 
@@ -660,14 +660,14 @@ namespace kor
                 {
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
-                        .setInstanceCount(toBuilderSize(byteSize, "Write"))
-                        .setUsage(Usage::eTransferSrc)
-                        .setType(Type::eStaging);
-                    auto stagingBuffer = stagingBuilder.build();
+                        .SetInstanceCount(ToBuilderSize(byteSize, "Write"))
+                        .SetUsage(Usage::eTransferSrc)
+                        .SetType(Type::eStaging);
+                    auto stagingBuffer = stagingBuilder.Build();
                     stagingBuffer->Write(data, 0);
                     CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), byteSize, 0, byteOffset);
-                    }, CommandBuffer::Usage::eTransfer).wait();
+                    }, CommandBuffer::Usage::eTransfer).Wait();
                     break;
                 }
                 case Type::eStaging:
@@ -709,7 +709,7 @@ namespace kor
 
             ConstMapping& operator=(ConstMapping&& other) noexcept {
                 if (this != &other) {
-                    if (_active) _buffer->releaseConstMapping();
+                    if (_active) _buffer->ReleaseConstMapping();
                     _buffer = other._buffer;
                     _offset = other._offset;
                     _count = other._count;
@@ -721,7 +721,7 @@ namespace kor
 
             /** @brief Releases the mapping, unmapping the buffer if this was the last one. */
             ~ConstMapping() {
-                if (_active) _buffer->releaseConstMapping();
+                if (_active) _buffer->ReleaseConstMapping();
             }
 
             /**
@@ -733,7 +733,7 @@ namespace kor
             }
 
             /** @brief The whole mapped range as a span, for iterating or passing on. Valid while the mapping lives. */
-            [[nodiscard]] std::span<const T> asSpan() const {
+            [[nodiscard]] std::span<const T> AsSpan() const {
                 return {
                     reinterpret_cast<const T*>(static_cast<const std::byte*>(_buffer->_mappedPtr) + _offset * sizeof(T)),
                     static_cast<std::size_t>(_count)
@@ -749,12 +749,12 @@ namespace kor
              */
             std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
-                    kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
                 const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
 
@@ -775,12 +775,12 @@ namespace kor
              */
             void Invalidate(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
-                    kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 _buffer->Invalidate((_offset + localOffset) * sizeof(T), n * sizeof(T));
@@ -789,7 +789,7 @@ namespace kor
         private:
             explicit ConstMapping(const Buffer& buffer, glm::u64 offset, glm::u64 count)
                 : _buffer(&buffer), _offset(offset), _count(count), _active(true) {
-                _buffer->acquireConstMapping();
+                _buffer->AcquireConstMapping();
                 _buffer->Invalidate(offset * sizeof(T), count * sizeof(T));
             }
 
@@ -824,7 +824,7 @@ namespace kor
 
             MutableMapping& operator=(MutableMapping&& other) noexcept {
                 if (this != &other) {
-                    if (_active) _buffer->releaseMutableMapping();
+                    if (_active) _buffer->ReleaseMutableMapping();
                     _buffer = other._buffer;
                     _offset = other._offset;
                     _count = other._count;
@@ -836,7 +836,7 @@ namespace kor
 
             /** @brief Releases the mapping and unmaps the buffer. */
             ~MutableMapping() {
-                if (_active) _buffer->releaseMutableMapping();
+                if (_active) _buffer->ReleaseMutableMapping();
             }
 
             /**
@@ -848,12 +848,12 @@ namespace kor
              * @warning Not bounds-checked. @p index must be less than the mapped element count.
              */
             T& operator[](const glm::u64 index) {
-                if (_buffer->isPerFrame()) {
-                    auto currentImageIndex = kor::Context::Scheduler().currentImageIndex();
+                if (_buffer->IsPerFrame()) {
+                    auto currentImageIndex = kor::Context::Scheduler().CurrentImageIndex();
                     const glm::u64 writeOffset = (_offset + index) * sizeof(T);
                     constexpr glm::u64 writeSize = sizeof(T);
                     // A fresh write to this region supersedes any still-pending propagation
-                    // of older data covering it; drop those so automaticUpdate() can't copy
+                    // of older data covering it; drop those so AutomaticUpdate() can't copy
                     // stale data over this write (the two run in an unspecified order).
                     std::erase_if(_buffer->_pendingWrites, [&](const PendingWrite& w) {
                         return w.offset >= writeOffset && w.offset + w.byteSize <= writeOffset + writeSize;
@@ -862,7 +862,7 @@ namespace kor
                         currentImageIndex,
                         writeOffset,
                         writeSize,
-                        kor::Context::Scheduler().imageIndicesExcept(currentImageIndex)
+                        kor::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
                     );
                 }
 
@@ -883,7 +883,7 @@ namespace kor
              *          per-frame buffer they reach the current frame's copy only. Use Write() or
              *          operator[] there.
              */
-            [[nodiscard]] std::span<T> asSpan() {
+            [[nodiscard]] std::span<T> AsSpan() {
                 return {
                     reinterpret_cast<T*>( static_cast<std::byte*>(_buffer->_mappedPtr) + _offset * sizeof(T)),
                     static_cast<std::size_t>(_count)
@@ -899,12 +899,12 @@ namespace kor
              */
             std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
-                    kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
                 const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    kor::log::error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
 
@@ -926,21 +926,21 @@ namespace kor
             template <RangeOf<T> R = std::span<const T>>
             void Write(R&& elements, glm::u64 localOffset = 0) {
                 const ContiguousCopy<T> contiguous(std::forward<R>(elements));
-                const std::span<const T> data = contiguous.view();
+                const std::span<const T> data = contiguous.View();
                 const auto count = static_cast<glm::u64>(data.size());
                 if (localOffset > _count || count > (_count - localOffset)) {
-                    kor::log::error("Attempted to write beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + count);
+                    kor::log::Error("Attempted to write beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + count);
                     throw std::out_of_range("Write range exceeds mapped range");
                 }
 
                 std::memcpy(static_cast<std::byte*>(_buffer->_mappedPtr) + (_offset + localOffset) * sizeof(T), data.data(), sizeof(T) * count);
 
-                if (_buffer->isPerFrame()) {
-                    auto currentImageIndex = kor::Context::Scheduler().currentImageIndex();
+                if (_buffer->IsPerFrame()) {
+                    auto currentImageIndex = kor::Context::Scheduler().CurrentImageIndex();
                     const glm::u64 writeOffset = (_offset + localOffset) * sizeof(T);
                     const glm::u64 writeSize = count * sizeof(T);
                     // A fresh write to this region supersedes any still-pending propagation
-                    // of older data covering it; drop those so automaticUpdate() can't copy
+                    // of older data covering it; drop those so AutomaticUpdate() can't copy
                     // stale data over this write (the two run in an unspecified order).
                     std::erase_if(_buffer->_pendingWrites, [&](const PendingWrite& w) {
                         return w.offset >= writeOffset && w.offset + w.byteSize <= writeOffset + writeSize;
@@ -949,7 +949,7 @@ namespace kor
                         currentImageIndex,
                         writeOffset,
                         writeSize,
-                        kor::Context::Scheduler().imageIndicesExcept(currentImageIndex)
+                        kor::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
                     );
                 }
             }
@@ -966,12 +966,12 @@ namespace kor
              */
             void Flush(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
-                    kor::log::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    kor::log::Error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Flush range exceeds mapped range");
                 }
                 const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    kor::log::error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    kor::log::Error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Flush range exceeds mapped range");
                 }
                 _buffer->Flush((_offset + localOffset) * sizeof(T), n * sizeof(T));
@@ -985,12 +985,12 @@ namespace kor
              */
             void Invalidate(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
                 if (localOffset > _count) {
-                    kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
+                    kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
-                    kor::log::error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
+                    kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
                 _buffer->Invalidate((_offset + localOffset) * sizeof(T), n * sizeof(T));
@@ -999,7 +999,7 @@ namespace kor
         private:
             explicit MutableMapping(Buffer& buffer, glm::u64 offset, glm::u64 count)
                 : _buffer(&buffer), _offset(offset), _count(count), _active(true) {
-                _buffer->acquireMutableMapping();
+                _buffer->AcquireMutableMapping();
              }
 
             Buffer* _buffer = nullptr;
@@ -1018,7 +1018,7 @@ namespace kor
          * — which is what passing the buffer itself means. Say otherwise by slicing it:
          *
          * @code
-         * .write("instances", kor::Buffer::slice(instanceBuffer, frameOffset, frameSize))
+         * .Write("instances", kor::Buffer::SliceOf(instanceBuffer, frameOffset, frameSize))
          * @endcode
          *
          * A size of 0 means "the rest of the buffer from the offset", which is the common case for
@@ -1042,7 +1042,7 @@ namespace kor
          * and an untracked one in a slice held by a descriptor set's builder is exactly the dangling
          * reference the whole ResourceRef design exists to prevent.
          */
-        [[nodiscard]] static Slice slice(ResourceRef<const Buffer> buffer, const glm::i64 offset,
+        [[nodiscard]] static Slice SliceOf(ResourceRef<const Buffer> buffer, const glm::i64 offset,
                                          const glm::i64 size = 0) {
             return Slice{ std::move(buffer), offset, size };
         }
@@ -1054,16 +1054,16 @@ namespace kor
          *
          * Read by the command buffer's barrier resolver to decide whether a transition is needed.
          */
-        [[nodiscard]] std::optional<ResourceAccess> trackedAccess() const { return _trackedAccess; }
+        [[nodiscard]] std::optional<ResourceAccess> TrackedAccess() const { return _trackedAccess; }
 
         /** @brief Records the access the buffer has been synchronised for. Called by the barrier resolver. */
-        void setTrackedAccess(const ResourceAccess access) const { _trackedAccess = access; }
+        void SetTrackedAccess(const ResourceAccess access) const { _trackedAccess = access; }
 
         /** @brief Everything this buffer was created to be used for. */
-        [[nodiscard]] Flags<Usage> usage() const { return _usage; }
+        [[nodiscard]] Flags<Usage> UsageFlags() const { return _usage; }
 
         /** @brief Where this buffer's memory lives. */
-        [[nodiscard]] Type type() const { return _type; }
+        [[nodiscard]] Type MemoryType() const { return _type; }
 
         /**
          * @brief Whether the memory can be reached from the CPU — mapped, written and read directly.
@@ -1071,10 +1071,10 @@ namespace kor
          * True for every type but Type::eDeviceLocal, which lives in memory only the GPU can see and
          * has to be reached through a copy.
          */
-        [[nodiscard]] bool isHostVisible() const { return _type != Type::eDeviceLocal; }
+        [[nodiscard]] bool IsHostVisible() const { return _type != Type::eDeviceLocal; }
 
         /** @brief Whether the buffer holds a separate copy per frame in flight. */
-        [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
+        [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
 
         /**
          * @brief GPU device address of this buffer, for use as a buffer_reference in
@@ -1085,7 +1085,7 @@ namespace kor
          * @note A buffer a shader reaches through its address appears in no descriptor set, so the
          *       automatic barriers cannot see the access. Declare it with CommandBuffer::Barrier.
          */
-        [[nodiscard]] virtual glm::u64 deviceAddress() const { return 0; }
+        [[nodiscard]] virtual glm::u64 DeviceAddress() const { return 0; }
 
         /**
          * @brief Maps a range of the buffer for reading.
@@ -1106,7 +1106,7 @@ namespace kor
             if (instanceCount == WholeSize) {
                 instanceCount = _size / sizeof(T) - offset;
             }
-            validateElementRange<T>(offset, instanceCount, "Map(const)");
+            ValidateElementRange<T>(offset, instanceCount, "Map(const)");
             return ConstMapping<T>(*this, offset, instanceCount);
         }
 
@@ -1129,7 +1129,7 @@ namespace kor
             if (instanceCount == WholeSize) {
                 instanceCount = _size / sizeof(T) - offset;
             }
-            validateElementRange<T>(offset, instanceCount, "Map(mutable)");
+            ValidateElementRange<T>(offset, instanceCount, "Map(mutable)");
             return MutableMapping<T>(*this, offset, instanceCount);
         }
 
@@ -1139,9 +1139,9 @@ namespace kor
         explicit Buffer(const RawBuilder& createInfo);
 
         /** @brief Converts a byte count to the builder's signed size, or throws if it does not fit. */
-        [[nodiscard]] static glm::i64 toBuilderSize(const glm::u64 bytes, const char* op) {
+        [[nodiscard]] static glm::i64 ToBuilderSize(const glm::u64 bytes, const char* op) {
             if (constexpr auto maxI64 = static_cast<glm::u64>((std::numeric_limits<glm::i64>::max)()); bytes > maxI64) {
-                kor::log::error("{}: requested byte size {} exceeds glm::i64 max {}", op, bytes, maxI64);
+                kor::log::Error("{}: requested byte size {} exceeds glm::i64 max {}", op, bytes, maxI64);
                 throw std::out_of_range("Byte size exceeds RawBuilder::size range");
             }
             return static_cast<glm::i64>(bytes);
@@ -1149,11 +1149,11 @@ namespace kor
 
         /** @brief Multiplies an element count by sizeof(T), or throws if the product overflows. */
         template <typename T>
-        [[nodiscard]] static glm::u64 checkedByteSize(const glm::u64 countElements, const char* op) {
+        [[nodiscard]] static glm::u64 CheckedByteSize(const glm::u64 countElements, const char* op) {
             static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
             constexpr auto elemBytes = sizeof(T);
             if (countElements > ((std::numeric_limits<glm::u64>::max)() / elemBytes)) {
-                kor::log::error("{}: element count {} overflows byte size for sizeof(T)={}", op, countElements, elemBytes);
+                kor::log::Error("{}: element count {} overflows byte size for sizeof(T)={}", op, countElements, elemBytes);
                 throw std::out_of_range("Element byte size overflow");
             }
             return countElements * elemBytes;
@@ -1170,12 +1170,12 @@ namespace kor
 
         /** @brief Throws if the element range lies outside the buffer, naming @p op in the message. */
         template <typename T>
-        void validateElementRange(const glm::u64 offsetElements, const glm::u64 countElements, const char* op) const {
+        void ValidateElementRange(const glm::u64 offsetElements, const glm::u64 countElements, const char* op) const {
             static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
 
             const auto elemCapacity = _size / sizeof(T);
             if (offsetElements > elemCapacity || countElements > (elemCapacity - offsetElements)) {
-                kor::log::error(
+                kor::log::Error(
                     "{}: range exceeds buffer elements. capacity={}, requested=[{}, {})",
                     op, elemCapacity, offsetElements, offsetElements + countElements
                 );
@@ -1193,9 +1193,9 @@ namespace kor
         mutable std::uint32_t _constMapCount = 0;
         mutable bool _isMappedMutably = false;
 
-        void acquireConstMapping() const {
+        void AcquireConstMapping() const {
             if (_isMappedMutably) {
-                kor::log::error("Attempted to acquire const mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
+                kor::log::Error("Attempted to acquire const mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
                 throw std::runtime_error("Buffer is already mapped mutably");
             }
             if (_constMapCount == 0) {
@@ -1204,7 +1204,7 @@ namespace kor
             ++_constMapCount;
         }
 
-        void releaseConstMapping() const {
+        void ReleaseConstMapping() const {
             if (_constMapCount == 0) return;
             --_constMapCount;
             if (_constMapCount == 0) {
@@ -1212,20 +1212,20 @@ namespace kor
             }
         }
 
-        void acquireMutableMapping() const {
+        void AcquireMutableMapping() const {
             if (_isMappedMutably) {
-                kor::log::error("Attempted to acquire mutable mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
+                kor::log::Error("Attempted to acquire mutable mapping for buffer that is already mapped mutably! You can only have one mutable mapping or multiple const mappings at a time.");
                 throw std::runtime_error("Buffer is already mapped mutably");
             }
             if (_constMapCount > 0) {
-                kor::log::error("Attempted to acquire mutable mapping for buffer that is already mapped const! You can only have one mutable mapping or multiple const mappings at a time.");
+                kor::log::Error("Attempted to acquire mutable mapping for buffer that is already mapped const! You can only have one mutable mapping or multiple const mappings at a time.");
                 throw std::runtime_error("Buffer is already mapped const");
             }
             Map();
             _isMappedMutably = true;
         }
 
-        void releaseMutableMapping() const {
+        void ReleaseMutableMapping() const {
             if (!_isMappedMutably) return;
             _isMappedMutably = false;
             Unmap();

@@ -48,7 +48,7 @@ namespace kor::vk
 
         // Timestamps are not universal: a queue family may report zero valid timestamp bits, which
         // is the driver saying this queue cannot be timed. Leaving the period at zero is what makes
-        // supportsTimers() false and turns the timer commands into no-ops on such a queue.
+        // SupportsTimers() false and turns the timer commands into no-ops on such a queue.
         if (queue.getFamily().getProperties().timestampValidBits > 0) {
             _timestampPeriod = Context::Runtime().getPhysicalDevice().getProperties().limits.timestampPeriod;
             if (_timestampPeriod > 0.f) {
@@ -89,10 +89,10 @@ namespace kor::vk
         }
     }
 
-    kor::CommandBuffer& CommandBuffer::doBegin()
+    kor::CommandBuffer& CommandBuffer::DoBegin()
     {
-        resetErrors();
-        clearRecords();
+        ResetErrors();
+        ClearRecords();
         _inFlight.clear();
         // WaitForFence() resets the fence after waiting, but a caller who waited on a token instead
         // never went through it, and submitting with a still-signalled fence is invalid. Re-recording
@@ -102,18 +102,18 @@ namespace kor::vk
         // Before the pool is reset below, which is what destroys the results being collected.
         // Re-recording is proof the GPU is done with the last submission, so this is the earliest
         // moment the previous frame's timestamps can be read — and the reason they are read here.
-        retireTimers();
+        RetireTimers();
         constexpr auto commandBufferBeginInfo = ::vk::CommandBufferBeginInfo()
             .setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
         _handle.begin(commandBufferBeginInfo);
         return *this;
     }
 
-    void CommandBuffer::doEnd()
+    void CommandBuffer::DoEnd()
     {
         // Nothing recorded so far has reached the GPU. Work out where the barriers belong now
         // that the whole sequence is visible, then emit everything in order.
-        resolveBarriers();
+        ResolveBarriers();
 
         // A timestamp may only be written into a query that has been reset, and vkCmdResetQueryPool
         // is illegal inside a render pass. Here is the one point that satisfies both without
@@ -121,15 +121,15 @@ namespace kor::vk
         // single command has been emitted yet, so we are outside every pass the frame will open.
         // Sized to what was actually recorded, which is why a frame that opens no scope resets
         // nothing at all.
-        if (const glm::u32 scopes = timerScopeCount(); _timerPool && scopes > 0)
+        if (const glm::u32 scopes = TimerScopeCount(); _timerPool && scopes > 0)
             _handle.resetQueryPool(_timerPool, 0, scopes * 2);
 
-        submitTimers();
-        emitRecords();
+        SubmitTimers();
+        EmitRecords();
         _handle.end();
     }
 
-    kor::CommandBuffer& CommandBuffer::doBeginDebugLabel(const std::string& label, const glm::vec4 color)
+    kor::CommandBuffer& CommandBuffer::DoBeginDebugLabel(const std::string& label, const glm::vec4 color)
     {
         return defer("BeginDebugLabel", [=, this] {
             // Guard on the loaded function pointer: VK_EXT_debug_utils is optional, so the
@@ -143,7 +143,7 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doEndDebugLabel()
+    kor::CommandBuffer& CommandBuffer::DoEndDebugLabel()
     {
         return defer("EndDebugLabel", [=, this] {
             if (VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdEndDebugUtilsLabelEXT) {
@@ -152,7 +152,7 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doInsertDebugLabel(const std::string& label, const glm::vec4 color)
+    kor::CommandBuffer& CommandBuffer::DoInsertDebugLabel(const std::string& label, const glm::vec4 color)
     {
         return defer("InsertDebugLabel", [=, this] {
             if (VULKAN_HPP_DEFAULT_DISPATCHER.vkCmdInsertDebugUtilsLabelEXT) {
@@ -164,28 +164,28 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doBeginRendering(const RenderInfo& renderInfo)
+    kor::CommandBuffer& CommandBuffer::DoBeginRendering(const RenderInfo& renderInfo)
     {
-        const auto framebuffer = renderInfo.framebuffer();
-        stateBeginRendering(framebuffer);
+        const auto framebuffer = renderInfo.Target();
+        StateBeginRendering(framebuffer);
         // The attachment transitions are declared as uses by kor::CommandBuffer::BeginRendering
         // and emitted by the resolver *before* this record — they cannot be emitted here, since
         // by then the render pass is about to open and Vulkan forbids a transition inside one.
 
         std::vector<::vk::RenderingAttachmentInfoKHR> colorAttachmentInfos;
         glm::u32 i = 0;
-        for (auto& colorAttachment : framebuffer->colorAttachments()) {
+        for (auto& colorAttachment : framebuffer->ColorAttachments()) {
             auto attachInfo = ::vk::RenderingAttachmentInfoKHR()
-                .setImageView(**dynamic_cast<const kor::vk::ImageView*>(colorAttachment.view.get()))
+                .setImageView(**dynamic_cast<const kor::vk::ImageView*>(colorAttachment.view.Get()))
                 .setImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                .setClearValue(getVkClearValue(renderInfo.clearColor(i)))
-                .setLoadOp(getVkLoadOp(renderInfo.colorLoadOperation()))
-                .setStoreOp(getVkStoreOp(renderInfo.colorStoreOperation()));
-            if (framebuffer->resolveAttachment(i).valid()) {
+                .setClearValue(getVkClearValue(renderInfo.ClearColorAt(i)))
+                .setLoadOp(getVkLoadOp(renderInfo.ColorLoadOperation()))
+                .setStoreOp(getVkStoreOp(renderInfo.ColorStoreOperation()));
+            if (framebuffer->ResolveAttachment(i).Valid()) {
                 attachInfo
                     .setResolveImageLayout(::vk::ImageLayout::eColorAttachmentOptimal)
-                    .setResolveImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->resolveAttachment(i).get()))
-                    .setResolveMode(getVkResolveMode(framebuffer->resolveMode()));
+                    .setResolveImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->ResolveAttachment(i).Get()))
+                    .setResolveMode(getVkResolveMode(framebuffer->ResolveMethod()));
             }
             colorAttachmentInfos.push_back(attachInfo);
             i++;
@@ -194,23 +194,23 @@ namespace kor::vk
         // One clear value for both slots: a combined depth/stencil format is one image, and the
         // pass carries one value for each half of it.
         const auto depthStencilClear = ::vk::ClearValue().setDepthStencil(
-            { renderInfo.clearDepth(), static_cast<glm::u32>(renderInfo.clearStencil()) });
+            { renderInfo.ClearDepth(), static_cast<glm::u32>(renderInfo.ClearStencil()) });
 
-        const auto depthAttachment = framebuffer->hasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->depthAttachment().get()))
+        const auto depthAttachment = framebuffer->HasDepthAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->DepthAttachment().Get()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(depthStencilClear)
-            .setLoadOp(getVkLoadOp(renderInfo.depthLoadOperation()))
-            .setStoreOp(getVkStoreOp(renderInfo.depthStoreOperation()))) : std::nullopt;
+            .setLoadOp(getVkLoadOp(renderInfo.DepthLoadOperation()))
+            .setStoreOp(getVkStoreOp(renderInfo.DepthStoreOperation()))) : std::nullopt;
 
-        const auto stencilAttachment = framebuffer->hasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
-            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->stencilAttachment().get()))
+        const auto stencilAttachment = framebuffer->HasStencilAttachment() ? std::optional(::vk::RenderingAttachmentInfoKHR()
+            .setImageView(**dynamic_cast<const kor::vk::ImageView*>(framebuffer->StencilAttachment().Get()))
             .setImageLayout(::vk::ImageLayout::eDepthStencilAttachmentOptimal)
             .setClearValue(depthStencilClear)
-            .setLoadOp(getVkLoadOp(renderInfo.stencilLoadOperation()))
-            .setStoreOp(getVkStoreOp(renderInfo.stencilStoreOperation()))) : std::nullopt;
+            .setLoadOp(getVkLoadOp(renderInfo.StencilLoadOperation()))
+            .setStoreOp(getVkStoreOp(renderInfo.StencilStoreOperation()))) : std::nullopt;
 
-        auto extent = framebuffer->extent();
+        auto extent = framebuffer->Extent();
         const auto renderArea = ::vk::Rect2D()
             .setOffset({0, 0})
             .setExtent({ extent.x, extent.y });
@@ -227,14 +227,14 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doEndRendering()
+    kor::CommandBuffer& CommandBuffer::DoEndRendering()
     {
         return defer("EndRendering", [=, this] {
             _handle.endRenderingKHR();
         }, PassEdge::eCloses);
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::DoSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         return defer("SetViewport", [=, this] {
             // Koral's canonical clip space is Vulkan's own, so the viewport is passed straight
@@ -251,7 +251,7 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    kor::CommandBuffer& CommandBuffer::DoSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
     {
         return defer("SetScissor", [=, this] {
             const ::vk::Rect2D scissor = ::vk::Rect2D()
@@ -261,21 +261,21 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetLineWidth(const float lineWidth)
+    kor::CommandBuffer& CommandBuffer::DoSetLineWidth(const float lineWidth)
     {
         return defer("SetLineWidth", [=, this] {
             _handle.setLineWidth(lineWidth);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
+    kor::CommandBuffer& CommandBuffer::DoSetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
     {
         return defer("SetDepthBias", [=, this] {
             _handle.setDepthBias(constantFactor, clamp, slopeFactor);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetBlendConstants(const glm::vec4 constants)
+    kor::CommandBuffer& CommandBuffer::DoSetBlendConstants(const glm::vec4 constants)
     {
         return defer("SetBlendConstants", [=, this] {
             const float bc[4] = { constants.r, constants.g, constants.b, constants.a };
@@ -283,35 +283,35 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
+    kor::CommandBuffer& CommandBuffer::DoSetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
     {
         return defer("SetStencilCompareMask", [=, this] {
             _handle.setStencilCompareMask(getVkStencilFace(face), compareMask);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
+    kor::CommandBuffer& CommandBuffer::DoSetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
     {
         return defer("SetStencilWriteMask", [=, this] {
             _handle.setStencilWriteMask(getVkStencilFace(face), writeMask);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetStencilReference(const StencilFace face, const glm::u32 reference)
+    kor::CommandBuffer& CommandBuffer::DoSetStencilReference(const StencilFace face, const glm::u32 reference)
     {
         return defer("SetStencilReference", [=, this] {
             _handle.setStencilReference(getVkStencilFace(face), reference);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetCullMode(const Flags<CullMode> cullMode)
+    kor::CommandBuffer& CommandBuffer::DoSetCullMode(const Flags<CullMode> cullMode)
     {
         return defer("SetCullMode", [=, this] {
             _handle.setCullMode(getVkCullMode(cullMode));
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetFrontFace(const FrontFace frontFace)
+    kor::CommandBuffer& CommandBuffer::DoSetFrontFace(const FrontFace frontFace)
     {
         return defer("SetFrontFace", [=, this] {
             // Winding is canonical (Vulkan) too, so this is a plain pass-through. GL agrees
@@ -321,86 +321,86 @@ namespace kor::vk
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetDepthTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::DoSetDepthTestEnable(const bool enable)
     {
         return defer("SetDepthTestEnable", [=, this] {
             _handle.setDepthTestEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetDepthWriteEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::DoSetDepthWriteEnable(const bool enable)
     {
         return defer("SetDepthWriteEnable", [=, this] {
             _handle.setDepthWriteEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetDepthCompareOp(const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::DoSetDepthCompareOp(const CompareOp compareOp)
     {
         return defer("SetDepthCompareOp", [=, this] {
             _handle.setDepthCompareOp(getVkCompareOp(compareOp));
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetStencilTestEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::DoSetStencilTestEnable(const bool enable)
     {
         return defer("SetStencilTestEnable", [=, this] {
             _handle.setStencilTestEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
+    kor::CommandBuffer& CommandBuffer::DoSetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
     {
         return defer("SetStencilOp", [=, this] {
             _handle.setStencilOp(getVkStencilFace(face), getVkStencilOp(failOp), getVkStencilOp(passOp), getVkStencilOp(depthFailOp), getVkCompareOp(compareOp));
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetDepthBiasEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::DoSetDepthBiasEnable(const bool enable)
     {
         return defer("SetDepthBiasEnable", [=, this] {
             _handle.setDepthBiasEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetRasterizerDiscardEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::DoSetRasterizerDiscardEnable(const bool enable)
     {
         return defer("SetRasterizerDiscardEnable", [=, this] {
             _handle.setRasterizerDiscardEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doSetPrimitiveRestartEnable(const bool enable)
+    kor::CommandBuffer& CommandBuffer::DoSetPrimitiveRestartEnable(const bool enable)
     {
         return defer("SetPrimitiveRestartEnable", [=, this] {
             _handle.setPrimitiveRestartEnable(enable);
         });
     }
 
-    kor::CommandBuffer& CommandBuffer::doBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline)
+    kor::CommandBuffer& CommandBuffer::DoBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline)
     {
-        stateBindComputePipeline(pipeline);
+        StateBindComputePipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline)
+    kor::CommandBuffer& CommandBuffer::DoBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline)
     {
-        stateBindGraphicsPipeline(pipeline);
+        StateBindGraphicsPipeline(pipeline);
         pipeline->Bind(*this);
         // Dynamic state (front face included) is applied lazily before the first draw
-        // via applyDynamicDefaults(), so nothing to emit here.
+        // via ApplyDynamicDefaults(), so nothing to emit here.
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline)
+    kor::CommandBuffer& CommandBuffer::DoBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline)
     {
-        stateBindRayTracingPipeline(pipeline);
+        StateBindRayTracingPipeline(pipeline);
         pipeline->Bind(*this);
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doTraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::DoTraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth, const std::source_location where)
     {
         return deferAt("TraceRays", where, [=, this] {
             const auto& vkPipeline = dynamic_cast<const kor::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
@@ -410,10 +410,10 @@ namespace kor::vk
                 vkPipeline.getHitRegion(),
                 vkPipeline.getCallableRegion(),
                 width, height, depth);
-        }, PassEdge::eNone, usesForBoundResources(false), boundPipelineUsesDeviceAddresses());
+        }, PassEdge::eNone, UsesForBoundResources(false), BoundPipelineUsesDeviceAddresses());
     }
 
-    kor::CommandBuffer& CommandBuffer::doBindDescriptorSet(const glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set)
+    kor::CommandBuffer& CommandBuffer::DoBindDescriptorSet(const glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set)
     {
 
         if (_state.boundComputePipeline.has_value()) {
@@ -455,26 +455,26 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doBindMesh(kor::ResourceRef<const kor::Mesh> mesh)
+    kor::CommandBuffer& CommandBuffer::DoBindMesh(kor::ResourceRef<const kor::Mesh> mesh)
     {
-        stateBindMesh(mesh);
+        StateBindMesh(mesh);
         std::vector<::vk::Buffer> vertexBuffers;
         std::vector<::vk::DeviceSize> offsets;
-        for (const auto& buffer : mesh->vertexBuffers()) {
+        for (const auto& buffer : mesh->VertexBuffers()) {
             const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
             vertexBuffers.push_back(*vkBuffer);
             offsets.push_back(0);
         }
         _handle.bindVertexBuffers(0, vertexBuffers, offsets);
-        if (mesh->hasIndexBuffer())
+        if (mesh->HasIndexBuffer())
         {
-            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*mesh->indexBuffer().value());
-            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->indexType().value()));
+            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*mesh->IndexBuffer().value());
+            _handle.bindIndexBuffer(*vkBuffer, 0, getVkIndexType(mesh->IndexType().value()));
         }
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doBarrier(
+    kor::CommandBuffer & CommandBuffer::DoBarrier(
         const std::vector<kor::BufferBarrier> bufferBarriers,
         const std::vector<kor::ImageBarrier> imageBarriers) {
 
@@ -484,34 +484,34 @@ namespace kor::vk
         std::vector<::vk::BufferMemoryBarrier> vkBufferBarriers;
         std::vector<::vk::ImageMemoryBarrier> vkImageBarriers;
         for (const auto& barrier : bufferBarriers) {
-            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*barrier.buffer());
+            const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*barrier.TargetBuffer());
             vkBufferBarriers.push_back(::vk::BufferMemoryBarrier()
                 .setSrcAccessMask(vkBuffer.getAccessMask())
-                .setDstAccessMask(getVkAccessFlags(barrier.dstAccess()))
+                .setDstAccessMask(getVkAccessFlags(barrier.DstAccess()))
                 .setSrcQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setDstQueueFamilyIndex(VK_QUEUE_FAMILY_IGNORED)
                 .setBuffer(*vkBuffer)
-                .setOffset(barrier.offset())
+                .setOffset(barrier.Offset())
                 .setSize(barrier.size()));
 
-            dstStageMask |= getVkPipelineStageFlags(barrier.dstAccess());
+            dstStageMask |= getVkPipelineStageFlags(barrier.DstAccess());
 
-            vkBuffer.setAccessMask(getVkAccessFlags(barrier.dstAccess()));
+            vkBuffer.setAccessMask(getVkAccessFlags(barrier.DstAccess()));
         }
         for (const auto& barrier : imageBarriers) {
-            const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*barrier.image());
+            const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*barrier.TargetImage());
 
-            const auto newLayout = getVkImageLayout(barrier.dstAccess());
-            const auto dstAccessMask = getVkAccessFlags(barrier.dstAccess());
-            const auto aspectMask = getVkImageAspectFlags(vkImage.format());
+            const auto newLayout = getVkImageLayout(barrier.DstAccess());
+            const auto dstAccessMask = getVkAccessFlags(barrier.DstAccess());
+            const auto aspectMask = getVkImageAspectFlags(vkImage.PixelFormat());
 
             // An absent count means "the rest of the image", so it is measured from the base
             // rather than from zero. Resolving it to the image's *total* count instead walked past
-            // the last level whenever a base was given without one. Matches resolveBarriers().
-            const auto baseMip = barrier.baseMipLevel().value_or(0);
-            const auto mipCount = barrier.levelCount().value_or(vkImage.mipLevels() - baseMip);
-            const auto baseLayer = barrier.baseArrayLayer().value_or(0);
-            const auto layerCount = barrier.layerCount().value_or(vkImage.arrayLayers() - baseLayer);
+            // the last level whenever a base was given without one. Matches ResolveBarriers().
+            const auto baseMip = barrier.BaseMipLevel().value_or(0);
+            const auto mipCount = barrier.LevelCount().value_or(vkImage.MipLevels() - baseMip);
+            const auto baseLayer = barrier.BaseArrayLayer().value_or(0);
+            const auto layerCount = barrier.LayerCount().value_or(vkImage.ArrayLayers() - baseLayer);
 
             // The current (old) layout and access mask are tracked per subresource, and a
             // range can legitimately span subresources in different layouts — e.g. right
@@ -540,7 +540,7 @@ namespace kor::vk
                 }
             }
 
-            dstStageMask |= getVkPipelineStageFlags(barrier.dstAccess());
+            dstStageMask |= getVkPipelineStageFlags(barrier.DstAccess());
         }
 
         _handle.pipelineBarrier(
@@ -554,77 +554,77 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doDispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::DoDispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ, const std::source_location where)
     {
         if (_failed) return *this;
         return deferAt("Dispatch", where, [=, this] {
             _handle.dispatch(groupCountX, groupCountY, groupCountZ);
-        }, PassEdge::eNone, usesForBoundResources(false), boundPipelineUsesDeviceAddresses());
+        }, PassEdge::eNone, UsesForBoundResources(false), BoundPipelineUsesDeviceAddresses());
     }
 
-    kor::CommandBuffer & CommandBuffer::doDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) {
+    kor::CommandBuffer & CommandBuffer::DoDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
         _handle.dispatchIndirect(*vkBuffer, offset);
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doDrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ, const std::source_location where) {
+    kor::CommandBuffer& CommandBuffer::DoDrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ, const std::source_location where) {
         if (_failed) return *this;
         return deferAt("DrawMeshTasks", where, [=, this] {
-            applyDynamicDefaults();
+            ApplyDynamicDefaults();
             _handle.drawMeshTasksEXT(taskCountX, taskCountY, taskCountZ);
-        }, PassEdge::eNone, usesForBoundResources(true), boundPipelineUsesDeviceAddresses());
+        }, PassEdge::eNone, UsesForBoundResources(true), BoundPipelineUsesDeviceAddresses());
     }
 
-    kor::CommandBuffer & CommandBuffer::doDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+    kor::CommandBuffer & CommandBuffer::DoDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
-        applyDynamicDefaults();
+        ApplyDynamicDefaults();
         _handle.drawIndirect(*vkBuffer, offset, drawCount, stride);
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+    kor::CommandBuffer & CommandBuffer::DoDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
-        applyDynamicDefaults();
+        ApplyDynamicDefaults();
         _handle.drawIndexedIndirect(*vkBuffer, offset, drawCount, stride);
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
+    kor::CommandBuffer & CommandBuffer::DoDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
-        applyDynamicDefaults();
+        ApplyDynamicDefaults();
         _handle.drawMeshTasksIndirectEXT(*vkBuffer, offset, drawCount, stride);
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doDraw(const glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
+    kor::CommandBuffer& CommandBuffer::DoDraw(const glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
     {
         return deferAt("Draw", where, [=, this] {
             // At emit time the tracked state has replayed to this point, so the dynamic-state
             // mask is the one that was in force for *this* draw, not the end of recording.
-            applyDynamicDefaults();
+            ApplyDynamicDefaults();
             _handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
-        }, PassEdge::eNone, usesForBoundResources(true), boundPipelineUsesDeviceAddresses());
+        }, PassEdge::eNone, UsesForBoundResources(true), BoundPipelineUsesDeviceAddresses());
     }
 
-    kor::CommandBuffer & CommandBuffer::doDrawIndexed(const glm::u64 indexCount, const glm::u32 instanceCount, const glm::u32 firstIndex, const glm::i32 vertexOffset, const glm::u32 firstInstance, const std::source_location where) {
+    kor::CommandBuffer & CommandBuffer::DoDrawIndexed(const glm::u64 indexCount, const glm::u32 instanceCount, const glm::u32 firstIndex, const glm::i32 vertexOffset, const glm::u32 firstInstance, const std::source_location where) {
         return deferAt("DrawIndexed", where, [=, this] {
-            applyDynamicDefaults();
+            ApplyDynamicDefaults();
             _handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-        }, PassEdge::eNone, usesForBoundResources(true), boundPipelineUsesDeviceAddresses());
+        }, PassEdge::eNone, UsesForBoundResources(true), BoundPipelineUsesDeviceAddresses());
     }
 
-    kor::CommandBuffer & CommandBuffer::doClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset, glm::u64 size) {
+    kor::CommandBuffer & CommandBuffer::DoClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         _handle.fillBuffer(*vkBuffer, offset, size, 0);
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, const void* data, const glm::u64 offset, glm::u64 size) {
+    kor::CommandBuffer & CommandBuffer::DoFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, const void* data, const glm::u64 offset, glm::u64 size) {
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         if (size == WholeSize) {
             size = vkBuffer.size() - offset;
@@ -633,7 +633,7 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doCopyBuffer(ResourceRef<const kor::Buffer> srcBuffer, ResourceRef<const kor::Buffer> dstBuffer, glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset) {
+    kor::CommandBuffer & CommandBuffer::DoCopyBuffer(ResourceRef<const kor::Buffer> srcBuffer, ResourceRef<const kor::Buffer> dstBuffer, glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset) {
         if (_failed) return *this;
         const auto& vkSrcBuffer = dynamic_cast<const kor::vk::Buffer&>(*srcBuffer);
         const auto& vkDstBuffer = dynamic_cast<const kor::vk::Buffer&>(*dstBuffer);
@@ -641,7 +641,7 @@ namespace kor::vk
             size = std::min(vkSrcBuffer.size() - srcOffset, vkDstBuffer.size() - dstOffset);
         }
         if (size > vkSrcBuffer.size() - srcOffset || size > vkDstBuffer.size() - dstOffset) {
-            return record(ErrorCode::eCopySizeExceedsBuffer,
+            return RecordError(ErrorCode::eCopySizeExceedsBuffer,
                 std::format("Copy size {} exceeds buffer bounds (src size {}, dst size {}, srcOffset {}, dstOffset {}).",
                             size, vkSrcBuffer.size(), vkDstBuffer.size(), srcOffset, dstOffset));
         }
@@ -653,7 +653,7 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doClearColorImage(kor::ResourceRef<const kor::Image> image, const glm::vec4 color) {
+    kor::CommandBuffer& CommandBuffer::DoClearColorImage(kor::ResourceRef<const kor::Image> image, const glm::vec4 color) {
         const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
         ::vk::ClearValue clearValue;
@@ -662,7 +662,7 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doBlitToScreen(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
+    kor::CommandBuffer& CommandBuffer::DoBlitToScreen(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
         ResourceRef<const kor::Image> dstImage =  dynamic_cast<const Scheduler&>(kor::Context::Scheduler()).getSwapChain().image();
         Barrier({}, {
             {
@@ -683,9 +683,9 @@ namespace kor::vk
         });
 
         if (blitInfo.srcExtent == glm::ivec3(-1))
-            blitInfo.srcExtent = srcImage->extent();
+            blitInfo.srcExtent = srcImage->Extent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = dstImage->extent();
+            blitInfo.dstExtent = dstImage->Extent();
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
         const auto& vkDstImage = dynamic_cast<const Image&>(*dstImage);
@@ -722,12 +722,12 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo)
+    kor::CommandBuffer& CommandBuffer::DoBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo)
     {
         if (blitInfo.srcExtent == glm::ivec3(-1))
-            blitInfo.srcExtent = srcImage->extent();
+            blitInfo.srcExtent = srcImage->Extent();
         if (blitInfo.dstExtent == glm::ivec3(-1))
-            blitInfo.dstExtent = dstImage->extent();
+            blitInfo.dstExtent = dstImage->Extent();
 
         // Both operands are declared as uses by the core wrapper; the resolver
         // emits their transitions ahead of this record.
@@ -761,29 +761,29 @@ namespace kor::vk
          return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doResolveToScreen(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
+    kor::CommandBuffer & CommandBuffer::DoResolveToScreen(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
         if (_failed) return *this;
-        if (srcImage->sampleCount() == SampleCount::e1)
-            return record(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
+        if (srcImage->Samples() == SampleCount::e1)
+            return RecordError(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
 
         if (!_resolveHelperImage)
             _resolveHelperImage = kor::Image::Builder()
-                .setIsPerFrame(true)
-                .setExtent(srcImage->extent())
-                .setFormat(srcImage->format())
+                .SetIsPerFrame(true)
+                .SetExtent(srcImage->Extent())
+                .SetFormat(srcImage->PixelFormat())
                 // Resolved into, then copied out of.
-                .setUsage(kor::Image::Usage::eTransferDst | kor::Image::Usage::eTransferSrc)
-                .build();
-        if (_resolveHelperImage->extent() != srcImage->extent())
-            _resolveHelperImage->Resize(srcImage->extent());
+                .SetUsage(kor::Image::Usage::eTransferDst | kor::Image::Usage::eTransferSrc)
+                .Build();
+        if (_resolveHelperImage->Extent() != srcImage->Extent())
+            _resolveHelperImage->Resize(srcImage->Extent());
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
         const auto& vkDstImage =  dynamic_cast<const Image&>(*_resolveHelperImage);
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
-            resolveInfo.srcExtent = vkSrcImage.extent();
+            resolveInfo.srcExtent = vkSrcImage.Extent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = vkDstImage.extent();
+            resolveInfo.dstExtent = vkDstImage.Extent();
 
         Barrier({}, {
             {
@@ -826,20 +826,20 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doResolve(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Resolve resolveInfo) {
+    kor::CommandBuffer& CommandBuffer::DoResolve(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Resolve resolveInfo) {
         if (_failed) return *this;
-        if (srcImage->sampleCount() == SampleCount::e1)
-            return record(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
-        if (dstImage && dstImage->sampleCount() != SampleCount::e1)
-            return record(ErrorCode::eResolveRequiresMultisample, "Resolve destination image must not be multisampled.");
+        if (srcImage->Samples() == SampleCount::e1)
+            return RecordError(ErrorCode::eResolveRequiresMultisample, "Resolve source image must be multisampled.");
+        if (dstImage && dstImage->Samples() != SampleCount::e1)
+            return RecordError(ErrorCode::eResolveRequiresMultisample, "Resolve destination image must not be multisampled.");
 
         const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
         const auto& vkDstImage =dynamic_cast<const Image&>(*dstImage);
 
         if (resolveInfo.srcExtent == glm::ivec3(-1))
-            resolveInfo.srcExtent = vkSrcImage.extent();
+            resolveInfo.srcExtent = vkSrcImage.Extent();
         if (resolveInfo.dstExtent == glm::ivec3(-1))
-            resolveInfo.dstExtent = vkDstImage.extent();
+            resolveInfo.dstExtent = vkDstImage.Extent();
 
         Barrier({}, {
             {
@@ -880,23 +880,23 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doCopyBufferToImage(ResourceRef<const kor::Buffer> buffer, ResourceRef<const kor::Image> image, kor::Copy copyInfo) {
+    kor::CommandBuffer& CommandBuffer::DoCopyBufferToImage(ResourceRef<const kor::Buffer> buffer, ResourceRef<const kor::Image> image, kor::Copy copyInfo) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
         if (copyInfo.bufferOffset >= vkBuffer.size())
-            return record(ErrorCode::eCopySizeExceedsBuffer,
+            return RecordError(ErrorCode::eCopySizeExceedsBuffer,
                 std::format("Buffer offset {} exceeds buffer size {}.", copyInfo.bufferOffset, vkBuffer.size()));
-        if (copyInfo.imageMipLevel >= vkImage.mipLevels())
-            return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.mipLevels()));
-        if (copyInfo.imageBaseArrayLayer >= vkImage.arrayLayers())
-            return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.arrayLayers()));
+        if (copyInfo.imageMipLevel >= vkImage.MipLevels())
+            return RecordError(ErrorCode::eImageSubresourceOutOfRange,
+                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.MipLevels()));
+        if (copyInfo.imageBaseArrayLayer >= vkImage.ArrayLayers())
+            return RecordError(ErrorCode::eImageSubresourceOutOfRange,
+                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.ArrayLayers()));
 
         if (copyInfo.imageExtent == glm::ivec3(-1))
-            copyInfo.imageExtent = image->extent();
+            copyInfo.imageExtent = image->Extent();
 
         if (copyInfo.bufferRowLength == 0)
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;
@@ -907,14 +907,14 @@ namespace kor::vk
         // image height to be whole numbers of them. The last mip levels of any texture are smaller
         // than one block — a 2x2 level of a 4x4 format — so rounding up here is not an edge case but
         // the ordinary end of every mip chain.
-        if (Image::isBlockCompressed(image->format())) {
-            const auto block = Image::blockExtent(image->format());
+        if (Image::IsBlockCompressed(image->PixelFormat())) {
+            const auto block = Image::BlockExtent(image->PixelFormat());
             const auto roundUp = [](const glm::u32 value, const glm::u32 to) { return (value + to - 1) / to * to; };
             copyInfo.bufferRowLength = roundUp(copyInfo.bufferRowLength, block.x);
             copyInfo.bufferImageHeight = roundUp(copyInfo.bufferImageHeight, block.y);
         }
         if (copyInfo.bufferRowLength < copyInfo.imageExtent.x || copyInfo.bufferImageHeight < copyInfo.imageExtent.y)
-            return record(ErrorCode::eInvalidArgument,
+            return RecordError(ErrorCode::eInvalidArgument,
                 std::format("Buffer row length {} / image height {} too small for image extent {}x{}.",
                             copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y));
         // Copy footprint in *bytes* (not texels): rowLength/imageHeight give the packed extent, and
@@ -924,19 +924,19 @@ namespace kor::vk
         // required size. Depth/stencil texel sizes are conservatively over-estimated, which only
         // makes the guard stricter.
         {
-            const glm::u64 copyBytes = Image::sizeOfRegion(
-                image->format(),
+            const glm::u64 copyBytes = Image::SizeOfRegion(
+                image->PixelFormat(),
                 { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
                 copyInfo.imageLayerCount);
             if (copyBytes + copyInfo.bufferOffset > vkBuffer.size())
-                return record(ErrorCode::eCopySizeExceedsBuffer,
+                return RecordError(ErrorCode::eCopySizeExceedsBuffer,
                     std::format("Buffer offset {} + copy size {} exceeds buffer size {}.",
                                 copyInfo.bufferOffset, copyBytes, vkBuffer.size()));
         }
-        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.arrayLayers())
-            return record(ErrorCode::eImageSubresourceOutOfRange,
+        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.ArrayLayers())
+            return RecordError(ErrorCode::eImageSubresourceOutOfRange,
                 std::format("Image base array layer {} + layer count {} exceeds image array layers {}.",
-                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.arrayLayers()));
+                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.ArrayLayers()));
 
         ImageBarrier({
             image,
@@ -956,7 +956,7 @@ namespace kor::vk
                 .setBufferRowLength(copyInfo.bufferRowLength)
                 .setBufferImageHeight(copyInfo.bufferImageHeight)
                 .setImageSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(getVkImageAspectFlags(vkImage.format()))
+                    .setAspectMask(getVkImageAspectFlags(vkImage.PixelFormat()))
                     .setMipLevel(copyInfo.imageMipLevel)
                     .setBaseArrayLayer(copyInfo.imageBaseArrayLayer)
                     .setLayerCount(copyInfo.imageLayerCount))
@@ -966,23 +966,23 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer & CommandBuffer::doCopyImageToBuffer(ResourceRef<const kor::Image> image, ResourceRef<const kor::Buffer> buffer, kor::Copy copyInfo) {
+    kor::CommandBuffer & CommandBuffer::DoCopyImageToBuffer(ResourceRef<const kor::Image> image, ResourceRef<const kor::Buffer> buffer, kor::Copy copyInfo) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
         const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*image);
 
         if (copyInfo.bufferOffset >= vkBuffer.size())
-            return record(ErrorCode::eCopySizeExceedsBuffer,
+            return RecordError(ErrorCode::eCopySizeExceedsBuffer,
                 std::format("Buffer offset {} exceeds buffer size {}.", copyInfo.bufferOffset, vkBuffer.size()));
-        if (copyInfo.imageMipLevel >= vkImage.mipLevels())
-            return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.mipLevels()));
-        if (copyInfo.imageBaseArrayLayer >= vkImage.arrayLayers())
-            return record(ErrorCode::eImageSubresourceOutOfRange,
-                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.arrayLayers()));
+        if (copyInfo.imageMipLevel >= vkImage.MipLevels())
+            return RecordError(ErrorCode::eImageSubresourceOutOfRange,
+                std::format("Image mip level {} exceeds image mip levels {}.", copyInfo.imageMipLevel, vkImage.MipLevels()));
+        if (copyInfo.imageBaseArrayLayer >= vkImage.ArrayLayers())
+            return RecordError(ErrorCode::eImageSubresourceOutOfRange,
+                std::format("Image base array layer {} exceeds image array layers {}.", copyInfo.imageBaseArrayLayer, vkImage.ArrayLayers()));
 
         if (copyInfo.imageExtent == glm::ivec3(-1))
-            copyInfo.imageExtent = image->extent();
+            copyInfo.imageExtent = image->Extent();
 
         if (copyInfo.bufferRowLength == 0)
             copyInfo.bufferRowLength = copyInfo.imageExtent.x;
@@ -993,14 +993,14 @@ namespace kor::vk
         // image height to be whole numbers of them. The last mip levels of any texture are smaller
         // than one block — a 2x2 level of a 4x4 format — so rounding up here is not an edge case but
         // the ordinary end of every mip chain.
-        if (Image::isBlockCompressed(image->format())) {
-            const auto block = Image::blockExtent(image->format());
+        if (Image::IsBlockCompressed(image->PixelFormat())) {
+            const auto block = Image::BlockExtent(image->PixelFormat());
             const auto roundUp = [](const glm::u32 value, const glm::u32 to) { return (value + to - 1) / to * to; };
             copyInfo.bufferRowLength = roundUp(copyInfo.bufferRowLength, block.x);
             copyInfo.bufferImageHeight = roundUp(copyInfo.bufferImageHeight, block.y);
         }
         if (copyInfo.bufferRowLength < copyInfo.imageExtent.x || copyInfo.bufferImageHeight < copyInfo.imageExtent.y)
-            return record(ErrorCode::eInvalidArgument,
+            return RecordError(ErrorCode::eInvalidArgument,
                 std::format("Buffer row length {} / image height {} too small for image extent {}x{}.",
                             copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.x, copyInfo.imageExtent.y));
         // Copy footprint in *bytes* (not texels): rowLength/imageHeight give the packed extent, and
@@ -1010,19 +1010,19 @@ namespace kor::vk
         // required size. Depth/stencil texel sizes are conservatively over-estimated, which only
         // makes the guard stricter.
         {
-            const glm::u64 copyBytes = Image::sizeOfRegion(
-                image->format(),
+            const glm::u64 copyBytes = Image::SizeOfRegion(
+                image->PixelFormat(),
                 { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
                 copyInfo.imageLayerCount);
             if (copyBytes + copyInfo.bufferOffset > vkBuffer.size())
-                return record(ErrorCode::eCopySizeExceedsBuffer,
+                return RecordError(ErrorCode::eCopySizeExceedsBuffer,
                     std::format("Buffer offset {} + copy size {} exceeds buffer size {}.",
                                 copyInfo.bufferOffset, copyBytes, vkBuffer.size()));
         }
-        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.arrayLayers())
-            return record(ErrorCode::eImageSubresourceOutOfRange,
+        if (copyInfo.imageBaseArrayLayer + copyInfo.imageLayerCount > vkImage.ArrayLayers())
+            return RecordError(ErrorCode::eImageSubresourceOutOfRange,
                 std::format("Image base array layer {} + layer count {} exceeds image array layers {}.",
-                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.arrayLayers()));
+                            copyInfo.imageBaseArrayLayer, copyInfo.imageLayerCount, vkImage.ArrayLayers()));
 
         ImageBarrier({
             image,
@@ -1042,7 +1042,7 @@ namespace kor::vk
                 .setBufferRowLength(copyInfo.bufferRowLength)
                 .setBufferImageHeight(copyInfo.bufferImageHeight)
                 .setImageSubresource(::vk::ImageSubresourceLayers()
-                    .setAspectMask(getVkImageAspectFlags(vkImage.format()))
+                    .setAspectMask(getVkImageAspectFlags(vkImage.PixelFormat()))
                     .setMipLevel(copyInfo.imageMipLevel)
                     .setBaseArrayLayer(copyInfo.imageBaseArrayLayer)
                     .setLayerCount(copyInfo.imageLayerCount))
@@ -1052,7 +1052,7 @@ namespace kor::vk
         return *this;
     }
 
-    kor::CommandBuffer& CommandBuffer::doRun(const std::function<void(kor::CommandBuffer&)>& command)
+    kor::CommandBuffer& CommandBuffer::DoRun(const std::function<void(kor::CommandBuffer&)>& command)
     {
         // Deferred like everything else, and for the same reason. The point of Run is to reach
         // the raw VkCommandBuffer — the ImGui backend records its own draws through it — and
@@ -1061,14 +1061,14 @@ namespace kor::vk
         // GUI appearing: it drew first and the scene then painted over it.
         //
         // The OpenGL backend's Run has always enqueued, so this also makes the two agree.
-        // Koral commands recorded from inside the lambda still work: enqueue() sees _emitting
+        // Koral commands recorded from inside the lambda still work: Enqueue() sees _emitting
         // and runs them in place, preserving order. They are past barrier resolution by then,
         // though, so anything needing synchronisation must say so with an explicit Barrier() —
         // which is exactly what GUI::Render does.
         return defer("Run", [this, command] { command(*this); });
     }
 
-    kor::VoidResult CommandBuffer::doSubmit(const kor::SubmitInfo& info)
+    kor::VoidResult CommandBuffer::DoSubmit(const kor::SubmitInfo& info)
     {
         // Code without a frame — a headless job, a tool — still needs deferred destruction to
         // drain somewhere; submitting is the one thing it is sure to keep doing.
@@ -1081,7 +1081,7 @@ namespace kor::vk
 
         for (const auto& token : info.waitFor) {
             // Nothing to hold back for — and skipping it spares the timeline a semaphore.
-            if (token.ready()) continue;
+            if (token.Ready()) continue;
             const auto [semaphore, value] = tokens.resolve(token);
             waitSemaphores.push_back(semaphore);
             waitValues.push_back(value);
@@ -1090,12 +1090,12 @@ namespace kor::vk
             _inFlight.push_back(token);
         }
         for (const auto& token : info.signal) {
-            if (token.value() == 0) continue; // a default token: no event to signal
-            if (token.ready()) {
+            if (token.Value() == 0) continue; // a default token: no event to signal
+            if (token.Ready()) {
                 // The GPU may only move a timeline forward; signalling where it already is, is
                 // invalid Vulkan rather than a no-op.
-                record(ErrorCode::eInvalidArgument, std::format(
-                    "Submit was asked to signal token {}, whose timeline has already reached it", token.value()));
+                RecordError(ErrorCode::eInvalidArgument, std::format(
+                    "Submit was asked to signal token {}, whose timeline has already reached it", token.Value()));
                 continue;
             }
             const auto [semaphore, value] = tokens.resolve(token);
@@ -1135,22 +1135,22 @@ namespace kor::vk
             }
             for (const auto& token : info.signal) TokenReactor::noteSubmittedSignal(token);
         } catch (const std::exception& e) {
-            record(ErrorCode::eBackend, e.what());
+            RecordError(ErrorCode::eBackend, e.what());
             // Nothing reached the GPU, so nothing there will signal these. Signalling them here
             // lets their waiters see the error rather than wait for ever.
             for (const auto& token : info.signal)
-                if (token.value() != 0 && !token.ready()) token.signal();
+                if (token.Value() != 0 && !token.Ready()) token.Signal();
         }
-        return result();
+        return Outcome();
     }
 
-    void CommandBuffer::doReset()
+    void CommandBuffer::DoReset()
     {
         _state = {};
         _handle.reset();
     }
 
-    void CommandBuffer::doWaitForFence() const
+    void CommandBuffer::DoWaitForFence() const
     {
         try {
             auto result = Context::Device()->waitForFences(_fence, true, WholeSize);
@@ -1164,7 +1164,7 @@ namespace kor::vk
         }
     }
 
-    void CommandBuffer::doWriteTimerTimestamp(const glm::u32 queryIndex)
+    void CommandBuffer::DoWriteTimerTimestamp(const glm::u32 queryIndex)
     {
         if (!_timerPool) return;
         // An even slot opens a scope and an odd one closes it. Timestamping the *earliest* stage on
@@ -1178,7 +1178,7 @@ namespace kor::vk
         _handle.writeTimestamp(stage, _timerPool, queryIndex);
     }
 
-    bool CommandBuffer::doReadTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
+    bool CommandBuffer::DoReadTimerTimestamps(const glm::u32 scopeCount, std::vector<double>& millisecondsOut)
     {
         if (!_timerPool || scopeCount == 0) return false;
 
@@ -1212,7 +1212,7 @@ namespace kor::vk
         return true;
     }
 
-    kor::CommandBuffer& CommandBuffer::doPushConstantBlock(const void *data, const glm::u32 size, const glm::u32 offset) {
+    kor::CommandBuffer& CommandBuffer::DoPushConstantBlock(const void *data, const glm::u32 size, const glm::u32 offset) {
         // The bytes, not the pointer: PushConstantBlock<T> hands us the address of a caller
         // temporary, which is long gone by the time End() emits.
         std::vector<std::byte> bytes(size);
@@ -1231,7 +1231,7 @@ namespace kor::vk
             const auto& vkPipeline = dynamic_cast<const kor::vk::GraphicsPipeline&>(*_state.boundGraphicsPipeline.value());
             _handle.pushConstants(
                 vkPipeline.getPipelineLayout(),
-                getVkShaderStageFlags(vkPipeline.pushConstantRange(offset).stages),
+                getVkShaderStageFlags(vkPipeline.PushConstantRange(offset).stages),
                 offset,
                 size,
                 data);
@@ -1239,7 +1239,7 @@ namespace kor::vk
             const auto& vkPipeline = dynamic_cast<const kor::vk::RayTracingPipeline&>(*_state.boundRayTracingPipeline.value());
             _handle.pushConstants(
                 vkPipeline.getPipelineLayout(),
-                getVkShaderStageFlags(vkPipeline.pushConstantRange(offset).stages),
+                getVkShaderStageFlags(vkPipeline.PushConstantRange(offset).stages),
                 offset,
                 size,
                 data);

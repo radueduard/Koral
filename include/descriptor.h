@@ -65,7 +65,7 @@ namespace kor
      * @endcode
      *
      * A descriptor built from an unusable resource does not throw; it becomes invalid and carries
-     * the reason, which DescriptorSet::Builder::build() reports.
+     * the reason, which DescriptorSet::Builder::Build() reports.
      */
     class KORAL_API Descriptor
     {
@@ -102,45 +102,45 @@ namespace kor
 
         ~Descriptor() = default;
 
-        /** @brief Whether it holds a usable resource. A false answer is explained by error(). */
-        [[nodiscard]] bool isValid() const { return valid; }
+        /** @brief Whether it holds a usable resource. A false answer is explained by Failure(). */
+        [[nodiscard]] bool IsValid() const { return valid; }
 
         /**
          * @brief Why this descriptor is invalid, if it is.
          * @return The error, or nullopt when it is valid. Recorded rather than thrown, and surfaced
-         *         by DescriptorSet::Builder::build().
+         *         by DescriptorSet::Builder::Build().
          */
-        [[nodiscard]] const std::optional<Error>& error() const { return _error; }
+        [[nodiscard]] const std::optional<Error>& Failure() const { return _error; }
 
         /** @brief The bound buffer. @throws if this descriptor holds something else. */
-        [[nodiscard]] const Buffer& buffer() const;
+        [[nodiscard]] const Buffer& BoundBuffer() const;
         /** @brief Byte offset into the bound buffer. @throws if this descriptor holds something else. */
-        [[nodiscard]] glm::i64 offset() const;
+        [[nodiscard]] glm::i64 Offset() const;
         /** @brief How many bytes of the bound buffer are visible. @throws if this descriptor holds something else. */
-        [[nodiscard]] glm::i64 range() const;
+        [[nodiscard]] glm::i64 Range() const;
         /** @brief The bound image view. @throws if this descriptor holds something else. */
-        [[nodiscard]] const ImageView& imageView() const;
+        [[nodiscard]] const ImageView& BoundImageView() const;
         /** @brief The bound sampler. @throws if this descriptor holds something else. */
-        [[nodiscard]] const Sampler& sampler() const;
+        [[nodiscard]] const Sampler& BoundSampler() const;
         /** @brief The bound acceleration structure. @throws if this descriptor holds something else. */
-        [[nodiscard]] const AccelerationStructure& accelerationStructure() const;
+        [[nodiscard]] const AccelerationStructure& BoundAccelerationStructure() const;
         /** @brief The bound buffer view. @throws if this descriptor holds something else. */
-        [[nodiscard]] const BufferView& bufferView() const;
+        [[nodiscard]] const BufferView& BoundBufferView() const;
 
         /**
          * @brief The bound buffer, or an empty reference if this descriptor holds something else.
          *
-         * The non-throwing counterpart of buffer(), for code that walks a whole set without
+         * The non-throwing counterpart of BoundBuffer(), for code that walks a whole set without
          * knowing what each slot holds — the barrier resolver does exactly that, and a bindless
          * array is routinely sparse.
          */
-        [[nodiscard]] ResourceRef<const Buffer> bufferRef() const;
+        [[nodiscard]] ResourceRef<const Buffer> BufferRef() const;
 
         /** @brief The bound image view, or an empty reference if this descriptor holds something else. */
-        [[nodiscard]] ResourceRef<const ImageView> imageViewRef() const;
+        [[nodiscard]] ResourceRef<const ImageView> ImageViewRef() const;
 
         /** @brief The bound buffer view, or an empty reference if this descriptor holds something else. */
-        [[nodiscard]] ResourceRef<const BufferView> bufferViewRef() const;
+        [[nodiscard]] ResourceRef<const BufferView> BufferViewRef() const;
 
     protected:
         bool valid = false;

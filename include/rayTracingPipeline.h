@@ -41,16 +41,16 @@ namespace kor
      * @code
      * kor::RayTracingPipeline::Builder builder;
      * auto pipeline = builder
-     *     .setRaygenShader(raygen)
-     *     .addMissShader(miss)
-     *     .addHitGroup({ .closestHitShader = closestHit })
-     *     .setMaxRecursionDepth(2)
-     *     .build();
+     *     .SetRaygenShader(raygen)
+     *     .AddMissShader(miss)
+     *     .AddHitGroup({ .closestHitShader = closestHit })
+     *     .SetMaxRecursionDepth(2)
+     *     .Build();
      *
      * commandBuffer.BindRayTracingPipeline(pipeline).TraceRays(width, height);
      * @endcode
      *
-     * Requires a device with ray-tracing support — check Context::supportsRayTracing(). Without it
+     * Requires a device with ray-tracing support — check Context::SupportsRayTracing(). Without it
      * the build fails into a poisoned resource rather than crashing. Vulkan only.
      */
     class KORAL_API RayTracingPipeline : public Pipeline
@@ -83,40 +83,40 @@ namespace kor
             glm::u32 maxRecursionDepth = 1;                                         ///< How deep rays may recurse.
 
             /** @brief Sets the raygen shader — the entry point run once per ray. Required. */
-            Builder& setRaygenShader(ResourceRef<const Shader> raygenShader);
+            Builder& SetRaygenShader(ResourceRef<const Shader> raygenShader);
 
             /** @brief Appends a miss shader. Its position is the index a trace call selects it by. */
-            Builder& addMissShader(ResourceRef<const Shader> missShader);
+            Builder& AddMissShader(ResourceRef<const Shader> missShader);
 
             /** @brief Appends a hit group. Its position is what AccelerationStructure::Instance::hitGroupIndex refers to. */
-            Builder& addHitGroup(const HitGroup& hitGroup);
+            Builder& AddHitGroup(const HitGroup& hitGroup);
 
             /** @brief Appends a callable shader, which other ray-tracing shaders may invoke by index. */
-            Builder& addCallableShader(ResourceRef<const Shader> callableShader);
+            Builder& AddCallableShader(ResourceRef<const Shader> callableShader);
 
             /**
              * @brief Sets how deep rays may recurse — a shader casting a ray that casts another.
              * @param maxRecursionDepth The limit. Keep it as low as the effect allows; devices cap
              *        it, and deeper recursion costs stack memory per ray.
              */
-            Builder& setMaxRecursionDepth(glm::u32 maxRecursionDepth);
+            Builder& SetMaxRecursionDepth(glm::u32 maxRecursionDepth);
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<RayTracingPipeline>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<RayTracingPipeline>> Create() const;
 
             /**
              * @brief Compiles the pipeline and its shader binding table.
              * @return It as a Resource; poisoned rather than thrown when a shader fails to compile
              *         or the device has no ray-tracing support.
              */
-            [[nodiscard]] kor::Resource<RayTracingPipeline> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<RayTracingPipeline> Build(std::source_location where = std::source_location::current()) const;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */
         ~RayTracingPipeline() override;
 
         /** @brief Maximum ray recursion depth this pipeline was created with. */
-        [[nodiscard]] glm::u32 maxRecursionDepth() const { return _maxRecursionDepth; }
+        [[nodiscard]] glm::u32 MaxRecursionDepth() const { return _maxRecursionDepth; }
 
     protected:
         explicit RayTracingPipeline(const Builder& createInfo);
@@ -124,7 +124,7 @@ namespace kor
         VoidResult Validate() override;
 
         /** @brief Every shader making up this pipeline, in shader-group order. */
-        [[nodiscard]] std::vector<ResourceRef<const Shader>> collectShaders() const;
+        [[nodiscard]] std::vector<ResourceRef<const Shader>> CollectShaders() const;
 
         std::optional<ResourceRef<const Shader>> _raygenShader;
         std::vector<ResourceRef<const Shader>> _missShaders;

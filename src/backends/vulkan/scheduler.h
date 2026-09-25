@@ -66,7 +66,7 @@ namespace kor::vk
 
     	[[nodiscard]] const kor::vk::SwapChain &getSwapChain() const { return *_swapChain; }
     	[[nodiscard]] bool isResized() const { return _resized; }
-		glm::u32 currentImageIndex() const override { return _swapChain->currentImageIndex(); }
+		glm::u32 CurrentImageIndex() const override { return _swapChain->currentImageIndex(); }
 
 
     private:
@@ -80,7 +80,7 @@ namespace kor::vk
     	/// order, because each step feeds the next.
     	void recreateSwapChain(const glm::uvec2& extent);
 
-    	void createFrames() override;
+    	void CreateFrames() override;
 
     public:
 	    void WaitIdle() const override;

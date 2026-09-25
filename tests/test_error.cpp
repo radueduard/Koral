@@ -1,5 +1,5 @@
 // Unit tests for the functional error model in error.h / error.cpp:
-// ErrorCode -> describe(), Error::toString(), fail(), guard(), Result.
+// ErrorCode -> Describe(), Error::ToString(), Fail(), Guard(), Result.
 
 #include <gtest/gtest.h>
 
@@ -17,14 +17,14 @@ using namespace kor;
 namespace {
 
 // -----------------------------------------------------------------------------
-// describe(): every code must have a real, non-fallback description.
+// Describe(): every code must have a real, non-fallback description.
 // This catches the common regression of adding an ErrorCode but forgetting to
-// extend the describe() switch (which would silently fall through to the
+// extend the Describe() switch (which would silently fall through to the
 // "Unknown error." default).
 // -----------------------------------------------------------------------------
 TEST(Error, EveryCodeHasADescription) {
     for (const ErrorCode code : magic_enum::enum_values<ErrorCode>()) {
-        const std::string_view d = describe(code);
+        const std::string_view d = Describe(code);
         EXPECT_FALSE(d.empty()) << "empty description for " << magic_enum::enum_name(code);
         EXPECT_NE(d, "Unknown error.")
             << "missing describe() case for " << magic_enum::enum_name(code);
@@ -32,59 +32,59 @@ TEST(Error, EveryCodeHasADescription) {
 }
 
 TEST(Error, DescribeReturnsStableText) {
-    EXPECT_EQ(describe(ErrorCode::eNone), "No error.");
-    EXPECT_EQ(describe(ErrorCode::eRayTracingUnsupported),
+    EXPECT_EQ(Describe(ErrorCode::eNone), "No error.");
+    EXPECT_EQ(Describe(ErrorCode::eRayTracingUnsupported),
               "Ray tracing is not supported on the active backend.");
 }
 
 // -----------------------------------------------------------------------------
-// Error::toString()
+// Error::ToString()
 // -----------------------------------------------------------------------------
 TEST(Error, ToStringContainsCodeNameMessageAndLocation) {
     Error e{.code = ErrorCode::eUniformBufferTooLarge, .message = "size 99999 > 65536"};
-    const std::string s = e.toString();
+    const std::string s = e.ToString();
     EXPECT_NE(s.find("eUniformBufferTooLarge"), std::string::npos) << s;
     EXPECT_NE(s.find("size 99999 > 65536"), std::string::npos) << s;
     EXPECT_NE(s.find("test_error.cpp"), std::string::npos) << s; // default source_location
 }
 
 TEST(Error, ToStringDistinguishesCodes) {
-    const std::string a = Error{.code = ErrorCode::eBackend, .message = "x"}.toString();
-    const std::string b = Error{.code = ErrorCode::eNoMeshBound, .message = "x"}.toString();
+    const std::string a = Error{.code = ErrorCode::eBackend, .message = "x"}.ToString();
+    const std::string b = Error{.code = ErrorCode::eNoMeshBound, .message = "x"}.ToString();
     EXPECT_NE(a, b);
     EXPECT_NE(a.find("eBackend"), std::string::npos);
     EXPECT_NE(b.find("eNoMeshBound"), std::string::npos);
 }
 
 // -----------------------------------------------------------------------------
-// fail()
+// Fail()
 // -----------------------------------------------------------------------------
 TEST(Error, FailWithFormattedMessage) {
-    Result<int> r = fail(ErrorCode::eBufferSizeInvalid, "count {} not > 0", 0);
+    Result<int> r = Fail(ErrorCode::eBufferSizeInvalid, "count {} not > 0", 0);
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error().code, ErrorCode::eBufferSizeInvalid);
     EXPECT_EQ(r.error().message, "count 0 not > 0");
 }
 
 TEST(Error, FailWithDefaultDescription) {
-    Result<int> r = fail(ErrorCode::eNoComputePipelineBound);
+    Result<int> r = Fail(ErrorCode::eNoComputePipelineBound);
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error().code, ErrorCode::eNoComputePipelineBound);
-    EXPECT_EQ(r.error().message, std::string(describe(ErrorCode::eNoComputePipelineBound)));
+    EXPECT_EQ(r.error().message, std::string(Describe(ErrorCode::eNoComputePipelineBound)));
 }
 
 // -----------------------------------------------------------------------------
-// Result::valueOrThrow()
+// Result::ValueOrThrow()
 // -----------------------------------------------------------------------------
 TEST(Error, ValueOrThrowReturnsValueOnSuccess) {
     Result<int> r = 7;
-    EXPECT_EQ(r.valueOrThrow(), 7);
+    EXPECT_EQ(r.ValueOrThrow(), 7);
 }
 
 TEST(Error, ValueOrThrowThrowsBackendExceptionOnFailure) {
-    Result<int> r = fail(ErrorCode::eShaderCompileFailed, "nope");
+    Result<int> r = Fail(ErrorCode::eShaderCompileFailed, "nope");
     try {
-        (void)r.valueOrThrow();
+        (void)r.ValueOrThrow();
         FAIL() << "expected BackendException";
     } catch (const BackendException& ex) {
         EXPECT_EQ(ex.error.code, ErrorCode::eShaderCompileFailed);
@@ -93,16 +93,16 @@ TEST(Error, ValueOrThrowThrowsBackendExceptionOnFailure) {
 }
 
 // -----------------------------------------------------------------------------
-// guard()
+// Guard()
 // -----------------------------------------------------------------------------
 TEST(Error, GuardReturnsValueWhenNoThrow) {
-    Result<int> r = guard(ErrorCode::eBackend, [] { return 42; });
+    Result<int> r = Guard(ErrorCode::eBackend, [] { return 42; });
     ASSERT_TRUE(r.has_value());
     EXPECT_EQ(*r, 42);
 }
 
 TEST(Error, GuardPreservesBackendExceptionError) {
-    Result<int> r = guard(ErrorCode::eBackend, []() -> int {
+    Result<int> r = Guard(ErrorCode::eBackend, []() -> int {
         throw BackendException(Error{.code = ErrorCode::eUniformBufferTooLarge,
                                      .message = "specific"});
     });
@@ -112,7 +112,7 @@ TEST(Error, GuardPreservesBackendExceptionError) {
 }
 
 TEST(Error, GuardConvertsGenericExceptionToFallback) {
-    Result<int> r = guard(ErrorCode::eBackend, []() -> int {
+    Result<int> r = Guard(ErrorCode::eBackend, []() -> int {
         throw std::runtime_error("kaboom");
     });
     ASSERT_FALSE(r.has_value());
@@ -122,20 +122,20 @@ TEST(Error, GuardConvertsGenericExceptionToFallback) {
 
 TEST(Error, GuardWorksForVoidReturn) {
     bool ran = false;
-    Result<void> r = guard(ErrorCode::eBackend, [&] { ran = true; });
+    Result<void> r = Guard(ErrorCode::eBackend, [&] { ran = true; });
     EXPECT_TRUE(ran);
     EXPECT_TRUE(r.has_value());
 }
 
 TEST(Error, GuardVoidPropagatesFailure) {
-    Result<void> r = guard(ErrorCode::eBackend, [] { throw std::runtime_error("boom"); });
+    Result<void> r = Guard(ErrorCode::eBackend, [] { throw std::runtime_error("boom"); });
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error().code, ErrorCode::eBackend);
     EXPECT_EQ(r.error().message, "boom");
 }
 
 TEST(Error, GuardVoidPreservesBackendException) {
-    Result<void> r = guard(ErrorCode::eBackend, [] {
+    Result<void> r = Guard(ErrorCode::eBackend, [] {
         throw BackendException(Error{.code = ErrorCode::eNoMeshBound, .message = "m"});
     });
     ASSERT_FALSE(r.has_value());
@@ -149,7 +149,7 @@ TEST(Error, VoidResultSuccessAndFailure) {
     VoidResult ok{};
     EXPECT_TRUE(ok.has_value());
 
-    VoidResult bad = fail(ErrorCode::eInvalidArgument, "bad");
+    VoidResult bad = Fail(ErrorCode::eInvalidArgument, "bad");
     ASSERT_FALSE(bad.has_value());
     EXPECT_EQ(bad.error().code, ErrorCode::eInvalidArgument);
 }
@@ -162,39 +162,39 @@ TEST(Error, VoidResultSuccessAndFailure) {
 TEST(Error, NoCauseByDefault) {
     const Error e{ .code = ErrorCode::eBackend, .message = "boom" };
     EXPECT_EQ(e.cause, nullptr);
-    EXPECT_EQ(e.depth(), 0u);
-    EXPECT_EQ(e.root().code, ErrorCode::eBackend);
+    EXPECT_EQ(e.Depth(), 0u);
+    EXPECT_EQ(e.Root().code, ErrorCode::eBackend);
 }
 
 TEST(Error, CausedByLinksAndReportsRoot) {
     auto compile = std::make_shared<const Error>(
         Error{ .code = ErrorCode::eShaderCompileFailed, .message = "undeclared identifier 'colour'" });
 
-    const Error pipeline = causedBy(
+    const Error pipeline = CausedBy(
         Error{ .code = ErrorCode::eMissingShaderStage, .message = "pipeline 'forward' is unusable" },
         compile);
 
-    EXPECT_EQ(pipeline.depth(), 1u);
+    EXPECT_EQ(pipeline.Depth(), 1u);
     ASSERT_NE(pipeline.cause, nullptr);
     EXPECT_EQ(pipeline.cause->code, ErrorCode::eShaderCompileFailed);
 
-    // root() is what the user must actually go and fix.
-    EXPECT_EQ(pipeline.root().code, ErrorCode::eShaderCompileFailed);
+    // Root() is what the user must actually go and fix.
+    EXPECT_EQ(pipeline.Root().code, ErrorCode::eShaderCompileFailed);
 }
 
 TEST(Error, HistoryWalksTheWholeChain) {
     auto compile = std::make_shared<const Error>(
         Error{ .code = ErrorCode::eShaderCompileFailed, .message = "undeclared identifier 'colour'" });
-    auto pipeline = std::make_shared<const Error>(causedBy(
+    auto pipeline = std::make_shared<const Error>(CausedBy(
         Error{ .code = ErrorCode::eMissingShaderStage, .message = "pipeline 'forward' is unusable" },
         compile));
-    const Error recording = causedBy(
+    const Error recording = CausedBy(
         Error{ .code = ErrorCode::eNoGraphicsPipelineBound, .message = "cannot bind pipeline" },
         pipeline);
 
-    EXPECT_EQ(recording.depth(), 2u);
+    EXPECT_EQ(recording.Depth(), 2u);
 
-    const std::string h = recording.history();
+    const std::string h = recording.History();
     // Symptom first, then each cause beneath it, deepest last.
     EXPECT_NE(h.find("cannot bind pipeline"), std::string::npos);
     EXPECT_NE(h.find("pipeline 'forward' is unusable"), std::string::npos);
@@ -209,12 +209,12 @@ TEST(Error, FailCausedByBuildsAnUnexpectedWithACause) {
     auto root = std::make_shared<const Error>(
         Error{ .code = ErrorCode::eShaderCompileFailed, .message = "syntax error" });
 
-    const Result<int> r = failCausedBy(ErrorCode::eMissingShaderStage, root, "pipeline '{}' is unusable", "forward");
+    const Result<int> r = FailCausedBy(ErrorCode::eMissingShaderStage, root, "pipeline '{}' is unusable", "forward");
 
     ASSERT_FALSE(r.has_value());
     EXPECT_EQ(r.error().code, ErrorCode::eMissingShaderStage);
     EXPECT_EQ(r.error().message, "pipeline 'forward' is unusable");
-    EXPECT_EQ(r.error().root().code, ErrorCode::eShaderCompileFailed);
+    EXPECT_EQ(r.error().Root().code, ErrorCode::eShaderCompileFailed);
 }
 
 // A single root cause is shared by every error that derives from it, rather than
@@ -223,11 +223,11 @@ TEST(Error, CauseIsSharedNotCopied) {
     auto root = std::make_shared<const Error>(
         Error{ .code = ErrorCode::eShaderCompileFailed, .message = "syntax error" });
 
-    const Error a = causedBy(Error{ .code = ErrorCode::eBackend, .message = "pipeline A" }, root);
-    const Error b = causedBy(Error{ .code = ErrorCode::eBackend, .message = "pipeline B" }, root);
+    const Error a = CausedBy(Error{ .code = ErrorCode::eBackend, .message = "pipeline A" }, root);
+    const Error b = CausedBy(Error{ .code = ErrorCode::eBackend, .message = "pipeline B" }, root);
 
     EXPECT_EQ(a.cause.get(), b.cause.get());
-    EXPECT_EQ(&a.root(), &b.root());
+    EXPECT_EQ(&a.Root(), &b.Root());
 }
 
 } // namespace

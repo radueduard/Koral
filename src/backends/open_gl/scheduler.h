@@ -23,7 +23,7 @@ namespace kor::ogl
         void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) override;
 
     protected:
-        void createFrames() override;
+        void CreateFrames() override;
 
     public:
         void WaitIdle() const override;

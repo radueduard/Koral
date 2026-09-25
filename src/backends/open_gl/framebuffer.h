@@ -27,7 +27,7 @@ namespace kor::ogl {
         /// Re-attach when an attachment's texture has been replaced underneath us.
         ///
         /// glNamedFramebufferTexture stores the texture *object*, not a reference to whatever the
-        /// engine holds — so a resize, which recreates the texture (@see Image::doResize), leaves
+        /// engine holds — so a resize, which recreates the texture (@see Image::DoResize), leaves
         /// this framebuffer pointing at a deleted one and therefore incomplete. Image *views*
         /// forward to the live id and survive the swap; a framebuffer cannot, and has to be told.
         void Refresh() const;

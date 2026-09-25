@@ -51,13 +51,13 @@ struct CameraPanelTest : GpuTest
 
 TEST_F(CameraPanelTest, DrawsBothKindsOfCameraInOneWindow) {
     auto perspective = kcam::PerspectiveCamera::Builder{}
-        .setName("player")
-        .setController({ .kind = kcam::Controller::Kind::eFly })
-        .build();
+        .SetName("player")
+        .SetController({ .kind = kcam::Controller::Kind::eFly })
+        .Build();
     auto orthographic = kcam::OrthographicCamera::Builder{}
-        .setName("minimap")
-        .setController({ .kind = kcam::Controller::Kind::eOrbit })
-        .build();
+        .SetName("minimap")
+        .SetController({ .kind = kcam::Controller::Kind::eOrbit })
+        .Build();
     ASSERT_TRUE(perspective);
     ASSERT_TRUE(orthographic);
 
@@ -69,8 +69,8 @@ TEST_F(CameraPanelTest, DrawsBothKindsOfCameraInOneWindow) {
 
     // Drawing must not move the cameras: a panel reads and writes on edit, and an edit needs input
     // this test does not supply.
-    EXPECT_EQ(perspective->controller().kind, kcam::Controller::Kind::eFly);
-    EXPECT_EQ(orthographic->controller().kind, kcam::Controller::Kind::eOrbit);
+    EXPECT_EQ(perspective->ControllerSettings().kind, kcam::Controller::Kind::eFly);
+    EXPECT_EQ(orthographic->ControllerSettings().kind, kcam::Controller::Kind::eOrbit);
 }
 
 TEST_F(CameraPanelTest, DrawsWithNoCamerasAtAllAndInsideAWindowOfTheCallersOwn) {
@@ -80,7 +80,7 @@ TEST_F(CameraPanelTest, DrawsWithNoCamerasAtAllAndInsideAWindowOfTheCallersOwn) 
 
     // The other half of the API: one camera, drawn where the cursor is, for a project that puts the
     // controls in its own layout rather than a window of ours.
-    auto camera = kcam::PerspectiveCamera::Builder{}.setName("inline").build();
+    auto camera = kcam::PerspectiveCamera::Builder{}.SetName("inline").Build();
     ASSERT_TRUE(camera);
     frame([&] {
         ImGui::Begin("someone else's window");
@@ -93,13 +93,13 @@ TEST_F(CameraPanelTest, DrawsWithNoCamerasAtAllAndInsideAWindowOfTheCallersOwn) 
 // that cannot offer a target to follow and says so instead.
 TEST_F(CameraPanelTest, DrawsEveryControllerKindAndAspectSource) {
     auto image = kor::Image::Builder{}
-        .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .setUsage(kor::Image::Usage::eColorAttachment)
-        .setExtent(glm::uvec2{ 320, 200 })
-        .build();
+        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+        .SetUsage(kor::Image::Usage::eColorAttachment)
+        .SetExtent(glm::uvec2{ 320, 200 })
+        .Build();
     ASSERT_TRUE(image);
 
-    auto camera = kcam::PerspectiveCamera::Builder{}.setName("cycled").build();
+    auto camera = kcam::PerspectiveCamera::Builder{}.SetName("cycled").Build();
     ASSERT_TRUE(camera);
 
     kgui::CameraPanel panel;
@@ -107,35 +107,35 @@ TEST_F(CameraPanelTest, DrawsEveryControllerKindAndAspectSource) {
 
     for (const auto kind : { kcam::Controller::Kind::eNone, kcam::Controller::Kind::eFly,
                              kcam::Controller::Kind::eOrbit }) {
-        camera->setController({ .kind = kind });
+        camera->SetController({ .kind = kind });
         frame([&] { panel.Draw("Cameras", &open, *camera); });
     }
 
-    camera->setFollowWindowAspect(true);
+    camera->SetFollowWindowAspect(true);
     frame([&] { panel.Draw("Cameras", &open, *camera); });
 
-    camera->followAspectOf(image);
+    camera->FollowAspectOf(image);
     frame([&] { panel.Draw("Cameras", &open, *camera); });
-    EXPECT_EQ(camera->aspectSource().kind, kcam::AspectSource::Kind::eImage);
+    EXPECT_EQ(camera->AspectSourceSettings().kind, kcam::AspectSource::Kind::eImage);
 }
 
 // The names an interface shows for a binding come from the engine, not from a table in the panel —
 // which is what makes writing your own rebinding interface possible at all. Keys above 128 are the
 // case that silently returned "?" before, and they are most of the interesting ones.
 TEST(CameraPanelNaming, TheEngineNamesEveryKeyAndButton) {
-    EXPECT_EQ(kor::Input::describe(kor::Key::eA), "A");
-    EXPECT_EQ(kor::Input::describe(kor::Key::eLeftShift), "Left Shift");
-    EXPECT_EQ(kor::Input::describe(kor::Key::eEsc), "Esc");
-    EXPECT_EQ(kor::Input::describe(kor::Key::eF11), "F11");
-    EXPECT_EQ(kor::Input::describe(kor::Key::eMenu), "Menu");
+    EXPECT_EQ(kor::Input::Describe(kor::Key::eA), "A");
+    EXPECT_EQ(kor::Input::Describe(kor::Key::eLeftShift), "Left Shift");
+    EXPECT_EQ(kor::Input::Describe(kor::Key::eEsc), "Esc");
+    EXPECT_EQ(kor::Input::Describe(kor::Key::eF11), "F11");
+    EXPECT_EQ(kor::Input::Describe(kor::Key::eMenu), "Menu");
 
-    EXPECT_EQ(kor::Input::describe(kor::MouseButton::eLeft), "Left Mouse");
-    EXPECT_EQ(kor::Input::describe(kor::MouseButton::eMiddle), "Middle Mouse");
-    EXPECT_EQ(kor::Input::describe(kor::MouseButton::e5), "Mouse 5");
+    EXPECT_EQ(kor::Input::Describe(kor::MouseButton::eLeft), "Left Mouse");
+    EXPECT_EQ(kor::Input::Describe(kor::MouseButton::eMiddle), "Middle Mouse");
+    EXPECT_EQ(kor::Input::Describe(kor::MouseButton::e5), "Mouse 5");
 
     // Nothing is pressed in a test, which is the answer a rebind waits on rather than a crash.
-    EXPECT_FALSE(kor::Input::firstKeyPressed().has_value());
-    EXPECT_FALSE(kor::Input::firstMouseButtonPressed().has_value());
+    EXPECT_FALSE(kor::Input::FirstKeyPressed().has_value());
+    EXPECT_FALSE(kor::Input::FirstMouseButtonPressed().has_value());
 }
 
 } // namespace

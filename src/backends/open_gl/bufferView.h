@@ -31,7 +31,7 @@ namespace kor::ogl
         /**
          * @brief The sized internal format the texture was attached with.
          *
-         * Named apart from kor::BufferView::format() on purpose: that one answers in
+         * Named apart from kor::BufferView::PixelFormat() on purpose: that one answers in
          * kor::Image::Format, and a getter that hides it with a different return type is the kind
          * of thing that compiles and then binds the wrong enum.
          */

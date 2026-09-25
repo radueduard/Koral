@@ -30,7 +30,7 @@ namespace kimg
 
         glm::uvec3 mipExtent(const kor::Image& image, const glm::u32 mipLevel)
         {
-            const auto base = image.extent();
+            const auto base = image.Extent();
             return { std::max(1u, base.x >> mipLevel),
                      std::max(1u, base.y >> mipLevel),
                      std::max(1u, base.z >> mipLevel) };
@@ -43,12 +43,12 @@ namespace kimg
                                                    .message = std::move(what) });
             };
 
-            if (subimage.mipLevel >= image.mipLevels())
+            if (subimage.mipLevel >= image.MipLevels())
                 return complaint(std::format("mip level {} does not exist; the image has {}",
-                                             subimage.mipLevel, image.mipLevels()));
-            if (subimage.arrayLayer >= image.arrayLayers())
+                                             subimage.mipLevel, image.MipLevels()));
+            if (subimage.arrayLayer >= image.ArrayLayers())
                 return complaint(std::format("array layer {} does not exist; the image has {}",
-                                             subimage.arrayLayer, image.arrayLayers()));
+                                             subimage.arrayLayer, image.ArrayLayers()));
 
             const auto level = mipExtent(image, subimage.mipLevel);
 
@@ -70,8 +70,8 @@ namespace kimg
             // A compressed image is addressed in blocks. An offset inside one, or an extent that ends
             // inside one, is not something a copy can express — except at the edge of the level, where
             // a partial block is the level itself.
-            if (kor::Image::isBlockCompressed(image.format())) {
-                const auto block = kor::Image::blockExtent(image.format());
+            if (kor::Image::IsBlockCompressed(image.PixelFormat())) {
+                const auto block = kor::Image::BlockExtent(image.PixelFormat());
                 if (subimage.offset.x % block.x != 0 || subimage.offset.y % block.y != 0) {
                     return complaint(std::format(
                         "a {}x{}-block format can only be read from a block boundary; ({}, {}) is not one",
@@ -92,16 +92,16 @@ namespace kimg
         std::expected<ReadBack, kor::Error> readBack(const kor::ResourceRef<const kor::Image>& image,
                                                     const Subimage& subimage)
         {
-            const auto byteCount = kor::Image::sizeOfRegion(image->format(), subimage.extent);
+            const auto byteCount = kor::Image::SizeOfRegion(image->PixelFormat(), subimage.extent);
 
             kor::Buffer::RawBuilder builder;
-            builder.setRawSize(static_cast<glm::i64>(byteCount))
+            builder.SetRawSize(static_cast<glm::i64>(byteCount))
 
-                .setType(kor::Buffer::Type::eReadback);
-            auto staging = builder.build();
+                .SetType(kor::Buffer::Type::eReadback);
+            auto staging = builder.Build();
             if (!staging) {
-                return std::unexpected(staging.error()
-                    ? *staging.error()
+                return std::unexpected(staging.Failure()
+                    ? *staging.Failure()
                     : kor::Error{ .code = kor::ErrorCode::eBackend, .message = "read-back buffer could not be allocated" });
             }
 
@@ -115,7 +115,7 @@ namespace kimg
                     .imageLayerCount = 1,
                     .imageMipLevel = subimage.mipLevel,
                 });
-            }, kor::CommandBuffer::Usage::eTransfer).wait();
+            }, kor::CommandBuffer::Usage::eTransfer).Wait();
 
             ReadBack data;
             data.extent = subimage.extent;
@@ -172,8 +172,8 @@ namespace kimg
             if (!output) return std::unexpected(fileError(target, "no writer for this container (" + OIIO::geterror() + ")"));
 
             const auto type = oiioTypeFor(format);
-            const auto sourceChannels = static_cast<int>(kor::Image::channelCount(format));
-            const auto channelSize = static_cast<std::size_t>(kor::Image::channelSize(format));
+            const auto sourceChannels = static_cast<int>(kor::Image::ChannelCount(format));
+            const auto channelSize = static_cast<std::size_t>(kor::Image::ChannelSize(format));
 
             // Not every container has an alpha channel — Radiance .hdr is RGBE and holds exactly
             // three — and one that has not will refuse a four-channel spec outright rather than drop
@@ -207,7 +207,7 @@ namespace kimg
         }
     }
 
-    std::string_view extensionFor(const FileFormat format)
+    std::string_view ExtensionFor(const FileFormat format)
     {
         switch (format) {
         case FileFormat::ePNG: return ".png";
@@ -237,12 +237,12 @@ namespace kimg
                                       const FileFormat format, const kor::ResourceRef<const kor::Image>& image,
                                       const Subimage& subimage)
         {
-            const auto target = directory / (name + std::string(extensionFor(format)));
+            const auto target = directory / (name + std::string(ExtensionFor(format)));
 
             if (!image) {
                 return std::unexpected(detail::fileError(target, "cannot be written from an unusable image"));
             }
-            if (kor::Image::isBlockCompressed(image->format()) && format != FileFormat::eKTX2) {
+            if (kor::Image::IsBlockCompressed(image->PixelFormat()) && format != FileFormat::eKTX2) {
                 // Decoding a block to invent something a PNG could hold is a decision this module has
                 // no business making silently. KTX2 takes the blocks as they are.
                 return std::unexpected(detail::fileError(target,
@@ -282,7 +282,7 @@ namespace kimg
         auto data = detail::readBack(image, prepared->subimage);
         if (!data) return std::unexpected(detail::fileError(prepared->target, std::string(data.error().message)));
 
-        if (auto written = detail::writeWithOiio(prepared->target, *data, image->format()); !written)
+        if (auto written = detail::writeWithOiio(prepared->target, *data, image->PixelFormat()); !written)
             return std::unexpected(written.error());
         return prepared->target;
     }
@@ -299,7 +299,7 @@ namespace kimg
         auto data = detail::readBack(image, prepared->subimage);
         if (!data) co_return std::unexpected(detail::fileError(prepared->target, std::string(data.error().message)));
 
-        const auto imageFormat = image->format();
+        const auto imageFormat = image->PixelFormat();
         const auto target = prepared->target;
 
         co_await kor::Context::SwitchToBackgroundThread();

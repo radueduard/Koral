@@ -31,10 +31,10 @@ namespace kor
      *
      * @code
      * auto view = kor::BufferView::Builder(particles)
-     *     .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
-     *     .build();
+     *     .SetFormat(kor::Image::Format::eRGBA32_SFLOAT)
+     *     .Build();
      *
-     * auto set = kor::DescriptorSet::Builder(pipeline, 0).write("source", view).build();
+     * auto set = kor::DescriptorSet::Builder(pipeline, 0).Write("source", view).Build();
      * @endcode
      *
      * The buffer must have been created with Buffer::Usage::eTexel — the formatted read is a
@@ -68,14 +68,14 @@ namespace kor
              * Must be a format the device can read from a texel buffer, which rules out the
              * block-compressed ones and the depth/stencil ones.
              */
-            Builder& setFormat(const Image::Format format)
+            Builder& SetFormat(const Image::Format format)
             {
                 this->format = format;
                 return *this;
             }
 
             /** @brief Sets the first byte of the buffer the view covers. Must be a whole number of texels in. */
-            Builder& setOffset(const glm::i64 offset)
+            Builder& SetOffset(const glm::i64 offset)
             {
                 this->offset = offset;
                 return *this;
@@ -87,34 +87,34 @@ namespace kor
              * Left at 0 it is the rest of the buffer, which is what a view of a whole buffer wants.
              * Either way it has to come out a whole number of texels.
              */
-            Builder& setRange(const glm::i64 range)
+            Builder& SetRange(const glm::i64 range)
             {
                 this->range = range;
                 return *this;
             }
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<BufferView>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<BufferView>> Create() const;
 
             /** @brief Creates the view. Poisoned rather than thrown if the buffer cannot be read as texels. */
-            [[nodiscard]] kor::Resource<BufferView> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<BufferView> Build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~BufferView() = default;
 
         /** @brief The buffer this is a view of. Barriers and hazards name this, not the view. */
-        [[nodiscard]] kor::ResourceRef<const Buffer> buffer() const { return _buffer; }
+        [[nodiscard]] kor::ResourceRef<const Buffer> SourceBuffer() const { return _buffer; }
         /** @brief What one texel is. */
-        [[nodiscard]] Image::Format format() const { return _format; }
+        [[nodiscard]] Image::Format PixelFormat() const { return _format; }
         /** @brief First byte of the buffer the view covers. */
-        [[nodiscard]] glm::i64 offset() const { return _offset; }
+        [[nodiscard]] glm::i64 Offset() const { return _offset; }
         /** @brief How many bytes the view covers. Resolved: a builder range of 0 reads back as the rest of the buffer. */
-        [[nodiscard]] glm::i64 range() const { return _range; }
+        [[nodiscard]] glm::i64 Range() const { return _range; }
         /** @brief How many texels that range holds. */
-        [[nodiscard]] glm::u64 texelCount() const { return _texelCount; }
+        [[nodiscard]] glm::u64 TexelCount() const { return _texelCount; }
 
         /** @brief Whether the view follows a per-frame buffer, and so has one instance per frame in flight. */
-        [[nodiscard]] bool isPerFrame() const { return _isPerFrame; }
+        [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
 
     protected:
         explicit BufferView(const Builder& createInfo);

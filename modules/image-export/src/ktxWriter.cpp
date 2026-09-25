@@ -118,28 +118,28 @@ namespace kimg
                                                  const kor::Image& image,
                                                  const std::vector<ReadBack>& slices)
         {
-            const auto vkFormat = vkFormatFor(image.format());
+            const auto vkFormat = vkFormatFor(image.PixelFormat());
             if (vkFormat == VK_FORMAT_UNDEFINED) {
                 return std::unexpected(fileError(target, std::format(
                     "there is no KTX2 format for this image's format ({})",
-                    static_cast<int>(image.format()))));
+                    static_cast<int>(image.PixelFormat()))));
             }
 
             const bool wholeImage = slices.size() > 1
-                || static_cast<glm::u32>(slices.size()) == image.mipLevels() * image.arrayLayers();
-            const glm::u32 levels = wholeImage ? image.mipLevels() : 1;
-            const glm::u32 layers = wholeImage ? image.arrayLayers() : 1;
+                || static_cast<glm::u32>(slices.size()) == image.MipLevels() * image.ArrayLayers();
+            const glm::u32 levels = wholeImage ? image.MipLevels() : 1;
+            const glm::u32 layers = wholeImage ? image.ArrayLayers() : 1;
 
             // Six 2D layers is a cube map as far as KTX is concerned, and saying so is what lets the
             // file be loaded back as one rather than as an array that happens to have six entries.
-            const bool isCube = layers == 6 && image.extent().z == 1;
+            const bool isCube = layers == 6 && image.Extent().z == 1;
 
             ktxTextureCreateInfo info {};
             info.vkFormat = vkFormat;
-            info.baseWidth = slices.empty() ? image.extent().x : slices.front().extent.x;
-            info.baseHeight = slices.empty() ? image.extent().y : slices.front().extent.y;
-            info.baseDepth = slices.empty() ? image.extent().z : slices.front().extent.z;
-            info.numDimensions = image.extent().z > 1 ? 3 : (info.baseHeight > 1 ? 2 : 1);
+            info.baseWidth = slices.empty() ? image.Extent().x : slices.front().extent.x;
+            info.baseHeight = slices.empty() ? image.Extent().y : slices.front().extent.y;
+            info.baseDepth = slices.empty() ? image.Extent().z : slices.front().extent.z;
+            info.numDimensions = image.Extent().z > 1 ? 3 : (info.baseHeight > 1 ? 2 : 1);
             info.numLevels = levels;
             info.numLayers = isCube ? 1 : layers;
             info.numFaces = isCube ? 6 : 1;
@@ -187,10 +187,10 @@ namespace kimg
         kor::Result<std::vector<detail::ReadBack>> readEverySlice(const kor::ResourceRef<const kor::Image>& image)
         {
             std::vector<detail::ReadBack> slices;
-            slices.reserve(static_cast<std::size_t>(image->mipLevels()) * image->arrayLayers());
+            slices.reserve(static_cast<std::size_t>(image->MipLevels()) * image->ArrayLayers());
 
-            for (glm::u32 level = 0; level < image->mipLevels(); ++level) {
-                for (glm::u32 layer = 0; layer < image->arrayLayers(); ++layer) {
+            for (glm::u32 level = 0; level < image->MipLevels(); ++level) {
+                for (glm::u32 layer = 0; layer < image->ArrayLayers(); ++layer) {
                     const auto extent = detail::mipExtent(*image, level);
                     auto data = detail::readBack(image, Subimage{
                         .mipLevel = level, .arrayLayer = layer, .offset = { 0, 0, 0 }, .extent = extent });
@@ -205,7 +205,7 @@ namespace kimg
                                                      const std::string& name,
                                                      const kor::ResourceRef<const kor::Image>& image)
         {
-            const auto target = directory / (name + std::string(extensionFor(FileFormat::eKTX2)));
+            const auto target = directory / (name + std::string(ExtensionFor(FileFormat::eKTX2)));
             if (!image) return std::unexpected(detail::fileError(target, "cannot be written from an unusable image"));
 
             std::error_code ec;

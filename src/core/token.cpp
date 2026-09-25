@@ -16,7 +16,7 @@ namespace kor::detail {
     // context there are no executors, and the signalling thread resumes it directly.
     Executor* TimelineState::resumeExecutor() noexcept {
         auto* main = Context::_mainThreadExecutor;
-        if (main && main->isMainThread()) return main;
+        if (main && main->IsMainThread()) return main;
         if (Context::_backgroundExecutor) return Context::_backgroundExecutor;
         return main;
     }
@@ -89,7 +89,7 @@ namespace kor::detail {
         // same timeline again.
         for (const auto& w : due) {
             // Claimed only when the resume actually runs: until then the coroutine may still be
-            // destroyed, and its awaiter's cancel() must be able to win.
+            // destroyed, and its awaiter's Cancel() must be able to win.
             if (w->executor) {
                 w->executor->Post([w] { if (w->claim(WaiterSlot::eResumed)) w->handle.resume(); });
             } else if (w->claim(WaiterSlot::eResumed)) {
@@ -105,7 +105,7 @@ namespace kor::detail {
             std::uint64_t now = reached.load(std::memory_order_relaxed);
             if (gpu) now = std::max(now, gpu->counter());
             if (value <= now) {
-                log::warn("Token {} signalled, but its timeline had already reached {}; "
+                log::Warn("Token {} signalled, but its timeline had already reached {}; "
                           "is more than one producer signalling the same timeline?", value, now);
                 return;
             }
@@ -131,7 +131,7 @@ namespace kor::detail {
             if (gpu) return false;
             gpu = make(reached.load(std::memory_order_relaxed));
         }
-        // A thread blocked in wait() is parked on the condition variable, which only CPU signals
+        // A thread blocked in Wait() is parked on the condition variable, which only CPU signals
         // wake; send it round again so it moves over to waiting on the GPU counter.
         reachedChanged.notify_all();
         return true;
@@ -166,10 +166,10 @@ namespace kor::detail {
             std::shared_ptr<void> owned;
 
             [[nodiscard]] bool ready() const {
-                return std::ranges::all_of(tokens, [](const Token& t) { return t.ready(); });
+                return std::ranges::all_of(tokens, [](const Token& t) { return t.Ready(); });
             }
             void wait() const {
-                for (const auto& t : tokens) t.wait();
+                for (const auto& t : tokens) t.Wait();
             }
         };
 
@@ -210,39 +210,39 @@ namespace kor::detail {
 
 kor::Timeline::Timeline() : _state(std::make_shared<detail::TimelineState>()) {}
 
-kor::Token kor::Timeline::next() {
+kor::Token kor::Timeline::Next() {
     return Token(_state, _state->reserved.fetch_add(1, std::memory_order_relaxed) + 1);
 }
 
-kor::Token kor::Timeline::at(const std::uint64_t value) const {
+kor::Token kor::Timeline::At(const std::uint64_t value) const {
     return Token(_state, value);
 }
 
-std::uint64_t kor::Timeline::value() const noexcept {
+std::uint64_t kor::Timeline::Value() const noexcept {
     return _state->current();
 }
 
 kor::Token kor::Token::Create() {
-    return Timeline().next();
+    return Timeline().Next();
 }
 
-bool kor::Token::ready() const noexcept {
+bool kor::Token::Ready() const noexcept {
     return !_state || _state->isReached(_value);
 }
 
-void kor::Token::wait() const {
-    if (ready()) return;
+void kor::Token::Wait() const {
+    if (Ready()) return;
     _state->wait(_value);
 }
 
-void kor::Token::signal() const {
+void kor::Token::Signal() const {
     if (_state) _state->reach(_value);
 }
 
-std::shared_ptr<kor::detail::WaiterSlot> kor::Token::suspend(const std::coroutine_handle<> h) const {
+std::shared_ptr<kor::detail::WaiterSlot> kor::Token::Suspend(const std::coroutine_handle<> h) const {
     return _state ? _state->suspend(_value, h) : nullptr;
 }
 
-void kor::Token::cancel(const std::shared_ptr<detail::WaiterSlot>& slot) const noexcept {
+void kor::Token::Cancel(const std::shared_ptr<detail::WaiterSlot>& slot) const noexcept {
     if (_state) _state->cancel(slot);
 }

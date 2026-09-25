@@ -2,7 +2,7 @@
 // cursor.
 //
 // Both need a device: an aspect source is a real kor::Image or kor::Framebuffer, and a camera's
-// automaticUpdate() is what the repository would call each frame. What cannot be covered here is the
+// AutomaticUpdate() is what the repository would call each frame. What cannot be covered here is the
 // *input* half — GLFW has no way to inject a key press, so a release binding on a key can only be
 // exercised through the state it toggles. The binding that is always held is the exception, and it is
 // also the one worth pinning: it is what a missing edge-trigger would break.
@@ -27,10 +27,10 @@ struct CameraAspect : GpuTest { };
 kor::Resource<kor::Image> colorImage(const glm::uvec2 extent)
 {
     return kor::Image::Builder()
-        .setFormat(kor::Image::Format::eRGBA8_UNORM)
-        .setUsage(kor::Image::Usage::eColorAttachment)
-        .setExtent(extent)
-        .build();
+        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+        .SetUsage(kor::Image::Usage::eColorAttachment)
+        .SetExtent(extent)
+        .Build();
 }
 
 TEST_F(CameraAspect, ACameraFollowingAnImageTakesItsShapeStraightAway)
@@ -41,50 +41,50 @@ TEST_F(CameraAspect, ACameraFollowingAnImageTakesItsShapeStraightAway)
     // At build, not on the first frame: a scene that renders before the repository has run once
     // would otherwise draw one frame at whatever the builder's default aspect was.
     const auto camera = PerspectiveCamera::Builder{}
-        .setAspect(1.f)
-        .followAspectOf(target)
-        .build();
+        .SetAspect(1.f)
+        .FollowAspectOf(target)
+        .Build();
     ASSERT_TRUE(camera);
-    EXPECT_FLOAT_EQ(camera->aspect(), 2.f);
+    EXPECT_FLOAT_EQ(camera->Aspect(), 2.f);
 
     // And it follows: resizing the target is the whole point, since that is what a viewport does.
     target->Resize({ 400, 800, 1 });
-    camera->automaticUpdate();
-    EXPECT_FLOAT_EQ(camera->aspect(), 0.5f);
+    camera->AutomaticUpdate();
+    EXPECT_FLOAT_EQ(camera->Aspect(), 0.5f);
 }
 
 TEST_F(CameraAspect, ACameraCanFollowAWholeFramebufferInstead)
 {
     auto color = colorImage({ 1200, 400 });
     ASSERT_TRUE(color);
-    auto view = kor::ImageView::Builder(color).build();
+    auto view = kor::ImageView::Builder(color).Build();
     ASSERT_TRUE(view);
-    auto framebuffer = kor::Framebuffer::Builder().addColor({ .view = view }).build();
+    auto framebuffer = kor::Framebuffer::Builder().AddColor({ .view = view }).Build();
     ASSERT_TRUE(framebuffer);
 
-    const auto camera = PerspectiveCamera::Builder{}.followAspectOf(framebuffer).build();
+    const auto camera = PerspectiveCamera::Builder{}.FollowAspectOf(framebuffer).Build();
     ASSERT_TRUE(camera);
-    EXPECT_FLOAT_EQ(camera->aspect(), 3.f);
-    EXPECT_EQ(camera->aspectSource().kind, AspectSource::Kind::eFramebuffer);
+    EXPECT_FLOAT_EQ(camera->Aspect(), 3.f);
+    EXPECT_EQ(camera->AspectSourceSettings().kind, AspectSource::Kind::eFramebuffer);
 
     framebuffer->Resize({ 400, 400 });
-    camera->automaticUpdate();
-    EXPECT_FLOAT_EQ(camera->aspect(), 1.f);
+    camera->AutomaticUpdate();
+    EXPECT_FLOAT_EQ(camera->Aspect(), 1.f);
 }
 
 TEST_F(CameraAspect, FollowingTheWindowIsStillOneCall)
 {
-    const auto camera = PerspectiveCamera::Builder{}.setFollowWindowAspect().build();
+    const auto camera = PerspectiveCamera::Builder{}.SetFollowWindowAspect().Build();
     ASSERT_TRUE(camera);
-    EXPECT_TRUE(camera->followsWindowAspect());
-    EXPECT_EQ(camera->aspectSource().kind, AspectSource::Kind::eWindow);
+    EXPECT_TRUE(camera->FollowsWindowAspect());
+    EXPECT_EQ(camera->AspectSourceSettings().kind, AspectSource::Kind::eWindow);
 
     // And switching it off leaves the aspect alone rather than resetting it: the last thing it
     // followed is the shape the scene is currently drawing at.
-    const float wasFollowing = camera->aspect();
-    camera->setFollowWindowAspect(false);
-    EXPECT_FALSE(camera->followsWindowAspect());
-    EXPECT_FLOAT_EQ(camera->aspect(), wasFollowing);
+    const float wasFollowing = camera->Aspect();
+    camera->SetFollowWindowAspect(false);
+    EXPECT_FALSE(camera->FollowsWindowAspect());
+    EXPECT_FLOAT_EQ(camera->Aspect(), wasFollowing);
 }
 
 TEST_F(CameraAspect, ASourceThatIsDestroyedLeavesTheAspectWhereItWas)
@@ -92,20 +92,20 @@ TEST_F(CameraAspect, ASourceThatIsDestroyedLeavesTheAspectWhereItWas)
     auto target = colorImage({ 900, 300 });
     ASSERT_TRUE(target);
 
-    const auto camera = PerspectiveCamera::Builder{}.followAspectOf(target).build();
+    const auto camera = PerspectiveCamera::Builder{}.FollowAspectOf(target).Build();
     ASSERT_TRUE(camera);
-    EXPECT_FLOAT_EQ(camera->aspect(), 3.f);
+    EXPECT_FLOAT_EQ(camera->Aspect(), 3.f);
 
     target = { };   // the scene dropped what the camera was following
 
-    EXPECT_TRUE(camera->aspectSource().dangling());
-    EXPECT_FALSE(camera->aspectSource().extent().has_value());
+    EXPECT_TRUE(camera->AspectSourceSettings().Dangling());
+    EXPECT_FALSE(camera->AspectSourceSettings().Extent().has_value());
 
     // Not a crash, and not a division by a zero extent either: the aspect simply stops moving. The
     // camera says so once, which is the difference between this and silently doing nothing.
-    camera->automaticUpdate();
-    camera->automaticUpdate();
-    EXPECT_FLOAT_EQ(camera->aspect(), 3.f);
+    camera->AutomaticUpdate();
+    camera->AutomaticUpdate();
+    EXPECT_FLOAT_EQ(camera->Aspect(), 3.f);
 }
 
 TEST_F(CameraAspect, PointingACameraAtSomethingElseRetargetsIt)
@@ -115,18 +115,18 @@ TEST_F(CameraAspect, PointingACameraAtSomethingElseRetargetsIt)
     ASSERT_TRUE(first);
     ASSERT_TRUE(second);
 
-    const auto camera = PerspectiveCamera::Builder{}.followAspectOf(first).build();
+    const auto camera = PerspectiveCamera::Builder{}.FollowAspectOf(first).Build();
     ASSERT_TRUE(camera);
-    EXPECT_FLOAT_EQ(camera->aspect(), 2.f);
+    EXPECT_FLOAT_EQ(camera->Aspect(), 2.f);
 
-    camera->followAspectOf(second);
-    EXPECT_FLOAT_EQ(camera->aspect(), 0.5f);
+    camera->FollowAspectOf(second);
+    EXPECT_FLOAT_EQ(camera->Aspect(), 0.5f);
 
     // Nothing at all: the aspect is the scene's to set by hand again.
-    camera->setAspectSource(AspectSource::none());
-    camera->setAspect(1.25f);
-    camera->automaticUpdate();
-    EXPECT_FLOAT_EQ(camera->aspect(), 1.25f);
+    camera->SetAspectSource(AspectSource::None());
+    camera->SetAspect(1.25f);
+    camera->AutomaticUpdate();
+    EXPECT_FLOAT_EQ(camera->Aspect(), 1.25f);
 }
 
 // The escape hatch, and the part of it a test can drive: GLFW has no way to inject a key press, but a
@@ -136,47 +136,47 @@ TEST_F(CameraAspect, PointingACameraAtSomethingElseRetargetsIt)
 TEST_F(CameraAspect, ReleasingOnlyEverReleases)
 {
     const auto camera = PerspectiveCamera::Builder{}
-        .setReleased(false)   // in control from the first frame, so there is a grip to let go of
-        .setController({
+        .SetReleased(false)   // in control from the first frame, so there is a grip to let go of
+        .SetController({
             .kind = Controller::Kind::eFly,
             // Engage unbound, so nothing can take the cursor back and the release is what is observed.
-            .bindings = { .release = kcam::Input::always(), .engage = { } },
+            .bindings = { .release = kcam::Input::Always(), .engage = { } },
         })
-        .build();
+        .Build();
     ASSERT_TRUE(camera);
-    EXPECT_FALSE(camera->released());
+    EXPECT_FALSE(camera->Released());
 
-    camera->automaticUpdate();
-    EXPECT_TRUE(camera->released());
+    camera->AutomaticUpdate();
+    EXPECT_TRUE(camera->Released());
 
-    for (int i = 0; i < 8; ++i) camera->automaticUpdate();
-    EXPECT_TRUE(camera->released());
+    for (int i = 0; i < 8; ++i) camera->AutomaticUpdate();
+    EXPECT_TRUE(camera->Released());
 }
 
 // Nothing should take the user's pointer before the user has asked it to, so a camera begins parked
 // whatever it was built with — and a scene that opens straight into play says so.
 TEST_F(CameraAspect, ACameraStartsHavingLetGoOfTheCursor)
 {
-    const auto idle = PerspectiveCamera::Builder{}.build();
+    const auto idle = PerspectiveCamera::Builder{}.Build();
     ASSERT_TRUE(idle);
-    EXPECT_TRUE(idle->released());
+    EXPECT_TRUE(idle->Released());
 
     const auto flying = PerspectiveCamera::Builder{}
-        .setController({ .kind = Controller::Kind::eFly })
-        .build();
+        .SetController({ .kind = Controller::Kind::eFly })
+        .Build();
     ASSERT_TRUE(flying);
-    EXPECT_TRUE(flying->released()) << "a controller does not make a camera grab the pointer";
+    EXPECT_TRUE(flying->Released()) << "a controller does not make a camera grab the pointer";
 
-    const auto ortho = OrthographicCamera::Builder{}.build();
+    const auto ortho = OrthographicCamera::Builder{}.Build();
     ASSERT_TRUE(ortho);
-    EXPECT_TRUE(ortho->released()) << "both kinds of camera start the same way";
+    EXPECT_TRUE(ortho->Released()) << "both kinds of camera start the same way";
 
     const auto straightIn = PerspectiveCamera::Builder{}
-        .setController({ .kind = Controller::Kind::eFly })
-        .setReleased(false)
-        .build();
+        .SetController({ .kind = Controller::Kind::eFly })
+        .SetReleased(false)
+        .Build();
     ASSERT_TRUE(straightIn);
-    EXPECT_FALSE(straightIn->released());
+    EXPECT_FALSE(straightIn->Released());
 }
 
 // And engaging only ever engages — but not from anywhere: it counts where the controller is allowed
@@ -189,25 +189,25 @@ TEST_F(CameraAspect, EngagingTakesTheCursorBackOnlyWhereTheMouseIsTheControllers
     // scene. Changing `input` under one camera mid-press would test that instead.
     const auto build = [](const Controller::Input input) {
         return PerspectiveCamera::Builder{}
-            .setController({
+            .SetController({
                 .kind = Controller::Kind::eFly,
                 .input = input,
-                .bindings = { .release = { }, .engage = kcam::Input::always() },
+                .bindings = { .release = { }, .engage = kcam::Input::Always() },
             })
-            .build();
+            .Build();
     };
 
     const auto elsewhere = build(Controller::Input::eDisabled);
     ASSERT_TRUE(elsewhere);
-    elsewhere->setReleased(true);
-    elsewhere->automaticUpdate();
-    EXPECT_TRUE(elsewhere->released()) << "a click somewhere else must not take the cursor back";
+    elsewhere->SetReleased(true);
+    elsewhere->AutomaticUpdate();
+    EXPECT_TRUE(elsewhere->Released()) << "a click somewhere else must not take the cursor back";
 
     const auto overTheScene = build(Controller::Input::eEnabled);
     ASSERT_TRUE(overTheScene);
-    overTheScene->setReleased(true);
-    overTheScene->automaticUpdate();
-    EXPECT_FALSE(overTheScene->released());
+    overTheScene->SetReleased(true);
+    overTheScene->AutomaticUpdate();
+    EXPECT_FALSE(overTheScene->Released());
 }
 
 // A scene releases the cursor itself when it opens a menu, and the state it writes is the same one
@@ -215,23 +215,23 @@ TEST_F(CameraAspect, EngagingTakesTheCursorBackOnlyWhereTheMouseIsTheControllers
 TEST_F(CameraAspect, ASceneCanLetTheCursorGoAndTakeItBack)
 {
     const auto camera = PerspectiveCamera::Builder{}
-        .setController({ .kind = Controller::Kind::eFly })
-        .build();
+        .SetController({ .kind = Controller::Kind::eFly })
+        .Build();
     ASSERT_TRUE(camera);
 
-    const glm::vec3 where = camera->position();
+    const glm::vec3 where = camera->Position();
 
-    camera->setReleased(true);
-    EXPECT_TRUE(camera->released());
+    camera->SetReleased(true);
+    EXPECT_TRUE(camera->Released());
 
     // Parked: the controller reads nothing while released. Nothing is being pressed here either, so
     // what this really pins is that a released camera is not touched by the update at all.
-    camera->automaticUpdate();
-    EXPECT_EQ(camera->position(), where);
-    EXPECT_TRUE(camera->released());
+    camera->AutomaticUpdate();
+    EXPECT_EQ(camera->Position(), where);
+    EXPECT_TRUE(camera->Released());
 
-    camera->setReleased(false);
-    EXPECT_FALSE(camera->released());
+    camera->SetReleased(false);
+    EXPECT_FALSE(camera->Released());
 }
 
 } // namespace

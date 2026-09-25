@@ -10,8 +10,8 @@ for CI and fast (<1s).
 |----------------------------|------------------------|-------|
 | `test_mesh_tlsf_allocator.cpp` | `kmesh::TLSFAllocator` | alloc/free, splitting, coalescing, accounting, OOM, a randomized no-overlap stress test |
 | `test_flags.cpp`           | `kor::Flags<Enum>`     | bit set/test/combine/mask, equality, conversions |
-| `test_error.cpp`           | `error.h` / `error.cpp`| `describe()` completeness, `Error::toString()`, `fail()`, `guard()`, `Result::valueOrThrow`, cause chains (`history()`, `root()`, `causedBy()`) |
-| `test_structs.cpp`         | `structs.h`            | `sizeofChannelType()`, default pipeline-state values |
+| `test_error.cpp`           | `error.h` / `error.cpp`| `Describe()` completeness, `Error::ToString()`, `Fail()`, `Guard()`, `Result::ValueOrThrow`, cause chains (`History()`, `Root()`, `CausedBy()`) |
+| `test_structs.cpp`         | `structs.h`            | `SizeofChannelType()`, default pipeline-state values |
 | `test_mesh_layout.cpp`     | `meshLayout.h`         | std430 alignment, `ParamVertex` stride/offsets, `FindPositionAttribute` |
 | `test_resource.cpp`        | `resource.h`           | `Resource` move/ownership, `ResourceRef` dangling detection, const/upcast conversions, poisoned resources and in-place repair |
 | `test_builder_recoverable.cpp` | `builder.h` / `buffer.h` | which builders may be retained for a retry (`Builder::Recoverable`), and that copying a `Buffer::Builder` does not alias the source's data |

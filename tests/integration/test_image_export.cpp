@@ -40,13 +40,13 @@ std::filesystem::path outDir() {
 kor::Resource<Image> mippedImage(const std::uint32_t size, const std::uint32_t mips,
                                  const std::uint32_t layers = 1) {
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec2{ size, size })
-        .setMipLevels(mips)
-        .setArrayLayers(layers)
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec2{ size, size })
+        .SetMipLevels(mips)
+        .SetArrayLayers(layers)
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
+        .Build();
 
     // Fill every level of every layer with a value derived from both, by uploading it: clears only
     // reach mip 0, and what is being tested is that a *chosen* subimage comes back.
@@ -58,10 +58,10 @@ kor::Resource<Image> mippedImage(const std::uint32_t size, const std::uint32_t m
                 static_cast<std::uint8_t>(10 + mip * 40), static_cast<std::uint8_t>(20 + layer * 30), 200, 255 });
 
             const auto staging = Buffer::Builder<glm::u8vec4>()
-                .setDataView(std::span<const glm::u8vec4>(texels))
-                .setUsage(Buffer::Usage::eTransferSrc)
-                .setType(Buffer::Type::eStaging)
-                .build();
+                .SetDataView(std::span<const glm::u8vec4>(texels))
+                .SetUsage(Buffer::Usage::eTransferSrc)
+                .SetType(Buffer::Type::eStaging)
+                .Build();
 
             CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
                 cb.CopyBufferToImage(staging, image, kor::Copy{
@@ -71,25 +71,25 @@ kor::Resource<Image> mippedImage(const std::uint32_t size, const std::uint32_t m
                     .imageLayerCount = 1,
                     .imageMipLevel = mip,
                 });
-            }).wait();
+            }).Wait();
         }
     }
     return image;
 }
 
 std::vector<glm::u8vec4> readTexels(const ResourceRef<const Image>& image) {
-    const auto extent = image->extent();
+    const auto extent = image->Extent();
     const auto texels = static_cast<std::size_t>(extent.x) * extent.y;
 
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(texels * sizeof(glm::u8vec4)))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(texels * sizeof(glm::u8vec4)))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(image, readback);
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
     return readback->Read<glm::u8vec4>();
 }
 
@@ -106,8 +106,8 @@ TEST_F(GpuTest, ExportWritesMipZeroByDefault) {
     ASSERT_TRUE(std::filesystem::exists(*saved));
 
     auto reloaded = kimg::LoadImage(*saved);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(16, 16, 1));
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(16, 16, 1));
 
     const auto texels = readTexels(reloaded);
     ASSERT_FALSE(texels.empty());
@@ -125,7 +125,7 @@ TEST_F(GpuTest, ExportWritesAChosenMipLevel) {
 
     auto reloaded = kimg::LoadImage(*saved);
     ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(4, 4, 1));   // 16 >> 2
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(4, 4, 1));   // 16 >> 2
 
     const auto texels = readTexels(reloaded);
     ASSERT_FALSE(texels.empty());
@@ -158,7 +158,7 @@ TEST_F(GpuTest, ExportWritesAChosenRegion) {
 
     auto reloaded = kimg::LoadImage(*saved);
     ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(8, 4, 1));
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(8, 4, 1));
 }
 
 // A subimage that does not exist is refused by name, before anything is written.
@@ -180,30 +180,30 @@ TEST_F(GpuTest, ExportRefusesASubimageThatIsNotThere) {
 // A float image needs a container that can hold floats; the writer must not quietly truncate it.
 TEST_F(GpuTest, ExportKeepsFloatPrecisionInAFloatContainer) {
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eRGBA32_SFLOAT)
-        .setExtent(glm::uvec2{ 4, 4 })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eRGBA32_SFLOAT)
+        .SetExtent(glm::uvec2{ 4, 4 })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
+        .Build();
     // A value no 8-bit container could hold.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(image, glm::vec4{ 12.5f, 0.25f, 3.f, 1.f });
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
 
     const auto saved = kimg::SaveImage(outDir(), "bright", kimg::FileFormat::eEXR, image);
     ASSERT_TRUE(saved.has_value()) << saved.error().message;
 
     auto reloaded = kimg::LoadImage(*saved);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
 
     Buffer::RawBuilder rb;
-    rb.setRawSize(4 * 4 * static_cast<glm::i64>(sizeof(glm::vec4)))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(4 * 4 * static_cast<glm::i64>(sizeof(glm::vec4)))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(reloaded, readback);
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     const auto texels = readback->Read<glm::vec4>();
     ASSERT_FALSE(texels.empty());
@@ -225,11 +225,11 @@ TEST_F(GpuTest, ExportWritesAWholeMippedCubeAsKtx2) {
     EXPECT_EQ(saved->extension(), ".ktx2");
 
     auto reloaded = kimg::LoadImage(*saved);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(kSize, kSize, 1));
-    EXPECT_EQ(reloaded->mipLevels(), kMips);
-    EXPECT_EQ(reloaded->arrayLayers(), 6u);
-    EXPECT_EQ(reloaded->format(), Image::Format::eRGBA8_UNORM);
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
+    EXPECT_EQ(reloaded->MipLevels(), kMips);
+    EXPECT_EQ(reloaded->ArrayLayers(), 6u);
+    EXPECT_EQ(reloaded->PixelFormat(), Image::Format::eRGBA8_UNORM);
 }
 
 // The async twin, run to completion the way the headless engine runs a job.
@@ -237,18 +237,18 @@ TEST_F(GpuTest, ExportWritesAWholeImageAsKtx2Async) {
     auto image = mippedImage(8, 4);
 
     auto task = kimg::SaveImageSetAsync(outDir(), "async", image);
-    while (!task.done()) {
+    while (!task.Done()) {
         kor::Context::DrainMainThread();
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    auto result = task.take();
+    auto result = task.Take();
     ASSERT_TRUE(result.has_value()) << result.error();
     ASSERT_TRUE(result->has_value()) << (*result).error().message;
     EXPECT_TRUE(std::filesystem::exists(**result));
 
     auto reloaded = kimg::LoadImage(**result);
     ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->mipLevels(), 4u);
+    EXPECT_EQ(reloaded->MipLevels(), 4u);
 }
 
 // A block-compressed image can only go into KTX2 — and it goes in as the blocks it already is, which
@@ -256,60 +256,60 @@ TEST_F(GpuTest, ExportWritesAWholeImageAsKtx2Async) {
 TEST_F(GpuTest, ExportWritesCompressedBlocksIntoKtx2) {
     constexpr std::uint32_t kSize = 16;
     const auto format = Image::Format::eBC7_UNORM;
-    const auto byteCount = Image::sizeOfRegion(format, { kSize, kSize, 1 });
+    const auto byteCount = Image::SizeOfRegion(format, { kSize, kSize, 1 });
 
     std::vector<std::uint8_t> blocks(byteCount);
     for (std::size_t i = 0; i < blocks.size(); ++i)
-        blocks[i] = static_cast<std::uint8_t>((i / Image::blockSize(format)) + 1);
+        blocks[i] = static_cast<std::uint8_t>((i / Image::BlockSize(format)) + 1);
 
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(format)
-        .setExtent(glm::uvec2{ kSize, kSize })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(format)
+        .SetExtent(glm::uvec2{ kSize, kSize })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
+        .Build();
     ASSERT_TRUE(static_cast<bool>(image));
 
     const auto staging = Buffer::Builder<std::uint8_t>()
-        .setDataView(std::span<const std::uint8_t>(blocks))
-        .setUsage(Buffer::Usage::eTransferSrc)
-        .setType(Buffer::Type::eStaging)
-        .build();
+        .SetDataView(std::span<const std::uint8_t>(blocks))
+        .SetUsage(Buffer::Usage::eTransferSrc)
+        .SetType(Buffer::Type::eStaging)
+        .Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyBufferToImage(staging, image, kor::Copy{
             .imageOffset = { 0, 0, 0 }, .imageExtent = { kSize, kSize, 1 } });
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     const auto saved = kimg::SaveImageSet(outDir(), "bc7", image);
     ASSERT_TRUE(saved.has_value()) << saved.error().message;
 
     auto reloaded = kimg::LoadImage(*saved);
-    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.error() ? reloaded.error()->message : "");
-    EXPECT_EQ(reloaded->format(), format);
-    EXPECT_EQ(reloaded->extent(), glm::uvec3(kSize, kSize, 1));
+    ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
+    EXPECT_EQ(reloaded->PixelFormat(), format);
+    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
 
     // The blocks themselves, byte for byte: a compressed texture that survives a round trip is one
     // nothing decoded and re-encoded behind your back.
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(byteCount))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(byteCount))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(reloaded, readback, kor::Copy{
             .imageOffset = { 0, 0, 0 }, .imageExtent = { kSize, kSize, 1 } });
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
     EXPECT_EQ(readback->Read<std::uint8_t>(), blocks);
 }
 
 // ...and it is refused, by name, from a container that cannot hold blocks.
 TEST_F(GpuTest, ExportRefusesCompressedIntoAnOrdinaryContainer) {
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eBC7_UNORM)
-        .setExtent(glm::uvec2{ 8, 8 })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eBC7_UNORM)
+        .SetExtent(glm::uvec2{ 8, 8 })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
+        .Build();
 
     const auto saved = kimg::SaveImage(outDir(), "bc7", kimg::FileFormat::ePNG, image);
     ASSERT_FALSE(saved.has_value());

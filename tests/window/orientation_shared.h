@@ -58,24 +58,24 @@ struct Result {
 
 inline kor::ResourceRef<const kor::Shader> loadShader(const char* file, kor::Shader::Stage stage, const char* key) {
     return kor::Shader::Builder{}
-        .setLang<kor::Shader::Lang::eGLSL>()
-        .setStage(stage)
-        .setPath(kor::shaderPath(file))
-        .getOrBuild(key);
+        .SetLang<kor::Shader::Lang::eGLSL>()
+        .SetStage(stage)
+        .SetPath(kor::ShaderPath(file))
+        .GetOrBuild(key);
 }
 
 // Copy an image back to host memory. Rows come out top-down on Vulkan and
 // bottom-up on OpenGL (see the file header) — expectHalfSplit accounts for that.
 inline std::vector<Pixel> readback(const kor::Resource<kor::Image>& image) {
     kor::Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .setUsage(kor::Buffer::Usage::eTransferDst)
-      .setType(kor::Buffer::Type::eReadback);
-    auto buf = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .SetUsage(kor::Buffer::Usage::eTransferDst)
+      .SetType(kor::Buffer::Type::eReadback);
+    auto buf = rb.Build();
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
         cb.CopyImageToBuffer(image,
                              buf);
-    }, kor::CommandBuffer::Usage::eTransfer).wait();
+    }, kor::CommandBuffer::Usage::eTransfer).Wait();
     return buf->Read<Pixel>();
 }
 
@@ -94,23 +94,23 @@ inline void blitToScreen(const kor::Resource<kor::Image>& image) {
 // image and read it back.
 inline Result rasterTopHalf() {
     auto image = kor::Image::Builder{}
-                     .setType(kor::Image::Type::e2D)
-                     .setFormat(kor::Image::Format::eRGBA8_UNORM)
-                     .setExtent(glm::uvec2{kW, kH})
-                     .setUsage(kor::Image::Usage::eColorAttachment | kor::Image::Usage::eTransferSrc)
-                     .build();
-    auto view = kor::ImageView::Builder(image).build();
+                     .SetType(kor::Image::Type::e2D)
+                     .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetUsage(kor::Image::Usage::eColorAttachment | kor::Image::Usage::eTransferSrc)
+                     .Build();
+    auto view = kor::ImageView::Builder(image).Build();
     auto fb = kor::Framebuffer::Builder{}
-                  .addColor({ .view = view, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
-                  .build();
+                  .AddColor({ .view = view, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                  .Build();
 
     const auto vert = loadShader("topHalfQuad.vert.glsl", kor::Shader::Stage::eVertex, "orient.tophalf.vert");
     const auto frag = loadShader("flatTriangle.frag.glsl", kor::Shader::Stage::eFragment, "orient.flat.frag");
     auto pipeline = kor::GraphicsPipeline::Builder{}
-                        .setVertexShader(vert)
-                        .setFragmentShader(frag)
-                        .setFramebuffer(fb)
-                        .build();
+                        .SetVertexShader(vert)
+                        .SetFragmentShader(frag)
+                        .SetFramebuffer(fb)
+                        .Build();
 
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
         cb.BeginRendering(fb);
@@ -119,7 +119,7 @@ inline Result rasterTopHalf() {
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(6); // two triangles covering the top half of clip space
         cb.EndRendering();
-    }, kor::CommandBuffer::Usage::eGraphics).wait();
+    }, kor::CommandBuffer::Usage::eGraphics).Wait();
 
     auto px = readback(image);
     return Result{ std::move(image), std::move(px) };
@@ -129,18 +129,18 @@ inline Result rasterTopHalf() {
 // and read it back.
 inline Result computeTopHalf() {
     auto image = kor::Image::Builder{}
-                     .setType(kor::Image::Type::e2D)
-                     .setFormat(kor::Image::Format::eRGBA8_UNORM)
-                     .setExtent(glm::uvec2{kW, kH})
-                     .setUsage(kor::Image::Usage::eStorage | kor::Image::Usage::eTransferSrc)
-                     .build();
-    auto view = kor::ImageView::Builder(image).build();
+                     .SetType(kor::Image::Type::e2D)
+                     .SetFormat(kor::Image::Format::eRGBA8_UNORM)
+                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetUsage(kor::Image::Usage::eStorage | kor::Image::Usage::eTransferSrc)
+                     .Build();
+    auto view = kor::ImageView::Builder(image).Build();
 
     const auto shader = loadShader("topHalfImage.comp.glsl", kor::Shader::Stage::eCompute, "orient.tophalf.comp");
-    auto pipeline = kor::ComputePipeline::Builder{}.setComputeShader(shader).build();
+    auto pipeline = kor::ComputePipeline::Builder{}.SetComputeShader(shader).Build();
     auto set = kor::DescriptorSet::Builder(pipeline, 0)
-                   .write(0, view)
-                   .build();
+                   .Write(0, view)
+                   .Build();
 
     const kor::ResourceRef<const kor::Image> imgRef(image);
     kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
@@ -149,7 +149,7 @@ inline Result computeTopHalf() {
         cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::eComputeWrite));
         cb.Dispatch((kW + 7) / 8, (kH + 7) / 8, 1);
         cb.ImageBarrier(kor::ImageBarrier(imgRef, kor::ResourceAccess::eTransferSrc));
-    }, kor::CommandBuffer::Usage::eCompute).wait();
+    }, kor::CommandBuffer::Usage::eCompute).Wait();
 
     auto px = readback(image);
     return Result{ std::move(image), std::move(px) };
@@ -164,7 +164,7 @@ inline void expectHalfSplit(const std::vector<Pixel>& px) {
 
     // Vulkan reads back top-down (green half = low rows); GL reads back bottom-up
     // (green half = high rows). The rendered image is the same either way.
-    const bool greenInLowRows = (kor::Context::activeAPI() == kor::API::eVulkan);
+    const bool greenInLowRows = (kor::Context::ActiveAPI() == kor::API::eVulkan);
 
     int greenRows = 0, blackRows = 0;
     for (std::uint32_t y = 0; y < kH; ++y) {

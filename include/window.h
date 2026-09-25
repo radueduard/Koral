@@ -43,7 +43,7 @@ namespace kor {
      *
      * A scene does not normally construct one. The runtime builds the window from the project's
      * configuration before the first frame and drives it; reach the live one through
-     * Context::Window() and the image being drawn to through framebuffer().
+     * Context::Window() and the image being drawn to through DefaultFramebuffer().
      *
      * There is one window per process. It is neither copyable nor thread-safe: every method here
      * must be called from the thread that created it, which is the thread the scene is driven on.
@@ -57,7 +57,7 @@ namespace kor {
         /**
          * @brief Settings the window is created with, and the scene it will run.
          *
-         * Every setter returns the builder, so they chain; build() then creates the window. The
+         * Every setter returns the builder, so they chain; Build() then creates the window. The
          * scene is the one argument with no default, because a window exists to draw one — it is
          * passed to the constructor and its ownership moves into the window.
          *
@@ -92,13 +92,13 @@ namespace kor {
             Builder& operator=(Builder&&) noexcept;
 
             /** @brief Sets the text shown in the title bar. */
-            Builder& setTitle(const std::string& title) {
+            Builder& SetTitle(const std::string& title) {
                 this->title = title;
                 return *this;
             }
 
             /** @brief Sets the initial size of the drawable area, in pixels. */
-            Builder& setExtent(const glm::uvec2& extent) {
+            Builder& SetExtent(const glm::uvec2& extent) {
                 this->extent = extent;
                 return *this;
             }
@@ -110,19 +110,19 @@ namespace kor {
              * through Scene::OnResize. Fixing the size does not exempt a scene from handling that:
              * a fullscreen window still adopts the monitor's resolution.
              */
-            Builder& setResizable(bool resizable) {
+            Builder& SetResizable(bool resizable) {
                 this->resizable = resizable;
                 return *this;
             }
 
             /** @brief Sets whether the window opens fullscreen on the primary monitor, at that monitor's resolution. */
-            Builder& setFullscreen(bool fullscreen) {
+            Builder& SetFullscreen(bool fullscreen) {
                 this->fullscreen = fullscreen;
                 return *this;
             }
 
             /** @brief Sets whether the OS draws a title bar and border around the window. */
-            Builder& setDecorated(bool decorated) {
+            Builder& SetDecorated(bool decorated) {
                 this->decorated = decorated;
                 return *this;
             }
@@ -134,7 +134,7 @@ namespace kor {
              * window possible. What shows through is whatever alpha the scene leaves in the
              * swap-chain image.
              */
-            Builder& setTransparentFramebuffer(bool transparent) {
+            Builder& SetTransparentFramebuffer(bool transparent) {
                 this->transparentFramebuffer = transparent;
                 return *this;
             }
@@ -147,13 +147,13 @@ namespace kor {
              * are ready — uncapped, and free to tear. Turn it off to measure how fast a scene
              * actually renders.
              */
-            Builder& setVSync(bool vsync) {
+            Builder& SetVSync(bool vsync) {
                 this->vsync = vsync;
                 return *this;
             }
 
             /** @brief Selects the graphics backend the window and everything drawn in it will use. */
-            Builder& setAPI(API api) {
+            Builder& SetAPI(API api) {
                 this->api = api;
                 return *this;
             }
@@ -167,7 +167,7 @@ namespace kor {
              *
              * @see WindowPlatform
              */
-            Builder& setPlatform(WindowPlatform platform) {
+            Builder& SetPlatform(WindowPlatform platform) {
                 this->platform = platform;
                 return *this;
             }
@@ -179,7 +179,7 @@ namespace kor {
              * layout follows whoever launched the program rather than the project. Naming a path
              * gives the project its own layout; missing parent directories are created.
              */
-            Builder& setImguiIni(std::filesystem::path imguiIni) {
+            Builder& SetImguiIni(std::filesystem::path imguiIni) {
                 this->imguiIni = std::move(imguiIni);
                 return *this;
             }
@@ -188,10 +188,10 @@ namespace kor {
              * @brief Creates the window, brings the graphics device up, and initializes the scene.
              * @return The window. It owns the scene, the surface and the default framebuffer.
              */
-            std::unique_ptr<Window> build();
+            std::unique_ptr<Window> Build();
         };
 
-        /** @brief Constructs the window from a builder. Prefer Builder::build(). */
+        /** @brief Constructs the window from a builder. Prefer Builder::Build(). */
         explicit Window(Builder&);
 
         /** @brief Waits for the device to go idle, then tears down the scene, the GUI and the device. */
@@ -204,57 +204,57 @@ namespace kor {
         Window &operator=(Window &&);
 
         /**
-         * @brief Whether the window has been asked to close, by the user or by close().
+         * @brief Whether the window has been asked to close, by the user or by Close().
          * @return true once the request has been made; the frame in progress still completes.
          */
-        [[nodiscard]] bool shouldClose() const;
+        [[nodiscard]] bool ShouldClose() const;
 
         /**
          * @brief Asks the window to close.
          *
-         * Sets the same flag the OS close button does, so shouldClose() reports it and the run loop
+         * Sets the same flag the OS close button does, so ShouldClose() reports it and the run loop
          * exits after the current frame. Nothing is destroyed here.
          */
-        void close();
+        void Close();
 
         /** @brief The underlying GLFW window handle, for code that has to talk to GLFW directly. */
         [[nodiscard]] GLFWwindow* operator*() const { return _window; }
 
         /** @brief Current size of the drawable area in pixels, which is not the window's outer size on a scaled display. */
-        [[nodiscard]] glm::uvec2 extent() const { return _extent; }
+        [[nodiscard]] glm::uvec2 Extent() const { return _extent; }
 
         /**
          * @brief Whether the window currently has no drawable area, i.e. it is minimized.
          * @return true while the framebuffer is zero-sized. Rendering into a zero-sized swap chain
          *         is invalid, so the run loop skips the frame entirely while this holds.
          */
-        [[nodiscard]] bool isPaused() const { return _paused; }
+        [[nodiscard]] bool IsPaused() const { return _paused; }
 
         /** @brief Whether the user may resize the window. */
-        [[nodiscard]] bool isResizable() const { return _resizable; }
+        [[nodiscard]] bool IsResizable() const { return _resizable; }
         /** @brief Whether the window is fullscreen. */
-        [[nodiscard]] bool isFullscreen() const { return _fullscreen; }
+        [[nodiscard]] bool IsFullscreen() const { return _fullscreen; }
         /** @brief Whether the OS draws a title bar and border. */
-        [[nodiscard]] bool isDecorated() const { return _decorated; }
+        [[nodiscard]] bool IsDecorated() const { return _decorated; }
         /** @brief Whether presentation waits for the display's refresh. */
-        [[nodiscard]] bool isVSync() const { return _vsync; }
+        [[nodiscard]] bool IsVSync() const { return _vsync; }
         /** @brief Whether the framebuffer's alpha composites with the desktop. */
-        [[nodiscard]] bool isFramebufferTransparent() const { return _transparentFramebuffer; }
+        [[nodiscard]] bool IsFramebufferTransparent() const { return _transparentFramebuffer; }
 
         /** @brief Marks the window paused, so the run loop stops rendering it. Set automatically when it is minimized. */
-        void pause() { _paused = true; }
+        void Pause() { _paused = true; }
 
         /** @brief Clears the paused state, so rendering resumes. */
-        void unpause() { _paused = false; }
+        void Unpause() { _paused = false; }
 
         /** @brief Changes the text in the title bar. */
-        void setTitle(const std::string &title);
+        void SetTitle(const std::string &title);
 
         /** @brief The graphics backend this window was brought up on. */
-        [[nodiscard]] API aPI() const { return _api; }
+        [[nodiscard]] API GraphicsAPI() const { return _api; }
 
         /** @brief The text currently in the title bar. */
-        [[nodiscard]] const std::string& title() const { return _title; }
+        [[nodiscard]] const std::string& Title() const { return _title; }
 
         /**
          * @brief The file Dear ImGui persists its layout to, or empty for ImGui's own default.
@@ -262,7 +262,7 @@ namespace kor {
          * The string itself backs ImGui's io.IniFilename, which keeps the pointer rather than a
          * copy, so it stays valid for as long as the window does.
          */
-        [[nodiscard]] const std::string& imguiIniPath() const { return _imguiIni; }
+        [[nodiscard]] const std::string& ImguiIniPath() const { return _imguiIni; }
 
         /**
          * @brief The default framebuffer: the swap-chain image this frame is presented from.
@@ -270,7 +270,7 @@ namespace kor {
          * This is what a scene renders into when it opens a pass without naming a framebuffer. It
          * is recreated on resize, so hold the reference for a frame, not for the run.
          */
-        [[nodiscard]] kor::ResourceRef<kor::Framebuffer> framebuffer() const;
+        [[nodiscard]] kor::ResourceRef<kor::Framebuffer> DefaultFramebuffer() const;
 
         /**
          * @brief Whether the drawable area changed size since the last frame.
@@ -279,10 +279,10 @@ namespace kor {
          * The run loop turns this into a Scene::OnResize call, which is where a scene should
          * rebuild anything sized to the window.
          */
-        [[nodiscard]] bool hasResized() const { return _hasResized; }
+        [[nodiscard]] bool HasResized() const { return _hasResized; }
 
         /** @brief The presentation surface the swap chain was created for. */
-        [[nodiscard]] const kor::Surface& surface() const { return *_surface; }
+        [[nodiscard]] const kor::Surface& RenderSurface() const { return *_surface; }
 
         /**
          * @brief Loads an image from disk and makes it the window's icon.
@@ -290,20 +290,20 @@ namespace kor {
          *
          * Replaces any icon set earlier. A file that fails to load leaves the icon unchanged.
          */
-        void setIcon(const std::filesystem::path& iconPath);
+        void SetIcon(const std::filesystem::path& iconPath);
 
         /** @brief Whether the window currently has input focus. */
-        [[nodiscard]] bool isFocused() const { return _focused; }
+        [[nodiscard]] bool IsFocused() const { return _focused; }
 
         /**
-         * @brief End-of-frame bookkeeping: clears the one-frame flags, hasResized() among them.
+         * @brief End-of-frame bookkeeping: clears the one-frame flags, HasResized() among them.
          *
          * The run loop calls this after the frame has been submitted. A scene should not.
          */
         void LateUpdate();
 
     private:
-    	static void framebufferResize(GLFWwindow* handle, int width, int height);
+    	static void FramebufferResize(GLFWwindow* handle, int width, int height);
 
         GLFWwindow* _window = nullptr;
         GLFWmonitor* _monitor = nullptr;

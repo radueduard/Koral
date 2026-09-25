@@ -32,31 +32,31 @@ namespace kcam
     class CameraBase : public Interface
     {
     public:
-        [[nodiscard]] glm::vec3 position() const override { return _position; }
-        [[nodiscard]] glm::quat rotation() const override { return _rotation; }
-        [[nodiscard]] glm::vec3 forward() const override { return _rotation * glm::vec3(0.f, 0.f, -1.f); }
-        [[nodiscard]] std::string_view name() const override { return _name; }
+        [[nodiscard]] glm::vec3 Position() const override { return _position; }
+        [[nodiscard]] glm::quat Rotation() const override { return _rotation; }
+        [[nodiscard]] glm::vec3 Forward() const override { return _rotation * glm::vec3(0.f, 0.f, -1.f); }
+        [[nodiscard]] std::string_view Name() const override { return _name; }
 
-        void setPosition(const glm::vec3 position) override
+        void SetPosition(const glm::vec3 position) override
         {
             _position = position;
             _viewDirty = true;
         }
 
-        void setRotation(const glm::quat rotation) override
+        void SetRotation(const glm::quat rotation) override
         {
             _rotation = glm::normalize(rotation);
             _viewDirty = true;
         }
 
-        void lookAt(const glm::vec3 target, const glm::vec3 up) override
+        void LookAt(const glm::vec3 target, const glm::vec3 up) override
         {
             const glm::vec3 to = target - _position;
             if (glm::dot(to, to) < 1e-12f) return;  // looking at yourself is not a direction
-            setRotation(glm::quatLookAt(glm::normalize(to), up));
+            SetRotation(glm::quatLookAt(glm::normalize(to), up));
         }
 
-        [[nodiscard]] const glm::mat4& view() const override
+        [[nodiscard]] const glm::mat4& View() const override
         {
             if (_viewDirty) {
                 // inverse(translate * rotate), assembled directly rather than inverted.
@@ -68,7 +68,7 @@ namespace kcam
             return _view;
         }
 
-        [[nodiscard]] const glm::mat4& projection() const override
+        [[nodiscard]] const glm::mat4& Projection() const override
         {
             if (_projectionDirty) {
                 _projection = computeProjection();
@@ -81,10 +81,10 @@ namespace kcam
             return _projection;
         }
 
-        [[nodiscard]] const glm::mat4& viewProjection() const override
+        [[nodiscard]] const glm::mat4& ViewProjection() const override
         {
-            const glm::mat4& v = view();
-            const glm::mat4& p = projection();
+            const glm::mat4& v = View();
+            const glm::mat4& p = Projection();
             if (_viewProjectionDirty) {
                 _viewProjection = p * v;
                 _viewProjectionDirty = false;
@@ -94,11 +94,11 @@ namespace kcam
 
         // ---- per-frame behaviour ----------------------------------------------------------------
 
-        void setController(const Controller& controller) override { _controller.set(controller); }
-        [[nodiscard]] const Controller& controller() const override { return _controller.get(); }
+        void SetController(const Controller& controller) override { _controller.set(controller); }
+        [[nodiscard]] const Controller& ControllerSettings() const override { return _controller.get(); }
 
-        [[nodiscard]] bool released() const override { return _controller.released(); }
-        void setReleased(const bool released) override { _controller.setReleased(released); }
+        [[nodiscard]] bool Released() const override { return _controller.released(); }
+        void SetReleased(const bool released) override { _controller.setReleased(released); }
 
         /**
          * @brief What the repository calls at the top of every frame.
@@ -107,10 +107,10 @@ namespace kcam
          * controller on later is an ordinary setter rather than a rebuild. A camera with nothing
          * enabled costs one virtual call and a switch.
          */
-        void automaticUpdate() override
+        void AutomaticUpdate() override
         {
-            _controller.update(*this, kor::Time::frameTime());
-            _semanticBuffers.refresh(*this);
+            _controller.update(*this, kor::Time::FrameTime());
+            _semanticBuffers.Refresh(*this);
         }
 
         // ---- the GPU copy -----------------------------------------------------------------------
@@ -122,35 +122,35 @@ namespace kcam
          * moved, and the matrices behind these are themselves lazy, so the repeated calls cost a
          * dirty-flag check each.
          */
-        bool serialize(const std::string_view semantic, kor::SemanticSlot& slot) const override
+        bool Serialize(const std::string_view semantic, kor::SemanticSlot& slot) const override
         {
             namespace sem = kcam::semantics;
 
-            if (semantic == sem::ViewMatrix)           { slot.set(view()); return true; }
-            if (semantic == sem::ProjectionMatrix)     { slot.set(projection()); return true; }
-            if (semantic == sem::ViewProjectionMatrix) { slot.set(viewProjection()); return true; }
+            if (semantic == sem::ViewMatrix)           { slot.Set(View()); return true; }
+            if (semantic == sem::ProjectionMatrix)     { slot.Set(Projection()); return true; }
+            if (semantic == sem::ViewProjectionMatrix) { slot.Set(ViewProjection()); return true; }
 
-            if (semantic == sem::InverseViewMatrix)       { slot.set(glm::inverse(view())); return true; }
-            if (semantic == sem::InverseProjectionMatrix) { slot.set(glm::inverse(projection())); return true; }
+            if (semantic == sem::InverseViewMatrix)       { slot.Set(glm::inverse(View())); return true; }
+            if (semantic == sem::InverseProjectionMatrix) { slot.Set(glm::inverse(Projection())); return true; }
             if (semantic == sem::InverseViewProjectionMatrix) {
-                slot.set(glm::inverse(viewProjection()));
+                slot.Set(glm::inverse(ViewProjection()));
                 return true;
             }
 
-            if (semantic == sem::Position) { slot.set(position()); return true; }
-            if (semantic == sem::Forward)  { slot.set(forward()); return true; }
-            if (semantic == sem::Up)       { slot.set(rotation() * glm::vec3(0.f, 1.f, 0.f)); return true; }
-            if (semantic == sem::Right)    { slot.set(rotation() * glm::vec3(1.f, 0.f, 0.f)); return true; }
+            if (semantic == sem::Position) { slot.Set(Position()); return true; }
+            if (semantic == sem::Forward)  { slot.Set(Forward()); return true; }
+            if (semantic == sem::Up)       { slot.Set(Rotation() * glm::vec3(0.f, 1.f, 0.f)); return true; }
+            if (semantic == sem::Right)    { slot.Set(Rotation() * glm::vec3(1.f, 0.f, 0.f)); return true; }
 
             const glm::vec4 depth = depthRange();
-            if (semantic == sem::NearPlane)  { slot.set(depth.x); return true; }
-            if (semantic == sem::FarPlane)   { slot.set(depth.y); return true; }
-            if (semantic == sem::DepthRange) { slot.set(depth); return true; }
+            if (semantic == sem::NearPlane)  { slot.Set(depth.x); return true; }
+            if (semantic == sem::FarPlane)   { slot.Set(depth.y); return true; }
+            if (semantic == sem::DepthRange) { slot.Set(depth); return true; }
 
             return false;   // not ours: reported against the field that asked for it
         }
 
-        kor::SemanticBuffers& semanticBuffers() override { return _semanticBuffers; }
+        kor::SemanticBuffers& SemanticStorage() override { return _semanticBuffers; }
 
     protected:
         /** @brief x = near, y = far, z = far - near, w = 1 / (far - near). */
@@ -194,27 +194,27 @@ namespace kcam
     public:
         explicit PerspectiveImpl(const Builder& builder);
 
-        [[nodiscard]] float fovY() const override { return _fovY; }
-        [[nodiscard]] float aspect() const override { return _aspect; }
-        [[nodiscard]] float zNear() const override { return _zNear; }
-        [[nodiscard]] float zFar() const override { return _zFar; }
+        [[nodiscard]] float FovY() const override { return _fovY; }
+        [[nodiscard]] float Aspect() const override { return _aspect; }
+        [[nodiscard]] float ZNear() const override { return _zNear; }
+        [[nodiscard]] float ZFar() const override { return _zFar; }
 
-        void setFovY(float fovY) override;
-        void setAspect(float aspect) override;
-        void setNearFar(float zNear, float zFar) override;
+        void SetFovY(float fovY) override;
+        void SetAspect(float aspect) override;
+        void SetNearFar(float zNear, float zFar) override;
 
-        void setFollowWindowAspect(bool follow) override;
-        [[nodiscard]] bool followsWindowAspect() const override
+        void SetFollowWindowAspect(bool follow) override;
+        [[nodiscard]] bool FollowsWindowAspect() const override
         { return _aspectSource.kind == AspectSource::Kind::eWindow; }
 
-        void setAspectSource(AspectSource source) override;
-        [[nodiscard]] const AspectSource& aspectSource() const override { return _aspectSource; }
+        void SetAspectSource(AspectSource source) override;
+        [[nodiscard]] const AspectSource& AspectSourceSettings() const override { return _aspectSource; }
 
         [[nodiscard]] glm::vec4 depthRange() const override
         { return { _zNear, _zFar, _zFar - _zNear, 1.f / (_zFar - _zNear) }; }
 
         /** @brief The controller, then the aspect source — which is what makes a resize free. */
-        void automaticUpdate() override;
+        void AutomaticUpdate() override;
 
     private:
         [[nodiscard]] glm::mat4 computeProjection() const override;
@@ -234,12 +234,12 @@ namespace kcam
     public:
         explicit OrthoImpl(const Builder& builder);
 
-        [[nodiscard]] glm::vec4 bounds() const override { return { _left, _right, _bottom, _top }; }
-        [[nodiscard]] float zNear() const override { return _zNear; }
-        [[nodiscard]] float zFar() const override { return _zFar; }
+        [[nodiscard]] glm::vec4 Bounds() const override { return { _left, _right, _bottom, _top }; }
+        [[nodiscard]] float ZNear() const override { return _zNear; }
+        [[nodiscard]] float ZFar() const override { return _zFar; }
 
-        void setBounds(float left, float right, float bottom, float top) override;
-        void setNearFar(float zNear, float zFar) override;
+        void SetBounds(float left, float right, float bottom, float top) override;
+        void SetNearFar(float zNear, float zFar) override;
 
         [[nodiscard]] glm::vec4 depthRange() const override
         { return { _zNear, _zFar, _zFar - _zNear, 1.f / (_zFar - _zNear) }; }

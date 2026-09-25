@@ -21,9 +21,9 @@ namespace kor::vk
     void ImageView::build() const
     {
         ::vk::ImageAspectFlags aspectMask = ::vk::ImageAspectFlagBits::eColor;
-        if (kor::isDepthStencilFormat(_image->format())) {
+        if (kor::IsDepthStencilFormat(_image->PixelFormat())) {
             aspectMask = ::vk::ImageAspectFlagBits::eDepth;
-            if (kor::isStencilFormat(_image->format())) {
+            if (kor::IsStencilFormat(_image->PixelFormat())) {
                 aspectMask |= ::vk::ImageAspectFlagBits::eStencil;
             }
         }
@@ -33,7 +33,7 @@ namespace kor::vk
             auto viewInfo = ::vk::ImageViewCreateInfo()
                 .setImage(image)
                 .setViewType(getVkImageViewType(_viewType))
-                .setFormat(getVkFormat(_image->format()))
+                .setFormat(getVkFormat(_image->PixelFormat()))
                 .setComponents(::vk::ComponentMapping()
                     .setR(getVkComponentSwizzle(_componentMapping.r))
                     .setG(getVkComponentSwizzle(_componentMapping.g))
@@ -47,12 +47,12 @@ namespace kor::vk
                     .setLayerCount(_arrayLayerCount));
             _imageViews.emplace_back(vk::Context::Device()->createImageView(viewInfo));
         }
-        _imageGeneration = _image->generation();
+        _imageGeneration = _image->Generation();
     }
 
     void ImageView::refreshIfStale() const
     {
-        if (!_image.valid() || _imageGeneration == _image->generation()) return;
+        if (!_image.Valid() || _imageGeneration == _image->Generation()) return;
 
         // The image was resized, so every view of it names a VkImage that is on its way out. The
         // frames in flight may still hold these, so they go when the GPU is done with them.
@@ -73,7 +73,7 @@ namespace kor::vk
     ::vk::ImageView ImageView::operator*() const
     {
         refreshIfStale();
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         return _imageViews[currentFrame];
     }
 

@@ -32,10 +32,10 @@ namespace kor
         Frame& operator=(const Frame&) = delete;
 
         /** @brief Which swap-chain image this frame presents. Also indexes the per-frame copies of resources. */
-		[[nodiscard]] glm::u32 imageIndex() const { return _imageIndex; }
+		[[nodiscard]] glm::u32 ImageIndex() const { return _imageIndex; }
 
         /** @brief The command buffer this frame's work is recorded into. */
-		[[nodiscard]] kor::CommandBuffer& commandBuffer() const { return *_commandBuffer; }
+		[[nodiscard]] kor::CommandBuffer& Commands() const { return *_commandBuffer; }
     protected:
         glm::u32 _imageIndex;
 		std::unique_ptr<kor::CommandBuffer> _commandBuffer;
@@ -45,7 +45,7 @@ namespace kor
      * @brief Owns the swap chain and the frames in flight, and runs one frame from start to present.
      *
      * The run loop calls Draw() once per frame; everything else here is the state a scene may need
-     * to read — most often currentImageIndex(), which is the index a per-frame resource uses to
+     * to read — most often CurrentImageIndex(), which is the index a per-frame resource uses to
      * find the copy the current frame owns.
      *
      * Created by the window as it is built; reach the live one through Context::Scheduler().
@@ -59,16 +59,16 @@ namespace kor
              * @brief How many frames in flight to ask for. Two allows double buffering.
              *
              * A request, not a guarantee: the surface may require more and the driver may hand out
-             * more still. imageCount() reports what was actually allocated, and that is the
+             * more still. ImageCount() reports what was actually allocated, and that is the
              * number everything downstream is sized and indexed by.
              */
-            glm::u32 imageCount = 2;        ///< How many to request; the driver may give more, and the actual count is what imageCount() reports.
+            glm::u32 imageCount = 2;        ///< How many to request; the driver may give more, and the actual count is what ImageCount() reports.
 
             /** @brief Sets the minimum number of swap-chain images. */
             /** @brief Sets the number of swap-chain images to request. */
-            Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
+            Builder& SetImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
             /** @brief Creates the scheduler for the active backend. Owned by the caller. */
-            [[nodiscard]] std::unique_ptr<Scheduler> build() const;
+            [[nodiscard]] std::unique_ptr<Scheduler> Build() const;
         };
 
         virtual ~Scheduler() = default;
@@ -82,26 +82,26 @@ namespace kor
     	virtual void Initialize() = 0;
 
         /** @brief How many frames are in flight — the actual swap-chain image count, which may exceed what was requested. */
-        [[nodiscard]] glm::u32 imageCount() const { return _imageCount; }
+        [[nodiscard]] glm::u32 ImageCount() const { return _imageCount; }
 
         /**
          * @brief Which frame is currently being recorded.
-         * @return An index below imageCount(). A per-frame buffer or image uses this to select
+         * @return An index below ImageCount(). A per-frame buffer or image uses this to select
          *         the copy that is safe to write this frame.
          */
-    	[[nodiscard]] virtual glm::u32 currentImageIndex() const { return _currentFrame; }
+    	[[nodiscard]] virtual glm::u32 CurrentImageIndex() const { return _currentFrame; }
 
         /** @brief The frame currently being recorded. */
-        [[nodiscard]] const kor::Frame &currentFrame() const { return *_frames.at(_currentFrame); }
+        [[nodiscard]] const kor::Frame &CurrentFrame() const { return *_frames.at(_currentFrame); }
 
         /** @brief The frame that will be recorded next, wrapping round at the end. */
-        [[nodiscard]] const kor::Frame &nextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
+        [[nodiscard]] const kor::Frame &NextFrame() const { return *_frames.at((_currentFrame + 1) % _imageCount); }
 
         /** @brief Moves on to the next frame. Called by Draw(); a scene should not. */
-    	void advanceFrame() { _currentFrame = (_currentFrame + 1) % _imageCount; }
+    	void AdvanceFrame() { _currentFrame = (_currentFrame + 1) % _imageCount; }
 
         /** @brief Every frame in flight, in index order. */
-        [[nodiscard]] std::vector<std::reference_wrapper<Frame>> frames() const
+        [[nodiscard]] std::vector<std::reference_wrapper<Frame>> Frames() const
         {
     		std::vector<std::reference_wrapper<Frame>> frames;
 			for (const auto& frame : _frames) {
@@ -118,7 +118,7 @@ namespace kor
         virtual void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) { _started = true; }
 
         /** @brief Whether the first frame has begun. Before it has, there is no current image to speak of. */
-    	[[nodiscard]] bool hasStarted() const { return _started; }
+    	[[nodiscard]] bool HasStarted() const { return _started; }
 
         /** @brief Blocks until the GPU has finished everything submitted so far. Used when tearing down. */
     	virtual void WaitIdle() const = 0;
@@ -137,7 +137,7 @@ namespace kor
          *        barriers are worked out in the order it actually runs. Any thread may hand one over.
          * @param placement Before or after the frame's own command buffer. Several with the same
          *        placement run in the order they were handed over.
-         * @return The frame's completion token (see frameCompletion()): the work is done when it is.
+         * @return The frame's completion token (see FrameCompletion()): the work is done when it is.
          *
          * @code
          * kor::Task<void> Simulate(kor::ResourceRef<const kor::Buffer> particles) {
@@ -178,13 +178,13 @@ namespace kor
          * `co_await` it to run code the moment the frame is done — reading back results, say —
          * without stalling the render loop.
          */
-        [[nodiscard]] Token frameCompletion();
+        [[nodiscard]] Token FrameCompletion();
 
         /**
          * @brief Every frame index except @p index.
          * @return The frames a write to @p index still has to be propagated to; see PendingWrite.
          */
-    	std::unordered_set<glm::u32> imageIndicesExcept(const glm::u32 index) const
+    	std::unordered_set<glm::u32> ImageIndicesExcept(const glm::u32 index) const
 		{
 			std::unordered_set<glm::u32> indices;
 			for (glm::u32 i = 0; i < _imageCount; ++i) {
@@ -196,11 +196,11 @@ namespace kor
 		}
 
     protected:
-    	virtual void createFrames() = 0;
+    	virtual void CreateFrames() = 0;
         explicit Scheduler(const Builder& createInfo);
     	bool _started = false;
 
-        /** @brief What a frame picks up from Execute(), WaitFor() and frameCompletion(). */
+        /** @brief What a frame picks up from Execute(), WaitFor() and FrameCompletion(). */
         struct Pending {
             std::vector<std::unique_ptr<CommandBuffer>> before;
             std::vector<std::unique_ptr<CommandBuffer>> after;
@@ -214,7 +214,7 @@ namespace kor
          * Call once per Draw, after the render callback — which may itself Execute() — and before
          * ending any command buffer.
          */
-        Pending takePending();
+        Pending TakePending();
 
         glm::u32 _imageCount;
 	    glm::u32 _currentFrame = 0;
@@ -224,7 +224,7 @@ namespace kor
         std::mutex _pendingMutex;
         Pending _pending;
         Timeline _frameTimeline;
-        std::uint64_t _frameNumber = 1; ///< The frame being built; its completion is _frameTimeline.at() it.
+        std::uint64_t _frameNumber = 1; ///< The frame being built; its completion is _frameTimeline.At() it.
     };
 }
 

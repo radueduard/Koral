@@ -75,7 +75,7 @@ namespace kgui
         ImVec4 color;    // RGBA
     };
 
-    inline bool isMean(const ImVec4 prev, const ImVec4 curr, const ImVec4 next)
+    inline bool IsMean(const ImVec4 prev, const ImVec4 curr, const ImVec4 next)
     {
         const bool rMean = std::abs(prev.x - curr.x) < 0.01f && std::abs(curr.x - next.x) < 0.01f;
         const bool gMean = std::abs(prev.y - curr.y) < 0.01f && std::abs(curr.y - next.y) < 0.01f;
@@ -122,7 +122,7 @@ namespace kgui
                 const float step = 1.f / (colors.size() - 1);
                 for (std::size_t i = 0; i < colors.size(); ++i)
                 {
-                    if (i >= 1 && i < colors.size() - 1 && isMean(colors[i - 1], colors[i], colors[i + 1]))
+                    if (i >= 1 && i < colors.size() - 1 && IsMean(colors[i - 1], colors[i], colors[i + 1]))
                     {
                         continue;
                     }

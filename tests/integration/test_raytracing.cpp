@@ -7,7 +7,7 @@
 // The ray-tracing extensions are only enabled when the selected device actually
 // advertises them (not every GPU does -- older/integrated GPUs and MoltenVK on
 // macOS commonly do not), so this test additionally skips itself via
-// kor::Context::supportsRayTracing() on top of the fixture's own "no device at
+// kor::Context::SupportsRayTracing() on top of the fixture's own "no device at
 // all" skip.
 
 #include "gpu_fixture.h"
@@ -51,7 +51,7 @@ constexpr std::uint32_t kW = 16;
 constexpr std::uint32_t kH = 16;
 
 TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
-    if (!kor::Context::supportsRayTracing()) {
+    if (!kor::Context::SupportsRayTracing()) {
         GTEST_SKIP() << "Device has no ray tracing support; skipping.";
     }
 
@@ -67,48 +67,48 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
 
     // --- BLAS + TLAS ------------------------------------------------------
     auto blas = AccelerationStructure::Builder{}
-                    .addMesh(mesh)
-                    .build();
-    ASSERT_EQ(blas->type(), AccelerationStructure::Type::eBottomLevel);
+                    .AddMesh(mesh)
+                    .Build();
+    ASSERT_EQ(blas->StructureType(), AccelerationStructure::Type::eBottomLevel);
 
     auto tlas = AccelerationStructure::Builder{}
-                    .addInstance(AccelerationStructure::Instance{
+                    .AddInstance(AccelerationStructure::Instance{
                         .blas = ResourceRef<const AccelerationStructure>(blas),
                         .transform = glm::mat4(1.0f),
                     })
-                    .build();
-    ASSERT_EQ(tlas->type(), AccelerationStructure::Type::eTopLevel);
+                    .Build();
+    ASSERT_EQ(tlas->StructureType(), AccelerationStructure::Type::eTopLevel);
 
     // --- storage image (ray-tracing output) ------------------------------
     auto outImage = Image::Builder{}
-                        .setType(Image::Type::e2D)
-                        .setFormat(Image::Format::eRGBA8_UNORM)
-                        .setExtent(glm::uvec2{kW, kH})
-                        .setUsage(Image::Usage::eStorage | Image::Usage::eTransferSrc)
-                        .build();
-    auto outView = ImageView::Builder(outImage).build();
+                        .SetType(Image::Type::e2D)
+                        .SetFormat(Image::Format::eRGBA8_UNORM)
+                        .SetExtent(glm::uvec2{kW, kH})
+                        .SetUsage(Image::Usage::eStorage | Image::Usage::eTransferSrc)
+                        .Build();
+    auto outView = ImageView::Builder(outImage).Build();
 
     // --- ray-tracing pipeline --------------------------------------------
-    const auto raygen = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eRaygen)
-        .setPath(kor::shaderPath("simpleRT.rgen.glsl")).getOrBuild("test.rt.rgen");
-    const auto miss = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eMiss)
-        .setPath(kor::shaderPath("simpleRT.rmiss.glsl")).getOrBuild("test.rt.rmiss");
-    const auto chit = Shader::Builder{}.setLang<Shader::Lang::eGLSL>().setStage(Shader::Stage::eClosestHit)
-        .setPath(kor::shaderPath("simpleRT.rchit.glsl")).getOrBuild("test.rt.rchit");
+    const auto raygen = Shader::Builder{}.SetLang<Shader::Lang::eGLSL>().SetStage(Shader::Stage::eRaygen)
+        .SetPath(kor::ShaderPath("simpleRT.rgen.glsl")).GetOrBuild("test.rt.rgen");
+    const auto miss = Shader::Builder{}.SetLang<Shader::Lang::eGLSL>().SetStage(Shader::Stage::eMiss)
+        .SetPath(kor::ShaderPath("simpleRT.rmiss.glsl")).GetOrBuild("test.rt.rmiss");
+    const auto chit = Shader::Builder{}.SetLang<Shader::Lang::eGLSL>().SetStage(Shader::Stage::eClosestHit)
+        .SetPath(kor::ShaderPath("simpleRT.rchit.glsl")).GetOrBuild("test.rt.rchit");
 
     auto pipeline = RayTracingPipeline::Builder{}
-                        .setRaygenShader(raygen)
-                        .addMissShader(miss)
-                        .addHitGroup(RayTracingPipeline::HitGroup{ .closestHitShader = chit })
-                        .setMaxRecursionDepth(1)
-                        .build();
+                        .SetRaygenShader(raygen)
+                        .AddMissShader(miss)
+                        .AddHitGroup(RayTracingPipeline::HitGroup{ .closestHitShader = chit })
+                        .SetMaxRecursionDepth(1)
+                        .Build();
     ASSERT_TRUE(static_cast<bool>(pipeline));
 
     // --- descriptor set: TLAS at 0, storage image at 1 -------------------
     auto descriptorSet = DescriptorSet::Builder(pipeline, 0)
-                             .write(0, tlas)
-                             .write(1, outView)
-                             .build();
+                             .Write(0, tlas)
+                             .Write(1, outView)
+                             .Build();
 
     // --- trace ------------------------------------------------------------
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -117,17 +117,17 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
         // No barrier: the storage image is bound at set 0 binding 1, so the engine transitions
         // it to the layout the raygen shader writes through.
         cb.TraceRays(kW, kH, 1);
-    }, CommandBuffer::Usage::eCompute).wait();
+    }, CommandBuffer::Usage::eCompute).Wait();
 
     // --- read the image back and verify the trace ran --------------------
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(outImage, readback);
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);

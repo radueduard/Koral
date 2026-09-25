@@ -11,50 +11,50 @@
 
 namespace kor
 {
-    AccelerationStructure::Builder& AccelerationStructure::Builder::addMesh(ResourceRef<const Mesh> mesh)
+    AccelerationStructure::Builder& AccelerationStructure::Builder::AddMesh(ResourceRef<const Mesh> mesh)
     {
-        return addGeometry(Geometry{ .mesh = mesh });
+        return AddGeometry(Geometry{ .mesh = mesh });
     }
 
-    AccelerationStructure::Builder& AccelerationStructure::Builder::addGeometry(const Geometry& geometry)
+    AccelerationStructure::Builder& AccelerationStructure::Builder::AddGeometry(const Geometry& geometry)
     {
         this->geometries.push_back(geometry);
         return *this;
     }
 
-    AccelerationStructure::Builder& AccelerationStructure::Builder::addInstance(const Instance& instance)
+    AccelerationStructure::Builder& AccelerationStructure::Builder::AddInstance(const Instance& instance)
     {
         this->instances.push_back(instance);
         return *this;
     }
 
-    kor::Result<std::unique_ptr<AccelerationStructure>> AccelerationStructure::Builder::create() const
+    kor::Result<std::unique_ptr<AccelerationStructure>> AccelerationStructure::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
-        for (const auto& geometry : geometries) adopt(geometry.mesh, "geometry mesh");
-        for (const auto& instance : instances)  adopt(instance.blas, "instance's bottom-level structure");
+        for (const auto& geometry : geometries) Adopt(geometry.mesh, "geometry mesh");
+        for (const auto& instance : instances)  Adopt(instance.blas, "instance's bottom-level structure");
 
         if (geometries.empty() == instances.empty())
-            addError(ErrorCode::eInvalidArgument,
+            AddError(ErrorCode::eInvalidArgument,
                 "An acceleration structure must be built from either meshes (bottom-level) or instances (top-level), but not both.");
 
-        if (auto v = validate(); !v) return std::unexpected(v.error());
+        if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const auto api = Context::activeAPI();
+        const auto api = Context::ActiveAPI();
         if (api == API::eOpenGL)
-            return fail(ErrorCode::eRayTracingUnsupported, "Acceleration structures are not supported on the OpenGL backend.");
+            return Fail(ErrorCode::eRayTracingUnsupported, "Acceleration structures are not supported on the OpenGL backend.");
         if (api != API::eVulkan)
-            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+            return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
-        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<AccelerationStructure> {
+        return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<AccelerationStructure> {
             return kor::MakeBackendPtr<AccelerationStructure, vk::AccelerationStructure>(*this);
         });
     }
 
-    kor::Resource<AccelerationStructure> AccelerationStructure::Builder::build(const std::source_location where) const
+    kor::Resource<AccelerationStructure> AccelerationStructure::Builder::Build(const std::source_location where) const
     {
-        return materialize<AccelerationStructure>(*this, "AccelerationStructure", where);
+        return Materialize<AccelerationStructure>(*this, "AccelerationStructure", where);
     }
 
     AccelerationStructure::AccelerationStructure(const Builder& createInfo)

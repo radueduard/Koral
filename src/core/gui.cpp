@@ -80,7 +80,7 @@ namespace
         {
             if (!layoutMatches(imguiModule))
             {
-                kor::log::error("[gui] a loaded library was built against a different ImGui than Koral "
+                kor::log::Error("[gui] a loaded library was built against a different ImGui than Koral "
                                 "(it reports {}, ImGuiIO {} bytes; Koral has {}, {} bytes). Its ImGui "
                                 "calls are left unbound rather than share a context that would be read "
                                 "as a different layout. Build the scene against the ImGui the SDK "
@@ -109,7 +109,7 @@ namespace
     }
 }
 
-void kor::detail::registerImGuiModule(const ImGuiModule& imguiModule)
+void kor::detail::RegisterImGuiModule(const ImGuiModule& imguiModule)
 {
     auto& modules = imguiModules();
 
@@ -130,7 +130,7 @@ void kor::detail::registerImGuiModule(const ImGuiModule& imguiModule)
 
 ImFont* AddFont(const std::filesystem::path& path, const float size)
 {
-    const std::string iconPath = kor::assetPath(FONT_ICON_FILE_NAME_FAS).string();
+    const std::string iconPath = kor::AssetPath(FONT_ICON_FILE_NAME_FAS).string();
     const float iconFontSize = size * 2.0f / 3.0f; // FontAwesome fonts need to have their sizes reduced by 2.0f/3.0f in order to align correctly
 
     ImFontConfig config;
@@ -226,11 +226,11 @@ void kor::GUI::DefineStyle()
 
 
     auto& io = ImGui::GetIO();
-    fonts()[Font::eRegular] = AddFont(kor::assetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
-    fonts()[Font::eBold] = AddFont(kor::assetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
-    fonts()[Font::eItalic] = AddFont(kor::assetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
-    fonts()[Font::eBlack] = AddFont(kor::assetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
-    fonts()[Font::eLight] = AddFont(kor::assetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
+    fonts()[Font::eRegular] = AddFont(kor::AssetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
+    fonts()[Font::eBold] = AddFont(kor::AssetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
+    fonts()[Font::eItalic] = AddFont(kor::AssetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
+    fonts()[Font::eBlack] = AddFont(kor::AssetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
+    fonts()[Font::eLight] = AddFont(kor::AssetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
 
     io.FontDefault = fonts()[Font::eRegular];
     io.FontGlobalScale = .55f;
@@ -255,7 +255,7 @@ namespace
     // Refs, not owners: a handle belongs to whoever created it, and one that is dropped disappears
     // from here on the next frame. Process-wide and in this translation unit rather than inline in
     // the header, so a handle created by a scene or a module lands in the same list the GUI walks.
-    // @see kor::GuiImage::refresh
+    // @see kor::GuiImage::Refresh
     std::vector<kor::ResourceRef<kor::GuiImage>>& liveImages()
     {
         static std::vector<kor::ResourceRef<kor::GuiImage>> images;
@@ -282,7 +282,7 @@ namespace
         static std::optional<ImVec2> parked;
 
         ImGuiIO& io = ImGui::GetIO();
-        if (kor::Input::cursorMode() != kor::Input::CursorMode::eCaptured) {
+        if (kor::Input::CurrentCursorMode() != kor::Input::CursorMode::eCaptured) {
             parked.reset();
             return;
         }
@@ -295,7 +295,7 @@ namespace
 kor::Resource<kor::GuiImage> kor::GuiImage::Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level)
 {
     auto handle = [&] {
-        switch (Context::activeAPI())
+        switch (Context::ActiveAPI())
         {
         case API::eOpenGL:
             return kor::MakeBackendResource<kor::GuiImage, kor::ogl::GuiImage>(image, layer, level);
@@ -329,7 +329,7 @@ void kor::GUI::Init()
     // holds the pointer rather than copying, so it must reference storage that outlives the context —
     // the window's own string does. An empty path leaves ImGui's default (imgui.ini in the CWD) in
     // place. ImGui will not create missing directories itself, so make the parent before it saves.
-    if (const std::string& iniPath = Context::Window().imguiIniPath(); !iniPath.empty()) {
+    if (const std::string& iniPath = Context::Window().ImguiIniPath(); !iniPath.empty()) {
         if (const auto parent = std::filesystem::path(iniPath).parent_path(); !parent.empty()) {
             std::error_code ec;
             std::filesystem::create_directories(parent, ec);
@@ -352,7 +352,7 @@ void kor::GUI::Init()
     if (viewportsSupported)
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    switch (Context::activeAPI())
+    switch (Context::ActiveAPI())
     {
     case API::eOpenGL:
          ogl::GUI::Init();
@@ -369,7 +369,7 @@ void kor::GUI::Init()
 
 void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
 {
-    switch (Context::activeAPI())
+    switch (Context::ActiveAPI())
     {
     case API::eOpenGL:
         ogl::GUI::NewFrame();
@@ -400,14 +400,14 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
     // No title bar even when the window is undecorated. An undecorated window used to get a *drawn*
     // one here, with its own close/maximise/minimise buttons and drag handling; that is gone, so an
     // undecorated window is exactly what it says — bare. Moving and closing it is then the
-    // application's business (kor::Window::close, glfwSetWindowPos), which is where those decisions
+    // application's business (kor::Window::Close, glfwSetWindowPos), which is where those decisions
     // belong.
     window_flags |= ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize
                   | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    ImGui::Begin(Context::Window().title().c_str(), nullptr, window_flags);
+    ImGui::Begin(Context::Window().Title().c_str(), nullptr, window_flags);
     ImGui::PopStyleVar(2);
 
     const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
@@ -428,13 +428,13 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
     //
     // Dead handles are dropped here rather than anywhere else — nothing else walks this list, and a
     // scene that creates and drops handles as it runs would otherwise grow it without bound.
-    std::erase_if(liveImages(), [](const ResourceRef<GuiImage>& handle) { return !handle.alive(); });
+    std::erase_if(liveImages(), [](const ResourceRef<GuiImage>& handle) { return !handle.Alive(); });
     for (const auto& handle : liveImages()) {
-        if (handle.valid()) const_cast<GuiImage&>(*handle).refresh(commandBuffer);
+        if (handle.Valid()) const_cast<GuiImage&>(*handle).Refresh(commandBuffer);
     }
 
     ImDrawData* draw_data = ImGui::GetDrawData();
-    switch (Context::activeAPI())
+    switch (Context::ActiveAPI())
     {
     case API::eOpenGL:
         ogl::GUI::Render(commandBuffer, draw_data);
@@ -470,7 +470,7 @@ namespace
 
         for (auto* window : present) {
             if (std::ranges::find(g_attachedPlatformWindows, window) == g_attachedPlatformWindows.end()) {
-                kor::Input::attachTo(window);
+                kor::Input::AttachTo(window);
                 g_attachedPlatformWindows.push_back(window);
             }
         }
@@ -478,7 +478,7 @@ namespace
         // Gone: a panel redocked or closed. Told to Input before ImGui destroys the window.
         std::erase_if(g_attachedPlatformWindows, [&present](GLFWwindow* window) {
             if (std::ranges::find(present, window) != present.end()) return false;
-            kor::Input::detachFrom(window);
+            kor::Input::DetachFrom(window);
             return true;
         });
     }
@@ -517,13 +517,13 @@ void kor::GUI::RenderPlatformWindows()
     // so it takes the same lock as every other submit.
     {
         std::unique_lock<std::mutex> queueLock;
-        if (Context::activeAPI() == API::eVulkan) queueLock = vk::Context::Device().lockQueues();
+        if (Context::ActiveAPI() == API::eVulkan) queueLock = vk::Context::Device().lockQueues();
         ImGui::RenderPlatformWindowsDefault();
     }
     // Those submissions bypass the epoch every other one signals, and they draw our images. An
     // epoch marker after them, in submission order, covers them: nothing they used is destroyed
     // until the GPU is past it.
-    if (Context::activeAPI() == API::eVulkan && ImGui::GetPlatformIO().Viewports.Size > 1) {
+    if (Context::ActiveAPI() == API::eVulkan && ImGui::GetPlatformIO().Viewports.Size > 1) {
         const auto& device = vk::Context::Device();
         device.markEpoch(device.requestQueue(::vk::QueueFlagBits::eGraphics));
     }
@@ -532,7 +532,7 @@ void kor::GUI::RenderPlatformWindows()
 
 void kor::GUI::Shutdown()
 {
-    switch (Context::activeAPI())
+    switch (Context::ActiveAPI())
     {
     case API::eOpenGL:
         ogl::GUI::Shutdown();

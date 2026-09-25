@@ -23,13 +23,13 @@ namespace {
 
 TEST(Flags, DefaultIsEmpty) {
     Flags<Bit> f;
-    EXPECT_EQ(f.value(), 0u);
+    EXPECT_EQ(f.Value(), 0u);
     EXPECT_FALSE(f & Bit::A);
 }
 
 TEST(Flags, ConstructFromSingleEnum) {
     Flags<Bit> f(Bit::B);
-    EXPECT_EQ(f.value(), static_cast<uint32_t>(Bit::B));
+    EXPECT_EQ(f.Value(), static_cast<uint32_t>(Bit::B));
     EXPECT_TRUE(f & Bit::B);
     EXPECT_FALSE(f & Bit::A);
 }
@@ -39,7 +39,7 @@ TEST(Flags, OrCombinesBits) {
     EXPECT_TRUE(f & Bit::A);
     EXPECT_TRUE(f & Bit::C);
     EXPECT_FALSE(f & Bit::B);
-    EXPECT_EQ(f.value(),
+    EXPECT_EQ(f.Value(),
               static_cast<uint32_t>(Bit::A) | static_cast<uint32_t>(Bit::C));
 }
 
@@ -57,7 +57,7 @@ TEST(Flags, OrAssignWithEnumAndFlags) {
 
 TEST(Flags, OrOfTwoFlagObjects) {
     Flags<Bit> f = Flags<Bit>(Bit::A) | Flags<Bit>(Bit::B);
-    EXPECT_EQ(f.value(),
+    EXPECT_EQ(f.Value(),
               static_cast<uint32_t>(Bit::A) | static_cast<uint32_t>(Bit::B));
 }
 
@@ -65,7 +65,7 @@ TEST(Flags, AndAssignMasksBits) {
     // operator&= keeps only the bits present in the operand.
     Flags<Bit> f = Flags<Bit>(Bit::A) | Bit::B | Bit::C;
     f &= Bit::B;
-    EXPECT_EQ(f.value(), static_cast<uint32_t>(Bit::B));
+    EXPECT_EQ(f.Value(), static_cast<uint32_t>(Bit::B));
     EXPECT_FALSE(f & Bit::A);
     EXPECT_TRUE(f & Bit::B);
 }

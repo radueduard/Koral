@@ -12,31 +12,31 @@ namespace kcam
 {
     // ---- what an aspect is matched to ----------------------------------------------------------
 
-    std::optional<glm::uvec2> AspectSource::extent() const
+    std::optional<glm::uvec2> AspectSource::Extent() const
     {
         switch (kind) {
         case Kind::eNone:
             return std::nullopt;
         case Kind::eWindow:
             // A job has no window to follow; the aspect stays as it was configured.
-            if (kor::Context::isHeadless()) return std::nullopt;
-            return kor::Context::Window().extent();
+            if (kor::Context::IsHeadless()) return std::nullopt;
+            return kor::Context::Window().Extent();
         case Kind::eFramebuffer:
-            if (!framebuffer.valid()) return std::nullopt;
-            return framebuffer->extent();
+            if (!framebuffer.Valid()) return std::nullopt;
+            return framebuffer->Extent();
         case Kind::eImage:
             // Depth is not part of a shape on screen; a 3D image is followed by its face.
-            if (!image.valid()) return std::nullopt;
-            return glm::uvec2(image->extent());
+            if (!image.Valid()) return std::nullopt;
+            return glm::uvec2(image->Extent());
         }
         return std::nullopt;
     }
 
-    bool AspectSource::dangling() const
+    bool AspectSource::Dangling() const
     {
         switch (kind) {
-        case Kind::eFramebuffer: return !framebuffer.valid();
-        case Kind::eImage:       return !image.valid();
+        case Kind::eFramebuffer: return !framebuffer.Valid();
+        case Kind::eImage:       return !image.Valid();
         default:                 return false;
         }
     }
@@ -54,52 +54,52 @@ namespace kcam
         adoptSourceAspect();
     }
 
-    void PerspectiveImpl::setFovY(const float fovY)
+    void PerspectiveImpl::SetFovY(const float fovY)
     {
         _fovY = fovY;
         markProjectionDirty();
     }
 
-    void PerspectiveImpl::setAspect(const float aspect)
+    void PerspectiveImpl::SetAspect(const float aspect)
     {
         _aspect = aspect;
         markProjectionDirty();
     }
 
-    void PerspectiveImpl::setNearFar(const float zNear, const float zFar)
+    void PerspectiveImpl::SetNearFar(const float zNear, const float zFar)
     {
         _zNear = zNear;
         _zFar = zFar;
         markProjectionDirty();
     }
 
-    void PerspectiveImpl::setFollowWindowAspect(const bool follow)
+    void PerspectiveImpl::SetFollowWindowAspect(const bool follow)
     {
-        setAspectSource(follow ? AspectSource::window() : AspectSource::none());
+        SetAspectSource(follow ? AspectSource::Window() : AspectSource::None());
     }
 
-    void PerspectiveImpl::setAspectSource(AspectSource source)
+    void PerspectiveImpl::SetAspectSource(AspectSource source)
     {
         _aspectSource = std::move(source);
         _warnedDeadSource = false;   // a new source deserves its own warning if it too goes away
         adoptSourceAspect();
     }
 
-    void PerspectiveImpl::automaticUpdate()
+    void PerspectiveImpl::AutomaticUpdate()
     {
-        CameraBase::automaticUpdate();
+        CameraBase::AutomaticUpdate();
         adoptSourceAspect();
     }
 
     void PerspectiveImpl::adoptSourceAspect()
     {
-        const std::optional<glm::uvec2> extent = _aspectSource.extent();
+        const std::optional<glm::uvec2> extent = _aspectSource.Extent();
         if (!extent) {
-            if (!_warnedDeadSource && _aspectSource.dangling()) {
+            if (!_warnedDeadSource && _aspectSource.Dangling()) {
                 _warnedDeadSource = true;
-                kor::log::warn("[camera] '{}' follows the aspect of a {} that is gone or unusable; "
+                kor::log::Warn("[camera] '{}' follows the aspect of a {} that is gone or unusable; "
                                "its aspect stays at {:.3f}",
-                               name(),
+                               Name(),
                                _aspectSource.kind == AspectSource::Kind::eFramebuffer
                                    ? "framebuffer" : "image",
                                _aspect);
@@ -112,7 +112,7 @@ namespace kcam
         if (const float aspect = static_cast<float>(extent->x) / static_cast<float>(extent->y);
             aspect != _aspect)
         {
-            setAspect(aspect);
+            SetAspect(aspect);
         }
     }
 
@@ -128,7 +128,7 @@ namespace kcam
           _left(builder.left), _right(builder.right), _bottom(builder.bottom), _top(builder.top),
           _zNear(builder.zNear), _zFar(builder.zFar) {}
 
-    void OrthoImpl::setBounds(const float left, const float right, const float bottom, const float top)
+    void OrthoImpl::SetBounds(const float left, const float right, const float bottom, const float top)
     {
         _left = left;
         _right = right;
@@ -137,7 +137,7 @@ namespace kcam
         markProjectionDirty();
     }
 
-    void OrthoImpl::setNearFar(const float zNear, const float zFar)
+    void OrthoImpl::SetNearFar(const float zNear, const float zFar)
     {
         _zNear = zNear;
         _zFar = zFar;

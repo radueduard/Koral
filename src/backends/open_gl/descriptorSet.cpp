@@ -23,8 +23,8 @@ namespace kor::ogl
 {
     DescriptorSet::DescriptorSet(const Builder& builder): kor::DescriptorSet(builder) {}
 
-    void DescriptorSet::rebind(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index) {
-        // GL has no persistent descriptor objects: bind() re-issues every write each
+    void DescriptorSet::Rebind(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index) {
+        // GL has no persistent descriptor objects: Bind() re-issues every write each
         // time the set is bound, so a runtime write only has to update the stored
         // descriptor and the next bind picks it up.
         auto it = _writes.find(binding);
@@ -33,10 +33,10 @@ namespace kor::ogl
         if (index >= it->second.size()) {
             // Bindless (variable-count) bindings reflect a layout count of 0 and are
             // filled by index at runtime; grow the write list to fit, matching the
-            // builder's behaviour. See DescriptorSet::Builder::write.
+            // builder's behaviour. See DescriptorSet::Builder::Write.
             // A count of 0 is an unbounded (bindless) array, which is the only case that may
             // grow past the size the layout declared.
-            const auto& bindings = _layout->bindings();
+            const auto& bindings = _layout->Bindings();
             const auto declared = bindings.find(binding);
             const bool variableCount = declared != bindings.end() && declared->second.count == 0;
             if (variableCount)
@@ -60,7 +60,7 @@ namespace kor::ogl
         }
     }
 
-    void DescriptorSet::bind(const kor::CommandBuffer& commandBuffer, glm::u32 index) const
+    void DescriptorSet::Bind(const kor::CommandBuffer& commandBuffer, glm::u32 index) const
     {
         const auto& oglCommandBuffer = dynamic_cast<const CommandBuffer&>(commandBuffer);
         const auto& layoutRemappings =  oglCommandBuffer.getRemappingTableForBoundPipeline();
@@ -80,7 +80,7 @@ namespace kor::ogl
         for (const auto& [binding, descriptors] : _writes)
         {
             if (bindlessConsumedBindings.contains(binding)) continue;
-            const auto type = _layout->bindingType(binding);
+            const auto type = _layout->BindingType(binding);
             for (size_t i = 0; i < descriptors.size(); ++i) {
                 const auto& descriptor = descriptors[i];
 
@@ -93,28 +93,28 @@ namespace kor::ogl
                 {
                 case DescriptorType::eUniformBuffer:
                     {
-                        const auto& buffer = dynamic_cast<const ogl::Buffer&>(descriptor.buffer());
-                        glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint->second, *buffer, descriptor.offset(), descriptor.range());
+                        const auto& buffer = dynamic_cast<const ogl::Buffer&>(descriptor.BoundBuffer());
+                        glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint->second, *buffer, descriptor.Offset(), descriptor.Range());
                         glCheckError();
                         break;
                     }
                 case DescriptorType::eStorageBuffer:
                     {
-                        const auto& buffer = dynamic_cast<const ogl::Buffer&>(descriptor.buffer());
-                        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, bindingPoint->second, *buffer, descriptor.offset(), descriptor.range());
+                        const auto& buffer = dynamic_cast<const ogl::Buffer&>(descriptor.BoundBuffer());
+                        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, bindingPoint->second, *buffer, descriptor.Offset(), descriptor.Range());
                         glCheckError();
                         break;
                     }
                 case DescriptorType::eCombinedImageSampler:
                     {
-                        const auto& sampler = dynamic_cast<const ogl::Sampler&>(descriptor.sampler());
-                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.imageView());
+                        const auto& sampler = dynamic_cast<const ogl::Sampler&>(descriptor.BoundSampler());
+                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.BoundImageView());
 
                         glBindSampler(bindingPoint->second, *sampler);
                         glCheckError();
                         glActiveTexture(GL_TEXTURE0 + bindingPoint->second);
                         GLenum target = GL_TEXTURE_2D;
-                        switch (imageView.viewType())
+                        switch (imageView.ViewType())
                         {
                         case ImageView::Type::e1D:
                             target = GL_TEXTURE_1D;
@@ -144,13 +144,13 @@ namespace kor::ogl
                     }
                 case DescriptorType::eStorageImage:
                     {
-                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.imageView());
+                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.BoundImageView());
 
                         glBindImageTexture(bindingPoint->second,
                                            *imageView,
-                                           imageView.baseMipLevel(),
-                                           imageView.arrayLayerCount() > 1,
-                                           imageView.baseArrayLayer(),
+                                           imageView.BaseMipLevel(),
+                                           imageView.ArrayLayerCount() > 1,
+                                           imageView.BaseArrayLayer(),
                                            GL_READ_WRITE,
                                            imageView.format());
                         glCheckError();
@@ -158,12 +158,12 @@ namespace kor::ogl
                     }
                 case DescriptorType::eSampledImage:
                     {
-                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.imageView());
+                        const auto& imageView = dynamic_cast<const ogl::ImageView&>(descriptor.BoundImageView());
                         glBindImageTexture(bindingPoint->second,
                                              *imageView,
-                                             imageView.baseMipLevel(),
-                                             imageView.arrayLayerCount() > 1,
-                                             imageView.baseArrayLayer(),
+                                             imageView.BaseMipLevel(),
+                                             imageView.ArrayLayerCount() > 1,
+                                             imageView.BaseArrayLayer(),
                                              GL_READ_ONLY,
                                              imageView.format());
                         glCheckError();
@@ -171,7 +171,7 @@ namespace kor::ogl
                     }
                 case DescriptorType::eSampler:
                     {
-                        const auto& sampler = dynamic_cast<const ogl::Sampler&>(descriptor.sampler());
+                        const auto& sampler = dynamic_cast<const ogl::Sampler&>(descriptor.BoundSampler());
                         glBindSampler(bindingPoint->second, *sampler);
                         glCheckError();
                         break;
@@ -181,7 +181,7 @@ namespace kor::ogl
                         // A `samplerBuffer` is fetched from a texture whose storage is the buffer,
                         // so binding it is binding that texture to a unit — no sampler, since a
                         // texel buffer has no filtering or addressing to configure.
-                        const auto& bufferView = dynamic_cast<const ogl::BufferView&>(descriptor.bufferView());
+                        const auto& bufferView = dynamic_cast<const ogl::BufferView&>(descriptor.BoundBufferView());
                         glActiveTexture(GL_TEXTURE0 + bindingPoint->second);
                         glBindTexture(GL_TEXTURE_BUFFER, *bufferView);
                         glCheckError();
@@ -191,7 +191,7 @@ namespace kor::ogl
                     {
                         // An `imageBuffer` is an image unit rather than a texture unit, which is the
                         // same distinction storage images make against sampled ones.
-                        const auto& bufferView = dynamic_cast<const ogl::BufferView&>(descriptor.bufferView());
+                        const auto& bufferView = dynamic_cast<const ogl::BufferView&>(descriptor.BoundBufferView());
                         glBindImageTexture(bindingPoint->second, *bufferView, 0, GL_FALSE, 0,
                                            GL_READ_WRITE, bufferView.getGLFormat());
                         glCheckError();
@@ -214,15 +214,15 @@ namespace kor::ogl
                 // Sampler shared by every element of this array (single descriptor).
                 GLuint samplerId = 0;
                 if (const auto s = _writes.find(arr.samplerBinding);
-                    s != _writes.end() && !s->second.empty() && s->second[0].isValid())
-                    samplerId = *dynamic_cast<const ogl::Sampler&>(s->second[0].sampler());
+                    s != _writes.end() && !s->second.empty() && s->second[0].IsValid())
+                    samplerId = *dynamic_cast<const ogl::Sampler&>(s->second[0].BoundSampler());
 
                 const auto imgIt = _writes.find(arr.imageBinding);
                 if (imgIt == _writes.end()) continue;
                 const auto& images = imgIt->second;
                 for (size_t i = 0; i < images.size(); ++i) {
-                    if (!images[i].isValid()) continue;
-                    const GLuint texture = *dynamic_cast<const ogl::ImageView&>(images[i].imageView());
+                    if (!images[i].IsValid()) continue;
+                    const GLuint texture = *dynamic_cast<const ogl::ImageView&>(images[i].BoundImageView());
 
                     // Cache the resident handle per (texture, sampler): forming a handle
                     // freezes the texture immutable, so we do it once, and skip the whole

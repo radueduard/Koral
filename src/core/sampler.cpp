@@ -13,26 +13,26 @@
 
 namespace kor
 {
-    kor::Result<std::unique_ptr<Sampler>> Sampler::Builder::create() const
+    kor::Result<std::unique_ptr<Sampler>> Sampler::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
-        if (auto v = validate(); !v) return std::unexpected(v.error());
+        if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const auto api = Context::activeAPI();
+        const auto api = Context::ActiveAPI();
         if (api != API::eOpenGL && api != API::eVulkan)
-            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+            return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
-        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Sampler> {
+        return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Sampler> {
             return (api == API::eVulkan)
                 ? kor::MakeBackendPtr<Sampler, vk::Sampler>(*this)
                 : kor::MakeBackendPtr<Sampler, ogl::Sampler>(*this);
         });
     }
 
-    kor::Resource<Sampler> Sampler::Builder::build(const std::source_location where) const
+    kor::Resource<Sampler> Sampler::Builder::Build(const std::source_location where) const
     {
-        return materialize<Sampler>(*this, "Sampler", where);
+        return Materialize<Sampler>(*this, "Sampler", where);
     }
 
     Sampler::Sampler(const Builder& builder) :

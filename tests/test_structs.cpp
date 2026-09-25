@@ -1,4 +1,4 @@
-// Unit tests for value helpers in structs.h — currently sizeofChannelType(),
+// Unit tests for value helpers in structs.h — currently SizeofChannelType(),
 // plus guards on the enum <-> byte-size contract that vertex layout math relies on.
 
 #include <gtest/gtest.h>
@@ -10,19 +10,19 @@ using namespace kor;
 namespace {
 
 TEST(Structs, SizeofChannelTypeMatchesScalarSizes) {
-    EXPECT_EQ(sizeofChannelType(ChannelType::eFloat),  sizeof(float));
-    EXPECT_EQ(sizeofChannelType(ChannelType::eInt),    sizeof(int));
-    EXPECT_EQ(sizeofChannelType(ChannelType::eUInt),   sizeof(unsigned int));
-    EXPECT_EQ(sizeofChannelType(ChannelType::eShort),  sizeof(short));
-    EXPECT_EQ(sizeofChannelType(ChannelType::eUShort), sizeof(unsigned short));
-    EXPECT_EQ(sizeofChannelType(ChannelType::eByte),   sizeof(char));
-    EXPECT_EQ(sizeofChannelType(ChannelType::eUByte),  sizeof(unsigned char));
-    EXPECT_EQ(sizeofChannelType(ChannelType::eDouble), sizeof(double));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eFloat),  sizeof(float));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eInt),    sizeof(int));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eUInt),   sizeof(unsigned int));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eShort),  sizeof(short));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eUShort), sizeof(unsigned short));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eByte),   sizeof(char));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eUByte),  sizeof(unsigned char));
+    EXPECT_EQ(SizeofChannelType(ChannelType::eDouble), sizeof(double));
 }
 
 TEST(Structs, SizeofChannelTypeThrowsOnInvalid) {
     const auto bogus = static_cast<ChannelType>(0xFF);
-    EXPECT_THROW(sizeofChannelType(bogus), std::runtime_error);
+    EXPECT_THROW(SizeofChannelType(bogus), std::runtime_error);
 }
 
 // Default-constructed pipeline state structs should carry the documented
@@ -33,7 +33,7 @@ TEST(Structs, RasterizationStateDefaults) {
     EXPECT_EQ(r.polygonMode, PolygonMode::eFill);
     EXPECT_EQ(r.frontFace, FrontFace::eCounterClockwise);
     EXPECT_FALSE(r.depthClampEnable);
-    EXPECT_EQ(r.cullMode.value(), 0u); // no faces culled by default
+    EXPECT_EQ(r.cullMode.Value(), 0u); // no faces culled by default
     EXPECT_FLOAT_EQ(r.lineWidth, 1.0f);
 }
 

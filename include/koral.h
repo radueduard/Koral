@@ -32,7 +32,7 @@
  * **lowerCamel answers a question or sets a value.** Accessors (`extent`, `bindings`),
  * predicates (`isDefault`, `supportsRayTracing`, `hasDepthAttachment`), queries
  * (`collectTimings`, `sizeOfRegion`, `frameTime`), every builder setter, and everything on a
- * builder up to and including `build()`.
+ * builder up to and including `Build()`.
  *
  * Compile-time constants are UpperCamel with no prefix — `kmesh::semantics::Position`,
  * `ProjectConfig::FileName`, `CommandBuffer::MaxTimerScopes` — the same casing as a type, since
@@ -54,7 +54,7 @@
  * line is whether the header deals in GPU quantities.
  *
  * Sizes go in signed and come out unsigned, which is deliberate. A builder takes `glm::i64`, so a
- * caller's negative arrives as a negative and is reported — `setRawSize(-1)` fails with a message
+ * caller's negative arrives as a negative and is reported — `SetRawSize(-1)` fails with a message
  * rather than allocating sixteen exabytes. An accessor returns `glm::u64`, because by then the
  * value is stored and cannot be negative.
  */
@@ -69,7 +69,7 @@
 #include "token.h"
 // Named here rather than left to arrive through something else: kor::Result and kor::Error are in
 // every builder's signature, kor::RangeOf in every upload, kor::ValueShape in PushConstant and
-// kor::SemanticSerializer in DescriptorSet::Builder::write. They did reach a project transitively,
+// kor::SemanticSerializer in DescriptorSet::Builder::Write. They did reach a project transitively,
 // but only because some other header happened to include them — reordering one would have broken a
 // build that had not changed.
 #include "error.h"
@@ -90,7 +90,7 @@
 #include "sampler.h"
 // descriptor.h is deliberately absent: kor::Descriptor is the record a descriptor set keeps of what
 // is bound where, not something a project constructs. Bind resources through
-// DescriptorSet::Builder::write, which takes them as themselves. The header is still reachable for
+// DescriptorSet::Builder::Write, which takes them as themselves. The header is still reachable for
 // anything walking a built set's contents.
 #include "descriptorSet.h"
 #include "descriptorSetLayout.h"

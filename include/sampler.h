@@ -28,13 +28,13 @@ namespace kor
      * @code
      * kor::Sampler::Builder builder;
      * auto linearRepeat = builder
-     *     .setMinFilter(kor::Filter::eLinear)
-     *     .setMagFilter(kor::Filter::eLinear)
-     *     .setMipmapMode(kor::Sampler::MipmapMode::eLinear)
-     *     .setAnisotropyEnable(true)
-     *     .setMaxAnisotropy(16.f)
-     *     .setMaxLod(static_cast<float>(texture->mipLevels()))
-     *     .build();
+     *     .SetMinFilter(kor::Filter::eLinear)
+     *     .SetMagFilter(kor::Filter::eLinear)
+     *     .SetMipmapMode(kor::Sampler::MipmapMode::eLinear)
+     *     .SetAnisotropyEnable(true)
+     *     .SetMaxAnisotropy(16.f)
+     *     .SetMaxLod(static_cast<float>(texture->MipLevels()))
+     *     .Build();
      * @endcode
      *
      * Bind it alongside an image view with Descriptor(imageView, sampler).
@@ -75,43 +75,43 @@ namespace kor
             bool unnormalizedCoordinates = false;               ///< Whether coordinates are in texels rather than 0..1.
 
             /** @brief Sets the filtering used when the texture is minified — drawn smaller than its pixel size. */
-            Builder& setMinFilter(Filter minFilter) {
+            Builder& SetMinFilter(Filter minFilter) {
                 this->minFilter = minFilter;
                 return *this;
             }
 
             /** @brief Sets the filtering used when the texture is magnified. eNearest gives crisp texels; eLinear smooths them. */
-            Builder& setMagFilter(Filter magFilter) {
+            Builder& SetMagFilter(Filter magFilter) {
                 this->magFilter = magFilter;
                 return *this;
             }
 
             /** @brief Sets how the two nearest mip levels are combined. */
-            Builder& setMipmapMode(MipmapMode mipmapMode) {
+            Builder& SetMipmapMode(MipmapMode mipmapMode) {
                 this->mipmapMode = mipmapMode;
                 return *this;
             }
 
             /** @brief Sets what happens outside 0..1 on the U axis. */
-            Builder& setAddressModeU(AddressMode addressModeU) {
+            Builder& SetAddressModeU(AddressMode addressModeU) {
                 this->addressModeU = addressModeU;
                 return *this;
             }
 
             /** @brief Sets what happens outside 0..1 on the V axis. */
-            Builder& setAddressModeV(AddressMode addressModeV) {
+            Builder& SetAddressModeV(AddressMode addressModeV) {
                 this->addressModeV = addressModeV;
                 return *this;
             }
 
             /** @brief Sets what happens outside 0..1 on the W axis, for 3D textures. */
-            Builder& setAddressModeW(AddressMode addressModeW) {
+            Builder& SetAddressModeW(AddressMode addressModeW) {
                 this->addressModeW = addressModeW;
                 return *this;
             }
 
             /** @brief Shifts the mip level the sampler picks. Negative values sharpen at the cost of aliasing. */
-            Builder& setMipLodBias(float mipLodBias) {
+            Builder& SetMipLodBias(float mipLodBias) {
                 this->mipLodBias = mipLodBias;
                 return *this;
             }
@@ -122,13 +122,13 @@ namespace kor
              * Sharpens textures viewed at a steep angle — ground planes above all — where ordinary
              * mip filtering blurs them. Costs bandwidth in proportion to setMaxAnisotropy.
              */
-            Builder& setAnisotropyEnable(bool anisotropyEnable) {
+            Builder& SetAnisotropyEnable(bool anisotropyEnable) {
                 this->anisotropyEnable = anisotropyEnable;
                 return *this;
             }
 
             /** @brief Sets the maximum anisotropy, silently capped by what the device supports. 16 is the usual maximum. */
-            Builder& setMaxAnisotropy(float maxAnisotropy) {
+            Builder& SetMaxAnisotropy(float maxAnisotropy) {
                 this->maxAnisotropy = maxAnisotropy;
                 return *this;
             }
@@ -140,19 +140,19 @@ namespace kor
              * shader supplies and returns the filtered *result* of those comparisons — which is what
              * gives shadow maps a smooth edge in one lookup.
              */
-            Builder& setCompareEnable(bool compareEnable) {
+            Builder& SetCompareEnable(bool compareEnable) {
                 this->compareEnable = compareEnable;
                 return *this;
             }
 
             /** @brief Sets the comparison a comparison sampler performs. */
-            Builder& setCompareOp(CompareOp compareOp) {
+            Builder& SetCompareOp(CompareOp compareOp) {
                 this->compareOp = compareOp;
                 return *this;
             }
 
             /** @brief Sets the lowest mip level the sampler may select. */
-            Builder& setMinLod(float minLod) {
+            Builder& SetMinLod(float minLod) {
                 this->minLod = minLod;
                 return *this;
             }
@@ -164,21 +164,21 @@ namespace kor
              *          texture will alias as though it had no mip chain at all. Set it to the
              *          image's mip level count.
              */
-            Builder& setMaxLod(float maxLod) {
+            Builder& SetMaxLod(float maxLod) {
                 this->maxLod = maxLod;
                 return *this;
             }
 
             /** @brief Switches coordinates from 0..1 to texel counts. Restricts the sampler: no mips, no repeat addressing. */
-            Builder& setUnnormalizedCoordinates(bool unnormalizedCoordinates) {
+            Builder& SetUnnormalizedCoordinates(bool unnormalizedCoordinates) {
                 this->unnormalizedCoordinates = unnormalizedCoordinates;
                 return *this;
             }
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<Sampler>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<Sampler>> Create() const;
             /** @brief Creates the sampler, poisoned rather than thrown if the device rejects the combination. */
-            [[nodiscard]] kor::Resource<Sampler> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<Sampler> Build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~Sampler() = default;

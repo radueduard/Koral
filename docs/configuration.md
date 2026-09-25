@@ -157,7 +157,7 @@ resolved against, tried in the order listed. They apply to:
 - `kmdl::Importer::Load` — models, from the model import module. A model's own material textures are
   looked for beside the model first, and if they are not there, across these same roots.
 - Shaders: GLSL/SPIR-V paths, `#include`s, and Slang module imports.
-- Anything that calls `kor::assetPath` or `kor::shaderPath` directly.
+- Anything that calls `kor::AssetPath` or `kor::ShaderPath` directly.
 
 A relative directory is resolved **against the config file**, so the project can be moved or checked
 out anywhere without the file needing an edit. An absolute one is used as written.

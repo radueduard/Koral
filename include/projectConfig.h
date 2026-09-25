@@ -183,10 +183,10 @@ namespace kor
          * @return ErrorCode::eConfigInvalid if the document is not valid JSON or a key has the
          *         wrong type. A config that is merely *empty* is not an error.
          */
-        VoidResult merge(std::string_view json, const std::filesystem::path& baseDirectory);
+        VoidResult Merge(std::string_view json, const std::filesystem::path& baseDirectory);
 
         /** @brief @ref merge the contents of @p file, resolving its directories against its parent. */
-        VoidResult mergeFile(const std::filesystem::path& file);
+        VoidResult MergeFile(const std::filesystem::path& file);
 
         /**
          * @brief Overlay command-line overrides onto this config.
@@ -206,7 +206,7 @@ namespace kor
          *         unparseable number — a typo'd flag is a mistake worth stopping for, not one to
          *         silently drop on the floor.
          */
-        VoidResult applyOverrides(std::span<const std::string> args);
+        VoidResult ApplyOverrides(std::span<const std::string> args);
 
         /**
          * @brief Locate the config file for a project, starting at @p startDirectory and walking up.
@@ -215,15 +215,15 @@ namespace kor
          * or two below the project root where the config lives — so we walk up rather than demand
          * that the caller know the layout. Stops at the filesystem root.
          */
-        static std::optional<std::filesystem::path> find(const std::filesystem::path& startDirectory);
+        static std::optional<std::filesystem::path> Find(const std::filesystem::path& startDirectory);
 
         /**
          * @brief Register @ref assetDirectories and @ref shaderDirectories as search roots, ahead of
          *        the engine's own. Call once, before any resource is loaded.
          */
-        void registerSearchPaths() const;
+        void RegisterSearchPaths() const;
 
         /** @brief The flags @ref applyOverrides accepts, formatted for a `--help` listing. */
-        static std::string_view usage();
+        static std::string_view Usage();
     };
 }

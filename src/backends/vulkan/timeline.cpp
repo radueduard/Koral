@@ -40,7 +40,7 @@ namespace {
             } catch (const std::exception& e) {
                 // Device lost, in practice. Reporting nothing reached keeps waiters parked rather
                 // than resuming them on work that never finished.
-                kor::log::error("Reading a token's timeline semaphore failed: {}", e.what());
+                kor::log::Error("Reading a token's timeline semaphore failed: {}", e.what());
                 return 0;
             }
         }
@@ -53,7 +53,7 @@ namespace {
             const auto result = kor::vk::Context::Device()->waitSemaphores(
                 ::vk::SemaphoreWaitInfo().setSemaphores(_semaphore).setValues(value), Forever);
             if (result != ::vk::Result::eSuccess)
-                kor::log::error("Waiting for a token failed: {}", ::vk::to_string(result));
+                kor::log::Error("Waiting for a token failed: {}", ::vk::to_string(result));
         }
 
         void watch() override { _reactor.poke(); }
@@ -90,20 +90,20 @@ namespace kor::vk {
         }
 
         std::lock_guard lock(state->mutex);
-        return {static_cast<const TimelineSemaphore&>(*state->gpu).handle(), token.value()};
+        return {static_cast<const TimelineSemaphore&>(*state->gpu).handle(), token.Value()};
     }
 
     void TokenReactor::noteSubmittedSignal(const Token& token) {
         const auto& state = detail::TokenAccess::state(token);
         if (!state) return;
         auto current = state->submitted.load(std::memory_order_relaxed);
-        while (current < token.value() &&
-               !state->submitted.compare_exchange_weak(current, token.value(), std::memory_order_release)) {}
+        while (current < token.Value() &&
+               !state->submitted.compare_exchange_weak(current, token.Value(), std::memory_order_release)) {}
     }
 
     bool TokenReactor::signalIsOnItsWay(const Token& token) {
         const auto& state = detail::TokenAccess::state(token);
-        return !state || token.ready() || state->submitted.load(std::memory_order_acquire) >= token.value();
+        return !state || token.Ready() || state->submitted.load(std::memory_order_acquire) >= token.Value();
     }
 
     void TokenReactor::poke() {
@@ -151,7 +151,7 @@ namespace kor::vk {
                 .setSemaphores(semaphores)
                 .setValues(values), Forever);
             if (result != ::vk::Result::eSuccess) {
-                log::error("The token reactor's wait failed ({}); GPU-signalled tokens will no longer "
+                log::Error("The token reactor's wait failed ({}); GPU-signalled tokens will no longer "
                            "resume their coroutines", ::vk::to_string(result));
                 return;
             }

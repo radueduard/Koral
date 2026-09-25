@@ -40,14 +40,14 @@ namespace kor
      *
      * @code
      * kor::AccelerationStructure::Builder blasBuilder;
-     * auto blas = blasBuilder.addMesh(mesh).build();
+     * auto blas = blasBuilder.AddMesh(mesh).Build();
      *
      * kor::AccelerationStructure::Builder tlasBuilder;
-     * auto tlas = tlasBuilder.addInstance({ .blas = blas, .transform = model }).build();
+     * auto tlas = tlasBuilder.AddInstance({ .blas = blas, .transform = model }).Build();
      * @endcode
      *
      * The TLAS is what a shader binds, through a Descriptor built from it. Requires a device with
-     * ray-tracing support — see Context::supportsRayTracing(). Structures are built as they are
+     * ray-tracing support — see Context::SupportsRayTracing(). Structures are built as they are
      * created, not refitted, so a moving instance means rebuilding the TLAS; the BLAS it refers to
      * can stay.
      */
@@ -92,10 +92,10 @@ namespace kor
             std::vector<Instance> instances = {};   ///< Instances for a top-level structure.
 
             /** @brief Add a whole mesh as a geometry of the bottom-level structure. */
-            Builder& addMesh(ResourceRef<const Mesh> mesh);
+            Builder& AddMesh(ResourceRef<const Mesh> mesh);
 
             /** @brief Add an explicit (sub)range of a mesh as a geometry of the bottom-level structure. */
-            Builder& addGeometry(const Geometry& geometry);
+            Builder& AddGeometry(const Geometry& geometry);
 
             /**
              * @brief Add a MeshHeap suballocation as a geometry of the bottom-level structure.
@@ -105,7 +105,7 @@ namespace kor
              * allocation together with the `Allocation` handle returned when it was created.
              */
             template<typename Heap>
-            Builder& addMesh(const Resource<Heap>& heap, const typename Heap::Allocation& allocation)
+            Builder& AddMesh(const Resource<Heap>& heap, const typename Heap::Allocation& allocation)
             {
                 // Aggregate-init: Geometry::mesh is a ResourceRef with no default ctor,
                 // so the struct cannot be default-constructed and then assigned.
@@ -119,15 +119,15 @@ namespace kor
                     geometry.firstIndex = allocation.indexIdentifier->offset;
                     geometry.indexCount = allocation.indexIdentifier->size;
                 }
-                return addGeometry(geometry);
+                return AddGeometry(geometry);
             }
 
             /** @brief Add an instance of a bottom-level structure to the top-level structure. */
-            Builder& addInstance(const Instance& instance);
+            Builder& AddInstance(const Instance& instance);
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<AccelerationStructure>> create() const;
-            [[nodiscard]] kor::Resource<AccelerationStructure> build(std::source_location where = std::source_location::current()) const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<AccelerationStructure>> Create() const;
+            [[nodiscard]] kor::Resource<AccelerationStructure> Build(std::source_location where = std::source_location::current()) const;
         };
 
         virtual ~AccelerationStructure();
@@ -136,7 +136,7 @@ namespace kor
         AccelerationStructure& operator=(const AccelerationStructure&) = delete;
 
         /** @brief Whether this is a bottom-level or top-level structure. */
-        [[nodiscard]] Type type() const { return _type; }
+        [[nodiscard]] Type StructureType() const { return _type; }
 
     protected:
         explicit AccelerationStructure(const Builder& createInfo);

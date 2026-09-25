@@ -88,7 +88,7 @@ namespace kor {
         }
     }
 
-    Shader::Builder Shader::Builder::resolved() const
+    Shader::Builder Shader::Builder::Resolved() const
     {
         Builder b = *this;
 
@@ -103,7 +103,7 @@ namespace kor {
         if (b.lang == Lang::eSlang) {
             if (b.module.empty()) b.module = b.path.stem().string();
         } else if (!b.path.empty() && b.path.is_relative()) {
-            b.path = kor::shaderPath(b.path);
+            b.path = kor::ShaderPath(b.path);
         }
 
         if (b.entry.empty() && b.lang != Lang::eSlang) b.entry = "main";
@@ -116,64 +116,64 @@ namespace kor {
         return b;
     }
 
-    std::string Shader::Builder::defaultIdentifier() const
+    std::string Shader::Builder::DefaultIdentifier() const
     {
-        const Builder b = resolved();
+        const Builder b = Resolved();
         const std::string source = b.lang == Lang::eSlang ? b.module : b.path.string();
         // GLSL's entry is always "main", so it adds nothing to the key; Slang's distinguishes the
         // several shaders that share one module.
         return b.lang == Lang::eSlang ? std::format("{}:{}", source, b.entry) : source;
     }
 
-    Result<std::unique_ptr<Shader>> Shader::Builder::create() const
+    Result<std::unique_ptr<Shader>> Shader::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
-        if (auto v = validate(); !v) return std::unexpected(v.error());
+        if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const Builder b = resolved();
+        const Builder b = Resolved();
 
         if (b.path.empty())
-            return fail(ErrorCode::eInvalidArgument,
+            return Fail(ErrorCode::eInvalidArgument,
                         "No shader source: call setPath(\"file.glsl\") (or setEntryPoint(module, entry) for Slang).");
 
         if (b.lang == Lang::eSlang && b.entry.empty())
-            return fail(ErrorCode::eInvalidArgument,
+            return Fail(ErrorCode::eInvalidArgument,
                         "Slang module '{}' needs an entry point: call setEntryPoint(\"name\").", b.module);
 
         // GLSL and SPIR-V cannot report their own stage, so an un-inferrable filename is fatal
         // rather than silently compiling as the eCompute default.
         if (b.lang != Lang::eSlang && !b.stageExplicit && !stageFromFilename(b.path))
-            return fail(ErrorCode::eInvalidArgument,
+            return Fail(ErrorCode::eInvalidArgument,
                         "Cannot infer the shader stage from '{}': name it '<name>.vert.glsl' (vert/frag/comp/geom/"
                         "tesc/tese/task/mesh/rgen/rahit/rchit/rmiss/rint/rcall) or call setStage() explicitly.",
                         b.path.string());
 
-        const auto api = Context::activeAPI();
+        const auto api = Context::ActiveAPI();
         if (api != API::eOpenGL && api != API::eVulkan)
-            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+            return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // Construction compiles the shader; a compile/parse failure throws and is
         // surfaced as a kor::Error (eShaderCompileFailed unless a more specific cause).
         // The backends read the builder's fields directly, so they must see the resolved one.
-        return guard(ErrorCode::eShaderCompileFailed, [&]() -> std::unique_ptr<Shader> {
+        return Guard(ErrorCode::eShaderCompileFailed, [&]() -> std::unique_ptr<Shader> {
             return (api == API::eVulkan)
                 ? kor::MakeBackendPtr<Shader, vk::Shader>(b)
                 : kor::MakeBackendPtr<Shader, ogl::Shader>(b);
         });
     }
 
-    kor::Resource<Shader> Shader::Builder::build(const std::source_location where) const
+    kor::Resource<Shader> Shader::Builder::Build(const std::source_location where) const
     {
         // Name it after whatever identifies the source, so a compile failure reads as
         // "shaders/forward.frag.glsl" rather than "Shader".
-        return materialize<Shader>(*this, defaultIdentifier(), where);
+        return Materialize<Shader>(*this, DefaultIdentifier(), where);
     }
 
-    ResourceRef<const Shader> Shader::Builder::getOrBuild(std::string identifierOrEmpty,
+    ResourceRef<const Shader> Shader::Builder::GetOrBuild(std::string identifierOrEmpty,
                                                           const std::source_location where) const
     {
-        const std::string identifier = identifierOrEmpty.empty() ? defaultIdentifier() : std::move(identifierOrEmpty);
+        const std::string identifier = identifierOrEmpty.empty() ? DefaultIdentifier() : std::move(identifierOrEmpty);
 
         // Get-or-create: a shader already registered under this identifier is reused as-is.
         // Rebuilding would recompile the shader (wasted work) and double-register its file
@@ -182,14 +182,14 @@ namespace kor {
         // A poisoned entry is reused too, deliberately: it is the same object every pipeline
         // built from this shader already refers to, and repairing it in place is what brings
         // all of them back at once.
-        if (Context::Repository().contains<Shader>(identifier))
-            return ResourceRef<const Shader>(Context::Repository().ref<Shader>(identifier));
+        if (Context::Repository().Contains<Shader>(identifier))
+            return ResourceRef<const Shader>(Context::Repository().Ref<Shader>(identifier));
 
         // Registered whether or not it compiled. A shader that failed to compile has to stay
         // alive, registered and watched — otherwise the file watcher never learns about the
         // file, fixing the source raises no event, and neither the shader nor anything built
         // from it could ever recover. The poisoned resource is the recovery mechanism.
-        ResourceRef<Shader> shaderRef = Context::Repository().add(identifier, build(where));
+        ResourceRef<Shader> shaderRef = Context::Repository().Add(identifier, Build(where));
 
         auto ctx = std::make_shared<WatchContext>();
         std::weak_ptr<WatchContext> weakCtx = ctx;
@@ -201,13 +201,13 @@ namespace kor {
         // A shader that failed to compile reports no dependencies (there was no successful
         // parse), so fall back to its declared source path — which is the very file the user
         // is about to fix, and thus the one event we cannot afford to miss.
-        auto resync = [shaderRef, weakCtx, fallback = resolved().path] () mutable
+        auto resync = [shaderRef, weakCtx, fallback = Resolved().path] () mutable
         {
             const auto ctx = weakCtx.lock();
-            if (!ctx || !shaderRef.alive()) return;
+            if (!ctx || !shaderRef.Alive()) return;
 
             std::vector<std::filesystem::path> dependencies;
-            if (shaderRef.valid()) dependencies = shaderRef->dependencies();
+            if (shaderRef.Valid()) dependencies = shaderRef->Dependencies();
             else if (!fallback.empty()) dependencies.push_back(fallback);
 
             for (const auto& dependency : dependencies)
@@ -221,15 +221,15 @@ namespace kor {
 
         ctx->onChange = [shaderRef, resync] () mutable
         {
-            if (!shaderRef.alive()) return; // shader destroyed; its watch callbacks safely no-op
+            if (!shaderRef.Alive()) return; // shader destroyed; its watch callbacks safely no-op
 
-            if (shaderRef.poisoned()) {
+            if (shaderRef.Poisoned()) {
                 // The shader never compiled, so there is no object to reload — it has to be rebuilt
                 // from its builder. Ask for that rather than doing it here: we are on the file
                 // watcher's thread, and a rebuild replaces the underlying object, which must not
-                // race whatever is recording with it. Repository::repair() picks this up at the top
+                // race whatever is recording with it. Repository::Repair() picks this up at the top
                 // of the next frame, and brings back every pipeline built from this shader with it.
-                shaderRef.requestRepair();
+                shaderRef.RequestRepair();
                 return;
             }
 
@@ -244,7 +244,7 @@ namespace kor {
 
         // Tie the watch state to the resource *slot*, not to the shader object: a shader that
         // failed to compile has no object, and that is exactly when the watch must survive.
-        shaderRef.attach(ctx);
+        shaderRef.Attach(ctx);
 
         resync();  // initial registration
 
@@ -281,7 +281,7 @@ namespace kor {
         return paths;
     }
 
-    void Shader::addSearchPath(const std::filesystem::path& dir, const bool front)
+    void Shader::AddSearchPath(const std::filesystem::path& dir, const bool front)
     {
         auto& paths = shaderSearchPathsStorage();
         if (dir.empty() || std::ranges::find(paths, dir) != paths.end()) return;
@@ -289,7 +289,7 @@ namespace kor {
         else       paths.push_back(dir);
     }
 
-    const std::vector<std::filesystem::path>& Shader::searchPaths() { return shaderSearchPathsStorage(); }
+    const std::vector<std::filesystem::path>& Shader::SearchPaths() { return shaderSearchPathsStorage(); }
 
     namespace {
         // glslang includer that resolves `#include`d files across the shader search roots
@@ -314,7 +314,7 @@ namespace kor {
             void releaseInclude(IncludeResult* result) override
             {
                 if (!result) return;
-                _directoryStack.pop_back(); // matches the push in a successful resolve()
+                _directoryStack.pop_back(); // matches the push in a successful Resolve()
                 delete[] static_cast<char*>(result->userData);
                 delete result;
             }
@@ -328,7 +328,7 @@ namespace kor {
                 // angle-bracket includes only look in the search roots.
                 std::vector<std::filesystem::path> roots;
                 if (local && !_directoryStack.empty()) roots.push_back(_directoryStack.back());
-                for (const auto& root : Shader::searchPaths()) roots.push_back(root);
+                for (const auto& root : Shader::SearchPaths()) roots.push_back(root);
 
                 for (const auto& root : roots) {
                     std::error_code ec;
@@ -374,7 +374,7 @@ namespace kor {
             return;
         }
         case Lang::eSlang: {
-            auto result = SlangCompiler::Compile(_module, _entry, searchPaths());
+            auto result = SlangCompiler::Compile(_module, _entry, SearchPaths());
             _spirvCode = std::move(result.spirv);
             _stage = result.stage;                          // auto-detected from [shader(...)]
             if (!result.resolvedPath.empty()) _path = result.resolvedPath; // for hot-reload
@@ -564,7 +564,7 @@ namespace kor {
     // from the source rather than from the SPIR-V.
     //
     // Includes are followed, because a project is expected to keep its shared blocks in a header.
-    void Shader::fetchFieldSemantics(const std::string& rawSource)
+    void Shader::FetchFieldSemantics(const std::string& rawSource)
     {
         // The pragmas that mean something to a compiler rather than to us. Everything else of the
         // form name(ARG) is read as an annotation, which is what makes the module's own name the
@@ -641,7 +641,7 @@ namespace kor {
     // annotated with. Offsets and types come from the SPIR-V, so they are the same however the
     // shader was written; only the annotation is language-specific, and that arrives in
     // _fieldSemantics from whichever front end read it. @see semantics.h
-    void Shader::fetchBlockMembers(const spirv_cross::Compiler& module,
+    void Shader::FetchBlockMembers(const spirv_cross::Compiler& module,
                                    const spirv_cross::Resource& resource,
                                    std::vector<BlockMember>& members,
                                    glm::u32& blockSize) const
@@ -698,7 +698,7 @@ namespace kor {
     // field of a nested struct, each element of an array. The offsets are the compiler's, so a
     // value written through one of these lands where the shader reads it however the two languages
     // disagree about padding — which is the whole point of walking down to the leaves.
-    void Shader::flattenPushConstant(const spirv_cross::Compiler& module,
+    void Shader::FlattenPushConstant(const spirv_cross::Compiler& module,
                                      const spirv_cross::SPIRType& type,
                                      const std::string& prefix, const glm::u32 baseOffset,
                                      std::vector<PushConstantField>& out)
@@ -758,7 +758,7 @@ namespace kor {
     					aggregate.arrayStride = 0;
     					aggregate.aggregate = true;
     					out.push_back(aggregate);
-    					flattenPushConstant(module, elementType, elementName + ".", elementOffset, out);
+    					FlattenPushConstant(module, elementType, elementName + ".", elementOffset, out);
     					continue;
     				}
 
@@ -777,7 +777,7 @@ namespace kor {
     			// Writable whole when the sizes agree, and field by field when they do not.
     			field.aggregate = true;
     			out.push_back(field);
-    			flattenPushConstant(module, memberType, name + ".", offset, out);
+    			FlattenPushConstant(module, memberType, name + ".", offset, out);
     			continue;
     		}
 
@@ -785,7 +785,7 @@ namespace kor {
     	}
     }
 
-    void Shader::fetchMemoryLayout()
+    void Shader::FetchMemoryLayout()
     {
     	if (!_valid) return;
 
@@ -798,7 +798,7 @@ namespace kor {
     			// An unreadable dependency is skipped rather than fatal: the shader itself compiled,
     			// and this pass only harvests field semantics from the files it included.
     			if (const auto text = utils::ReadFileAsString(dependency); text && !text->empty())
-    				fetchFieldSemantics(*text);
+    				FetchFieldSemantics(*text);
     		}
     	}
 
@@ -911,7 +911,7 @@ namespace kor {
 			const auto& name = module.get_name(buffer.id);
 			auto descriptor = Descriptor { DescriptorType::eUniformBuffer, name, count, stage, AccessKind::eRead, isActive(buffer) };
 			descriptor.blockName = module.get_name(buffer.base_type_id);
-			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
+			FetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eUniformBuffer
 		for (const auto& buffer : resources.storage_buffers) {
@@ -923,7 +923,7 @@ namespace kor {
 			const auto access = AccessFrom(module.get_buffer_block_flags(buffer.id));
 			auto descriptor = Descriptor { DescriptorType::eStorageBuffer, name, count, stage, access, isActive(buffer) };
 			descriptor.blockName = module.get_name(buffer.base_type_id);
-			fetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
+			FetchBlockMembers(module, buffer, descriptor.members, descriptor.blockSize);
 			memoryLayout.descriptorSets[set].descriptors.emplace(binding, std::move(descriptor));
 		} // eStorageBuffer
 		for (const auto& accelerationStructure : resources.acceleration_structures) {
@@ -965,7 +965,7 @@ namespace kor {
 					const auto member = failedIndex < probeType.member_types.size()
 						? probe.get_member_name(pushConstant.base_type_id, failedIndex)
 						: std::string("<unknown>");
-					// Thrown, not logged and shrugged off: at construction guard() turns this into a
+					// Thrown, not logged and shrugged off: at construction Guard() turns this into a
 					// poisoned shader — and so a poisoned pipeline — while a *reload* that
 					// introduces it keeps the last working version, which is the same treatment a
 					// syntax error gets.
@@ -984,7 +984,7 @@ namespace kor {
 			// way down: their paths are what CommandBuffer::PushConstant looks a constant up by,
 			// and their offsets are absolute within the range, so each one can be pushed on its own.
 			PushConstant pushConstantBlock { name, size, offset, stage };
-			flattenPushConstant(module, type, {}, 0, pushConstantBlock.members);
+			FlattenPushConstant(module, type, {}, 0, pushConstantBlock.members);
 
 			memoryLayout.pushConstants.emplace(offset, std::move(pushConstantBlock));
 		} // push constants
@@ -994,7 +994,7 @@ namespace kor {
 
     void Shader::OnReload()
     {
-    	kor::log::info("Reloading shader: {}", _path.string());
+    	kor::log::Info("Reloading shader: {}", _path.string());
 
     	_modified = true;
 
@@ -1005,16 +1005,16 @@ namespace kor {
     	// re-enters here and picks the fix up.
     	//
     	// Only a shader that has *never* compiled becomes poisoned, and that is decided at
-    	// construction — where the throw is exactly what guard() turns into the poison.
+    	// construction — where the throw is exactly what Guard() turns into the poison.
     	try {
     		Compile();
-    		fetchMemoryLayout();
+    		FetchMemoryLayout();
     	} catch (const BackendException& e) {
-    		kor::log::error("Reload of '{}' failed; keeping the last working version:\n{}",
-    		                _path.string(), e.error.history());
+    		kor::log::Error("Reload of '{}' failed; keeping the last working version:\n{}",
+    		                _path.string(), e.error.History());
     		_modified = true; // still stale, so the next save retries
     	} catch (const std::exception& e) {
-    		kor::log::error("Reload of '{}' failed; keeping the last working version: {}",
+    		kor::log::Error("Reload of '{}' failed; keeping the last working version: {}",
     		                _path.string(), e.what());
     		_modified = true;
     	}
@@ -1037,6 +1037,6 @@ namespace kor {
         }
 
     	Compile();
-    	fetchMemoryLayout();
+    	FetchMemoryLayout();
     }
 }

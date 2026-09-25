@@ -11,7 +11,7 @@
  * railway model. Every error carries a documented @ref kor::ErrorCode so users
  * get an actionable Koral error instead of a raw backend (Vulkan) one.
  *
- * Backends still throw internally; @ref kor::guard converts any escaping
+ * Backends still throw internally; @ref kor::Guard converts any escaping
  * exception into a kor::Error at the API boundary.
  */
 
@@ -83,7 +83,7 @@ namespace kor
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */
-    [[nodiscard]] KORAL_API std::string_view describe(ErrorCode code);
+    [[nodiscard]] KORAL_API std::string_view Describe(ErrorCode code);
 
     /**
      * @brief A structured API error: a documented code, a human message, an origin,
@@ -101,11 +101,11 @@ namespace kor
     {
         ErrorCode code = ErrorCode::eNone;      ///< What kind of failure this is.
         std::string message;                    ///< What went wrong, in words, with the specifics filled in.
-        std::source_location where = std::source_location::current();   ///< Where it was raised — the caller's build() or record site, not somewhere inside Koral.
+        std::source_location where = std::source_location::current();   ///< Where it was raised — the caller's Build() or record site, not somewhere inside Koral.
         std::shared_ptr<const Error> cause;     ///< The error that made our input unusable, if any.
 
         /** @brief Format this error alone as "kor::Error(code): message [file:line]". */
-        [[nodiscard]] std::string toString() const;
+        [[nodiscard]] std::string ToString() const;
 
         /**
          * @brief Format this error and every error beneath it, one "caused by" per line.
@@ -113,24 +113,24 @@ namespace kor
          * This is what gets printed to the console for an unrecoverable failure: it
          * explains the history of the issue so the user knows what to actually fix.
          */
-        [[nodiscard]] std::string history() const;
+        [[nodiscard]] std::string History() const;
 
         /** @brief Depth of the cause chain (0 when this error has no cause). */
-        [[nodiscard]] std::size_t depth() const;
+        [[nodiscard]] std::size_t Depth() const;
 
         /** @brief The deepest error in the chain: the thing the user has to fix. */
-        [[nodiscard]] const Error& root() const;
+        [[nodiscard]] const Error& Root() const;
     };
 
     /** @brief Copy @p e with @p cause linked beneath it. */
-    [[nodiscard]] KORAL_API Error causedBy(Error e, std::shared_ptr<const Error> cause);
+    [[nodiscard]] KORAL_API Error CausedBy(Error e, std::shared_ptr<const Error> cause);
 
     /**
      * @brief Exception carrying a kor::Error, thrown by backends and unwrapped at the API boundary.
      *
      * Backend code that can identify an actionable cause throws this so the specific
      * kor::Error survives; @ref guard converts everything else into ErrorCode::eBackend.
-     * It is also what @ref Result::valueOrThrow re-throws.
+     * It is also what @ref Result::ValueOrThrow re-throws.
      */
     struct KORAL_API BackendException : std::runtime_error
     {
@@ -147,7 +147,7 @@ namespace kor
      * A thin extension of std::expected: all of its operations remain available
      * (operator bool, value(), error(), and_then/or_else/transform). It adds
      * @ref valueOrThrow for call sites that prefer to bridge a failure back into an
-     * exception while keeping the fluent `builder.build()` style.
+     * exception while keeping the fluent `builder.Build()` style.
      */
     template<class T>
     struct Result : std::expected<T, Error>
@@ -155,13 +155,13 @@ namespace kor
         using std::expected<T, Error>::expected;
 
         /** @brief Return the value, or throw BackendException(error) on failure. */
-        T valueOrThrow() && {
+        T ValueOrThrow() && {
             if (!this->has_value()) throw BackendException(std::move(this->error()));
             return std::move(this->value());
         }
 
         /** @brief Return the value, or throw BackendException(error) on failure. */
-        T valueOrThrow() const & {
+        T ValueOrThrow() const & {
             if (!this->has_value()) throw BackendException(this->error());
             return this->value();
         }
@@ -176,15 +176,15 @@ namespace kor
      * Usage: `return fail(ErrorCode::eUniformBufferTooLarge, "size {} > 65536", n);`
      */
     template<class... A>
-    [[nodiscard]] std::unexpected<Error> fail(const ErrorCode code, const std::format_string<A...> fmt, A&&... a)
+    [[nodiscard]] std::unexpected<Error> Fail(const ErrorCode code, const std::format_string<A...> fmt, A&&... a)
     {
         return std::unexpected(Error{ .code = code, .message = std::format(fmt, std::forward<A>(a)...) });
     }
 
     /** @brief Build an `unexpected` kor::Error using the code's standard description. */
-    [[nodiscard]] inline std::unexpected<Error> fail(const ErrorCode code)
+    [[nodiscard]] inline std::unexpected<Error> Fail(const ErrorCode code)
     {
-        return std::unexpected(Error{ .code = code, .message = std::string(describe(code)) });
+        return std::unexpected(Error{ .code = code, .message = std::string(Describe(code)) });
     }
 
     /**
@@ -194,7 +194,7 @@ namespace kor
      * independent problem, so the user is shown the root cause and not just the symptom.
      */
     template<class... A>
-    [[nodiscard]] std::unexpected<Error> failCausedBy(const ErrorCode code, std::shared_ptr<const Error> cause,
+    [[nodiscard]] std::unexpected<Error> FailCausedBy(const ErrorCode code, std::shared_ptr<const Error> cause,
                                                       const std::format_string<A...> fmt, A&&... a)
     {
         return std::unexpected(Error{
@@ -212,7 +212,7 @@ namespace kor
      * Guarantees no backend exception crosses the API boundary.
      */
     template<class F>
-    [[nodiscard]] auto guard(const ErrorCode fallback, F&& f) -> Result<std::invoke_result_t<F>>
+    [[nodiscard]] auto Guard(const ErrorCode fallback, F&& f) -> Result<std::invoke_result_t<F>>
     {
         using R = std::invoke_result_t<F>;
         try {

@@ -42,7 +42,7 @@ namespace kor::ogl
             std::cerr << "Error: Multisampled images are not supported!" << std::endl;
         }
 
-        if (isDepthStencilFormat(createInfo.format) && createInfo.type != Type::e2D) {
+        if (IsDepthStencilFormat(createInfo.format) && createInfo.type != Type::e2D) {
             std::cerr << "Error: Depth/stencil formats are only supported for 2D images! Attempting to create a depth/stencil image with type " << magic_enum::enum_name(createInfo.type) << std::endl;
         }
 
@@ -110,7 +110,7 @@ namespace kor::ogl
         glCheckError();
     }
 
-    void Image::doResize(const glm::uvec3 &extent) {
+    void Image::DoResize(const glm::uvec3 &extent) {
 
         // glTexStorage* storage is immutable, so a resize must recreate the texture.
         // Image views forward to the image's current id (see ImageView::operator*),

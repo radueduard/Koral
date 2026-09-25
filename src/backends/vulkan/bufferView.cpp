@@ -36,7 +36,7 @@ namespace kor::vk
 
     ::vk::BufferView BufferView::operator*() const
     {
-        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+        const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
         return _bufferViews[currentFrame];
     }
 

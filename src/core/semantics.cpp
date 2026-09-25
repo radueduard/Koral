@@ -22,7 +22,7 @@ namespace kor
         : _semantic(semantic), _field(field), _scalar(scalar), _rows(rows), _columns(columns),
           _destination(destination) {}
 
-    std::string SemanticSlot::describe(const Scalar scalar, const std::uint8_t rows, const std::uint8_t columns)
+    std::string SemanticSlot::Describe(const Scalar scalar, const std::uint8_t rows, const std::uint8_t columns)
     {
         const char* base = "?";
         switch (scalar) {
@@ -38,7 +38,7 @@ namespace kor
         return base;
     }
 
-    bool SemanticSlot::write(const Scalar scalar, const std::uint8_t rows, const std::uint8_t columns,
+    bool SemanticSlot::Write(const Scalar scalar, const std::uint8_t rows, const std::uint8_t columns,
                              const void* bytes, const std::size_t size)
     {
         if (scalar != _scalar || rows != _rows || columns != _columns) {
@@ -48,7 +48,7 @@ namespace kor
                 .code = ErrorCode::eInvalidArgument,
                 .message = std::format(
                     "'{}' is declared as {} but {} fills a {}.",
-                    _field, describe(_scalar, _rows, _columns), _semantic, describe(scalar, rows, columns)),
+                    _field, Describe(_scalar, _rows, _columns), _semantic, Describe(scalar, rows, columns)),
             };
             return false;
         }
@@ -72,21 +72,21 @@ namespace kor
         return true;
     }
 
-    void SemanticSlot::set(const float value)          { write(Scalar::eFloat, 1, 1, &value, sizeof(value)); }
-    void SemanticSlot::set(const std::int32_t value)   { write(Scalar::eInt, 1, 1, &value, sizeof(value)); }
-    void SemanticSlot::set(const std::uint32_t value)  { write(Scalar::eUInt, 1, 1, &value, sizeof(value)); }
-    void SemanticSlot::set(const glm::vec2& value)     { write(Scalar::eFloat, 2, 1, &value, sizeof(value)); }
-    void SemanticSlot::set(const glm::vec3& value)     { write(Scalar::eFloat, 3, 1, &value, sizeof(value)); }
-    void SemanticSlot::set(const glm::vec4& value)     { write(Scalar::eFloat, 4, 1, &value, sizeof(value)); }
-    void SemanticSlot::set(const glm::mat4& value)     { write(Scalar::eFloat, 4, 4, &value, sizeof(value)); }
+    void SemanticSlot::Set(const float value)          { Write(Scalar::eFloat, 1, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const std::int32_t value)   { Write(Scalar::eInt, 1, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const std::uint32_t value)  { Write(Scalar::eUInt, 1, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const glm::vec2& value)     { Write(Scalar::eFloat, 2, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const glm::vec3& value)     { Write(Scalar::eFloat, 3, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const glm::vec4& value)     { Write(Scalar::eFloat, 4, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const glm::mat4& value)     { Write(Scalar::eFloat, 4, 4, &value, sizeof(value)); }
 
-    void SemanticSlot::set(const glm::mat3& value)
+    void SemanticSlot::Set(const glm::mat3& value)
     {
         // std140 pads each column of a mat3 out to 16 bytes, so the tight glm::mat3 cannot be
         // copied straight in. Expanded here rather than made the caller's problem.
         if (_scalar != Scalar::eFloat || _rows != 3 || _columns != 3)
         {
-            write(Scalar::eFloat, 3, 3, &value, sizeof(value));   // reports the mismatch
+            Write(Scalar::eFloat, 3, 3, &value, sizeof(value));   // reports the mismatch
             return;
         }
 
@@ -94,7 +94,7 @@ namespace kor
         for (int column = 0; column < 3; ++column) {
             for (int row = 0; row < 3; ++row) padded[column * 4 + row] = value[column][row];
         }
-        write(Scalar::eFloat, 3, 3, padded, sizeof(padded));
+        Write(Scalar::eFloat, 3, 3, padded, sizeof(padded));
     }
 
     // ---- SemanticBuffers ------------------------------------------------------------------------
@@ -122,7 +122,7 @@ namespace kor
     SemanticBuffers::SemanticBuffers() : _state(std::make_unique<State>()) {}
     SemanticBuffers::~SemanticBuffers() = default;
 
-    std::size_t SemanticBuffers::blockCount() const { return _state->blocks.size(); }
+    std::size_t SemanticBuffers::BlockCount() const { return _state->blocks.size(); }
 
     namespace
     {
@@ -152,7 +152,7 @@ namespace kor
         }
     }
 
-    Result<ResourceRef<const Buffer>> SemanticBuffers::acquire(
+    Result<ResourceRef<const Buffer>> SemanticBuffers::Acquire(
         const std::vector<Shader::BlockMember>& members, const std::uint32_t blockSize,
         const SemanticSerializer& owner)
     {
@@ -175,13 +175,13 @@ namespace kor
 
             // The annotation names the module that should fill it, so writing the wrong kind of
             // object here is caught by name rather than leaving every field silently at zero.
-            if (member.semanticNamespace != owner.semanticNamespace()) {
+            if (member.semanticNamespace != owner.SemanticNamespace()) {
                 block.error = Error{
                     .code = ErrorCode::eInvalidArgument,
                     .message = std::format(
                         "'{}' asks for {}({}), but a '{}' was written to this binding.",
                         member.name, member.semanticNamespace, member.semantic,
-                        owner.semanticNamespace()),
+                        owner.SemanticNamespace()),
                 };
                 break;
             }
@@ -191,18 +191,18 @@ namespace kor
                               member.rows, member.columns,
                               std::span(block.staging).subspan(member.offset, member.size));
 
-            if (!owner.serialize(member.semantic, slot)) {
+            if (!owner.Serialize(member.semantic, slot)) {
                 block.error = Error{
                     .code = ErrorCode::eInvalidArgument,
                     .message = std::format(
                         "'{}' does not answer for {}({}), which '{}' is annotated with — the "
                         "semantic is misspelled, or that module does not provide it.",
-                        owner.semanticNamespace(), member.semanticNamespace, member.semantic,
+                        owner.SemanticNamespace(), member.semanticNamespace, member.semantic,
                         member.name),
                 };
                 break;
             }
-            if (slot.error()) { block.error = slot.error(); break; }
+            if (slot.Failure()) { block.error = slot.Failure(); break; }
         }
 
         if (block.error) {
@@ -212,15 +212,15 @@ namespace kor
         }
 
         block.buffer = Buffer::RawBuilder()
-            .setRawSize(static_cast<glm::i64>(blockSize))
-            .setUsage(Buffer::Usage::eUniform)
-            .setIsPerFrame(true)
-            .setType(Buffer::Type::eDynamic)
-            .build();
+            .SetRawSize(static_cast<glm::i64>(blockSize))
+            .SetUsage(Buffer::Usage::eUniform)
+            .SetIsPerFrame(true)
+            .SetType(Buffer::Type::eDynamic)
+            .Build();
 
-        if (!block.buffer.valid()) {
-            return std::unexpected(block.buffer.error()
-                ? *block.buffer.error()
+        if (!block.buffer.Valid()) {
+            return std::unexpected(block.buffer.Failure()
+                ? *block.buffer.Failure()
                 : Error{ .code = ErrorCode::eInvalidArgument, .message = "Could not allocate the block." });
         }
 
@@ -229,10 +229,10 @@ namespace kor
         return ResourceRef<const Buffer>(it->second.buffer);
     }
 
-    void SemanticBuffers::refresh(const SemanticSerializer& owner)
+    void SemanticBuffers::Refresh(const SemanticSerializer& owner)
     {
         for (auto& block : _state->blocks | std::views::values) {
-            if (!block.buffer.valid() || block.error) continue;
+            if (!block.buffer.Valid() || block.error) continue;
 
             std::vector<std::byte> next(block.staging.size(), std::byte{});
             for (const auto& member : block.members) {
@@ -242,7 +242,7 @@ namespace kor
                                   static_cast<SemanticSlot::Scalar>(member.scalar),
                                   member.rows, member.columns,
                                   std::span(next).subspan(member.offset, member.size));
-                owner.serialize(member.semantic, slot);
+                owner.Serialize(member.semantic, slot);
             }
 
             // Only when something moved. A camera that has not been touched since the last frame

@@ -67,11 +67,11 @@ struct GuiViewport : GpuTest
 
 kor::Resource<Image> target(const std::uint32_t width, const std::uint32_t height) {
     return Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(Image::Format::eRGBA8_UNORM)
-        .setExtent(glm::uvec2{ width, height })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(Image::Format::eRGBA8_UNORM)
+        .SetExtent(glm::uvec2{ width, height })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
+        .Build();
 }
 
 // A viewport with nothing in it must still draw, and must report no size to render at.
@@ -81,7 +81,7 @@ TEST_F(GuiViewport, DrawsWithNoImage) {
         placeNextWindow(ImVec2(0, 0), ImVec2(640, 480));
         viewport.Draw("empty");
     });
-    EXPECT_FALSE(viewport.image().alive());
+    EXPECT_FALSE(viewport.DisplayedImage().Alive());
 }
 
 // The resolution a scene should render at is the window's content region, and it is reported as
@@ -92,13 +92,13 @@ TEST_F(GuiViewport, ReportsItsSizeAndSaysWhenItChanged) {
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(320, 240));
-        viewport.setImage(image);
+        viewport.SetImage(image);
         viewport.Draw("sized");
     });
     const auto first = viewport.size();
     EXPECT_GT(first.x, 0u);
     EXPECT_GT(first.y, 0u);
-    EXPECT_TRUE(viewport.resized()) << "the first size is a change from nothing";
+    EXPECT_TRUE(viewport.Resized()) << "the first size is a change from nothing";
 
     // Same size again: nothing to re-create.
     frame([&] {
@@ -106,14 +106,14 @@ TEST_F(GuiViewport, ReportsItsSizeAndSaysWhenItChanged) {
         viewport.Draw("sized");
     });
     EXPECT_EQ(viewport.size(), first);
-    EXPECT_FALSE(viewport.resized());
+    EXPECT_FALSE(viewport.Resized());
 
     // Bigger window, so a scene has to re-create its targets.
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(640, 480));
         viewport.Draw("sized");
     });
-    EXPECT_TRUE(viewport.resized());
+    EXPECT_TRUE(viewport.Resized());
     EXPECT_GT(viewport.size().x, first.x);
 }
 
@@ -122,15 +122,15 @@ TEST_F(GuiViewport, ReportsItsSizeAndSaysWhenItChanged) {
 TEST_F(GuiViewport, StretchFillsTheContentRegion) {
     auto image = target(64, 32);
     kgui::Viewport viewport;
-    viewport.setFit(kgui::Viewport::Fit::eStretch);
+    viewport.SetFit(kgui::Viewport::Fit::eStretch);
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(400, 300));
-        viewport.setImage(image);
+        viewport.SetImage(image);
         viewport.Draw("stretch");
     });
 
-    const auto& rect = viewport.rect();
+    const auto& rect = viewport.ScreenRect();
     EXPECT_NEAR(rect.size.x, static_cast<float>(viewport.size().x), 1.f);
     EXPECT_NEAR(rect.size.y, static_cast<float>(viewport.size().y), 1.f);
 }
@@ -139,12 +139,12 @@ TEST_F(GuiViewport, StretchFillsTheContentRegion) {
 TEST_F(GuiViewport, ContainKeepsTheImageAspectAndCentresIt) {
     auto image = target(64, 32);            // 2:1
     kgui::Viewport viewport;
-    viewport.setFit(kgui::Viewport::Fit::eContain);
+    viewport.SetFit(kgui::Viewport::Fit::eContain);
 
     ImVec2 windowPosition { 0.f, 0.f };
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(400, 400));   // 1:1 window
-        viewport.setImage(image);
+        viewport.SetImage(image);
         viewport.Draw("contain");
 
         // Re-entering an existing window reads its state without drawing anything, which is how the
@@ -154,7 +154,7 @@ TEST_F(GuiViewport, ContainKeepsTheImageAspectAndCentresIt) {
         ImGui::End();
     });
 
-    const auto& rect = viewport.rect();
+    const auto& rect = viewport.ScreenRect();
     ASSERT_GT(rect.size.y, 0.f);
     EXPECT_NEAR(rect.size.x / rect.size.y, 2.f, 0.05f) << "the image's own aspect, not the window's";
     // Letterboxed: it cannot be as tall as the window, and what is left over is split evenly.
@@ -173,7 +173,7 @@ TEST_F(GuiViewport, ACollapsedWindowAsksForNothing) {
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(320, 240));
-        viewport.setImage(image);
+        viewport.SetImage(image);
         viewport.Draw("collapsing");
     });
     ASSERT_GT(viewport.size().x, 0u);
@@ -184,7 +184,7 @@ TEST_F(GuiViewport, ACollapsedWindowAsksForNothing) {
         EXPECT_FALSE(viewport.Draw("collapsing"));
     });
     EXPECT_EQ(viewport.size(), glm::uvec2(0, 0));
-    EXPECT_FALSE(viewport.resized());
+    EXPECT_FALSE(viewport.Resized());
 }
 
 // The pointer's position is reported in the *image's* pixels, and only while it is over the image.
@@ -196,11 +196,11 @@ TEST_F(GuiViewport, MousePositionIsInImagePixelsOrNothing) {
     ImGui::GetIO().AddMousePosEvent(2000.f, 2000.f);
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(200, 100));
-        viewport.setImage(image);
+        viewport.SetImage(image);
         viewport.Draw("picking");
     });
-    EXPECT_FALSE(viewport.mousePosition().has_value());
-    EXPECT_FALSE(viewport.isHovered());
+    EXPECT_FALSE(viewport.MousePosition().has_value());
+    EXPECT_FALSE(viewport.IsHovered());
 }
 
 // An image destroyed under the viewport leaves it drawing a placeholder rather than a dead texture.
@@ -210,13 +210,13 @@ TEST_F(GuiViewport, SurvivesItsImageBeingDestroyed) {
         auto image = target(64, 64);
         frame([&] {
             placeNextWindow(ImVec2(0, 0), ImVec2(320, 240));
-            viewport.setImage(image);
+            viewport.SetImage(image);
             viewport.Draw("dying");
         });
-        EXPECT_TRUE(viewport.image().alive());
+        EXPECT_TRUE(viewport.DisplayedImage().Alive());
     }   // the image goes away, the viewport keeps only a ref
 
-    EXPECT_FALSE(viewport.image().alive());
+    EXPECT_FALSE(viewport.DisplayedImage().Alive());
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(320, 240));
         viewport.Draw("dying");
@@ -243,8 +243,8 @@ TEST_F(GuiViewport, GizmoDrawsOverAViewport) {
     auto image = target(64, 64);
     kgui::Viewport viewport;
     kgui::Gizmo gizmo;
-    gizmo.setOperation(kgui::Gizmo::Operation::eTranslate);
-    gizmo.setSpace(kgui::Gizmo::Space::eWorld);
+    gizmo.SetOperation(kgui::Gizmo::Operation::eTranslate);
+    gizmo.SetSpace(kgui::Gizmo::Space::eWorld);
 
     const glm::mat4 view {
         1.f, 0.f, 0.f, 0.f,  0.f, 1.f, 0.f, 0.f,
@@ -257,7 +257,7 @@ TEST_F(GuiViewport, GizmoDrawsOverAViewport) {
 
     frame([&] {
         placeNextWindow(ImVec2(0, 0), ImVec2(600, 400));
-        viewport.setImage(image);
+        viewport.SetImage(image);
         viewport.Draw("scene");
 
         // Inside the same window, which is what SetDrawlist needs.
@@ -270,18 +270,18 @@ TEST_F(GuiViewport, GizmoDrawsOverAViewport) {
 
     // Nothing was dragged, so nothing moved.
     EXPECT_EQ(transform, before);
-    EXPECT_FALSE(gizmo.isUsing());
+    EXPECT_FALSE(gizmo.IsUsing());
 }
 
 TEST_F(GuiViewport, GizmoRemembersWhatItWasSetTo) {
     kgui::Gizmo gizmo;
-    EXPECT_EQ(gizmo.operation(), kgui::Gizmo::Operation::eTranslate);
-    gizmo.setOperation(kgui::Gizmo::Operation::eRotate);
-    gizmo.setSpace(kgui::Gizmo::Space::eLocal);
-    gizmo.setSnap(glm::vec3(0.25f));
-    EXPECT_EQ(gizmo.operation(), kgui::Gizmo::Operation::eRotate);
-    EXPECT_EQ(gizmo.space(), kgui::Gizmo::Space::eLocal);
-    EXPECT_EQ(gizmo.snap(), glm::vec3(0.25f));
+    EXPECT_EQ(gizmo.CurrentOperation(), kgui::Gizmo::Operation::eTranslate);
+    gizmo.SetOperation(kgui::Gizmo::Operation::eRotate);
+    gizmo.SetSpace(kgui::Gizmo::Space::eLocal);
+    gizmo.SetSnap(glm::vec3(0.25f));
+    EXPECT_EQ(gizmo.CurrentOperation(), kgui::Gizmo::Operation::eRotate);
+    EXPECT_EQ(gizmo.CurrentSpace(), kgui::Gizmo::Space::eLocal);
+    EXPECT_EQ(gizmo.Snap(), glm::vec3(0.25f));
 }
 
 } // namespace

@@ -53,9 +53,9 @@ namespace kor
 
     ogl::GuiImage::GuiImage(kor::ResourceRef<const kor::Image> image, const glm::u32 layer, const glm::u32 level) : _image(image)
     {
-        _generation = image->generation();
-        setImage(image);
-        setLayerAndLevel(layer, level);
+        _generation = image->Generation();
+        SetImage(image);
+        SetLayerAndLevel(layer, level);
     }
 
     ogl::GuiImage::~GuiImage()
@@ -64,25 +64,25 @@ namespace kor
         glCheckError();
     }
 
-    void ogl::GuiImage::refresh(kor::CommandBuffer&)
+    void ogl::GuiImage::Refresh(kor::CommandBuffer&)
     {
         // No command buffer is used: unlike Vulkan, where the blit has to be recorded into the
         // frame so the engine's barriers can see the read, GL's blit is immediate.
-        if (const auto generation = _image->generation(); generation != _generation)
+        if (const auto generation = _image->Generation(); generation != _generation)
         {
-            // The source was recreated at a new extent (@see Image::doResize). This handle's copy
+            // The source was recreated at a new extent (@see Image::DoResize). This handle's copy
             // has immutable storage at the old one, so it has to be reallocated before the blit —
             // otherwise the viewport keeps showing a copy the size the window used to be.
             _generation = generation;
             const auto layer = _layer, level = _level;
-            setImage(_image);
-            setLayerAndLevel(layer, level);
+            SetImage(_image);
+            SetLayerAndLevel(layer, level);
             return;
         }
-        setLayerAndLevel(_layer, _level);
+        SetLayerAndLevel(_layer, _level);
     }
 
-    void ogl::GuiImage::setLayerAndLevel(glm::u32 layer, glm::u32 level)
+    void ogl::GuiImage::SetLayerAndLevel(glm::u32 layer, glm::u32 level)
     {
         _layer = layer;
         _level = level;
@@ -95,15 +95,15 @@ namespace kor
         glCheckError();
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, srcFramebuffer);
-        if (_image->type() == kor::Image::Type::e1D && layer == 0) {
+        if (_image->ImageType() == kor::Image::Type::e1D && layer == 0) {
             glFramebufferTexture1D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_1D, *oglImage, level);
-        } else if (_image->type() == kor::Image::Type::e1D) {
+        } else if (_image->ImageType() == kor::Image::Type::e1D) {
             glFramebufferTextureLayer(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, *oglImage, layer, level);
-        } else if (_image->type() == kor::Image::Type::e2D && layer == 0) {
+        } else if (_image->ImageType() == kor::Image::Type::e2D && layer == 0) {
             glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, *oglImage, level);
-        } else if (_image->type() == kor::Image::Type::e2D) {
+        } else if (_image->ImageType() == kor::Image::Type::e2D) {
             glFramebufferTexture3D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_ARRAY, *oglImage, level, layer);
-        } else if (_image->type() == kor::Image::Type::e3D) {
+        } else if (_image->ImageType() == kor::Image::Type::e3D) {
             glFramebufferTexture3D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_3D, *oglImage, level, layer);
         }
         glCheckError();
@@ -128,10 +128,10 @@ namespace kor
         // compute imageStore is already top-down — glClipControl moves the rasterizer, not the
         // shader — so one carrying eColorAttachment it never actually rendered with would come out
         // flipped. Sampling one of those through ImGui is not a thing any scene here does.
-        const bool rendered = (_image->usage() & kor::Image::Usage::eColorAttachment)
-                           || (_image->usage() & kor::Image::Usage::eDepthStencilAttachment);
-        const auto width = static_cast<GLint>(oglImage.extent().x);
-        const auto height = static_cast<GLint>(oglImage.extent().y);
+        const bool rendered = (_image->UsageFlags() & kor::Image::Usage::eColorAttachment)
+                           || (_image->UsageFlags() & kor::Image::Usage::eDepthStencilAttachment);
+        const auto width = static_cast<GLint>(oglImage.Extent().x);
+        const auto height = static_cast<GLint>(oglImage.Extent().y);
 
         glBlitFramebuffer(
             0, 0, width, height,
@@ -148,14 +148,14 @@ namespace kor
         glCheckError();
     }
 
-    void ogl::GuiImage::setImage(kor::ResourceRef<const kor::Image> image)
+    void ogl::GuiImage::SetImage(kor::ResourceRef<const kor::Image> image)
     {
         _image = image;
         const auto& oglImage = dynamic_cast<const kor::ogl::Image&>(*image);
         GLuint textureId;
         glGenTextures(1, &textureId);
         glBindTexture(GL_TEXTURE_2D, textureId);
-        glTexStorage2D(GL_TEXTURE_2D, 1, oglImage.getGLFormat(), image->extent().x, image->extent().y);
+        glTexStorage2D(GL_TEXTURE_2D, 1, oglImage.getGLFormat(), image->Extent().x, image->Extent().y);
         glCheckError();
 
         if (_id != 0)
@@ -165,7 +165,7 @@ namespace kor
         }
         _id = textureId;
 
-        setLayerAndLevel(0, 0);
+        SetLayerAndLevel(0, 0);
     }
 
     ImTextureID ogl::GuiImage::operator*() const {

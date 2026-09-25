@@ -31,7 +31,7 @@ namespace kor::vk
         // stops responding with nothing logged.
         [[noreturn]] void reportDeviceLost(const char* where)
         {
-            kor::log::error("[vulkan] device lost during {} — the GPU stopped responding (driver "
+            kor::log::Error("[vulkan] device lost during {} — the GPU stopped responding (driver "
                             "reset / TDR, or a command the driver refused). Unrecoverable; aborting.",
                             where);
             throw std::runtime_error(std::string("Vulkan device lost during ") + where);
@@ -69,22 +69,22 @@ namespace kor::vk
 
     void Scheduler::Initialize()
     {
-        _swapChain = kor::vk::SwapChain::Builder(dynamic_cast<const kor::vk::Surface&>(kor::Context::Window().surface()))
+        _swapChain = kor::vk::SwapChain::Builder(dynamic_cast<const kor::vk::Surface&>(kor::Context::Window().RenderSurface()))
             .setImageCount(_imageCount)
             .setSampleCount(SampleCount::e1)
             .build();
 
         adoptSwapChainSizing();
 
-        createFrames();
+        CreateFrames();
     }
 
     void Scheduler::adoptSwapChainSizing()
     {
         // Adopt the swapchain's *actual* image count before anything is sized to it.
-        // currentImageIndex() returns the driver-acquired image index (0..actualCount-1), and
+        // CurrentImageIndex() returns the driver-acquired image index (0..actualCount-1), and
         // every per-frame resource — the frames, the swap chain's own depth target, and every user
-        // Buffer/Image/ImageView/DescriptorSet built later off imageCount() — is indexed by it.
+        // Buffer/Image/ImageView/DescriptorSet built later off ImageCount() — is indexed by it.
         // Leaving _imageCount at the requested value while the driver hands out more images made all
         // of those read out of bounds on other GPUs (the render-loop segfault); keeping the two in
         // step is what makes the acquire index always land in range.
@@ -104,10 +104,10 @@ namespace kor::vk
         adoptSwapChainSizing();
 
         // Last, because it attaches the views the two steps above just replaced. Through the window
-        // rather than Context::defaultFramebuffer(): that one hands out a const ref, because reading
+        // rather than Context::DefaultFramebuffer(): that one hands out a const ref, because reading
         // the default framebuffer is all a project ever does with it. Resizing it is the engine's
         // own job, and this is the place that owns it.
-        kor::Context::Window().framebuffer()->Resize(_swapChain->extent());
+        kor::Context::Window().DefaultFramebuffer()->Resize(_swapChain->extent());
     }
 
     Scheduler::~Scheduler() {
@@ -119,7 +119,7 @@ namespace kor::vk
 
     void Scheduler::Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) {
         kor::Scheduler::Draw(renderFunc);
-        const auto& frame = dynamic_cast<const kor::vk::Frame&>(currentFrame());
+        const auto& frame = dynamic_cast<const kor::vk::Frame&>(CurrentFrame());
 
         const auto& fence = frame.getInFlightFence();
         // vulkan-hpp throws on error codes rather than returning them, so a lost device surfaces
@@ -146,7 +146,7 @@ namespace kor::vk
             }
             if (result == ::vk::Result::eErrorOutOfDateKHR || result == ::vk::Result::eSuboptimalKHR) {
                 _started = false;
-                recreateSwapChain(kor::Context::Window().extent());
+                recreateSwapChain(kor::Context::Window().Extent());
                 _started = true;
                 // recreate the semaphore
                 frame.ResetSemaphore();
@@ -163,14 +163,14 @@ namespace kor::vk
             throw std::runtime_error("Failed to reset fence: " + ::vk::to_string(result));
         }
 
-        auto& commandBuffer = frame.commandBuffer();
+        auto& commandBuffer = frame.Commands();
         const auto& vkCommandBuffer = dynamic_cast<kor::vk::CommandBuffer&>(commandBuffer);
         commandBuffer.Reset();
         commandBuffer.Begin();
         renderFunc(commandBuffer);
 
         // After the render callback, which may Execute() work of its own.
-        auto pending = takePending();
+        auto pending = TakePending();
 
         SubmitInfo submitInfo {
             .waitSemaphores = { frame.getImageAvailableSemaphore() },
@@ -189,7 +189,7 @@ namespace kor::vk
                 const auto& vkExternal = dynamic_cast<const kor::vk::CommandBuffer&>(*external);
                 if (vkExternal.getQueue().getIdentifier() != vkCommandBuffer.getQueue().getIdentifier()) {
                     // Barriers do not reach across queues; running it here would be unsynchronised.
-                    kor::log::error("[scheduler] a command buffer handed to Execute() belongs to a "
+                    kor::log::Error("[scheduler] a command buffer handed to Execute() belongs to a "
                                     "different queue than the frame's and was not run. Submit it on "
                                     "its own with a token, and WaitFor() that token instead.");
                     external->Reset();
@@ -208,7 +208,7 @@ namespace kor::vk
         std::vector<Token> tokens;
         auto& reactor = Context::Tokens();
         for (const auto& token : pending.waits) {
-            if (token.ready()) continue;
+            if (token.Ready()) continue;
             const auto [semaphore, value] = reactor.resolve(token);
             submitInfo.waitSemaphores.push_back(semaphore);
             submitInfo.waitValues.push_back(value);
@@ -232,7 +232,7 @@ namespace kor::vk
         // signal therefore holds up the *present*, here; one a submission already on a queue will
         // signal does not.
         for (const auto& token : pending.waits) {
-            if (!TokenReactor::signalIsOnItsWay(token)) token.wait();
+            if (!TokenReactor::signalIsOnItsWay(token)) token.Wait();
         }
 
         const auto presentResult = _swapChain->Present(frame);
@@ -241,15 +241,15 @@ namespace kor::vk
         }
         if (presentResult == ::vk::Result::eErrorOutOfDateKHR || presentResult == ::vk::Result::eSuboptimalKHR) {
             _started = false;
-            recreateSwapChain(kor::Context::Window().extent());
+            recreateSwapChain(kor::Context::Window().Extent());
             _started = true;
             return;
         }
 
-        advanceFrame();
+        AdvanceFrame();
     }
 
-    void Scheduler::createFrames() {
+    void Scheduler::CreateFrames() {
         _frames.reserve(_imageCount);
         const auto& queue = Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
         for (uint32_t i = 0; i < _imageCount; i++) {

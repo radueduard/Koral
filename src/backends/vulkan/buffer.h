@@ -31,7 +31,7 @@ namespace kor::vk
         void Unmap() const override;
 		void Flush(glm::i64 size, glm::u64 offset) const override;
 		void Invalidate(glm::i64 size, glm::u64 offset) const override;
-		void automaticUpdate() override;
+		void AutomaticUpdate() override;
 
 	public:
 		::vk::Buffer operator*() const;
@@ -41,7 +41,7 @@ namespace kor::vk
 		 * @brief GPU device address of this buffer (current frame if per-frame).
 		 * Requires the buffer to have been created with Usage::eShaderDeviceAddress.
 		 */
-		[[nodiscard]] glm::u64 deviceAddress() const override;
+		[[nodiscard]] glm::u64 DeviceAddress() const override;
 
 		[[nodiscard]] ::vk::AccessFlags getAccessMask() const;
 		void setAccessMask(::vk::AccessFlags access) const;

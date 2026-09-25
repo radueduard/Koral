@@ -199,8 +199,8 @@ namespace kor {
      *
      * @code
      * void MyScene::Update() {
-     *     if (kor::Input::isKeyHeld(kor::Key::eW)) camera.moveForward(kor::Time::frameTime());
-     *     if (kor::Input::isKeyPressed(kor::Key::eSpace)) jump();     // once per press
+     *     if (kor::Input::IsKeyHeld(kor::Key::eW)) camera.moveForward(kor::Time::FrameTime());
+     *     if (kor::Input::IsKeyPressed(kor::Key::eSpace)) jump();     // once per press
      * }
      * @endcode
      *
@@ -215,28 +215,28 @@ namespace kor {
     	friend class Engine;
     public:
         /** @brief Where @p key is in the press-hold-release cycle this frame. */
-        static KeyState keyState(Key key);
+        static KeyState StateOf(Key key);
 
         /** @brief Where @p button is in the press-hold-release cycle this frame. */
-        static KeyState mouseButtonState(MouseButton button);
+        static KeyState MouseButtonState(MouseButton button);
 
         /** @brief Whether @p key went down this frame. True for one frame per press. */
-        static bool isKeyPressed(Key key);
+        static bool IsKeyPressed(Key key);
 
         /** @brief Whether @p key is being held, having gone down on an earlier frame. */
-        static bool isKeyHeld(Key key);
+        static bool IsKeyHeld(Key key);
 
         /** @brief Whether @p key came up this frame. True for one frame per release. */
-        static bool isKeyReleased(Key key);
+        static bool IsKeyReleased(Key key);
 
         /** @brief Whether @p button went down this frame. True for one frame per press. */
-        static bool isMouseButtonPressed(MouseButton button);
+        static bool IsMouseButtonPressed(MouseButton button);
 
         /** @brief Whether @p button is being held, having gone down on an earlier frame. */
-        static bool isMouseButtonHeld(MouseButton button);
+        static bool IsMouseButtonHeld(MouseButton button);
 
         /** @brief Whether @p button came up this frame. True for one frame per release. */
-        static bool isMouseButtonReleased(MouseButton button);
+        static bool IsMouseButtonReleased(MouseButton button);
 
         /**
          * @brief A readable name for @p key, as an interface would show it: "Left Shift", "F1", "A".
@@ -246,10 +246,10 @@ namespace kor {
          * over an enumeration whose values run past the usual limit — a trap paid for once, in the
          * engine, instead of by everyone who writes a key-rebinding interface.
          */
-        [[nodiscard]] static std::string describe(Key key);
+        [[nodiscard]] static std::string Describe(Key key);
 
-        /** @brief A readable name for @p button: "Left Mouse", "Middle Mouse". @see describe(Key) */
-        [[nodiscard]] static std::string describe(MouseButton button);
+        /** @brief A readable name for @p button: "Left Mouse", "Middle Mouse". @see Describe(Key) */
+        [[nodiscard]] static std::string Describe(MouseButton button);
 
         /**
          * @brief The first key that went down this frame, if any.
@@ -258,10 +258,10 @@ namespace kor {
          * key is "first" among several pressed in one frame is unspecified — pressing two at once is
          * not a thing a rebinding interface can honour anyway.
          */
-        [[nodiscard]] static std::optional<Key> firstKeyPressed();
+        [[nodiscard]] static std::optional<Key> FirstKeyPressed();
 
         /** @brief The first mouse button that went down this frame, if any. @see firstKeyPressed */
-        [[nodiscard]] static std::optional<MouseButton> firstMouseButtonPressed();
+        [[nodiscard]] static std::optional<MouseButton> FirstMouseButtonPressed();
 
         /**
          * @brief Whether the interface is using the pointer this frame — a panel hovered, a slider
@@ -276,22 +276,22 @@ namespace kor {
          * False when there is no interface at all: a headless job, or a test. That is the answer
          * that lets the same code run in both.
          */
-        [[nodiscard]] static bool interfaceWantsMouse();
+        [[nodiscard]] static bool InterfaceWantsMouse();
 
         /** @brief Whether the interface is using the keyboard — text is being typed into it. @see interfaceWantsMouse */
-        [[nodiscard]] static bool interfaceWantsKeyboard();
+        [[nodiscard]] static bool InterfaceWantsKeyboard();
 
         /** @brief Cursor position in pixels, measured from the top-left of the drawable area. */
-        static const glm::vec2& mousePosition();
+        static const glm::vec2& MousePosition();
 
         /** @brief How far the cursor moved since the previous frame, in pixels. The value to drive a look-around camera with. */
-        static const glm::vec2& mousePositionDelta();
+        static const glm::vec2& MousePositionDelta();
 
         /** @brief How far the wheel turned this frame. Y is the usual vertical wheel; X is horizontal scrolling where the device has it. */
-        static const glm::vec2& mouseScrollDelta();
+        static const glm::vec2& MouseScrollDelta();
 
         /** @brief Where the cursor was on the previous frame, in pixels. */
-        static const glm::vec2& lastMousePosition();
+        static const glm::vec2& LastMousePosition();
 
         /**
          * @brief What the cursor does while the application runs.
@@ -321,10 +321,10 @@ namespace kor {
          * Raw, unaccelerated movement is used while captured where the platform has it, which is what
          * an aimed camera wants — desktop pointer acceleration is tuned for reaching menus.
          */
-        static void setCursorMode(CursorMode mode);
+        static void SetCursorMode(CursorMode mode);
 
         /** @brief What the cursor is currently doing. */
-        [[nodiscard]] static CursorMode cursorMode();
+        [[nodiscard]] static CursorMode CurrentCursorMode();
 
         /**
          * @brief Starts reading input from another window as well as the main one.
@@ -343,30 +343,30 @@ namespace kor {
          * Positions are reported in *virtual desktop* coordinates from the moment more than one window
          * is attached, so a delta stays meaningful as the pointer crosses from one to another.
          */
-        static void attachTo(GLFWwindow* window);
+        static void AttachTo(GLFWwindow* window);
 
         /** @brief Stops reading input from @p window. Called for you when ImGui closes one. */
-        static void detachFrom(GLFWwindow* window);
+        static void DetachFrom(GLFWwindow* window);
 
         /** @brief Every window input is currently read from, the main one first. */
-        [[nodiscard]] static std::vector<GLFWwindow*> attachedWindows();
+        [[nodiscard]] static std::vector<GLFWwindow*> AttachedWindows();
 
     private:
-        static void setup(GLFWwindow* window);
+        static void Setup(GLFWwindow* window);
 
         /** @brief Points a window's GLFW callbacks at the engine's. @see attachTo */
-        static void installCallbacks(GLFWwindow* window);
-        static void update();
+        static void InstallCallbacks(GLFWwindow* window);
+        static void Update();
 
     	struct KORAL_API Callbacks {
-    		static void keyCallback(GLFWwindow*, int, int, int, int);
-    		static void mouseMoveCallback(GLFWwindow*, double, double);
-    		static void mouseButtonCallback(GLFWwindow*, int, int, int);
-    		static void scrollCallback(GLFWwindow*, double, double);
-    	    static void focusCallback(GLFWwindow*, int);
-    	    static void charCallback(GLFWwindow*, unsigned int);
-    	    static void cursorEnterCallback(GLFWwindow*, int);
-    	    static void closeCallback(GLFWwindow*);
+    		static void KeyCallback(GLFWwindow*, int, int, int, int);
+    		static void MouseMoveCallback(GLFWwindow*, double, double);
+    		static void MouseButtonCallback(GLFWwindow*, int, int, int);
+    		static void ScrollCallback(GLFWwindow*, double, double);
+    	    static void FocusCallback(GLFWwindow*, int);
+    	    static void CharCallback(GLFWwindow*, unsigned int);
+    	    static void CursorEnterCallback(GLFWwindow*, int);
+    	    static void CloseCallback(GLFWwindow*);
     	};
     };
 }

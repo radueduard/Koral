@@ -16,7 +16,7 @@ namespace kor::vk
         explicit DescriptorSet(const Builder& builder);
         ~DescriptorSet() override;
 
-        void rebind(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) override;
+        void Rebind(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) override;
 
         void DebugPrint() const override;
 

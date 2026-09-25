@@ -71,7 +71,7 @@ namespace kor::vk
 			.setSharingMode(::vk::SharingMode::eExclusive);
 
 
-		const auto frameCount = _isPerFrame ? kor::Context::Scheduler().imageCount() : 1;
+		const auto frameCount = _isPerFrame ? kor::Context::Scheduler().ImageCount() : 1;
 		for (int i = 0; i < frameCount; ++i)
 		{
 			auto [buffer, allocation] = Context::Allocator().AllocateBuffer(bufferInfo, memoryUsage, flags);
@@ -117,22 +117,22 @@ namespace kor::vk
 
 	::vk::Buffer Buffer::operator*() const
 	{
-		return _buffers[_isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0];
+		return _buffers[_isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0];
 	}
 
-	glm::u64 Buffer::deviceAddress() const
+	glm::u64 Buffer::DeviceAddress() const
 	{
 		return static_cast<glm::u64>(
 			Context::Device()->getBufferAddress(::vk::BufferDeviceAddressInfo().setBuffer(**this)));
 	}
 
 	::vk::AccessFlags Buffer::getAccessMask() const {
-		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
 		return _accessFlags[currentFrame];
 	}
 
 	void Buffer::setAccessMask(const ::vk::AccessFlags access) const {
-		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0;
+		const auto currentFrame = _isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0;
 		_accessFlags[currentFrame] = access;
 	}
 
@@ -144,8 +144,8 @@ namespace kor::vk
 	}
 
 	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
-	void Buffer::automaticUpdate() {
-		const auto currentFrame = kor::Context::Scheduler().currentImageIndex();
+	void Buffer::AutomaticUpdate() {
+		const auto currentFrame = kor::Context::Scheduler().CurrentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
 
@@ -185,7 +185,7 @@ namespace kor::vk
 		// per written buffer, on every frame after one was written. A camera writes its uniform block
 		// on every frame it moves, so moving the camera stalled the queue every frame — which is both
 		// slower than the rest of the frame put together and uneven enough to see.
-		if (isHostVisible()) {
+		if (IsHostVisible()) {
 			auto& allocator = Context::Allocator();
 			auto* destination = static_cast<std::byte*>(allocator.MapMemory(_allocations[currentFrame]));
 
@@ -206,10 +206,10 @@ namespace kor::vk
 			for (const auto&[srcBuffer, copyRegions] : copyRegionsPerBuffer) {
 				commandBuffer->copyBuffer(srcBuffer, dstBuffer, static_cast<uint32_t>(copyRegions.size()), copyRegions.data());
 			}
-		}, ::vk::QueueFlagBits::eTransfer).wait();
+		}, ::vk::QueueFlagBits::eTransfer).Wait();
 	}
 
 	VmaAllocation Buffer::getAllocation() const {
-		return  _allocations[_isPerFrame ? kor::Context::Scheduler().currentImageIndex() : 0];
+		return  _allocations[_isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0];
 	}
 }

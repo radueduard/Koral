@@ -69,9 +69,9 @@ TEST(MeshLayout, ParamVertexStrideMatchesStorageSize) {
 
 TEST(MeshLayout, ParamVertexConstructAndGet) {
     PNU v(glm::vec3(1, 2, 3), glm::vec3(0, 1, 0), glm::vec2(0.5f, 0.25f));
-    EXPECT_EQ(v.get<0>(), glm::vec3(1, 2, 3));
-    EXPECT_EQ(v.get<1>(), glm::vec3(0, 1, 0));
-    EXPECT_EQ(v.get<2>(), glm::vec2(0.5f, 0.25f));
+    EXPECT_EQ(v.Get<0>(), glm::vec3(1, 2, 3));
+    EXPECT_EQ(v.Get<1>(), glm::vec3(0, 1, 0));
+    EXPECT_EQ(v.Get<2>(), glm::vec2(0.5f, 0.25f));
 }
 
 // -----------------------------------------------------------------------------
@@ -143,7 +143,7 @@ TEST(MeshLayout, PositionDefaultsToTheFirstAttribute) {
     // Nothing carries PositionAttribute, so nothing is recorded — and the first attribute is
     // what gets read.
     EXPECT_FALSE(layout.positionAttribute.has_value());
-    const auto position = layout.position();
+    const auto position = layout.Position();
     ASSERT_TRUE(position.has_value());
     EXPECT_EQ(position->binding, 0u);
     EXPECT_EQ(position->offset, 0u);
@@ -156,7 +156,7 @@ TEST(MeshLayout, PositionIsFoundWhenNotFirst) {
     ASSERT_TRUE(layout.positionAttribute.has_value());
     EXPECT_EQ(*layout.positionAttribute, 1u);
 
-    const auto position = layout.position();
+    const auto position = layout.Position();
     ASSERT_TRUE(position.has_value());
     EXPECT_EQ(position->offset, NPU::OffsetOf<1>());
     EXPECT_EQ(position->channelCount, 3u);
@@ -168,7 +168,7 @@ TEST(MeshLayout, PositionIsFoundInALaterStream) {
     using UvStream  = ParamVertex<UV>;
     const auto layout = MakeVertexLayout<UvStream, PosStream>();
 
-    const auto position = layout.position();
+    const auto position = layout.Position();
     ASSERT_TRUE(position.has_value());
     EXPECT_EQ(position->binding, 1u);
 }
@@ -176,7 +176,7 @@ TEST(MeshLayout, PositionIsFoundInALaterStream) {
 TEST(MeshLayout, PositionOfAnEmptyLayoutIsNothing) {
     const kor::VertexLayout layout;
     EXPECT_TRUE(layout.empty());
-    EXPECT_FALSE(layout.position().has_value());
+    EXPECT_FALSE(layout.Position().has_value());
 }
 
 } // namespace

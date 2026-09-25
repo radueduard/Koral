@@ -134,7 +134,7 @@ namespace kor
             return (base / dir).lexically_normal();
         }
 
-        // The shared body of merge() and mergeFile(). `source` is only ever used to name the config
+        // The shared body of Merge() and MergeFile(). `source` is only ever used to name the config
         // in a diagnostic, so a file reports its own path while a string parsed straight out of
         // memory reports the directory it was resolved against.
         VoidResult mergeInto(ProjectConfig& config, const std::string_view json,
@@ -156,7 +156,7 @@ namespace kor
             if (doc.schemaVersion && *doc.schemaVersion > ProjectConfig::SchemaVersion) {
                 // Forward-compatible on purpose: a newer file may only *add* keys, which we ignore.
                 // Say so once rather than failing, so an old runtime still starts a new project.
-                log::warn("[config] '{}' declares schema {}, this build understands {}; "
+                log::Warn("[config] '{}' declares schema {}, this build understands {}; "
                           "unknown settings will be ignored",
                           source, *doc.schemaVersion, ProjectConfig::SchemaVersion);
             }
@@ -235,13 +235,13 @@ namespace kor
         }
     }
 
-    VoidResult ProjectConfig::merge(const std::string_view json,
+    VoidResult ProjectConfig::Merge(const std::string_view json,
                                     const std::filesystem::path& baseDirectory)
     {
         return mergeInto(*this, json, baseDirectory, baseDirectory.string());
     }
 
-    VoidResult ProjectConfig::mergeFile(const std::filesystem::path& file)
+    VoidResult ProjectConfig::MergeFile(const std::filesystem::path& file)
     {
         std::ifstream stream(file, std::ios::binary);
         if (!stream)
@@ -256,7 +256,7 @@ namespace kor
         return mergeInto(*this, contents.str(), file.parent_path(), file.string());
     }
 
-    VoidResult ProjectConfig::applyOverrides(const std::span<const std::string> args)
+    VoidResult ProjectConfig::ApplyOverrides(const std::span<const std::string> args)
     {
         const auto invalid = [](const std::string& detail) {
             return std::unexpected(Error{
@@ -380,7 +380,7 @@ namespace kor
         return {};
     }
 
-    std::optional<std::filesystem::path> ProjectConfig::find(const std::filesystem::path& startDirectory)
+    std::optional<std::filesystem::path> ProjectConfig::Find(const std::filesystem::path& startDirectory)
     {
         std::error_code ec;
         auto directory = std::filesystem::weakly_canonical(startDirectory, ec);
@@ -397,12 +397,12 @@ namespace kor
         return std::nullopt;
     }
 
-    void ProjectConfig::registerSearchPaths() const
+    void ProjectConfig::RegisterSearchPaths() const
     {
         const auto warnIfMissing = [](const std::filesystem::path& dir, const std::string_view kind) {
             std::error_code ec;
             if (!std::filesystem::is_directory(dir, ec))
-                log::warn("[config] {} directory '{}' does not exist", kind, dir.string());
+                log::Warn("[config] {} directory '{}' does not exist", kind, dir.string());
         };
 
         // Walked backwards because each root is inserted at the front: reversing here leaves them in
@@ -411,15 +411,15 @@ namespace kor
         // asset does not thereby lose the rest.
         for (const auto& dir : std::views::reverse(assetDirectories)) {
             warnIfMissing(dir, "asset");
-            addAssetSearchPath(dir, /*front=*/true);
+            AddAssetSearchPath(dir, /*front=*/true);
         }
         for (const auto& dir : std::views::reverse(shaderDirectories)) {
             warnIfMissing(dir, "shader");
-            Shader::addSearchPath(dir, /*front=*/true);
+            Shader::AddSearchPath(dir, /*front=*/true);
         }
     }
 
-    std::string_view ProjectConfig::usage()
+    std::string_view ProjectConfig::Usage()
     {
         return
             "  --config <file>     Config file to read (default: nearest koral.json above the scene library)\n"

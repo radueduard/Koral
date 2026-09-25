@@ -71,10 +71,10 @@ namespace kor
                 return mustExist(fromEnv, "KORAL_CONFIG");
 
             std::error_code ec;
-            if (auto found = ProjectConfig::find(std::filesystem::absolute(scenePath, ec).parent_path()))
+            if (auto found = ProjectConfig::Find(std::filesystem::absolute(scenePath, ec).parent_path()))
                 return found;
 
-            return ProjectConfig::find(std::filesystem::current_path(ec));
+            return ProjectConfig::Find(std::filesystem::current_path(ec));
         }
     }
 
@@ -90,19 +90,19 @@ namespace kor
 
         const auto configFile = locateConfig(args, scenePath);
         if (!configFile) {
-            log::error("[engine] {}", configFile.error());
+            log::Error("[engine] {}", configFile.error());
             return EXIT_FAILURE;
         }
         if (*configFile) {
-            if (const auto merged = config.mergeFile(**configFile); !merged) {
-                log::error("[engine] {}", merged.error().message);
+            if (const auto merged = config.MergeFile(**configFile); !merged) {
+                log::Error("[engine] {}", merged.error().message);
                 return EXIT_FAILURE;
             }
-            log::info("[engine] configuration: {}", (*configFile)->string());
+            log::Info("[engine] configuration: {}", (*configFile)->string());
         }
 
-        if (const auto overridden = config.applyOverrides(args); !overridden) {
-            log::error("[engine] {}\n\nOptions:\n{}", overridden.error().message, ProjectConfig::usage());
+        if (const auto overridden = config.ApplyOverrides(args); !overridden) {
+            log::Error("[engine] {}\n\nOptions:\n{}", overridden.error().message, ProjectConfig::Usage());
             return EXIT_FAILURE;
         }
 
@@ -115,7 +115,7 @@ namespace kor
 
         // Before anything is loaded: every relative texture, model and shader path from here on is
         // resolved against these roots.
-        config.registerSearchPaths();
+        config.RegisterSearchPaths();
 
         // The modules koral.json names by hand — the ones nothing links against. A module the
         // project *uses* is already in the process by the time its library is loaded, below, and
@@ -135,7 +135,7 @@ namespace kor
                 moduleDirectories.push_back(std::move(sceneDir));
 
             if (const auto loaded = ModuleHost::Load(config.modules, moduleDirectories); !loaded) {
-                log::error("[engine] {}", loaded.error().message);
+                log::Error("[engine] {}", loaded.error().message);
                 return EXIT_FAILURE;
             }
         }
@@ -144,8 +144,8 @@ namespace kor
         // device, which happens inside InitHeadless / the window build below.
         if (!config.gpu.empty()) {
             if (config.api == API::eOpenGL)
-                log::warn("[engine] a GPU preference ('{}') only applies to the Vulkan backend; OpenGL uses whichever device the driver gives it", config.gpu);
-            setPreferredGpu(config.gpu);
+                log::Warn("[engine] a GPU preference ('{}') only applies to the Vulkan backend; OpenGL uses whichever device the driver gives it", config.gpu);
+            SetPreferredGpu(config.gpu);
         }
 
         // Headless path: a library exporting CreateJob runs on a device-only context
@@ -155,19 +155,19 @@ namespace kor
             bool failed = false;
             // The job's library is loaded, so every module it links has registered itself by now.
             if (const auto resolved = ModuleHost::Resolve(); !resolved) {
-                log::error("[engine] {}", resolved.error().message);
+                log::Error("[engine] {}", resolved.error().message);
                 return EXIT_FAILURE;
             }
             Context::InitHeadless(config.api);
             ModuleHost::Initialize();
             {
                 Task<void> task = job->Run();
-                while (!task.done()) {
+                while (!task.Done()) {
                     Context::DrainMainThread();
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 }
-                if (auto result = task.take(); !result) {
-                    log::error("[engine] job failed: {}", result.error());
+                if (auto result = task.Take(); !result) {
+                    log::Error("[engine] job failed: {}", result.error());
                     failed = true;
                 }
             } // task destroyed before the executors it may reference
@@ -184,41 +184,41 @@ namespace kor
         // a project can use a module without naming it anywhere.
         auto scene = SceneManager::LoadScene(scenePath);
         if (const auto resolved = ModuleHost::Resolve(); !resolved) {
-            log::error("[engine] {}", resolved.error().message);
+            log::Error("[engine] {}", resolved.error().message);
             return EXIT_FAILURE;
         }
 
         auto window = Window::Builder(std::move(scene))
-            .setTitle(config.title.empty() ? scenePath.string() : config.title)
-            .setExtent(config.extent)
-            .setFullscreen(config.fullscreen)
-            .setResizable(config.resizable)
-            .setDecorated(config.decorated)
-            .setTransparentFramebuffer(config.transparentFramebuffer)
-            .setVSync(config.vsync)
-            .setAPI(config.api)
-            .setPlatform(config.platform)
-            .setImguiIni(config.imguiIni)
-            .build();
+            .SetTitle(config.title.empty() ? scenePath.string() : config.title)
+            .SetExtent(config.extent)
+            .SetFullscreen(config.fullscreen)
+            .SetResizable(config.resizable)
+            .SetDecorated(config.decorated)
+            .SetTransparentFramebuffer(config.transparentFramebuffer)
+            .SetVSync(config.vsync)
+            .SetAPI(config.api)
+            .SetPlatform(config.platform)
+            .SetImguiIni(config.imguiIni)
+            .Build();
 
-        while (!window->shouldClose()) {
+        while (!window->ShouldClose()) {
             glfwPollEvents();
             Context::DrainMainThread();
 
-            if (window->isPaused()) {
-                Input::update();
+            if (window->IsPaused()) {
+                Input::Update();
                 continue;
             }
             auto& scene = *window->_scene;
-            if (window->hasResized()) {
+            if (window->HasResized()) {
                 // Modules first, so that anything the scene reads from one in its own OnResize —
                 // a camera's projection, say — already reflects the new size.
-                ModuleHost::OnResize(window->extent());
-                scene.OnResize(window->extent());
+                ModuleHost::OnResize(window->Extent());
+                scene.OnResize(window->Extent());
             }
-            Time::update();
+            Time::Update();
             Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
-                Context::Repository().update();
+                Context::Repository().Update();
                 // The fixed frame order every module is written against: modules move things, the
                 // scene reacts, modules settle what the scene changed, then the frame is recorded.
                 ModuleHost::Update();
@@ -237,10 +237,10 @@ namespace kor
                 //
                 // *Before* the GUI on purpose. Clearing after it would wipe the interface, and the
                 // interface is the one thing such a scene draws.
-                if (const auto framebuffer = Context::defaultFramebuffer();
-                    framebuffer.valid() && !framebuffer->colorAttachments().empty()) {
-                    if (const auto screen = framebuffer->colorImage(0);
-                        !commandBuffer.hasTouched(screen)) {
+                if (const auto framebuffer = Context::DefaultFramebuffer();
+                    framebuffer.Valid() && !framebuffer->ColorAttachments().empty()) {
+                    if (const auto screen = framebuffer->ColorImage(0);
+                        !commandBuffer.HasTouched(screen)) {
                         commandBuffer.BeginRendering();
                         commandBuffer.EndRendering();
                     }
@@ -252,7 +252,7 @@ namespace kor
             // buffers of their own, and those must follow the frame's — which is only submitted when
             // Draw returns. @see GUI::RenderPlatformWindows
             GUI::RenderPlatformWindows();
-            Input::update();
+            Input::Update();
             window->LateUpdate();
         }
         window.reset();

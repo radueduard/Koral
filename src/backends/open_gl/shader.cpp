@@ -36,7 +36,7 @@ namespace kor::ogl
             for (const auto& image : resources.storage_images) {
                 const spirv_cross::SPIRType& type = compiler.get_type(image.type_id);
                 if (type.image.dim != spv::Dim2D || type.image.arrayed || type.image.ms || !type.array.empty()) {
-                    kor::log::warn("[gl] shader uses a non-2D storage image; its Y orientation is left "
+                    kor::log::Warn("[gl] shader uses a non-2D storage image; its Y orientation is left "
                                    "in GL's native (bottom-left) space rather than Vulkan's top-left.");
                     return;
                 }

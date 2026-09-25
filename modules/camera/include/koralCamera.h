@@ -13,20 +13,20 @@
  * // CMakeLists.txt:  target_link_libraries(MyScene PRIVATE Koral koral-camera)
  *
  * _player = kcam::PerspectiveCamera::Builder{}
- *     .setName("player")
- *     .setFovY(glm::radians(70.f))
- *     .setPosition({ 0.f, 1.5f, 5.f })
- *     .lookAt({ 0.f, 0.f, 0.f })
- *     .setController({ .kind = kcam::Controller::Kind::eFly })  // the runtime moves it, before the scene runs
- *     .setFollowWindowAspect(true)                              // and keeps its aspect matched to the window
- *     .build();                                                 // (followAspectOf(target) for a viewport)
+ *     .SetName("player")
+ *     .SetFovY(glm::radians(70.f))
+ *     .SetPosition({ 0.f, 1.5f, 5.f })
+ *     .LookAt({ 0.f, 0.f, 0.f })
+ *     .SetController({ .kind = kcam::Controller::Kind::eFly })  // the runtime moves it, before the scene runs
+ *     .SetFollowWindowAspect(true)                              // and keeps its aspect matched to the window
+ *     .Build();                                                 // (followAspectOf(target) for a viewport)
  *
  * _minimap = kcam::OrthographicCamera::Builder{}
- *     .setBounds(-50.f, 50.f, -50.f, 50.f)
- *     .build();                                // no per-frame behaviour: entirely the scene's
+ *     .SetBounds(-50.f, 50.f, -50.f, 50.f)
+ *     .Build();                                // no per-frame behaviour: entirely the scene's
  *
  * // ... later, in Render()
- * commandBuffer.PushConstantBlock(Push{ _player->viewProjection() });
+ * commandBuffer.PushConstantBlock(Push{ _player->ViewProjection() });
  * @endcode
  *
  * Linking the module is what loads it: the library registers itself with the runtime as it is
@@ -184,14 +184,14 @@ namespace kcam
      *
      * The two constant states are what make a gate expressible without a second convention:
      * @ref always is held on every frame, and an unbound input — which is what default
-     * construction gives — is held on none. So `enable = Input::always()` is a controller that is
+     * construction gives — is held on none. So `enable = Input::Always()` is a controller that is
      * simply on, and `moveUp = {}` is an action nothing triggers, and neither reading has to be
      * inferred from the field it sits in.
      *
      * @code
-     * .enable      = kcam::Input::always(),                        // on, no gate at all
-     * .look        = kcam::Input::mouse(kor::MouseButton::eRight), // only while held
-     * .moveForward = kcam::Input::key(kor::Key::eUp),
+     * .enable      = kcam::Input::Always(),                        // on, no gate at all
+     * .look        = kcam::Input::FromMouse(kor::MouseButton::eRight), // only while held
+     * .moveForward = kcam::Input::FromKey(kor::Key::eUp),
      * .moveUp      = {},                                           // nothing moves the camera up
      * @endcode
      *
@@ -211,23 +211,23 @@ namespace kcam
         std::uint16_t code = 0;         ///< A kor::Key or a kor::MouseButton, per @ref type.
         Modifier modifiers = Modifier::eNone;   ///< Also held for this to count. @see Modifier
 
-        [[nodiscard]] static constexpr Input key(const kor::Key key,
+        [[nodiscard]] static constexpr Input FromKey(const kor::Key key,
                                                  const Modifier modifiers = Modifier::eNone)
         {
             return { Type::eKey, static_cast<std::uint16_t>(key), modifiers };
         }
 
-        [[nodiscard]] static constexpr Input mouse(const kor::MouseButton button,
+        [[nodiscard]] static constexpr Input FromMouse(const kor::MouseButton button,
                                                    const Modifier modifiers = Modifier::eNone)
         {
             return { Type::eMouseButton, static_cast<std::uint16_t>(button), modifiers };
         }
 
         /** @brief Held on every frame, with nothing to press. */
-        [[nodiscard]] static constexpr Input always() { return { Type::eAlways }; }
+        [[nodiscard]] static constexpr Input Always() { return { Type::eAlways }; }
 
         /** @brief Whether anything can ever make this fire. */
-        [[nodiscard]] constexpr bool bound() const { return type != Type::eNone; }
+        [[nodiscard]] constexpr bool Bound() const { return type != Type::eNone; }
 
         [[nodiscard]] constexpr bool operator==(const Input&) const = default;
     };
@@ -269,21 +269,21 @@ namespace kcam
      *
      * @code
      * // arrow keys instead of WASD, and only while the right mouse button is down
-     * camera->setController({
+     * camera->SetController({
      *     .kind = kcam::Controller::Kind::eFly,
      *     .bindings = {
-     *         .enable      = kcam::Input::mouse(kor::MouseButton::eRight),
-     *         .moveForward = kcam::Input::key(kor::Key::eUp),
-     *         .moveBack    = kcam::Input::key(kor::Key::eDown),
-     *         .moveLeft    = kcam::Input::key(kor::Key::eLeft),
-     *         .moveRight   = kcam::Input::key(kor::Key::eRight),
+     *         .enable      = kcam::Input::FromMouse(kor::MouseButton::eRight),
+     *         .moveForward = kcam::Input::FromKey(kor::Key::eUp),
+     *         .moveBack    = kcam::Input::FromKey(kor::Key::eDown),
+     *         .moveLeft    = kcam::Input::FromKey(kor::Key::eLeft),
+     *         .moveRight   = kcam::Input::FromKey(kor::Key::eRight),
      *     },
      * });
      *
      * // or one action at a time, which is what a rebinding interface does
-     * auto controller = camera->controller();
-     * controller.bindings[kcam::Action::eMoveUp] = kcam::Input::key(kor::Key::eSpace);
-     * camera->setController(controller);
+     * auto controller = camera->ControllerSettings();
+     * controller.bindings[kcam::Action::eMoveUp] = kcam::Input::FromKey(kor::Key::eSpace);
+     * camera->SetController(controller);
      * @endcode
      *
      * Keys are physical positions, not the characters they print (@see kor::Key), so the WASD
@@ -300,23 +300,23 @@ namespace kcam
          * unbound is the opposite extreme — a controller that never runs, which is a way to park
          * one without forgetting how it was set up.
          */
-        Input enable = Input::always();
+        Input enable = Input::Always();
 
         /**
          * @brief Held for @ref yaw and @ref pitch to turn the camera.
          *
          * Separate from @ref enable so "always drivable, but only looks around while the button is
-         * down" — which is what the defaults do — is expressible. Set it to Input::always() for a
+         * down" — which is what the defaults do — is expressible. Set it to Input::Always() for a
          * camera that turns with the pointer the whole time, as a first-person game does.
          */
-        Input look = Input::mouse(kor::MouseButton::eRight);
+        Input look = Input::FromMouse(kor::MouseButton::eRight);
 
         /**
          * @brief Pressed to let the cursor go. Ctrl+Shift+O by default.
          *
          * The way out of a captured cursor. With @ref enable and @ref look both bound to a button,
          * releasing that button ends the look and hands the pointer back — but a first-person camera
-         * sets both to Input::always(), and then there is nothing to release: the cursor would stay
+         * sets both to Input::Always(), and then there is nothing to release: the cursor would stay
          * captured for as long as the scene runs, with no way to reach a menu or another window.
          *
          * A chord rather than a single key, and deliberately: this fires while the scene has the
@@ -328,10 +328,10 @@ namespace kcam
          * keeps its angles, so taking the grip back resumes rather than snaps. Unbind it (`= {}`)
          * for a camera that never lets go.
          *
-         * @see Camera::released, which is the same state a scene can read and write directly — that
+         * @see Camera::Released, which is the same state a scene can read and write directly — that
          * is how a menu opening releases the cursor without the user pressing anything.
          */
-        Input release = Input::key(kor::Key::eO, Modifier::eCtrl | Modifier::eShift);
+        Input release = Input::FromKey(kor::Key::eO, Modifier::eCtrl | Modifier::eShift);
 
         /**
          * @brief Pressed over the scene to take the cursor back afterwards. Left mouse by default.
@@ -341,15 +341,15 @@ namespace kcam
          * is what makes clicking a panel while released stay a click on that panel: the camera takes
          * the pointer back when you click *it*, and not before. @see Controller::Input
          */
-        Input engage = Input::mouse(kor::MouseButton::eLeft);
+        Input engage = Input::FromMouse(kor::MouseButton::eLeft);
 
-        Input moveForward = Input::key(kor::Key::eW);
-        Input moveBack    = Input::key(kor::Key::eS);
-        Input moveLeft    = Input::key(kor::Key::eA);
-        Input moveRight   = Input::key(kor::Key::eD);
-        Input moveUp      = Input::key(kor::Key::eE);
-        Input moveDown    = Input::key(kor::Key::eQ);
-        Input boost       = Input::key(kor::Key::eLeftShift);
+        Input moveForward = Input::FromKey(kor::Key::eW);
+        Input moveBack    = Input::FromKey(kor::Key::eS);
+        Input moveLeft    = Input::FromKey(kor::Key::eA);
+        Input moveRight   = Input::FromKey(kor::Key::eD);
+        Input moveUp      = Input::FromKey(kor::Key::eE);
+        Input moveDown    = Input::FromKey(kor::Key::eQ);
+        Input boost       = Input::FromKey(kor::Key::eLeftShift);
 
         /** @brief What the boost input multiplies the fly speed by while it is held. */
         float boostFactor = 4.f;
@@ -406,7 +406,7 @@ namespace kcam
      * camera orbits instead" are the same kind of change.
      *
      * @code
-     * .setController({ .kind = kcam::Controller::Kind::eFly, .speed = 12.f })
+     * .SetController({ .kind = kcam::Controller::Kind::eFly, .speed = 12.f })
      * @endcode
      *
      * A default-constructed Controller drives nothing, which is what a camera starts with.
@@ -432,7 +432,7 @@ namespace kcam
          * It is *wrong* for a scene shown inside an ImGui window, a viewport above all: the pointer is
          * over a window there by definition, so the automatic answer is always "someone else's" and the
          * camera never moves. Such a scene decides for itself — `eEnabled` while the viewport is
-         * hovered, `eDisabled` otherwise. @see kgui::Viewport::isHovered
+         * hovered, `eDisabled` otherwise. @see kgui::Viewport::IsHovered
          */
         enum class Input : std::uint8_t
         {
@@ -485,31 +485,31 @@ namespace kcam
     {
     public:
         /** @brief World-space position of the eye. */
-        [[nodiscard]] virtual glm::vec3 position() const = 0;
+        [[nodiscard]] virtual glm::vec3 Position() const = 0;
 
         /** @brief World-space orientation. Identity looks down -Z with +Y up. */
-        [[nodiscard]] virtual glm::quat rotation() const = 0;
+        [[nodiscard]] virtual glm::quat Rotation() const = 0;
 
         /** @brief The direction the camera looks along, derived from @ref rotation. */
-        [[nodiscard]] virtual glm::vec3 forward() const = 0;
+        [[nodiscard]] virtual glm::vec3 Forward() const = 0;
 
-        virtual void setPosition(glm::vec3 position) = 0;
-        virtual void setRotation(glm::quat rotation) = 0;
+        virtual void SetPosition(glm::vec3 position) = 0;
+        virtual void SetRotation(glm::quat rotation) = 0;
 
         /** @brief Turns the camera (from wherever it stands) to look at @p target. */
-        virtual void lookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f }) = 0;
+        virtual void LookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f }) = 0;
 
         /** @brief World → view. */
-        [[nodiscard]] virtual const glm::mat4& view() const = 0;
+        [[nodiscard]] virtual const glm::mat4& View() const = 0;
 
         /** @brief View → clip, in the engine's clip conventions (zero-to-one depth, Y down). */
-        [[nodiscard]] virtual const glm::mat4& projection() const = 0;
+        [[nodiscard]] virtual const glm::mat4& Projection() const = 0;
 
-        /** @brief projection() * view(), cached — the matrix a draw usually wants. */
-        [[nodiscard]] virtual const glm::mat4& viewProjection() const = 0;
+        /** @brief Projection() * View(), cached — the matrix a draw usually wants. */
+        [[nodiscard]] virtual const glm::mat4& ViewProjection() const = 0;
 
         /** @brief The name given at build time, for interfaces and logs. */
-        [[nodiscard]] virtual std::string_view name() const = 0;
+        [[nodiscard]] virtual std::string_view Name() const = 0;
 
         // ---- per-frame behaviour ----------------------------------------------------------------
 
@@ -524,8 +524,8 @@ namespace kcam
          * To change one knob, read the current controller, edit, and set it back — the value is a
          * plain struct, so that is a copy and two lines.
          */
-        virtual void setController(const Controller& controller) = 0;
-        [[nodiscard]] virtual const Controller& controller() const = 0;
+        virtual void SetController(const Controller& controller) = 0;
+        [[nodiscard]] virtual const Controller& ControllerSettings() const = 0;
 
         /**
          * @brief Whether the controller has let go: the cursor is the user's and no input is read.
@@ -537,10 +537,10 @@ namespace kcam
          * where it was.
          *
          * **A camera starts released**, so nothing takes the pointer before the user has asked it
-         * to: click the scene and it is yours. `Builder::setReleased(false)` opts out.
+         * to: click the scene and it is yours. `Builder::SetReleased(false)` opts out.
          */
-        [[nodiscard]] virtual bool released() const = 0;
-        virtual void setReleased(bool released) = 0;
+        [[nodiscard]] virtual bool Released() const = 0;
+        virtual void SetReleased(bool released) = 0;
 
         // ---- the GPU copy -----------------------------------------------------------------------
 
@@ -550,13 +550,13 @@ namespace kcam
          * Answers for every KOR_VIEW_*, KOR_PROJECTION_*, KOR_CAMERA_* and depth-range semantic;
          * a shader takes the ones it wants and leaves the rest. @see kor::semantics
          */
-        bool serialize(std::string_view semantic, kor::SemanticSlot& slot) const override = 0;
+        bool Serialize(std::string_view semantic, kor::SemanticSlot& slot) const override = 0;
 
         /** @brief "camera" — what a shader writes in `camera(VIEW_MATRIX)`. */
-        [[nodiscard]] std::string_view semanticNamespace() const override { return semantics::Namespace; }
+        [[nodiscard]] std::string_view SemanticNamespace() const override { return semantics::Namespace; }
 
         /** @brief The blocks this camera has been asked to fill. @see kor::SemanticBuffers */
-        kor::SemanticBuffers& semanticBuffers() override = 0;
+        kor::SemanticBuffers& SemanticStorage() override = 0;
     };
 
     /**
@@ -570,11 +570,11 @@ namespace kcam
      *
      * @code
      * // a full-screen scene
-     * camera->setFollowWindowAspect(true);
+     * camera->SetFollowWindowAspect(true);
      *
      * // a scene rendered into a viewport's target instead
-     * camera->followAspectOf(_viewportColor);        // a kor::Resource<kor::Image>
-     * camera->followAspectOf(_viewportFramebuffer);  // or the framebuffer it belongs to
+     * camera->FollowAspectOf(_viewportColor);        // a kor::Resource<kor::Image>
+     * camera->FollowAspectOf(_viewportFramebuffer);  // or the framebuffer it belongs to
      * @endcode
      *
      * The reference does not own anything: a source that has been destroyed simply stops being read,
@@ -597,21 +597,21 @@ namespace kcam
         kor::ResourceRef<const kor::Image> image;               ///< Read when @ref kind is eImage.
 
         /** @brief Follows nothing. */
-        [[nodiscard]] static AspectSource none() { return { }; }
+        [[nodiscard]] static AspectSource None() { return { }; }
 
         /** @brief Follows the window. */
-        [[nodiscard]] static AspectSource window() { return { .kind = Kind::eWindow }; }
+        [[nodiscard]] static AspectSource Window() { return { .kind = Kind::eWindow }; }
 
         /** @brief Follows a framebuffer — the usual answer for a scene rendered off-screen. */
-        [[nodiscard]] static AspectSource of(kor::ResourceRef<const kor::Framebuffer> framebuffer)
+        [[nodiscard]] static AspectSource Of(kor::ResourceRef<const kor::Framebuffer> framebuffer)
         { return { .kind = Kind::eFramebuffer, .framebuffer = std::move(framebuffer) }; }
 
         /** @brief Follows one image, for a scene whose target is not a whole framebuffer. */
-        [[nodiscard]] static AspectSource of(kor::ResourceRef<const kor::Image> image)
+        [[nodiscard]] static AspectSource Of(kor::ResourceRef<const kor::Image> image)
         { return { .kind = Kind::eImage, .image = std::move(image) }; }
 
         /** @brief The extent to match, or nothing when there is nothing to read. */
-        [[nodiscard]] KCAM_API std::optional<glm::uvec2> extent() const;
+        [[nodiscard]] KCAM_API std::optional<glm::uvec2> Extent() const;
 
         /**
          * @brief Whether this names a resource that cannot be read — destroyed, or poisoned.
@@ -619,7 +619,7 @@ namespace kcam
          * The difference between "following nothing" and "following something that is gone", which
          * is what makes the second one reportable. @see extent
          */
-        [[nodiscard]] KCAM_API bool dangling() const;
+        [[nodiscard]] KCAM_API bool Dangling() const;
     };
 
     /** @brief A camera with a perspective projection: things farther away draw smaller. */
@@ -628,7 +628,7 @@ namespace kcam
     public:
         /**
          * @brief Everything a perspective camera starts from. Every field has a usable default, so
-         *        `PerspectiveCamera::Builder{}.build()` is already a working camera.
+         *        `PerspectiveCamera::Builder{}.Build()` is already a working camera.
          */
         struct KCAM_API Builder : kor::Builder
         {
@@ -645,33 +645,33 @@ namespace kcam
             bool released = true;                   ///< Whether it starts with the cursor let go. @see setReleased
 
             /** @brief Names the camera, for interfaces, logs and resource diagnostics. */
-            Builder& setName(std::string name) { this->name = std::move(name); return *this; }
+            Builder& SetName(std::string name) { this->name = std::move(name); return *this; }
 
             /** @brief Sets the vertical field of view, in radians. Narrower zooms in. */
-            Builder& setFovY(const float fovY) { this->fovY = fovY; return *this; }
+            Builder& SetFovY(const float fovY) { this->fovY = fovY; return *this; }
 
             /** @brief Sets width over height. Pointless alongside @ref setFollowWindowAspect. */
-            Builder& setAspect(const float aspect) { this->aspect = aspect; return *this; }
+            Builder& SetAspect(const float aspect) { this->aspect = aspect; return *this; }
 
             /** @brief Sets the depth range. Keep zNear as large as the scene allows; it is what depth precision costs. */
-            Builder& setNearFar(const float zNear, const float zFar)
+            Builder& SetNearFar(const float zNear, const float zFar)
             { this->zNear = zNear; this->zFar = zFar; return *this; }
 
             /** @brief Sets where the camera starts. */
-            Builder& setPosition(const glm::vec3 position) { this->position = position; return *this; }
+            Builder& SetPosition(const glm::vec3 position) { this->position = position; return *this; }
 
             /** @brief Sets which way the camera starts out facing. */
-            Builder& setRotation(const glm::quat rotation) { this->rotation = rotation; return *this; }
+            Builder& SetRotation(const glm::quat rotation) { this->rotation = rotation; return *this; }
 
             /** @brief Points the camera at @p target from wherever @ref setPosition put it. */
-            Builder& lookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f });
+            Builder& LookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f });
 
             /**
              * @brief Hands the camera to the runtime, which moves it from input every frame.
              *
              * The scene then contains no camera input handling at all. @see Controller
              */
-            Builder& setController(const Controller& controller)
+            Builder& SetController(const Controller& controller)
             { this->controller = controller; return *this; }
 
             /**
@@ -682,9 +682,9 @@ namespace kcam
              * — a left click over the scene — hands it over. Pass false for a camera that is in
              * control from the first frame, which is what a game that opens straight into play wants.
              *
-             * @see Camera::released
+             * @see Camera::Released
              */
-            Builder& setReleased(const bool released = true)
+            Builder& SetReleased(const bool released = true)
             { this->released = released; return *this; }
 
             /**
@@ -696,53 +696,53 @@ namespace kcam
              * For a scene that does not fill the window — one rendered into a viewport — follow what
              * it renders into instead. @see followAspectOf
              */
-            Builder& setFollowWindowAspect(const bool follow = true)
-            { aspectSource = follow ? AspectSource::window() : AspectSource::none(); return *this; }
+            Builder& SetFollowWindowAspect(const bool follow = true)
+            { aspectSource = follow ? AspectSource::Window() : AspectSource::None(); return *this; }
 
             /** @brief Keeps the aspect matched to a framebuffer, across every resize. @see AspectSource */
-            Builder& followAspectOf(kor::ResourceRef<const kor::Framebuffer> framebuffer)
-            { aspectSource = AspectSource::of(std::move(framebuffer)); return *this; }
+            Builder& FollowAspectOf(kor::ResourceRef<const kor::Framebuffer> framebuffer)
+            { aspectSource = AspectSource::Of(std::move(framebuffer)); return *this; }
 
             /** @brief Keeps the aspect matched to one image. @see AspectSource */
-            Builder& followAspectOf(kor::ResourceRef<const kor::Image> image)
-            { aspectSource = AspectSource::of(std::move(image)); return *this; }
+            Builder& FollowAspectOf(kor::ResourceRef<const kor::Image> image)
+            { aspectSource = AspectSource::Of(std::move(image)); return *this; }
 
             /** @brief Sets what the aspect follows, whatever that is. @see AspectSource */
-            Builder& setAspectSource(AspectSource source)
+            Builder& SetAspectSource(AspectSource source)
             { aspectSource = std::move(source); return *this; }
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] kor::Result<std::unique_ptr<PerspectiveCamera>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] kor::Result<std::unique_ptr<PerspectiveCamera>> Create() const;
 
             /** @brief Creates the camera, poisoned rather than thrown if the configuration is impossible. */
-            [[nodiscard]] kor::Resource<PerspectiveCamera> build(
+            [[nodiscard]] kor::Resource<PerspectiveCamera> Build(
                 std::source_location where = std::source_location::current()) const;
         };
 
-        [[nodiscard]] virtual float fovY() const = 0;
-        [[nodiscard]] virtual float aspect() const = 0;
-        [[nodiscard]] virtual float zNear() const = 0;
-        [[nodiscard]] virtual float zFar() const = 0;
+        [[nodiscard]] virtual float FovY() const = 0;
+        [[nodiscard]] virtual float Aspect() const = 0;
+        [[nodiscard]] virtual float ZNear() const = 0;
+        [[nodiscard]] virtual float ZFar() const = 0;
 
-        virtual void setFovY(float fovY) = 0;
-        virtual void setAspect(float aspect) = 0;
-        virtual void setNearFar(float zNear, float zFar) = 0;
+        virtual void SetFovY(float fovY) = 0;
+        virtual void SetAspect(float aspect) = 0;
+        virtual void SetNearFar(float zNear, float zFar) = 0;
 
-        /** @brief Turns window-aspect tracking on or off. @see Builder::setFollowWindowAspect */
-        virtual void setFollowWindowAspect(bool follow) = 0;
-        [[nodiscard]] virtual bool followsWindowAspect() const = 0;
+        /** @brief Turns window-aspect tracking on or off. @see Builder::SetFollowWindowAspect */
+        virtual void SetFollowWindowAspect(bool follow) = 0;
+        [[nodiscard]] virtual bool FollowsWindowAspect() const = 0;
 
         /** @brief Sets what the aspect is kept matched to, from now on. @see AspectSource */
-        virtual void setAspectSource(AspectSource source) = 0;
-        [[nodiscard]] virtual const AspectSource& aspectSource() const = 0;
+        virtual void SetAspectSource(AspectSource source) = 0;
+        [[nodiscard]] virtual const AspectSource& AspectSourceSettings() const = 0;
 
         /** @brief Matches the aspect to a framebuffer, across every resize. @see AspectSource */
-        void followAspectOf(kor::ResourceRef<const kor::Framebuffer> framebuffer)
-        { setAspectSource(AspectSource::of(std::move(framebuffer))); }
+        void FollowAspectOf(kor::ResourceRef<const kor::Framebuffer> framebuffer)
+        { SetAspectSource(AspectSource::Of(std::move(framebuffer))); }
 
         /** @brief Matches the aspect to one image. @see AspectSource */
-        void followAspectOf(kor::ResourceRef<const kor::Image> image)
-        { setAspectSource(AspectSource::of(std::move(image))); }
+        void FollowAspectOf(kor::ResourceRef<const kor::Image> image)
+        { SetAspectSource(AspectSource::Of(std::move(image))); }
     };
 
     /** @brief A camera with an orthographic projection: size on screen ignores distance. */
@@ -764,47 +764,47 @@ namespace kcam
             bool released = true;                   ///< Whether it starts with the cursor let go. @see setReleased
 
             /** @brief Names the camera, for interfaces, logs and resource diagnostics. */
-            Builder& setName(std::string name) { this->name = std::move(name); return *this; }
+            Builder& SetName(std::string name) { this->name = std::move(name); return *this; }
 
             /** @brief Sets the view volume's extent. Its shape is the image's shape — match the viewport's. */
-            Builder& setBounds(const float left, const float right, const float bottom, const float top)
+            Builder& SetBounds(const float left, const float right, const float bottom, const float top)
             { this->left = left; this->right = right; this->bottom = bottom; this->top = top; return *this; }
 
             /** @brief Sets the depth range. */
-            Builder& setNearFar(const float zNear, const float zFar)
+            Builder& SetNearFar(const float zNear, const float zFar)
             { this->zNear = zNear; this->zFar = zFar; return *this; }
 
             /** @brief Sets where the camera starts. */
-            Builder& setPosition(const glm::vec3 position) { this->position = position; return *this; }
+            Builder& SetPosition(const glm::vec3 position) { this->position = position; return *this; }
 
             /** @brief Sets which way the camera starts out facing. */
-            Builder& setRotation(const glm::quat rotation) { this->rotation = rotation; return *this; }
+            Builder& SetRotation(const glm::quat rotation) { this->rotation = rotation; return *this; }
 
             /** @brief Points the camera at @p target from wherever @ref setPosition put it. */
-            Builder& lookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f });
+            Builder& LookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f });
 
             /** @brief Hands the camera to the runtime, which moves it from input every frame. */
-            Builder& setController(const Controller& controller)
+            Builder& SetController(const Controller& controller)
             { this->controller = controller; return *this; }
 
-            /** @brief Whether it starts having let go of the cursor. It does. @see Camera::released */
-            Builder& setReleased(const bool released = true)
+            /** @brief Whether it starts having let go of the cursor. It does. @see Camera::Released */
+            Builder& SetReleased(const bool released = true)
             { this->released = released; return *this; }
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] kor::Result<std::unique_ptr<OrthographicCamera>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] kor::Result<std::unique_ptr<OrthographicCamera>> Create() const;
 
             /** @brief Creates the camera, poisoned rather than thrown if the configuration is impossible. */
-            [[nodiscard]] kor::Resource<OrthographicCamera> build(
+            [[nodiscard]] kor::Resource<OrthographicCamera> Build(
                 std::source_location where = std::source_location::current()) const;
         };
 
-        [[nodiscard]] virtual glm::vec4 bounds() const = 0;   ///< left, right, bottom, top.
-        [[nodiscard]] virtual float zNear() const = 0;
-        [[nodiscard]] virtual float zFar() const = 0;
+        [[nodiscard]] virtual glm::vec4 Bounds() const = 0;   ///< left, right, bottom, top.
+        [[nodiscard]] virtual float ZNear() const = 0;
+        [[nodiscard]] virtual float ZFar() const = 0;
 
-        virtual void setBounds(float left, float right, float bottom, float top) = 0;
-        virtual void setNearFar(float zNear, float zFar) = 0;
+        virtual void SetBounds(float left, float right, float bottom, float top) = 0;
+        virtual void SetNearFar(float zNear, float zFar) = 0;
     };
 
 }

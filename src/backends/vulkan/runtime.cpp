@@ -29,7 +29,7 @@ namespace kor::vk
             // chain, present) needs it — so fail fast with a clear message rather
             // than returning an uninitialized handle and crashing later.
             const auto msg = "Failed to create window surface: " + ::vk::to_string(static_cast<::vk::Result>(result));
-            kor::log::error("[vulkan] {}", msg);
+            kor::log::Error("[vulkan] {}", msg);
             throw std::runtime_error(msg);
         }
         return { surface };
@@ -43,16 +43,16 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
         switch (messageSeverity) {
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-                kor::log::info("[vulkan] {}", pCallbackData->pMessage);
+                kor::log::Info("[vulkan] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-                kor::log::info("[vulkan] {}", pCallbackData->pMessage);
+                kor::log::Info("[vulkan] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-                kor::log::warn("[vulkan] {}", pCallbackData->pMessage);
+                kor::log::Warn("[vulkan] {}", pCallbackData->pMessage);
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-                kor::log::error("[vulkan] {}", pCallbackData->pMessage);
+                kor::log::Error("[vulkan] {}", pCallbackData->pMessage);
                 // KORAL_BREAK();
                 break;
             case VK_DEBUG_UTILS_MESSAGE_SEVERITY_FLAG_BITS_MAX_ENUM_EXT:
@@ -97,7 +97,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 ); !icdManifest.empty()) {
             addLoaderSearchPath("VK_ADD_DRIVER_FILES", icdManifest.c_str());
         } else {
-            kor::log::warn("[vulkan] MoltenVK ICD manifest not found; Vulkan will have no "
+            kor::log::Warn("[vulkan] MoltenVK ICD manifest not found; Vulkan will have no "
                             "driver unless a system Vulkan SDK is installed. Run "
                             "'brew install molten-vk' and reconfigure.");
         }
@@ -119,11 +119,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         uint32_t glfwExtensionCount = 0;
         const char** glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
         for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
-            kor::log::info("[vulkan] {}", glfwExtensions[i]);
+            kor::log::Info("[vulkan] {}", glfwExtensions[i]);
         }
 
         if (glfwExtensions == nullptr || glfwExtensionCount == 0) {
-            kor::log::warn("[vulkan] glfwGetRequiredInstanceExtensions returned null — platform surface extension may be missing.");
+            kor::log::Warn("[vulkan] glfwGetRequiredInstanceExtensions returned null — platform surface extension may be missing.");
         } else {
             for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
                 // Deduplicate (VK_KHR_surface is already in the hardcoded list)
@@ -131,7 +131,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 const bool already = std::ranges::any_of(_instanceExtensions,
                     [&](const char* e){ return std::string_view(e) == ext; });
                 if (!already) {
-                    kor::log::info("[vulkan] Adding GLFW platform extension: {}", glfwExtensions[i]);
+                    kor::log::Info("[vulkan] Adding GLFW platform extension: {}", glfwExtensions[i]);
                     _instanceExtensions.emplace_back(glfwExtensions[i]);
                 }
             }
@@ -151,12 +151,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 return std::ranges::any_of(platformExts, [&](const char* p){ return std::string_view(e) == p; });
             });
             if (!hasPlatformExt) {
-                kor::log::warn("[vulkan] No platform surface extension from GLFW — probing available WSI extensions.");
+                kor::log::Warn("[vulkan] No platform surface extension from GLFW — probing available WSI extensions.");
                 const auto availableExts = ::vk::enumerateInstanceExtensionProperties();
                 for (const char* candidate : platformExts) {
                     for (const auto& avail : availableExts) {
                         if (std::string_view(avail.extensionName) == candidate) {
-                            kor::log::info("[vulkan] Adding fallback platform extension: {}", candidate);
+                            kor::log::Info("[vulkan] Adding fallback platform extension: {}", candidate);
                             _instanceExtensions.push_back(candidate);
                             break;
                         }
@@ -174,7 +174,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                 for (const auto& avail : availableLayers)
                     if (std::string_view(avail.layerName) == req) { found = true; break; }
                 if (found) supported.push_back(req);
-                else kor::log::warn("[vulkan] Layer '{}' not available, skipping.", req);
+                else kor::log::Warn("[vulkan] Layer '{}' not available, skipping.", req);
             }
             _instanceLayers = supported;
         }
@@ -203,14 +203,14 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                         debugUtilsEnabled = true;
                     _instanceExtensions.push_back(req);
                 } else {
-                    kor::log::warn("[vulkan] Optional extension '{}' not available, skipping.", req);
+                    kor::log::Warn("[vulkan] Optional extension '{}' not available, skipping.", req);
                 }
             }
         }
 
-        kor::log::info("[vulkan] Final instance extensions ({}):", _instanceExtensions.size());
+        kor::log::Info("[vulkan] Final instance extensions ({}):", _instanceExtensions.size());
         for (const auto& ext : _instanceExtensions)
-            kor::log::info("[vulkan]   [ext] {}", ext);
+            kor::log::Info("[vulkan]   [ext] {}", ext);
 
         // DebugPrintf GPU-assisted instrumentation is opt-in: it instruments every
         // shader and crashes the validation layer at queue submit on some drivers
@@ -268,7 +268,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         if (debugUtilsEnabled && VULKAN_HPP_DEFAULT_DISPATCHER.vkCreateDebugUtilsMessengerEXT) {
             _debugMessenger = _instance.createDebugUtilsMessengerEXT(debugCreateInfo);
         } else if (hasValidation) {
-            kor::log::warn("[vulkan] VK_EXT_debug_utils unavailable — debug messenger disabled.");
+            kor::log::Warn("[vulkan] VK_EXT_debug_utils unavailable — debug messenger disabled.");
         }
     }
 
@@ -314,7 +314,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         // exactly this listing, so it is always printed, preference or not.
         for (std::size_t i = 0; i < candidates.size(); ++i) {
             const auto& properties = candidates[i]->getProperties();
-            kor::log::info("[vulkan] GPU {}: {} ({}){}", i,
+            kor::log::Info("[vulkan] GPU {}: {} ({}){}", i,
                            std::string_view(properties.deviceName.data()),
                            ::vk::to_string(properties.deviceType),
                            candidates[i]->isSuitable() ? "" : " — missing required capabilities");
@@ -322,25 +322,25 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 
         const auto select = [this] (std::unique_ptr<PhysicalDevice>& candidate) {
             const auto& properties = candidate->getProperties();
-            kor::log::info("[vulkan] Selected physical device: {} ({})",
+            kor::log::Info("[vulkan] Selected physical device: {} ({})",
                            std::string_view(properties.deviceName.data()),
                            ::vk::to_string(properties.deviceType));
             _physicalDevice = std::move(candidate);
         };
 
-        // An explicit preference (koral.json rendering.gpu, --gpu, or kor::setPreferredGpu):
+        // An explicit preference (koral.json rendering.gpu, --gpu, or kor::SetPreferredGpu):
         // an index into the listing above, or a case-insensitive substring of a device name.
         // A preference that cannot be honoured falls back to the automatic choice rather than
         // refusing to start — it is reported loudly instead.
-        if (const std::string& preference = kor::preferredGpu(); !preference.empty()) {
+        if (const std::string& preference = kor::PreferredGpu(); !preference.empty()) {
             std::size_t index = 0;
             const auto [end, ec] = std::from_chars(preference.data(), preference.data() + preference.size(), index);
             if (ec == std::errc{} && end == preference.data() + preference.size()) {
                 if (index >= candidates.size()) {
-                    kor::log::warn("[vulkan] GPU index {} is out of range ({} device{} present) — falling back to automatic selection.",
+                    kor::log::Warn("[vulkan] GPU index {} is out of range ({} device{} present) — falling back to automatic selection.",
                                    index, candidates.size(), candidates.size() == 1 ? "" : "s");
                 } else if (!candidates[index]->isSuitable()) {
-                    kor::log::warn("[vulkan] GPU {} ({}) is missing required capabilities — falling back to automatic selection.",
+                    kor::log::Warn("[vulkan] GPU {} ({}) is missing required capabilities — falling back to automatic selection.",
                                    index, std::string_view(candidates[index]->getProperties().deviceName.data()));
                 } else {
                     select(candidates[index]);
@@ -363,9 +363,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
                     return;
                 }
                 if (matchedUnsuitable)
-                    kor::log::warn("[vulkan] Every GPU matching '{}' is missing required capabilities — falling back to automatic selection.", preference);
+                    kor::log::Warn("[vulkan] Every GPU matching '{}' is missing required capabilities — falling back to automatic selection.", preference);
                 else
-                    kor::log::warn("[vulkan] No GPU matches '{}' — falling back to automatic selection.", preference);
+                    kor::log::Warn("[vulkan] No GPU matches '{}' — falling back to automatic selection.", preference);
             }
         }
 

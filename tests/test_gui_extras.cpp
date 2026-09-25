@@ -61,34 +61,34 @@ struct HeadlessImGui : testing::Test
 };
 
 TEST_F(HeadlessImGui, LogPanelDrawsWhatWasLogged) {
-    kor::log::clearHistory();
-    kor::log::info("a quiet message");
-    kor::log::warn("something to look at");
-    kor::log::error("something to fix");
+    kor::log::ClearHistory();
+    kor::log::Info("a quiet message");
+    kor::log::Warn("something to look at");
+    kor::log::Error("something to fix");
 
     kgui::LogPanel panel;
     frame([&] { panel.Draw(); });
 
     // The history is the panel's only state, and drawing must not consume it.
-    EXPECT_EQ(kor::log::history().size(), 3u);
+    EXPECT_EQ(kor::log::History().size(), 3u);
 
     // Drawn a second time with the levels filtered down, which is the branch a reader uses most.
-    panel.setShows(kor::log::Level::eInfo, false);
-    EXPECT_FALSE(panel.shows(kor::log::Level::eInfo));
+    panel.SetShows(kor::log::Level::eInfo, false);
+    EXPECT_FALSE(panel.Shows(kor::log::Level::eInfo));
     frame([&] { panel.Draw("Log", nullptr); });
 
-    kor::log::clearHistory();
+    kor::log::ClearHistory();
 }
 
 TEST_F(HeadlessImGui, LogPanelSurvivesAnEmptyHistoryAndABigOne) {
     kgui::LogPanel panel;
 
-    kor::log::clearHistory();
+    kor::log::ClearHistory();
     frame([&] { panel.Draw(); });
 
-    for (int i = 0; i < 500; ++i) kor::log::info("message {}", i);
+    for (int i = 0; i < 500; ++i) kor::log::Info("message {}", i);
     frame([&] { panel.Draw(); });
-    kor::log::clearHistory();
+    kor::log::ClearHistory();
 }
 
 // Wrapping is what makes the rows different heights, and different heights are what the panel's own
@@ -97,12 +97,12 @@ TEST_F(HeadlessImGui, LogPanelSurvivesAnEmptyHistoryAndABigOne) {
 // height. Nothing here can assert *where* a line landed (there is no window to look at), but ImGui
 // does assert on a cursor left somewhere impossible, a broken id stack, or an unbalanced push.
 TEST_F(HeadlessImGui, LogPanelWrapsLinesTooLongForItsWidth) {
-    kor::log::clearHistory();
+    kor::log::ClearHistory();
 
     const std::string wide(600, 'x');   // several lines' worth at any sane panel width
-    kor::log::info("{}", wide);
-    kor::log::warn("short one");
-    kor::log::error("{}", wide);
+    kor::log::Info("{}", wide);
+    kor::log::Warn("short one");
+    kor::log::Error("{}", wide);
 
     kgui::LogPanel panel;
 
@@ -118,13 +118,13 @@ TEST_F(HeadlessImGui, LogPanelWrapsLinesTooLongForItsWidth) {
     });
 
     // Times off changes the text of every line, and so its height. Same story.
-    panel.setShowsTimes(false);
+    panel.SetShowsTimes(false);
     frame([&] { panel.Draw(); });
 
     // So does the padding: it is inside the highlight, so it both adds to a row's height and takes
     // width away from the text that wraps in it.
-    panel.setPadding(ImVec2(20.f, 10.f));
-    EXPECT_FLOAT_EQ(panel.padding().x, 20.f);
+    panel.SetPadding(ImVec2(20.f, 10.f));
+    EXPECT_FLOAT_EQ(panel.Padding().x, 20.f);
     frame([&] {
         ImGui::SetNextWindowSize(ImVec2(220.f, 300.f));
         panel.Draw();
@@ -132,66 +132,66 @@ TEST_F(HeadlessImGui, LogPanelWrapsLinesTooLongForItsWidth) {
 
     // Rounding is drawn, not measured — but a negative value means "whatever the application's style
     // says", and that branch should be walked at least once.
-    panel.setRounding(6.f);
+    panel.SetRounding(6.f);
     frame([&] { panel.Draw(); });
-    panel.setRounding(-1.f);
+    panel.SetRounding(-1.f);
     frame([&] { panel.Draw(); });
 
-    kor::log::clearHistory();
+    kor::log::ClearHistory();
 }
 
 // A selection is by sequence number, not by position, so it survives the log growing underneath it —
 // which is the only reason it is worth keeping at all in a list that scrolls on its own.
 TEST_F(HeadlessImGui, LogPanelSelectionOutlivesTheLinesAroundIt) {
-    kor::log::clearHistory();
-    kor::log::info("the interesting one");
+    kor::log::ClearHistory();
+    kor::log::Info("the interesting one");
 
-    const auto chosen = kor::log::lastSequence();
+    const auto chosen = kor::log::LastSequence();
     ASSERT_NE(chosen, 0u);
 
     kgui::LogPanel panel;
-    EXPECT_EQ(panel.selected(), 0u);
+    EXPECT_EQ(panel.Selected(), 0u);
 
-    panel.select(chosen);
+    panel.Select(chosen);
     frame([&] { panel.Draw(); });
-    EXPECT_EQ(panel.selected(), chosen);
+    EXPECT_EQ(panel.Selected(), chosen);
 
-    for (int i = 0; i < 50; ++i) kor::log::info("noise {}", i);
+    for (int i = 0; i < 50; ++i) kor::log::Info("noise {}", i);
     frame([&] { panel.Draw(); });
-    EXPECT_EQ(panel.selected(), chosen);
+    EXPECT_EQ(panel.Selected(), chosen);
 
     // Selecting something that is no longer in the history is not an error: it simply highlights
     // nothing, which is what happens as a chosen line ages out of the log.
-    kor::log::clearHistory();
+    kor::log::ClearHistory();
     frame([&] { panel.Draw(); });
-    EXPECT_EQ(panel.selected(), chosen);
+    EXPECT_EQ(panel.Selected(), chosen);
 
-    panel.select(0);
-    EXPECT_EQ(panel.selected(), 0u);
+    panel.Select(0);
+    EXPECT_EQ(panel.Selected(), 0u);
 }
 
 // The history is a bounded ring: once it is full, a frame can drop as many records off the front as it
 // gains at the back, leaving the count unchanged while every index shifts. The filtered list is indices
 // into that, so a panel that decides "same size, nothing to do" would draw the wrong lines.
 TEST_F(HeadlessImGui, LogPanelKeepsUpWhenTheHistoryRollsOver) {
-    const auto limit = kor::log::historyLimit();
-    kor::log::setHistoryLimit(8);
-    kor::log::clearHistory();
+    const auto limit = kor::log::HistoryLimit();
+    kor::log::SetHistoryLimit(8);
+    kor::log::ClearHistory();
 
     kgui::LogPanel panel;
-    for (int i = 0; i < 8; ++i) kor::log::info("first {}", i);
+    for (int i = 0; i < 8; ++i) kor::log::Info("first {}", i);
     frame([&] { panel.Draw(); });
 
     // Exactly as many again: the count is the same before and after, the contents entirely different.
-    for (int i = 0; i < 8; ++i) kor::log::info("second {}", i);
+    for (int i = 0; i < 8; ++i) kor::log::Info("second {}", i);
     frame([&] { panel.Draw(); });
 
-    const auto history = kor::log::history();
+    const auto history = kor::log::History();
     ASSERT_EQ(history.size(), 8u);
     EXPECT_EQ(history.front().message, "second 0");
 
-    kor::log::setHistoryLimit(limit);
-    kor::log::clearHistory();
+    kor::log::SetHistoryLimit(limit);
+    kor::log::ClearHistory();
 }
 
 // The panel's own culling, on its own. Wrapped lines are not all the same height, so ImGuiListClipper
@@ -199,33 +199,33 @@ TEST_F(HeadlessImGui, LogPanelKeepsUpWhenTheHistoryRollsOver) {
 // arithmetic, and the only part of the change that fails silently — get it wrong and the list is empty
 // rather than broken. Four lines, at 0, 10, 30 and 40, the last ten tall.
 TEST(LogPanelCulling, PicksOutTheLinesAViewCovers) {
-    using kgui::log_detail::linesIn;
+    using kgui::log_detail::LinesIn;
     const std::vector<float> offsets { 0.f, 10.f, 30.f, 40.f, 50.f };
 
     // A view over the middle takes every line it touches, including the one it starts part-way down.
-    EXPECT_EQ(linesIn(offsets, 15.f, 35.f).first, 1u);
-    EXPECT_EQ(linesIn(offsets, 15.f, 35.f).last,  3u);
+    EXPECT_EQ(LinesIn(offsets, 15.f, 35.f).first, 1u);
+    EXPECT_EQ(LinesIn(offsets, 15.f, 35.f).last,  3u);
 
     // Scrolled to the very top, where the cursor sits below the scroll origin by the window's padding
     // and `from` is *negative*: the first line, not the one before it — which does not exist.
-    EXPECT_EQ(linesIn(offsets, -4.f, 20.f).first, 0u);
-    EXPECT_EQ(linesIn(offsets, -4.f, 20.f).last,  2u);
+    EXPECT_EQ(LinesIn(offsets, -4.f, 20.f).first, 0u);
+    EXPECT_EQ(LinesIn(offsets, -4.f, 20.f).last,  2u);
 
     // A view taller than the list: all of it, and no more than all of it.
-    EXPECT_EQ(linesIn(offsets, 0.f, 500.f).first, 0u);
-    EXPECT_EQ(linesIn(offsets, 0.f, 500.f).last,  4u);
+    EXPECT_EQ(LinesIn(offsets, 0.f, 500.f).first, 0u);
+    EXPECT_EQ(LinesIn(offsets, 0.f, 500.f).last,  4u);
 
     // Past the end, which is where a stale scroll position lands after the log is cleared.
-    EXPECT_EQ(linesIn(offsets, 200.f, 300.f).first, 4u);
-    EXPECT_EQ(linesIn(offsets, 200.f, 300.f).last,  4u);
+    EXPECT_EQ(LinesIn(offsets, 200.f, 300.f).first, 4u);
+    EXPECT_EQ(LinesIn(offsets, 200.f, 300.f).last,  4u);
 
     // Exactly on a boundary: a line starting at the bottom edge is the first one *not* drawn.
-    EXPECT_EQ(linesIn(offsets, 10.f, 30.f).first, 1u);
-    EXPECT_EQ(linesIn(offsets, 10.f, 30.f).last,  2u);
+    EXPECT_EQ(LinesIn(offsets, 10.f, 30.f).first, 1u);
+    EXPECT_EQ(LinesIn(offsets, 10.f, 30.f).last,  2u);
 
     // Nothing measured yet, and one lone offset with no line after it.
-    EXPECT_EQ(linesIn(std::vector<float>{}, 0.f, 100.f).last, 0u);
-    EXPECT_EQ(linesIn(std::vector<float>{ 0.f }, 0.f, 100.f).last, 0u);
+    EXPECT_EQ(LinesIn(std::vector<float>{}, 0.f, 100.f).last, 0u);
+    EXPECT_EQ(LinesIn(std::vector<float>{ 0.f }, 0.f, 100.f).last, 0u);
 }
 
 TEST_F(HeadlessImGui, StatsPanelDrawsWithNoDeviceAtAll) {

@@ -47,15 +47,15 @@ namespace kor {
      * @brief Marker base for resources the Repository drives once per frame.
      *
      * Buffers use it to propagate per-frame writes; pipelines use it to notice a recompiled shader.
-     * Inheriting it — rather than merely declaring automaticUpdate() — is what the repository keys
+     * Inheriting it — rather than merely declaring AutomaticUpdate() — is what the repository keys
      * on, so the update can never be silently disabled by an inaccessible override: a non-public
-     * automaticUpdate() becomes a compile error instead of a resource that quietly stops updating.
+     * AutomaticUpdate() becomes a compile error instead of a resource that quietly stops updating.
      */
     struct AutoUpdatable {
         virtual ~AutoUpdatable() = default;
 
         /** @brief Called once per frame, at the top of the frame, on the main thread. */
-        virtual void automaticUpdate() = 0;
+        virtual void AutomaticUpdate() = 0;
     };
 
     template<typename ResourceType>
@@ -81,7 +81,7 @@ namespace kor {
 
         // Set from *outside* the frame — a file-watcher thread noticing that a shader's source
         // changed. It is only a request: the repair itself happens on the main thread, in
-        // Repository::update(), because it destroys and replaces the underlying object and must not
+        // Repository::Update(), because it destroys and replaces the underlying object and must not
         // race a command buffer that is recording with it.
         std::atomic<bool> repairRequested{false};
 
@@ -91,7 +91,7 @@ namespace kor {
         // it is the thing that will notice the fix and trigger the retry.
         std::shared_ptr<void> attachment;
 
-        [[nodiscard]] bool poisoned() const noexcept { return error != nullptr; }
+        [[nodiscard]] bool Poisoned() const noexcept { return error != nullptr; }
 
         /**
          * @brief Re-run the stored builder, hoping the cause has been fixed.
@@ -100,16 +100,16 @@ namespace kor {
          * Driven by the Repository once per frame for resources that need it. A resource with no
          * stored builder can never be repaired and always returns false.
          */
-        virtual bool retry() = 0;
+        virtual bool Retry() = 0;
 
         /** @brief Whether this resource could ever be repaired at runtime. */
-        [[nodiscard]] virtual bool recoverable() const noexcept = 0;
+        [[nodiscard]] virtual bool Recoverable() const noexcept = 0;
 
         /** @brief Ask for a repair on the next frame. Safe to call from any thread. */
-        void requestRepair() noexcept { repairRequested.store(true, std::memory_order_relaxed); }
+        void RequestRepair() noexcept { repairRequested.store(true, std::memory_order_relaxed); }
 
         /** @brief Whether any input has been rebuilt (or destroyed) since we last read it. */
-        [[nodiscard]] bool dependenciesChanged() const {
+        [[nodiscard]] bool DependenciesChanged() const {
             for (const auto& [weak, seen] : dependencies) {
                 const auto dependency = weak.lock();
                 if (!dependency) return true;  // destroyed: worth one attempt, to report it properly
@@ -138,11 +138,11 @@ namespace kor {
          * "fix the shader and the pipeline comes back" path. A *healthy* one is a candidate only if
          * it asked to be. @see rebuildsOnInputChange
          */
-        [[nodiscard]] bool needsRepair() {
-            if (!recoverable()) return false;
-            if (!poisoned() && !rebuildsOnInputChange) return false;
+        [[nodiscard]] bool NeedsRepair() {
+            if (!Recoverable()) return false;
+            if (!Poisoned() && !rebuildsOnInputChange) return false;
             const bool requested = repairRequested.exchange(false, std::memory_order_relaxed);
-            return requested || dependenciesChanged();
+            return requested || DependenciesChanged();
         }
     };
 
@@ -160,15 +160,15 @@ namespace kor {
         // honest across a repair.
         std::function<std::vector<std::pair<std::weak_ptr<ResourceStateBase>, std::uint64_t>>()> collectDependencies;
 
-        [[nodiscard]] bool recoverable() const noexcept override { return static_cast<bool>(rebuild); }
+        [[nodiscard]] bool Recoverable() const noexcept override { return static_cast<bool>(rebuild); }
 
-        bool retry() override {
+        bool Retry() override {
             if (!rebuild) return false;
 
             auto result = rebuild();
 
             // Re-read the dependencies after *every* attempt, successful or not. A failed attempt
-            // must still record the generations it just saw — otherwise dependenciesChanged() would
+            // must still record the generations it just saw — otherwise DependenciesChanged() would
             // stay true forever and we would rebuild a still-broken pipeline on every single frame.
             if (collectDependencies) dependencies = collectDependencies();
 
@@ -183,7 +183,7 @@ namespace kor {
             value = std::move(*result);
             error.reset();
             ++generation;  // un-gates everything downstream of us on the next frame
-            log::info("Resource '{}' recovered.", name.empty() ? "<unnamed>" : name);
+            log::Info("Resource '{}' recovered.", name.empty() ? "<unnamed>" : name);
             return true;
         }
     };
@@ -224,7 +224,7 @@ namespace kor {
          * The resource is still a live, addressable thing with a stable identity — refs may
          * be taken from it and will come good if it is ever repaired.
          */
-        static Resource failed(Error error, std::string name = {}) {
+        static Resource Failed(Error error, std::string name = {}) {
             Resource r;
             r._state->error = std::make_shared<const Error>(std::move(error));
             r._state->name = std::move(name);
@@ -238,72 +238,72 @@ namespace kor {
         Resource& operator=(const Resource&) = delete;
 
         // Dereference. The framework never reaches these on a poisoned resource: every path
-        // into a backend goes through an API entry point (a builder's adopt(), a command
+        // into a backend goes through an API entry point (a builder's Adopt(), a command
         // buffer's validation) that rejects poison before the core→backend cast that would
         // dereference it. Dereferencing a poisoned resource is therefore a bug in *calling*
         // code, and is treated as one: it is reported loudly rather than papered over.
-        ResourceType& operator*() { checkUsable(); return *get(); }
-        const ResourceType& operator*() const { checkUsable(); return *get(); }
-        ResourceType* operator->() const { checkUsable(); return get(); }
+        ResourceType& operator*() { CheckUsable(); return *Get(); }
+        const ResourceType& operator*() const { CheckUsable(); return *Get(); }
+        ResourceType* operator->() const { CheckUsable(); return Get(); }
 
         /** @brief The object, or nullptr if this resource is empty or poisoned. */
-        [[nodiscard]] ResourceType* get() const noexcept {
-            return valid() ? _state->value.get() : nullptr;
+        [[nodiscard]] ResourceType* Get() const noexcept {
+            return Valid() ? _state->value.get() : nullptr;
         }
 
         /** @brief True iff the object exists and is usable. */
-        [[nodiscard]] bool valid() const noexcept {
-            return _state && _state->value != nullptr && !_state->poisoned();
+        [[nodiscard]] bool Valid() const noexcept {
+            return _state && _state->value != nullptr && !_state->Poisoned();
         }
 
         /** @brief True iff construction failed and an explanation is attached. */
-        [[nodiscard]] bool poisoned() const noexcept { return _state && _state->poisoned(); }
+        [[nodiscard]] bool Poisoned() const noexcept { return _state && _state->Poisoned(); }
 
-        explicit operator bool() const noexcept { return valid(); }
+        explicit operator bool() const noexcept { return Valid(); }
 
         /** @brief Why this resource is unusable, or nullptr if it is fine. */
-        [[nodiscard]] const Error* error() const noexcept {
+        [[nodiscard]] const Error* Failure() const noexcept {
             return _state ? _state->error.get() : nullptr;
         }
 
         /** @brief Shared handle to the error, for linking as another error's cause. */
-        [[nodiscard]] std::shared_ptr<const Error> errorPtr() const noexcept {
+        [[nodiscard]] std::shared_ptr<const Error> ErrorPtr() const noexcept {
             return _state ? _state->error : nullptr;
         }
 
-        [[nodiscard]] std::uint64_t generation() const noexcept { return _state ? _state->generation : 0; }
-        [[nodiscard]] const std::string& name() const noexcept {
+        [[nodiscard]] std::uint64_t Generation() const noexcept { return _state ? _state->generation : 0; }
+        [[nodiscard]] const std::string& Name() const noexcept {
             static const std::string empty;
             return _state ? _state->name : empty;
         }
 
-        /** @brief Attempt to rebuild a poisoned resource. @see ResourceStateBase::retry */
-        bool retry() { return _state && _state->retry(); }
+        /** @brief Attempt to rebuild a poisoned resource. @see ResourceStateBase::Retry */
+        bool Retry() { return _state && _state->Retry(); }
 
-        /** @brief Whether a repair is worth attempting right now. @see ResourceStateBase::needsRepair */
-        [[nodiscard]] bool needsRepair() const { return _state && _state->needsRepair(); }
+        /** @brief Whether a repair is worth attempting right now. @see ResourceStateBase::NeedsRepair */
+        [[nodiscard]] bool NeedsRepair() const { return _state && _state->NeedsRepair(); }
 
         /** @brief Ask for a repair on the next frame. Safe to call from any thread. */
-        void requestRepair() const noexcept { if (_state) _state->requestRepair(); }
+        void RequestRepair() const noexcept { if (_state) _state->RequestRepair(); }
 
         /** @brief Install the builder used to repair this resource if it is ever broken. */
-        void setRebuild(std::function<Result<std::unique_ptr<ResourceType>>()> rebuild) {
+        void SetRebuild(std::function<Result<std::unique_ptr<ResourceType>>()> rebuild) {
             if (_state) _state->rebuild = std::move(rebuild);
         }
 
         /** @brief Install the probe that re-reads the builder's inputs after each attempt. */
-        void setDependencyProbe(
+        void SetDependencyProbe(
             std::function<std::vector<std::pair<std::weak_ptr<ResourceStateBase>, std::uint64_t>>()> probe) {
             if (_state) _state->collectDependencies = std::move(probe);
         }
 
         /** @brief Record a dependency and the generation it had when we consumed it. */
-        void addDependency(const std::shared_ptr<ResourceStateBase>& dep, const std::uint64_t generation) {
+        void AddDependency(const std::shared_ptr<ResourceStateBase>& dep, const std::uint64_t generation) {
             if (_state && dep) _state->dependencies.emplace_back(dep, generation);
         }
 
         /** @brief Whether a dependency changing in place should rebuild this. @see ResourceStateBase::rebuildsOnInputChange */
-        void setRebuildsOnInputChange(const bool rebuilds) {
+        void SetRebuildsOnInputChange(const bool rebuilds) {
             if (_state) _state->rebuildsOnInputChange = rebuilds;
         }
 
@@ -315,21 +315,21 @@ namespace kor {
          * describe what its dependents were built against. Bumping the generation is exactly what
          * a successful rebuild does, so dependents notice it the same way.
          */
-        void markChanged() { if (_state) ++_state->generation; }
+        void MarkChanged() { if (_state) ++_state->generation; }
 
         /** @brief Destroy the object. Existing refs expire, exactly as before. */
-        void reset() { _state.reset(); }
+        void Reset() { _state.reset(); }
 
     private:
-        void checkUsable() const {
+        void CheckUsable() const {
             if (!_state || _state->value) return;
 
-            if (_state->poisoned()) {
-                log::error("Dereferenced the unusable resource '{}':\n{}",
+            if (_state->Poisoned()) {
+                log::Error("Dereferenced the unusable resource '{}':\n{}",
                            _state->name.empty() ? "<unnamed>" : _state->name,
-                           _state->error->history());
+                           _state->error->History());
             } else {
-                log::error("Dereferenced an empty resource.");
+                log::Error("Dereferenced an empty resource.");
             }
         }
 
@@ -360,9 +360,9 @@ namespace kor {
     /**
      * @brief Construct a backend Impl behind a unique_ptr to its Public base.
      *
-     * The unwrapped counterpart of @ref MakeBackendResource, for a builder's `create()`, which
+     * The unwrapped counterpart of @ref MakeBackendResource, for a builder's `Create()`, which
      * works one level below the Resource: it produces the object (or an error), and the Resource
-     * that owns it is assembled around that by Builder::materialize.
+     * that owns it is assembled around that by Builder::Materialize.
      */
     template<typename Public, typename Impl, typename... Args>
         requires std::is_base_of_v<Public, Impl>
@@ -395,7 +395,7 @@ namespace kor {
         // It yields Raw* rather than ResourceType* so that a ResourceRef<T> and a
         // ResourceRef<const T> share one thunk type and can convert into each other.
         template<typename Stored>
-        static Raw* readThunk(ResourceStateBase* state) {
+        static Raw* ReadThunk(ResourceStateBase* state) {
             auto* typed = static_cast<ResourceState<std::remove_const_t<Stored>>*>(state);
             return typed->value.get();  // Stored* → Raw* applies any base-class adjustment
         }
@@ -412,7 +412,7 @@ namespace kor {
         ResourceRef(const Resource<Stored>& resource)
             : _life(resource._state),
               _state(resource._state.get()),
-              _get(&readThunk<Stored>) {}
+              _get(&ReadThunk<Stored>) {}
 
         // Const-qualifying conversion: ResourceRef<T> → ResourceRef<const T>. The thunk type
         // is identical (both yield Raw*), so it carries across unchanged.
@@ -441,62 +441,62 @@ namespace kor {
         ResourceRef& operator=(ResourceRef&&) = default;
         ~ResourceRef() = default;
 
-        ResourceType& operator*() const { return *checkedGet(); }
-        ResourceType* operator->() const { return checkedGet(); }
+        ResourceType& operator*() const { return *CheckedGet(); }
+        ResourceType* operator->() const { return CheckedGet(); }
 
         /** @brief The object, or nullptr if this ref is expired, empty or poisoned. */
-        [[nodiscard]] ResourceType* get() const noexcept {
+        [[nodiscard]] ResourceType* Get() const noexcept {
             if (_unsafe) return _direct;
-            if (!alive() || _state->poisoned()) return nullptr;
+            if (!Alive() || _state->Poisoned()) return nullptr;
             return _get ? _get(_state) : nullptr;
         }
 
         /** @brief Whether the owning Resource still exists. */
-        [[nodiscard]] bool alive() const noexcept {
+        [[nodiscard]] bool Alive() const noexcept {
             return _unsafe ? _direct != nullptr : !_life.expired();
         }
 
         /** @brief Whether the resource this refers to failed to build. */
-        [[nodiscard]] bool poisoned() const noexcept {
-            return !_unsafe && alive() && _state->poisoned();
+        [[nodiscard]] bool Poisoned() const noexcept {
+            return !_unsafe && Alive() && _state->Poisoned();
         }
 
         /** @brief True iff the object exists and is usable right now. */
-        [[nodiscard]] bool valid() const noexcept { return get() != nullptr; }
+        [[nodiscard]] bool Valid() const noexcept { return Get() != nullptr; }
 
-        explicit operator bool() const noexcept { return valid(); }
+        explicit operator bool() const noexcept { return Valid(); }
 
-        [[nodiscard]] const Error* error() const noexcept {
-            return (!_unsafe && alive()) ? _state->error.get() : nullptr;
+        [[nodiscard]] const Error* Failure() const noexcept {
+            return (!_unsafe && Alive()) ? _state->error.get() : nullptr;
         }
 
-        [[nodiscard]] std::shared_ptr<const Error> errorPtr() const noexcept {
-            return (!_unsafe && alive()) ? _state->error : nullptr;
+        [[nodiscard]] std::shared_ptr<const Error> ErrorPtr() const noexcept {
+            return (!_unsafe && Alive()) ? _state->error : nullptr;
         }
 
-        [[nodiscard]] std::uint64_t generation() const noexcept {
-            return (!_unsafe && alive()) ? _state->generation : 0;
+        [[nodiscard]] std::uint64_t Generation() const noexcept {
+            return (!_unsafe && Alive()) ? _state->generation : 0;
         }
 
-        [[nodiscard]] std::string name() const {
-            return (!_unsafe && alive()) ? _state->name : std::string{};
+        [[nodiscard]] std::string Name() const {
+            return (!_unsafe && Alive()) ? _state->name : std::string{};
         }
 
         /** @brief The owner's state block, for a consumer to record as a dependency. */
-        [[nodiscard]] std::shared_ptr<ResourceStateBase> state() const noexcept {
+        [[nodiscard]] std::shared_ptr<ResourceStateBase> State() const noexcept {
             return _unsafe ? nullptr : _life.lock();
         }
 
         /**
-         * @brief Attempt to rebuild the resource behind this ref. @see ResourceStateBase::retry
+         * @brief Attempt to rebuild the resource behind this ref. @see ResourceStateBase::Retry
          *
          * Available through a ref (not just the owner) because the thing that notices a fix — a
          * file-watch callback — only ever holds a ref, never the Resource.
          */
-        bool retry() const { return !_unsafe && alive() && _state->retry(); }
+        bool Retry() const { return !_unsafe && Alive() && _state->Retry(); }
 
-        /** @brief Whether a repair is worth attempting right now. @see ResourceStateBase::needsRepair */
-        [[nodiscard]] bool needsRepair() const { return !_unsafe && alive() && _state->needsRepair(); }
+        /** @brief Whether a repair is worth attempting right now. @see ResourceStateBase::NeedsRepair */
+        [[nodiscard]] bool NeedsRepair() const { return !_unsafe && Alive() && _state->NeedsRepair(); }
 
         /**
          * @brief Ask for a repair on the next frame. Safe to call from any thread.
@@ -504,27 +504,27 @@ namespace kor {
          * This is what a file-watcher callback calls. It must not do the repair itself: that swaps
          * out the underlying object, and would race whatever thread is recording with it.
          */
-        void requestRepair() const noexcept { if (!_unsafe && alive()) _state->requestRepair(); }
+        void RequestRepair() const noexcept { if (!_unsafe && Alive()) _state->RequestRepair(); }
 
         /** @brief Attach data whose lifetime follows the resource slot. @see ResourceStateBase::attachment */
-        void attach(std::shared_ptr<void> data) const {
-            if (!_unsafe && alive()) _state->attachment = std::move(data);
+        void Attach(std::shared_ptr<void> data) const {
+            if (!_unsafe && Alive()) _state->attachment = std::move(data);
         }
 
     private:
-        ResourceType* checkedGet() const {
+        ResourceType* CheckedGet() const {
             // An expired ref is a lifetime bug, not a build failure, and there is no valid
             // value to hand back — this keeps throwing, as it always has.
             if (!_unsafe && _life.expired()) {
                 throw std::runtime_error("Attempted to dereference a ResourceRef whose Resource has been destroyed!");
             }
-            if (poisoned()) {
-                log::error("Dereferenced the unusable resource '{}':\n{}",
+            if (Poisoned()) {
+                log::Error("Dereferenced the unusable resource '{}':\n{}",
                            _state->name.empty() ? "<unnamed>" : _state->name,
-                           _state->error->history());
+                           _state->error->History());
                 return nullptr;
             }
-            return get();
+            return Get();
         }
 
         // The state block's address is stable for the owner's whole life (unlike the object's,
@@ -551,15 +551,15 @@ namespace kor {
      * propagates its writes — and retries the ones whose failure may have been fixed, which is how
      * a shader edit brings a poisoned pipeline back.
      *
-     * Reach it through Context::Repository(). The named get()/add() side is for code that wants to
+     * Reach it through Context::Repository(). The named Get()/Add() side is for code that wants to
      * look a resource up by string id rather than hold it.
      */
     class Repository {
         struct IStorage {
             virtual ~IStorage() = default;
-            virtual void update() = 0;
+            virtual void Update() = 0;
             /** @return true if anything was actually brought back this pass. */
-            virtual bool repair() = 0;
+            virtual bool Repair() = 0;
 
             /** @return How many resources of this type the repository is watching. */
             [[nodiscard]] virtual std::size_t size() const = 0;
@@ -567,26 +567,26 @@ namespace kor {
              * @return How many of them are poisoned — built from something that failed and waiting
              *         for it to be fixed. Worth surfacing: a poisoned resource is silent by design.
              */
-            [[nodiscard]] virtual std::size_t unusable() const = 0;
+            [[nodiscard]] virtual std::size_t Unusable() const = 0;
         };
 
         template<typename T>
         struct Storage final : IStorage {
             std::unordered_map<std::string, Resource<T>> items{};
 
-            bool repair() override {
+            bool Repair() override {
                 bool recovered = false;
                 for (auto& resource : items | std::views::values) {
-                    if (resource.needsRepair()) recovered |= resource.retry();
+                    if (resource.NeedsRepair()) recovered |= resource.Retry();
                 }
                 return recovered;
             }
 
-            void update() override {
-                if constexpr (requires(T t) { t.update(); }) {
+            void Update() override {
+                if constexpr (requires(T t) { t.Update(); }) {
                     for (auto& [id, resource] : items) {
                         if (resource) {
-                            resource->update();
+                            resource->Update();
                         }
                     }
                 }
@@ -594,7 +594,7 @@ namespace kor {
 
             [[nodiscard]] std::size_t size() const override { return items.size(); }
 
-            [[nodiscard]] std::size_t unusable() const override {
+            [[nodiscard]] std::size_t Unusable() const override {
                 return static_cast<std::size_t>(std::ranges::count_if(
                     items | std::views::values, [](const Resource<T>& resource) { return !resource; }));
             }
@@ -604,25 +604,25 @@ namespace kor {
         struct RefStorage final : IStorage {
             std::vector<ResourceRef<T>> items{};
 
-            bool repair() override {
+            bool Repair() override {
                 bool recovered = false;
                 for (auto& item : items) {
-                    if (item.needsRepair()) recovered |= item.retry();
+                    if (item.NeedsRepair()) recovered |= item.Retry();
                 }
                 return recovered;
             }
 
-            void update() override {
+            void Update() override {
                 // Drop what the owner has destroyed. These are refs, not owners, so an expired one
                 // is not a leak of the object — but nothing else ever removes them, and a scene
                 // that creates and drops resources as it runs would otherwise grow this list
-                // without bound. Done here rather than in repair() so both passes see the same set.
-                std::erase_if(items, [](const ResourceRef<T>& item) { return !item.alive(); });
+                // without bound. Done here rather than in Repair() so both passes see the same set.
+                std::erase_if(items, [](const ResourceRef<T>& item) { return !item.Alive(); });
 
                 if constexpr (std::is_base_of_v<AutoUpdatable, T>) {
                     for (auto& item : items) {
-                        if (item.valid()) {
-                            const_cast<std::remove_const_t<T>&>(*item).automaticUpdate();
+                        if (item.Valid()) {
+                            const_cast<std::remove_const_t<T>&>(*item).AutomaticUpdate();
                         }
                     }
                 }
@@ -630,9 +630,9 @@ namespace kor {
 
             [[nodiscard]] std::size_t size() const override { return items.size(); }
 
-            [[nodiscard]] std::size_t unusable() const override {
+            [[nodiscard]] std::size_t Unusable() const override {
                 return static_cast<std::size_t>(std::ranges::count_if(
-                    items, [](const ResourceRef<T>& item) { return !item.valid(); }));
+                    items, [](const ResourceRef<T>& item) { return !item.Valid(); }));
             }
         };
 
@@ -642,11 +642,11 @@ namespace kor {
          *
          * Called at the top of the frame by the run loop.
          */
-        void update() {
-            repair();
+        void Update() {
+            Repair();
 
             for (const auto &storage: _refStorages | std::views::values) {
-                storage->update();
+                storage->Update();
             }
         }
 
@@ -656,7 +656,7 @@ namespace kor {
          * For a diagnostic overlay rather than for logic: it counts what the engine has been asked to
          * keep an eye on, which is every resource built through a builder.
          */
-        [[nodiscard]] std::size_t trackedResources() const {
+        [[nodiscard]] std::size_t TrackedResources() const {
             std::size_t total = 0;
             for (const auto& storage : _storages | std::views::values) total += storage->size();
             for (const auto& storage : _refStorages | std::views::values) total += storage->size();
@@ -669,10 +669,10 @@ namespace kor {
          * A poisoned resource reports itself once and then waits quietly to be repaired, so a count
          * of them is the one number that says "something is broken right now" without reading a log.
          */
-        [[nodiscard]] std::size_t unusableResources() const {
+        [[nodiscard]] std::size_t UnusableResources() const {
             std::size_t total = 0;
-            for (const auto& storage : _storages | std::views::values) total += storage->unusable();
-            for (const auto& storage : _refStorages | std::views::values) total += storage->unusable();
+            for (const auto& storage : _storages | std::views::values) total += storage->Unusable();
+            for (const auto& storage : _refStorages | std::views::values) total += storage->Unusable();
             return total;
         }
 
@@ -686,15 +686,15 @@ namespace kor {
          * built from it), so a single pass repairs only the shallowest layer. Iterate until nothing
          * more comes back, bounded so a dependency cycle cannot spin the frame forever.
          */
-        void repair() {
+        void Repair() {
             constexpr int maxPasses = 8;
             for (int pass = 0; pass < maxPasses; ++pass) {
                 bool recovered = false;
-                for (const auto& storage : _storages | std::views::values)    recovered |= storage->repair();
-                for (const auto& storage : _refStorages | std::views::values) recovered |= storage->repair();
+                for (const auto& storage : _storages | std::views::values)    recovered |= storage->Repair();
+                for (const auto& storage : _refStorages | std::views::values) recovered |= storage->Repair();
                 if (!recovered) return;
             }
-            kor::log::warn("Resource repair did not settle after {} passes; giving up this frame.", maxPasses);
+            kor::log::Warn("Resource repair did not settle after {} passes; giving up this frame.", maxPasses);
         }
 
         /**
@@ -702,15 +702,15 @@ namespace kor {
          * @throws std::runtime_error if no such resource is registered.
          */
         template<typename T>
-        T& get(std::string_view id) {
-            auto& s = storage<T>();
+        T& Get(std::string_view id) {
+            auto& s = StorageFor<T>();
             if (!s) {
-                kor::log::error("Resource of type '{}' not found in repository!", typeid(T).name());
+                kor::log::Error("Resource of type '{}' not found in repository!", typeid(T).name());
                 throw std::runtime_error("Resource of type '" + std::string(typeid(T).name()) + "' not found in repository!");
             }
             auto it = s.items.find(std::string(id));
             if (it == s.items.end()) {
-                kor::log::error("Resource with id '{}' not found in repository!", id);
+                kor::log::Error("Resource with id '{}' not found in repository!", id);
                 throw std::runtime_error("Resource with id '" + std::string(id) + "' not found in repository!");
             }
             return *it->second;
@@ -721,15 +721,15 @@ namespace kor {
          * @throws std::runtime_error if no such resource is registered.
          */
         template<typename T>
-        const T& get(std::string_view id) const {
-            const auto& s = tryStorage<T>();
+        const T& Get(std::string_view id) const {
+            const auto& s = TryStorage<T>();
             if (!s) {
-                kor::log::error("Resource of type '{}' not found in repository!", typeid(T).name());
+                kor::log::Error("Resource of type '{}' not found in repository!", typeid(T).name());
                 throw std::runtime_error("Resource of type '" + std::string(typeid(T).name()) + "' not found in repository!");
             }
             const auto it = s->items.find(std::string(id));
             if (it == s->items.end()) {
-                kor::log::error("Resource with id '{}' not found in repository!", id);
+                kor::log::Error("Resource with id '{}' not found in repository!", id);
                 throw std::runtime_error("Resource with id '" + std::string(id) + "' not found in repository!");
             }
             return *it->second;
@@ -741,10 +741,10 @@ namespace kor {
          *         leaves the first in place.
          */
         template<typename T>
-        ResourceRef<T> add(std::string_view id, Resource<T> resource) {
-            auto& s = storage<T>();
+        ResourceRef<T> Add(std::string_view id, Resource<T> resource) {
+            auto& s = StorageFor<T>();
             if (s.items.contains(std::string(id))) {
-                kor::log::error("Resource with id '{}' already exists in repository!", id);
+                kor::log::Error("Resource with id '{}' already exists in repository!", id);
             }
             auto [it, inserted] = s.items.emplace(std::string(id), std::move(resource));
             return ResourceRef<T>(it->second);
@@ -756,15 +756,15 @@ namespace kor {
          * What a buffer or pipeline does with itself at build time. Ownership stays with the caller.
          */
         template<typename T>
-        void addRef(ResourceRef<T> resource) {
-            auto& s = refStorage<T>();
+        void AddRef(ResourceRef<T> resource) {
+            auto& s = RefStorageFor<T>();
             s.items.emplace_back(std::move(resource));
         }
 
         // Whether a resource of type T is registered under `id`.
         template<typename T>
-        bool contains(const std::string_view id) {
-            const auto* s = tryStorage<T>();
+        bool Contains(const std::string_view id) {
+            const auto* s = TryStorage<T>();
             return s && s->items.contains(std::string(id));
         }
 
@@ -772,19 +772,19 @@ namespace kor {
         // tryGet (which returns a raw pointer / "unsafe" ref), this carries the owning
         // Resource's lifetime stamp, so it is safe to store and pass around.
         template<typename T>
-        ResourceRef<T> ref(const std::string_view id) {
-            auto& s = storage<T>();
+        ResourceRef<T> Ref(const std::string_view id) {
+            auto& s = StorageFor<T>();
             const auto it = s.items.find(std::string(id));
             if (it == s.items.end()) {
-                kor::log::error("Resource with id '{}' not found in repository!", id);
+                kor::log::Error("Resource with id '{}' not found in repository!", id);
                 throw std::runtime_error("Resource with id '" + std::string(id) + "' not found in repository!");
             }
             return ResourceRef<T>(it->second);
         }
 
         template<typename T>
-        T* tryGet(const std::string_view id) noexcept {
-            auto* s = tryStorage<T>();
+        T* TryGet(const std::string_view id) noexcept {
+            auto* s = TryStorage<T>();
             if (!s) {
                 return nullptr;
             }
@@ -796,8 +796,8 @@ namespace kor {
         }
 
         template<typename T>
-        const T* tryGet(const std::string_view id) const noexcept {
-            const auto* s = tryStorage<T>();
+        const T* TryGet(const std::string_view id) const noexcept {
+            const auto* s = TryStorage<T>();
             if (!s) {
                 return nullptr;
             }
@@ -816,7 +816,7 @@ namespace kor {
 
     private:
         template<typename T>
-        Storage<T>& storage() {
+        Storage<T>& StorageFor() {
             const std::type_index key(typeid(T));
             const auto it = _storages.find(key);
             if (it == _storages.end()) {
@@ -829,7 +829,7 @@ namespace kor {
         }
 
         template<typename T>
-        RefStorage<T>& refStorage() {
+        RefStorage<T>& RefStorageFor() {
             const std::type_index key(typeid(T));
             const auto it = _refStorages.find(key);
             if (it == _refStorages.end()) {
@@ -842,14 +842,14 @@ namespace kor {
         }
 
         template<typename T>
-        Storage<T>* tryStorage() {
+        Storage<T>* TryStorage() {
             const std::type_index key(typeid(T));
             const auto it = _storages.find(key);
             return it == _storages.end() ? nullptr : static_cast<Storage<T>*>(it->second.get());
         }
 
         template<typename T>
-        const Storage<T>* tryStorage() const {
+        const Storage<T>* TryStorage() const {
             const std::type_index key(typeid(T));
             const auto it = _storages.find(key);
             return it == _storages.end() ? nullptr : static_cast<const Storage<T>*>(it->second.get());

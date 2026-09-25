@@ -19,17 +19,17 @@ namespace kor::vk
     public:
         explicit GuiImage(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
         ~GuiImage() override;
-        void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(kor::ResourceRef<const kor::Image> image) override;
+        void SetLayerAndLevel(glm::u32 layer, glm::u32 level) override;
+        void SetImage(kor::ResourceRef<const kor::Image> image) override;
 
         ImTextureID operator*() const override;
 
     private:
         // Blits the source into this frame's copy of the helper image and leaves it shader-readable.
-        // @see kor::GuiImage::refresh
-        void refresh(kor::CommandBuffer& commandBuffer) override;
+        // @see kor::GuiImage::Refresh
+        void Refresh(kor::CommandBuffer& commandBuffer) override;
 
-        // Records that blit into whichever command buffer is given. The frame's, from refresh(); a
+        // Records that blit into whichever command buffer is given. The frame's, from Refresh(); a
         // single-time one when a handle is first built and there is no frame to record into.
         void recordBlit(kor::CommandBuffer& commandBuffer) const;
 
@@ -49,7 +49,7 @@ namespace kor::vk
         bool _direct = false;
 
         // Which generation of the image the descriptors were written against. A resize replaces the
-        // image, so they have to be written again. @see kor::Image::generation
+        // image, so they have to be written again. @see kor::Image::Generation
         glm::u64 _boundGeneration = 0;
     };
 

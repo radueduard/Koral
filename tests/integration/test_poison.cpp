@@ -57,20 +57,20 @@ TEST_F(GpuTest, BrokenShaderIsPoisonedNotThrown) {
     kor::Resource<Shader> shader;
     ASSERT_NO_THROW({
         shader = Shader::Builder{}
-                     .setLang<Shader::Lang::eGLSL>()
-                     .setStage(Shader::Stage::eCompute)
-                     .setPath(path)
-                     .build();
+                     .SetLang<Shader::Lang::eGLSL>()
+                     .SetStage(Shader::Stage::eCompute)
+                     .SetPath(path)
+                     .Build();
     });
 
-    EXPECT_FALSE(shader.valid());
-    EXPECT_TRUE(shader.poisoned());
-    ASSERT_NE(shader.error(), nullptr);
-    EXPECT_EQ(shader.error()->code, ErrorCode::eShaderCompileFailed);
+    EXPECT_FALSE(shader.Valid());
+    EXPECT_TRUE(shader.Poisoned());
+    ASSERT_NE(shader.Failure(), nullptr);
+    EXPECT_EQ(shader.Failure()->code, ErrorCode::eShaderCompileFailed);
 
     // The resource still has an identity and a name — it is a thing that exists and is broken,
     // not a thing that is missing.
-    EXPECT_EQ(shader.name(), path.string());
+    EXPECT_EQ(shader.Name(), path.string());
 }
 
 // The motivating case. A pipeline built from a shader that failed to compile is itself unusable,
@@ -79,32 +79,32 @@ TEST_F(GpuTest, PoisonedShaderPoisonsThePipelineWithACauseChain) {
     const auto path = writeBrokenShader("koral_broken2.comp.glsl", kBrokenCompute);
 
     const auto shader = Shader::Builder{}
-                            .setLang<Shader::Lang::eGLSL>()
-                            .setStage(Shader::Stage::eCompute)
-                            .setPath(path)
-                            .build();
-    ASSERT_TRUE(shader.poisoned());
+                            .SetLang<Shader::Lang::eGLSL>()
+                            .SetStage(Shader::Stage::eCompute)
+                            .SetPath(path)
+                            .Build();
+    ASSERT_TRUE(shader.Poisoned());
 
     kor::Resource<ComputePipeline> pipeline;
     ASSERT_NO_THROW({
         pipeline = ComputePipeline::Builder{}
-                       .setComputeShader(shader)
-                       .build();
+                       .SetComputeShader(shader)
+                       .Build();
     });
 
-    EXPECT_FALSE(pipeline.valid());
-    ASSERT_TRUE(pipeline.poisoned());
+    EXPECT_FALSE(pipeline.Valid());
+    ASSERT_TRUE(pipeline.Poisoned());
 
     // The pipeline's own error explains the symptom...
-    ASSERT_NE(pipeline.error(), nullptr);
-    EXPECT_NE(pipeline.error()->message.find("compute shader"), std::string::npos);
+    ASSERT_NE(pipeline.Failure(), nullptr);
+    EXPECT_NE(pipeline.Failure()->message.find("compute shader"), std::string::npos);
 
     // ...and the chain beneath it explains what to actually go and fix.
-    ASSERT_NE(pipeline.error()->cause, nullptr);
-    EXPECT_EQ(pipeline.error()->root().code, ErrorCode::eShaderCompileFailed);
+    ASSERT_NE(pipeline.Failure()->cause, nullptr);
+    EXPECT_EQ(pipeline.Failure()->Root().code, ErrorCode::eShaderCompileFailed);
 
     // The printed history names both ends of the story.
-    const std::string history = pipeline.error()->history();
+    const std::string history = pipeline.Failure()->History();
     EXPECT_NE(history.find("caused by"), std::string::npos);
 }
 
@@ -114,14 +114,14 @@ TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowi
     const auto path = writeBrokenShader("koral_broken3.comp.glsl", kBrokenCompute);
 
     const auto shader = Shader::Builder{}
-                            .setLang<Shader::Lang::eGLSL>()
-                            .setStage(Shader::Stage::eCompute)
-                            .setPath(path)
-                            .build();
+                            .SetLang<Shader::Lang::eGLSL>()
+                            .SetStage(Shader::Stage::eCompute)
+                            .SetPath(path)
+                            .Build();
     const auto pipeline = ComputePipeline::Builder{}
-                              .setComputeShader(shader)
-                              .build();
-    ASSERT_TRUE(pipeline.poisoned());
+                              .SetComputeShader(shader)
+                              .Build();
+    ASSERT_TRUE(pipeline.Poisoned());
 
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
 
@@ -132,10 +132,10 @@ TEST_F(GpuTest, RecordingWithAPoisonedPipelineFailsTheCommandBufferWithoutThrowi
         cb->End();
     });
 
-    EXPECT_FALSE(cb->ok());
-    ASSERT_FALSE(cb->errors().empty());
+    EXPECT_FALSE(cb->Ok());
+    ASSERT_FALSE(cb->Errors().empty());
 
-    const auto result = cb->result();
+    const auto result = cb->Outcome();
     ASSERT_FALSE(result.has_value());
 }
 
@@ -149,37 +149,37 @@ TEST_F(GpuTest, FixingTheShaderBringsThePipelineBack) {
 
     // getOrBuild registers the shader (poisoned) so it is watched and can be repaired.
     const auto shader = Shader::Builder{}
-                            .setLang<Shader::Lang::eGLSL>()
-                            .setStage(Shader::Stage::eCompute)
-                            .setPath(path)
-                            .getOrBuild("test.recover");
-    ASSERT_TRUE(shader.poisoned());
+                            .SetLang<Shader::Lang::eGLSL>()
+                            .SetStage(Shader::Stage::eCompute)
+                            .SetPath(path)
+                            .GetOrBuild("test.recover");
+    ASSERT_TRUE(shader.Poisoned());
 
-    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
-    ASSERT_TRUE(pipeline.poisoned());
+    auto pipeline = ComputePipeline::Builder{}.SetComputeShader(shader).Build();
+    ASSERT_TRUE(pipeline.Poisoned());
 
     // Hand a ref out *while the pipeline is broken*, as a renderer or scene would.
     const kor::ResourceRef<const ComputePipeline> ref = pipeline;
-    ASSERT_FALSE(ref.valid());
+    ASSERT_FALSE(ref.Valid());
 
     // The user fixes the shader. (Driving requestRepair directly rather than waiting on the file
     // watcher keeps the test deterministic; the watcher calls exactly this.)
     std::ofstream(path) << kWorkingCompute;
-    shader.requestRepair();
+    shader.RequestRepair();
 
     // One frame's worth of repository maintenance: the shader recompiles, and the pipeline — whose
     // only problem was that shader — is rebuilt behind it in the same pass.
-    kor::Context::Repository().update();
+    kor::Context::Repository().Update();
 
-    EXPECT_TRUE(shader.valid()) << "the shader should have recompiled";
-    EXPECT_TRUE(pipeline.valid())
+    EXPECT_TRUE(shader.Valid()) << "the shader should have recompiled";
+    EXPECT_TRUE(pipeline.Valid())
         << "the pipeline should have been rebuilt once its shader came back";
-    EXPECT_FALSE(pipeline.poisoned());
+    EXPECT_FALSE(pipeline.Poisoned());
 
     // The ref issued while everything was broken now resolves to the repaired pipeline, without
     // having been re-issued. This is the property the state-block redesign exists to provide.
-    EXPECT_TRUE(ref.valid());
-    EXPECT_EQ(ref.get(), pipeline.get());
+    EXPECT_TRUE(ref.Valid());
+    EXPECT_EQ(ref.Get(), pipeline.Get());
 }
 
 // A repair that does not help must not spin: a still-broken pipeline may not rebuild itself on
@@ -188,55 +188,55 @@ TEST_F(GpuTest, RepairDoesNotSpinWhileStillBroken) {
     const auto path = writeBrokenShader("koral_nospin.comp.glsl", kBrokenCompute);
 
     const auto shader = Shader::Builder{}
-                            .setLang<Shader::Lang::eGLSL>()
-                            .setStage(Shader::Stage::eCompute)
-                            .setPath(path)
-                            .getOrBuild("test.nospin");
-    const auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
-    ASSERT_TRUE(pipeline.poisoned());
+                            .SetLang<Shader::Lang::eGLSL>()
+                            .SetStage(Shader::Stage::eCompute)
+                            .SetPath(path)
+                            .GetOrBuild("test.nospin");
+    const auto pipeline = ComputePipeline::Builder{}.SetComputeShader(shader).Build();
+    ASSERT_TRUE(pipeline.Poisoned());
 
-    const auto generationBefore = pipeline.generation();
+    const auto generationBefore = pipeline.Generation();
 
     // No edit, no repair request: several frames must change nothing at all.
-    for (int frame = 0; frame < 5; ++frame) kor::Context::Repository().update();
+    for (int frame = 0; frame < 5; ++frame) kor::Context::Repository().Update();
 
-    EXPECT_TRUE(pipeline.poisoned());
-    EXPECT_EQ(pipeline.generation(), generationBefore) << "a hopeless repair must not be retried";
+    EXPECT_TRUE(pipeline.Poisoned());
+    EXPECT_EQ(pipeline.Generation(), generationBefore) << "a hopeless repair must not be retried";
 }
 
 // A shader that compiles is not poisoned, and neither is the pipeline built from it. Guards
 // against the propagation being so eager that it poisons everything.
 TEST_F(GpuTest, GoodShaderYieldsAUsablePipeline) {
     const auto shader = Shader::Builder{}
-                            .setLang<Shader::Lang::eGLSL>()
-                            .setStage(Shader::Stage::eCompute)
-                            .setPath(kor::shaderPath("doubleValues.comp.glsl"))
-                            .build();
-    ASSERT_TRUE(shader.valid()) << shader.error()->history();
+                            .SetLang<Shader::Lang::eGLSL>()
+                            .SetStage(Shader::Stage::eCompute)
+                            .SetPath(kor::ShaderPath("doubleValues.comp.glsl"))
+                            .Build();
+    ASSERT_TRUE(shader.Valid()) << shader.Failure()->History();
 
     const auto pipeline = ComputePipeline::Builder{}
-                              .setComputeShader(shader)
-                              .build();
-    EXPECT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
-    EXPECT_FALSE(pipeline.poisoned());
+                              .SetComputeShader(shader)
+                              .Build();
+    EXPECT_TRUE(pipeline.Valid()) << (pipeline.Failure() ? pipeline.Failure()->History() : "");
+    EXPECT_FALSE(pipeline.Poisoned());
 }
 
 } // namespace
 
 // The error a user reads must point at *their* line, not at a file inside Koral. Without the
-// source_location threaded through build(), `where` names whichever library .cpp happened to
+// source_location threaded through Build(), `where` names whichever library .cpp happened to
 // construct the Error, which tells the reader nothing they can act on.
 TEST_F(GpuTest, ErrorLocationPointsAtTheCallerNotTheLibrary) {
     const auto path = writeBrokenShader("koral_broken_loc.comp.glsl", kBrokenCompute);
 
     const auto expectedLine = __LINE__ + 1;
-    const auto shader = Shader::Builder{}.setPath(path).build();
+    const auto shader = Shader::Builder{}.SetPath(path).Build();
 
-    ASSERT_TRUE(shader.poisoned());
-    ASSERT_NE(shader.error(), nullptr);
+    ASSERT_TRUE(shader.Poisoned());
+    ASSERT_NE(shader.Failure(), nullptr);
 
-    const std::string file = shader.error()->where.file_name();
+    const std::string file = shader.Failure()->where.file_name();
     EXPECT_NE(file.find("test_poison.cpp"), std::string::npos)
         << "error points into the library instead of the caller: " << file;
-    EXPECT_EQ(shader.error()->where.line(), expectedLine);
+    EXPECT_EQ(shader.Failure()->where.line(), expectedLine);
 }

@@ -99,7 +99,7 @@ namespace kor
      *
      * **Errors are sticky, and never thrown.** A failed command records an error and puts the buffer
      * into a failed state where subsequent GPU work is skipped, so a chain never has to be
-     * interrupted to be checked. Ask afterwards with ok(), result() or errors(); Submit() returns
+     * interrupted to be checked. Ask afterwards with Ok(), Outcome() or Errors(); Submit() returns
      * the same information.
      *
      * A command buffer belongs to the thread that created it and must be recorded from that thread.
@@ -122,7 +122,7 @@ namespace kor
         // executed the commands that write them, which is long after Scene::Render returned. So a
         // scope's result is not available in the frame that recorded it — it is collected at the
         // start of the next recording on the same command buffer, which for the frame's command
-        // buffer is once the frame in flight comes round again. timings() therefore reports a
+        // buffer is once the frame in flight comes round again. Timings() therefore reports a
         // frame that has definitely completed, a few frames back, and never blocks waiting for one.
         //
         // @note A continuation that runs the instant the GPU signals — rather than at the next
@@ -172,7 +172,7 @@ namespace kor
          * @param label The name given to BeginTimer.
          * @return The GPU time in milliseconds, or an Error explaining why there is none yet.
          *
-         * Unlike timings(), this goes and looks: call it any time after Submit() and it will
+         * Unlike Timings(), this goes and looks: call it any time after Submit() and it will
          * collect the timestamps if the GPU has finished with them. That makes it the way to time
          * a command buffer that is submitted once and never re-recorded — a job's compute pass,
          * say — where waiting for the next Begin() would mean waiting forever.
@@ -180,18 +180,18 @@ namespace kor
          * @code
          * commandBuffer->Submit();
          * commandBuffer->WaitForFence();
-         * if (const auto ms = commandBuffer->collectTimer("sort"))
-         *     kor::log::info("sort took {:.3f} ms", *ms);
+         * if (const auto ms = commandBuffer->CollectTimer("sort"))
+         *     kor::log::Info("sort took {:.3f} ms", *ms);
          * else
-         *     kor::log::warn("{}", ms.error().message);
+         *     kor::log::Warn("{}", ms.error().message);
          * @endcode
          *
          * Never blocks. Called before the GPU has finished — without a WaitForFence, say — it
          * fails with a message saying so rather than stalling, and succeeds on a later call. If
          * more than one scope shares @p label this reports the first one opened; read them all
-         * with collectTimings().
+         * with CollectTimings().
          */
-        [[nodiscard]] Result<double> collectTimer(std::string_view label);
+        [[nodiscard]] Result<double> CollectTimer(std::string_view label);
 
         /**
          * @brief Every scope's result, fetching them if they have arrived.
@@ -200,7 +200,7 @@ namespace kor
          * The whole-buffer form of collectTimer, and the same timing rules apply. Empty while
          * nothing has been measured or the GPU has not finished.
          */
-        [[nodiscard]] const std::vector<TimerResult>& collectTimings();
+        [[nodiscard]] const std::vector<TimerResult>& CollectTimings();
 
         /**
          * @brief The scopes already collected, without going to look for more.
@@ -215,7 +215,7 @@ namespace kor
          * The results persist until the next completed submission replaces them, so a frame that
          * records no timers leaves the previous frame's readings in place rather than blanking them.
          */
-        [[nodiscard]] const std::vector<TimerResult>& timings() const { return _timings; }
+        [[nodiscard]] const std::vector<TimerResult>& Timings() const { return _timings; }
 
         /**
          * @brief Whether this command buffer's device and queue can timestamp at all.
@@ -223,13 +223,13 @@ namespace kor
          * False on a queue whose family reports no valid timestamp bits — a dedicated transfer
          * queue on some drivers — in which case the timer commands do nothing.
          */
-        [[nodiscard]] bool supportsTimers() const { return doSupportsTimers(); }
+        [[nodiscard]] bool SupportsTimers() const { return DoSupportsTimers(); }
 
         /** @brief The most scopes one recording may open. Beyond this BeginTimer fails the recording. */
         static constexpr glm::u32 MaxTimerScopes = 256;
 
         /** @brief How many commands the last completed recording emitted. */
-        [[nodiscard]] glm::u64 lastFrameCommandCount() const { return _lastFrameCommandCount; }
+        [[nodiscard]] glm::u64 LastFrameCommandCount() const { return _lastFrameCommandCount; }
 
         // ---- Error railway --------------------------------------------------------------------
 
@@ -238,7 +238,7 @@ namespace kor
          * @return false once any command has failed. From that point GPU commands are skipped, so
          *         the rest of the chain does nothing rather than compounding the failure.
          */
-        [[nodiscard]] bool ok() const { return !_failed; }
+        [[nodiscard]] bool Ok() const { return !_failed; }
 
         /**
          * @brief The first error recorded, as a result.
@@ -246,10 +246,10 @@ namespace kor
          *         which carries the failing command's source location and, where one exists, the
          *         cause it inherited from a poisoned resource.
          */
-        [[nodiscard]] VoidResult result() const;
+        [[nodiscard]] VoidResult Outcome() const;
 
         /** @brief Every error recorded, in the order they happened. */
-        [[nodiscard]] const std::vector<Error>& errors() const { return _errors; }
+        [[nodiscard]] const std::vector<Error>& Errors() const { return _errors; }
 
         /**
          * @brief Whether anything recorded so far names @p image among what it touches.
@@ -262,13 +262,13 @@ namespace kor
          * screen yet?", which is how the runtime knows whether to clear the window's framebuffer
          * itself. Asked *during* recording: once End() has run there is nothing left to ask.
          */
-        [[nodiscard]] bool hasTouched(const kor::ResourceRef<const Image>& image) const;
+        [[nodiscard]] bool HasTouched(const kor::ResourceRef<const Image>& image) const;
 
         /**
          * @brief The window framebuffer's colour image — what the screen-targeting Blit and Resolve
-         *        write into, and what hasTouched() is asked about. Null before there is a window.
+         *        write into, and what HasTouched() is asked about. Null before there is a window.
          */
-        [[nodiscard]] static ResourceRef<const Image> screenImage();
+        [[nodiscard]] static ResourceRef<const Image> ScreenImage();
 
         /**
          * @brief What kind of work a command buffer may record.
@@ -304,7 +304,7 @@ namespace kor
          * What happens next is up to the caller:
          *
          * @code
-         * kor::CommandBuffer::SingleTimeCommand(copy).wait();   // setup or readback: block until done
+         * kor::CommandBuffer::SingleTimeCommand(copy).Wait();   // setup or readback: block until done
          * co_await kor::CommandBuffer::SingleTimeCommand(copy);  // in a coroutine: suspend until done
          * (void)kor::CommandBuffer::SingleTimeCommand(clear);    // fire and forget
          * @endcode
@@ -344,7 +344,7 @@ namespace kor
         void End();
 
         /** @brief Whether Begin() has been called and End() has not yet. */
-        [[nodiscard]] bool isRecording() const { return _recording; }
+        [[nodiscard]] bool IsRecording() const { return _recording; }
 
         /**
          * @brief Submits the recorded work to its queue.
@@ -380,7 +380,7 @@ namespace kor
          * @code
          * commandBuffer.BeginRendering();          // the screen
          * commandBuffer.BeginRendering(gBuffer);   // a framebuffer of your own
-         * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer).setClearColor(0, glm::vec4{1.f}));
+         * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer).SetClearColor(0, glm::vec4{1.f}));
          * @endcode
          *
          * Its attachments are declared as used, so the transitions they need are emitted ahead of
@@ -610,7 +610,7 @@ namespace kor
         template<typename T> requires std::is_trivially_copyable_v<T>
         CommandBuffer& PushConstant(const std::string_view name, const T& data,
                                     const std::source_location where = std::source_location::current()) {
-            return PushConstant(name, &data, sizeof(T), shapeOf<T>(), where);
+            return PushConstant(name, &data, sizeof(T), ShapeOf<T>(), where);
         }
 
         // ---- Barriers -------------------------------------------------------------------------
@@ -866,7 +866,7 @@ namespace kor
                                   const std::source_location where = std::source_location::current())
         {
             const ContiguousCopy<T> contiguous(std::forward<R>(elements));
-            const std::span<const T> data = contiguous.view();
+            const std::span<const T> data = contiguous.View();
             return FillBuffer(std::move(buffer), data.data(),
                               offset, data.size() * sizeof(T), where);
         }
@@ -1059,16 +1059,16 @@ namespace kor
         Flags<Usage> _usage;
 
         /** @brief Applies the bound pipeline's default for every dynamic state not overridden since it was bound. */
-        void applyDynamicDefaults();
+        void ApplyDynamicDefaults();
 
         /** @brief Records an error and enters the failed state. Returns *this, so it can be returned from a command. */
-        CommandBuffer& record(ErrorCode code, std::string message);
+        CommandBuffer& RecordError(ErrorCode code, std::string message);
 
         /** @brief Records an already-built error, preserving its cause chain. */
-        CommandBuffer& record(Error error);
+        CommandBuffer& RecordError(Error error);
 
         /** @brief Clears the accumulated errors and leaves the failed state. Called by Begin(). */
-        void resetErrors() { _errors.clear(); _failed = false; }
+        void ResetErrors() { _errors.clear(); _failed = false; }
 
         /**
          * @brief Refuses a resource that cannot be used, failing the recording rather than the process.
@@ -1081,18 +1081,18 @@ namespace kor
          * pipeline". Nothing throws, and the backend is never reached.
          */
         template<typename T>
-        bool reject(const ResourceRef<T>& input, const std::string_view what) {
-            if (!input.alive()) {
-                record(ErrorCode::eInvalidArgument, std::format("The {} has been destroyed.", what));
+        bool Reject(const ResourceRef<T>& input, const std::string_view what) {
+            if (!input.Alive()) {
+                RecordError(ErrorCode::eInvalidArgument, std::format("The {} has been destroyed.", what));
                 return true;
             }
-            if (input.poisoned()) {
-                const auto name = input.name();
-                record(Error{
-                    .code = input.error()->code,
+            if (input.Poisoned()) {
+                const auto name = input.Name();
+                RecordError(Error{
+                    .code = input.Failure()->code,
                     .message = std::format("Cannot record with the {} '{}': it is unusable.",
                                            what, name.empty() ? "<unnamed>" : name),
-                    .cause = input.errorPtr(),
+                    .cause = input.ErrorPtr(),
                 });
                 return true;
             }
@@ -1108,7 +1108,7 @@ namespace kor
         };
 
         /// One resource a command touches, and how. Exactly one of buffer/image is set; the other
-        /// is left default-constructed, for which alive() is false.
+        /// is left default-constructed, for which Alive() is false.
         struct ResourceUse {
             kor::ResourceRef<const Buffer> buffer;
             kor::ResourceRef<const Image>  image;
@@ -1151,7 +1151,7 @@ namespace kor
          * @param dereferencesDeviceAddresses Whether its shaders reach buffers by raw address.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& enqueue(const char* command, std::source_location where,
+        CommandBuffer& Enqueue(const char* command, std::source_location where,
                                std::vector<ResourceUse> uses, PassEdge pass,
                                std::function<void()> emit, bool transitions = false,
                                bool dereferencesDeviceAddresses = false);
@@ -1160,16 +1160,16 @@ namespace kor
          * @brief Whether any of @p uses needs a transfer usage its resource was not created with.
          * @return The error to record, or nullopt when every transfer role is covered.
          *
-         * Checked once, in enqueue(), rather than in each of the dozen commands that perform a
+         * Checked once, in Enqueue(), rather than in each of the dozen commands that perform a
          * transfer: every one of them already declares which resource it reads from and which it
          * writes to, because the barrier resolver needs exactly that. So the declaration that drives
          * synchronisation drives this too, and a transfer command added later is covered without
          * knowing about it.
          *
          * Both flags are on by default, so this fires only for a resource whose builder called
-         * setUsage() and left one out — a real mistake, and one the message names the flag for.
+         * SetUsage() and left one out — a real mistake, and one the message names the flag for.
          */
-        [[nodiscard]] static std::optional<Error> missingTransferUsage(
+        [[nodiscard]] static std::optional<Error> MissingTransferUsage(
             const std::vector<ResourceUse>& uses, const char* command, std::source_location where);
 
         /**
@@ -1178,7 +1178,7 @@ namespace kor
          * The framebuffer the current pass renders into, which is the window's only when the pass
          * targets the screen. @see Draw
          */
-        [[nodiscard]] glm::uvec2 defaultViewportExtent() const;
+        [[nodiscard]] glm::uvec2 DefaultViewportExtent() const;
 
         /**
          * @brief Gives a draw the whole target when it set no viewport or scissor of its own.
@@ -1186,10 +1186,10 @@ namespace kor
          * Recorded as ordinary Set calls, so the tracking bits and the commands the backend emits
          * cannot disagree about what is in force.
          */
-        void ensureViewportAndScissor();
+        void EnsureViewportAndScissor();
 
         /** @brief Whether the currently bound pipeline reaches buffers through device addresses. */
-        [[nodiscard]] bool boundPipelineUsesDeviceAddresses() const;
+        [[nodiscard]] bool BoundPipelineUsesDeviceAddresses() const;
 
         /**
          * @brief Everything the currently bound descriptor sets and mesh will be touched for.
@@ -1200,19 +1200,19 @@ namespace kor
          * skipped, as are samplers and acceleration structures, which name nothing an image or
          * buffer barrier applies to.
          */
-        [[nodiscard]] std::vector<ResourceUse> usesForBoundResources(bool includeMesh) const;
+        [[nodiscard]] std::vector<ResourceUse> UsesForBoundResources(bool includeMesh) const;
 
         /** @brief Inserts the barriers the recorded commands imply. Called by End(). */
-        void resolveBarriers();
+        void ResolveBarriers();
 
         /** @brief Runs every record's emit callback in order. Called by End() after resolving. */
-        void emitRecords();
+        void EmitRecords();
 
         /** @brief Drops the recorded commands and the tracked state. Called by Begin() and Reset(). */
-        void clearRecords() { _records.clear(); _emitting = false; resetTrackedState(); }
+        void ClearRecords() { _records.clear(); _emitting = false; ResetTrackedState(); }
 
         /** @brief Returns the mirrored pipeline and binding state to where recording began, so the emit walk replays from the same start. */
-        void resetTrackedState();
+        void ResetTrackedState();
 
         std::vector<Record> _records;
         bool _emitting = false;  ///< True while End() is walking _records.
@@ -1225,7 +1225,7 @@ namespace kor
         // already have validated the resource: these only touch _state.
 
         /** @brief Records that a render pass opened on this framebuffer, clearing the pipeline and viewport bindings. */
-        void stateBeginRendering(const ResourceRef<const Framebuffer>& framebuffer);
+        void StateBeginRendering(const ResourceRef<const Framebuffer>& framebuffer);
 
         /**
          * @brief Drops the framebuffer and pipeline bindings a pass held.
@@ -1234,17 +1234,17 @@ namespace kor
          * replays its records later has to apply the same change again at replay time, and cannot
          * call EndRendering to get it without recursing back into its own do* half.
          */
-        void stateEndRendering();
+        void StateEndRendering();
         /** @brief Records the bound compute pipeline. */
-        void stateBindComputePipeline(const ResourceRef<const ComputePipeline>& pipeline);
+        void StateBindComputePipeline(const ResourceRef<const ComputePipeline>& pipeline);
         /** @brief Records the bound graphics pipeline, and clears the dynamic-state mask. */
-        void stateBindGraphicsPipeline(const ResourceRef<const GraphicsPipeline>& pipeline);
+        void StateBindGraphicsPipeline(const ResourceRef<const GraphicsPipeline>& pipeline);
         /** @brief Records the bound ray-tracing pipeline. */
-        void stateBindRayTracingPipeline(const ResourceRef<const RayTracingPipeline>& pipeline);
+        void StateBindRayTracingPipeline(const ResourceRef<const RayTracingPipeline>& pipeline);
         /** @brief Records the bound mesh. */
-        void stateBindMesh(const ResourceRef<const Mesh>& mesh);
+        void StateBindMesh(const ResourceRef<const Mesh>& mesh);
         /** @brief Records which descriptor set is bound at which index, for whichever pipeline type is bound. */
-        void stateBindDescriptorSet(glm::u32 index, const ResourceRef<const DescriptorSet>& descriptorSet);
+        void StateBindDescriptorSet(glm::u32 index, const ResourceRef<const DescriptorSet>& descriptorSet);
 
         // ---- Backend commands -----------------------------------------------------------------
         //
@@ -1252,81 +1252,81 @@ namespace kor
         // validates, rejects unusable resources and updates the tracked state; only then is the
         // matching do* called, so a backend is never handed a poisoned or destroyed resource.
 
-        virtual CommandBuffer& doBeginRendering(const RenderInfo& renderParameters) = 0;
+        virtual CommandBuffer& DoBeginRendering(const RenderInfo& renderParameters) = 0;
         // Recording lifecycle. The base owns what is common to every backend — resetting the
         // errors and records, retiring the previous submission's timers, resolving barriers once
         // the whole sequence is visible — and each of these supplies only the API call that ends it.
-        virtual CommandBuffer& doBegin() = 0;
-        virtual void doEnd() = 0;
-        virtual VoidResult doSubmit(const SubmitInfo& info) = 0;
-        virtual void doReset() = 0;
-        virtual void doWaitForFence() const = 0;
-        virtual CommandBuffer& doRun(const std::function<void(CommandBuffer&)>& command) = 0;
+        virtual CommandBuffer& DoBegin() = 0;
+        virtual void DoEnd() = 0;
+        virtual VoidResult DoSubmit(const SubmitInfo& info) = 0;
+        virtual void DoReset() = 0;
+        virtual void DoWaitForFence() const = 0;
+        virtual CommandBuffer& DoRun(const std::function<void(CommandBuffer&)>& command) = 0;
 
-        virtual CommandBuffer& doEndRendering() = 0;
+        virtual CommandBuffer& DoEndRendering() = 0;
 
         // Dynamic state. The guard ("is a graphics pipeline bound?") and the tracking bit that
         // stops applyDynamicDefaults from stamping the pipeline's value over an explicit one are
         // the base's; these emit the command and nothing else.
-        virtual CommandBuffer& doSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
-        virtual CommandBuffer& doSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
-        virtual CommandBuffer& doSetLineWidth(float lineWidth) = 0;
-        virtual CommandBuffer& doSetDepthBias(float constantFactor, float clamp, float slopeFactor) = 0;
-        virtual CommandBuffer& doSetBlendConstants(glm::vec4 constants) = 0;
-        virtual CommandBuffer& doSetStencilCompareMask(StencilFace face, glm::u32 compareMask) = 0;
-        virtual CommandBuffer& doSetStencilWriteMask(StencilFace face, glm::u32 writeMask) = 0;
-        virtual CommandBuffer& doSetStencilReference(StencilFace face, glm::u32 reference) = 0;
-        virtual CommandBuffer& doSetCullMode(Flags<CullMode> cullMode) = 0;
-        virtual CommandBuffer& doSetFrontFace(FrontFace frontFace) = 0;
-        virtual CommandBuffer& doSetDepthTestEnable(bool enable) = 0;
-        virtual CommandBuffer& doSetDepthWriteEnable(bool enable) = 0;
-        virtual CommandBuffer& doSetDepthCompareOp(CompareOp compareOp) = 0;
-        virtual CommandBuffer& doSetStencilTestEnable(bool enable) = 0;
-        virtual CommandBuffer& doSetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp) = 0;
-        virtual CommandBuffer& doSetDepthBiasEnable(bool enable) = 0;
-        virtual CommandBuffer& doSetRasterizerDiscardEnable(bool enable) = 0;
-        virtual CommandBuffer& doSetPrimitiveRestartEnable(bool enable) = 0;
+        virtual CommandBuffer& DoSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
+        virtual CommandBuffer& DoSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
+        virtual CommandBuffer& DoSetLineWidth(float lineWidth) = 0;
+        virtual CommandBuffer& DoSetDepthBias(float constantFactor, float clamp, float slopeFactor) = 0;
+        virtual CommandBuffer& DoSetBlendConstants(glm::vec4 constants) = 0;
+        virtual CommandBuffer& DoSetStencilCompareMask(StencilFace face, glm::u32 compareMask) = 0;
+        virtual CommandBuffer& DoSetStencilWriteMask(StencilFace face, glm::u32 writeMask) = 0;
+        virtual CommandBuffer& DoSetStencilReference(StencilFace face, glm::u32 reference) = 0;
+        virtual CommandBuffer& DoSetCullMode(Flags<CullMode> cullMode) = 0;
+        virtual CommandBuffer& DoSetFrontFace(FrontFace frontFace) = 0;
+        virtual CommandBuffer& DoSetDepthTestEnable(bool enable) = 0;
+        virtual CommandBuffer& DoSetDepthWriteEnable(bool enable) = 0;
+        virtual CommandBuffer& DoSetDepthCompareOp(CompareOp compareOp) = 0;
+        virtual CommandBuffer& DoSetStencilTestEnable(bool enable) = 0;
+        virtual CommandBuffer& DoSetStencilOp(StencilFace face, StencilOp failOp, StencilOp passOp, StencilOp depthFailOp, CompareOp compareOp) = 0;
+        virtual CommandBuffer& DoSetDepthBiasEnable(bool enable) = 0;
+        virtual CommandBuffer& DoSetRasterizerDiscardEnable(bool enable) = 0;
+        virtual CommandBuffer& DoSetPrimitiveRestartEnable(bool enable) = 0;
 
         /// Default to nothing: a backend without debug-marker support simply ignores labels.
-        virtual CommandBuffer& doBeginDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
-        virtual CommandBuffer& doEndDebugLabel() { return *this; }
-        virtual CommandBuffer& doInsertDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
+        virtual CommandBuffer& DoBeginDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
+        virtual CommandBuffer& DoEndDebugLabel() { return *this; }
+        virtual CommandBuffer& DoInsertDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
 
-        virtual CommandBuffer& doDispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) = 0;
+        virtual CommandBuffer& DoDispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) = 0;
         /// Defaults to reporting ray tracing as unsupported, like doBindRayTracingPipeline.
-        virtual CommandBuffer& doTraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where);
+        virtual CommandBuffer& DoTraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where);
         /// @param vertexCount Already resolved from the bound mesh when the caller left it defaulted.
-        virtual CommandBuffer& doDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) = 0;
+        virtual CommandBuffer& DoDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) = 0;
         /// @param indexCount Already resolved from the bound mesh when the caller left it defaulted.
-        virtual CommandBuffer& doDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) = 0;
+        virtual CommandBuffer& DoDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) = 0;
         /// Unimplemented on OpenGL, where it is a no-op.
-        virtual CommandBuffer& doDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) { return *this; }
+        virtual CommandBuffer& DoDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) { return *this; }
 
-        virtual CommandBuffer& doPushConstantBlock(const void* data, glm::u32 size, glm::u32 offset) = 0;
+        virtual CommandBuffer& DoPushConstantBlock(const void* data, glm::u32 size, glm::u32 offset) = 0;
 
-        virtual CommandBuffer& doBindComputePipeline(ResourceRef<const ComputePipeline> pipeline) = 0;
-        virtual CommandBuffer& doBindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline) = 0;
+        virtual CommandBuffer& DoBindComputePipeline(ResourceRef<const ComputePipeline> pipeline) = 0;
+        virtual CommandBuffer& DoBindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline) = 0;
         /// Defaults to reporting ray tracing as unsupported, like TraceRays; OpenGL leaves it alone.
-        virtual CommandBuffer& doBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
-        virtual CommandBuffer& doBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
-        virtual CommandBuffer& doBindMesh(ResourceRef<const Mesh> mesh) = 0;
-        virtual CommandBuffer& doBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;
-        virtual CommandBuffer& doDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
-        virtual CommandBuffer& doDrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
-        virtual CommandBuffer& doDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
+        virtual CommandBuffer& DoBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
+        virtual CommandBuffer& DoBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
+        virtual CommandBuffer& DoBindMesh(ResourceRef<const Mesh> mesh) = 0;
+        virtual CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;
+        virtual CommandBuffer& DoDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
+        virtual CommandBuffer& DoDrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
+        virtual CommandBuffer& DoDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
         /// Unimplemented on OpenGL, where it is a no-op.
-        virtual CommandBuffer& doDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) { return *this; }
-        virtual CommandBuffer& doClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset, glm::u64 size) = 0;
-        virtual CommandBuffer& doClearColorImage(ResourceRef<const Image> image, glm::vec4 color) = 0;
-        virtual CommandBuffer& doFillBuffer(ResourceRef<const Buffer> buffer, const void* data, glm::u64 offset, glm::u64 size) = 0;
-        virtual CommandBuffer& doCopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) = 0;
-        virtual CommandBuffer& doGenerateMipmaps(ResourceRef<const Image> image);
-        virtual CommandBuffer& doCopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo) = 0;
-        virtual CommandBuffer& doCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo) = 0;
-        virtual CommandBuffer& doBlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo) = 0;
-        virtual CommandBuffer& doBlit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo) = 0;
-        virtual CommandBuffer& doResolveToScreen(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) = 0;
-        virtual CommandBuffer& doResolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) = 0;
+        virtual CommandBuffer& DoDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) { return *this; }
+        virtual CommandBuffer& DoClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset, glm::u64 size) = 0;
+        virtual CommandBuffer& DoClearColorImage(ResourceRef<const Image> image, glm::vec4 color) = 0;
+        virtual CommandBuffer& DoFillBuffer(ResourceRef<const Buffer> buffer, const void* data, glm::u64 offset, glm::u64 size) = 0;
+        virtual CommandBuffer& DoCopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) = 0;
+        virtual CommandBuffer& DoGenerateMipmaps(ResourceRef<const Image> image);
+        virtual CommandBuffer& DoCopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo) = 0;
+        virtual CommandBuffer& DoCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo) = 0;
+        virtual CommandBuffer& DoBlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo) = 0;
+        virtual CommandBuffer& DoBlit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo) = 0;
+        virtual CommandBuffer& DoResolveToScreen(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) = 0;
+        virtual CommandBuffer& DoResolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) = 0;
 
         std::vector<Error> _errors;
         bool _failed = false;
@@ -1347,10 +1347,10 @@ namespace kor
         };
 
         /** @brief Backend hook: whether this device and queue can timestamp at all. @see supportsTimers */
-        [[nodiscard]] virtual bool doSupportsTimers() const { return false; }
+        [[nodiscard]] virtual bool DoSupportsTimers() const { return false; }
 
         /** @brief Backend hook: write the timestamp for query slot @p queryIndex at this point in the stream. */
-        virtual void doWriteTimerTimestamp(glm::u32 queryIndex) {}
+        virtual void DoWriteTimerTimestamp(glm::u32 queryIndex) {}
 
         /**
          * @brief Backend hook: read back the previous submission's timestamps, without blocking.
@@ -1359,7 +1359,7 @@ namespace kor
          * @return false if the GPU has not finished with them, in which case nothing is reported
          *         and the previous results stand.
          */
-        virtual bool doReadTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) { return false; }
+        virtual bool DoReadTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) { return false; }
 
         /**
          * @brief Fetches the last submission's timestamps if the GPU has finished with them.
@@ -1369,7 +1369,7 @@ namespace kor
          * Idempotent and non-blocking, which is what lets both the recurring path (Begin()) and
          * the one-shot path (collectTimer) share it without either having to know about the other.
          */
-        bool collectTimers();
+        bool CollectTimers();
 
         /**
          * @brief Collects the previous submission's timings and starts a fresh set. Called by Begin().
@@ -1378,25 +1378,25 @@ namespace kor
          * collection point for anything recurring — and the only one that also has to clear the
          * recording state for the pass about to begin.
          */
-        void retireTimers();
+        void RetireTimers();
 
-        /** @brief Closes out the recorded scopes and hands them to the next retireTimers(). Called by End(). */
-        void submitTimers();
+        /** @brief Closes out the recorded scopes and hands them to the next RetireTimers(). Called by End(). */
+        void SubmitTimers();
 
-        /** @brief How many scopes the recording being built has opened. Valid until submitTimers(). */
-        [[nodiscard]] glm::u32 timerScopeCount() const { return static_cast<glm::u32>(_pendingTimers.size()); }
+        /** @brief How many scopes the recording being built has opened. Valid until SubmitTimers(). */
+        [[nodiscard]] glm::u32 TimerScopeCount() const { return static_cast<glm::u32>(_pendingTimers.size()); }
 
         std::vector<TimerScope> _pendingTimers;    ///< Scopes in the recording being built.
         std::vector<TimerScope> _submittedTimers;  ///< Scopes of the submission whose results are still on the GPU.
         std::vector<glm::u32> _timerStack;         ///< Indices into _pendingTimers for the scopes currently open.
-        std::vector<TimerResult> _timings;         ///< Last results that arrived; see timings().
+        std::vector<TimerResult> _timings;         ///< Last results that arrived; see Timings().
 
         glm::u64 _lastFrameCommandCount = 0;
 
         CommandBuffer& PushConstantBlock(const void* data, glm::u32 size, glm::u32 offset);
 
         /** @brief Whichever pipeline is bound, of the three kinds, or nullptr when none is. */
-        [[nodiscard]] const Pipeline* boundPipeline() const;
+        [[nodiscard]] const Pipeline* BoundPipeline() const;
 
         /**
          * @brief Resolves @p name on the bound pipeline and writes @p data into the layout it declared.

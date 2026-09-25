@@ -76,17 +76,17 @@ namespace {
     }
 }
 
-void kor::setPreferredGpu(const std::string_view preference)
+void kor::SetPreferredGpu(const std::string_view preference)
 {
     preferredGpuStorage() = preference;
 }
 
-const std::string& kor::preferredGpu()
+const std::string& kor::PreferredGpu()
 {
     return preferredGpuStorage();
 }
 
-void kor::addAssetSearchPath(const std::filesystem::path& dir, const bool front)
+void kor::AddAssetSearchPath(const std::filesystem::path& dir, const bool front)
 {
     auto& paths = assetSearchPathsStorage();
     if (dir.empty() || std::ranges::find(paths, dir) != paths.end()) return;
@@ -94,24 +94,24 @@ void kor::addAssetSearchPath(const std::filesystem::path& dir, const bool front)
     else       paths.push_back(dir);
 }
 
-const std::vector<std::filesystem::path>& kor::assetSearchPaths() { return assetSearchPathsStorage(); }
+const std::vector<std::filesystem::path>& kor::AssetSearchPaths() { return assetSearchPathsStorage(); }
 
-std::filesystem::path kor::assetPath(const std::filesystem::path& relativePath)
+std::filesystem::path kor::AssetPath(const std::filesystem::path& relativePath)
 {
     // An absolute path is an answer already, not a question — resolving it against a root would
     // only produce nonsense.
     if (relativePath.is_absolute()) return relativePath;
 
-    return resolveAgainstRoots(relativePath, assetSearchPaths());
+    return resolveAgainstRoots(relativePath, AssetSearchPaths());
 }
 
-std::filesystem::path kor::shaderPath(const std::filesystem::path& relativePath)
+std::filesystem::path kor::ShaderPath(const std::filesystem::path& relativePath)
 {
     if (relativePath.is_absolute()) return relativePath;
 
     // The registered shader roots: the install roots, plus anything the project or its koral.json
-    // added via Shader::addSearchPath.
-    return resolveAgainstRoots(relativePath, Shader::searchPaths());
+    // added via Shader::AddSearchPath.
+    return resolveAgainstRoots(relativePath, Shader::SearchPaths());
 }
 
 kor::Window& kor::Context::Window()
@@ -132,13 +132,13 @@ kor::Scheduler& kor::Context::Scheduler()
     return *_scheduler;
 }
 
-kor::ResourceRef<const kor::Framebuffer> kor::Context::defaultFramebuffer()
+kor::ResourceRef<const kor::Framebuffer> kor::Context::DefaultFramebuffer()
 {
     if (_window == nullptr)
     {
         throw std::runtime_error("There is no default framebuffer!");
     }
-    return _window->framebuffer();
+    return _window->DefaultFramebuffer();
 }
 
 kor::SwitchAwaiter kor::Context::SwitchToMainThread() {
@@ -162,7 +162,7 @@ void kor::Context::DrainMainThread() {
     _mainThreadExecutor->Drain();
 }
 
-bool kor::Context::hasRepository() noexcept {
+bool kor::Context::HasRepository() noexcept {
     return _repository != nullptr;
 }
 
@@ -173,22 +173,22 @@ kor::Repository & kor::Context::Repository() {
     return *_repository;
 }
 
-kor::API kor::Context::activeAPI()
+kor::API kor::Context::ActiveAPI()
 {
     return _activeAPI;
 }
 
-bool kor::Context::isHeadless()
+bool kor::Context::IsHeadless()
 {
     return _headless;
 }
 
-bool kor::Context::hasDevice() noexcept
+bool kor::Context::HasDevice() noexcept
 {
     return _window != nullptr || _headless;
 }
 
-bool kor::Context::supportsRayTracing()
+bool kor::Context::SupportsRayTracing()
 {
     if (_activeAPI != API::eVulkan) return false;
     if (_window == nullptr && !_headless) return false;

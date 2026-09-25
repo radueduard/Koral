@@ -94,10 +94,10 @@ namespace kor
      * @code
      * kor::GraphicsPipeline::Builder builder;
      * auto pipeline = builder
-     *     .setVertexShader(vertexShader, MyMesh::Layout())   // vertex layout, matched by semantic
-     *     .setFragmentShader(fragmentShader)
-     *     .setFramebuffer(framebuffer)
-     *     .build();
+     *     .SetVertexShader(vertexShader, MyMesh::Layout())   // vertex layout, matched by semantic
+     *     .SetFragmentShader(fragmentShader)
+     *     .SetFramebuffer(framebuffer)
+     *     .Build();
      * @endcode
      *
      * The descriptor set layouts come from the shaders themselves, by reflection, so they are never
@@ -145,7 +145,7 @@ namespace kor
              * bytes are which. A shader that annotates nothing is matched by declaration order
              * instead. @see VertexLayout
              */
-            Builder& setVertexShader(ResourceRef<const Shader> shader, const VertexLayout& layout);
+            Builder& SetVertexShader(ResourceRef<const Shader> shader, const VertexLayout& layout);
 
             /**
              * @brief Sets the vertex shader, taking the default vertex layout.
@@ -154,19 +154,19 @@ namespace kor
              * a program with a single vertex format — the first one described becomes the default.
              * @see VertexLayout::SetDefault
              */
-            Builder& setVertexShader(ResourceRef<const Shader> shader);
+            Builder& SetVertexShader(ResourceRef<const Shader> shader);
 
             /** @brief Adds the tessellation stages. Requires Topology::ePatchList. */
-            Builder& setTessellationState(const TessellationState& tessellationState);
+            Builder& SetTessellationState(const TessellationState& tessellationState);
 
             /** @brief Adds a geometry shader, which may emit more primitives than it receives. */
-            Builder& setGeometryShader(ResourceRef<const Shader> geometryShader);
+            Builder& SetGeometryShader(ResourceRef<const Shader> geometryShader);
 
             /** @brief Sets the fragment shader, which computes each pixel's output. */
-            Builder& setFragmentShader(ResourceRef<const Shader> fragmentShader);
+            Builder& SetFragmentShader(ResourceRef<const Shader> fragmentShader);
 
             /** @brief Sets the task shader, which decides how much mesh-shader work to launch. Vulkan only. */
-            Builder& setTaskShader(ResourceRef<const Shader> taskShader);
+            Builder& SetTaskShader(ResourceRef<const Shader> taskShader);
 
             /**
              * @brief Sets the mesh shader, replacing the vertex-input and vertex-shader stages entirely.
@@ -174,29 +174,29 @@ namespace kor
              * A mesh-shader pipeline generates its own primitives, so it needs no vertex layout and
              * is drawn with CommandBuffer::DrawMeshTasks. Vulkan only.
              */
-            Builder& setMeshShader(ResourceRef<const Shader> meshShader);
+            Builder& SetMeshShader(ResourceRef<const Shader> meshShader);
 
             /** @brief Sets how vertices are assembled into primitives — triangles, lines, points, patches. */
-            Builder& setInputAssemblyState(const InputAssemblyState& inputAssemblyState);
+            Builder& SetInputAssemblyState(const InputAssemblyState& inputAssemblyState);
 
             /** @brief Sets rasterization: fill mode, culling, winding, depth bias, line width. */
-            Builder& setRasterizationState(const RasterizationState& rasterizationState);
+            Builder& SetRasterizationState(const RasterizationState& rasterizationState);
 
             /** @brief Sets multisampling. Must match the sample count of the framebuffer it renders into. */
-            Builder& setMultisampleState(const MultisampleState& multisampleState);
+            Builder& SetMultisampleState(const MultisampleState& multisampleState);
 
             /** @brief Sets depth and stencil testing. */
-            Builder& setDepthStencilState(const DepthStencilState& depthStencilState);
+            Builder& SetDepthStencilState(const DepthStencilState& depthStencilState);
 
             /** @brief Sets how fragments blend with the colour attachments. */
-            Builder& setColorBlendState(const ColorBlendState& colorBlendState);
+            Builder& SetColorBlendState(const ColorBlendState& colorBlendState);
 
             /**
              * @brief Sets the framebuffer this pipeline renders into.
              * @param framebuffer The target. Its attachment formats and sample count are compiled
              *        into the pipeline, so it can only be used in a pass on a compatible framebuffer.
              */
-            Builder& setFramebuffer(kor::ResourceRef<const Framebuffer> framebuffer);
+            Builder& SetFramebuffer(kor::ResourceRef<const Framebuffer> framebuffer);
 
             /**
              * @brief Bakes a specialization constant into every shader stage of this pipeline.
@@ -212,7 +212,7 @@ namespace kor
              * @throws std::runtime_error if the accumulated constants exceed the internal buffer.
              */
             template<typename T> requires std::is_trivially_copyable_v<T>
-            Builder& setSpecializationConstant(glm::u32 id, T value) {
+            Builder& SetSpecializationConstant(glm::u32 id, T value) {
                 const glm::u32 valueSize = sizeof(T);
                 if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
                     throw std::runtime_error("Exceeded maximum specialization constant data size");
@@ -226,15 +226,15 @@ namespace kor
             std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
 
-            /** @brief One build attempt. Internal: prefer build(). */
-            [[nodiscard]] Result<std::unique_ptr<GraphicsPipeline>> create() const;
+            /** @brief One build attempt. Internal: prefer Build(). */
+            [[nodiscard]] Result<std::unique_ptr<GraphicsPipeline>> Create() const;
 
             /**
              * @brief Compiles the pipeline.
              * @return It as a Resource; poisoned rather than thrown when a shader fails to compile
              *         or the state is inconsistent, and repaired automatically when the shader is fixed.
              */
-            [[nodiscard]] kor::Resource<GraphicsPipeline> build(std::source_location where = std::source_location::current()) const;
+            [[nodiscard]] kor::Resource<GraphicsPipeline> Build(std::source_location where = std::source_location::current()) const;
 
         private:
             glm::u32 _currentSpecConstantSize = 0;
@@ -244,25 +244,25 @@ namespace kor
         ~GraphicsPipeline() override;
 
         /** @brief Vertex input binding descriptions, if available. */
-        [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& vertexBindingDescriptions() const { return _vertexBindingDescriptions; }
+        [[nodiscard]] const std::optional<std::vector<VertexInputBindingDescription>>& VertexBindingDescriptions() const { return _vertexBindingDescriptions; }
 
         /** @brief Vertex input attribute descriptions, if available. */
-        [[nodiscard]] const std::optional<std::vector<VertexInputAttributeDescription>>& vertexAttributeDescriptions() const { return _vertexAttributeDescriptions; }
+        [[nodiscard]] const std::optional<std::vector<VertexInputAttributeDescription>>& VertexAttributeDescriptions() const { return _vertexAttributeDescriptions; }
 
         /** @brief Configured input assembly state. */
-        [[nodiscard]] const InputAssemblyState& inputAssemblyState() const { return _inputAssemblyState; }
+        [[nodiscard]] const InputAssemblyState& InputAssembly() const { return _inputAssemblyState; }
 
         /** @brief Configured rasterization state. */
-        [[nodiscard]] const RasterizationState& rasterizationState() const { return _rasterizationState; }
+        [[nodiscard]] const RasterizationState& Rasterization() const { return _rasterizationState; }
 
         /** @brief Configured multisample state. */
-        [[nodiscard]] const MultisampleState& multisampleState() const { return _multisampleState; }
+        [[nodiscard]] const MultisampleState& Multisample() const { return _multisampleState; }
 
         /** @brief Configured depth/stencil state. */
-        [[nodiscard]] const DepthStencilState& depthStencilState() const { return _depthStencilState; }
+        [[nodiscard]] const DepthStencilState& DepthStencil() const { return _depthStencilState; }
 
         /** @brief Configured color blend state. */
-        [[nodiscard]] const ColorBlendState& colorBlendState() const { return _colorBlendState; }
+        [[nodiscard]] const ColorBlendState& ColorBlend() const { return _colorBlendState; }
 
     protected:
         /**

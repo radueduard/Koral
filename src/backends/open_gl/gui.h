@@ -27,14 +27,14 @@ namespace kor::ogl
         explicit GuiImage(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level);
         ~GuiImage() override;
 
-        void setLayerAndLevel(glm::u32 layer, glm::u32 level) override;
-        void setImage(kor::ResourceRef<const kor::Image> image) override;
+        void SetLayerAndLevel(glm::u32 layer, glm::u32 level) override;
+        void SetImage(kor::ResourceRef<const kor::Image> image) override;
 
         ImTextureID operator*() const override;
 
-        // @see kor::GuiImage::refresh — the copy this handle shows has to be retaken every frame,
+        // @see kor::GuiImage::Refresh — the copy this handle shows has to be retaken every frame,
         // or the viewport keeps displaying the frame the handle was created on.
-        void refresh(kor::CommandBuffer& commandBuffer) override;
+        void Refresh(kor::CommandBuffer& commandBuffer) override;
 
     private:
         // 0, not indeterminate: setImage tests this before deleting the previous texture, and it

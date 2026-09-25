@@ -33,8 +33,8 @@
  *
  * @code{.cpp}
  * auto set = kor::DescriptorSet::Builder(_pipeline, 1)
- *     .write("Frame", _camera)   // the camera answers for every KOR_CAMERA_* / KOR_VIEW_* semantic
- *     .build();
+ *     .Write("Frame", _camera)   // the camera answers for every KOR_CAMERA_* / KOR_VIEW_* semantic
+ *     .Build();
  * @endcode
  *
  * The buffer is created by the write, sized and laid out from the shader's own reflection, and
@@ -97,10 +97,10 @@ namespace kor
                      std::span<std::byte> destination);
 
         /** @brief The semantic this field was annotated with. */
-        [[nodiscard]] std::string_view semantic() const { return _semantic; }
+        [[nodiscard]] std::string_view Semantic() const { return _semantic; }
 
         /** @brief The field's name in the shader, for diagnostics. */
-        [[nodiscard]] std::string_view field() const { return _field; }
+        [[nodiscard]] std::string_view Field() const { return _field; }
 
         /**
          * @brief Writes a value into the field.
@@ -113,28 +113,28 @@ namespace kor
          * that no caller wants and none in the engine ever made — the accumulated error is both
          * the better report and the one the set actually acts on.
          */
-        void set(float value);
-        void set(std::int32_t value);
-        void set(std::uint32_t value);
-        void set(const glm::vec2& value);
-        void set(const glm::vec3& value);
-        void set(const glm::vec4& value);
-        void set(const glm::mat3& value);
-        void set(const glm::mat4& value);
+        void Set(float value);
+        void Set(std::int32_t value);
+        void Set(std::uint32_t value);
+        void Set(const glm::vec2& value);
+        void Set(const glm::vec3& value);
+        void Set(const glm::vec4& value);
+        void Set(const glm::mat3& value);
+        void Set(const glm::mat4& value);
 
-        /** @brief Why the last set() was refused, if it was. */
-        [[nodiscard]] const std::optional<Error>& error() const { return _error; }
+        /** @brief Why the last Set() was refused, if it was. */
+        [[nodiscard]] const std::optional<Error>& Failure() const { return _error; }
 
         /** @brief Whether anything has been written here. */
-        [[nodiscard]] bool written() const { return _written; }
+        [[nodiscard]] bool Written() const { return _written; }
 
     private:
         /** @brief Checks the field's shape and copies @p bytes in if it matches. */
-        bool write(Scalar scalar, std::uint8_t rows, std::uint8_t columns,
+        bool Write(Scalar scalar, std::uint8_t rows, std::uint8_t columns,
                    const void* bytes, std::size_t size);
 
         /** @brief "float3", "float4x4" — how a shape is named in a mismatch report. */
-        static std::string describe(Scalar scalar, std::uint8_t rows, std::uint8_t columns);
+        static std::string Describe(Scalar scalar, std::uint8_t rows, std::uint8_t columns);
 
         std::string _semantic;
         std::string _field;
@@ -154,7 +154,7 @@ namespace kor
      * re-serializes all of them once a frame.
      *
      * Embed one in whatever implements @ref SemanticSerializer and return it from
-     * SemanticSerializer::semanticBuffers(); nothing else has to be written.
+     * SemanticSerializer::SemanticStorage(); nothing else has to be written.
      */
     class KORAL_API SemanticBuffers
     {
@@ -171,10 +171,10 @@ namespace kor
          * Call once a frame, from wherever the object already updates itself — a camera does it in
          * its automaticUpdate. Blocks whose bytes have not changed are not re-uploaded.
          */
-        void refresh(const SemanticSerializer& owner);
+        void Refresh(const SemanticSerializer& owner);
 
         /** @brief How many distinct block shapes this object has been asked to fill. */
-        [[nodiscard]] std::size_t blockCount() const;
+        [[nodiscard]] std::size_t BlockCount() const;
 
         /**
          * @brief The buffer for one block shape, created and filled on first request.
@@ -183,7 +183,7 @@ namespace kor
          *
          * Called by DescriptorSet::Builder; there is no reason for anything else to.
          */
-        [[nodiscard]] Result<ResourceRef<const Buffer>> acquire(
+        [[nodiscard]] Result<ResourceRef<const Buffer>> Acquire(
             const std::vector<Shader::BlockMember>& members, std::uint32_t blockSize,
             const SemanticSerializer& owner);
 
@@ -199,17 +199,17 @@ namespace kor
      * @brief Something that can answer for semantics: a camera, a light, a project's own object.
      *
      * Implemented by whatever holds the data a shader wants. The engine never asks what the object
-     * *is* — DescriptorSet::Builder::write takes the object itself and asks, at runtime, whether it
+     * *is* — DescriptorSet::Builder::Write takes the object itself and asks, at runtime, whether it
      * can serialize; anything that can, can be written into a semantic block.
      *
      * @code
      * class Sun : public kor::SemanticSerializer {
-     *     std::string_view semanticNamespace() const override { return "sun"; }
-     *     bool serialize(std::string_view semantic, kor::SemanticSlot& slot) const override {
-     *         if (semantic == "DIRECTION") { slot.set(_direction); return true; }   // sun(DIRECTION)
+     *     std::string_view SemanticNamespace() const override { return "sun"; }
+     *     bool Serialize(std::string_view semantic, kor::SemanticSlot& slot) const override {
+     *         if (semantic == "DIRECTION") { slot.Set(_direction); return true; }   // sun(DIRECTION)
      *         return false;
      *     }
-     *     kor::SemanticBuffers& semanticBuffers() override { return _buffers; }
+     *     kor::SemanticBuffers& SemanticStorage() override { return _buffers; }
      *     kor::SemanticBuffers _buffers;
      * };
      * @endcode
@@ -222,11 +222,11 @@ namespace kor
         /**
          * @brief Fills one field.
          * @param semantic What the shader asked for.
-         * @param slot The field to write it into. @see SemanticSlot::set
+         * @param slot The field to write it into. @see SemanticSlot::Set
          * @return Whether this object answers for @p semantic at all. Returning false is what
          *         makes an unanswered semantic a reportable mistake rather than a silent zero.
          */
-        virtual bool serialize(std::string_view semantic, SemanticSlot& slot) const = 0;
+        virtual bool Serialize(std::string_view semantic, SemanticSlot& slot) const = 0;
 
         /**
          * @brief The name this object answers under — the `camera` of `camera(VIEW_MATRIX)`.
@@ -235,9 +235,9 @@ namespace kor
          * filling it, so writing a light into a block annotated for a camera is caught and named
          * rather than quietly leaving every field at zero.
          */
-        [[nodiscard]] virtual std::string_view semanticNamespace() const = 0;
+        [[nodiscard]] virtual std::string_view SemanticNamespace() const = 0;
 
         /** @brief Where the blocks filled from this object live. Normally a member. */
-        virtual SemanticBuffers& semanticBuffers() = 0;
+        virtual SemanticBuffers& SemanticStorage() = 0;
     };
 }

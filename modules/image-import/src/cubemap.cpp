@@ -36,8 +36,8 @@ namespace kimg
 
         kor::Resource<kor::Image> failure(std::string what)
         {
-            kor::log::error("[image] {}", what);
-            return kor::Resource<kor::Image>::failed(
+            kor::log::Error("[image] {}", what);
+            return kor::Resource<kor::Image>::Failed(
                 kor::Error{ .code = kor::ErrorCode::eInvalidArgument, .message = std::move(what) },
                 "Image");
         }
@@ -53,9 +53,9 @@ namespace kimg
         void warnAboutOpenGlOnce()
         {
             static bool said = false;
-            if (said || kor::Context::activeAPI() != kor::API::eOpenGL) return;
+            if (said || kor::Context::ActiveAPI() != kor::API::eOpenGL) return;
             said = true;
-            kor::log::warn("[image] cubemaps load on the OpenGL backend but cannot yet be sampled as "
+            kor::log::Warn("[image] cubemaps load on the OpenGL backend but cannot yet be sampled as "
                            "cubes there: an image view is bound as its underlying image, so a cube "
                            "view reads as a 2D array. Vulkan is unaffected.");
         }
@@ -76,13 +76,13 @@ namespace kimg
             if (storage) usage |= kor::Image::Usage::eStorage;
 
             auto builder = kor::Image::Builder()
-                .setType(kor::Image::Type::e2D)
-                .setExtent({ faceExtent.x, faceExtent.y, 1 })
-                .setArrayLayers(kFaceCount)
-                .setMipLevels(generateMipmaps ? 0 : 1)
-                .setFormat(format)
-                .setUsage(usage);
-            return builder.build();
+                .SetType(kor::Image::Type::e2D)
+                .SetExtent({ faceExtent.x, faceExtent.y, 1 })
+                .SetArrayLayers(kFaceCount)
+                .SetMipLevels(generateMipmaps ? 0 : 1)
+                .SetFormat(format)
+                .SetUsage(usage);
+            return builder.Build();
         }
 
         /** @brief Uploads one decoded face into its layer. */
@@ -125,8 +125,8 @@ namespace kimg
     kor::Resource<kor::Image> LoadCubemap(const CubeFaces& faces, const bool generateMipmaps)
     {
         std::array<std::filesystem::path, kFaceCount> paths{};
-        const auto named = faces.inLayerOrder();
-        for (glm::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::assetPath(named[face]);
+        const auto named = faces.InLayerOrder();
+        for (glm::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::AssetPath(named[face]);
 
         std::array<CpuImage, kFaceCount> decoded{};
         for (glm::u32 face = 0; face < kFaceCount; ++face) {
@@ -149,8 +149,8 @@ namespace kimg
         // Resolved on the main thread, before anything is handed to a background one: the search
         // roots are read-mostly global state the main thread owns.
         std::array<std::filesystem::path, kFaceCount> paths{};
-        const auto named = faces.inLayerOrder();
-        for (glm::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::assetPath(named[face]);
+        const auto named = faces.InLayerOrder();
+        for (glm::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::AssetPath(named[face]);
 
         co_await kor::Context::SwitchToBackgroundThread();
 
@@ -204,10 +204,10 @@ namespace kimg
         {
             if (!g_pipeline) {
                 const auto shader = kor::Shader::Builder{}
-                    .setLang<kor::Shader::Lang::eSlang>()
-                    .setEntryPoint("equirectToCube", "main")
-                    .getOrBuild("koral.image.equirectToCube");
-                g_pipeline = kor::ComputePipeline::Builder{}.setComputeShader(shader).build();
+                    .SetLang<kor::Shader::Lang::eSlang>()
+                    .SetEntryPoint("equirectToCube", "main")
+                    .GetOrBuild("koral.image.equirectToCube");
+                g_pipeline = kor::ComputePipeline::Builder{}.SetComputeShader(shader).Build();
             }
             return g_pipeline;
         }
@@ -219,12 +219,12 @@ namespace kimg
                     // Longitude wraps: the texel left of u=0 is the one at u=1, which is what keeps
                     // the seam behind the viewer from showing. Latitude does not — clamping stops
                     // the pole row bleeding round to the other pole.
-                    .setAddressModeU(kor::Sampler::AddressMode::eRepeat)
-                    .setAddressModeV(kor::Sampler::AddressMode::eClampToEdge)
-                    .setAddressModeW(kor::Sampler::AddressMode::eClampToEdge)
-                    .setMinFilter(kor::Filter::eLinear)
-                    .setMagFilter(kor::Filter::eLinear)
-                    .build();
+                    .SetAddressModeU(kor::Sampler::AddressMode::eRepeat)
+                    .SetAddressModeV(kor::Sampler::AddressMode::eClampToEdge)
+                    .SetAddressModeW(kor::Sampler::AddressMode::eClampToEdge)
+                    .SetMinFilter(kor::Filter::eLinear)
+                    .SetMagFilter(kor::Filter::eLinear)
+                    .Build();
             }
             return kor::ResourceRef<const kor::Sampler>(g_sampler);
         }
@@ -246,8 +246,8 @@ namespace kimg
         // static destructor runs long after the device is gone.
         void releaseGpuCache()
         {
-            g_pipeline.reset();
-            g_sampler.reset();
+            g_pipeline.Reset();
+            g_sampler.Reset();
         }
     }
 
@@ -258,7 +258,7 @@ namespace kimg
             return failure("cannot project an equirectangular image that could not be loaded");
         }
 
-        const auto sourceExtent = equirect->extent();
+        const auto sourceExtent = equirect->Extent();
         if (faceSize == 0) {
             // A quarter of the panorama's width: the point at which a face's texels are about as
             // dense as the source's, so the projection neither invents nor discards detail.
@@ -273,23 +273,23 @@ namespace kimg
 
         auto cube = makeCubeImage({ faceSize, faceSize }, kProjectedFormat, generateMipmaps, true);
 
-        const auto equirectView = kor::ImageView::Builder(equirect).build();
+        const auto equirectView = kor::ImageView::Builder(equirect).Build();
         // The cube seen as what the shader writes: a six-layer 2D array, top mip only. The same
         // image is *read* later through a cube view — one image, two ways of looking at it.
         const auto cubeView = kor::ImageView::Builder(cube)
-            .setViewType(kor::ImageView::Type::e2DArray)
-            .setArrayLayerCount(kFaceCount)
-            .setMipLevelCount(1)
-            .build();
+            .SetViewType(kor::ImageView::Type::e2DArray)
+            .SetArrayLayerCount(kFaceCount)
+            .SetMipLevelCount(1)
+            .Build();
 
         const auto set = kor::DescriptorSet::Builder(pipeline, 0)
-            .write(0, equirectView)
-            .write(1, projectionSampler())
-            .write(2, cubeView)
-            .build();
+            .Write(0, equirectView)
+            .Write(1, projectionSampler())
+            .Write(2, cubeView)
+            .Build();
         if (!set) {
             return failure(std::format("the equirectangular projection could not be bound: {}",
-                                       set.error() ? set.error()->message : "unknown reason"));
+                                       set.Failure() ? set.Failure()->message : "unknown reason"));
         }
 
         constexpr glm::u32 kLocalSize = 8;   // matches [numthreads(8, 8, 1)] in equirectToCube.slang
@@ -299,7 +299,7 @@ namespace kimg
             commandBuffer.BindComputePipeline(pipeline);
             commandBuffer.BindDescriptorSet(0, set);
             commandBuffer.Dispatch(groups, groups, kFaceCount);
-        }, kor::CommandBuffer::Usage::eCompute).wait();
+        }, kor::CommandBuffer::Usage::eCompute).Wait();
 
         detail::finishUpload(cube, generateMipmaps);
         return cube;

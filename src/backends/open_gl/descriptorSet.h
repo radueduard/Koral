@@ -11,7 +11,7 @@ namespace kor::ogl
     {
     public:
         explicit DescriptorSet(const Builder& builder);
-        void rebind(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) override;
-        void bind(const CommandBuffer& commandBuffer, glm::u32 index) const override;
+        void Rebind(glm::u32 binding, const Descriptor &descriptor, glm::u32 index) override;
+        void Bind(const CommandBuffer& commandBuffer, glm::u32 index) const override;
     };
 }

@@ -86,14 +86,14 @@ class GlOverlayScene : public kor::Scene {
 public:
     void Initialize() override {
         _image = Image::Builder{}
-                     .setType(Image::Type::e2D)
-                     .setFormat(Image::Format::eRGBA8_UNORM)
-                     .setExtent(glm::uvec2{16, 16})
-                     .setUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
-                     .build();
+                     .SetType(Image::Type::e2D)
+                     .SetFormat(Image::Format::eRGBA8_UNORM)
+                     .SetExtent(glm::uvec2{16, 16})
+                     .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
+                     .Build();
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.ClearColorImage(_image, glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
-        }, CommandBuffer::Usage::eGraphics).wait();
+        }, CommandBuffer::Usage::eGraphics).Wait();
         _guiImage = kor::GuiImage::Create(_image);
     }
 
@@ -127,7 +127,7 @@ void drawFrame(kor::Scene& scene) {
     glfwPollEvents();
     kor::Context::DrainMainThread();
     kor::Context::Scheduler().Draw([&](CommandBuffer& cb) {
-        kor::Context::Repository().update();
+        kor::Context::Repository().Update();
         scene.Update();
         scene.Render(cb);
         kor::GUI::Render(cb, scene);
@@ -149,12 +149,12 @@ public:
         s_scene = scenePtr.get();
         try {
             s_window = kor::Window::Builder(std::move(scenePtr))
-                           .setTitle("Koral GL windowed test")
-                           .setExtent({320, 240})
-                           .setResizable(true)
-                           .setVSync(false)
-                           .setAPI(kor::API::eOpenGL)
-                           .build();
+                           .SetTitle("Koral GL windowed test")
+                           .SetExtent({320, 240})
+                           .SetResizable(true)
+                           .SetVSync(false)
+                           .SetAPI(kor::API::eOpenGL)
+                           .Build();
         } catch (const std::exception& e) {
             s_reason = e.what();
             s_window.reset();
@@ -191,7 +191,7 @@ protected:
         if (!GlEnvironment::ready()) {
             GTEST_SKIP() << "windowed OpenGL context unavailable: " << GlEnvironment::reason();
         }
-        EXPECT_EQ(kor::Context::activeAPI(), kor::API::eOpenGL);
+        EXPECT_EQ(kor::Context::ActiveAPI(), kor::API::eOpenGL);
     }
 };
 
@@ -206,46 +206,46 @@ struct OffscreenTarget {
 OffscreenTarget makeTarget(const glm::vec4 clearColor) {
     OffscreenTarget t;
     t.image = Image::Builder{}
-                  .setType(Image::Type::e2D)
-                  .setFormat(Image::Format::eRGBA8_UNORM)
-                  .setExtent(glm::uvec2{kW, kH})
-                  .setUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
-                  .build();
-    t.view = ImageView::Builder(t.image).build();
+                  .SetType(Image::Type::e2D)
+                  .SetFormat(Image::Format::eRGBA8_UNORM)
+                  .SetExtent(glm::uvec2{kW, kH})
+                  .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
+                  .Build();
+    t.view = ImageView::Builder(t.image).Build();
     t.framebuffer = Framebuffer::Builder{}
-                        .addColor({ .view = t.view, .clear = clearColor })
-                        .build();
+                        .AddColor({ .view = t.view, .clear = clearColor })
+                        .Build();
     return t;
 }
 
 ResourceRef<const Shader> loadShader(const char* file, const Shader::Stage stage, const char* key) {
     return Shader::Builder{}
-        .setLang<Shader::Lang::eGLSL>()
-        .setStage(stage)
-        .setPath(kor::shaderPath(file))
-        .getOrBuild(key);
+        .SetLang<Shader::Lang::eGLSL>()
+        .SetStage(stage)
+        .SetPath(kor::ShaderPath(file))
+        .GetOrBuild(key);
 }
 
 std::vector<Pixel> readbackImage(const kor::Resource<Image>& image) {
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(image, readback);
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
     return readback->Read<Pixel>();
 }
 
 kor::Resource<Image> makeImage(kor::Flags<Image::Usage> usage,
                                Image::Format format = Image::Format::eRGBA8_UNORM) {
     return Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(format)
-        .setExtent(glm::uvec2{8, 8})
-        .setUsage(usage)
-        .build();
+        .SetType(Image::Type::e2D)
+        .SetFormat(format)
+        .SetExtent(glm::uvec2{8, 8})
+        .SetUsage(usage)
+        .Build();
 }
 
 // -----------------------------------------------------------------------------
@@ -257,7 +257,7 @@ TEST_F(GlTest, RenderParity) {
     auto& scene = GlEnvironment::scene();
 
     // ---- Phase 1: presentation path -------------------------------------
-    for (int i = 0; i < 8 && !window.shouldClose(); ++i) {
+    for (int i = 0; i < 8 && !window.ShouldClose(); ++i) {
         drawFrame(scene);
         window.LateUpdate();
     }
@@ -269,10 +269,10 @@ TEST_F(GlTest, RenderParity) {
         const auto vert = loadShader("flatTriangle.vert.glsl", Shader::Stage::eVertex, "glt.flat.vert");
         const auto frag = loadShader("flatTriangle.frag.glsl", Shader::Stage::eFragment, "glt.flat.frag");
         auto pipeline = GraphicsPipeline::Builder{}
-                            .setVertexShader(vert)
-                            .setFragmentShader(frag)
-                            .setFramebuffer(target.framebuffer)
-                            .build();
+                            .SetVertexShader(vert)
+                            .SetFragmentShader(frag)
+                            .SetFramebuffer(target.framebuffer)
+                            .Build();
 
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.BeginRendering(target.framebuffer);
@@ -281,7 +281,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics).wait();
+        }, CommandBuffer::Usage::eGraphics).Wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -299,10 +299,10 @@ TEST_F(GlTest, RenderParity) {
         const auto vert = loadShader("flatTriangle.vert.glsl", Shader::Stage::eVertex, "glt.flat.vert");
         const auto frag = loadShader("pushColor.frag.glsl", Shader::Stage::eFragment, "glt.push.frag");
         auto pipeline = GraphicsPipeline::Builder{}
-                            .setVertexShader(vert)
-                            .setFragmentShader(frag)
-                            .setFramebuffer(target.framebuffer)
-                            .build();
+                            .SetVertexShader(vert)
+                            .SetFragmentShader(frag)
+                            .SetFramebuffer(target.framebuffer)
+                            .Build();
 
         const glm::vec4 pushed{1.f, 0.f, 1.f, 1.f}; // magenta
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -313,7 +313,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics).wait();
+        }, CommandBuffer::Usage::eGraphics).Wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -337,11 +337,11 @@ TEST_F(GlTest, RenderParity) {
             .dstColorBlendFactor = kor::BlendFactor::eOneMinusSrcAlpha,
         });
         auto pipeline = GraphicsPipeline::Builder{}
-                            .setVertexShader(vert)
-                            .setFragmentShader(frag)
-                            .setFramebuffer(target.framebuffer)
-                            .setColorBlendState(blend)
-                            .build();
+                            .SetVertexShader(vert)
+                            .SetFragmentShader(frag)
+                            .SetFramebuffer(target.framebuffer)
+                            .SetColorBlendState(blend)
+                            .Build();
 
         const glm::vec4 halfGreen{0.f, 1.f, 0.f, 0.5f};
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -352,7 +352,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetScissor(0, 0, kW, kH);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics).wait();
+        }, CommandBuffer::Usage::eGraphics).Wait();
 
         // 0.5*green + 0.5*red = (0.5, 0.5, 0) -> ~128/128/0 in UNORM8.
         const auto out = readbackImage(target.image);
@@ -375,10 +375,10 @@ TEST_F(GlTest, RenderParity) {
         const auto vert = loadShader("flatTriangle.vert.glsl", Shader::Stage::eVertex, "glt.flat.vert");
         const auto frag = loadShader("flatTriangle.frag.glsl", Shader::Stage::eFragment, "glt.flat.frag");
         auto pipeline = GraphicsPipeline::Builder{}
-                            .setVertexShader(vert)
-                            .setFragmentShader(frag)
-                            .setFramebuffer(target.framebuffer)
-                            .build();
+                            .SetVertexShader(vert)
+                            .SetFragmentShader(frag)
+                            .SetFramebuffer(target.framebuffer)
+                            .Build();
 
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.BeginRendering(target.framebuffer);
@@ -392,7 +392,7 @@ TEST_F(GlTest, RenderParity) {
             cb.SetRasterizerDiscardEnable(false);
             cb.Draw(3);
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics).wait();
+        }, CommandBuffer::Usage::eGraphics).Wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -427,10 +427,10 @@ TEST_F(GlTest, RenderParity) {
         const auto vert = loadShader("meshTriangle.vert.glsl", Shader::Stage::eVertex, "glt.mesh.vert");
         const auto frag = loadShader("flatTriangle.frag.glsl", Shader::Stage::eFragment, "glt.flat.frag");
         auto pipeline = GraphicsPipeline::Builder{}
-                            .setVertexShader(vert, PosMesh::Layout())
-                            .setFragmentShader(frag)
-                            .setFramebuffer(target.framebuffer)
-                            .build();
+                            .SetVertexShader(vert, PosMesh::Layout())
+                            .SetFragmentShader(frag)
+                            .SetFramebuffer(target.framebuffer)
+                            .Build();
 
         CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
             cb.BeginRendering(target.framebuffer);
@@ -440,7 +440,7 @@ TEST_F(GlTest, RenderParity) {
             cb.BindMesh(mesh);
             cb.DrawIndexed(); // index count resolved from the bound mesh
             cb.EndRendering();
-        }, CommandBuffer::Usage::eGraphics).wait();
+        }, CommandBuffer::Usage::eGraphics).Wait();
 
         const auto out = readbackImage(target.image);
         ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -453,7 +453,7 @@ TEST_F(GlTest, RenderParity) {
     // ---- Phase 7: resize + present ----------------------------------------
     glfwSetWindowSize(*window, 480, 360);
     for (int i = 0; i < 20; ++i) glfwPollEvents();
-    for (int i = 0; i < 6 && !window.shouldClose(); ++i) {
+    for (int i = 0; i < 6 && !window.ShouldClose(); ++i) {
         drawFrame(scene);
         window.LateUpdate();
     }
@@ -471,17 +471,17 @@ TEST_F(GlTest, ComputeDispatch) {
     std::iota(input.begin(), input.end(), 1u); // 1,2,3,...
 
     Buffer::Builder<std::uint32_t> bufBuilder;
-    bufBuilder.setData(input);
-    bufBuilder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    bufBuilder.setType(Buffer::Type::eDeviceLocal);
-    auto buffer = bufBuilder.build();
+    bufBuilder.SetData(input);
+    bufBuilder.SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    bufBuilder.SetType(Buffer::Type::eDeviceLocal);
+    auto buffer = bufBuilder.Build();
 
     const auto shader = loadShader("doubleValues.comp.glsl", Shader::Stage::eCompute, "glt.doubleValues");
-    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
+    auto pipeline = ComputePipeline::Builder{}.SetComputeShader(shader).Build();
 
     auto descriptorSet = DescriptorSet::Builder(pipeline, 0)
-                             .write(0, buffer)
-                             .build();
+                             .Write(0, buffer)
+                             .Build();
 
     const ResourceRef<const Buffer> bufRef(buffer);
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -490,7 +490,7 @@ TEST_F(GlTest, ComputeDispatch) {
         cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::eComputeReadWrite));
         cb.Dispatch(kCount / kLocalSize, 1, 1);
         cb.BufferBarrier(kor::BufferBarrier(bufRef, kor::ResourceAccess::eTransferSrc));
-    }, CommandBuffer::Usage::eCompute).wait();
+    }, CommandBuffer::Usage::eCompute).Wait();
 
     const std::vector<std::uint32_t> output = buffer->Read<std::uint32_t>();
     ASSERT_EQ(output.size(), input.size());
@@ -505,54 +505,54 @@ TEST_F(GlTest, ComputeDispatch) {
 // -----------------------------------------------------------------------------
 TEST_F(GlTest, SamplersAndDescriptors) {
     auto linear = Sampler::Builder{}
-                      .setMinFilter(kor::Filter::eLinear)
-                      .setMagFilter(kor::Filter::eLinear)
-                      .setMipmapMode(Sampler::MipmapMode::eLinear)
-                      .setAddressModeU(Sampler::AddressMode::eRepeat)
-                      .setAddressModeV(Sampler::AddressMode::eMirroredRepeat)
-                      .setAddressModeW(Sampler::AddressMode::eClampToEdge)
-                      .setMaxLod(4.f)
-                      .build();
+                      .SetMinFilter(kor::Filter::eLinear)
+                      .SetMagFilter(kor::Filter::eLinear)
+                      .SetMipmapMode(Sampler::MipmapMode::eLinear)
+                      .SetAddressModeU(Sampler::AddressMode::eRepeat)
+                      .SetAddressModeV(Sampler::AddressMode::eMirroredRepeat)
+                      .SetAddressModeW(Sampler::AddressMode::eClampToEdge)
+                      .SetMaxLod(4.f)
+                      .Build();
     ASSERT_TRUE(static_cast<bool>(linear));
 
     auto nearest = Sampler::Builder{}
-                       .setMinFilter(kor::Filter::eNearest)
-                       .setMagFilter(kor::Filter::eNearest)
-                       .setMipmapMode(Sampler::MipmapMode::eNearest)
-                       .setAddressModeU(Sampler::AddressMode::eClampToBorder)
-                       .build();
+                       .SetMinFilter(kor::Filter::eNearest)
+                       .SetMagFilter(kor::Filter::eNearest)
+                       .SetMipmapMode(Sampler::MipmapMode::eNearest)
+                       .SetAddressModeU(Sampler::AddressMode::eClampToBorder)
+                       .Build();
     ASSERT_TRUE(static_cast<bool>(nearest));
 
     auto sampledImg = makeImage(kor::Flags(Image::Usage::eSampled) | Image::Usage::eTransferDst);
     auto storageImg = makeImage(kor::Flags(Image::Usage::eStorage) | Image::Usage::eTransferDst);
-    auto sampledView = ImageView::Builder(sampledImg).build();
-    auto storageView = ImageView::Builder(storageImg).build();
-    auto sampler = Sampler::Builder{}.build();
+    auto sampledView = ImageView::Builder(sampledImg).Build();
+    auto storageView = ImageView::Builder(storageImg).Build();
+    auto sampler = Sampler::Builder{}.Build();
 
     Buffer::RawBuilder ub;
-    ub.setRawSize(256).setUsage(Buffer::Usage::eUniform).setType(Buffer::Type::eDynamic);
-    auto uniform = ub.build();
+    ub.SetRawSize(256).SetUsage(Buffer::Usage::eUniform).SetType(Buffer::Type::eDynamic);
+    auto uniform = ub.Build();
 
     // eSampledImage / eStorageImage / eCombinedImageSampler / eSampler / eUniformBuffer
     auto layout = DescriptorSetLayout::Builder{}
-                      .addBinding(0, DescriptorType::eSampler)
-                      .addBinding(1, DescriptorType::eSampledImage)
-                      .addBinding(2, DescriptorType::eStorageImage)
-                      .addBinding(3, DescriptorType::eCombinedImageSampler)
-                      .addBinding(4, DescriptorType::eUniformBuffer)
-                      .build();
+                      .AddBinding(0, DescriptorType::eSampler)
+                      .AddBinding(1, DescriptorType::eSampledImage)
+                      .AddBinding(2, DescriptorType::eStorageImage)
+                      .AddBinding(3, DescriptorType::eCombinedImageSampler)
+                      .AddBinding(4, DescriptorType::eUniformBuffer)
+                      .Build();
     auto set = DescriptorSet::Builder(*layout)
-                   .write(0, sampler)
-                   .write(1, sampledView)
-                   .write(2, storageView)
-                   .write(3, sampledView, sampler)
-                   .write(4, uniform)
-                   .build();
+                   .Write(0, sampler)
+                   .Write(1, sampledView)
+                   .Write(2, storageView)
+                   .Write(3, sampledView, sampler)
+                   .Write(4, uniform)
+                   .Build();
     ASSERT_TRUE(static_cast<bool>(set));
 
     // Runtime re-write path (separate from the build-time writes above).
-    set->rebind(0, sampler, 0);
-    set->rebind(3, sampledView, sampler, 0);
+    set->Rebind(0, sampler, 0);
+    set->Rebind(3, sampledView, sampler, 0);
     SUCCEED();
 }
 
@@ -563,42 +563,42 @@ TEST_F(GlTest, SamplersAndDescriptors) {
 TEST_F(GlTest, ImageOpsAndTransfers) {
     // 3D + array + single-channel image/view creation.
     auto image3d = Image::Builder{}
-                       .setType(Image::Type::e3D)
-                       .setFormat(Image::Format::eRGBA8_UNORM)
-                       .setExtent(glm::uvec3{8, 8, 4})
-                       .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
-                       .build();
+                       .SetType(Image::Type::e3D)
+                       .SetFormat(Image::Format::eRGBA8_UNORM)
+                       .SetExtent(glm::uvec3{8, 8, 4})
+                       .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
+                       .Build();
     ASSERT_TRUE(static_cast<bool>(image3d));
     auto view3d = ImageView::Builder(image3d)
-                      .setViewType(ImageView::Type::e3D).build();
+                      .SetViewType(ImageView::Type::e3D).Build();
     ASSERT_TRUE(static_cast<bool>(view3d));
 
     auto arrayImg = Image::Builder{}
-                        .setType(Image::Type::e2D)
-                        .setFormat(Image::Format::eR8_UNORM)
-                        .setExtent(glm::uvec2{8, 8})
-                        .setArrayLayers(3)
-                        .setUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
-                        .build();
+                        .SetType(Image::Type::e2D)
+                        .SetFormat(Image::Format::eR8_UNORM)
+                        .SetExtent(glm::uvec2{8, 8})
+                        .SetArrayLayers(3)
+                        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
+                        .Build();
     ASSERT_TRUE(static_cast<bool>(arrayImg));
 
     // GenerateMipmaps: walk every level of a mipped image.
     auto mipped = Image::Builder{}
-                      .setType(Image::Type::e2D)
-                      .setFormat(Image::Format::eRGBA8_UNORM)
-                      .setExtent(glm::uvec2{8, 8})
-                      .setMipLevels(4)
-                      .setUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
-                      .build();
+                      .SetType(Image::Type::e2D)
+                      .SetFormat(Image::Format::eRGBA8_UNORM)
+                      .SetExtent(glm::uvec2{8, 8})
+                      .SetMipLevels(4)
+                      .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
+                      .Build();
 
     // Blit (down-scale) between two images.
     auto blitSrc = makeImage(kor::Flags(Image::Usage::eTransferSrc) | Image::Usage::eTransferDst);
     auto blitDst = Image::Builder{}
-                       .setType(Image::Type::e2D)
-                       .setFormat(Image::Format::eRGBA8_UNORM)
-                       .setExtent(glm::uvec2{4, 4})
-                       .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
-                       .build();
+                       .SetType(Image::Type::e2D)
+                       .SetFormat(Image::Format::eRGBA8_UNORM)
+                       .SetExtent(glm::uvec2{4, 4})
+                       .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
+                       .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(mipped, glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
@@ -609,21 +609,21 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
             .dstExtent = {4, 4, 1},
             .filtering = kor::Filter::eLinear,
         });
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
 
     // Buffer-to-buffer copy / fill / clear, then verify the copy round-trips.
     std::vector<std::uint32_t> data(64, 7u);
     Buffer::Builder<std::uint32_t> srcB;
-    srcB.setData(data);
-    srcB.setUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    srcB.setType(Buffer::Type::eDeviceLocal);
-    auto src = srcB.build();
+    srcB.SetData(data);
+    srcB.SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    srcB.SetType(Buffer::Type::eDeviceLocal);
+    auto src = srcB.Build();
 
     Buffer::RawBuilder dstB;
-    dstB.setRawSize(static_cast<glm::i64>(data.size() * sizeof(std::uint32_t)))
-        .setUsage(Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc)
-        .setType(Buffer::Type::eReadback);
-    auto dst = dstB.build();
+    dstB.SetRawSize(static_cast<glm::i64>(data.size() * sizeof(std::uint32_t)))
+        .SetUsage(Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc)
+        .SetType(Buffer::Type::eReadback);
+    auto dst = dstB.Build();
 
     // Eight of them: FillBuffer copies the bytes it is given rather than replicating a value, so
     // asking for 8 * sizeof(uint32_t) from a single uint32_t read past the end of it.
@@ -633,7 +633,7 @@ TEST_F(GlTest, ImageOpsAndTransfers) {
         cb.CopyBuffer(src, dst);
         cb.FillBuffer(src, fillValues);
         cb.ClearBuffer(src);
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     const std::vector<std::uint32_t> out = dst->Read<std::uint32_t>();
     ASSERT_EQ(out.size(), data.size());
@@ -652,25 +652,25 @@ TEST_F(GlTest, TexturedDraw) {
     const glm::vec4 texColor{0.2f, 0.4f, 0.8f, 1.f};
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.ClearColorImage(texture, texColor);
-    }, CommandBuffer::Usage::eGraphics).wait();
-    auto texView = ImageView::Builder(texture).build();
+    }, CommandBuffer::Usage::eGraphics).Wait();
+    auto texView = ImageView::Builder(texture).Build();
     auto sampler = Sampler::Builder{}
-                       .setMinFilter(kor::Filter::eNearest)
-                       .setMagFilter(kor::Filter::eNearest)
-                       .build();
+                       .SetMinFilter(kor::Filter::eNearest)
+                       .SetMagFilter(kor::Filter::eNearest)
+                       .Build();
 
     auto target = makeTarget({0.f, 0.f, 0.f, 1.f});
     const auto vert = loadShader("sampleTexture.vert.glsl", Shader::Stage::eVertex, "glt.tex.vert");
     const auto frag = loadShader("sampleTexture.frag.glsl", Shader::Stage::eFragment, "glt.tex.frag");
     auto pipeline = GraphicsPipeline::Builder{}
-                        .setVertexShader(vert)
-                        .setFragmentShader(frag)
-                        .setFramebuffer(target.framebuffer)
-                        .build();
+                        .SetVertexShader(vert)
+                        .SetFragmentShader(frag)
+                        .SetFramebuffer(target.framebuffer)
+                        .Build();
 
     auto set = DescriptorSet::Builder(pipeline, 0)
-                   .write(0, texView, sampler)
-                   .build();
+                   .Write(0, texView, sampler)
+                   .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginRendering(target.framebuffer);
@@ -680,7 +680,7 @@ TEST_F(GlTest, TexturedDraw) {
         cb.SetScissor(0, 0, kW, kH);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
 
     const auto out = readbackImage(target.image);
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -705,14 +705,14 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
     const auto vert = loadShader("pushMultiStage.vert.glsl", Shader::Stage::eVertex, "glt.pushmulti.vert");
     const auto frag = loadShader("pushMultiStage.frag.glsl", Shader::Stage::eFragment, "glt.pushmulti.frag");
     auto pipeline = GraphicsPipeline::Builder{}
-                        .setVertexShader(vert)
-                        .setFragmentShader(frag)
-                        .setFramebuffer(target.framebuffer)
-                        .build();
-    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+                        .SetVertexShader(vert)
+                        .SetFragmentShader(frag)
+                        .SetFramebuffer(target.framebuffer)
+                        .Build();
+    ASSERT_TRUE(pipeline.Valid()) << (pipeline.Failure() ? pipeline.Failure()->History() : "");
 
-    const auto* offsetConstant = pipeline->findPushConstant("offset");
-    const auto* colorConstant = pipeline->findPushConstant("color");
+    const auto* offsetConstant = pipeline->FindPushConstant("offset");
+    const auto* colorConstant = pipeline->FindPushConstant("color");
     ASSERT_NE(offsetConstant, nullptr);
     ASSERT_NE(colorConstant, nullptr);
     EXPECT_TRUE(offsetConstant->stages & Shader::Stage::eVertex);
@@ -727,7 +727,7 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
         cb.PushConstant("color", glm::vec4{1.f, 0.f, 1.f, 1.f});   // magenta
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
 
     const auto out = readbackImage(target.image);
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
@@ -745,7 +745,7 @@ TEST_F(GlTest, PushConstantsByNameAcrossStages) {
         cb.PushConstant("color", glm::vec4{1.f, 0.f, 1.f, 1.f});
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
 
     EXPECT_EQ(readbackImage(target.image).front(), Pixel(0, 0, 0, 255))
         << "the vertex stage did not read its half of the block";
@@ -763,14 +763,14 @@ TEST_F(GlTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
     const auto vert = loadShader("flatTriangle.vert.glsl", Shader::Stage::eVertex, "glt.aligned.vert");
     const auto frag = loadShader("pushAligned.frag.glsl", Shader::Stage::eFragment, "glt.aligned.frag");
     auto pipeline = GraphicsPipeline::Builder{}
-                        .setVertexShader(vert)
-                        .setFragmentShader(frag)
-                        .setFramebuffer(target.framebuffer)
-                        .build();
-    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+                        .SetVertexShader(vert)
+                        .SetFragmentShader(frag)
+                        .SetFramebuffer(target.framebuffer)
+                        .Build();
+    ASSERT_TRUE(pipeline.Valid()) << (pipeline.Failure() ? pipeline.Failure()->History() : "");
 
-    const auto* basis = pipeline->findPushConstant("basis");
-    const auto* tints = pipeline->findPushConstant("tints");
+    const auto* basis = pipeline->FindPushConstant("basis");
+    const auto* tints = pipeline->FindPushConstant("tints");
     ASSERT_NE(basis, nullptr);
     ASSERT_NE(tints, nullptr);
     EXPECT_EQ(basis->matrixStride, 16u);
@@ -791,7 +791,7 @@ TEST_F(GlTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
         cb.PushConstant("tints", tintsValue);
         cb.Draw(3);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
 
     // The same colour Vulkan produces from the same two calls, which is the whole point.
     const auto out = readbackImage(target.image);
@@ -813,25 +813,25 @@ TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
     auto target = makeTarget({0.f, 0.f, 1.f, 1.f});   // built blue; neither pass asks for it
 
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto firstPass = rb.build();
-    auto secondPass = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto firstPass = rb.Build();
+    auto secondPass = rb.Build();
 
     // Both passes in one command buffer, so both lambdas are queued before either runs — which is
     // the arrangement that catches a value read at replay time.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginRendering(kor::RenderInfo(target.framebuffer)
-                              .setClearColor(0, glm::vec4{1.f, 0.f, 0.f, 1.f}));
+                              .SetClearColor(0, glm::vec4{1.f, 0.f, 0.f, 1.f}));
         cb.EndRendering();
         cb.CopyImageToBuffer(target.image, firstPass);
 
         cb.BeginRendering(kor::RenderInfo(target.framebuffer)
-                              .setClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
+                              .SetClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
         cb.EndRendering();
         cb.CopyImageToBuffer(target.image, secondPass);
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
 
     const auto first = firstPass->Read<Pixel>();
     const auto second = secondPass->Read<Pixel>();
@@ -844,7 +844,7 @@ TEST_F(GlTest, PerPassClearColorsSurviveDeferredReplay) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginRendering(target.framebuffer);
         cb.EndRendering();
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
     EXPECT_EQ(readbackImage(target.image).front(), Pixel(0, 0, 255, 255));
 }
 
@@ -861,7 +861,7 @@ TEST_F(GlTest, DebugLabels) {
             inner.ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
         });
         cb.EndDebugLabel();
-    }, CommandBuffer::Usage::eGraphics).wait();
+    }, CommandBuffer::Usage::eGraphics).Wait();
     SUCCEED();
 }
 
@@ -878,12 +878,12 @@ TEST_F(GlTest, DeviceDynamicBufferRoundTrips) {
     std::iota(source.begin(), source.end(), 1u);
 
     Buffer::Builder<std::uint32_t> builder;
-    builder.setData(source);
-    builder.setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc);
-    builder.setType(Buffer::Type::eDeviceDynamic);
-    auto buffer = builder.build();
-    ASSERT_TRUE(buffer.valid());
-    EXPECT_TRUE(buffer->isHostVisible());
+    builder.SetData(source);
+    builder.SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc);
+    builder.SetType(Buffer::Type::eDeviceDynamic);
+    auto buffer = builder.Build();
+    ASSERT_TRUE(buffer.Valid());
+    EXPECT_TRUE(buffer->IsHostVisible());
 
     const auto readBack = buffer->Read<std::uint32_t>();
     ASSERT_EQ(readBack.size(), source.size());
@@ -900,7 +900,7 @@ TEST_F(GlTest, DeviceDynamicBufferRoundTrips) {
 TEST_F(GlTest, GpuTimersMeasureFrameWork) {
     auto image = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
 
-    const int budget = static_cast<int>(kor::Context::Scheduler().imageCount()) + 8;
+    const int budget = static_cast<int>(kor::Context::Scheduler().ImageCount()) + 8;
     bool found = false;
     double milliseconds = 0.0;
 
@@ -912,8 +912,8 @@ TEST_F(GlTest, GpuTimersMeasureFrameWork) {
             });
         });
 
-        for (const auto& f : kor::Context::Scheduler().frames()) {
-            for (const auto& timing : f.get().commandBuffer().timings()) {
+        for (const auto& f : kor::Context::Scheduler().Frames()) {
+            for (const auto& timing : f.get().Commands().Timings()) {
                 if (timing.label != "gl.clears") continue;
                 found = true;
                 milliseconds = timing.milliseconds;
@@ -937,32 +937,32 @@ TEST_F(GlTest, GpuTimersMeasureFrameWork) {
 TEST_F(GlTest, CompressedImageUploadRoundTrips) {
     constexpr std::uint32_t kSize = 16;   // 4x4 blocks of BC7
     const auto format = Image::Format::eBC7_UNORM;
-    const auto byteCount = Image::sizeOfRegion(format, { kSize, kSize, 1 });
+    const auto byteCount = Image::SizeOfRegion(format, { kSize, kSize, 1 });
     ASSERT_EQ(byteCount, 256u);
 
     std::vector<std::uint8_t> blocks(byteCount);
     for (std::size_t i = 0; i < blocks.size(); ++i)
-        blocks[i] = static_cast<std::uint8_t>((i / Image::blockSize(format)) + 1);
+        blocks[i] = static_cast<std::uint8_t>((i / Image::BlockSize(format)) + 1);
 
     auto image = Image::Builder{}
-        .setType(Image::Type::e2D)
-        .setFormat(format)
-        .setExtent(glm::uvec2{ kSize, kSize })
-        .setUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
-        .build();
-    ASSERT_TRUE(static_cast<bool>(image)) << (image.error() ? image.error()->message : "");
+        .SetType(Image::Type::e2D)
+        .SetFormat(format)
+        .SetExtent(glm::uvec2{ kSize, kSize })
+        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
+        .Build();
+    ASSERT_TRUE(static_cast<bool>(image)) << (image.Failure() ? image.Failure()->message : "");
 
     const auto staging = Buffer::Builder<std::uint8_t>()
-        .setDataView(std::span<const std::uint8_t>(blocks))
-        .setUsage(Buffer::Usage::eTransferSrc)
-        .setType(Buffer::Type::eStaging)
-        .build();
+        .SetDataView(std::span<const std::uint8_t>(blocks))
+        .SetUsage(Buffer::Usage::eTransferSrc)
+        .SetType(Buffer::Type::eStaging)
+        .Build();
 
     Buffer::RawBuilder rb;
-    rb.setRawSize(static_cast<glm::i64>(byteCount))
-      .setUsage(Buffer::Usage::eTransferDst)
-      .setType(Buffer::Type::eReadback);
-    auto readback = rb.build();
+    rb.SetRawSize(static_cast<glm::i64>(byteCount))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyBufferToImage(staging, image, kor::Copy{
@@ -973,7 +973,7 @@ TEST_F(GlTest, CompressedImageUploadRoundTrips) {
             .imageOffset = { 0, 0, 0 },
             .imageExtent = { kSize, kSize, 1 },
         });
-    }, CommandBuffer::Usage::eTransfer).wait();
+    }, CommandBuffer::Usage::eTransfer).Wait();
 
     const auto out = readback->Read<std::uint8_t>();
     ASSERT_EQ(out.size(), blocks.size());
@@ -1012,31 +1012,31 @@ TEST_F(GlTest, TexelBufferFetch) {
     for (std::uint32_t i = 0; i < kTexels; ++i) source[i * 4] = static_cast<float>(i);
 
     Buffer::Builder<float> sourceBuilder;
-    sourceBuilder.setData(source)
-                 .setUsage(Buffer::Usage::eTexel | Buffer::Usage::eTransferDst);
-    auto sourceBuffer = sourceBuilder.build();
-    ASSERT_TRUE(sourceBuffer.valid()) << (sourceBuffer.error() ? sourceBuffer.error()->history() : "");
+    sourceBuilder.SetData(source)
+                 .SetUsage(Buffer::Usage::eTexel | Buffer::Usage::eTransferDst);
+    auto sourceBuffer = sourceBuilder.Build();
+    ASSERT_TRUE(sourceBuffer.Valid()) << (sourceBuffer.Failure() ? sourceBuffer.Failure()->History() : "");
 
     auto view = kor::BufferView::Builder(sourceBuffer)
-        .setFormat(kor::Image::Format::eRGBA32_SFLOAT)
-        .build();
-    ASSERT_TRUE(view.valid()) << (view.error() ? view.error()->history() : "");
+        .SetFormat(kor::Image::Format::eRGBA32_SFLOAT)
+        .Build();
+    ASSERT_TRUE(view.Valid()) << (view.Failure() ? view.Failure()->History() : "");
 
     Buffer::Builder<float> destBuilder;
-    destBuilder.setData(std::vector<float>(kTexels, -1.f))
-               .setUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
-    auto destination = destBuilder.build();
-    ASSERT_TRUE(destination.valid());
+    destBuilder.SetData(std::vector<float>(kTexels, -1.f))
+               .SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst);
+    auto destination = destBuilder.Build();
+    ASSERT_TRUE(destination.Valid());
 
     const auto shader = loadShader("texelBuffer.comp.glsl", Shader::Stage::eCompute, "glt.texelBuffer");
-    auto pipeline = ComputePipeline::Builder{}.setComputeShader(shader).build();
-    ASSERT_TRUE(pipeline.valid()) << (pipeline.error() ? pipeline.error()->history() : "");
+    auto pipeline = ComputePipeline::Builder{}.SetComputeShader(shader).Build();
+    ASSERT_TRUE(pipeline.Valid()) << (pipeline.Failure() ? pipeline.Failure()->History() : "");
 
     auto set = DescriptorSet::Builder(pipeline, 0)
-        .write("source", view)
-        .write("destination", destination)
-        .build();
-    ASSERT_TRUE(set.valid()) << (set.error() ? set.error()->history() : "");
+        .Write("source", view)
+        .Write("destination", destination)
+        .Build();
+    ASSERT_TRUE(set.Valid()) << (set.Failure() ? set.Failure()->History() : "");
 
     const ResourceRef<const Buffer> destRef(destination);
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -1045,7 +1045,7 @@ TEST_F(GlTest, TexelBufferFetch) {
         cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::eComputeReadWrite));
         cb.Dispatch(kTexels / 64, 1, 1);
         cb.BufferBarrier(kor::BufferBarrier(destRef, kor::ResourceAccess::eTransferSrc));
-    }, CommandBuffer::Usage::eCompute).wait();
+    }, CommandBuffer::Usage::eCompute).Wait();
 
     const std::vector<float> output = destination->Read<float>();
     ASSERT_EQ(output.size(), static_cast<std::size_t>(kTexels));
@@ -1088,7 +1088,7 @@ TEST_F(GlTest, SubmitWaitsForAndSignalsTokensOnTheCallingThread) {
 
     std::thread producer([&] {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        go.signal();
+        go.Signal();
     });
 
     auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
@@ -1097,6 +1097,6 @@ TEST_F(GlTest, SubmitWaitsForAndSignalsTokensOnTheCallingThread) {
     ASSERT_TRUE(cb->Submit({.waitFor = {go}, .signal = {done}}));
     producer.join();
 
-    EXPECT_TRUE(go.ready());
-    EXPECT_TRUE(done.ready());
+    EXPECT_TRUE(go.Ready());
+    EXPECT_TRUE(done.Ready());
 }

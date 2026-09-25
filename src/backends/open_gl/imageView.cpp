@@ -18,12 +18,12 @@ namespace kor::ogl
         GLenum target;
         switch (createInfo.type) {
             case Type::e1D:
-                target = image.arrayLayers() == 1 ? GL_TEXTURE_1D : GL_TEXTURE_1D_ARRAY;
+                target = image.ArrayLayers() == 1 ? GL_TEXTURE_1D : GL_TEXTURE_1D_ARRAY;
                 break;
             case Type::e2D:
-                target = image.arrayLayers() == 1
-                    ? (image.sampleCount() == SampleCount::e1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
-                    : (image.sampleCount() == SampleCount::e1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
+                target = image.ArrayLayers() == 1
+                    ? (image.Samples() == SampleCount::e1 ? GL_TEXTURE_2D : GL_TEXTURE_2D_MULTISAMPLE)
+                    : (image.Samples() == SampleCount::e1 ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY);
                 break;
             case Type::e3D:
                 target = GL_TEXTURE_3D;
@@ -35,7 +35,7 @@ namespace kor::ogl
                 target = GL_TEXTURE_1D_ARRAY;
                 break;
             case Type::e2DArray:
-                target = image.sampleCount() == SampleCount::e1
+                target = image.Samples() == SampleCount::e1
                     ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
                 break;
             case Type::eCube:
@@ -52,7 +52,7 @@ namespace kor::ogl
             _textureViewID,
             target,
             *image,
-            kor::ogl::Image::InternalFormatFromImageFormat(image.format()),
+            kor::ogl::Image::InternalFormatFromImageFormat(image.PixelFormat()),
             _baseMipLevel,
             _mipLevelCount,
             _baseArrayLayer,

@@ -30,19 +30,19 @@ namespace kcam
         template<typename CameraType>
         void handToRuntime(const kor::Resource<CameraType>& camera)
         {
-            if (!camera.valid()) return;
+            if (!camera.Valid()) return;
 
             const kor::ResourceRef<Camera> ref(camera);
 
             // Built before there is an engine to drive it — from a static initializer, or a test.
             // The camera works; nothing will move it.
-            if (!kor::Context::hasRepository()) {
-                kor::log::warn("[camera] '{}' was built before the engine came up; it will not be "
+            if (!kor::Context::HasRepository()) {
+                kor::log::Warn("[camera] '{}' was built before the engine came up; it will not be "
                                "updated automatically. Build cameras from Scene::Initialize onwards.",
-                               camera->name());
+                               camera->Name());
                 return;
             }
-            kor::Context::Repository().addRef(ref);
+            kor::Context::Repository().AddRef(ref);
         }
 
         /** @brief The depth range checks both kinds share. */
@@ -65,80 +65,80 @@ namespace kcam
 
     // ---- perspective ----------------------------------------------------------------------------
 
-    PerspectiveCamera::Builder& PerspectiveCamera::Builder::lookAt(const glm::vec3 target, const glm::vec3 up)
+    PerspectiveCamera::Builder& PerspectiveCamera::Builder::LookAt(const glm::vec3 target, const glm::vec3 up)
     {
         const glm::vec3 to = target - position;
         if (glm::dot(to, to) < 1e-12f) {
-            warn("lookAt() was given the camera's own position; the rotation is unchanged");
+            Warn("lookAt() was given the camera's own position; the rotation is unchanged");
             return *this;
         }
         rotation = glm::quatLookAt(glm::normalize(to), up);
         return *this;
     }
 
-    kor::Result<std::unique_ptr<PerspectiveCamera>> PerspectiveCamera::Builder::create() const
+    kor::Result<std::unique_ptr<PerspectiveCamera>> PerspectiveCamera::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
         if (fovY <= 0.f || fovY >= glm::pi<float>())
-            addError(kor::ErrorCode::eInvalidArgument,
+            AddError(kor::ErrorCode::eInvalidArgument,
                      std::format("the vertical field of view must be between 0 and pi radians, "
                                  "not {} ({:.1f} degrees)", fovY, glm::degrees(fovY)));
 
         if (aspect <= 0.f)
-            addError(kor::ErrorCode::eInvalidArgument,
+            AddError(kor::ErrorCode::eInvalidArgument,
                      std::format("the aspect ratio must be greater than zero, not {}", aspect));
 
         if (const auto depth = validateDepth(zNear, zFar, true); !depth)
-            addError(depth.error().code, depth.error().message);
+            AddError(depth.error().code, depth.error().message);
 
-        if (const auto valid = validate(); !valid) return std::unexpected(valid.error());
+        if (const auto valid = Validate(); !valid) return std::unexpected(valid.error());
 
         return kor::MakeBackendPtr<PerspectiveCamera, PerspectiveImpl>(*this);
     }
 
-    kor::Resource<PerspectiveCamera> PerspectiveCamera::Builder::build(const std::source_location where) const
+    kor::Resource<PerspectiveCamera> PerspectiveCamera::Builder::Build(const std::source_location where) const
     {
-        auto camera = materialize<PerspectiveCamera>(*this, name, where);
+        auto camera = Materialize<PerspectiveCamera>(*this, name, where);
         handToRuntime(camera);
         return camera;
     }
 
     // ---- orthographic ---------------------------------------------------------------------------
 
-    OrthographicCamera::Builder& OrthographicCamera::Builder::lookAt(const glm::vec3 target, const glm::vec3 up)
+    OrthographicCamera::Builder& OrthographicCamera::Builder::LookAt(const glm::vec3 target, const glm::vec3 up)
     {
         const glm::vec3 to = target - position;
         if (glm::dot(to, to) < 1e-12f) {
-            warn("lookAt() was given the camera's own position; the rotation is unchanged");
+            Warn("lookAt() was given the camera's own position; the rotation is unchanged");
             return *this;
         }
         rotation = glm::quatLookAt(glm::normalize(to), up);
         return *this;
     }
 
-    kor::Result<std::unique_ptr<OrthographicCamera>> OrthographicCamera::Builder::create() const
+    kor::Result<std::unique_ptr<OrthographicCamera>> OrthographicCamera::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
         // An empty view volume projects everything onto nothing, and the matrix divides by the
         // extent — this is a silent black screen if it is let through.
         if (left == right || bottom == top)
-            addError(kor::ErrorCode::eInvalidArgument,
+            AddError(kor::ErrorCode::eInvalidArgument,
                      std::format("the view volume is empty: left/right are {}/{} and bottom/top "
                                  "are {}/{}", left, right, bottom, top));
 
         if (const auto depth = validateDepth(zNear, zFar, false); !depth)
-            addError(depth.error().code, depth.error().message);
+            AddError(depth.error().code, depth.error().message);
 
-        if (const auto valid = validate(); !valid) return std::unexpected(valid.error());
+        if (const auto valid = Validate(); !valid) return std::unexpected(valid.error());
 
         return kor::MakeBackendPtr<OrthographicCamera, OrthoImpl>(*this);
     }
 
-    kor::Resource<OrthographicCamera> OrthographicCamera::Builder::build(const std::source_location where) const
+    kor::Resource<OrthographicCamera> OrthographicCamera::Builder::Build(const std::source_location where) const
     {
-        auto camera = materialize<OrthographicCamera>(*this, name, where);
+        auto camera = Materialize<OrthographicCamera>(*this, name, where);
         handToRuntime(camera);
         return camera;
     }

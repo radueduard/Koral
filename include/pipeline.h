@@ -67,22 +67,22 @@ namespace kor
          * @param index Descriptor set number.
          * @return Descriptor set layout associated with @p index.
          */
-        [[nodiscard]] const DescriptorSetLayout& descriptorSetLayout(glm::u32 index) const;
+        [[nodiscard]] const DescriptorSetLayout& SetLayout(glm::u32 index) const;
 
         /**
          * @brief Lifetime-tracked reference to the descriptor set layout for @p index.
          *
-         * Prefer this over descriptorSetLayout(): a reload can replace the layout, and a raw reference
+         * Prefer this over SetLayout(): a reload can replace the layout, and a raw reference
          * into _setLayouts would be left dangling by that. A ResourceRef notices instead.
          */
-        [[nodiscard]] ResourceRef<const DescriptorSetLayout> descriptorSetLayoutRef(glm::u32 index) const;
+        [[nodiscard]] ResourceRef<const DescriptorSetLayout> SetLayoutRef(glm::u32 index) const;
 
         /**
          * @brief Get push-constant range by byte offset.
          * @param offset Byte offset into declared push constant ranges.
          * @return Push-constant range covering @p offset.
          */
-        [[nodiscard]] const Shader::PushConstant& pushConstantRange(glm::u32 offset) const;
+        [[nodiscard]] const Shader::PushConstant& PushConstantRange(glm::u32 offset) const;
 
         /**
          * @brief One push constant the pipeline's shaders declare, addressed by name.
@@ -112,22 +112,22 @@ namespace kor
          * offsets. Names are merged across stages: a constant declared by both the vertex and
          * fragment shader is one entry whose stages are the union of the two.
          */
-        [[nodiscard]] const PushConstantMember* findPushConstant(std::string_view name) const;
+        [[nodiscard]] const PushConstantMember* FindPushConstant(std::string_view name) const;
 
         /** @brief Every push constant the pipeline declares, by name. For diagnostics. */
-        [[nodiscard]] const std::map<std::string, PushConstantMember, std::less<>>& pushConstants() const { return _pushConstants; }
+        [[nodiscard]] const std::map<std::string, PushConstantMember, std::less<>>& PushConstants() const { return _pushConstants; }
 
         /** @brief Repository-driven hot reload hook. */
-        void automaticUpdate() override;
+        void AutomaticUpdate() override;
 
         /**
          * @brief Whether any shader in this pipeline reaches buffers through raw device addresses.
          *
          * Unioned across stages. When true the automatic barrier resolver cannot see which
          * buffers a draw or dispatch touches, so it reports an unguarded write instead of
-         * quietly under-synchronising. See Shader::usesDeviceAddresses.
+         * quietly under-synchronising. See Shader::UsesDeviceAddresses.
          */
-        [[nodiscard]] bool usesDeviceAddresses() const { return _usesDeviceAddresses; }
+        [[nodiscard]] bool UsesDeviceAddresses() const { return _usesDeviceAddresses; }
 
     protected:
         Pipeline() = default;
@@ -143,13 +143,13 @@ namespace kor
          * @param shaders Shaders making up this pipeline.
          * @return true if the merged layout is consistent, false on a descriptor conflict.
          */
-        VoidResult buildLayouts(std::span<const ResourceRef<const Shader>> shaders);
+        VoidResult BuildLayouts(std::span<const ResourceRef<const Shader>> shaders);
 
         /** @brief Subscribe to a shader's reload notifications, keyed by stage. */
-        void subscribeReload(const ResourceRef<const Shader>& shader);
+        void SubscribeReload(const ResourceRef<const Shader>& shader);
 
         /** @brief Drop a previously registered reload subscription for a shader. */
-        void unsubscribeReload(const ResourceRef<const Shader>& shader);
+        void UnsubscribeReload(const ResourceRef<const Shader>& shader);
 
         /** @brief Re-validate and recreate backend resources if a shader changed. */
         void Reload();

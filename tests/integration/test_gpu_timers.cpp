@@ -48,22 +48,22 @@ struct Workload {
         std::iota(input.begin(), input.end(), 1u);
 
         Buffer::Builder<std::uint32_t> bufBuilder;
-        bufBuilder.setData(input);
-        bufBuilder.setUsage(Buffer::Usage::eStorage);
-        auto buffer = bufBuilder.build();
+        bufBuilder.SetData(input);
+        bufBuilder.SetUsage(Buffer::Usage::eStorage);
+        auto buffer = bufBuilder.Build();
 
         Shader::Builder shaderBuilder;
-        shaderBuilder.setPath("doubleValues.comp.glsl");
-        auto shader = shaderBuilder.build();
+        shaderBuilder.SetPath("doubleValues.comp.glsl");
+        auto shader = shaderBuilder.Build();
 
         ComputePipeline::Builder pipeBuilder;
-        pipeBuilder.setComputeShader(shader);
-        auto pipeline = pipeBuilder.build();
+        pipeBuilder.SetComputeShader(shader);
+        auto pipeline = pipeBuilder.Build();
 
         auto descriptorSet =
             DescriptorSet::Builder(pipeline, 0)
-                .write(0, buffer)
-                .build();
+                .Write(0, buffer)
+                .Build();
 
         return Workload{ std::move(buffer), std::move(pipeline), std::move(descriptorSet) };
     }
@@ -89,24 +89,24 @@ void runAndWait(CommandBuffer& cb, const std::function<void(CommandBuffer&)>& bo
 
 TEST_F(GpuTest, TimerReportsPositiveGpuTimeAfterTheNextRecording) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     const auto work = Workload::build();
-    ASSERT_TRUE(work.pipeline.valid());
+    ASSERT_TRUE(work.pipeline.Valid());
 
     runAndWait(*cb, [&](CommandBuffer& c) {
         c.Timer("dispatches", [&](CommandBuffer& inner) { work.record(inner); });
-        EXPECT_TRUE(c.ok()) << "recording failed: " << c.result().error().toString();
+        EXPECT_TRUE(c.Ok()) << "recording failed: " << c.Outcome().error().ToString();
     });
 
     // The deferral, stated as a test: the work is finished on the GPU, but nothing has collected
     // the timestamps yet, because collecting them is what the next Begin() does.
-    EXPECT_TRUE(cb->timings().empty())
+    EXPECT_TRUE(cb->Timings().empty())
         << "timings appeared before the recording that collects them";
 
     cb->Begin();
 
-    const auto& timings = cb->timings();
+    const auto& timings = cb->Timings();
     ASSERT_EQ(timings.size(), 1u);
     EXPECT_EQ(timings[0].label, "dispatches");
     EXPECT_EQ(timings[0].depth, 0u);
@@ -122,10 +122,10 @@ TEST_F(GpuTest, TimerReportsPositiveGpuTimeAfterTheNextRecording) {
 
 TEST_F(GpuTest, NestedTimersReportTheirDepthAndOrder) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     const auto work = Workload::build();
-    ASSERT_TRUE(work.pipeline.valid());
+    ASSERT_TRUE(work.pipeline.Valid());
 
     runAndWait(*cb, [&](CommandBuffer& c) {
         c.BeginTimer("outer");
@@ -134,12 +134,12 @@ TEST_F(GpuTest, NestedTimersReportTheirDepthAndOrder) {
         c.EndTimer();
         work.record(c);
         c.EndTimer();
-        EXPECT_TRUE(c.ok()) << "recording failed: " << c.result().error().toString();
+        EXPECT_TRUE(c.Ok()) << "recording failed: " << c.Outcome().error().ToString();
     });
 
     cb->Begin();
 
-    const auto& timings = cb->timings();
+    const auto& timings = cb->Timings();
     ASSERT_EQ(timings.size(), 2u);
     // Reported in the order the scopes were *opened*, so the enclosing one comes first.
     EXPECT_EQ(timings[0].label, "outer");
@@ -156,10 +156,10 @@ TEST_F(GpuTest, NestedTimersReportTheirDepthAndOrder) {
 
 TEST_F(GpuTest, StaleTimingsSurviveARecordingThatTimesNothing) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     const auto work = Workload::build();
-    ASSERT_TRUE(work.pipeline.valid());
+    ASSERT_TRUE(work.pipeline.Valid());
 
     runAndWait(*cb, [&](CommandBuffer& c) {
         c.Timer("measured", [&](CommandBuffer& inner) { work.record(inner); });
@@ -169,10 +169,10 @@ TEST_F(GpuTest, StaleTimingsSurviveARecordingThatTimesNothing) {
     // lack of scopes must not then wipe them, or a UI reading them would flicker to empty whenever
     // a frame happened not to measure anything.
     runAndWait(*cb, [&](CommandBuffer& c) { work.record(c); });
-    ASSERT_EQ(cb->timings().size(), 1u);
+    ASSERT_EQ(cb->Timings().size(), 1u);
 
     cb->Begin();
-    const auto& timings = cb->timings();
+    const auto& timings = cb->Timings();
     ASSERT_EQ(timings.size(), 1u);
     EXPECT_EQ(timings[0].label, "measured");
     cb->End();
@@ -184,46 +184,46 @@ TEST_F(GpuTest, StaleTimingsSurviveARecordingThatTimesNothing) {
 // goes and fetches the timestamps itself.
 TEST_F(GpuTest, CollectTimerReadsAResultWithoutAnotherRecording) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     const auto work = Workload::build();
-    ASSERT_TRUE(work.pipeline.valid());
+    ASSERT_TRUE(work.pipeline.Valid());
 
     runAndWait(*cb, [&](CommandBuffer& c) {
         c.Timer("sort", [&](CommandBuffer& inner) { work.record(inner); });
     });
 
     // No second Begin() anywhere in this test — that is the whole point.
-    const auto milliseconds = cb->collectTimer("sort");
+    const auto milliseconds = cb->CollectTimer("sort");
     ASSERT_TRUE(milliseconds.has_value()) << milliseconds.error().message;
     EXPECT_GT(*milliseconds, 0.0);
     EXPECT_LT(*milliseconds, 1000.0);
 
     // Idempotent: the results stay readable once fetched, so a caller may ask again — or ask for a
     // second scope — without the first call having consumed them.
-    const auto again = cb->collectTimer("sort");
+    const auto again = cb->CollectTimer("sort");
     ASSERT_TRUE(again.has_value()) << again.error().message;
     EXPECT_DOUBLE_EQ(*again, *milliseconds);
 
     // And the plural form sees the same set.
-    ASSERT_EQ(cb->collectTimings().size(), 1u);
-    EXPECT_EQ(cb->collectTimings().front().label, "sort");
+    ASSERT_EQ(cb->CollectTimings().size(), 1u);
+    EXPECT_EQ(cb->CollectTimings().front().label, "sort");
 }
 
 // A name that was never recorded is a mistake in the caller's code, and has to read as one rather
 // than as "not ready yet" — the two have completely different fixes.
 TEST_F(GpuTest, CollectTimerNamesTheTimerItCannotFind) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     const auto work = Workload::build();
-    ASSERT_TRUE(work.pipeline.valid());
+    ASSERT_TRUE(work.pipeline.Valid());
 
     runAndWait(*cb, [&](CommandBuffer& c) {
         c.Timer("sort", [&](CommandBuffer& inner) { work.record(inner); });
     });
 
-    const auto missing = cb->collectTimer("scan");
+    const auto missing = cb->CollectTimer("scan");
     ASSERT_FALSE(missing.has_value());
     EXPECT_NE(missing.error().message.find("scan"), std::string::npos) << missing.error().message;
     // Specifically not the in-flight message: the work is done, the name is simply wrong.
@@ -231,36 +231,36 @@ TEST_F(GpuTest, CollectTimerNamesTheTimerItCannotFind) {
         << "a misspelled name was reported as unfinished work: " << missing.error().message;
 }
 
-// timings() stays a plain accessor — it must not go and fetch, or the recurring path would
+// Timings() stays a plain accessor — it must not go and fetch, or the recurring path would
 // collect at unpredictable moments instead of once per Begin().
 TEST_F(GpuTest, GetTimingsDoesNotFetchButCollectTimingsDoes) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     const auto work = Workload::build();
-    ASSERT_TRUE(work.pipeline.valid());
+    ASSERT_TRUE(work.pipeline.Valid());
 
     runAndWait(*cb, [&](CommandBuffer& c) {
         c.Timer("sort", [&](CommandBuffer& inner) { work.record(inner); });
     });
 
-    EXPECT_TRUE(cb->timings().empty()) << "timings() collected results on its own";
-    EXPECT_EQ(cb->collectTimings().size(), 1u);
-    EXPECT_EQ(cb->timings().size(), 1u) << "what collectTimings fetched must stay readable";
+    EXPECT_TRUE(cb->Timings().empty()) << "timings() collected results on its own";
+    EXPECT_EQ(cb->CollectTimings().size(), 1u);
+    EXPECT_EQ(cb->Timings().size(), 1u) << "what collectTimings fetched must stay readable";
 }
 
 
 TEST_F(GpuTest, UnmatchedEndTimerFailsTheRecording) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     cb->Begin();
     cb->EndTimer();
 
-    EXPECT_FALSE(cb->ok());
-    ASSERT_FALSE(cb->errors().empty());
-    EXPECT_NE(cb->errors().front().message.find("EndTimer"), std::string::npos)
-        << cb->errors().front().message;
+    EXPECT_FALSE(cb->Ok());
+    ASSERT_FALSE(cb->Errors().empty());
+    EXPECT_NE(cb->Errors().front().message.find("EndTimer"), std::string::npos)
+        << cb->Errors().front().message;
 
     cb->End();
 }
@@ -268,21 +268,21 @@ TEST_F(GpuTest, UnmatchedEndTimerFailsTheRecording) {
 
 TEST_F(GpuTest, UnclosedTimerIsReportedAtEnd) {
     const auto cb = CommandBuffer::Create(CommandBuffer::Usage::eCompute);
-    if (!cb->supportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
+    if (!cb->SupportsTimers()) GTEST_SKIP() << "queue reports no valid timestamp bits";
 
     cb->Begin();
     cb->BeginTimer("forgotten");
-    EXPECT_TRUE(cb->ok()) << "opening a scope is not itself an error";
+    EXPECT_TRUE(cb->Ok()) << "opening a scope is not itself an error";
     cb->End();
 
-    EXPECT_FALSE(cb->ok()) << "a scope left open can never resolve, and must be reported";
-    ASSERT_FALSE(cb->errors().empty());
-    EXPECT_NE(cb->errors().front().message.find("forgotten"), std::string::npos)
-        << cb->errors().front().message;
+    EXPECT_FALSE(cb->Ok()) << "a scope left open can never resolve, and must be reported";
+    ASSERT_FALSE(cb->Errors().empty());
+    EXPECT_NE(cb->Errors().front().message.find("forgotten"), std::string::npos)
+        << cb->Errors().front().message;
 
     // And nothing is published from a recording that could not resolve.
     cb->Begin();
-    EXPECT_TRUE(cb->timings().empty());
+    EXPECT_TRUE(cb->Timings().empty());
     cb->End();
 }
 

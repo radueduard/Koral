@@ -59,7 +59,7 @@ namespace kgui
          * cost the same as one with ten. Split out from the drawing because the boundaries are where
          * this sort of thing goes wrong — and a wrong answer here is an empty list, not a crash.
          */
-        [[nodiscard]] inline LineRange linesIn(const std::span<const float> offsets,
+        [[nodiscard]] inline LineRange LinesIn(const std::span<const float> offsets,
                                                const float from, const float to)
         {
             if (offsets.size() < 2) return { };
@@ -100,34 +100,34 @@ namespace kgui
         {
             // Sync before the early return: a panel that is closed for a while must not come back
             // having missed everything logged in the meantime.
-            sync();
+            Sync();
 
             if (!ImGui::Begin(title, open)) { ImGui::End(); return; }
 
             // Before the toolbar, so the "shown of total" it prints is this frame's answer and not
             // last frame's. Doing it again inside drawLines is what picks up a toggle made just now,
             // and costs nothing when nothing changed.
-            refilter();
+            Refilter();
 
-            drawToolbar(_records);
+            DrawToolbar(_records);
             ImGui::Separator();
-            drawLines(_records);
+            DrawLines(_records);
 
             ImGui::End();
         }
 
         /** @brief Whether messages of @p level are shown. */
-        [[nodiscard]] bool shows(const kor::log::Level level) const { return _show[index(level)]; }
+        [[nodiscard]] bool Shows(const kor::log::Level level) const { return _show[Index(level)]; }
         /** @brief Shows or hides messages of @p level. */
-        void setShows(const kor::log::Level level, const bool shown) { _show[index(level)] = shown; }
+        void SetShows(const kor::log::Level level, const bool shown) { _show[Index(level)] = shown; }
 
         /** @brief Whether the view follows new messages as they arrive. */
-        [[nodiscard]] bool followsTail() const { return _followTail; }
-        void setFollowsTail(const bool follow) { _followTail = follow; }
+        [[nodiscard]] bool FollowsTail() const { return _followTail; }
+        void SetFollowsTail(const bool follow) { _followTail = follow; }
 
         /** @brief Whether each line is prefixed with the time it was logged. */
-        [[nodiscard]] bool showsTimes() const { return _showTimes; }
-        void setShowsTimes(const bool show) { _showTimes = show; }
+        [[nodiscard]] bool ShowsTimes() const { return _showTimes; }
+        void SetShowsTimes(const bool show) { _showTimes = show; }
 
         /**
          * @brief The sequence number of the selected entry, or 0 when none is.
@@ -136,21 +136,21 @@ namespace kgui
          * but it is also how a scene can tell which line the user pointed at, since kor::log::Record
          * carries the same number.
          */
-        [[nodiscard]] std::uint64_t selected() const { return _selected; }
+        [[nodiscard]] std::uint64_t Selected() const { return _selected; }
         /** @brief Selects the entry with this sequence number, or clears the selection with 0. */
-        void select(const std::uint64_t sequence) { _selected = sequence; }
+        void Select(const std::uint64_t sequence) { _selected = sequence; }
 
         /** @brief How far an entry's text sits inside its highlight, horizontally and vertically. */
-        [[nodiscard]] ImVec2 padding() const { return _padding; }
+        [[nodiscard]] ImVec2 Padding() const { return _padding; }
         /** @brief Sets that inset. It is part of a line's height, so the list re-measures. */
-        void setPadding(const ImVec2 padding) { _padding = padding; }
+        void SetPadding(const ImVec2 padding) { _padding = padding; }
 
         /**
          * @brief The corner radius of an entry's highlight. Negative — the default — follows
          *        ImGuiStyle::FrameRounding, so the panel looks like the rest of the application.
          */
-        [[nodiscard]] float rounding() const { return _rounding; }
-        void setRounding(const float rounding) { _rounding = rounding; }
+        [[nodiscard]] float Rounding() const { return _rounding; }
+        void SetRounding(const float rounding) { _rounding = rounding; }
 
     private:
         /**
@@ -158,18 +158,18 @@ namespace kgui
          *
          * Only what has arrived since the last call is copied — usually nothing. The whole history was
          * copied here once a frame, strings and all, and at a few hundred messages that alone cost most
-         * of a frame. @see kor::log::historySince
+         * of a frame. @see kor::log::HistorySince
          */
-        void sync()
+        void Sync()
         {
             // The log was cleared (or is shorter than what we hold): start again rather than keep
             // showing records that are no longer in it.
-            if (const auto last = kor::log::lastSequence(); last < _lastSequence) {
+            if (const auto last = kor::log::LastSequence(); last < _lastSequence) {
                 _records.clear();
                 _lastSequence = 0;
             }
 
-            auto arrived = kor::log::historySince(_lastSequence);
+            auto arrived = kor::log::HistorySince(_lastSequence);
             if (!arrived.empty()) {
                 _lastSequence = arrived.back().sequence;
                 _records.insert(_records.end(), std::make_move_iterator(arrived.begin()),
@@ -177,7 +177,7 @@ namespace kgui
             }
 
             // Bounded by what the log itself keeps, so a panel left open all run does not grow for ever.
-            if (const auto limit = kor::log::historyLimit(); limit > 0 && _records.size() > limit) {
+            if (const auto limit = kor::log::HistoryLimit(); limit > 0 && _records.size() > limit) {
                 _records.erase(_records.begin(),
                                _records.begin() + static_cast<std::ptrdiff_t>(_records.size() - limit));
             }
@@ -186,9 +186,9 @@ namespace kgui
         static constexpr std::array kLevels {
             kor::log::Level::eInfo, kor::log::Level::eWarn, kor::log::Level::eError };
 
-        static std::size_t index(const kor::log::Level level) { return static_cast<std::size_t>(level); }
+        static std::size_t Index(const kor::log::Level level) { return static_cast<std::size_t>(level); }
 
-        static ImVec4 colorFor(const kor::log::Level level)
+        static ImVec4 ColorFor(const kor::log::Level level)
         {
             switch (level) {
             case kor::log::Level::eWarn:  return ImVec4(1.00f, 0.78f, 0.24f, 1.f);
@@ -197,7 +197,7 @@ namespace kgui
             }
         }
 
-        static const char* labelFor(const kor::log::Level level)
+        static const char* LabelFor(const kor::log::Level level)
         {
             switch (level) {
             case kor::log::Level::eWarn:  return "warn";
@@ -206,10 +206,10 @@ namespace kgui
             }
         }
 
-        void drawToolbar(const std::vector<kor::log::Record>& records)
+        void DrawToolbar(const std::vector<kor::log::Record>& records)
         {
             if (ImGui::Button("Clear")) {
-                kor::log::clearHistory();
+                kor::log::ClearHistory();
                 _records.clear();   // what this panel holds is its own copy; the log's clear does not reach it
             }
             ImGui::SameLine();
@@ -223,14 +223,14 @@ namespace kgui
             // question a log panel is opened to answer, and it costs one pass over a snapshot that
             // has to be taken anyway.
             std::array<std::size_t, kLevels.size()> counts { };
-            for (const auto& record : records) ++counts[index(record.level)];
+            for (const auto& record : records) ++counts[Index(record.level)];
 
             for (const auto level : kLevels) {
                 ImGui::SameLine();
-                ImGui::PushStyleColor(ImGuiCol_Text, colorFor(level));
+                ImGui::PushStyleColor(ImGuiCol_Text, ColorFor(level));
                 char label[32];
-                std::snprintf(label, sizeof(label), "%s (%zu)", labelFor(level), counts[index(level)]);
-                ImGui::Checkbox(label, &_show[index(level)]);
+                std::snprintf(label, sizeof(label), "%s (%zu)", LabelFor(level), counts[Index(level)]);
+                ImGui::Checkbox(label, &_show[Index(level)]);
                 ImGui::PopStyleColor();
             }
 
@@ -243,9 +243,9 @@ namespace kgui
             ImGui::InputTextWithHint("##filter", "filter", _filter.data(), _filter.size());
         }
 
-        [[nodiscard]] bool passes(const kor::log::Record& record) const
+        [[nodiscard]] bool Passes(const kor::log::Record& record) const
         {
-            if (!_show[index(record.level)]) return false;
+            if (!_show[Index(record.level)]) return false;
             if (_filter[0] == '\0') return true;
 
             // Case-insensitive substring, which is what a filter box is taken to mean.
@@ -264,9 +264,9 @@ namespace kgui
          * Kept as a list of indices so drawing can jump straight to the n-th *visible* line without
          * walking the ones it hides.
          */
-        void refilter()
+        void Refilter()
         {
-            // The oldest record's sequence, not just how many there are: sync() drops from the front
+            // The oldest record's sequence, not just how many there are: Sync() drops from the front
             // once the log is full, and a frame that drops one and gains one leaves the count alone
             // while shifting every index by one — which would leave _visible pointing at the wrong
             // lines, silently.
@@ -286,15 +286,15 @@ namespace kgui
 
             _visible.clear();
             for (std::size_t i = 0; i < _records.size(); ++i) {
-                if (passes(_records[i])) _visible.push_back(i);
+                if (Passes(_records[i])) _visible.push_back(i);
             }
             // Every cached height belongs to the old list of lines. Bumping this is what tells
-            // measure() so, since two different filters can leave the same *number* of lines.
+            // Measure() so, since two different filters can leave the same *number* of lines.
             ++_generation;
         }
 
         /** @brief The text of one entry as the list shows it: the time, if times are on, then the message. */
-        void composeInto(const kor::log::Record& record, std::string& out) const
+        void ComposeInto(const kor::log::Record& record, std::string& out) const
         {
             out.clear();
             if (_showTimes) {
@@ -306,10 +306,10 @@ namespace kgui
         }
 
         /** @brief The same text, as a string of its own — for the clipboard, which outlives the scratch. */
-        [[nodiscard]] std::string compose(const kor::log::Record& record) const
+        [[nodiscard]] std::string Compose(const kor::log::Record& record) const
         {
             std::string line;
-            composeInto(record, line);
+            ComposeInto(record, line);
             return line;
         }
 
@@ -325,7 +325,7 @@ namespace kgui
          * the answer would differ: a new or re-filtered list, a resized window, times switched on or
          * off. Scrolling, which is what actually happens, costs nothing.
          */
-        void measure(const std::vector<kor::log::Record>& records, const float width)
+        void Measure(const std::vector<kor::log::Record>& records, const float width)
         {
             const float spacing = ImGui::GetStyle().ItemSpacing.y;
             if (_measuredGeneration == _generation && _measuredWidth == width
@@ -348,7 +348,7 @@ namespace kgui
 
             float y = 0.f;
             for (const auto record : _visible) {
-                composeInto(records[record], _scratch);
+                ComposeInto(records[record], _scratch);
                 const ImVec2 size = ImGui::CalcTextSize(
                     _scratch.c_str(), _scratch.c_str() + _scratch.size(), false, wrapWidth);
                 y += size.y + 2.f * _padding.y + spacing;
@@ -357,15 +357,15 @@ namespace kgui
         }
 
         /** @brief Level, sequence number, when — and the message in full. Shown while an entry is hovered. */
-        void drawTooltip(const kor::log::Record& record) const
+        void DrawTooltip(const kor::log::Record& record) const
         {
             if (!ImGui::BeginTooltip()) return;
 
-            ImGui::PushStyleColor(ImGuiCol_Text, colorFor(record.level));
-            ImGui::TextUnformatted(labelFor(record.level));
+            ImGui::PushStyleColor(ImGuiCol_Text, ColorFor(record.level));
+            ImGui::TextUnformatted(LabelFor(record.level));
             ImGui::PopStyleColor();
             ImGui::SameLine();
-            // The sequence number is worth showing: it is the same one kor::log::historySince takes,
+            // The sequence number is worth showing: it is the same one kor::log::HistorySince takes,
             // and it says how many messages were suppressed or dropped between two lines.
             ImGui::TextDisabled("#%llu  at %.3f s",
                 static_cast<unsigned long long>(record.sequence), record.time);
@@ -379,7 +379,7 @@ namespace kgui
         }
 
         /** @brief Right-click on an entry: take it away with you, or narrow the list down to its kind. */
-        void drawContextMenu(const kor::log::Record& record)
+        void DrawContextMenu(const kor::log::Record& record)
         {
             if (!ImGui::BeginPopupContextItem("##entry")) return;
 
@@ -387,12 +387,12 @@ namespace kgui
             _selected = record.sequence;
 
             if (ImGui::MenuItem("Copy message")) ImGui::SetClipboardText(record.message.c_str());
-            if (ImGui::MenuItem("Copy line"))    ImGui::SetClipboardText(compose(record).c_str());
+            if (ImGui::MenuItem("Copy line"))    ImGui::SetClipboardText(Compose(record).c_str());
             ImGui::Separator();
             if (ImGui::MenuItem("Show only this level"))
-                for (const auto level : kLevels) _show[index(level)] = level == record.level;
+                for (const auto level : kLevels) _show[Index(level)] = level == record.level;
             if (ImGui::MenuItem("Show all levels"))
-                for (const auto level : kLevels) _show[index(level)] = true;
+                for (const auto level : kLevels) _show[Index(level)] = true;
 
             ImGui::EndPopup();
         }
@@ -408,7 +408,7 @@ namespace kgui
          * drawn back over it, inset by the padding. The highlight itself is drawn by hand, because
          * ImGui's own is square-cornered with no way to ask for anything else.
          */
-        void drawEntry(const kor::log::Record& record, const std::size_t slot)
+        void DrawEntry(const kor::log::Record& record, const std::size_t slot)
         {
             const ImGuiStyle& style = ImGui::GetStyle();
             const float spacing = style.ItemSpacing.y;
@@ -445,20 +445,20 @@ namespace kgui
                     _rounding < 0.f ? style.FrameRounding : _rounding);
             }
 
-            drawContextMenu(record);
+            DrawContextMenu(record);
 
             // Inside the box by the padding, on both axes, and wrapping the same distance short of the
-            // right edge — which is what measure() sized this row for.
+            // right edge — which is what Measure() sized this row for.
             ImGui::SetCursorPos(ImVec2(left + _padding.x, top + _padding.y));
-            composeInto(record, _scratch);
-            ImGui::PushStyleColor(ImGuiCol_Text, colorFor(record.level));
+            ComposeInto(record, _scratch);
+            ImGui::PushStyleColor(ImGuiCol_Text, ColorFor(record.level));
             ImGui::PushTextWrapPos(left + _measuredWidth - _padding.x);
             ImGui::TextUnformatted(_scratch.c_str(), _scratch.c_str() + _scratch.size());
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
 
             // After the text, so the tooltip is not what the text is drawn over.
-            if (hovered) drawTooltip(record);
+            if (hovered) DrawTooltip(record);
 
             ImGui::PopID();
 
@@ -467,28 +467,28 @@ namespace kgui
             ImGui::SetCursorPosY(top + height + spacing);
         }
 
-        void drawLines(const std::vector<kor::log::Record>& records)
+        void DrawLines(const std::vector<kor::log::Record>& records)
         {
-            refilter();
+            Refilter();
 
             // No horizontal scrollbar: lines wrap instead of running off the edge, so there is nothing
             // to scroll sideways to.
             if (ImGui::BeginChild("##lines", ImVec2(0, 0), ImGuiChildFlags_None)) {
                 ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1));
 
-                measure(records, ImGui::GetContentRegionAvail().x);
+                Measure(records, ImGui::GetContentRegionAvail().x);
 
                 if (_copying) {
                     // Copying wants the whole log, not the part that happens to be on screen, and it
                     // wants the text — not the rows the text is drawn on.
                     ImGui::LogToClipboard();
                     for (const auto record : _visible) {
-                        composeInto(records[record], _scratch);
+                        ComposeInto(records[record], _scratch);
                         ImGui::TextUnformatted(_scratch.c_str(), _scratch.c_str() + _scratch.size());
                     }
                     ImGui::LogFinish();
                 } else {
-                    drawVisibleLines(records);
+                    DrawVisibleLines(records);
                 }
 
                 ImGui::PopStyleVar();
@@ -508,7 +508,7 @@ namespace kgui
          * on-screen line starts, draw down to the last one, then jump the cursor to the full height so
          * the scrollbar still describes the whole list. Everything above and below costs a comparison.
          */
-        void drawVisibleLines(const std::vector<kor::log::Record>& records)
+        void DrawVisibleLines(const std::vector<kor::log::Record>& records)
         {
             if (_visible.empty()) {
                 ImGui::TextDisabled(_records.empty() ? "Nothing has been logged."
@@ -518,11 +518,11 @@ namespace kgui
 
             const float top = ImGui::GetCursorPosY();
             const float from = ImGui::GetScrollY() - top;
-            const auto [first, last] = log_detail::linesIn(_offsets, from, from + ImGui::GetWindowSize().y);
+            const auto [first, last] = log_detail::LinesIn(_offsets, from, from + ImGui::GetWindowSize().y);
 
             ImGui::SetCursorPosY(top + _offsets[first]);
             for (std::size_t slot = first; slot < last; ++slot)
-                drawEntry(records[_visible[slot]], slot);
+                DrawEntry(records[_visible[slot]], slot);
 
             // The height of everything that was not drawn, so the scrollbar is the whole log's.
             ImGui::SetCursorPosY(top + _offsets.back());

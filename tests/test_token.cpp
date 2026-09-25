@@ -25,68 +25,68 @@ Task<void> AwaitThenCount(Token token, std::atomic<int>& resumed) {
 
 TEST(Token, DefaultTokenIsAlwaysReady) {
     const Token none;
-    EXPECT_TRUE(none.ready());
-    EXPECT_EQ(none.value(), 0u);
-    none.wait();    // returns at once
-    none.signal();  // does nothing
+    EXPECT_TRUE(none.Ready());
+    EXPECT_EQ(none.Value(), 0u);
+    none.Wait();    // returns at once
+    none.Signal();  // does nothing
 }
 
 TEST(Token, SignalMakesItReady) {
     const Token t = Token::Create();
-    EXPECT_FALSE(t.ready());
-    t.signal();
-    EXPECT_TRUE(t.ready());
-    t.wait();
+    EXPECT_FALSE(t.Ready());
+    t.Signal();
+    EXPECT_TRUE(t.Ready());
+    t.Wait();
 }
 
 TEST(Token, CopiesShareTheEvent) {
     const Token a = Token::Create();
     const Token b = a;
     EXPECT_EQ(a, b);
-    b.signal();
-    EXPECT_TRUE(a.ready());
+    b.Signal();
+    EXPECT_TRUE(a.Ready());
     EXPECT_NE(a, Token::Create());
 }
 
 TEST(Timeline, ReservesIncreasingValues) {
     Timeline tl;
-    EXPECT_EQ(tl.next().value(), 1u);
-    EXPECT_EQ(tl.next().value(), 2u);
-    EXPECT_EQ(tl.next().value(), 3u);
-    EXPECT_EQ(tl.value(), 0u);
+    EXPECT_EQ(tl.Next().Value(), 1u);
+    EXPECT_EQ(tl.Next().Value(), 2u);
+    EXPECT_EQ(tl.Next().Value(), 3u);
+    EXPECT_EQ(tl.Value(), 0u);
 }
 
 TEST(Timeline, AtNamesTheSameEventWithoutReserving) {
     Timeline tl;
-    EXPECT_EQ(tl.at(3), tl.at(3));
-    tl.at(3).signal();
-    EXPECT_TRUE(tl.at(2).ready());
-    EXPECT_FALSE(tl.at(4).ready());
-    EXPECT_EQ(tl.next().value(), 1u);  // at() reserved nothing
+    EXPECT_EQ(tl.At(3), tl.At(3));
+    tl.At(3).Signal();
+    EXPECT_TRUE(tl.At(2).Ready());
+    EXPECT_FALSE(tl.At(4).Ready());
+    EXPECT_EQ(tl.Next().Value(), 1u);  // At() reserved nothing
 }
 
 TEST(Timeline, ReachingAValueReachesEveryEarlierOne) {
     Timeline tl;
-    const Token first  = tl.next();
-    const Token second = tl.next();
-    const Token third  = tl.next();
+    const Token first  = tl.Next();
+    const Token second = tl.Next();
+    const Token third  = tl.Next();
 
-    second.signal();
-    EXPECT_TRUE(first.ready());
-    EXPECT_TRUE(second.ready());
-    EXPECT_FALSE(third.ready());
-    EXPECT_EQ(tl.value(), 2u);
+    second.Signal();
+    EXPECT_TRUE(first.Ready());
+    EXPECT_TRUE(second.Ready());
+    EXPECT_FALSE(third.Ready());
+    EXPECT_EQ(tl.Value(), 2u);
 }
 
 TEST(Timeline, SignallingAnAlreadyReachedValueDoesNotGoBackwards) {
     Timeline tl;
-    const Token first  = tl.next();
-    const Token second = tl.next();
+    const Token first  = tl.Next();
+    const Token second = tl.Next();
 
-    second.signal();
-    first.signal();   // already reached: a warning, not a rewind
-    second.signal();  // twice: likewise
-    EXPECT_EQ(tl.value(), 2u);
+    second.Signal();
+    first.Signal();   // already reached: a warning, not a rewind
+    second.Signal();  // twice: likewise
+    EXPECT_EQ(tl.Value(), 2u);
 }
 
 TEST(Token, WaitBlocksUntilAnotherThreadSignals) {
@@ -96,23 +96,23 @@ TEST(Token, WaitBlocksUntilAnotherThreadSignals) {
     std::thread producer([&] {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         signalled.store(true);
-        t.signal();
+        t.Signal();
     });
 
-    t.wait();
+    t.Wait();
     EXPECT_TRUE(signalled.load());
     producer.join();
 }
 
 TEST(Token, AwaitingAReadyTokenDoesNotSuspend) {
     const Token t = Token::Create();
-    t.signal();
+    t.Signal();
 
     std::atomic<int> resumed{0};
     auto task = AwaitThenCount(t, resumed);
-    EXPECT_TRUE(task.done());
+    EXPECT_TRUE(task.Done());
     EXPECT_EQ(resumed.load(), 1);
-    EXPECT_TRUE(task.take().has_value());
+    EXPECT_TRUE(task.Take().has_value());
 }
 
 TEST(Token, AwaitSuspendsUntilSignalled) {
@@ -120,11 +120,11 @@ TEST(Token, AwaitSuspendsUntilSignalled) {
 
     std::atomic<int> resumed{0};
     auto task = AwaitThenCount(t, resumed);
-    EXPECT_FALSE(task.done());
+    EXPECT_FALSE(task.Done());
     EXPECT_EQ(resumed.load(), 0);
 
-    t.signal();  // no executors: resumes the coroutine right here
-    EXPECT_TRUE(task.done());
+    t.Signal();  // no executors: resumes the coroutine right here
+    EXPECT_TRUE(task.Done());
     EXPECT_EQ(resumed.load(), 1);
 }
 
@@ -132,28 +132,28 @@ TEST(Token, AwaitingTheTemporaryOfAnExpiredTokenStillWorks) {
     // The awaiter keeps its own copy, so the coroutine is fine even once every other copy is gone.
     std::atomic<int> resumed{0};
     Timeline tl;
-    auto task = AwaitThenCount(tl.next(), resumed);
-    EXPECT_FALSE(task.done());
+    auto task = AwaitThenCount(tl.Next(), resumed);
+    EXPECT_FALSE(task.Done());
 
-    tl.next().signal();  // value 2 — reaches the awaited value 1 too
-    EXPECT_TRUE(task.done());
+    tl.Next().Signal();  // value 2 — reaches the awaited value 1 too
+    EXPECT_TRUE(task.Done());
 }
 
 TEST(Timeline, ResumesOnlyTheWaitersWhoseValueWasReached) {
     Timeline tl;
-    const Token t1 = tl.next(), t2 = tl.next(), t3 = tl.next();
+    const Token t1 = tl.Next(), t2 = tl.Next(), t3 = tl.Next();
 
     std::atomic<int> r1{0}, r2{0}, r3{0};
     auto a = AwaitThenCount(t1, r1);
     auto b = AwaitThenCount(t2, r2);
     auto c = AwaitThenCount(t3, r3);
 
-    t2.signal();
+    t2.Signal();
     EXPECT_EQ(r1.load(), 1);
     EXPECT_EQ(r2.load(), 1);
     EXPECT_EQ(r3.load(), 0);
 
-    t3.signal();
+    t3.Signal();
     EXPECT_EQ(r3.load(), 1);
 }
 
@@ -165,7 +165,7 @@ TEST(Token, ManyWaitersOnOneEventAllResume) {
     for (int i = 0; i < 64; ++i) tasks.push_back(AwaitThenCount(t, resumed));
     EXPECT_EQ(resumed.load(), 0);
 
-    t.signal();
+    t.Signal();
     EXPECT_EQ(resumed.load(), 64);
 }
 
@@ -187,11 +187,11 @@ TEST(Token, ACoroutineDestroyedWhileWaitingIsNeverResumed) {
     std::atomic<int> destroyed{0}, resumed{0};
     {
         auto task = WaitHoldingALocal(t, destroyed, resumed);
-        ASSERT_FALSE(task.done());
+        ASSERT_FALSE(task.Done());
     }
     EXPECT_EQ(destroyed.load(), 1) << "destroying the Task should have destroyed the waiting coroutine";
 
-    t.signal();
+    t.Signal();
     EXPECT_EQ(resumed.load(), 0) << "a destroyed coroutine was resumed";
 }
 
@@ -202,9 +202,9 @@ TEST(Token, OtherWaitersStillResumeAfterOneIsDestroyed) {
     {
         auto dropped = WaitHoldingALocal(t, destroyed, resumed);
     }
-    t.signal();
+    t.Signal();
     EXPECT_EQ(resumed.load(), 1);
-    EXPECT_TRUE(kept.done());
+    EXPECT_TRUE(kept.Done());
 }
 
 // The window that matters: a signal landing between a coroutine's await_ready and its
@@ -219,13 +219,13 @@ TEST(Token, ConcurrentSignalAndAwaitNeverLosesAWakeup) {
 
         std::thread signaller([&] {
             while (!go.load(std::memory_order_acquire)) {}
-            t.signal();
+            t.Signal();
         });
 
         go.store(true, std::memory_order_release);
         auto task = AwaitThenCount(t, resumed);
         signaller.join();
-        ASSERT_TRUE(task.done()) << "lost wakeup in round " << i;
+        ASSERT_TRUE(task.Done()) << "lost wakeup in round " << i;
     }
     EXPECT_EQ(resumed.load(), kRounds);
 }

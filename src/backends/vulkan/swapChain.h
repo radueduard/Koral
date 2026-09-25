@@ -62,7 +62,7 @@ namespace kor::vk
         void Resize(const glm::uvec2& newSize);
 
         /// (Re)builds the per-frame depth target. Call only after the scheduler has adopted
-        /// imageCount(), which is what the target is sized to. @see CreateSwapChain
+        /// ImageCount(), which is what the target is sized to. @see CreateSwapChain
         void CreateDepthResources();
         ::vk::Result Acquire(const kor::vk::Frame &frame);
         ::vk::Result Present(const kor::vk::Frame &frame);
@@ -81,7 +81,7 @@ namespace kor::vk
         glm::u32 _requestedImageCount = 0;
         glm::u32 _imageCount = 0;   ///< What the driver actually allocated.
         // Written by Acquire on the main thread, read by any thread whose End() picks a per-frame
-        // resource's copy (they all go through currentImageIndex()). Atomic so that read is not a race.
+        // resource's copy (they all go through CurrentImageIndex()). Atomic so that read is not a race.
         std::atomic<glm::u32> _imageIndex = 0;
 
         std::reference_wrapper<const Surface> _surface;

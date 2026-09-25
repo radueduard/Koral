@@ -26,7 +26,7 @@ namespace kimg
     {
         // kor::Result is a std::expected with two extra members rather than an alias of one, so the
         // conversion has to be spelled out.
-        auto decoded = detail::decodeFile(kor::assetPath(relativePath));
+        auto decoded = detail::decodeFile(kor::AssetPath(relativePath));
         if (!decoded) return std::unexpected(std::move(decoded.error()));
         return std::move(*decoded);
     }
@@ -105,10 +105,10 @@ namespace kimg
         kor::Resource<kor::Image> makeDecodedImage(const CpuImage& decoded, const bool generateMipmaps)
         {
             return kor::Image::Builder()
-                .setExtent(decoded.extent)
-                .setFormat(decoded.format)
-                .setMipLevels(generateMipmaps ? 0 : 1)
-                .build();
+                .SetExtent(decoded.extent)
+                .SetFormat(decoded.format)
+                .SetMipLevels(generateMipmaps ? 0 : 1)
+                .Build();
         }
 
         kor::Task<kor::Resource<kor::Image>> loadDecodedAsync(const std::filesystem::path path, const bool generateMipmaps)
@@ -138,8 +138,8 @@ namespace kimg
     kor::Resource<kor::Image> LoadImage(const std::filesystem::path& relativePath, const bool generateMipmaps)
     {
         // A relative path is a question — "wood.png, wherever you keep textures" — and the asset
-        // search roots are the answer. An absolute one is left alone. See kor::assetPath.
-        const auto path = kor::assetPath(relativePath);
+        // search roots are the answer. An absolute one is left alone. See kor::AssetPath.
+        const auto path = kor::AssetPath(relativePath);
 
         if (detail::isKtx(path)) return loadKtx(path, generateMipmaps);
 
@@ -156,7 +156,7 @@ namespace kimg
     {
         // Resolved here rather than inside the coroutines: they run on a background thread, and the
         // search roots are read-mostly global state that the main thread owns.
-        const auto path = kor::assetPath(relativePath);
+        const auto path = kor::AssetPath(relativePath);
 
         if (detail::isKtx(path)) return loadKtxAsync(path, generateMipmaps);
         return loadDecodedAsync(path, generateMipmaps);

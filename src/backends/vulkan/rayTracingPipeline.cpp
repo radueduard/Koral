@@ -68,7 +68,7 @@ namespace kor::vk
         if (!_setLayouts.empty()) {
             setLayouts = { std::ranges::max(_setLayouts | std::views::keys) + 1, nullptr };
             for (const auto& [set, layout] : _setLayouts) {
-                setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.get());
+                setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.Get());
             }
         }
 

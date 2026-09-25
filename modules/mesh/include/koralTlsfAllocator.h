@@ -79,7 +79,7 @@ namespace kmesh
             // one free block covering the whole capacity.
             _pool.push_back(Block{});   // index 0 = null sentinel
 
-            const std::uint32_t rootIdx = newBlock();
+            const std::uint32_t rootIdx = NewBlock();
             Block& root = _pool[rootIdx];
             root.offset   = 0;
             root.size     = capacity;
@@ -87,7 +87,7 @@ namespace kmesh
             root.prevPhys = 0;
             root.nextPhys = 0;
 
-            insertFreeBlock(rootIdx);
+            InsertFreeBlock(rootIdx);
         }
 
         ~TLSFAllocator() = default;
@@ -111,18 +111,18 @@ namespace kmesh
             const std::uint64_t size = std::max(numElements, MIN_BLOCK_SIZE);
 
             int fl, sl;
-            mappingSearch(size, fl, sl);
+            MappingSearch(size, fl, sl);
 
-            const std::uint32_t blockIdx = findSuitableBlock(fl, sl);
+            const std::uint32_t blockIdx = FindSuitableBlock(fl, sl);
             if (blockIdx == 0) return std::nullopt;
 
-            removeFreeBlock(blockIdx);
+            RemoveFreeBlock(blockIdx);
 
             // Split if the remainder is large enough
             const std::uint64_t remaining = _pool[blockIdx].size - size;
             if (remaining >= MIN_BLOCK_SIZE)
             {
-                const std::uint32_t splitIdx = newBlock();
+                const std::uint32_t splitIdx = NewBlock();
                 Block& blk   = _pool[blockIdx]; // re-fetch after potential reallocation
                 Block& split = _pool[splitIdx];
 
@@ -138,7 +138,7 @@ namespace kmesh
                 blk.size     = size;
                 blk.nextPhys = splitIdx;
 
-                insertFreeBlock(splitIdx);
+                InsertFreeBlock(splitIdx);
             }
 
             _pool[blockIdx].isFree = false;
@@ -155,15 +155,15 @@ namespace kmesh
          */
         void Free(TLSFAllocation alloc)
         {
-            const std::uint32_t blockIdx = findBlockByOffset(alloc.offset);
+            const std::uint32_t blockIdx = FindBlockByOffset(alloc.offset);
             assert(blockIdx != 0 && "TLSFAllocator::Free: invalid offset");
             assert(!_pool[blockIdx].isFree && "TLSFAllocator::Free: double free");
 
             _allocated -= _pool[blockIdx].size;
             _pool[blockIdx].isFree = true;
 
-            const std::uint32_t merged = mergeBlock(blockIdx);
-            insertFreeBlock(merged);
+            const std::uint32_t merged = MergeBlock(blockIdx);
+            InsertFreeBlock(merged);
         }
 
         /** @brief How many elements the heap holds in total. */
@@ -215,7 +215,7 @@ namespace kmesh
         // =====================================================================
         // Pool management
         // =====================================================================
-        std::uint32_t newBlock()
+        std::uint32_t NewBlock()
         {
             if (_freeNodeHead != 0)
             {
@@ -228,7 +228,7 @@ namespace kmesh
             return static_cast<std::uint32_t>(_pool.size() - 1);
         }
 
-        void recycleBlock(std::uint32_t idx)
+        void RecycleBlock(std::uint32_t idx)
         {
             _pool[idx] = Block{};
             _pool[idx].nextFree = _freeNodeHead;
@@ -238,7 +238,7 @@ namespace kmesh
         // =====================================================================
         // TLSF index mapping
         // =====================================================================
-        static void mappingInsert(std::uint64_t size, int& fl, int& sl)
+        static void MappingInsert(std::uint64_t size, int& fl, int& sl)
         {
             if (size < static_cast<std::uint64_t>(MIN_BLOCK_SIZE))
             {
@@ -256,23 +256,23 @@ namespace kmesh
         }
 
         // Round size UP to guarantee a suitable free block is found
-        static void mappingSearch(std::uint64_t size, int& fl, int& sl)
+        static void MappingSearch(std::uint64_t size, int& fl, int& sl)
         {
             if (size >= static_cast<std::uint64_t>(MIN_BLOCK_SIZE))
             {
                 const std::uint64_t round = (1ULL << (63 - std::countl_zero(size) - SL_INDEX_COUNT_LOG2)) - 1;
                 size += round;
             }
-            mappingInsert(size, fl, sl);
+            MappingInsert(size, fl, sl);
         }
 
         // =====================================================================
         // Free list management
         // =====================================================================
-        void insertFreeBlock(std::uint32_t idx)
+        void InsertFreeBlock(std::uint32_t idx)
         {
             int fl, sl;
-            mappingInsert(_pool[idx].size, fl, sl);
+            MappingInsert(_pool[idx].size, fl, sl);
 
             _pool[idx].prevFree = 0;
             _pool[idx].nextFree = _freeLists[fl][sl];
@@ -285,10 +285,10 @@ namespace kmesh
             _slBitmap[fl] |= (1u << sl);
         }
 
-        void removeFreeBlock(std::uint32_t idx)
+        void RemoveFreeBlock(std::uint32_t idx)
         {
             int fl, sl;
-            mappingInsert(_pool[idx].size, fl, sl);
+            MappingInsert(_pool[idx].size, fl, sl);
 
             if (_pool[idx].prevFree != 0)
                 _pool[_pool[idx].prevFree].nextFree = _pool[idx].nextFree;
@@ -312,7 +312,7 @@ namespace kmesh
         // =====================================================================
         // Block search
         // =====================================================================
-        std::uint32_t findSuitableBlock(int fl, int sl) const
+        std::uint32_t FindSuitableBlock(int fl, int sl) const
         {
             // Look in the same fl bucket first, at sl or higher
             std::uint32_t slMap = _slBitmap[fl] & (~0u << sl);
@@ -332,7 +332,7 @@ namespace kmesh
         }
 
         // Linear scan by offset — only called on Free(); acceptable cost.
-        std::uint32_t findBlockByOffset(std::uint64_t offset) const
+        std::uint32_t FindBlockByOffset(std::uint64_t offset) const
         {
             for (std::uint32_t i = 1; i < static_cast<std::uint32_t>(_pool.size()); ++i)
             {
@@ -345,30 +345,30 @@ namespace kmesh
         // =====================================================================
         // Coalescing
         // =====================================================================
-        std::uint32_t mergeBlock(std::uint32_t idx)
+        std::uint32_t MergeBlock(std::uint32_t idx)
         {
             // Merge with next physical block if free
             const std::uint32_t nextIdx = _pool[idx].nextPhys;
             if (nextIdx != 0 && _pool[nextIdx].isFree)
             {
-                removeFreeBlock(nextIdx);
+                RemoveFreeBlock(nextIdx);
                 _pool[idx].size     += _pool[nextIdx].size;
                 _pool[idx].nextPhys  = _pool[nextIdx].nextPhys;
                 if (_pool[nextIdx].nextPhys != 0)
                     _pool[_pool[nextIdx].nextPhys].prevPhys = idx;
-                recycleBlock(nextIdx);
+                RecycleBlock(nextIdx);
             }
 
             // Merge with previous physical block if free
             const std::uint32_t prevIdx = _pool[idx].prevPhys;
             if (prevIdx != 0 && _pool[prevIdx].isFree)
             {
-                removeFreeBlock(prevIdx);
+                RemoveFreeBlock(prevIdx);
                 _pool[prevIdx].size     += _pool[idx].size;
                 _pool[prevIdx].nextPhys  = _pool[idx].nextPhys;
                 if (_pool[idx].nextPhys != 0)
                     _pool[_pool[idx].nextPhys].prevPhys = prevIdx;
-                recycleBlock(idx);
+                RecycleBlock(idx);
                 return prevIdx;
             }
 

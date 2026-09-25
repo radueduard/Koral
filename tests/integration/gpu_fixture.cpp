@@ -21,16 +21,16 @@ void GpuEnvironment::SetUp() {
     // handles outlive the device and vkDestroyDevice reports them as leaks.
     try {
         if (const auto resolved = kor::ModuleHost::Resolve(); !resolved) {
-            kor::log::error("GPU integration harness: module resolve failed: {}", resolved.error().message);
+            kor::log::Error("GPU integration harness: module resolve failed: {}", resolved.error().message);
         }
         kor::Context::InitHeadless(kor::API::eVulkan);
         kor::ModuleHost::Initialize();
         g_ready = true;
     } catch (const std::exception& e) {
-        kor::log::error("GPU integration harness: headless device init failed: {}", e.what());
+        kor::log::Error("GPU integration harness: headless device init failed: {}", e.what());
         g_ready = false;
     } catch (...) {
-        kor::log::error("GPU integration harness: headless device init failed (unknown exception)");
+        kor::log::Error("GPU integration harness: headless device init failed (unknown exception)");
         g_ready = false;
     }
 }

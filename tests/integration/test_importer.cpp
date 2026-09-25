@@ -26,7 +26,7 @@ using kor::ResourceRef;
 namespace {
 
 std::filesystem::path helmetPath() {
-    return kor::assetPath("DamagedHelmet/DamagedHelmet.gltf");
+    return kor::AssetPath("DamagedHelmet/DamagedHelmet.gltf");
 }
 
 // Load the glTF scene and walk the mesh/material/node metadata the importer

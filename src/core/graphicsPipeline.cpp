@@ -17,151 +17,151 @@
 
 namespace kor
 {
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader,
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetVertexShader(ResourceRef<const Shader> shader,
                                                                          const VertexLayout& layout) {
         this->vertexShader = shader;
         this->vertexLayout = layout;
         return *this;
     }
 
-    GraphicsPipeline::Builder & GraphicsPipeline::Builder::setVertexShader(ResourceRef<const Shader> shader) {
-        return setVertexShader(std::move(shader), VertexLayout::Default());
+    GraphicsPipeline::Builder & GraphicsPipeline::Builder::SetVertexShader(ResourceRef<const Shader> shader) {
+        return SetVertexShader(std::move(shader), VertexLayout::Default());
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTessellationState(const TessellationState& tessellationState)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetTessellationState(const TessellationState& tessellationState)
     {
         this->tessellationState = tessellationState;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setGeometryShader(ResourceRef<const Shader> geometryShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetGeometryShader(ResourceRef<const Shader> geometryShader)
     {
         this->geometryShader = geometryShader;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFragmentShader(ResourceRef<const Shader> fragmentShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetFragmentShader(ResourceRef<const Shader> fragmentShader)
     {
         this->fragmentShader = fragmentShader;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setTaskShader(ResourceRef<const Shader> taskShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetTaskShader(ResourceRef<const Shader> taskShader)
     {
         this->taskShader = taskShader;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMeshShader(ResourceRef<const Shader> meshShader)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetMeshShader(ResourceRef<const Shader> meshShader)
     {
         this->meshShader = meshShader;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setInputAssemblyState(const InputAssemblyState& inputAssemblyState)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetInputAssemblyState(const InputAssemblyState& inputAssemblyState)
     {
         this->inputAssemblyState = inputAssemblyState;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setRasterizationState(const RasterizationState& rasterizationState)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetRasterizationState(const RasterizationState& rasterizationState)
     {
         this->rasterizationState = rasterizationState;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setMultisampleState(const MultisampleState& multisampleState)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetMultisampleState(const MultisampleState& multisampleState)
     {
         this->multisampleState = multisampleState;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setDepthStencilState(const DepthStencilState& depthStencilState)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetDepthStencilState(const DepthStencilState& depthStencilState)
     {
         this->depthStencilState = depthStencilState;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setColorBlendState(const ColorBlendState& colorBlendState)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetColorBlendState(const ColorBlendState& colorBlendState)
     {
         this->colorBlendState = colorBlendState;
         return *this;
     }
 
-    GraphicsPipeline::Builder& GraphicsPipeline::Builder::setFramebuffer(kor::ResourceRef<const kor::Framebuffer> framebuffer)
+    GraphicsPipeline::Builder& GraphicsPipeline::Builder::SetFramebuffer(kor::ResourceRef<const kor::Framebuffer> framebuffer)
     {
         this->framebuffer = framebuffer;
         return *this;
     }
 
-    kor::Result<std::unique_ptr<GraphicsPipeline>> GraphicsPipeline::Builder::create() const
+    kor::Result<std::unique_ptr<GraphicsPipeline>> GraphicsPipeline::Builder::Create() const
     {
-        beginAttempt();
+        BeginAttempt();
 
         // A pipeline is only as usable as its shaders. Adopting them here is what turns "the
         // fragment shader failed to compile" into "this pipeline is unusable, *because* the
         // fragment shader failed to compile" — and what lets it come back when that is fixed.
-        if (vertexShader)   adopt(*vertexShader,   "vertex shader");
-        if (geometryShader) adopt(*geometryShader, "geometry shader");
-        if (fragmentShader) adopt(*fragmentShader, "fragment shader");
-        if (taskShader)     adopt(*taskShader,     "task shader");
-        if (meshShader)     adopt(*meshShader,     "mesh shader");
+        if (vertexShader)   Adopt(*vertexShader,   "vertex shader");
+        if (geometryShader) Adopt(*geometryShader, "geometry shader");
+        if (fragmentShader) Adopt(*fragmentShader, "fragment shader");
+        if (taskShader)     Adopt(*taskShader,     "task shader");
+        if (meshShader)     Adopt(*meshShader,     "mesh shader");
         if (tessellationState) {
-            adopt(tessellationState->controlShader, "tessellation control shader");
-            adopt(tessellationState->evalShader,    "tessellation evaluation shader");
+            Adopt(tessellationState->controlShader, "tessellation control shader");
+            Adopt(tessellationState->evalShader,    "tessellation evaluation shader");
         }
-        if (framebuffer) adopt(*framebuffer, "framebuffer");
+        if (framebuffer) Adopt(*framebuffer, "framebuffer");
 
-        if (auto v = validate(); !v) return std::unexpected(v.error());
+        if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const auto api = Context::activeAPI();
+        const auto api = Context::ActiveAPI();
         if (api != API::eOpenGL && api != API::eVulkan)
-            return fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
+            return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // The vertex layout becomes locations here rather than when it was set, because the shader
-        // it is matched against can be recompiled underneath us: a reload runs create() again, and
+        // it is matched against can be recompiled underneath us: a reload runs Create() again, and
         // the attributes follow wherever the new shader put its inputs.
         Builder resolved = *this;
         if (vertexLayout.has_value() && vertexShader.has_value()) {
-            auto attributes = vertexLayout->resolve(**vertexShader);
+            auto attributes = vertexLayout->Resolve(**vertexShader);
             if (!attributes) {
                 // The shader is what has to be edited, so the error names it as the place to look.
-                return fail(attributes.error().code, "{} (vertex shader '{}')",
-                            attributes.error().message, (*vertexShader)->sourcePath().string());
+                return Fail(attributes.error().code, "{} (vertex shader '{}')",
+                            attributes.error().message, (*vertexShader)->SourcePath().string());
             }
             resolved.vertexAttributeDescriptions = std::move(*attributes);
             resolved.vertexBindingDescriptions = vertexLayout->bindings;
         }
 
         // Construction runs Validate() (which may throw BackendException with a specific
-        // code) and the backend Setup(); guard() turns any escape into a kor::Error.
-        return guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<GraphicsPipeline> {
+        // code) and the backend Setup(); Guard() turns any escape into a kor::Error.
+        return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<GraphicsPipeline> {
             return (api == API::eVulkan)
                 ? kor::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(resolved)
                 : kor::MakeBackendPtr<GraphicsPipeline, ogl::GraphicsPipeline>(resolved);
         });
     }
 
-    kor::Resource<GraphicsPipeline> GraphicsPipeline::Builder::build(const std::source_location where) const
+    kor::Resource<GraphicsPipeline> GraphicsPipeline::Builder::Build(const std::source_location where) const
     {
-        auto pipeline = materialize<GraphicsPipeline>(*this, "GraphicsPipeline", where);
+        auto pipeline = Materialize<GraphicsPipeline>(*this, "GraphicsPipeline", where);
         // Registered even when poisoned: the Repository is what drives the retry that brings it
         // back once its shaders compile again.
-        Context::Repository().addRef(ResourceRef<const GraphicsPipeline>(pipeline));
+        Context::Repository().AddRef(ResourceRef<const GraphicsPipeline>(pipeline));
         return pipeline;
     }
 
     GraphicsPipeline::~GraphicsPipeline()
     {
-        if (_vertexShader.has_value()) unsubscribeReload(*_vertexShader);
+        if (_vertexShader.has_value()) UnsubscribeReload(*_vertexShader);
         if (_tessellationState.has_value()) {
-            unsubscribeReload(_tessellationState->controlShader);
-            unsubscribeReload(_tessellationState->evalShader);
+            UnsubscribeReload(_tessellationState->controlShader);
+            UnsubscribeReload(_tessellationState->evalShader);
         }
-        if (_geometryShader.has_value()) unsubscribeReload(*_geometryShader);
-        if (_fragmentShader.has_value()) unsubscribeReload(*_fragmentShader);
-        if (_taskShader.has_value()) unsubscribeReload(*_taskShader);
-        if (_meshShader.has_value()) unsubscribeReload(*_meshShader);
+        if (_geometryShader.has_value()) UnsubscribeReload(*_geometryShader);
+        if (_fragmentShader.has_value()) UnsubscribeReload(*_fragmentShader);
+        if (_taskShader.has_value()) UnsubscribeReload(*_taskShader);
+        if (_meshShader.has_value()) UnsubscribeReload(*_meshShader);
     }
 
     GraphicsPipeline::GraphicsPipeline(const Builder& createInfo)
@@ -174,7 +174,7 @@ namespace kor
         _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),
-        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::defaultFramebuffer()),
+        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::DefaultFramebuffer()),
         _depthStencilState(createInfo.depthStencilState),
         _colorBlendState(createInfo.colorBlendState),
         _vertexAttributeDescriptions(createInfo.vertexAttributeDescriptions),
@@ -184,27 +184,27 @@ namespace kor
     {
         if (auto v = Validate(); !v) throw BackendException(v.error());
 
-        if (_vertexShader.has_value()) subscribeReload(*_vertexShader);
+        if (_vertexShader.has_value()) SubscribeReload(*_vertexShader);
         if (_tessellationState.has_value()) {
-            subscribeReload(_tessellationState->controlShader);
-            subscribeReload(_tessellationState->evalShader);
+            SubscribeReload(_tessellationState->controlShader);
+            SubscribeReload(_tessellationState->evalShader);
         }
-        if (_geometryShader.has_value()) subscribeReload(*_geometryShader);
-        if (_fragmentShader.has_value()) subscribeReload(*_fragmentShader);
-        if (_taskShader.has_value()) subscribeReload(*_taskShader);
-        if (_meshShader.has_value()) subscribeReload(*_meshShader);
+        if (_geometryShader.has_value()) SubscribeReload(*_geometryShader);
+        if (_fragmentShader.has_value()) SubscribeReload(*_fragmentShader);
+        if (_taskShader.has_value()) SubscribeReload(*_taskShader);
+        if (_meshShader.has_value()) SubscribeReload(*_meshShader);
     }
 
     VoidResult GraphicsPipeline::Validate()
     {
         if (!_vertexShader.has_value() && !_meshShader.has_value())
-            return fail(ErrorCode::eMissingShaderStage, "Graphics pipeline must have either a vertex shader or a mesh shader.");
+            return Fail(ErrorCode::eMissingShaderStage, "Graphics pipeline must have either a vertex shader or a mesh shader.");
         if (!_vertexShader.has_value() && _tessellationState.has_value())
-            return fail(ErrorCode::eShaderStageMismatch, "Tessellation state requires a vertex shader.");
+            return Fail(ErrorCode::eShaderStageMismatch, "Tessellation state requires a vertex shader.");
         if (!_vertexShader.has_value() && _geometryShader.has_value())
-            return fail(ErrorCode::eShaderStageMismatch, "Geometry shader requires a vertex shader.");
+            return Fail(ErrorCode::eShaderStageMismatch, "Geometry shader requires a vertex shader.");
         if (!_meshShader.has_value() && _taskShader.has_value())
-            return fail(ErrorCode::eShaderStageMismatch, "Task shader requires a mesh shader.");
+            return Fail(ErrorCode::eShaderStageMismatch, "Task shader requires a mesh shader.");
 
         std::vector<kor::ResourceRef<const Shader>> shaders;
         if (_vertexShader.has_value()) shaders.push_back(*_vertexShader);
@@ -218,7 +218,7 @@ namespace kor
         if (_meshShader.has_value()) shaders.push_back(*_meshShader);
 
         // Merge descriptor set layouts and push constants across all stages.
-        if (auto merged = buildLayouts(shaders); !merged)
+        if (auto merged = BuildLayouts(shaders); !merged)
             return std::unexpected(merged.error());
 
         return {};
