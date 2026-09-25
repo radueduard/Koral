@@ -221,10 +221,12 @@ namespace kor
             Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
                 Context::Repository().Update();
                 // The fixed frame order every module is written against: modules move things, the
-                // scene reacts, modules settle what the scene changed, then the frame is recorded.
+                // scene reacts, modules settle what the scene changed, the scene sees the settled state, then the
+                // frame is recorded.
                 ModuleHost::Update();
                 scene.Update();
                 ModuleHost::LateUpdate();
+                scene.LateUpdate();
 
                 ModuleHost::Render(commandBuffer);
                 scene.Render(commandBuffer);

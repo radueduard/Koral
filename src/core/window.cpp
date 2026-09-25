@@ -296,6 +296,12 @@ namespace kor {
         // first steps for a constructor that threw part-way.
         if (_stage >= Stage::eRuntime) {
             Context::Scheduler().WaitIdle();
+            // Everything is still alive and the GPU is done: the scene's last chance to stop its own
+            // background work. What it submits from there is waited for too.
+            if (_stage == Stage::eScene && _scene) {
+                _scene->Shutdown();
+                Context::Scheduler().WaitIdle();
+            }
             // One-off submissions still held for the GPU, before the scene and modules whose resources
             // their records may keep alive.
             detail::collectRetired(/*all=*/true);

@@ -34,9 +34,10 @@ namespace kor
      * @endcode
      *
      * The runtime creates the scene, brings the window and device up, calls Initialize() once, and
-     * then drives Update() → Render() → RenderUI() every frame until the window closes. It owns the
-     * scene and destroys it before the device goes away, so resources held as members are released
-     * at the right time without any teardown code.
+     * then drives Update() → LateUpdate() → Render() → RenderUI() every frame until the window
+     * closes, and calls Shutdown() once it has. It owns the scene and destroys it before the device
+     * goes away, so resources held as members are released at the right time without any teardown
+     * code.
      *
      * Everything happens on one thread — the same one throughout — so a scene needs no locking.
      * Work that would stall the frame belongs on a background executor; see kor::Task.
@@ -46,18 +47,12 @@ namespace kor
     class KORAL_API Scene {
     public:
         /**
-         * @brief Where a scene releases what Initialize() created. There is no Shutdown() hook, and
-         *        does not need to be.
+         * @brief Destroyed by the runtime at a defined point: after Shutdown(), with the device idle
+         *        and the modules and the repository still alive.
          *
-         * The runtime destroys the scene at a defined point, not whenever the process happens to
-         * wind down: the window waits for the device to go idle, destroys the scene, and only then
-         * shuts the modules down and tears the device apart. So a destructor runs with the device,
-         * the modules and the repository all still alive — which is exactly what a Shutdown() hook
-         * would have guaranteed, and is why there is not one.
-         *
-         * The one thing to keep in mind is the ordinary C++ rule: a derived scene's own destructor
-         * body runs first, so release order within the scene is the reverse of member declaration
-         * order unless it is written out explicitly.
+         * So releasing resources needs no code at all — members go with the scene. The ordinary C++
+         * rule applies: a derived scene's members are destroyed in reverse declaration order, and
+         * before the base's own frame graph (and the passes in it).
          */
         virtual ~Scene() = default;
 
@@ -121,13 +116,26 @@ namespace kor
          */
         virtual void OnResize(glm::uvec2 extent) {}
 
-        // kor::Module carries two hooks this does not — LateUpdate and RenderOverlay — and their
-        // absence here is deliberate rather than an oversight. They exist to bracket *this* scene:
-        // the frame runs ModuleHost::Update, then Scene::Update, then ModuleHost::LateUpdate, and
-        // likewise ModuleHost::Render, Scene::Render, ModuleHost::RenderOverlay. That order is the
-        // contract every module is written against. A scene sits in the middle of the sandwich, so
-        // it has no second slot to run in — what would follow its own Update is simply the rest of
-        // Update, and what would follow its own Render is the rest of Render.
+        /**
+         * @brief Called once per frame after Update, once every module has finished its own frame
+         *        logic too.
+         *
+         * The frame runs ModuleHost::Update, Scene::Update, ModuleHost::LateUpdate, then this. So
+         * what a module settles late — the camera's final matrices, after its controller moved it —
+         * is final here. Optional.
+         */
+        virtual void LateUpdate() {}
+
+        /**
+         * @brief Called once, before the scene is destroyed: the last frame has finished on the GPU,
+         *        and everything — the scene's members, its frame graph, the modules — is still alive.
+         *
+         * For what a destructor is the wrong place for: stopping background work (a Task still
+         * loading a model would otherwise resume into members that are already gone), saving
+         * settings, anything that calls a virtual function. Resources need nothing here; they are
+         * released with the scene. Optional.
+         */
+        virtual void Shutdown() {}
 
     private:
         kor::FrameGraph _graph;
