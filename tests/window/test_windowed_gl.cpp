@@ -23,6 +23,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <functional>
+#include <string>
 #include <memory>
 #include <numeric>
 #include <span>
@@ -42,6 +44,7 @@
 #include "descriptorSet.h"
 #include "descriptorSetLayout.h"
 #include "framebuffer.h"
+#include "frameGraph.h"
 #include "graphicsPipeline.h"
 #include "gui.h"
 #include "image.h"
@@ -1143,4 +1146,107 @@ TEST_F(GlTest, SubmitWaitsForAndSignalsTokensOnTheCallingThread) {
 
     EXPECT_TRUE(go.Ready());
     EXPECT_TRUE(done.Ready());
+}
+
+// ---- frame graph under OpenGL ------------------------------------------------
+//
+// OpenGL records the passes on its own thread, one after another; CPU passes run inline among them,
+// in order. The same promises as under Vulkan: memory shared between images never alive together,
+// and a CPU pass done before the GPU passes that use it record.
+
+namespace {
+    class GlLambdaPass final : public kor::RenderPass {
+    public:
+        explicit GlLambdaPass(std::string name) : RenderPass(std::move(name)) {}
+        void Setup(kor::PassBuilder& b) override { setup(b); }
+        void Initialize(const kor::PassResources& r) override { if (initialize) initialize(r); }
+        void Record(CommandBuffer& cb) const override { if (record) record(cb); }
+        std::function<void(kor::PassBuilder&)> setup;
+        std::function<void(const kor::PassResources&)> initialize;
+        std::function<void(CommandBuffer&)> record;
+    };
+
+    kor::Resource<Buffer> glReadback() {
+        return Buffer::RawBuilder{}
+            .SetRawSize(static_cast<glm::i64>(sizeof(float)))
+            .SetUsage(Buffer::Usage::eTransferDst)
+            .SetType(Buffer::Type::eReadback)
+            .Build();
+    }
+
+    void drawGlGraphFrame(kor::Scene& scene, kor::FrameGraph& graph) {
+        glfwPollEvents();
+        kor::Context::DrainMainThread();
+        kor::Context::Scheduler().Draw([&](CommandBuffer& cb) {
+            kor::Context::Repository().Update();
+            scene.Update();
+            scene.Render(cb);
+            graph.Execute();
+            kor::GUI::Render(cb, scene);
+        });
+        kor::GUI::RenderPlatformWindows();
+        kor::Context::Scheduler().WaitIdle();
+    }
+
+    // Clears a new image to `value`; a later pass copies a texel of it out.
+    kor::Resource<Buffer> glFillAndRead(kor::FrameGraph& graph, const std::string& name, const float value) {
+        auto readback = glReadback();
+        auto target = std::make_shared<kor::ResourceRef<const Image>>();
+        auto& fill = graph.Add<GlLambdaPass>("Fill " + name);
+        fill.setup = [=](kor::PassBuilder& b) { b.Create(name, {.format = Image::Format::eR32_SFLOAT, .usage = Image::Usage::eTransferDst}); };
+        fill.initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(name); };
+        fill.record = [=](CommandBuffer& cb) { cb.ClearColorImage(*target, glm::vec4(value)); };
+        auto& read = graph.Add<GlLambdaPass>("Read " + name);
+        read.setup = [=](kor::PassBuilder& b) { b.Read(name, Image::Usage::eTransferSrc).SideEffect(); };
+        read.initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(name); };
+        read.record = [=, out = kor::ResourceRef<const Buffer>(readback)](CommandBuffer& cb) {
+            cb.CopyImageToBuffer(*target, out, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+        };
+        return readback;
+    }
+
+    class GlCountFrames final : public kor::CpuPass {
+    public:
+        GlCountFrames() : CpuPass("Count frames") {}
+        void Setup(kor::PassBuilder& b) override {
+            b.Create("count", kor::BufferDesc{.size = sizeof(float), .usage = Buffer::Usage::eTransferSrc,
+                                              .type = Buffer::Type::eDynamic});
+        }
+        void Initialize(const kor::PassResources& r) override { _count = r.WritableBufferNamed("count"); }
+        void Prepare() override { ++frame; }
+        void Run() override { _count->Write(std::array<float, 1>{ static_cast<float>(frame) }, 0); }
+        int frame = 0;
+    private:
+        kor::ResourceRef<Buffer> _count;
+    };
+}
+
+TEST_F(GlTest, AFrameGraphSharesMemoryBetweenImagesNeverAliveTogether) {
+    auto& scene = GlEnvironment::scene();
+    kor::FrameGraph graph;
+    auto a = glFillAndRead(graph, "a", 1.f);
+    auto b = glFillAndRead(graph, "b", 2.f);
+    drawGlGraphFrame(scene, graph);
+    EXPECT_EQ(graph.Memory().allocations, 1u);
+    EXPECT_EQ(a->Read<float>(1).front(), 1.f);
+    EXPECT_EQ(b->Read<float>(1).front(), 2.f);
+}
+
+TEST_F(GlTest, AFrameGraphCpuPassRunsBeforeTheGpuPassesThatUseIt) {
+    auto& scene = GlEnvironment::scene();
+    kor::FrameGraph graph;
+    auto& counter = graph.Add<GlCountFrames>();
+    auto readback = glReadback();
+    auto& copy = graph.Add<GlLambdaPass>("Copy count");
+    auto count = std::make_shared<kor::ResourceRef<const Buffer>>();
+    copy.setup = [](kor::PassBuilder& b) { b.Read("count", Buffer::Usage::eTransferSrc).SideEffect(); };
+    copy.initialize = [=](const kor::PassResources& r) { *count = r.BufferNamed("count"); };
+    copy.record = [=, out = kor::ResourceRef<const Buffer>(readback)](CommandBuffer& cb) {
+        cb.CopyBuffer(*count, out, sizeof(float), 0, 0);
+    };
+    for (int frame = 1; frame <= 4; ++frame) {
+        drawGlGraphFrame(scene, graph);
+        EXPECT_EQ(counter.frame, frame);
+        EXPECT_EQ(readback->Read<float>(1).front(), static_cast<float>(frame));
+    }
 }

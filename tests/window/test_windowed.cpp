@@ -658,7 +658,7 @@ namespace {
                 _framebuffer = kor::Framebuffer::Builder{}.SetDepth({ .view = _stamp }).Build();
         }
         void Prepare() override { _frameValue = _value; }
-        void Record(kor::CommandBuffer& cb) override {
+        void Record(kor::CommandBuffer& cb) const override {
             if (_framebuffer) cb.BeginRendering(kor::RenderInfo(_framebuffer).SetClearDepth(_frameValue)).EndRendering();
             else cb.ClearColorImage(_stamp, glm::vec4(_frameValue));
         }
@@ -684,7 +684,7 @@ namespace {
                 .Build();
         }
         void Prepare() override { hadPrevious = HasPrevious("stamp"); }
-        void Record(kor::CommandBuffer& cb) override {
+        void Record(kor::CommandBuffer& cb) const override {
             cb.CopyImageToBuffer(_previous, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
         }
         bool hadPrevious = false;
@@ -728,16 +728,26 @@ namespace {
             }
         }
 
-        // A rebuild (a resize, a pass toggled) starts the history over.
+        // A rebuild that leaves the resource as it was keeps its history: last frame is still last frame.
         graph.Invalidate();
         value = stampOf(6);
         drawGraphFrame(scene, graph);
-        EXPECT_FALSE(probe.hadPrevious);
-        EXPECT_EQ(probe.readback->Read<float>(1).front(), cleared);
+        EXPECT_TRUE(probe.hadPrevious);
+        EXPECT_EQ(probe.readback->Read<float>(1).front(), stampOf(5));
+
+        // One that drops it — nothing reads the previous frame for a while — starts it over.
+        probe.SetEnabled(false);
         value = stampOf(7);
         drawGraphFrame(scene, graph);
+        probe.SetEnabled(true);
+        value = stampOf(8);
+        drawGraphFrame(scene, graph);
+        EXPECT_FALSE(probe.hadPrevious);
+        EXPECT_EQ(probe.readback->Read<float>(1).front(), cleared);
+        value = stampOf(9);
+        drawGraphFrame(scene, graph);
         EXPECT_TRUE(probe.hadPrevious);
-        EXPECT_EQ(probe.readback->Read<float>(1).front(), stampOf(6));
+        EXPECT_EQ(probe.readback->Read<float>(1).front(), stampOf(8));
     }
 }
 
@@ -772,6 +782,259 @@ TEST_F(VkWindowTest, AFrameGraphTimesEachPass) {
         EXPECT_GT(timing.recordMs, 0.0) << timing.name;
     }
     EXPECT_NEAR(graph.Timing().gpuMs, timings[0].gpuMs + timings[1].gpuMs, 1e-9);
+}
+
+// ---- frame graph: memory, usage, rebuilds, CPU passes -------------------------------------
+
+namespace {
+    // A pass assembled from lambdas, counting how often it is initialized.
+    class LambdaPass final : public kor::RenderPass {
+    public:
+        explicit LambdaPass(std::string name) : RenderPass(std::move(name)) {}
+        void Setup(kor::PassBuilder& b) override { if (setup) setup(b); }
+        void Initialize(const kor::PassResources& r) override { ++initializations; if (initialize) initialize(r); }
+        void Record(kor::CommandBuffer& cb) const override { if (record) record(cb); }
+        using RenderPass::RequestInitialize;
+
+        std::function<void(kor::PassBuilder&)> setup;
+        std::function<void(const kor::PassResources&)> initialize;
+        std::function<void(kor::CommandBuffer&)> record;
+        int initializations = 0;
+    };
+
+    kor::Resource<kor::Buffer> makeReadback() {
+        return kor::Buffer::RawBuilder{}
+            .SetRawSize(static_cast<glm::i64>(sizeof(float)))
+            .SetUsage(kor::Buffer::Usage::eTransferDst)
+            .SetType(kor::Buffer::Type::eReadback)
+            .Build();
+    }
+
+    // Clears a new image to `value`, and a later pass copies one texel of it out.
+    struct FillAndRead {
+        LambdaPass* fill;
+        LambdaPass* read;
+        kor::Resource<kor::Buffer> readback;
+    };
+    FillAndRead addFillAndRead(kor::FrameGraph& graph, const std::string& image, const float value) {
+        FillAndRead out{.readback = makeReadback()};
+        auto target = std::make_shared<kor::ResourceRef<const kor::Image>>();
+        out.fill = &graph.Add<LambdaPass>("Fill " + image);
+        out.fill->setup = [=](kor::PassBuilder& b) { b.Create(image, {.format = kor::Image::Format::eR32_SFLOAT,
+                                                                      .usage = kor::Image::Usage::eTransferDst}); };
+        out.fill->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(image); };
+        out.fill->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, glm::vec4(value)); };
+        out.read = &graph.Add<LambdaPass>("Read " + image);
+        out.read->setup = [=](kor::PassBuilder& b) { b.Read(image, kor::Image::Usage::eTransferSrc).SideEffect(); };
+        out.read->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(image); };
+        out.read->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.readback)](kor::CommandBuffer& cb) {
+            cb.CopyImageToBuffer(*target, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+        };
+        return out;
+    }
+}
+
+// Two images of one shape, never needed at the same time, share one allocation — and each still
+// holds what its own passes put there.
+TEST_F(VkWindowTest, AFrameGraphSharesMemoryBetweenImagesNeverAliveTogether) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto a = addFillAndRead(graph, "a", 1.f);
+    auto b = addFillAndRead(graph, "b", 2.f);
+
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(graph.Memory().resources, 2u);
+    EXPECT_EQ(graph.Memory().allocations, 1u) << "'a' is done with before 'b' is made";
+    EXPECT_GT(graph.Memory().unsharedBytes, graph.Memory().bytes);
+    EXPECT_EQ(a.readback->Read<float>(1).front(), 1.f);
+    EXPECT_EQ(b.readback->Read<float>(1).front(), 2.f);
+
+    graph.SetAliasing(false);
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(graph.Memory().allocations, 2u);
+    EXPECT_EQ(graph.Memory().unsharedBytes, graph.Memory().bytes);
+    EXPECT_EQ(a.readback->Read<float>(1).front(), 1.f);
+    EXPECT_EQ(b.readback->Read<float>(1).front(), 2.f);
+}
+
+// An image asked for by name gets memory of its own, so what the frame left in it is still there.
+TEST_F(VkWindowTest, AFrameGraphImageAskedForByNameIsNotShared) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    addFillAndRead(graph, "a", 1.f);
+    addFillAndRead(graph, "b", 2.f);
+    drawGraphFrame(scene, graph);
+    ASSERT_EQ(graph.Memory().allocations, 1u);
+
+    EXPECT_TRUE(graph.ImageNamed("a").Alive());
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(graph.Memory().allocations, 2u);
+    EXPECT_NE(graph.ImageNamed("a").Get(), graph.ImageNamed("b").Get());
+}
+
+// The image is made with the usage of every pass that touches it, not only its creator's.
+TEST_F(VkWindowTest, AFrameGraphImageHasTheUsageOfEveryPassUsingIt) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto& make = graph.Add<LambdaPass>("Make");
+    make.setup = [](kor::PassBuilder& b) { b.Create("x", {.format = kor::Image::Format::eRGBA8_UNORM}); };
+    auto& write = graph.Add<LambdaPass>("Write");
+    write.setup = [](kor::PassBuilder& b) { b.Write("x", kor::Image::Usage::eTransferDst); };
+    auto& read = graph.Add<LambdaPass>("Read");
+    read.setup = [](kor::PassBuilder& b) { b.Read("x", kor::Image::Usage::eSampled | kor::Image::Usage::eTransferSrc).SideEffect(); };
+
+    drawGraphFrame(scene, graph);
+    const auto x = graph.ImageNamed("x");
+    ASSERT_TRUE(x.Alive());
+    const auto usage = x->UsageFlags();
+    EXPECT_TRUE(usage & kor::Image::Usage::eTransferDst);
+    EXPECT_TRUE(usage & kor::Image::Usage::eSampled);
+    EXPECT_TRUE(usage & kor::Image::Usage::eTransferSrc);
+}
+
+TEST_F(VkWindowTest, AFrameGraphRefusesAnImageNoPassSaysHowItUses) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto& make = graph.Add<LambdaPass>("Make");
+    make.setup = [](kor::PassBuilder& b) { b.Create("x", {.format = kor::Image::Format::eRGBA8_UNORM}); };
+    auto& read = graph.Add<LambdaPass>("Read");
+    read.setup = [](kor::PassBuilder& b) { b.Read("x").SideEffect(); };
+    drawGraphFrame(scene, graph);
+    EXPECT_TRUE(graph.Schedule().empty());
+    EXPECT_EQ(make.initializations, 0);
+}
+
+// A rebuild initializes again only the passes whose resources it changed.
+TEST_F(VkWindowTest, AFrameGraphInitializesAgainOnlyThePassesWhoseResourcesChanged) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto pair = addFillAndRead(graph, "a", 1.f);
+    auto& user = graph.Add<LambdaPass>("Uses the import");
+    user.setup = [](kor::PassBuilder& b) { b.Read("imported").SideEffect(); };
+    auto first = makeReadback();
+    graph.Import("imported", kor::ResourceRef<const kor::Buffer>(first));
+
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(pair.fill->initializations, 1);
+    EXPECT_EQ(pair.read->initializations, 1);
+    EXPECT_EQ(user.initializations, 1);
+
+    // Nothing changed: nothing is initialized again, and the images are the ones there were.
+    graph.Invalidate();
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(pair.fill->initializations, 1);
+    EXPECT_EQ(user.initializations, 1);
+
+    // The import now means another buffer: only the pass using it.
+    auto second = makeReadback();
+    graph.Import("imported", kor::ResourceRef<const kor::Buffer>(second));
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(pair.fill->initializations, 1);
+    EXPECT_EQ(pair.read->initializations, 1);
+    EXPECT_EQ(user.initializations, 2);
+
+    // Asked for explicitly.
+    pair.fill->RequestInitialize();
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(pair.fill->initializations, 2);
+    EXPECT_EQ(pair.read->initializations, 1);
+    EXPECT_EQ(pair.readback->Read<float>(1).front(), 1.f);
+}
+
+namespace {
+    // Writes this frame's number into a buffer the CPU writes and the GPU reads.
+    class CountFrames final : public kor::CpuPass {
+    public:
+        CountFrames() : CpuPass("Count frames") {}
+        void Setup(kor::PassBuilder& b) override {
+            b.Create("count", kor::BufferDesc{.size = sizeof(float), .usage = kor::Buffer::Usage::eTransferSrc,
+                                              .type = kor::Buffer::Type::eDynamic});
+        }
+        void Initialize(const kor::PassResources& r) override { _count = r.WritableBufferNamed("count"); }
+        void Prepare() override { ++_frame; }
+        void Run() override {
+            ranOn = std::this_thread::get_id();
+            _count->Write(std::array<float, 1>{ static_cast<float>(_frame) }, 0);
+            value = _frame;
+        }
+        std::atomic<int> value = 0;
+        std::thread::id ranOn;
+    private:
+        int _frame = 0;
+        kor::ResourceRef<kor::Buffer> _count;
+    };
+
+    // Copies it out on the GPU, and notes what the CPU pass had got to when it recorded.
+    class CopyCount final : public kor::RenderPass {
+    public:
+        explicit CopyCount(const CountFrames& counter) : RenderPass("Copy count"), _counter(counter) {}
+        void Setup(kor::PassBuilder& b) override { b.Read("count", kor::Buffer::Usage::eTransferSrc).SideEffect(); }
+        void Initialize(const kor::PassResources& r) override {
+            _count = r.BufferNamed("count");
+            readback = makeReadback();
+        }
+        void Record(kor::CommandBuffer& cb) const override {
+            seenWhenRecording = _counter.value.load();
+            cb.CopyBuffer(_count, readback, sizeof(float), 0, 0);
+        }
+        kor::Resource<kor::Buffer> readback;
+        mutable std::atomic<int> seenWhenRecording = -1;
+    private:
+        const CountFrames& _counter;
+        kor::ResourceRef<const kor::Buffer> _count;
+    };
+}
+
+// A CPU pass runs off the main thread, before the GPU passes that use what it wrote record.
+TEST_F(VkWindowTest, AFrameGraphCpuPassRunsBeforeTheGpuPassesThatUseIt) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto& counter = graph.Add<CountFrames>();
+    auto& copy = graph.Add<CopyCount>(counter);
+
+    for (int frame = 1; frame <= 5; ++frame) {
+        drawGraphFrame(scene, graph);
+        EXPECT_EQ(copy.seenWhenRecording, frame) << "the GPU pass recorded before the CPU pass had run";
+        EXPECT_EQ(copy.readback->Read<float>(1).front(), static_cast<float>(frame));
+    }
+    EXPECT_NE(counter.ranOn, std::this_thread::get_id()) << "a CPU pass runs on the background pool";
+    ASSERT_EQ(graph.PassTimings().size(), 2u);
+    EXPECT_FALSE(graph.PassTimings()[0].gpuMeasured) << "a CPU pass has no GPU time";
+}
+
+TEST_F(VkWindowTest, AFrameGraphRefusesACpuPassFedByTheGpu) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto& gpu = graph.Add<LambdaPass>("GPU");
+    gpu.setup = [](kor::PassBuilder& b) {
+        b.Create("made", kor::BufferDesc{.size = 4, .usage = kor::Buffer::Usage::eStorage, .type = kor::Buffer::Type::eDynamic});
+    };
+    class Reader final : public kor::CpuPass {
+    public:
+        Reader() : CpuPass("CPU") {}
+        void Setup(kor::PassBuilder& b) override { b.Read("made").SideEffect(); }
+        void Run() override {}
+    };
+    graph.Add<Reader>();
+    drawGraphFrame(scene, graph);
+    EXPECT_TRUE(graph.Schedule().empty());
+}
+
+// Record cannot change the graph: the change is refused rather than racing the other passes.
+TEST_F(VkWindowTest, AFrameGraphRefusesChangesWhilePassesRecord) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto pair = addFillAndRead(graph, "a", 1.f);
+    pair.read->record = [&, copy = pair.read->record](kor::CommandBuffer& cb) {
+        copy(cb);
+        graph.Invalidate();
+        pair.fill->SetEnabled(false);
+    };
+    drawGraphFrame(scene, graph);
+    drawGraphFrame(scene, graph);
+    EXPECT_TRUE(pair.fill->Enabled());
+    EXPECT_EQ(pair.fill->initializations, 1) << "the graph was rebuilt from inside Record";
+    EXPECT_EQ(pair.readback->Read<float>(1).front(), 1.f);
 }
 
 // ---- per-frame device-local buffers ---------------------------------------------------------
