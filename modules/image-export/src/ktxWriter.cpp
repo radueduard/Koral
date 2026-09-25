@@ -51,8 +51,6 @@ namespace kimg
                 case F::eRGBA8_UINT: return VK_FORMAT_R8G8B8A8_UINT;
                 case F::eRGBA8_SINT: return VK_FORMAT_R8G8B8A8_SINT;
                 case F::eRGBA8_SRGB: return VK_FORMAT_R8G8B8A8_SRGB;
-                case F::eBGRA8_UNORM: return VK_FORMAT_B8G8R8A8_UNORM;
-                case F::eBGRA8_SRGB: return VK_FORMAT_B8G8R8A8_SRGB;
 
                 case F::eR16_UNORM: return VK_FORMAT_R16_UNORM;
                 case F::eR16_SFLOAT: return VK_FORMAT_R16_SFLOAT;

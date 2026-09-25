@@ -24,7 +24,8 @@ namespace kor {
         _fullscreen(settings.fullscreen),
         _decorated(settings.decorated),
         _transparentFramebuffer(settings.transparentFramebuffer),
-        _vsync(settings.vsync)
+        _vsync(settings.vsync),
+        _formats(settings.formats)
     {
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -83,6 +84,11 @@ namespace kor {
                 }
             }
         }
+    }
+
+    Window::Format Window::PixelFormat() const
+    {
+        return dynamic_cast<const vk::Surface&>(*_surface).swapChain().getWindowFormat();
     }
 
     Window::~Window() {

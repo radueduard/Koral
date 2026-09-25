@@ -125,6 +125,10 @@ namespace kimg
                     .message = std::format("the GPU returned {} bytes for a {}-byte region",
                                            data.bytes.size(), byteCount) });
             }
+            // A window's image in a BGRA format: every file format here wants red first.
+            if (image->IsBgrOrder()) {
+                for (std::size_t texel = 0; texel + 3 < byteCount; texel += 4) std::swap(data.bytes[texel], data.bytes[texel + 2]);
+            }
             return data;
         }
 

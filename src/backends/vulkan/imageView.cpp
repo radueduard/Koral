@@ -33,7 +33,7 @@ namespace kor::vk
             auto viewInfo = ::vk::ImageViewCreateInfo()
                 .setImage(image)
                 .setViewType(getVkImageViewType(_viewType))
-                .setFormat(getVkFormat(_image->PixelFormat()))
+                .setFormat(dynamic_cast<const Image&>(*_image).getFormat())
                 .setComponents(::vk::ComponentMapping()
                     .setR(getVkComponentSwizzle(_componentMapping.r))
                     .setG(getVkComponentSwizzle(_componentMapping.g))

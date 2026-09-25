@@ -46,6 +46,7 @@ namespace kor::vk
             .setExtent(window.Extent())
             .setVSync(window.IsVSync())
             .setTransparent(window.IsFramebufferTransparent())
+            .setFormats(window.RequestedFormats())
             .setSampleCount(SampleCount::e1)
             .build();
     }

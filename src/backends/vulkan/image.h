@@ -9,6 +9,7 @@
 #include "commandBuffer.h"
 
 #include <image.h>
+#include <window.h>
 
 
 namespace kor::vk
@@ -34,9 +35,12 @@ namespace kor::vk
 
     	void DoResize(const glm::uvec3& extent) override;
 
-    	/** @brief A swap chain's images; @p acquired says which one the frame uses. */
-    	explicit Image(const std::vector<::vk::Image>& surfaceImages, glm::uvec2 extent, Format format, SampleCount msaa,
+    	/** @brief A swap chain's images, in @p format; @p acquired says which one the frame uses. */
+    	explicit Image(const std::vector<::vk::Image>& surfaceImages, glm::uvec2 extent, kor::Window::Format format, SampleCount msaa,
     	               std::function<glm::u32()> acquired);
+
+    	/** @brief The Vulkan format it really is: for a swap chain's, not always PixelFormat()'s. */
+    	[[nodiscard]] ::vk::Format getFormat() const { return _vkFormat; }
 
     	::vk::Image operator*() const;
     	VmaAllocation getAllocation() const;
@@ -48,6 +52,7 @@ namespace kor::vk
 		::vk::ImageAspectFlags getAspectFlags() const;
 
     private:
+    	::vk::Format _vkFormat;
     	std::vector<::vk::Image> _images;
     	std::vector<VmaAllocation> _allocations;
 		mutable std::unordered_map<glm::u32, ::vk::ImageLayout> _layouts {};

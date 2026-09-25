@@ -5,12 +5,14 @@
 #pragma once
 #include <image.h>
 #include <framebuffer.h>
+#include <window.h>
 
 #include "image.h"
 #include "imageView.h"
 #include "graphicsPipeline.h"
 #include "sampler.h"
 
+#include <optional>
 #include <vulkan/vulkan.hpp>
 
 
@@ -142,6 +144,42 @@ namespace kor
             return ::vk::ImageAspectFlagBits::eDepth | ::vk::ImageAspectFlagBits::eStencil;
         default: return ::vk::ImageAspectFlagBits::eColor;
         }
+    }
+
+    inline ::vk::Format getVkFormat(const kor::Window::Format format) {
+        switch (format) {
+        case kor::Window::Format::eBGRA8_UNORM: return ::vk::Format::eB8G8R8A8Unorm;
+        case kor::Window::Format::eBGRA8_SRGB: return ::vk::Format::eB8G8R8A8Srgb;
+        case kor::Window::Format::eRGBA8_UNORM: return ::vk::Format::eR8G8B8A8Unorm;
+        case kor::Window::Format::eRGBA8_SRGB: return ::vk::Format::eR8G8B8A8Srgb;
+        }
+        throw std::runtime_error("Unsupported window format!");
+    }
+
+    /** The window format a swap chain's @p format is, if it is one the engine presents in. */
+    inline std::optional<kor::Window::Format> windowFormat(const ::vk::Format format) {
+        switch (format) {
+        case ::vk::Format::eB8G8R8A8Unorm: return kor::Window::Format::eBGRA8_UNORM;
+        case ::vk::Format::eB8G8R8A8Srgb: return kor::Window::Format::eBGRA8_SRGB;
+        case ::vk::Format::eR8G8B8A8Unorm: return kor::Window::Format::eRGBA8_UNORM;
+        case ::vk::Format::eR8G8B8A8Srgb: return kor::Window::Format::eRGBA8_SRGB;
+        default: return std::nullopt;
+        }
+    }
+
+    /** The image format of the same size and encoding as a window's, which may have red and blue swapped. */
+    inline Image::Format imageFormatOf(const kor::Window::Format format) {
+        switch (format) {
+        case kor::Window::Format::eBGRA8_UNORM:
+        case kor::Window::Format::eRGBA8_UNORM: return Image::Format::eRGBA8_UNORM;
+        case kor::Window::Format::eBGRA8_SRGB:
+        case kor::Window::Format::eRGBA8_SRGB: return Image::Format::eRGBA8_SRGB;
+        }
+        throw std::runtime_error("Unsupported window format!");
+    }
+
+    inline bool isBgrOrder(const kor::Window::Format format) {
+        return format == kor::Window::Format::eBGRA8_UNORM || format == kor::Window::Format::eBGRA8_SRGB;
     }
 
     inline ::vk::ImageLayout getVkImageLayout(const ResourceAccess access) {
@@ -407,8 +445,6 @@ namespace kor
         case Image::Format::eD32_SFLOAT: return ::vk::Format::eD32Sfloat;
         case Image::Format::eD32_SFLOAT_S8_UINT: return ::vk::Format::eD32SfloatS8Uint;
 
-        case Image::Format::eBGRA8_UNORM : return ::vk::Format::eB8G8R8A8Unorm;
-        case Image::Format::eBGRA8_SRGB : return ::vk::Format::eB8G8R8A8Srgb;
         case Image::Format::eBC1_RGB_UNORM: return ::vk::Format::eBc1RgbUnormBlock;
         case Image::Format::eBC1_RGB_SRGB: return ::vk::Format::eBc1RgbSrgbBlock;
         case Image::Format::eBC1_RGBA_UNORM: return ::vk::Format::eBc1RgbaUnormBlock;
@@ -503,9 +539,6 @@ namespace kor
         case ::vk::Format::eD24UnormS8Uint: return Image::Format::eD24_UNORM_S8_UINT;
         case ::vk::Format::eD32Sfloat: return Image::Format::eD32_SFLOAT;
         case ::vk::Format::eD32SfloatS8Uint: return Image::Format::eD32_SFLOAT_S8_UINT;
-
-        case ::vk::Format::eB8G8R8A8Unorm: return Image::Format::eBGRA8_UNORM;
-        case ::vk::Format::eB8G8R8A8Srgb: return Image::Format::eBGRA8_SRGB;
         default: throw std::runtime_error("Unsupported image format!");
         }
     }

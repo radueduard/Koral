@@ -160,10 +160,6 @@ namespace kor
             eD32_SFLOAT,
             eD32_SFLOAT_S8_UINT,
 
-            // Surface formats. What a swap chain typically presents; rarely chosen by hand.
-            eBGRA8_UNORM,
-            eBGRA8_SRGB,
-
             // ---- Block-compressed formats ----------------------------------------------------
             //
             // Texels are stored in fixed-size blocks — four bytes a texel becomes one byte or less —
@@ -414,8 +410,19 @@ namespace kor
 
         /** @brief How many dimensions the image has. */
         [[nodiscard]] Type ImageType() const { return _type; }
-        /** @brief What one pixel holds. */
+        /**
+         * @brief What one pixel holds.
+         *
+         * For a window's image, which is in one of the formats a display offers (Window::Format),
+         * the Image::Format of the same size and encoding — see IsBgrOrder().
+         */
         [[nodiscard]] Format PixelFormat() const { return _format; }
+        /**
+         * @brief Whether the red and blue channels are swapped in memory: a window's image in a BGRA
+         *        format (Window::Format::eBGRA8_UNORM, say). Reading one back gives blue first; a
+         *        copy to an image that is not keeps them swapped, and a blit converts.
+         */
+        [[nodiscard]] bool IsBgrOrder() const { return _bgrOrder; }
         /**
          * @brief The samples per pixel. SampleCount::e1 is an ordinary, non-multisampled image.
          *
@@ -617,6 +624,7 @@ namespace kor
         std::function<glm::u32()> _copySelector;
         Type _type;
         Format _format;
+        bool _bgrOrder = false;
         glm::uvec3 _extent;
         /// Bumped by a backend's Resize. @see generation
         glm::u64 _generation = 0;

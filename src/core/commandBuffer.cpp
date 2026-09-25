@@ -1934,7 +1934,7 @@ namespace kor
         if (Reject(dstImage, "copy destination image")) return *this;
         const auto& src = *srcImage;
         const auto& dst = *dstImage;
-        if (src.PixelFormat() != dst.PixelFormat() || src.Extent() != dst.Extent() || src.MipLevels() != dst.MipLevels()
+        if (src.PixelFormat() != dst.PixelFormat() || src.IsBgrOrder() != dst.IsBgrOrder() || src.Extent() != dst.Extent() || src.MipLevels() != dst.MipLevels()
             || src.ArrayLayers() != dst.ArrayLayers() || src.Samples() != dst.Samples() || src.ImageType() != dst.ImageType()) {
             return RecordError(ErrorCode::eInvalidArgument, std::format(
                 "CopyImage needs two images of the same shape; '{}' and '{}' differ in format, extent, "

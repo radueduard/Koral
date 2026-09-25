@@ -1191,7 +1191,7 @@ namespace {
 
         [[nodiscard]] glm::u8 Red() const {
             const auto texel = readback->Read<glm::u8>(4);
-            return SceneWindow().DefaultFramebuffer()->ColorImage(0)->PixelFormat() == kor::Image::Format::eBGRA8_UNORM ? texel[2] : texel[0];
+            return SceneWindow().DefaultFramebuffer()->ColorImage(0)->IsBgrOrder() ? texel[2] : texel[0];
         }
 
         float red;
@@ -1398,6 +1398,46 @@ TEST_F(VkWindowTest, FixedStepsFollowTheScenesOwnTime) {
 
     app.Close(*scene);
     settle();
+}
+
+// A window presents in the first of the formats it asks for that the display offers, and its image
+// says so: the image format of the same size and encoding, with the channel order beside it.
+TEST_F(VkWindowTest, AWindowPresentsInTheFirstFormatItAsksForThatTheDisplayOffers) {
+    auto& app = VkEnvironment::app();
+    const auto& main = VkEnvironment::scene().SceneWindow();
+    EXPECT_EQ(main.PixelFormat(), kor::Window::Format::eBGRA8_UNORM) << "the default, and what every desktop display offers";
+    const auto mainImage = main.DefaultFramebuffer()->ColorImage(0);
+    EXPECT_EQ(mainImage->PixelFormat(), kor::Image::Format::eRGBA8_UNORM);
+    EXPECT_TRUE(mainImage->IsBgrOrder());
+
+    kor::WindowSettings settings = kSmall;
+    settings.formats = { kor::Window::Format::eRGBA8_SRGB, kor::Window::Format::eBGRA8_SRGB };
+    auto* scene = app.Open<PaintScene>(settings, 1.f);
+    ASSERT_NE(scene, nullptr);
+    for (int frame = 0; frame < 2; ++frame) settle();
+    const auto format = scene->SceneWindow().PixelFormat();
+    EXPECT_TRUE(format == kor::Window::Format::eRGBA8_SRGB || format == kor::Window::Format::eBGRA8_SRGB)
+        << "one of those asked for, and every display offers the second";
+    const auto image = scene->SceneWindow().DefaultFramebuffer()->ColorImage(0);
+    EXPECT_EQ(image->PixelFormat(), kor::Image::Format::eRGBA8_SRGB);
+    EXPECT_EQ(image->IsBgrOrder(), format == kor::Window::Format::eBGRA8_SRGB);
+    if (!scene->SceneWindow().IsPaused()) EXPECT_EQ(scene->Red(), 255) << "drawn into, and read back red first";
+    app.Close(*scene);
+    settle();
+}
+
+// A copy moves bytes, so one between a BGRA window image and an RGBA image would swap red and blue:
+// refused, pointing at a blit, which converts.
+TEST_F(VkWindowTest, CopyingAWindowsBgraImageToAnRgbaOneIsRefused) {
+    const auto screen = VkEnvironment::scene().SceneWindow().DefaultFramebuffer()->ColorImage(0);
+    ASSERT_TRUE(screen->IsBgrOrder());
+    auto copy = kor::Image::Builder().SetExtent(screen->Extent()).SetFormat(screen->PixelFormat())
+        .SetUsage(kor::Image::Usage::eTransferDst).Build();
+    auto cb = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eGraphics);
+    cb->Begin();
+    cb->CopyImage(screen, copy);
+    EXPECT_FALSE(cb->Errors().empty());
+    cb->Reset();
 }
 
 // A library of scenes, loaded while the application runs: its scenes opened by name, the library

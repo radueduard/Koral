@@ -43,6 +43,7 @@ namespace kor::vk
             glm::uvec2 extent {1, 1};
             bool vsync = true;
             bool transparent = false;
+            std::vector<kor::Window::Format> formats { kor::Window::Format::eBGRA8_UNORM };   ///< Most wanted first.
             SampleCount sampleCount = SampleCount::e1;
 
             Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
@@ -50,6 +51,7 @@ namespace kor::vk
             Builder& setExtent(const glm::uvec2 extent) { this->extent = extent; return *this; }
             Builder& setVSync(const bool vsync) { this->vsync = vsync; return *this; }
             Builder& setTransparent(const bool transparent) { this->transparent = transparent; return *this; }
+            Builder& setFormats(std::vector<kor::Window::Format> formats) { this->formats = std::move(formats); return *this; }
             Builder& setSampleCount(const kor::SampleCount sampleCount) { this->sampleCount = sampleCount; return *this; }
             std::unique_ptr<SwapChain> build() { return std::make_unique<SwapChain>(*this); }
         };
@@ -71,6 +73,7 @@ namespace kor::vk
         [[nodiscard]] kor::ResourceRef<const kor::ImageView> getDepthImageViews() const { return _depthImageViews; }
 
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
+        [[nodiscard]] kor::Window::Format getWindowFormat() const { return _windowFormat; }
         [[nodiscard]] glm::u32 currentImageIndex() const { return _imageIndex; }
 
     	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinishedSemaphores[_imageIndex]; }
@@ -107,6 +110,8 @@ namespace kor::vk
 
         std::reference_wrapper<const Surface> _surface;
         ::vk::SurfaceFormatKHR _surfaceFormat = {};
+        kor::Window::Format _windowFormat = kor::Window::Format::eBGRA8_UNORM;
+        std::vector<kor::Window::Format> _formats;
         ::vk::PresentModeKHR _presentMode = {};
 
         const kor::vk::Queue& _presentQueue;
@@ -126,7 +131,8 @@ namespace kor::vk
         /// The per-frame depth target, sized to the frames in flight — not to the images.
         void CreateDepthResources();
 
-        static ::vk::SurfaceFormatKHR ChooseSurfaceFormat(const std::vector<::vk::SurfaceFormatKHR> &availableFormats);
+        /** The first of the requested formats the surface offers, else the first it offers that the engine knows. */
+        [[nodiscard]] std::pair<::vk::SurfaceFormatKHR, kor::Window::Format> ChooseSurfaceFormat(const std::vector<::vk::SurfaceFormatKHR>& availableFormats) const;
         static ::vk::PresentModeKHR ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes, bool vsync);
         static glm::uvec2 ChooseExtent(const ::vk::SurfaceCapabilitiesKHR &capabilities, const glm::uvec2& extent);
     };

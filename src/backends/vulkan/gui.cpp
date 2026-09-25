@@ -296,7 +296,7 @@ namespace kor::vk
         // Kept alive by the pipeline-rendering info ImGui copies: one per interface would dangle, so the
         // format is looked up per call and held in storage that outlives every Init.
         static std::vector<VkFormat> formatStorage;
-        formatStorage.assign(1, static_cast<VkFormat>(getVkFormat(swapChain.image()->PixelFormat())));
+        formatStorage.assign(1, static_cast<VkFormat>(swapChain.getImageFormat()));
         const auto& colorAttachmentFormats = formatStorage;
 
         const auto pipelineRenderingCreateInfo = VkPipelineRenderingCreateInfo {

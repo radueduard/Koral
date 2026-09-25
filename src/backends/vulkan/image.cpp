@@ -43,14 +43,14 @@ namespace kor::vk
         return (properties.optimalTilingFeatures & required) == required;
     }
 
-    Image::Image(const Builder &builder) : kor::Image(builder) {
+    Image::Image(const Builder &builder) : kor::Image(builder), _vkFormat(getVkFormat(_format)) {
         auto imageCreateFlags = ::vk::ImageCreateFlags();
         // if (_type == Type::e3D) imageCreateFlags |= ::vk::ImageCreateFlagBits::e2DArrayCompatibleKHR;
         if (_arrayLayers == 6 && _type == Type::e2D) imageCreateFlags |= ::vk::ImageCreateFlagBits::eCubeCompatible;
 
 
         const auto type = getVkImageType(this->_type);
-        const auto format = getVkFormat(_format);
+        const auto format = _vkFormat;
         const auto usage = getVkUsage(this->_usage);
 
         auto tiling = ::vk::ImageTiling::eOptimal;
@@ -103,7 +103,7 @@ namespace kor::vk
         });
     }
 
-    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const Format format, const SampleCount msaa,
+    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const kor::Window::Format format, const SampleCount msaa,
                  std::function<glm::u32()> acquired)
         : kor::Image(Builder()
             .SetIsPerFrame(true)
@@ -112,8 +112,9 @@ namespace kor::vk
             .SetUsage(Usage::eTransferDst | Usage::eTransferSrc | Usage::eColorAttachment)
             .SetArrayLayers(1)
             .SetMipLevels(1)
-            .SetFormat(format)
-            .SetSampleCount(msaa)) {
+            .SetFormat(imageFormatOf(format))
+            .SetSampleCount(msaa)), _vkFormat(getVkFormat(format)) {
+        _bgrOrder = isBgrOrder(format);
         _images = surfaceImages;
         _copySelector = std::move(acquired);
 
@@ -234,7 +235,7 @@ namespace kor::vk
 
         const auto imageCreateInfo = ::vk::ImageCreateInfo()
             .setImageType(getVkImageType(_type))
-            .setFormat(getVkFormat(_format))
+            .setFormat(_vkFormat)
             .setExtent(::vk::Extent3D(extent.x, extent.y, extent.z))
             .setMipLevels(_mipLevels)
             .setArrayLayers(_arrayLayers)

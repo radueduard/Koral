@@ -37,16 +37,16 @@ namespace kor::vk
     {
         std::vector<::vk::Format> colorAttachmentFormats;
         for (const auto& format : _framebuffer->ColorAttachments()) {
-            colorAttachmentFormats.push_back(getVkFormat(format.view->SourceImage()->PixelFormat()));
+            colorAttachmentFormats.push_back(dynamic_cast<const Image&>(*format.view->SourceImage()).getFormat());
         }
         auto pipelineRenderingCreateInfo = ::vk::PipelineRenderingCreateInfo()
             .setColorAttachmentFormats(colorAttachmentFormats);
         if (_framebuffer->HasDepthAttachment()) {
-            const auto depthFormat = getVkFormat(_framebuffer->DepthAttachment()->SourceImage()->PixelFormat());
+            const auto depthFormat = dynamic_cast<const Image&>(*_framebuffer->DepthAttachment()->SourceImage()).getFormat();
             pipelineRenderingCreateInfo.setDepthAttachmentFormat(depthFormat);
         }
         if (_framebuffer->HasStencilAttachment()) {
-            const auto stencilFormat = getVkFormat(_framebuffer->StencilAttachment()->SourceImage()->PixelFormat());
+            const auto stencilFormat = dynamic_cast<const Image&>(*_framebuffer->StencilAttachment()->SourceImage()).getFormat();
             // Only set stencil format if the image actually has a stencil aspect
             const auto aspectFlags = getVkImageAspectFlags(_framebuffer->StencilAttachment()->SourceImage()->PixelFormat());
             if (aspectFlags & ::vk::ImageAspectFlagBits::eStencil) {

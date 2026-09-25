@@ -7,6 +7,11 @@
 #include <framebuffer.h>
 #include <ranges>
 #include <iostream>
+#include <tuple>
+
+#include <magic_enum/magic_enum.hpp>
+
+#include "log.h"
 
 #include "context.h"
 #include "image.h"
@@ -19,17 +24,24 @@
 
 namespace kor::vk
 {
-    ::vk::SurfaceFormatKHR SwapChain::ChooseSurfaceFormat(const std::vector<::vk::SurfaceFormatKHR> &availableFormats) {
-        for (const auto &availableFormat : availableFormats) {
-            // std::cout << "Available surface format: " << ::vk::to_string(availableFormat.format) << ", color space: " << ::vk::to_string(availableFormat.colorSpace) << std::endl;
-            // if (availableFormat.format == ::vk::Format::eA2B10G10R10UnormPack32 && availableFormat.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear) {
-            if (availableFormat.format == ::vk::Format::eB8G8R8A8Unorm && availableFormat.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear) {
-            // if (availableFormat.format == ::vk::Format::eR8G8B8A8Unorm && availableFormat.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear) {
-                return availableFormat;
+    std::pair<::vk::SurfaceFormatKHR, kor::Window::Format> SwapChain::ChooseSurfaceFormat(const std::vector<::vk::SurfaceFormatKHR>& availableFormats) const {
+        const auto offered = [&](const ::vk::Format format) {
+            return std::ranges::find_if(availableFormats, [&](const ::vk::SurfaceFormatKHR& available) {
+                return available.format == format && available.colorSpace == ::vk::ColorSpaceKHR::eSrgbNonlinear;
+            });
+        };
+        for (const auto wanted : _formats)
+            if (const auto it = offered(getVkFormat(wanted)); it != availableFormats.end()) return {*it, wanted};
+        // None of those: whatever the display offers that the engine presents in, said out loud.
+        for (const auto& available : availableFormats) {
+            if (available.colorSpace != ::vk::ColorSpaceKHR::eSrgbNonlinear) continue;
+            if (const auto format = windowFormat(available.format)) {
+                kor::log::Warn("[window] the display offers none of the formats asked for; presenting in {}",
+                               magic_enum::enum_name(*format));
+                return {available, *format};
             }
         }
-        std::cerr << "Failed to find suitable surface format" << std::endl;
-        return availableFormats[0];
+        throw std::runtime_error("The display offers no format a window can present in (8-bit RGBA or BGRA, sRGB colour space).");
     }
 
     ::vk::PresentModeKHR SwapChain::ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes, const bool vsync) {
@@ -72,6 +84,7 @@ namespace kor::vk
         _surface(createInfo.surface),
         _presentQueue(Context::Device().requestPresentQueue(_surface))
     {
+        _formats = createInfo.formats;
         vk::Context::Device().waitIdle();
 
         for (glm::u32 i = 0; i < std::max(createInfo.framesInFlight, 1u); ++i)
@@ -83,7 +96,7 @@ namespace kor::vk
     void SwapChain::CreateSwapChain() {
         const auto surfaceCapabilities = _surface.get().getCapabilities();
 
-        _surfaceFormat = ChooseSurfaceFormat(_surface.get().getFormats());
+        std::tie(_surfaceFormat, _windowFormat) = ChooseSurfaceFormat(_surface.get().getFormats());
         _presentMode = ChoosePresentMode(_surface.get().getPresentModes(), _vsync);
         _extent = ChooseExtent(surfaceCapabilities, _extent);
 
@@ -166,7 +179,7 @@ namespace kor::vk
 
         // Which of them a command means is the one acquired for this frame — never the frame in flight.
         _swapChainImages = Resource<kor::Image>(std::make_unique<kor::vk::Image>(
-            swapChainImageHandles, _extent, format(_surfaceFormat.format), _sampleCount,
+            swapChainImageHandles, _extent, _windowFormat, _sampleCount,
             [this] { return _imageIndex.load(); }));
 
         _swapChainImageViews = kor::ImageView::Builder(_swapChainImages)

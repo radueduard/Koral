@@ -4,8 +4,10 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <filesystem>
 #include <glm/glm.hpp>
@@ -28,26 +30,7 @@ struct GLFWimage;
 struct GLFWvidmode;
 
 namespace kor {
-    /**
-     * @brief What a window is opened with.
-     *
-     * Designated initialisers name just what differs from the defaults:
-     *
-     * @code
-     * kor::Navigator::Open("Inspector", {.title = "Buffers", .extent = {640, 360}});
-     * @endcode
-     *
-     * The runtime reads the first scene's from koral.json.
-     */
-    struct WindowSettings {
-        std::string title = "Koral";               ///< Text in the title bar.
-        glm::uvec2 extent = { 1280, 720 };          ///< Initial size of the drawable area, in pixels.
-        bool resizable = true;                      ///< Whether the user may resize it.
-        bool fullscreen = false;                    ///< Whether to open fullscreen on the primary monitor.
-        bool decorated = true;                      ///< Whether the OS draws a title bar and border.
-        bool transparentFramebuffer = false;        ///< Whether the framebuffer's alpha composites with the desktop.
-        bool vsync = true;                          ///< Whether presentation waits for the display's refresh.
-    };
+    struct WindowSettings;
 
     /**
      * @brief One scene's OS window: the surface it presents to, its swap chain and its default
@@ -66,6 +49,20 @@ namespace kor {
         friend class App;
         friend class kor::vk::Scheduler;
     public:
+        /**
+         * @brief What a window can present in: the formats a display offers, which an image cannot
+         *        be created with. @see Image::Format for those.
+         *
+         * The BGRA ones are what nearly every desktop display offers first. A window's image in one
+         * reports the Image::Format of the same size and encoding (eRGBA8_UNORM for eBGRA8_UNORM),
+         * with Image::IsBgrOrder() saying the red and blue channels are swapped in memory.
+         */
+        enum class Format : std::uint8_t {
+            eBGRA8_UNORM,
+            eBGRA8_SRGB,   ///< Encoded to sRGB by the hardware on every write.
+            eRGBA8_UNORM,
+            eRGBA8_SRGB,
+        };
 
         /** @brief Waits for nothing: the application retires a window once the frames using it are done. */
         ~Window();
@@ -109,6 +106,10 @@ namespace kor {
         [[nodiscard]] bool IsVSync() const { return _vsync; }
         /** @brief Whether the framebuffer's alpha composites with the desktop. */
         [[nodiscard]] bool IsFramebufferTransparent() const { return _transparentFramebuffer; }
+        /** @brief The format the window presents in: the first of WindowSettings::formats the display offers. */
+        [[nodiscard]] Format PixelFormat() const;
+        /** @brief The formats it was asked to present in, most wanted first. */
+        [[nodiscard]] const std::vector<Format>& RequestedFormats() const { return _formats; }
 
         /** @brief Marks the window paused. Set automatically when it is minimized. */
         void Pause() { _paused = true; }
@@ -179,6 +180,7 @@ namespace kor {
         bool _decorated;
         bool _transparentFramebuffer;
         bool _vsync;
+        std::vector<Format> _formats;
 
         kor::Resource<kor::Framebuffer> _framebuffer;
 
@@ -187,5 +189,32 @@ namespace kor {
         bool _focused = true;
         bool _hasResized = false;
         bool _shownThisFrame = false;
+    };
+
+    /**
+     * @brief What a window is opened with.
+     *
+     * Designated initialisers name just what differs from the defaults:
+     *
+     * @code
+     * kor::Navigator::Open("Inspector", {.title = "Buffers", .extent = {640, 360}});
+     * @endcode
+     *
+     * The runtime reads the first scene's from koral.json.
+     */
+    struct WindowSettings {
+        std::string title = "Koral";               ///< Text in the title bar.
+        glm::uvec2 extent = { 1280, 720 };          ///< Initial size of the drawable area, in pixels.
+        bool resizable = true;                      ///< Whether the user may resize it.
+        bool fullscreen = false;                    ///< Whether to open fullscreen on the primary monitor.
+        bool decorated = true;                      ///< Whether the OS draws a title bar and border.
+        bool transparentFramebuffer = false;        ///< Whether the framebuffer's alpha composites with the desktop.
+        bool vsync = true;                          ///< Whether presentation waits for the display's refresh.
+        /**
+         * The formats to present in, most wanted first; the first the display offers is used. The
+         * default is plain 8-bit: a scene that writes sRGB-encoded values itself (a tone-mapping
+         * pass, say) wants UNORM, one that wants the hardware to encode on write wants SRGB.
+         */
+        std::vector<Window::Format> formats = { Window::Format::eBGRA8_UNORM, Window::Format::eRGBA8_UNORM };
     };
 }
