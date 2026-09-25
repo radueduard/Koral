@@ -85,10 +85,10 @@ namespace kcam
         adoptSourceAspect();
     }
 
-    void PerspectiveImpl::AutomaticUpdate()
+    std::optional<glm::uvec2> PerspectiveImpl::renderExtent() const
     {
-        CameraBase::AutomaticUpdate();
-        adoptSourceAspect();
+        if (_aspectSource.kind != AspectSource::Kind::eNone) return _aspectSource.Extent();
+        return CameraBase::renderExtent();
     }
 
     void PerspectiveImpl::adoptSourceAspect()

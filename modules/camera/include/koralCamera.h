@@ -118,6 +118,13 @@ namespace kcam
         inline constexpr std::string_view InverseProjectionMatrix     = "INVERSE_PROJECTION_MATRIX";
         inline constexpr std::string_view InverseViewProjectionMatrix = "INVERSE_VIEW_PROJECTION_MATRIX";
 
+        /** @brief projection * view without this frame's jitter. @see Camera::SetJitter */
+        inline constexpr std::string_view UnjitteredViewProjectionMatrix = "UNJITTERED_VIEW_PROJECTION_MATRIX";
+        /** @brief Last frame's unjittered projection * view — what reprojection maps a point back through. */
+        inline constexpr std::string_view PreviousViewProjectionMatrix  = "PREVIOUS_VIEW_PROJECTION_MATRIX";
+        /** @brief vec2: this frame's jitter, in clip space (NDC units). Zero when jitter is off. */
+        inline constexpr std::string_view Jitter = "JITTER";
+
         inline constexpr std::string_view Position = "POSITION";
         inline constexpr std::string_view Forward  = "FORWARD";
         inline constexpr std::string_view Up       = "UP";
@@ -502,11 +509,46 @@ namespace kcam
         /** @brief World → view. */
         [[nodiscard]] virtual const glm::mat4& View() const = 0;
 
-        /** @brief View → clip, in the engine's clip conventions (zero-to-one depth, Y down). */
+        /**
+         * @brief View → clip, in the engine's clip conventions (zero-to-one depth, Y down).
+         *
+         * Includes this frame's sub-pixel jitter when SetJitter is on — it is what the scene is
+         * rasterised with, so it is what every camera semantic but the unjittered and previous
+         * ones is built from.
+         */
         [[nodiscard]] virtual const glm::mat4& Projection() const = 0;
 
         /** @brief Projection() * View(), cached — the matrix a draw usually wants. */
         [[nodiscard]] virtual const glm::mat4& ViewProjection() const = 0;
+
+        // ---- temporal effects ---------------------------------------------------------------------
+
+        /**
+         * @brief Offsets the projection by a different sub-pixel amount every frame, for temporal
+         *        anti-aliasing to resolve.
+         *
+         * Each frame the camera takes the next point of an 8-sample Halton(2, 3) sequence and moves
+         * the image by it — within one pixel of the size the camera renders at (what its aspect
+         * follows, or the window). Applied as the camera updates at the top of the frame, so the
+         * matrices a shader receives and the ones Projection() returns always agree. Off by
+         * default: without a pass that resolves it, jitter only makes the image shimmer.
+         */
+        virtual void SetJitter(bool enabled) = 0;
+        [[nodiscard]] virtual bool Jittering() const = 0;
+
+        /** @brief This frame's jitter, in clip space (NDC units); zero when jitter is off. */
+        [[nodiscard]] virtual glm::vec2 Jitter() const = 0;
+
+        /** @brief ViewProjection() without the jitter: where a point sits on the pixel grid itself. */
+        [[nodiscard]] virtual const glm::mat4& UnjitteredViewProjection() const = 0;
+
+        /**
+         * @brief The unjittered view-projection the previous frame was rendered with.
+         *
+         * Maps a world-space point to where it was on screen last frame — the reprojection a TAA
+         * resolve or motion vectors need. The same as UnjitteredViewProjection() on the first frame.
+         */
+        [[nodiscard]] virtual const glm::mat4& PreviousViewProjection() const = 0;
 
         /** @brief The name given at build time, for interfaces and logs. */
         [[nodiscard]] virtual std::string_view Name() const = 0;

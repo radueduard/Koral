@@ -234,4 +234,63 @@ TEST_F(CameraAspect, ASceneCanLetTheCursorGoAndTakeItBack)
     EXPECT_FALSE(camera->Released());
 }
 
+// ---- temporal jitter and the previous frame's matrix -------------------------------------------
+
+TEST_F(CameraAspect, JitterMovesTheImageByLessThanAPixelAndChangesEveryFrame)
+{
+    auto target = colorImage({ 100, 50 });
+    const auto camera = PerspectiveCamera::Builder{}.FollowAspectOf(target).Build();
+    ASSERT_TRUE(camera);
+    camera->SetJitter(true);
+
+    std::vector<glm::vec2> seen;
+    for (int frame = 0; frame < 16; ++frame) {
+        camera->AutomaticUpdate();
+        const glm::vec2 jitter = camera->Jitter();
+        // Half a pixel either way, and a pixel is 2 / extent in NDC.
+        EXPECT_LE(std::abs(jitter.x), 1.f / 100.f + 1e-6f) << "frame " << frame;
+        EXPECT_LE(std::abs(jitter.y), 1.f / 50.f + 1e-6f) << "frame " << frame;
+
+        // The whole image moves by it: a point lands jitter * w further along in clip space.
+        const glm::vec4 point(0.3f, -0.2f, -5.f, 1.f);
+        const glm::vec4 jittered = camera->ViewProjection() * point;
+        const glm::vec4 plain = camera->UnjitteredViewProjection() * point;
+        EXPECT_NEAR(jittered.x - plain.x, jitter.x * plain.w, 1e-5f);
+        EXPECT_NEAR(jittered.y - plain.y, jitter.y * plain.w, 1e-5f);
+        EXPECT_FLOAT_EQ(jittered.w, plain.w);
+        seen.push_back(jitter);
+    }
+    for (int i = 1; i < 8; ++i) EXPECT_NE(seen[i], seen[i - 1]) << "frame " << i << " did not move";
+    for (int i = 0; i < 8; ++i) EXPECT_EQ(seen[i], seen[i + 8]) << "an 8-sample sequence repeats";
+}
+
+TEST_F(CameraAspect, WithoutJitterTheProjectionIsLeftAlone)
+{
+    auto target = colorImage({ 100, 50 });
+    const auto camera = PerspectiveCamera::Builder{}.FollowAspectOf(target).Build();
+    camera->SetJitter(true);
+    camera->AutomaticUpdate();
+    camera->SetJitter(false);
+    EXPECT_EQ(camera->Jitter(), glm::vec2(0.f)) << "switching it off takes the current offset away too";
+    camera->AutomaticUpdate();
+    EXPECT_EQ(camera->Jitter(), glm::vec2(0.f));
+    EXPECT_EQ(camera->ViewProjection(), camera->UnjitteredViewProjection());
+}
+
+TEST_F(CameraAspect, ThePreviousViewProjectionIsWhatTheFrameBeforeWasDrawnWith)
+{
+    auto target = colorImage({ 100, 50 });
+    const auto camera = PerspectiveCamera::Builder{}.FollowAspectOf(target).SetPosition({ 0.f, 0.f, 5.f }).Build();
+    camera->SetJitter(true);
+
+    camera->AutomaticUpdate();
+    EXPECT_EQ(camera->PreviousViewProjection(), camera->UnjitteredViewProjection()) << "no frame before the first";
+    const glm::mat4 first = camera->UnjitteredViewProjection();
+
+    camera->SetPosition({ 1.f, 0.f, 5.f });   // moved between frames, as a scene would
+    camera->AutomaticUpdate();
+    EXPECT_EQ(camera->PreviousViewProjection(), first);
+    EXPECT_NE(camera->PreviousViewProjection(), camera->UnjitteredViewProjection());
+}
+
 } // namespace
