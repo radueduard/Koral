@@ -1922,6 +1922,28 @@ namespace kor
             }, PassEdge::eNone, [this, srcImage, dstImage, blitInfo] { DoBlit(srcImage, dstImage, blitInfo); });
     }
 
+    CommandBuffer& CommandBuffer::CopyImage(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage,
+                                            const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(srcImage, "copy source image")) return *this;
+        if (Reject(dstImage, "copy destination image")) return *this;
+        const auto& src = *srcImage;
+        const auto& dst = *dstImage;
+        if (src.PixelFormat() != dst.PixelFormat() || src.Extent() != dst.Extent() || src.MipLevels() != dst.MipLevels()
+            || src.ArrayLayers() != dst.ArrayLayers() || src.Samples() != dst.Samples() || src.ImageType() != dst.ImageType()) {
+            return RecordError(ErrorCode::eInvalidArgument, std::format(
+                "CopyImage needs two images of the same shape; '{}' and '{}' differ in format, extent, "
+                "mip levels, layers, samples or type. Blit copies between different ones.",
+                srcImage.Name().empty() ? "<source>" : srcImage.Name(),
+                dstImage.Name().empty() ? "<destination>" : dstImage.Name()));
+        }
+        return Enqueue("CopyImage", where, {
+                ResourceUse{ .image = srcImage, .access = ResourceAccess::eTransferSrc },
+                ResourceUse{ .image = dstImage, .access = ResourceAccess::eTransferDst },
+            }, PassEdge::eNone, [this, srcImage, dstImage] { DoCopyImage(srcImage, dstImage); });
+    }
+
     CommandBuffer& CommandBuffer::ResolveToScreen(kor::ResourceRef<const Image> srcImage, const kor::Resolve resolveInfo,
                                           const std::source_location where)
     {

@@ -909,6 +909,19 @@ namespace kor
                             std::source_location where = std::source_location::current());
 
         /**
+         * @brief Copies one image into another of exactly the same shape: every mip level, every layer.
+         * @param srcImage Source.
+         * @param dstImage Destination: the same format, extent, mip count, layer count and sample count.
+         * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
+         *
+         * A copy, not a Blit: the bytes are moved as they are, so it works for every format — depth
+         * included, which a Blit is not guaranteed to — and never filters. Images of different
+         * shapes are refused rather than partly copied.
+         */
+        CommandBuffer& CopyImage(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage,
+                                 std::source_location where = std::source_location::current());
+
+        /**
          * @brief Resolves a multisampled image onto the swap-chain image this frame presents.
          * @param srcImage The multisampled image.
          * @param resolveInfo Which region to take and where it lands; see kor::Resolve.
@@ -1325,6 +1338,7 @@ namespace kor
         virtual CommandBuffer& DoCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo) = 0;
         virtual CommandBuffer& DoBlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo) = 0;
         virtual CommandBuffer& DoBlit(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Blit blitInfo) = 0;
+        virtual CommandBuffer& DoCopyImage(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage) = 0;
         virtual CommandBuffer& DoResolveToScreen(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) = 0;
         virtual CommandBuffer& DoResolve(ResourceRef<const Image> srcImage, ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) = 0;
 

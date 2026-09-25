@@ -72,6 +72,7 @@ namespace kor::vk
 
         kor::CommandBuffer& DoBlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo) override;
         kor::CommandBuffer& DoBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo) override;
+        kor::CommandBuffer& DoCopyImage(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage) override;
         kor::CommandBuffer& DoResolveToScreen(ResourceRef<const Image> srcImage, kor::Resolve resolveInfo) override;
         kor::CommandBuffer& DoResolve(kor::ResourceRef<const Image> srcImage, kor::ResourceRef<const Image> dstImage, kor::Resolve resolveInfo) override;
 

@@ -761,6 +761,30 @@ namespace kor::vk
          return *this;
     }
 
+    kor::CommandBuffer& CommandBuffer::DoCopyImage(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage)
+    {
+        // Both operands are declared as uses by the core wrapper, which also checked they match.
+        const auto& vkSrcImage = dynamic_cast<const Image&>(*srcImage);
+        const auto& vkDstImage = dynamic_cast<const Image&>(*dstImage);
+        const glm::uvec3 extent = srcImage->Extent();
+
+        std::vector<::vk::ImageCopy> regions;
+        for (glm::u32 mip = 0; mip < srcImage->MipLevels(); ++mip) {
+            const auto layers = ::vk::ImageSubresourceLayers()
+                .setAspectMask(vkSrcImage.getAspectFlags())
+                .setMipLevel(mip)
+                .setBaseArrayLayer(0)
+                .setLayerCount(srcImage->ArrayLayers());
+            regions.push_back(::vk::ImageCopy()
+                .setSrcSubresource(layers)
+                .setDstSubresource(layers)
+                .setExtent({ std::max(1u, extent.x >> mip), std::max(1u, extent.y >> mip), std::max(1u, extent.z >> mip) }));
+        }
+        _handle.copyImage(*vkSrcImage, ::vk::ImageLayout::eTransferSrcOptimal,
+                          *vkDstImage, ::vk::ImageLayout::eTransferDstOptimal, regions);
+        return *this;
+    }
+
     kor::CommandBuffer & CommandBuffer::DoResolveToScreen(ResourceRef<const kor::Image> srcImage, kor::Resolve resolveInfo) {
         if (_failed) return *this;
         if (srcImage->Samples() == SampleCount::e1)

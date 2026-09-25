@@ -463,6 +463,45 @@ TEST_F(GlTest, RenderParity) {
 // Compute round-trip: doubles every uint in a storage buffer on the GPU. Drives
 // the GL ComputePipeline, storage-buffer descriptor bind and Dispatch paths.
 // -----------------------------------------------------------------------------
+// CopyImage under OpenGL is glCopyImageSubData, level by level: every mip must arrive, not just the
+// first. The frame graph's previous-frame history is built on it.
+TEST_F(GlTest, CopyImageCopiesEveryMipLevel) {
+    const auto make = [] {
+        return Image::Builder{}
+            .SetType(Image::Type::e2D)
+            .SetFormat(Image::Format::eRGBA8_UNORM)
+            .SetExtent(glm::uvec2{8, 8})
+            .SetMipLevels(2)
+            .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst)
+            .Build();
+    };
+    auto src = make();
+    auto dst = make();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.ClearColorImage(dst, glm::vec4{0.f, 0.f, 0.f, 0.f});
+        cb.ClearColorImage(src, glm::vec4{1.f, 0.5f, 0.f, 1.f});
+        cb.CopyImage(src, dst);
+    }, CommandBuffer::Usage::eGraphics).Wait();
+
+    for (glm::u32 mip = 0; mip < 2; ++mip) {
+        const glm::u32 side = 8u >> mip;
+        Buffer::RawBuilder rb;
+        rb.SetRawSize(static_cast<glm::i64>(side * side * 4))
+          .SetUsage(Buffer::Usage::eTransferDst)
+          .SetType(Buffer::Type::eReadback);
+        auto readback = rb.Build();
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+            cb.CopyImageToBuffer(dst, readback, kor::Copy{ .imageMipLevel = mip });
+        }, CommandBuffer::Usage::eTransfer).Wait();
+        const auto texels = readback->Read<std::uint8_t>();
+        ASSERT_EQ(texels.size(), side * side * 4u);
+        EXPECT_EQ(texels[0], 255) << "mip " << mip;
+        EXPECT_NEAR(texels[1], 128, 1) << "mip " << mip;
+        EXPECT_EQ(texels[2], 0) << "mip " << mip;
+        EXPECT_EQ(texels.back(), 255) << "mip " << mip << ", last texel";
+    }
+}
+
 TEST_F(GlTest, ComputeDispatch) {
     constexpr std::uint32_t kCount = 256;   // multiple of local_size_x (64)
     constexpr std::uint32_t kLocalSize = 64;

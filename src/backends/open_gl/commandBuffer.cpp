@@ -816,6 +816,31 @@ namespace kor::ogl
         return *this;
     }
 
+    GLenum GetTargetFromImageType(kor::Image::Type type, kor::SampleCount msaa, glm::u32 arrayLayers);  // image.cpp
+
+    kor::CommandBuffer& CommandBuffer::DoCopyImage(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage)
+    {
+        CheckRecording();
+        enqueue([srcImage, dstImage] {
+            const auto& glSrcImage = dynamic_cast<const ogl::Image&>(*srcImage);
+            const auto& glDstImage = dynamic_cast<const ogl::Image&>(*dstImage);
+            const GLenum target = GetTargetFromImageType(srcImage->ImageType(), srcImage->Samples(), srcImage->ArrayLayers());
+            const glm::uvec3 extent = srcImage->Extent();
+            const bool is3D = srcImage->ImageType() == kor::Image::Type::e3D;
+            for (glm::u32 mip = 0; mip < srcImage->MipLevels(); ++mip) {
+                // glCopyImageSubData counts array layers as depth.
+                const auto depth = is3D ? std::max(1u, extent.z >> mip) : srcImage->ArrayLayers();
+                glCopyImageSubData(*glSrcImage, target, static_cast<GLint>(mip), 0, 0, 0,
+                                   *glDstImage, target, static_cast<GLint>(mip), 0, 0, 0,
+                                   static_cast<GLsizei>(std::max(1u, extent.x >> mip)),
+                                   static_cast<GLsizei>(std::max(1u, extent.y >> mip)),
+                                   static_cast<GLsizei>(depth));
+                glCheckError();
+            }
+        });
+        return *this;
+    }
+
     kor::CommandBuffer& CommandBuffer::DoBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo)
     {
         if (srcImage->Samples() != SampleCount::e1)
