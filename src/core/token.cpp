@@ -3,6 +3,7 @@
 //
 
 #include "tokenState.h"
+#include "task.h"
 
 #include <algorithm>
 
@@ -33,13 +34,14 @@ namespace kor::detail {
         return gpu && gpu->counter() >= value;
     }
 
-    TimelineState::Waiter TimelineState::suspend(const std::uint64_t value, const std::coroutine_handle<> handle) {
+    TimelineState::Waiter TimelineState::suspend(const std::uint64_t value, const std::coroutine_handle<> handle,
+                                                 const bool resumeInline) {
         std::lock_guard lock(mutex);
         // Re-checked under the lock: a signal between await_ready and here would otherwise leave
         // this coroutine parked on a value nobody is going to reach again.
         if (reached.load(std::memory_order_acquire) >= value) return nullptr;
         if (gpu && gpu->counter() >= value) return nullptr;
-        auto waiter = std::make_shared<WaiterSlot>(value, handle, resumeExecutor());
+        auto waiter = std::make_shared<WaiterSlot>(value, handle, resumeInline ? nullptr : resumeExecutor());
         waiters.push_back(waiter);
         // The GPU tells nobody when it gets there; the backend has to be looking.
         if (gpu) gpu->watch();
@@ -206,6 +208,31 @@ namespace kor::detail {
         for (const auto& r : released) r.wait();
         released.clear();
     }
+}
+
+namespace kor::detail {
+    bool InlineAwaiter::await_suspend(const std::coroutine_handle<> h) {
+        const auto& state = TokenAccess::state(token);
+        if (!state) return false;
+        slot = state->suspend(token.Value(), h, /*resumeInline=*/true);
+        return slot != nullptr;
+    }
+
+    InlineAwaiter::~InlineAwaiter() {
+        if (slot) if (const auto& state = TokenAccess::state(token)) state->cancel(slot);
+    }
+}
+
+kor::Task<void> kor::WhenAll(std::vector<Task<void>> tasks) {
+    for (const auto& task : tasks) co_await detail::InlineAwaiter(task.Completion());
+    std::exception_ptr first;
+    for (const auto& task : tasks)
+        if (!first) first = task.Exception();
+    if (first) std::rethrow_exception(first);
+}
+
+kor::Task<void> kor::WhenAll(std::vector<Token> tokens) {
+    for (const auto& token : tokens) co_await detail::InlineAwaiter(token);
 }
 
 kor::Timeline::Timeline() : _state(std::make_shared<detail::TimelineState>()) {}

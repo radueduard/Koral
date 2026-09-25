@@ -80,7 +80,7 @@ namespace kor::detail {
         /** The highest value known to be reached, looking at the GPU counter if there is one. */
         [[nodiscard]] std::uint64_t current();
         [[nodiscard]] bool isReached(std::uint64_t value);
-        Waiter suspend(std::uint64_t value, std::coroutine_handle<> handle);
+        Waiter suspend(std::uint64_t value, std::coroutine_handle<> handle, bool resumeInline = false);
         void cancel(const Waiter& waiter) noexcept;
         void wait(std::uint64_t value);
 
@@ -120,6 +120,26 @@ namespace kor::detail {
      * releases those too — for shutdown, while whatever they hold can still be destroyed properly.
      */
     KORAL_API void collectRetired(bool all = false); // exported: the runtime's headless path calls it
+
+    /**
+     * Awaits a token and is resumed by whichever thread signals it, instead of going back to the
+     * executor it suspended on. For combinators such as WhenAll, whose own frame belongs to no
+     * thread: bouncing through the main thread's queue would deadlock a main thread blocked in
+     * Wait() on the combinator itself.
+     */
+    struct InlineAwaiter {
+        Token token;
+        std::shared_ptr<WaiterSlot> slot;
+
+        explicit InlineAwaiter(Token t) : token(std::move(t)) {}
+        InlineAwaiter(const InlineAwaiter&) = delete;
+        InlineAwaiter& operator=(const InlineAwaiter&) = delete;
+        ~InlineAwaiter();
+
+        bool await_ready() const noexcept { return token.Ready(); }
+        bool await_suspend(std::coroutine_handle<> h);
+        void await_resume() const noexcept {}
+    };
 
     /** How the backends get at a token's state without it being part of the public API. */
     struct TokenAccess {

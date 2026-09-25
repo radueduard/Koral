@@ -97,6 +97,39 @@ TEST_F(TokenExecutorTest, ACoroutineDestroyedWhileItsResumeIsQueuedIsSkipped) {
     EXPECT_EQ(resumed.load(), 0) << "a destroyed coroutine was resumed from the executor's queue";
 }
 
+Task<void> WorkOnBackground(std::atomic<int>& done) {
+    co_await Context::SwitchToBackgroundThread();
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    done.fetch_add(1);
+}
+
+// The frame graph's shape: fan work out to the pool, then block the main thread until all of it is
+// done. WhenAll must not route its own resumes through the main thread's queue, or the main thread
+// — blocked right here — would be waiting on itself.
+TEST_F(TokenExecutorTest, WaitingOnWhenAllFromTheMainThreadDoesNotDeadlock) {
+    std::atomic<int> done{0};
+    std::vector<Task<void>> tasks;
+    for (int i = 0; i < 8; ++i) tasks.push_back(WorkOnBackground(done));
+    auto all = WhenAll(std::move(tasks));
+
+    // A regression would hang here forever; after two seconds the watchdog notes it and runs the
+    // main queue itself, so the suite fails instead of hanging.
+    std::atomic<bool> finished{false}, deadlocked{false};
+    std::thread watchdog([&] {
+        for (int i = 0; i < 200 && !finished.load(); ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if (!finished.load()) {
+            deadlocked.store(true);
+            Context::DrainMainThread();
+        }
+    });
+    all.Wait();
+    finished.store(true);
+    watchdog.join();
+    EXPECT_FALSE(deadlocked.load()) << "WhenAll needed the main thread it was blocking";
+    EXPECT_EQ(done.load(), 8);
+    EXPECT_TRUE(all.Take().has_value());
+}
+
 // The long-lived-loop shape from the v2 design: a background coroutine that parks on a request
 // timeline, does a step, and reports on a done timeline. It holds no thread while parked.
 Task<void> StepLoop(Timeline& requests, Timeline& done, const int steps, std::atomic<int>& state) {

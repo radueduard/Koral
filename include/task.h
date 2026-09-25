@@ -11,6 +11,9 @@
 #include <optional>
 #include <utility>
 #include <string>
+#include <vector>
+
+#include "token.h"
 
 namespace kor {
     /**
@@ -70,8 +73,8 @@ namespace kor {
      * @brief The return type of an asynchronous operation: a coroutine that may suspend and resume.
      * @tparam T What it produces, or void for one that only performs work.
      *
-     * Writing a function that returns a Task makes it a coroutine — it may `co_await` other tasks
-     * and executor switches, and it starts running immediately when called, up to its first
+     * Writing a function that returns a Task makes it a coroutine — it may `co_await` other tasks,
+     * tokens and executor switches, and it starts running immediately when called, up to its first
      * suspension.
      *
      * @code
@@ -85,59 +88,129 @@ namespace kor {
      * }
      * @endcode
      *
+     * Every task carries a completion Token, signalled when its coroutine finishes. Awaiting a task
+     * is awaiting that token, so it follows the token's rule: the awaiting coroutine resumes where
+     * it suspended — on the main thread if it was there, on the background pool otherwise — not on
+     * whichever thread the task happened to finish on.
+     *
      * A task owns its coroutine and destroys it when it goes out of scope, so it is move-only and
-     * must outlive the work it represents. From non-coroutine code — the run loop, for instance —
-     * poll done() and then take() the result.
+     * must outlive the work it represents. From ordinary code, Wait() for it (or poll Done()) and
+     * then Take() the result.
      */
     template <typename T>
     class Task;
 
-    /**
-     * @brief A task that performs work but produces no value.
-     *
-     * @note Unlike Task<T>, this cannot be `co_await`ed. Drive it from ordinary code with done()
-     *       and take(), which is how the engine runs a headless Job::Run to completion.
-     */
-    template <>
-    class Task<void> {
-    public:
-        struct promise_type {
+    namespace detail {
+        struct TaskPromiseBase {
             std::exception_ptr exception;
-
-            Task get_return_object() noexcept {
-                return Task{std::coroutine_handle<promise_type>::from_promise(*this)};
-            }
+            Token completion = Token::Create();
 
             std::suspend_never initial_suspend() noexcept { return {}; }
-            std::suspend_always final_suspend() noexcept { return {}; }
+
+            // Suspends for good at the end, so the Task can still read the result, and signals the
+            // completion token. The coroutine counts as suspended once await_suspend is entered, so
+            // an awaiter resumed inline by the signal may destroy this frame at once — which is
+            // why the token is copied out before it is signalled and nothing is touched after.
+            struct FinalAwaiter {
+                bool await_ready() const noexcept { return false; }
+                template <typename Promise>
+                void await_suspend(const std::coroutine_handle<Promise> h) const noexcept {
+                    const Token done = h.promise().completion;
+                    done.Signal();
+                }
+                void await_resume() const noexcept {}
+            };
+            FinalAwaiter final_suspend() noexcept { return {}; }
 
             void unhandled_exception() noexcept { exception = std::current_exception(); }
+        };
+
+        inline std::string Describe(const std::exception_ptr& exception) {
+            try {
+                std::rethrow_exception(exception);
+            } catch (const std::exception& e) {
+                return e.what();
+            } catch (...) {
+                return "Unknown exception";
+            }
+        }
+
+        // What Task<void> and Task<T> share: ownership of the coroutine, and its completion.
+        template <typename Promise>
+        class TaskBase {
+        public:
+            TaskBase() noexcept = default;
+            explicit TaskBase(std::coroutine_handle<Promise> h) noexcept : _handle(h) {}
+
+            TaskBase(TaskBase&& other) noexcept : _handle(std::exchange(other._handle, {})) {}
+            TaskBase& operator=(TaskBase&& other) noexcept {
+                if (this != &other) {
+                    if (_handle) _handle.destroy();
+                    _handle = std::exchange(other._handle, {});
+                }
+                return *this;
+            }
+            TaskBase(const TaskBase&) = delete;
+            TaskBase& operator=(const TaskBase&) = delete;
+
+            ~TaskBase() {
+                if (_handle) _handle.destroy();
+            }
+
+            /** @brief Whether the coroutine has run to completion (or was never started). */
+            [[nodiscard]] bool Done() const noexcept {
+                return !_handle || _handle.done();
+            }
+
+            /** @brief A token signalled once the coroutine has finished. Always ready for an empty task. */
+            [[nodiscard]] Token Completion() const noexcept {
+                return _handle ? _handle.promise().completion : Token{};
+            }
+
+            /**
+             * @brief Blocks the calling thread until the coroutine has finished.
+             * @warning Never from the main thread for a task that needs the main thread to finish:
+             *          it resumes there on the next drain, which is what this is blocking.
+             */
+            void Wait() const { Completion().Wait(); }
+
+            /** @brief What the coroutine threw, once it has finished; null if it has not, or threw nothing. */
+            [[nodiscard]] std::exception_ptr Exception() const noexcept {
+                return _handle && _handle.done() ? _handle.promise().exception : nullptr;
+            }
+
+        protected:
+            std::coroutine_handle<Promise> _handle{};
+        };
+    }
+
+    namespace detail {
+        struct VoidPromise : TaskPromiseBase {
+            Task<void> get_return_object() noexcept;
             void return_void() noexcept {}
         };
 
-        Task() noexcept = default;
-        explicit Task(std::coroutine_handle<promise_type> h) noexcept : _handle(h) {}
+        template <typename T>
+        struct ValuePromise : TaskPromiseBase {
+            std::optional<T> value;
 
-        Task(Task&& other) noexcept : _handle(std::exchange(other._handle, {})) {}
-        Task& operator=(Task&& other) noexcept {
-            if (this != &other) {
-                if (_handle) _handle.destroy();
-                _handle = std::exchange(other._handle, {});
+            Task<T> get_return_object() noexcept;
+
+            template <typename U>
+            void return_value(U&& v) noexcept(std::is_nothrow_constructible_v<T, U&&>) {
+                value.emplace(std::forward<U>(v));
             }
-            return *this;
-        }
+        };
+    }
 
-        Task(const Task&) = delete;
-        Task& operator=(const Task&) = delete;
+    /** @brief A task that performs work but produces no value. */
+    template <>
+    class Task<void> : public detail::TaskBase<detail::VoidPromise> {
+    public:
+        using promise_type = detail::VoidPromise;
 
-        ~Task() {
-            if (_handle) _handle.destroy();
-        }
-
-        /** @brief Whether the coroutine has run to completion (or was never started). */
-        [[nodiscard]] bool Done() const noexcept {
-            return !_handle || _handle.done();
-        }
+        Task() noexcept = default;
+        explicit Task(std::coroutine_handle<promise_type> h) noexcept : TaskBase(h) {}
 
         /**
          * @brief Collects the outcome and releases the coroutine.
@@ -149,83 +222,40 @@ namespace kor {
         std::expected<void, std::string> Take() {
             if (!_handle) return std::unexpected("No task to take from");
             if (!_handle.done()) return std::unexpected("Task is not completed yet");
-
-            auto& p = _handle.promise();
-            if (p.exception) {
-                try {
-                    std::rethrow_exception(p.exception);
-                } catch (const std::exception& e) {
-                    return std::unexpected(e.what());
-                } catch (...) {
-                    return std::unexpected("Unknown exception");
-                }
-            }
-
+            const auto exception = _handle.promise().exception;
             _handle.destroy();
             _handle = {};
-            return {}; // success
+            if (exception) return std::unexpected(detail::Describe(exception));
+            return {};
         }
 
-    private:
-        std::coroutine_handle<promise_type> _handle{};
-    };
+        /**
+         * @brief Suspends the awaiting coroutine until this task finishes.
+         *
+         * An exception that escaped the awaited task is rethrown here, in the awaiting coroutine.
+         */
+        struct Awaiter {
+            std::coroutine_handle<promise_type> handle;
+            Token::Awaiter finished;
 
-    template <typename T>
-    class Task {
-    public:
-        struct promise_type {
-            std::optional<T> value;
-            std::exception_ptr exception;
-            std::coroutine_handle<> continuation; // who's waiting on us
-
-            Task get_return_object() noexcept {
-                return Task{std::coroutine_handle<promise_type>::from_promise(*this)};
-            }
-
-            std::suspend_never initial_suspend() noexcept { return {}; }
-
-            // Custom final awaiter: resume the continuation (if any) when this task finishes
-            struct FinalAwaiter {
-                bool await_ready() const noexcept { return false; }
-                void await_suspend(std::coroutine_handle<promise_type> h) const noexcept {
-                    if (auto cont = h.promise().continuation)
-                        cont.resume(); // or enqueue on an executor
-                }
-                void await_resume() const noexcept {}
-            };
-            FinalAwaiter final_suspend() noexcept { return {}; }
-
-            void unhandled_exception() noexcept { exception = std::current_exception(); }
-
-            template <typename U>
-            void return_value(U&& v) noexcept(std::is_nothrow_constructible_v<T, U&&>) {
-                value.emplace(std::forward<U>(v));
+            bool await_ready() const noexcept { return finished.await_ready(); }
+            bool await_suspend(const std::coroutine_handle<> awaiting) { return finished.await_suspend(awaiting); }
+            void await_resume() const {
+                if (handle && handle.promise().exception) std::rethrow_exception(handle.promise().exception);
             }
         };
 
+        Awaiter operator co_await() noexcept { return Awaiter{_handle, Token::Awaiter(Completion())}; }
+    };
+
+    template <typename T>
+    class Task : public detail::TaskBase<detail::ValuePromise<T>> {
+        using Base = detail::TaskBase<detail::ValuePromise<T>>;
+    public:
+        using promise_type = detail::ValuePromise<T>;
+
         Task() noexcept = default;
-        explicit Task(std::coroutine_handle<promise_type> h) noexcept : _handle(h) {}
-
-        Task(Task&& other) noexcept : _handle(std::exchange(other._handle, {})) {}
-        Task& operator=(Task&& other) noexcept {
-            if (this != &other) {
-                if (_handle) _handle.destroy();
-                _handle = std::exchange(other._handle, {});
-            }
-            return *this;
-        }
-
-        Task(const Task&) = delete;
-        Task& operator=(const Task&) = delete;
-
-        ~Task() {
-            if (_handle) _handle.destroy();
-        }
-
-        /** @brief Whether the coroutine has run to completion (or was never started). */
-        [[nodiscard]] bool Done() const noexcept {
-            return !_handle || _handle.done();
-        }
+        explicit Task(std::coroutine_handle<promise_type> h) noexcept : Base(h) {}
 
         /**
          * @brief Collects the value and releases the coroutine.
@@ -235,24 +265,14 @@ namespace kor {
          * @note Consumes the task: calling it twice reports that there is nothing to take.
          */
         std::expected<T, std::string> Take() {
+            auto& _handle = this->_handle;
             if (!_handle) return std::unexpected("No task to take from");
             if (!_handle.done()) return std::unexpected("Task is not completed yet");
-
             auto& p = _handle.promise();
-            if (p.exception) {
-                try {
-                    std::rethrow_exception(p.exception);
-                } catch (const std::exception& e) {
-                    return std::unexpected(e.what());
-                } catch (...) {
-                    return std::unexpected("Unknown exception");
-                }
-            }
-            if (!p.value.has_value()) {
-                return std::unexpected("Task completed without returning a value");
-            }
-
-            T out = std::move(*p.value);
+            std::expected<T, std::string> out = p.exception
+                ? std::unexpected(detail::Describe(p.exception))
+                : p.value.has_value() ? std::expected<T, std::string>(std::move(*p.value))
+                                      : std::unexpected(std::string("Task completed without returning a value"));
             _handle.destroy();
             _handle = {};
             return out;
@@ -264,27 +284,50 @@ namespace kor {
          * An exception that escaped the awaited task is rethrown here, in the awaiting coroutine.
          */
         struct Awaiter {
-            std::coroutine_handle<promise_type> handle;
+            promise_type* promise;
+            Token::Awaiter finished;
 
-            bool await_ready() const noexcept { return handle.done(); }
-
-            void await_suspend(std::coroutine_handle<> awaiting) const noexcept {
-                handle.promise().continuation = awaiting;
-            }
-
+            bool await_ready() const noexcept { return finished.await_ready(); }
+            bool await_suspend(const std::coroutine_handle<> awaiting) { return finished.await_suspend(awaiting); }
             T await_resume() const {
-                auto& p = handle.promise();
-                if (p.exception) std::rethrow_exception(p.exception);
-                return std::move(*p.value);
+                if (promise->exception) std::rethrow_exception(promise->exception);
+                return std::move(*promise->value);
             }
         };
 
         /** @brief Makes the task awaitable, so `co_await task` yields its value. */
         Awaiter operator co_await() noexcept {
-            return Awaiter{_handle};
+            return Awaiter{&this->_handle.promise(), Token::Awaiter(this->Completion())};
         }
-
-    private:
-        std::coroutine_handle<promise_type> _handle{};
     };
+
+    inline Task<void> detail::VoidPromise::get_return_object() noexcept {
+        return Task<void>{std::coroutine_handle<VoidPromise>::from_promise(*this)};
+    }
+
+    template <typename T>
+    Task<T> detail::ValuePromise<T>::get_return_object() noexcept {
+        return Task<T>{std::coroutine_handle<ValuePromise>::from_promise(*this)};
+    }
+
+    /**
+     * @brief Suspends until every one of @p tasks has finished.
+     *
+     * The tasks are already running — a task starts when it is called — so this only waits; they
+     * make progress side by side, wherever each has taken itself. If any threw, the first
+     * exception is rethrown once all have finished, so none is left running unobserved.
+     *
+     * Safe to Wait() on from the main thread even when the tasks run on the background pool: its
+     * own bookkeeping never goes back through the main thread's queue.
+     *
+     * @code
+     * std::vector<kor::Task<void>> passes;
+     * for (auto& pass : graph) passes.push_back(RecordOnBackground(pass));
+     * co_await kor::WhenAll(std::move(passes));   // or .Wait() from ordinary code
+     * @endcode
+     */
+    [[nodiscard]] KORAL_API Task<void> WhenAll(std::vector<Task<void>> tasks);
+
+    /** @brief Suspends until every one of @p tokens has happened. As WhenAll over tasks. */
+    [[nodiscard]] KORAL_API Task<void> WhenAll(std::vector<Token> tokens);
 }
