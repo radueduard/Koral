@@ -116,6 +116,64 @@ TEST(ResourceRef, UpcastsDerivedToBase) {
     EXPECT_EQ(b->tag(), 2); // virtual dispatch reaches Derived
 }
 
+TEST(ResourceRef, UpcastsARefToABaseRef) {
+    Resource<Derived> d = MakeResource<Derived>();
+    const ResourceRef<Derived> derived = d;
+    const ResourceRef<const Base> base = derived;   // from a ref, not from the Resource
+    ASSERT_TRUE(base.Valid());
+    EXPECT_EQ(base.Get(), static_cast<const Base*>(d.Get()));
+    EXPECT_EQ(base->tag(), 2);
+}
+
+// Two conversions deep, through a class whose base is not at offset zero, so a pointer that
+// skipped an adjustment would land on the wrong subobject.
+struct Padding {
+    virtual ~Padding() = default;
+    int filler[4] {};
+};
+struct Offset : Padding, Base {
+    int tag() const override { return 3; }
+};
+struct MoreDerived : Offset {
+    int tag() const override { return 4; }
+};
+
+TEST(ResourceRef, AnUpcastChainAppliesEveryAdjustment) {
+    Resource<MoreDerived> r = MakeResource<MoreDerived>();
+    const ResourceRef<MoreDerived> most = r;
+    const ResourceRef<Offset> middle = most;
+    const ResourceRef<const Base> base = middle;
+    ASSERT_TRUE(base.Valid());
+    EXPECT_EQ(base.Get(), static_cast<const Base*>(r.Get()));
+    EXPECT_NE(static_cast<const void*>(base.Get()), static_cast<const void*>(r.Get())) << "the test needs a real offset";
+    EXPECT_EQ(base->tag(), 4);
+}
+
+TEST(ResourceRef, UpcastRefSharesTheSourcesLifetime) {
+    ResourceRef<const Base> base;
+    {
+        Resource<Derived> d = MakeResource<Derived>();
+        const ResourceRef<Derived> derived = d;
+        base = derived;
+        EXPECT_TRUE(base.Alive());
+    }
+    EXPECT_FALSE(base.Alive());
+    EXPECT_FALSE(base.Valid());
+    EXPECT_THROW((void)*base, std::runtime_error);
+}
+
+TEST(ResourceRef, UpcastOfAnEmptyOrUnsafeRef) {
+    const ResourceRef<Derived> empty;
+    const ResourceRef<const Base> fromEmpty = empty;
+    EXPECT_FALSE(fromEmpty.Valid());
+
+    Derived object;
+    const ResourceRef<Derived> unsafe(&object);
+    const ResourceRef<const Base> fromUnsafe = unsafe;
+    ASSERT_TRUE(fromUnsafe.Valid());
+    EXPECT_EQ(fromUnsafe.Get(), static_cast<const Base*>(&object));
+}
+
 // -----------------------------------------------------------------------------
 // "unsafe" refs: constructed from a raw pointer/reference with no lifetime
 // tracking. They must remain dereferenceable (no throw) despite having no stamp.
@@ -262,6 +320,21 @@ TEST(ResourceRef, UpcastRefSurvivesRepair) {
 
     ASSERT_TRUE(base.Valid());
     EXPECT_EQ(base->tag(), 2);   // virtual dispatch still reaches Derived
+}
+
+// The same through a ref-to-ref upcast: the chain re-reads the repaired object too.
+TEST(ResourceRef, RefToRefUpcastSurvivesRepair) {
+    auto r = Resource<Derived>::Failed(Error{ .code = ErrorCode::eBackend, .message = "broken" });
+    const ResourceRef<Derived> derived = r;
+    const ResourceRef<const Base> base = derived;
+    EXPECT_FALSE(base.Valid());
+    EXPECT_TRUE(base.Poisoned());
+
+    r.SetRebuild([]() -> Result<std::unique_ptr<Derived>> { return std::make_unique<Derived>(); });
+    ASSERT_TRUE(r.Retry());
+
+    ASSERT_TRUE(base.Valid());
+    EXPECT_EQ(base.Get(), static_cast<const Base*>(r.Get()));
 }
 
 } // namespace

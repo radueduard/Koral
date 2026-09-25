@@ -385,6 +385,20 @@ namespace kor {
      * every access. A ref handed out while its resource was poisoned starts working the
      * moment that resource is repaired — which is the whole point.
      */
+    namespace detail {
+        /**
+         * How a ref converted from another ref reaches its object: through the reader of the ref it
+         * came from, and that ref's own link, and so on back to the one built from the Resource.
+         *
+         * Readers of different ref types return different pointer types, so the reader is kept
+         * type-erased and restored by the thunk that was instantiated knowing the source type.
+         */
+        struct RefLink {
+            void (*read)();
+            std::shared_ptr<const RefLink> next;
+        };
+    }
+
     template<typename ResourceType>
     class ResourceRef {
         friend class Repository;
@@ -403,9 +417,18 @@ namespace kor {
         // It yields Raw* rather than ResourceType* so that a ResourceRef<T> and a
         // ResourceRef<const T> share one thunk type and can convert into each other.
         template<typename Stored>
-        static Raw* ReadThunk(ResourceStateBase* state) {
+        static Raw* ReadThunk(ResourceStateBase* state, const detail::RefLink*) {
             auto* typed = static_cast<ResourceState<std::remove_const_t<Stored>>*>(state);
             return typed->value.get();  // Stored* → Raw* applies any base-class adjustment
+        }
+
+        // The reader of a ref upcast from a ResourceRef<Source>: whatever that ref reads, adjusted
+        // to our type. It knows only Source, not the type actually stored, which is why it has to
+        // go through the source's reader rather than straight to the state block.
+        template<typename Source>
+        static Raw* UpcastThunk(ResourceStateBase* state, const detail::RefLink* link) {
+            using SourceRead = std::remove_const_t<Source>* (*)(ResourceStateBase*, const detail::RefLink*);
+            return reinterpret_cast<SourceRead>(link->read)(state, link->next.get());
         }
 
     public:
@@ -426,7 +449,22 @@ namespace kor {
         // is identical (both yield Raw*), so it carries across unchanged.
         ResourceRef(const ResourceRef<Raw>& other)
             requires (std::is_const_v<ResourceType>)
-            : _life(other._life), _state(other._state), _get(other._get),
+            : _life(other._life), _state(other._state), _get(other._get), _link(other._link),
+              _direct(other._direct), _unsafe(other._unsafe) {}
+
+        // Upcast from another ref: ResourceRef<StandardMesh> → ResourceRef<const Mesh>, for code
+        // that is handed a ref rather than the owning Resource. Reads through the source ref's
+        // reader, so like every ref it follows the object across a repair.
+        template<typename Source>
+            requires (!std::is_same_v<std::remove_const_t<Source>, Raw> &&
+                      std::is_convertible_v<std::remove_const_t<Source>*, Raw*> &&
+                      (std::is_const_v<ResourceType> || !std::is_const_v<Source>))
+        ResourceRef(const ResourceRef<Source>& other)
+            : _life(other._life), _state(other._state),
+              _get(other._get ? &UpcastThunk<Source> : nullptr),
+              _link(other._get ? std::make_shared<const detail::RefLink>(detail::RefLink{
+                                     reinterpret_cast<void (*)()>(other._get), other._link })
+                               : nullptr),
               _direct(other._direct), _unsafe(other._unsafe) {}
 
         // Unsafe refs: a view onto an object this ref does not track the lifetime of, used
@@ -456,7 +494,7 @@ namespace kor {
         [[nodiscard]] ResourceType* Get() const noexcept {
             if (_unsafe) return _direct;
             if (!Alive() || _state->Poisoned()) return nullptr;
-            return _get ? _get(_state) : nullptr;
+            return _get ? _get(_state, _link.get()) : nullptr;
         }
 
         /** @brief Whether the owning Resource still exists. */
@@ -539,7 +577,8 @@ namespace kor {
         // which moves on repair), so caching it here is safe; _life is what detects destruction.
         std::weak_ptr<ResourceStateBase> _life;
         ResourceStateBase* _state = nullptr;
-        Raw* (*_get)(ResourceStateBase*) = nullptr;
+        Raw* (*_get)(ResourceStateBase*, const detail::RefLink*) = nullptr;
+        std::shared_ptr<const detail::RefLink> _link;  // refs converted from another ref only
 
         Raw* _direct = nullptr;  // unsafe refs only
         bool _unsafe = false;
