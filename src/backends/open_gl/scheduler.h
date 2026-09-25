@@ -5,6 +5,7 @@
 #pragma once
 #include "../../../include/scheduler.h"
 
+#include <memory>
 #include <vector>
 
 namespace kor::ogl
@@ -37,6 +38,9 @@ namespace kor::ogl
         struct InFlight {
             void* fence; // GLsync, kept opaque so this header need not pull in GL
             Token completion;
+            // What Execute() handed over, kept until the fence passes: their timer queries are only
+            // readable then. @see kor::CommandBuffer::OnTimings
+            std::vector<std::unique_ptr<kor::CommandBuffer>> executed;
         };
         mutable std::vector<InFlight> _inFlight;
     };

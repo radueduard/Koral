@@ -100,7 +100,10 @@ namespace kor::ogl
         submit(commandBuffer);
         for (const auto& external : pending.after) submit(*external);
 
-        _inFlight.push_back({glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), pending.completion});
+        std::vector<std::unique_ptr<kor::CommandBuffer>> executed;
+        for (auto& external : pending.before) executed.push_back(std::move(external));
+        for (auto& external : pending.after) executed.push_back(std::move(external));
+        _inFlight.push_back({glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0), pending.completion, std::move(executed)});
 
         // Debug: dump the final default-framebuffer image to a PPM after N frames.
         // KORAL_SCREENSHOT=<path>[:frame]. Lets us verify rendered output when a live
@@ -166,6 +169,7 @@ namespace kor::ogl
             } while (wait && status == GL_TIMEOUT_EXPIRED);
             if (status == GL_TIMEOUT_EXPIRED) break;
             glDeleteSync(fence);
+            for (const auto& commandBuffer : _inFlight[done].executed) commandBuffer->DeliverTimings();
             _inFlight[done].completion.Signal();
         }
         _inFlight.erase(_inFlight.begin(), _inFlight.begin() + static_cast<std::ptrdiff_t>(done));

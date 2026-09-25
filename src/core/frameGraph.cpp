@@ -5,6 +5,9 @@
 #include "frameGraph.h"
 
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <map>
 #include <ranges>
 #include <set>
 
@@ -13,6 +16,7 @@
 #include "commandBuffer.h"
 #include "context.h"
 #include "framebuffer.h"
+#include "gtime.h"
 #include "log.h"
 #include "scheduler.h"
 #include "task.h"
@@ -127,8 +131,34 @@ namespace kor {
         if (_graph) _graph->Invalidate();
     }
 
-    FrameGraph::FrameGraph() = default;
+    // ---- statistics -----------------------------------------------------------------------------
+
+    struct FrameGraph::Stats {
+        static constexpr double Smoothing = 0.1;   // weight of the newest sample in each average
+        static constexpr std::size_t History = 240;
+
+        static void average(double& into, const double sample) {
+            into = into == 0.0 ? sample : into + (sample - into) * Smoothing;
+        }
+
+        std::map<std::string, PassTiming, std::less<>> passes;
+        GraphTiming graph;
+        std::array<float, History> frameMs {};   // CPU frame time, a ring
+        std::array<float, History> gpuMs {};     // the graph's GPU time, a ring
+        std::size_t next = 0;
+    };
+
+    FrameGraph::FrameGraph() : _stats(std::make_shared<Stats>()) {}
     FrameGraph::~FrameGraph() = default;
+
+    std::vector<FrameGraph::PassTiming> FrameGraph::PassTimings() const {
+        std::vector<PassTiming> out;
+        for (const RenderPass* pass : _order)
+            if (const auto it = _stats->passes.find(pass->Name()); it != _stats->passes.end()) out.push_back(it->second);
+        return out;
+    }
+
+    FrameGraph::GraphTiming FrameGraph::Timing() const { return _stats->graph; }
 
     void FrameGraph::Adopt(std::unique_ptr<RenderPass> pass) {
         pass->_graph = this;
@@ -285,12 +315,26 @@ namespace kor {
     }
 
     namespace {
-        Task<void> RecordOnBackground(RenderPass& pass, std::unique_ptr<CommandBuffer>& out) {
-            co_await Context::SwitchToBackgroundThread();
+        using Clock = std::chrono::steady_clock;
+        double millisecondsSince(const Clock::time_point start) {
+            return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
+        }
+
+        // Records a pass inside a GPU timer scope named after it, and times the recording itself.
+        void RecordTimed(RenderPass& pass, std::unique_ptr<CommandBuffer>& out, double& recordMs) {
+            const auto start = Clock::now();
             auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
             cb->Begin();
+            cb->BeginTimer(pass.Name());
             pass.Record(*cb);
+            cb->EndTimer();
             out = std::move(cb);
+            recordMs = millisecondsSince(start);
+        }
+
+        Task<void> RecordOnBackground(RenderPass& pass, std::unique_ptr<CommandBuffer>& out, double& recordMs) {
+            co_await Context::SwitchToBackgroundThread();
+            RecordTimed(pass, out, recordMs);
         }
     }
 
@@ -303,7 +347,14 @@ namespace kor {
         if (_dirty) Build();
         if (_broken || _order.empty()) return false;
 
-        for (RenderPass* pass : _order) pass->Prepare();
+        std::vector<double> prepareMs(_order.size(), 0.0);
+        const auto prepareStart = Clock::now();
+        for (std::size_t i = 0; i < _order.size(); ++i) {
+            const auto start = Clock::now();
+            _order[i]->Prepare();
+            prepareMs[i] = millisecondsSince(start);
+        }
+        const double prepareTotal = millisecondsSince(prepareStart);
 
         auto& scheduler = Context::Scheduler();
 
@@ -327,21 +378,52 @@ namespace kor {
         // Every pass records at once. The order they finish in does not matter: the frame ends
         // their command buffers — which is where barriers are worked out — in execution order.
         std::vector<std::unique_ptr<CommandBuffer>> recorded(_order.size());
+        std::vector<double> recordMs(_order.size(), 0.0);
+        const auto recordStart = Clock::now();
         if (Context::ActiveAPI() == API::eVulkan) {
             std::vector<Task<void>> tasks;
             tasks.reserve(_order.size());
-            for (std::size_t i = 0; i < _order.size(); ++i) tasks.push_back(RecordOnBackground(*_order[i], recorded[i]));
+            for (std::size_t i = 0; i < _order.size(); ++i) tasks.push_back(RecordOnBackground(*_order[i], recorded[i], recordMs[i]));
             auto all = WhenAll(std::move(tasks));
             all.Wait();
             if (const auto result = all.Take(); !result) log::Error("[frame graph] a pass failed to record: {}", result.error());
         } else {
             // OpenGL is bound to this thread, so its passes record here, one after another.
-            for (std::size_t i = 0; i < _order.size(); ++i) {
-                recorded[i] = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
-                recorded[i]->Begin();
-                _order[i]->Record(*recorded[i]);
+            for (std::size_t i = 0; i < _order.size(); ++i) RecordTimed(*_order[i], recorded[i], recordMs[i]);
+        }
+        const double recordWall = millisecondsSince(recordStart);
+
+        // The CPU side is known now; the GPU side arrives once the frame is done, per pass.
+        auto& stats = *_stats;
+        double recordWork = 0.0;
+        for (std::size_t i = 0; i < _order.size(); ++i) {
+            auto& timing = stats.passes[_order[i]->Name()];
+            timing.name = _order[i]->Name();
+            Stats::average(timing.prepareMs, prepareMs[i]);
+            Stats::average(timing.recordMs, recordMs[i]);
+            recordWork += recordMs[i];
+            if (recorded[i]) {
+                recorded[i]->OnTimings([weak = std::weak_ptr(_stats), name = _order[i]->Name()](const std::vector<TimerResult>& results) {
+                    const auto statsNow = weak.lock();
+                    if (!statsNow) return;   // the graph is gone
+                    for (const auto& result : results) {
+                        if (result.depth != 0 || result.label != name) continue;
+                        auto& timing = statsNow->passes[name];
+                        Stats::average(timing.gpuMs, result.milliseconds);
+                        timing.gpuMeasured = true;
+                    }
+                });
             }
         }
+        Stats::average(stats.graph.prepareMs, prepareTotal);
+        Stats::average(stats.graph.recordWallMs, recordWall);
+        Stats::average(stats.graph.recordWorkMs, recordWork);
+        double gpuSum = 0.0;
+        for (const RenderPass* pass : _order) gpuSum += stats.passes[pass->Name()].gpuMs;
+        stats.graph.gpuMs = gpuSum;
+        stats.frameMs[stats.next] = Time::FrameTime() * 1000.f;
+        stats.gpuMs[stats.next] = static_cast<float>(gpuSum);
+        stats.next = (stats.next + 1) % Stats::History;
 
         bool touchedScreen = false;
         const auto framebuffer = Context::DefaultFramebuffer();
@@ -365,8 +447,22 @@ namespace kor {
         return touchedScreen;
     }
 
+    void FrameGraph::DrawMenuItems() {
+        ImGui::MenuItem("Frame graph", nullptr, &_showSchedule);
+        ImGui::MenuItem("Performance", nullptr, &_showPerformance);
+        ImGui::MenuItem("Pass settings", nullptr, &_showPassWindows);
+    }
+
     void FrameGraph::DrawGUI() {
-        if (ImGui::Begin("Frame Graph")) {
+        // Begin/End pair up whatever Begin returns, and Begin may clear the flag (its close button) —
+        // so the flag is read once, before either.
+        if (_showSchedule) DrawSchedule();
+        if (_showPerformance) DrawPerformance();
+        if (_showPassWindows) for (RenderPass* pass : _order) pass->DrawGUI();
+    }
+
+    void FrameGraph::DrawSchedule() {
+        if (ImGui::Begin("Frame Graph", &_showSchedule)) {
             ImGui::TextDisabled("Passes on one level do not depend on each other.");
             for (const auto& [name, level] : _schedule) ImGui::Text("%*s%u  %s", static_cast<int>(level * 2), "", level, name.c_str());
             if (!_skipped.empty()) {
@@ -393,6 +489,52 @@ namespace kor {
             if (_broken) ImGui::TextColored({1.f, 0.4f, 0.4f, 1.f}, "The graph does not compile; see the log.");
         }
         ImGui::End();
-        for (RenderPass* pass : _order) pass->DrawGUI();
+    }
+
+    void FrameGraph::DrawPerformance() {
+        if (ImGui::Begin("Performance", &_showPerformance)) {
+            const auto& stats = *_stats;
+
+            // The frame as a whole: CPU wall time between frames, and the graph's GPU time.
+            float frameAverage = 0.f, frameWorst = 0.f;
+            for (const float ms : stats.frameMs) { frameAverage += ms; frameWorst = std::max(frameWorst, ms); }
+            frameAverage /= static_cast<float>(Stats::History);
+            ImGui::Text("Frame  %.2f ms  (%.0f fps)   worst %.2f ms", frameAverage,
+                        frameAverage > 0.f ? 1000.f / frameAverage : 0.f, frameWorst);
+            const float ceiling = std::max(frameWorst * 1.2f, 16.7f);
+            ImGui::PlotLines("##frame", stats.frameMs.data(), static_cast<int>(Stats::History),
+                             static_cast<int>(stats.next), "CPU frame time", 0.f, ceiling, ImVec2(-FLT_MIN, 50.f));
+            ImGui::PlotLines("##gpu", stats.gpuMs.data(), static_cast<int>(Stats::History),
+                             static_cast<int>(stats.next), "GPU, frame graph", 0.f, ceiling, ImVec2(-FLT_MIN, 50.f));
+
+            const auto& graph = stats.graph;
+            ImGui::Text("Graph GPU %.2f ms   prepare %.2f ms   record %.2f ms (%.2f ms of work across threads)",
+                        graph.gpuMs, graph.prepareMs, graph.recordWallMs, graph.recordWorkMs);
+            ImGui::Separator();
+
+            // Pass by pass, in the order they run, with a bar for each one's share of the GPU time.
+            if (ImGui::BeginTable("passes", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp)) {
+                ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 1.4f);
+                ImGui::TableSetupColumn("GPU ms", ImGuiTableColumnFlags_WidthFixed, 60.f);
+                ImGui::TableSetupColumn("share", ImGuiTableColumnFlags_WidthStretch, 1.f);
+                ImGui::TableSetupColumn("Record ms", ImGuiTableColumnFlags_WidthFixed, 70.f);
+                ImGui::TableSetupColumn("Prepare ms", ImGuiTableColumnFlags_WidthFixed, 72.f);
+                ImGui::TableHeadersRow();
+                for (const auto& timing : PassTimings()) {
+                    ImGui::TableNextRow();
+                    ImGui::TableNextColumn(); ImGui::TextUnformatted(timing.name.c_str());
+                    ImGui::TableNextColumn();
+                    if (timing.gpuMeasured) ImGui::Text("%.3f", timing.gpuMs); else ImGui::TextDisabled("n/a");
+                    ImGui::TableNextColumn();
+                    ImGui::ProgressBar(graph.gpuMs > 0.0 ? static_cast<float>(timing.gpuMs / graph.gpuMs) : 0.f,
+                                       ImVec2(-FLT_MIN, 0.f), "");
+                    ImGui::TableNextColumn(); ImGui::Text("%.3f", timing.recordMs);
+                    ImGui::TableNextColumn(); ImGui::Text("%.3f", timing.prepareMs);
+                }
+                ImGui::EndTable();
+            }
+            ImGui::TextDisabled("Averaged over recent frames. GPU times arrive once the GPU has run the frame.");
+        }
+        ImGui::End();
     }
 }

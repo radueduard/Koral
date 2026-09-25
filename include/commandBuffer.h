@@ -218,6 +218,23 @@ namespace kor
         [[nodiscard]] const std::vector<TimerResult>& Timings() const { return _timings; }
 
         /**
+         * @brief Hands this command buffer's timer results to @p callback once the GPU has run it.
+         *
+         * For a command buffer given to Scheduler::Execute, which the scheduler owns from then on
+         * and destroys when its frame is done — so there is no later moment to ask for them. The
+         * scheduler calls it as it retires the frame, on the main thread; it is called once.
+         */
+        void OnTimings(std::function<void(const std::vector<TimerResult>&)> callback) { _onTimings = std::move(callback); }
+
+        /** @brief Collects and delivers the timings to the OnTimings callback, if there is one. The scheduler calls this. */
+        void DeliverTimings() {
+            if (!_onTimings) return;
+            auto callback = std::move(_onTimings);
+            _onTimings = nullptr;
+            callback(CollectTimings());
+        }
+
+        /**
          * @brief Whether this command buffer's device and queue can timestamp at all.
          *
          * False on a queue whose family reports no valid timestamp bits — a dedicated transfer
@@ -1404,6 +1421,7 @@ namespace kor
         std::vector<TimerScope> _submittedTimers;  ///< Scopes of the submission whose results are still on the GPU.
         std::vector<glm::u32> _timerStack;         ///< Indices into _pendingTimers for the scopes currently open.
         std::vector<TimerResult> _timings;         ///< Last results that arrived; see Timings().
+        std::function<void(const std::vector<TimerResult>&)> _onTimings;  ///< See OnTimings().
 
         glm::u64 _lastFrameCommandCount = 0;
 

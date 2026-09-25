@@ -747,6 +747,28 @@ TEST_F(VkWindowTest, AFrameGraphPassReadsThePreviousFramesDepth) {
                                       [](const int frame) { return 0.1f * static_cast<float>(frame + 1) / 2.f; });
 }
 
+// The graph times every pass: GPU time from a timer scope around what it recorded (arriving once the
+// frame is done, through CommandBuffer::OnTimings), CPU time for its recording and its Prepare.
+TEST_F(VkWindowTest, AFrameGraphTimesEachPass) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    float value = 1.f;
+    graph.Add<StampPass>(kor::Image::Format::eR32_SFLOAT, value);
+    graph.Add<ProbePass>();
+    for (int frame = 0; frame < 8; ++frame) drawGraphFrame(scene, graph);
+
+    const auto timings = graph.PassTimings();
+    ASSERT_EQ(timings.size(), 2u);
+    EXPECT_EQ(timings[0].name, "Stamp");
+    EXPECT_EQ(timings[1].name, "Probe");
+    for (const auto& timing : timings) {
+        EXPECT_TRUE(timing.gpuMeasured) << timing.name << ": no GPU time arrived";
+        EXPECT_GT(timing.gpuMs, 0.0) << timing.name;
+        EXPECT_GT(timing.recordMs, 0.0) << timing.name;
+    }
+    EXPECT_NEAR(graph.Timing().gpuMs, timings[0].gpuMs + timings[1].gpuMs, 1e-9);
+}
+
 // ---- per-frame device-local buffers ---------------------------------------------------------
 //
 // The same promise as the two tests above, for memory the CPU cannot map. A write there is staged, and

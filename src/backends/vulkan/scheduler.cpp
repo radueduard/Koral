@@ -56,6 +56,8 @@ namespace kor::vk
     }
 
     void Frame::release() const {
+        // The frame's fence has passed: whatever the executed command buffers timed is readable now.
+        for (const auto& commandBuffer : _executed) commandBuffer->DeliverTimings();
         _executed.clear();
         _tokens.clear();
     }

@@ -224,8 +224,20 @@ namespace kor {
          */
         bool Execute();
 
-        /** @brief Every pass's DrawGUI, plus a window showing the schedule. */
+        /** @brief Every pass's DrawGUI, plus the schedule and the Performance window — whichever are shown. */
         void DrawGUI();
+
+        /**
+         * @brief Menu items showing and hiding the graph's windows, for a menu the scene owns.
+         *
+         * @code
+         * if (ImGui::BeginMainMenuBar()) {
+         *     if (ImGui::BeginMenu("View")) { Graph().DrawMenuItems(); ImGui::EndMenu(); }
+         *     ImGui::EndMainMenuBar();
+         * }
+         * @endcode
+         */
+        void DrawMenuItems();
 
         /** @brief One pass as scheduled: its name, and how deep in the dependencies it sits. */
         struct Scheduled {
@@ -244,6 +256,32 @@ namespace kor {
         /** @brief Passes left out because nothing needs what they make. */
         [[nodiscard]] const std::vector<std::string>& CulledPasses() const { return _culled; }
 
+        /**
+         * @brief What one pass costs, averaged over recent frames.
+         *
+         * GPU time is measured with a timer scope around everything the pass recorded — barriers
+         * the frame put in front of its commands included — and arrives a few frames late, once
+         * the GPU has run it. Zero, with gpuMeasured false, on a device that cannot timestamp.
+         */
+        struct PassTiming {
+            std::string name;
+            double gpuMs = 0.0;
+            double recordMs = 0.0;    ///< CPU time recording it (on a background thread under Vulkan).
+            double prepareMs = 0.0;   ///< CPU time in its Prepare, on the main thread.
+            bool gpuMeasured = false;
+        };
+        /** @brief Every scheduled pass, in the order it runs. */
+        [[nodiscard]] std::vector<PassTiming> PassTimings() const;
+
+        /** @brief The graph's own share of a frame, averaged: what the main thread waits for, and what the GPU spends. */
+        struct GraphTiming {
+            double prepareMs = 0.0;     ///< Every Prepare, one after another.
+            double recordWallMs = 0.0;  ///< From the first pass starting to record to the last finishing.
+            double recordWorkMs = 0.0;  ///< Recording time summed over the passes; above recordWallMs when they overlap.
+            double gpuMs = 0.0;         ///< The passes' GPU times, summed.
+        };
+        [[nodiscard]] GraphTiming Timing() const;
+
         /** @brief An image of the graph's by name — for a screenshot or a debug view. Empty before the first frame. */
         [[nodiscard]] ResourceRef<const Image> ImageNamed(std::string_view name) const;
 
@@ -256,6 +294,17 @@ namespace kor {
 
         void Adopt(std::unique_ptr<RenderPass> pass);
         bool Build();
+        void DrawSchedule();
+        void DrawPerformance();
+
+        // Shared with the timer callbacks, which arrive from the scheduler once a frame is done —
+        // possibly after the graph is gone, hence held weakly by them.
+        struct Stats;
+        std::shared_ptr<Stats> _stats;
+
+        bool _showSchedule = true;
+        bool _showPerformance = true;
+        bool _showPassWindows = true;
 
         std::vector<std::unique_ptr<RenderPass>> _passes;
         std::vector<RenderPass*> _order;      // what runs, in order
