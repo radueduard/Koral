@@ -58,6 +58,11 @@ namespace kor {
         return *this;
     }
 
+    PassBuilder& PassBuilder::ReadPrevious(const std::string_view name) {
+        _impl.decl.uses.push_back({std::string(name), graph::Access::eReadPrevious});
+        return *this;
+    }
+
     ResourceRef<const Image> PassResources::ImageNamed(const std::string_view name) const {
         if (name == FrameGraph::Screen) {
             const auto framebuffer = Context::DefaultFramebuffer();
@@ -80,6 +85,24 @@ namespace kor {
         return it->second;
     }
 
+    ResourceRef<const Image> PassResources::PreviousImageNamed(const std::string_view name) const {
+        const auto it = _graph._previousImages.find(name);
+        if (it == _graph._previousImages.end()) {
+            log::Error("[frame graph] no previous frame of an image named '{}' is kept; declare ReadPrevious(\"{}\")", name, name);
+            return {};
+        }
+        return it->second;
+    }
+
+    ResourceRef<const Buffer> PassResources::PreviousBufferNamed(const std::string_view name) const {
+        const auto it = _graph._previousBuffers.find(name);
+        if (it == _graph._previousBuffers.end()) {
+            log::Error("[frame graph] no previous frame of a buffer named '{}' is kept; declare ReadPrevious(\"{}\")", name, name);
+            return {};
+        }
+        return it->second;
+    }
+
     glm::uvec2 PassResources::Extent(const std::string_view name) const {
         const auto img = ImageNamed(name);
         return img.Alive() ? glm::uvec2(img->Extent()) : glm::uvec2(0);
@@ -88,6 +111,14 @@ namespace kor {
     ResourceRef<const Image> FrameGraph::ImageNamed(const std::string_view name) const {
         const auto it = _images.find(name);
         return it != _images.end() ? it->second : ResourceRef<const Image>{};
+    }
+
+    bool FrameGraph::HasPrevious(const std::string_view name) const {
+        return _historyFrames > 0 && (_previousImages.contains(name) || _previousBuffers.contains(name));
+    }
+
+    bool RenderPass::HasPrevious(const std::string_view name) const {
+        return _graph && _graph->HasPrevious(name);
     }
 
     void RenderPass::SetEnabled(const bool enabled) {
@@ -159,6 +190,14 @@ namespace kor {
         _images.clear();
         _buffers.clear();
         _imageDescs.clear();
+        _previousImages.clear();
+        _previousBuffers.clear();
+        _imageHistory.clear();
+        _bufferHistory.clear();
+        _historyClears.clear();
+        _history = compiled->history;
+        _historyFrames = 0;
+        const std::set<std::string, std::less<>> history(compiled->history.begin(), compiled->history.end());
         for (const auto& [name, image] : _importedImages) _images.emplace(name, image);
         for (const auto& [name, buffer] : _importedBuffers) _buffers.emplace(name, buffer);
 
@@ -171,33 +210,63 @@ namespace kor {
         for (const auto& lifetime : compiled->lifetimes) {
             if (const auto it = imageDescs.find(lifetime.resource); it != imageDescs.end()) {
                 const ImageDesc& desc = it->second;
+                const bool keepsHistory = history.contains(lifetime.resource);
                 const glm::uvec2 size = desc.extent.value_or(glm::max(
                     glm::uvec2(glm::vec2(_extent) * desc.scale), glm::uvec2(1)));
                 auto image = Image::Builder()
                     .SetIsPerFrame(true)  // one per frame in flight, so the next frame can start
                     .SetFormat(desc.format)
-                    .SetUsage(desc.usage)
+                    .SetUsage(keepsHistory ? desc.usage | Image::Usage::eTransferSrc : desc.usage)
                     .SetExtent(size)
                     .SetMipLevels(desc.mipLevels)
                     .Build();
                 image.SetName(lifetime.resource);
                 _images.emplace(lifetime.resource, ResourceRef<const Image>(image));
                 _imageDescs.emplace(lifetime.resource, desc);
+                if (keepsHistory) {
+                    // One image, not one per frame: it carries a value from one frame to the next,
+                    // and the GPU runs frames in order, so the barriers are all it needs.
+                    // Written by the copy; readable by one too, so it can be inspected or read back.
+                    auto usage = desc.usage | Image::Usage::eTransferDst | Image::Usage::eTransferSrc;
+                    if (IsDepthStencilFormat(desc.format)) usage |= Image::Usage::eDepthStencilAttachment;
+                    auto previous = Image::Builder()
+                        .SetFormat(desc.format)
+                        .SetUsage(usage)
+                        .SetExtent(size)
+                        .SetMipLevels(desc.mipLevels)
+                        .Build();
+                    previous.SetName(lifetime.resource + " (previous frame)");
+                    _previousImages.emplace(lifetime.resource, ResourceRef<const Image>(previous));
+                    _imageHistory.emplace_back(ResourceRef<const Image>(image), std::move(previous));
+                }
                 _ownedImages.push_back(std::move(image));
             } else if (const auto bt = bufferDescs.find(lifetime.resource); bt != bufferDescs.end()) {
+                const bool keepsHistory = history.contains(lifetime.resource);
                 auto buffer = Buffer::RawBuilder()
                     .SetRawSize(bt->second.size)
-                    .SetUsage(bt->second.usage)
+                    .SetUsage(keepsHistory ? bt->second.usage | Buffer::Usage::eTransferSrc : bt->second.usage)
                     .SetType(bt->second.type)
                     .Build();
                 buffer.SetName(lifetime.resource);
                 _buffers.emplace(lifetime.resource, ResourceRef<const Buffer>(buffer));
+                if (keepsHistory) {
+                    auto previous = Buffer::RawBuilder()
+                        .SetRawSize(bt->second.size)
+                        .SetUsage(bt->second.usage | Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc)
+                        .SetType(bt->second.type)
+                        .Build();
+                    previous.SetName(lifetime.resource + " (previous frame)");
+                    _previousBuffers.emplace(lifetime.resource, ResourceRef<const Buffer>(previous));
+                    _bufferHistory.emplace_back(ResourceRef<const Buffer>(buffer), std::move(previous));
+                }
                 _ownedBuffers.push_back(std::move(buffer));
             }
         }
         for (const auto& [alias, root] : compiled->aliases) {
             if (const auto it = _images.find(root); it != _images.end()) _images.emplace(alias, it->second);
             if (const auto it = _buffers.find(root); it != _buffers.end()) _buffers.emplace(alias, it->second);
+            if (const auto it = _previousImages.find(root); it != _previousImages.end()) _previousImages.emplace(alias, it->second);
+            if (const auto it = _previousBuffers.find(root); it != _previousBuffers.end()) _previousBuffers.emplace(alias, it->second);
         }
 
         // ---- schedule ---------------------------------------------------------------------------------
@@ -236,6 +305,25 @@ namespace kor {
 
         for (RenderPass* pass : _order) pass->Prepare();
 
+        auto& scheduler = Context::Scheduler();
+
+        // Freshly made history has nothing in it yet: give it a defined value before any pass reads it.
+        if (_historyFrames == 0 && (!_imageHistory.empty() || !_bufferHistory.empty())) {
+            auto clear = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+            clear->Begin();
+            for (const auto& previous : _imageHistory | std::views::values) {
+                if (IsDepthStencilFormat(previous->PixelFormat())) {
+                    auto framebuffer = Framebuffer::Builder().SetDepth({.view = previous, .depth = 1.f}).Build();
+                    clear->BeginRendering(framebuffer).EndRendering();
+                    _historyClears.push_back(std::move(framebuffer));
+                } else {
+                    clear->ClearColorImage(previous, glm::vec4(0.f));
+                }
+            }
+            for (const auto& previous : _bufferHistory | std::views::values) clear->ClearBuffer(previous);
+            scheduler.Execute(std::move(clear));
+        }
+
         // Every pass records at once. The order they finish in does not matter: the frame ends
         // their command buffers — which is where barriers are worked out — in execution order.
         std::vector<std::unique_ptr<CommandBuffer>> recorded(_order.size());
@@ -259,11 +347,20 @@ namespace kor {
         const auto framebuffer = Context::DefaultFramebuffer();
         const auto screen = framebuffer.Valid() && !framebuffer->ColorAttachments().empty()
             ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
-        auto& scheduler = Context::Scheduler();
         for (auto& cb : recorded) {
             if (!cb) continue;  // its pass threw; already reported
             if (screen.Alive() && cb->HasTouched(screen)) touchedScreen = true;
             scheduler.Execute(std::move(cb));
+        }
+
+        // After the last pass: what this frame left becomes the next frame's previous frame.
+        if (!_imageHistory.empty() || !_bufferHistory.empty()) {
+            auto keep = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+            keep->Begin();
+            for (const auto& [current, previous] : _imageHistory) keep->CopyImage(current, previous);
+            for (const auto& [current, previous] : _bufferHistory) keep->CopyBuffer(current, previous);
+            scheduler.Execute(std::move(keep));
+            ++_historyFrames;
         }
         return touchedScreen;
     }
@@ -282,6 +379,11 @@ namespace kor {
                 ImGui::Separator();
                 ImGui::TextDisabled("Culled (nothing reads what they make):");
                 for (const auto& name : _culled) ImGui::BulletText("%s", name.c_str());
+            }
+            if (!_history.empty()) {
+                ImGui::Separator();
+                ImGui::TextDisabled("Kept for the next frame:");
+                for (const auto& name : _history) ImGui::BulletText("%s", name.c_str());
             }
             ImGui::Separator();
             for (const auto& pass : _passes) {

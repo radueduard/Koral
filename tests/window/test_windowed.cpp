@@ -36,6 +36,7 @@
 #include "shader.h"
 #include "error.h"
 #include "framebuffer.h"
+#include "frameGraph.h"
 #include "input.h"
 #include "imageView.h"
 #include "buffer.h"
@@ -627,6 +628,123 @@ TEST_F(VkWindowTest, APerFrameBufferPropagatesAWriteToEveryCopy) {
         EXPECT_EQ(seen[i], kValue)
             << "frame " << i << " of " << copies << " in flight read a stale copy";
     }
+}
+
+// ---- frame graph: previous-frame resources ---------------------------------------------------
+//
+// A pass that declares ReadPrevious sees the resource as it stood at the end of the last frame — not
+// as a pass earlier in *this* frame left it, and not a stale or undefined copy. These drive a graph of
+// their own through the scheduler, the way the runtime does after Scene::Render.
+
+namespace {
+    // Clears "stamp" to this frame's number: a value that says which frame wrote it.
+    class StampPass final : public kor::RenderPass {
+    public:
+        StampPass(kor::Image::Format format, float& value) : RenderPass("Stamp"), _format(format), _value(value) {}
+        void Setup(kor::PassBuilder& b) override {
+            const bool depth = kor::IsDepthStencilFormat(_format);
+            b.Create("stamp", { .format = _format,
+                                .usage = kor::Image::Usage::eTransferDst | kor::Image::Usage::eSampled
+                                       | (depth ? kor::Image::Usage::eDepthStencilAttachment : kor::Image::Usage::eTransferDst) });
+        }
+        void Initialize(const kor::PassResources& r) override {
+            _stamp = r.ImageNamed("stamp");
+            if (kor::IsDepthStencilFormat(_format))
+                _framebuffer = kor::Framebuffer::Builder{}.SetDepth({ .view = _stamp }).Build();
+        }
+        void Prepare() override { _frameValue = _value; }
+        void Record(kor::CommandBuffer& cb) override {
+            if (_framebuffer) cb.BeginRendering(kor::RenderInfo(_framebuffer).SetClearDepth(_frameValue)).EndRendering();
+            else cb.ClearColorImage(_stamp, glm::vec4(_frameValue));
+        }
+    private:
+        kor::Image::Format _format;
+        float& _value;
+        float _frameValue = 0.f;
+        kor::ResourceRef<const kor::Image> _stamp;
+        kor::Resource<kor::Framebuffer> _framebuffer;
+    };
+
+    // Runs after the stamp in the same frame, and copies out the *previous* frame's stamp.
+    class ProbePass final : public kor::RenderPass {
+    public:
+        ProbePass() : RenderPass("Probe") {}
+        void Setup(kor::PassBuilder& b) override { b.Read("stamp").ReadPrevious("stamp").SideEffect(); }
+        void Initialize(const kor::PassResources& r) override {
+            _previous = r.PreviousImageNamed("stamp");
+            readback = kor::Buffer::RawBuilder{}
+                .SetRawSize(static_cast<glm::i64>(sizeof(float)))
+                .SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback)
+                .Build();
+        }
+        void Prepare() override { hadPrevious = HasPrevious("stamp"); }
+        void Record(kor::CommandBuffer& cb) override {
+            cb.CopyImageToBuffer(_previous, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+        }
+        bool hadPrevious = false;
+        kor::Resource<kor::Buffer> readback;
+    private:
+        kor::ResourceRef<const kor::Image> _previous;
+    };
+
+    // A frame the way the runtime draws one: the graph runs after Scene::Render.
+    void drawGraphFrame(kor::Scene& scene, kor::FrameGraph& graph) {
+        glfwPollEvents();
+        kor::Context::DrainMainThread();
+        kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
+            kor::Context::Repository().Update();
+            scene.Update();
+            scene.Render(cb);
+            graph.Execute();
+            kor::GUI::Render(cb, scene);
+        });
+        kor::GUI::RenderPlatformWindows();
+        kor::Context::Scheduler().WaitIdle();
+    }
+
+    void expectEachFrameSeesThePreviousOne(kor::Scene& scene, const kor::Image::Format format, const float cleared,
+                                           const std::function<float(int)>& stampOf) {
+        kor::FrameGraph graph;
+        float value = 0.f;
+        graph.Add<StampPass>(format, value);
+        auto& probe = graph.Add<ProbePass>();
+
+        for (int frame = 0; frame < 6; ++frame) {
+            value = stampOf(frame);
+            drawGraphFrame(scene, graph);
+            const float seen = probe.readback->Read<float>(1).front();
+            if (frame == 0) {
+                EXPECT_FALSE(probe.hadPrevious) << "no frame before the first";
+                EXPECT_EQ(seen, cleared) << "the history starts cleared, not undefined";
+            } else {
+                EXPECT_TRUE(probe.hadPrevious) << "frame " << frame;
+                EXPECT_EQ(seen, stampOf(frame - 1)) << "frame " << frame << " did not see the frame before it";
+            }
+        }
+
+        // A rebuild (a resize, a pass toggled) starts the history over.
+        graph.Invalidate();
+        value = stampOf(6);
+        drawGraphFrame(scene, graph);
+        EXPECT_FALSE(probe.hadPrevious);
+        EXPECT_EQ(probe.readback->Read<float>(1).front(), cleared);
+        value = stampOf(7);
+        drawGraphFrame(scene, graph);
+        EXPECT_TRUE(probe.hadPrevious);
+        EXPECT_EQ(probe.readback->Read<float>(1).front(), stampOf(6));
+    }
+}
+
+TEST_F(VkWindowTest, AFrameGraphPassReadsThePreviousFramesImage) {
+    expectEachFrameSeesThePreviousOne(VkEnvironment::scene(), kor::Image::Format::eR32_SFLOAT, 0.f,
+                                      [](const int frame) { return static_cast<float>(frame + 1); });
+}
+
+TEST_F(VkWindowTest, AFrameGraphPassReadsThePreviousFramesDepth) {
+    // Depth must stay in [0, 1]; the history of a depth image starts at the far plane.
+    expectEachFrameSeesThePreviousOne(VkEnvironment::scene(), kor::Image::Format::eD32_SFLOAT, 1.f,
+                                      [](const int frame) { return 0.1f * static_cast<float>(frame + 1) / 2.f; });
 }
 
 // ---- per-frame device-local buffers ---------------------------------------------------------

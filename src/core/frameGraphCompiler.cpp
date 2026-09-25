@@ -40,10 +40,17 @@ namespace kor::graph {
         // A std::map, so problems are reported in a stable order.
         std::map<std::string, ResourceInfo> resources;
         std::map<std::string, std::string> aliasOf;  // consume's new name -> the name it consumed
+        // Reads of last frame's version, kept apart: a pass may read the previous frame's copy of
+        // the very thing it creates this frame, and the two must not collapse into one use.
+        std::vector<std::pair<std::size_t, std::string>> previousReads;
         for (std::size_t p = 0; p < n; ++p) {
             // One pass naming a resource twice counts once, at the strongest access it asked for.
             std::map<std::string, Use> strongest;
             for (const auto& use : passes[p].uses) {
+                if (use.access == Access::eReadPrevious) {
+                    previousReads.emplace_back(p, use.resource);
+                    continue;
+                }
                 auto [it, fresh] = strongest.try_emplace(use.resource, use);
                 if (!fresh && static_cast<int>(use.access) > static_cast<int>(it->second.access)) it->second = use;
             }
@@ -83,6 +90,7 @@ namespace kor::graph {
                     aliasOf[use.as] = name;
                     break;
                 }
+                case Access::eReadPrevious: break;  // collected above
                 }
             }
         }
@@ -94,6 +102,22 @@ namespace kor::graph {
             std::ranges::sort(users);
             problems.push_back(std::format("{} {} '{}', but no pass creates it and it was not imported.",
                                            quoted(users, passes), users.size() == 1 ? "uses" : "use", name));
+        }
+        // The real resource behind a name: follow consumes back to what was created or imported.
+        const auto root = [&](std::string name) {
+            for (auto it = aliasOf.find(name); it != aliasOf.end(); it = aliasOf.find(name)) name = it->second;
+            return name;
+        };
+        for (const auto& [p, name] : previousReads) {
+            const std::string physical = root(name);
+            if (imported.contains(physical)) {
+                problems.push_back(std::format("Pass '{}' reads '{}' from the previous frame, but it is imported: the graph "
+                                               "keeps previous frames only of what it creates. Keep a copy yourself.",
+                                               passes[p].name, name));
+            } else if (const auto it = resources.find(physical); it == resources.end() || !it->second.creator) {
+                problems.push_back(std::format("Pass '{}' reads '{}' from the previous frame, but no pass creates it.",
+                                               passes[p].name, name));
+            }
         }
         if (!problems.empty()) {
             std::string message;
@@ -121,12 +145,6 @@ namespace kor::graph {
                 for (const auto r : info.readers) depend(r, *info.consumer, name);
             }
         }
-
-        // The real resource behind a name: follow consumes back to what was created or imported.
-        const auto root = [&](std::string name) {
-            for (auto it = aliasOf.find(name); it != aliasOf.end(); it = aliasOf.find(name)) name = it->second;
-            return name;
-        };
 
         // ---- order: Kahn's algorithm, lowest declaration index first among the ready ----------
         std::vector<std::vector<std::size_t>> succs(n);
@@ -181,11 +199,35 @@ namespace kor::graph {
                     isRoot = true;
             if (isRoot) { keep[p] = true; stack.push_back(p); }
         }
-        while (!stack.empty()) {
-            const auto p = stack.back();
-            stack.pop_back();
-            for (const auto& pred : preds[p] | std::views::keys)
-                if (!keep[pred]) { keep[pred] = true; stack.push_back(pred); }
+        const auto propagate = [&] {
+            while (!stack.empty()) {
+                const auto p = stack.back();
+                stack.pop_back();
+                for (const auto& pred : preds[p] | std::views::keys)
+                    if (!keep[pred]) { keep[pred] = true; stack.push_back(pred); }
+            }
+        };
+        propagate();
+        // A kept pass reading last frame's version needs this frame to produce it for the next: every
+        // pass that creates, writes or consumes the physical resource is kept too. Those may read
+        // previous frames of their own, so this runs until nothing more is kept.
+        std::set<std::string> history;
+        for (bool grew = true; grew;) {
+            grew = false;
+            for (const auto& [reader, name] : previousReads) {
+                if (!keep[reader]) continue;
+                const std::string physical = root(name);
+                history.insert(physical);
+                for (const auto& [resource, info] : resources) {
+                    if (root(resource) != physical) continue;
+                    std::vector<std::size_t> producers = info.writers;
+                    if (info.creator) producers.push_back(*info.creator);
+                    if (info.consumer) producers.push_back(*info.consumer);
+                    for (const auto p : producers)
+                        if (!keep[p]) { keep[p] = true; stack.push_back(p); grew = true; }
+                }
+            }
+            propagate();
         }
 
         CompiledGraph out;
@@ -222,7 +264,12 @@ namespace kor::graph {
             for (const auto r : info.readers) touch(r);
             if (info.consumer) touch(*info.consumer);
         }
+        for (const auto& physical : history) {
+            // Copied into the next frame's history after the last pass, and read before the first.
+            if (!out.order.empty()) spans[physical] = { 0, out.order.size() - 1 };
+        }
         for (const auto& [name, span] : spans) out.lifetimes.push_back({name, span.first, span.second});
+        out.history.assign(history.begin(), history.end());
         std::ranges::sort(out.lifetimes, {}, &CompiledGraph::Lifetime::first);
         for (const auto& alias : aliasOf | std::views::keys) out.aliases[alias] = root(alias);
         return out;

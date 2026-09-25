@@ -25,6 +25,7 @@
 namespace kor {
     class CommandBuffer;
     class FrameGraph;
+    class Framebuffer;
     class RenderPass;
 
     /** @brief An image the frame graph creates for its passes. */
@@ -73,6 +74,21 @@ namespace kor {
         PassBuilder& Consume(std::string_view name, std::string_view as);
         /** @brief Keeps the pass even when nothing reads what it makes (it has effects of its own). */
         PassBuilder& SideEffect();
+        /**
+         * @brief Reads it as it stood at the end of the previous frame.
+         *
+         * For temporal effects — TAA blending into last frame's result, reprojection, occlusion
+         * culling against last frame's depth. It orders nothing: the pass may run before this frame
+         * produces the resource, even when it is the pass that produces it. It does keep whatever
+         * produces the resource running, since the next frame needs it.
+         *
+         * Reach it with PassResources::PreviousImageNamed (or PreviousBufferNamed): a separate image
+         * the graph copies the resource into at the end of every frame, so a descriptor set built
+         * once in Initialize stays right. Cleared (depth to 1, everything else to 0) whenever the
+         * graph is rebuilt; RenderPass::HasPrevious says when it holds a real previous frame again.
+         * Only for resources the graph creates.
+         */
+        PassBuilder& ReadPrevious(std::string_view name);
 
     private:
         friend class FrameGraph;
@@ -88,6 +104,9 @@ namespace kor {
         [[nodiscard]] ResourceRef<const Buffer> BufferNamed(std::string_view name) const;
         /** @brief The size an image the graph made has (or will have, after a resize). */
         [[nodiscard]] glm::uvec2 Extent(std::string_view name) const;
+        /** @brief Where last frame's @p name is kept, for a pass that declared PassBuilder::ReadPrevious. */
+        [[nodiscard]] ResourceRef<const Image> PreviousImageNamed(std::string_view name) const;
+        [[nodiscard]] ResourceRef<const Buffer> PreviousBufferNamed(std::string_view name) const;
 
     private:
         friend class FrameGraph;
@@ -146,6 +165,15 @@ namespace kor {
          * skipped with it (FrameGraph::SkippedPasses).
          */
         void SetEnabled(bool enabled);
+
+    protected:
+        /**
+         * @brief Whether last frame's @p name holds a real previous frame, rather than the cleared
+         *        contents it starts with after the graph is (re)built.
+         *
+         * For a temporal effect to reset its accumulation after a resize. From Prepare and Record.
+         */
+        [[nodiscard]] bool HasPrevious(std::string_view name) const;
 
     private:
         friend class FrameGraph;
@@ -219,6 +247,9 @@ namespace kor {
         /** @brief An image of the graph's by name — for a screenshot or a debug view. Empty before the first frame. */
         [[nodiscard]] ResourceRef<const Image> ImageNamed(std::string_view name) const;
 
+        /** @brief Whether last frame's @p name holds a real previous frame. @see RenderPass::HasPrevious */
+        [[nodiscard]] bool HasPrevious(std::string_view name) const;
+
     private:
         friend class PassResources;
         struct Allocation;
@@ -238,6 +269,18 @@ namespace kor {
         std::map<std::string, ImageDesc, std::less<>> _imageDescs;
         std::vector<Resource<Image>> _ownedImages;
         std::vector<Resource<Buffer>> _ownedBuffers;
+
+        // ---- previous frames ----------------------------------------------------------------------
+        // Every resource some pass reads from the previous frame has a second copy that is not
+        // per-frame: cleared when allocated, then refreshed from the resource after the frame's last
+        // pass. Keyed by every name that reaches it, aliases included.
+        std::map<std::string, ResourceRef<const Image>, std::less<>> _previousImages;
+        std::map<std::string, ResourceRef<const Buffer>, std::less<>> _previousBuffers;
+        std::vector<std::pair<ResourceRef<const Image>, Resource<Image>>> _imageHistory;    // this frame's, kept copy
+        std::vector<std::pair<ResourceRef<const Buffer>, Resource<Buffer>>> _bufferHistory;
+        std::vector<Resource<Framebuffer>> _historyClears;  // what cleared a depth history, kept until rebuilt
+        std::vector<std::string> _history;                  // the physical names, for the interface
+        glm::u64 _historyFrames = 0;                        // frames copied since the history was (re)made
         glm::uvec2 _extent {0, 0};
         bool _dirty = true;
         bool _broken = false;

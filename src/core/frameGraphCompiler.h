@@ -35,6 +35,13 @@ namespace kor::graph {
          * the new one. Both names are the same physical resource. One pass may consume a name.
          */
         eConsume,
+        /**
+         * Reads it as it stood at the end of the *previous* frame. No ordering with this frame's
+         * passes at all — it may run before this frame's creator — but it keeps every pass that
+         * produces the resource, since the next frame needs what they leave. Only for resources the
+         * graph creates: an imported one has no previous frame the graph keeps.
+         */
+        eReadPrevious,
     };
 
     struct Use {
@@ -84,6 +91,12 @@ namespace kor::graph {
         };
         /** Created resources some kept pass uses, in order of first use. Imported ones are not listed. */
         std::vector<Lifetime> lifetimes;
+
+        /**
+         * Physical resources (created, never aliases) some kept pass reads from the previous frame.
+         * Each needs a copy kept from one frame to the next. In name order.
+         */
+        std::vector<std::string> history;
 
         /**
          * Every name a consume introduced, and the resource (created or imported) it is really —

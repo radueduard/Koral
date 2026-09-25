@@ -22,6 +22,7 @@ PassDecl pass(std::string name, std::vector<Use> uses, const bool sideEffect = f
 Use create(std::string r) { return {std::move(r), Access::eCreate}; }
 Use read(std::string r)   { return {std::move(r), Access::eRead}; }
 Use write(std::string r)  { return {std::move(r), Access::eWrite}; }
+Use readPrevious(std::string r) { return {std::move(r), Access::eReadPrevious}; }
 
 std::vector<std::string> names(const std::vector<PassDecl>& passes, const std::vector<std::size_t>& indices) {
     std::vector<std::string> out;
@@ -298,6 +299,103 @@ TEST(FrameGraphCompiler, DisablingACreatorSkipsWhatNeedsItTransitively) {
             EXPECT_EQ(chain[s.source].name, "cull") << "blamed on the pass it actually needed";
         }
     }
+}
+
+// ---- previous-frame reads -----------------------------------------------------------------------
+
+// Occlusion culling against last frame's depth: the cull runs before this frame's depth exists, and
+// the draw that makes the depth needs the cull's list. Read as this frame's depth, that is a cycle.
+TEST(FrameGraphCompiler, ReadingThePreviousFrameAddsNoOrdering) {
+    const std::vector<PassDecl> passes{
+        pass("draw", {read("list"), create("depth"), write("screen")}),
+        pass("cull", {readPrevious("depth"), create("list")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(names(passes, compiled->order), (std::vector<std::string>{"cull", "draw"}));
+    EXPECT_EQ(compiled->history, (std::vector<std::string>{"depth"}));
+
+    const auto it = std::ranges::find(compiled->lifetimes, std::string("depth"), &CompiledGraph::Lifetime::resource);
+    ASSERT_NE(it, compiled->lifetimes.end());
+    EXPECT_EQ(it->first, 0u) << "read at the start of the frame, as last frame left it";
+    EXPECT_EQ(it->last, 1u) << "copied for the next frame after the last pass";
+}
+
+TEST(FrameGraphCompiler, APreviousFrameReadKeepsItsProducerAlive) {
+    const std::vector<PassDecl> passes{
+        pass("make", {create("x")}),                            // nothing reads x this frame
+        pass("use",  {readPrevious("x"), write("screen")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(names(passes, compiled->order), (std::vector<std::string>{"make", "use"}));
+    EXPECT_TRUE(compiled->culled.empty()) << "next frame needs what 'make' leaves";
+    EXPECT_EQ(compiled->history, (std::vector<std::string>{"x"}));
+}
+
+// Temporal accumulation: blend this frame into what the pass itself produced last frame.
+TEST(FrameGraphCompiler, APassMayReadThePreviousVersionOfWhatItCreates) {
+    const std::vector<PassDecl> passes{
+        pass("scene",   {create("hdr")}),
+        pass("taa",     {read("hdr"), readPrevious("taa"), create("taa")}),
+        pass("present", {read("taa"), write("screen")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(names(passes, compiled->order), (std::vector<std::string>{"scene", "taa", "present"}));
+    EXPECT_EQ(compiled->history, (std::vector<std::string>{"taa"}));
+}
+
+TEST(FrameGraphCompiler, ThePreviousFrameOfAConsumedResourceIsItsFinalState) {
+    const std::vector<PassDecl> passes{
+        pass("reset",   {create("draws")}),
+        pass("cull",    {consume("draws", "draws.culled")}),
+        pass("forward", {read("draws.culled"), readPrevious("draws.culled"), write("screen")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(compiled->history, (std::vector<std::string>{"draws"})) << "one physical resource, kept once";
+}
+
+TEST(FrameGraphCompiler, RefusesThePreviousFrameOfAnImportedResource) {
+    const std::vector<PassDecl> passes{pass("feedback", {readPrevious("screen"), write("screen")})};
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_FALSE(compiled);
+    EXPECT_NE(compiled.error().message.find("imported"), std::string::npos) << compiled.error().message;
+}
+
+TEST(FrameGraphCompiler, RefusesThePreviousFrameOfSomethingNothingCreates) {
+    const std::vector<PassDecl> passes{pass("use", {readPrevious("ghost"), write("screen")})};
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_FALSE(compiled);
+    EXPECT_NE(compiled.error().message.find("reads 'ghost' from the previous frame, but no pass creates it"),
+              std::string::npos) << compiled.error().message;
+}
+
+TEST(FrameGraphCompiler, ACulledReaderKeepsNoHistory) {
+    const std::vector<PassDecl> passes{
+        pass("make",   {create("x")}),
+        pass("unused", {readPrevious("x"), create("nobodyReadsThis")}),
+        pass("other",  {write("screen")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(names(passes, compiled->order), (std::vector<std::string>{"other"}));
+    EXPECT_TRUE(compiled->history.empty());
+}
+
+TEST(FrameGraphCompiler, DisablingTheCreatorSkipsThePreviousFrameReader) {
+    std::vector<PassDecl> passes{
+        pass("make", {create("x")}),
+        pass("use",  {readPrevious("x"), write("screen")}),
+    };
+    passes = disable(std::move(passes), "make");
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    ASSERT_EQ(compiled->skipped.size(), 1u);
+    EXPECT_EQ(passes[compiled->skipped[0].pass].name, "use");
+    EXPECT_EQ(compiled->skipped[0].resource, "x");
+    EXPECT_TRUE(compiled->history.empty());
 }
 
 TEST(FrameGraphCompiler, AnEmptyGraphIsFine) {
