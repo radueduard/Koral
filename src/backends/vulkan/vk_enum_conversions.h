@@ -56,11 +56,14 @@ namespace kor
         case ResourceAccess::eVertexBuffer: return ::vk::AccessFlagBits::eVertexAttributeRead;
         case ResourceAccess::eIndexBuffer: return ::vk::AccessFlagBits::eIndexRead;
         case ResourceAccess::eIndirectBuffer: return ::vk::AccessFlagBits::eIndirectCommandRead;
-        case ResourceAccess::eColorAttachment: return ::vk::AccessFlagBits::eColorAttachmentWrite;
+        // An attachment is read as well as written: a LOAD op, blending and the depth test all
+        // read it, and a barrier granting only the write leaves those reads unsynchronised.
+        case ResourceAccess::eColorAttachment:
+            return ::vk::AccessFlagBits::eColorAttachmentRead | ::vk::AccessFlagBits::eColorAttachmentWrite;
         case ResourceAccess::eDepthStencilAttachment:
         case ResourceAccess::eDepthAttachment:
         case ResourceAccess::eStencilAttachment:
-            return ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+            return ::vk::AccessFlagBits::eDepthStencilAttachmentRead | ::vk::AccessFlagBits::eDepthStencilAttachmentWrite;
         case ResourceAccess::eDepthStencilRead:
         case ResourceAccess::eDepthRead:
         case ResourceAccess::eStencilRead:
