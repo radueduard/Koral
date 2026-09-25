@@ -41,6 +41,7 @@ namespace kor
         case ErrorCode::eConfigInvalid:              return "eConfigInvalid";
         case ErrorCode::eModuleLoadFailed:           return "eModuleLoadFailed";
         case ErrorCode::eFileNotReadable:            return "eFileNotReadable";
+        case ErrorCode::eFrameGraphInvalid:          return "eFrameGraphInvalid";
         }
         return "eUnknown";
     }
@@ -104,6 +105,8 @@ namespace kor
             return "A module could not be found or loaded, or a module it requires is missing.";
         case ErrorCode::eFileNotReadable:
             return "A file could not be opened for reading or writing, or its contents are not the shape expected.";
+        case ErrorCode::eFrameGraphInvalid:
+            return "The render passes declared something the frame graph cannot schedule: a resource nobody makes, one made twice, or passes that depend on each other in a circle.";
         }
         return "Unknown error.";
     }

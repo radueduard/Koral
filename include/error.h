@@ -80,6 +80,9 @@ namespace kor
 
         // --- files ---
         eFileNotReadable,      ///< A file could not be opened, or its contents are not the shape expected.
+
+        // --- frame graph ---
+        eFrameGraphInvalid,    ///< Render passes declared something the frame graph cannot schedule.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */
