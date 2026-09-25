@@ -41,10 +41,11 @@ namespace kor::vk
         return usage;
     }
 
-    CommandBuffer::CommandBuffer(const kor::vk::Queue& queue, const ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool parentCommandPool)
+    CommandBuffer::CommandBuffer(const kor::vk::Queue& queue, const ::vk::CommandBuffer commandBuffer, const ::vk::CommandPool parentCommandPool,
+                                 const ::vk::Fence fence, const ::vk::QueryPool timerPool)
         : kor::CommandBuffer(getCommandBufferUsage(queue)), _queue(queue), _parentPool(parentCommandPool) {
         _handle = commandBuffer;
-        _fence = kor::vk::Context::Device()->createFence({});
+        _fence = fence ? fence : kor::vk::Context::Device()->createFence({});
 
         // Timestamps are not universal: a queue family may report zero valid timestamp bits, which
         // is the driver saying this queue cannot be timed. Leaving the period at zero is what makes
@@ -52,7 +53,7 @@ namespace kor::vk
         if (queue.getFamily().getProperties().timestampValidBits > 0) {
             _timestampPeriod = Context::Runtime().getPhysicalDevice().getProperties().limits.timestampPeriod;
             if (_timestampPeriod > 0.f) {
-                _timerPool = Context::Device()->createQueryPool(::vk::QueryPoolCreateInfo()
+                _timerPool = timerPool ? timerPool : Context::Device()->createQueryPool(::vk::QueryPoolCreateInfo()
                     .setQueryType(::vk::QueryType::eTimestamp)
                     .setQueryCount(MaxTimerScopes * 2));
             }
@@ -60,8 +61,8 @@ namespace kor::vk
     }
 
     CommandBuffer::~CommandBuffer() {
-        Context::Device().freeCommandBuffer(*this);
-
+        // Back on the free list with its fence and query pool, for the next command buffer to reuse.
+        if (Context::Device().freeCommandBuffer(*this)) return;
         Context::Device()->destroyFence(_fence);
         if (_timerPool) Context::Device()->destroyQueryPool(_timerPool);
     }

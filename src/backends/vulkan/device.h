@@ -114,9 +114,12 @@ namespace kor::vk {
         // would still be shared. A pool per *command buffer* is used by whichever single thread is
         // recording that buffer, which is the one rule callers already follow.
         [[nodiscard]] std::unique_ptr<kor::vk::CommandBuffer> requestCommandBuffer(const kor::vk::Queue& queue) const;
-        // Resets the buffer's pool and puts the pair back on the free list. The GPU must be done
-        // with the buffer, as it had to be for vkFreeCommandBuffers before.
-        void freeCommandBuffer(const kor::vk::CommandBuffer &commandBuffer) const;
+        // Resets the buffer's pool and puts it back on the free list — with its fence and timer
+        // query pool, which cost far more to create than the buffer itself and would otherwise be
+        // made and destroyed for every command buffer, serialised inside the driver. The GPU must be
+        // done with the buffer, as it had to be for vkFreeCommandBuffers before. False when the
+        // pools are already gone (freeQueues), leaving the fence and query pool to their owner.
+        [[nodiscard]] bool freeCommandBuffer(const kor::vk::CommandBuffer &commandBuffer) const;
 
         // Records `command` into a fresh command buffer on a queue with `requiredFlags` and submits
         // it, without waiting. The returned token is signalled when the GPU is done; the command
@@ -145,6 +148,8 @@ namespace kor::vk {
         struct PooledCommandBuffer {
             ::vk::CommandPool pool;
             ::vk::CommandBuffer buffer;
+            ::vk::Fence fence;
+            ::vk::QueryPool timerPool;   // null where the queue cannot be timed
         };
         mutable std::mutex _poolMutex;
         mutable std::map<glm::u32, std::vector<PooledCommandBuffer>> _freeCommandBuffers {}; // by queue identifier

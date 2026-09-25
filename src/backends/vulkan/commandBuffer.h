@@ -16,12 +16,15 @@ namespace kor::vk
 
     class CommandBuffer : public kor::CommandBuffer, public kor::vk::Wrapper<::vk::CommandBuffer> {
     public:
-        CommandBuffer(const kor::vk::Queue& queue, ::vk::CommandBuffer commandBuffer, ::vk::CommandPool parentCommandPool);
+        /// @p fence and @p timerPool come from a recycled command buffer; null makes new ones.
+        CommandBuffer(const kor::vk::Queue& queue, ::vk::CommandBuffer commandBuffer, ::vk::CommandPool parentCommandPool,
+                      ::vk::Fence fence = nullptr, ::vk::QueryPool timerPool = nullptr);
         ~CommandBuffer() override;
         void Run(const std::function<void(const kor::vk::CommandBuffer&)>& command, ::vk::Semaphore waitSemaphore = nullptr) const;
 
         [[nodiscard]] ::vk::CommandPool getParentPool() const { return _parentPool; }
         [[nodiscard]] const ::vk::Fence& getFence() const { return _fence; }
+        [[nodiscard]] ::vk::QueryPool getTimerPool() const { return _timerPool; }
         [[nodiscard]] const kor::vk::Queue& getQueue() const { return _queue; }
 
         kor::CommandBuffer& DoBegin() override;

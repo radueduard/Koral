@@ -355,6 +355,12 @@ namespace kor::vk {
             std::lock_guard lock(_poolMutex);
             for (const auto pool : _commandPools) _handle.destroyCommandPool(pool);
             _commandPools.clear();
+            for (const auto& free : _freeCommandBuffers | std::views::values) {
+                for (const auto& recycled : free) {
+                    _handle.destroyFence(recycled.fence);
+                    if (recycled.timerPool) _handle.destroyQueryPool(recycled.timerPool);
+                }
+            }
             _freeCommandBuffers.clear();
         }
         std::lock_guard lock(_queuesMutex);
@@ -366,9 +372,9 @@ namespace kor::vk {
         {
             std::lock_guard lock(_poolMutex);
             if (auto& free = _freeCommandBuffers[queue.getIdentifier()]; !free.empty()) {
-                const auto [freePool, freeBuffer] = free.back();
+                const auto recycled = free.back();
                 free.pop_back();
-                return std::make_unique<CommandBuffer>(queue, freeBuffer, freePool);
+                return std::make_unique<CommandBuffer>(queue, recycled.buffer, recycled.pool, recycled.fence, recycled.timerPool);
             }
             pool = _handle.createCommandPool(::vk::CommandPoolCreateInfo()
                 // Reset-per-buffer so re-recording a buffer resets it implicitly on begin.
@@ -384,14 +390,19 @@ namespace kor::vk {
         return std::make_unique<CommandBuffer>(queue, buffers.front(), pool);
     }
 
-    void Device::freeCommandBuffer(const CommandBuffer &commandBuffer) const {
+    bool Device::freeCommandBuffer(const CommandBuffer &commandBuffer) const {
         const auto pool = commandBuffer.getParentPool();
         std::lock_guard lock(_poolMutex);
-        if (std::ranges::find(_commandPools, pool) == _commandPools.end()) return; // freeQueues() got there first
+        if (std::ranges::find(_commandPools, pool) == _commandPools.end()) return false; // freeQueues() got there first
         // Still this buffer's alone until it is on the free list, but resetting under the lock
         // costs nothing that matters and keeps the "gone" check above honest.
         _handle.resetCommandPool(pool);
-        _freeCommandBuffers[commandBuffer.getQueue().getIdentifier()].push_back({pool, *commandBuffer});
+        // The next owner submits with this fence, which must be unsignalled by then.
+        const auto fence = commandBuffer.getFence();
+        if (_handle.getFenceStatus(fence) == ::vk::Result::eSuccess) (void)_handle.resetFences(1, &fence);
+        _freeCommandBuffers[commandBuffer.getQueue().getIdentifier()].push_back(
+            {pool, *commandBuffer, fence, commandBuffer.getTimerPool()});
+        return true;
     }
 
     kor::Token Device::runSingleTimeCommand(const std::function<void(kor::vk::CommandBuffer&)> &command, const ::vk::QueueFlags requiredFlags) const
