@@ -164,7 +164,7 @@ namespace kmdl
             std::vector<glm::u32> materialIndices;  ///< Indices into Scene::materials, one per mesh above.
 
             glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);  ///< Translation relative to the parent.
-            glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);  ///< Euler rotation relative to the parent, in radians.
+            glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);  ///< Euler rotation relative to the parent, in **degrees** (X, Y, Z).
             glm::vec3 scale = glm::vec3(1.f, 1.f, 1.f);     ///< Scale relative to the parent.
             AABB aabb;                                      ///< Bounds of the meshes under this node.
         };
