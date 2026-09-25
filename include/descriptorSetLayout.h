@@ -3,6 +3,8 @@
 //
 
 #pragma once
+
+#include <span>
 #include <map>
 #include <memory>
 #include <string>
@@ -31,6 +33,20 @@ namespace kor
     class KORAL_API DescriptorSetLayout
     {
     public:
+        /**
+         * @brief The layout shaders declare for one set, with no pipeline involved.
+         * @param shaders The shaders that reach the set — every stage that does, merged as a
+         *        pipeline built from them would merge them.
+         * @param set Which descriptor set.
+         *
+         * For descriptor sets that outlive any one pipeline: a pipeline is rebuilt when what it
+         * renders into changes (a resize, say), but a set built against a layout from here stays
+         * valid for every pipeline made from the same shaders.
+         */
+        [[nodiscard]] static kor::Resource<DescriptorSetLayout> FromShaders(
+            std::span<const ResourceRef<const Shader>> shaders, glm::u32 set,
+            std::source_location where = std::source_location::current());
+
         /**
          * @brief What one binding is, plus what the shader does with it.
          *

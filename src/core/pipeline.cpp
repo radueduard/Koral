@@ -49,34 +49,19 @@ namespace kor
         throw std::runtime_error("This pipeline declares no push-constant range covering that offset!");
     }
 
-    VoidResult Pipeline::BuildLayouts(const std::span<const ResourceRef<const Shader>> shaders)
-    {
-        // The first conflict found, kept so the pipeline's failure names what actually went wrong
-        // rather than reporting every kind of merge problem as a descriptor conflict. The scan
-        // continues past it, so one build logs every conflict there is.
-        std::optional<Error> failure;
-        const auto conflict = [&failure](const ErrorCode code, std::string message) {
-            kor::log::Error("{}", message);
-            if (!failure) failure = Error{ .code = code, .message = std::move(message) };
-        };
+    namespace {
+        using MergedSets = std::unordered_map<glm::u32, std::map<glm::u32, Shader::Descriptor>>;
 
-        // Merge per-shader memory layouts: descriptors sharing a (set, binding) are
-        // unioned across stages, push constants are unioned by offset.
-        std::unordered_map<glm::u32, std::map<glm::u32, Shader::Descriptor>> mergedSetLayouts;
-        std::unordered_map<glm::u32, Shader::PushConstant> mergedPushConstants;
-        // Every block as its own shader declared it. The merge above is keyed by offset and keeps
-        // the first declaration it sees, which is exactly the case the name merge below has to
-        // examine: two stages declaring different blocks at one offset.
-        std::vector<const Shader::PushConstant*> declaredPushConstants;
-        for (const auto& shader : shaders)
-        {
-            const auto& memoryLayout = shader->BlockLayout();
-            for (const auto& [setIndex, setDescription] : memoryLayout.descriptorSets)
+        // Merges one shader's descriptors into `merged`: a (set, binding) several stages declare is
+        // one binding, reached by all of them.
+        template<typename Conflict>
+        void mergeDescriptors(const Shader& shader, MergedSets& merged, const Conflict& conflict) {
+            for (const auto& [setIndex, setDescription] : shader.BlockLayout().descriptorSets)
             {
                 for (const auto& [binding, descriptor] : setDescription.descriptors)
                 {
-                    if (mergedSetLayouts[setIndex].contains(binding)) {
-                        auto& existingDescriptor = mergedSetLayouts[setIndex][binding];
+                    if (merged[setIndex].contains(binding)) {
+                        auto& existingDescriptor = merged[setIndex][binding];
                         if (existingDescriptor != descriptor)
                         {
                             conflict(ErrorCode::eDescriptorConflict, std::format(
@@ -94,10 +79,85 @@ namespace kor
                         existingDescriptor.active = existingDescriptor.active || descriptor.active;
                     } else
                     {
-                        mergedSetLayouts[setIndex][binding] = descriptor;
+                        merged[setIndex][binding] = descriptor;
                     }
                 }
             }
+        }
+
+        DescriptorSetLayout::Builder layoutBuilder(const std::map<glm::u32, Shader::Descriptor>& setDescription) {
+            auto builder = DescriptorSetLayout::Builder();
+            for (const auto& [binding, descriptor] : setDescription)
+            {
+                builder.AddBinding(binding, DescriptorSetLayout::Binding{
+                    .type = descriptor.type,
+                    .count = descriptor.count,
+                    .access = descriptor.access,
+                    .stages = descriptor.stages,
+                    .active = descriptor.active,
+                    .members = descriptor.members,
+                    .blockSize = descriptor.blockSize,
+                    // Carried through so a set can be written by the name the shader uses rather
+                    // than by a number restated in C++. @see DescriptorSet::Builder::Write
+                    .name = descriptor.name,
+                    .blockName = descriptor.blockName,
+                    // What an Image bound directly at this binding is turned into a view by.
+                    .shape = descriptor.shape,
+                });
+            }
+            return builder;
+        }
+    }
+
+    Resource<DescriptorSetLayout> DescriptorSetLayout::FromShaders(const std::span<const ResourceRef<const Shader>> shaders,
+                                                                  const glm::u32 set, const std::source_location where)
+    {
+        std::optional<Error> failure;
+        const auto conflict = [&failure](const ErrorCode code, std::string message) {
+            if (!failure) failure = Error{ .code = code, .message = std::move(message) };
+        };
+        MergedSets merged;
+        for (const auto& shader : shaders) {
+            if (!shader.Alive() || shader.Poisoned()) {
+                conflict(ErrorCode::eInvalidArgument, "FromShaders was given a shader that is missing or failed to build.");
+                continue;
+            }
+            mergeDescriptors(*shader, merged, conflict);
+        }
+        if (!failure && !merged.contains(set))
+            conflict(ErrorCode::eInvalidArgument, std::format("None of the shaders declares descriptor set {}.", set));
+        if (failure) {
+            // Through a builder, so the failure is an ordinary poisoned resource naming the caller.
+            auto failed = DescriptorSetLayout::Builder();
+            failed.AddError(failure->code, failure->message);
+            return failed.Build(where);
+        }
+        return layoutBuilder(merged.at(set)).Build(where);
+    }
+
+    VoidResult Pipeline::BuildLayouts(const std::span<const ResourceRef<const Shader>> shaders)
+    {
+        // The first conflict found, kept so the pipeline's failure names what actually went wrong
+        // rather than reporting every kind of merge problem as a descriptor conflict. The scan
+        // continues past it, so one build logs every conflict there is.
+        std::optional<Error> failure;
+        const auto conflict = [&failure](const ErrorCode code, std::string message) {
+            kor::log::Error("{}", message);
+            if (!failure) failure = Error{ .code = code, .message = std::move(message) };
+        };
+
+        // Merge per-shader memory layouts: descriptors sharing a (set, binding) are
+        // unioned across stages, push constants are unioned by offset.
+        MergedSets mergedSetLayouts;
+        std::unordered_map<glm::u32, Shader::PushConstant> mergedPushConstants;
+        // Every block as its own shader declared it. The merge above is keyed by offset and keeps
+        // the first declaration it sees, which is exactly the case the name merge below has to
+        // examine: two stages declaring different blocks at one offset.
+        std::vector<const Shader::PushConstant*> declaredPushConstants;
+        for (const auto& shader : shaders)
+        {
+            const auto& memoryLayout = shader->BlockLayout();
+            mergeDescriptors(*shader, mergedSetLayouts, conflict);
             for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
             {
                 declaredPushConstants.push_back(&pushConstant);
@@ -125,25 +185,7 @@ namespace kor
 
         for (const auto& [setIndex, setDescription] : mergedSetLayouts)
         {
-            auto builder = DescriptorSetLayout::Builder();
-            for (const auto& [binding, descriptor] : setDescription)
-            {
-                builder.AddBinding(binding, DescriptorSetLayout::Binding{
-                    .type = descriptor.type,
-                    .count = descriptor.count,
-                    .access = descriptor.access,
-                    .stages = descriptor.stages,
-                    .active = descriptor.active,
-                    .members = descriptor.members,
-                    .blockSize = descriptor.blockSize,
-                    // Carried through so a set can be written by the name the shader uses rather
-                    // than by a number restated in C++. @see DescriptorSet::Builder::Write
-                    .name = descriptor.name,
-                    .blockName = descriptor.blockName,
-                    // What an Image bound directly at this binding is turned into a view by.
-                    .shape = descriptor.shape,
-                });
-            }
+            auto builder = layoutBuilder(setDescription);
 
             if (const auto existing = _setLayouts.find(setIndex);
                 existing != _setLayouts.end() && existing->second.Valid() &&
