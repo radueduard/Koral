@@ -345,6 +345,18 @@ namespace kor
         return PushConstantBlock(laidOut.data(), static_cast<glm::u32>(laidOut.size()), member->offset);
     }
 
+    namespace {
+        ResourceAccess withWrite(const ResourceAccess access) {
+            switch (access) {
+            case ResourceAccess::eComputeRead:        return ResourceAccess::eComputeReadWrite;
+            case ResourceAccess::eVertexShaderRead:   return ResourceAccess::eVertexShaderReadWrite;
+            case ResourceAccess::eFragmentShaderRead: return ResourceAccess::eFragmentShaderReadWrite;
+            case ResourceAccess::eAllShaderRead:      return ResourceAccess::eAllShaderReadWrite;
+            default:                                  return access;
+            }
+        }
+    }
+
     std::vector<CommandBuffer::ResourceUse> CommandBuffer::UsesForBoundResources(const bool includeMesh) const
     {
         std::vector<ResourceUse> uses;
@@ -354,9 +366,14 @@ namespace kor
                          : _state.boundGraphicsPipeline.has_value()   ? _state.boundGraphicsDescriptorSets
                          : _state.boundRayTracingDescriptorSets;
 
-        for (const auto& set : sets | std::views::values) {
+        const Pipeline* pipeline = BoundPipeline();
+        for (const auto& [index, set] : sets) {
             if (!set.Alive() || set.Poisoned()) continue;
-            const auto layout = set->Layout();
+            // How a binding is accessed is up to the shader that consumes it, so it is read from the
+            // bound pipeline's layout, not from the one the set was allocated with: a set built for a
+            // compute pass that writes it may be bound, unchanged, to a draw that only reads it.
+            auto layout = pipeline ? pipeline->SetLayoutRef(index) : kor::ResourceRef<const DescriptorSetLayout>{};
+            if (!layout.Alive() || layout.Poisoned()) layout = set->Layout();
             if (!layout.Alive() || layout.Poisoned()) continue;
 
             const auto& descriptions = layout->Bindings();
@@ -366,7 +383,12 @@ namespace kor
                 if (!description->second.active) continue;
                 if (!synchronisable(description->second.type)) continue;
 
-                const auto access = shaderAccess(description->second.access, description->second.stages);
+                auto access = shaderAccess(description->second.access, description->second.stages);
+                // A storage image is only ever accessed in the general layout, even read-only; the
+                // plain read accesses map to the sampled layout instead. So a read of one is recorded
+                // as its read-write form — the layout is what matters, and the only cost is a barrier
+                // between two back-to-back read-only uses that did not strictly need one.
+                if (description->second.type == DescriptorType::eStorageImage) access = withWrite(access);
 
                 // Every element, which is what makes a bindless array work: the index a draw
                 // picks is unknowable, but requiring the same access on all of them is correct
@@ -990,11 +1012,46 @@ namespace kor
             SetPrimitiveRestartEnable(ia.primitiveRestartEnable);
     }
 
+    namespace {
+        // Whether a set bound under one layout still stands under another: the same bindings, each
+        // of the same type and count (Binding's own interface comparison). Stages are left out on
+        // purpose: the backend's layouts are visible to every stage, which is what lets a set built
+        // for a compute pipeline be bound to a graphics one — and people do exactly that.
+        bool compatibleLayouts(const DescriptorSetLayout& a, const DescriptorSetLayout& b) {
+            if (&a == &b) return true;
+            return std::ranges::equal(a.Bindings(), b.Bindings(), [](const auto& l, const auto& r) {
+                return l.first == r.first && l.second == r.second;
+            });
+        }
+
+        // Binding a different pipeline does not unbind descriptor sets. Vulkan keeps every set whose
+        // layout the new pipeline shares, up to the first one it does not, and the GPU goes on
+        // reading them — so the sets tracked here must follow the same rule. Forgetting them all
+        // (as this once did) left the draws after a pipeline switch with no recorded uses, and the
+        // barriers their images needed were never emitted.
+        void keepCompatibleSets(std::map<glm::u32, kor::ResourceRef<const DescriptorSet>>& sets, const Pipeline& pipeline) {
+            for (auto it = sets.begin(); it != sets.end(); ++it) {
+                const auto wanted = pipeline.SetLayoutRef(it->first);
+                const auto& set = it->second;
+                const bool stands = wanted.Alive() && set.Alive() && !set.Poisoned() && set->Layout().Alive()
+                                 && compatibleLayouts(*set->Layout(), *wanted);
+                if (!stands) {
+                    sets.erase(it, sets.end());  // an incompatible set disturbs every set after it
+                    return;
+                }
+            }
+        }
+    }
+
     void CommandBuffer::StateBindComputePipeline(const kor::ResourceRef<const ComputePipeline>& pipeline)
     {
         // Get(), not &*: comparing identity must not dereference.
-        if (!_state.boundComputePipeline.has_value() || _state.boundComputePipeline->Get() != pipeline.Get())
-            _state.boundComputeDescriptorSets.clear();
+        // Each bind point keeps its own sets, whatever the others do in between; what a new
+        // pipeline disturbs is decided by layout, as Vulkan decides it.
+        if (!_state.boundComputePipeline.has_value() || _state.boundComputePipeline->Get() != pipeline.Get()) {
+            if (pipeline.Alive() && !pipeline.Poisoned()) keepCompatibleSets(_state.boundComputeDescriptorSets, *pipeline);
+            else _state.boundComputeDescriptorSets.clear();
+        }
         _state.boundComputePipeline = pipeline;
         _state.boundGraphicsPipeline = std::nullopt;
         _state.boundRayTracingPipeline = std::nullopt;
@@ -1013,8 +1070,12 @@ namespace kor
     void CommandBuffer::StateBindGraphicsPipeline(const kor::ResourceRef<const GraphicsPipeline>& pipeline)
     {
         // Get(), not &*: comparing identity must not dereference.
-        if (!_state.boundGraphicsPipeline.has_value() || _state.boundGraphicsPipeline->Get() != pipeline.Get())
-            _state.boundGraphicsDescriptorSets.clear();
+        // Each bind point keeps its own sets, whatever the others do in between; what a new
+        // pipeline disturbs is decided by layout, as Vulkan decides it.
+        if (!_state.boundGraphicsPipeline.has_value() || _state.boundGraphicsPipeline->Get() != pipeline.Get()) {
+            if (pipeline.Alive() && !pipeline.Poisoned()) keepCompatibleSets(_state.boundGraphicsDescriptorSets, *pipeline);
+            else _state.boundGraphicsDescriptorSets.clear();
+        }
         _state.boundGraphicsPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
         _state.boundRayTracingPipeline = std::nullopt;
@@ -1036,8 +1097,12 @@ namespace kor
     void CommandBuffer::StateBindRayTracingPipeline(const kor::ResourceRef<const RayTracingPipeline>& pipeline)
     {
         // Get(), not &*: comparing identity must not dereference.
-        if (!_state.boundRayTracingPipeline.has_value() || _state.boundRayTracingPipeline->Get() != pipeline.Get())
-            _state.boundRayTracingDescriptorSets.clear();
+        // Each bind point keeps its own sets, whatever the others do in between; what a new
+        // pipeline disturbs is decided by layout, as Vulkan decides it.
+        if (!_state.boundRayTracingPipeline.has_value() || _state.boundRayTracingPipeline->Get() != pipeline.Get()) {
+            if (pipeline.Alive() && !pipeline.Poisoned()) keepCompatibleSets(_state.boundRayTracingDescriptorSets, *pipeline);
+            else _state.boundRayTracingDescriptorSets.clear();
+        }
         _state.boundRayTracingPipeline = pipeline;
         _state.boundComputePipeline = std::nullopt;
         _state.boundGraphicsPipeline = std::nullopt;
