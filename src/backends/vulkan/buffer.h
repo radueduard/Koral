@@ -32,6 +32,7 @@ namespace kor::vk
 		void Flush(glm::i64 size, glm::u64 offset) const override;
 		void Invalidate(glm::i64 size, glm::u64 offset) const override;
 		void AutomaticUpdate() override;
+		[[nodiscard]] glm::u32 CopyCount() const override { return static_cast<glm::u32>(_buffers.size()); }
 
 	public:
 		::vk::Buffer operator*() const;

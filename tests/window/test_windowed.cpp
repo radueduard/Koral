@@ -18,6 +18,7 @@
 #include <array>
 #include <chrono>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <thread>
 #include <iostream>
@@ -104,6 +105,7 @@ public:
 
     void Update() override {
         ++updates;
+        if (onUpdate) onUpdate();
 
         // A window being dragged asks for a new size every frame, so the target is replaced every
         // frame — and every replacement is a fresh image in an undefined layout that the interface
@@ -162,6 +164,8 @@ public:
 
     int updates = 0;
     glm::uvec2 lastResize{0, 0};
+    /// Runs inside the frame, where a scene's own Update would write its per-frame data.
+    std::function<void()> onUpdate;
 
     kgui::Viewport viewport;
     // A colour target as a scene would actually make one: sampled and rendered into, with no transfer
@@ -623,6 +627,122 @@ TEST_F(VkWindowTest, APerFrameBufferPropagatesAWriteToEveryCopy) {
         EXPECT_EQ(seen[i], kValue)
             << "frame " << i << " of " << copies << " in flight read a stale copy";
     }
+}
+
+// ---- per-frame device-local buffers ---------------------------------------------------------
+//
+// The same promise as the two tests above, for memory the CPU cannot map. A write there is staged, and
+// each frame's copy has to receive it — as that frame's own command, since the other copies may still
+// be in use by frames in flight when the write is made.
+
+namespace {
+    kor::Resource<kor::Buffer> makeDeviceLocalPerFrameU32() {
+        kor::Buffer::RawBuilder rb;
+        rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+          .SetUsage(kor::Buffer::Usage::eStorage | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst)
+          .SetIsPerFrame(true)
+          .SetType(kor::Buffer::Type::eDeviceLocal);
+        return rb.Build();
+    }
+}
+
+TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferPropagatesAWriteToEveryCopy) {
+    auto& scene = VkEnvironment::scene();
+    const auto copies = kor::Context::Scheduler().ImageCount();
+    ASSERT_GE(copies, 2u) << "nothing to propagate to with a single copy";
+    auto buffer = makeDeviceLocalPerFrameU32();
+    ASSERT_TRUE(static_cast<bool>(buffer));
+
+    // Between frames, the way a loading coroutine or a scene's Initialize writes.
+    constexpr glm::u32 kValue = 0xC0FFEE;
+    buffer->Write(std::array<glm::u32, 1>{ kValue }, 0);
+
+    for (glm::u32 i = 0; i < copies * 2 + 1; ++i) {
+        drawFrame(scene);
+        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), kValue) << "frame " << i << " read a copy that never got the write";
+    }
+}
+
+TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferWrittenInsideAFramePropagatesToEveryCopy) {
+    auto& scene = VkEnvironment::scene();
+    const auto copies = kor::Context::Scheduler().ImageCount();
+    auto buffer = makeDeviceLocalPerFrameU32();
+    ASSERT_TRUE(static_cast<bool>(buffer));
+
+    // Once, from inside a frame, and never again.
+    constexpr glm::u32 kValue = 0xBEEF;
+    scene.onUpdate = [&] { buffer->Write(std::array<glm::u32, 1>{ kValue }, 0); scene.onUpdate = nullptr; };
+
+    for (glm::u32 i = 0; i < copies * 2 + 1; ++i) {
+        drawFrame(scene);
+        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), kValue) << "frame " << i << " read a copy that never got the write";
+    }
+    scene.onUpdate = nullptr;
+}
+
+TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferWrittenEveryFrameReadsBackThatFramesValue) {
+    auto& scene = VkEnvironment::scene();
+    auto buffer = makeDeviceLocalPerFrameU32();
+    ASSERT_TRUE(static_cast<bool>(buffer));
+
+    // Every frame a new value — so an older write still on its way to a copy must never land on top
+    // of a newer one.
+    glm::u32 value = 0;
+    scene.onUpdate = [&] { ++value; buffer->Write(std::array<glm::u32, 1>{ value }, 0); };
+    for (int i = 0; i < 12; ++i) {
+        drawFrame(scene);
+        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), value) << "frame " << i << " read another frame's value";
+    }
+    scene.onUpdate = nullptr;
+}
+
+TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferBuiltWithDataHoldsItInEveryCopy) {
+    auto& scene = VkEnvironment::scene();
+    const auto copies = kor::Context::Scheduler().ImageCount();
+
+    constexpr glm::u32 kValue = 0xF00D;
+    auto buffer = kor::Buffer::Builder<glm::u32>()
+        .SetData(kValue)
+        .SetUsage(kor::Buffer::Usage::eStorage | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst)
+        .SetIsPerFrame(true)
+        .SetType(kor::Buffer::Type::eDeviceLocal)
+        .Build();
+    ASSERT_TRUE(static_cast<bool>(buffer));
+
+    for (glm::u32 i = 0; i < copies * 2 + 1; ++i) {
+        drawFrame(scene);
+        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), kValue) << "frame " << i << " read a copy the initial data never reached";
+    }
+}
+
+// The staging buffers behind those writes must not outlive them: each is released once every copy has
+// its data and the last frame to copy from it has finished — or a buffer written every frame leaks one
+// staging buffer per frame.
+//
+// "Every copy" means every swap-chain image, and the driver does not hand those out in turn: with a
+// mailbox present mode it can alternate between two for a dozen frames before the third comes round.
+// So this draws until the staging is gone, with a cap, rather than for a fixed count.
+TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferReleasesItsStagingOnceDelivered) {
+    auto& scene = VkEnvironment::scene();
+    const auto copies = kor::Context::Scheduler().ImageCount();
+    auto buffer = makeDeviceLocalPerFrameU32();
+    ASSERT_TRUE(static_cast<bool>(buffer));
+    for (glm::u32 i = 0; i < copies + 1; ++i) drawFrame(scene);
+    (void)buffer->Read<glm::u32>(1);
+    drawFrame(scene);
+    const auto baseline = kor::Context::Repository().TrackedResources();
+
+    glm::u32 value = 0;
+    scene.onUpdate = [&] { buffer->Write(std::array<glm::u32, 1>{ ++value }, 0); };
+    for (int i = 0; i < 20; ++i) drawFrame(scene);
+    scene.onUpdate = nullptr;
+    buffer->Write(std::array<glm::u32, 1>{ ++value }, 0);   // and one between frames
+
+    int frames = 0;
+    for (; frames < 200 && kor::Context::Repository().TrackedResources() != baseline; ++frames) drawFrame(scene);
+    EXPECT_EQ(kor::Context::Repository().TrackedResources(), baseline)
+        << "staging buffers were still held " << frames << " frames after the last write";
+    EXPECT_EQ(buffer->Read<glm::u32>(1).front(), value);
 }
 
 // The moving-camera case: a per-frame buffer written with a *different* value every frame must read

@@ -94,7 +94,8 @@ namespace kor
      * writing to a buffer the GPU is still reading from an earlier frame corrupts that frame; with
      * it, a write lands in the current frame's copy and is propagated to the others as they come
      * round. Anything the CPU rewrites every frame — camera matrices, per-frame constants — should
-     * be per-frame.
+     * be per-frame. A per-frame eDeviceLocal buffer is written without waiting: the data is staged
+     * once, and each frame's copy receives it as the first commands of that frame.
      *
      * Reads and writes come in two forms. Read/Write/ReadAt/WriteAt are one-shot and handle staging
      * and synchronisation themselves. Map() returns a mapping object that keeps the memory mapped
@@ -408,6 +409,11 @@ namespace kor
 
                     switch (buffer->MemoryType()) {
                         case Type::eDeviceLocal: {
+                            if (buffer->CopyCount() > 1) {
+                                // Every copy gets it, each in a frame of its own. @see UploadPerFrame
+                                buffer->UploadPerFrame(std::as_bytes(data), 0);
+                                break;
+                            }
                             const auto byteSize = CheckedByteSize<T>(static_cast<glm::u64>(_instanceCount), "Builder::build");
                             Builder<std::byte> stagingBuilder;
                             stagingBuilder
@@ -452,6 +458,7 @@ namespace kor
             [[nodiscard]] Resource<Buffer> Build(std::source_location where = std::source_location::current()) const override {
                 auto buffer = Materialize<Buffer>(*this, "Buffer", where);
                 Context::Repository().AddRef(ResourceRef<const Buffer>(buffer));
+                Buffer::Adopted(buffer);
                 return buffer;
             }
         };
@@ -628,7 +635,10 @@ namespace kor
          * visible to a copy recorded afterwards.
          *
          * @warning On a Type::eDeviceLocal buffer this stages a copy and blocks until the GPU has
-         *          performed it. For data written every frame, use a host-visible per-frame buffer.
+         *          performed it — unless the buffer is per-frame, in which case it returns at once
+         *          and each frame's copy receives the data as that frame's first commands. A Read()
+         *          of a copy whose frame has not run yet still returns the old contents. For small
+         *          data written every frame, a host-visible per-frame buffer is cheaper still.
          * @throws std::out_of_range if the range runs past the end of the buffer.
          * @throws std::runtime_error if the buffer is currently mapped; write through the mapping instead.
          */
@@ -658,6 +668,10 @@ namespace kor
             switch (_type) {
                 case Type::eDeviceLocal:
                 {
+                    if (CopyCount() > 1) {
+                        UploadPerFrame(std::as_bytes(data), byteOffset);
+                        break;
+                    }
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
                         .SetInstanceCount(ToBuilderSize(byteSize, "Write"))
@@ -1233,6 +1247,38 @@ namespace kor
 
         /// Writes made to one frame's copy that the other frames have not received yet.
         mutable std::unordered_set<PendingWrite, PendingWrite::Hash> _pendingWrites {};
+
+        // ---- per-frame device-local writes ---------------------------------------------------
+        //
+        // A device-local copy cannot be written by the CPU, and the copies of other frames may be in
+        // use by frames still in flight when the write is made. So the data is staged once, and each
+        // copy is written from the staging buffer by a command in its own frame — handed to
+        // Scheduler::Execute ahead of that frame's rendering, where the frame's barriers cover it.
+
+        /** @brief Stages @p bytes for every copy; the current one gets them now if a frame is being built. */
+        void UploadPerFrame(std::span<const std::byte> bytes, glm::u64 byteOffset);
+
+        /** @brief Called once the buffer is a Resource: remembers a tracked ref to itself, delivers what is waiting. */
+        static void Adopted(const Resource<Buffer>& buffer);
+
+        struct UploadQueue;
+        /// Staged writes on their way to the copies, oldest first. Shared so the type can stay in the .cpp.
+        std::shared_ptr<UploadQueue> _uploads;
+        /// The buffer's own Resource, weakly — what the delivery commands refer to it by.
+        ResourceRef<const Buffer> _self;
+
+    protected:
+        /**
+         * @brief Records, for the frame being built, the copies of staged writes its copy is owed.
+         *
+         * The backend calls it from AutomaticUpdate(), at the top of every frame. Does nothing
+         * outside a frame, or when nothing is waiting.
+         */
+        void DeliverPendingUploads();
+
+    public:
+        /** @brief How many copies of the data the backend keeps: one per frame in flight when per-frame, else one. */
+        [[nodiscard]] virtual glm::u32 CopyCount() const { return 1; }
     };
 
     // Out here rather than beside the enum: a specialisation cannot be written at class scope,

@@ -120,6 +120,14 @@ namespace kor
         /** @brief Whether the first frame has begun. Before it has, there is no current image to speak of. */
     	[[nodiscard]] bool HasStarted() const { return _started; }
 
+        /**
+         * @brief Whether a frame is being recorded right now: inside Draw's render callback.
+         *
+         * CurrentImageIndex() names the frame being built only then; before the first frame and
+         * between frames it names the last one, which may still be running on the GPU.
+         */
+        [[nodiscard]] bool IsBuildingFrame() const { return _buildingFrame; }
+
         /** @brief Blocks until the GPU has finished everything submitted so far. Used when tearing down. */
     	virtual void WaitIdle() const = 0;
 
@@ -199,6 +207,8 @@ namespace kor
     	virtual void CreateFrames() = 0;
         explicit Scheduler(const Builder& createInfo);
     	bool _started = false;
+        /// Set by the backend's Draw from just before the render callback until the frame's work is taken.
+        bool _buildingFrame = false;
 
         /** @brief What a frame picks up from Execute(), WaitFor() and FrameCompletion(). */
         struct Pending {

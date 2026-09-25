@@ -143,8 +143,10 @@ namespace kor::vk
 		return _buffers[i];
 	}
 
-	// !TODO make this run on the render command buffer with barriers instead of having a different command buffer that stalls the queue
 	void Buffer::AutomaticUpdate() {
+		// Staged writes to device-local memory: recorded into this frame, never waited on.
+		DeliverPendingUploads();
+
 		const auto currentFrame = kor::Context::Scheduler().CurrentImageIndex();
 
 		std::map<::vk::Buffer, std::vector<::vk::BufferCopy>> copyRegionsPerBuffer;
@@ -200,13 +202,10 @@ namespace kor::vk
 			return;
 		}
 
-		// Device-local memory has no host mapping, so it still costs a copy on the queue.
-		auto dstBuffer = _buffers[currentFrame];
-		Context::Device().runSingleTimeCommand([dstBuffer, &copyRegionsPerBuffer](const kor::vk::CommandBuffer& commandBuffer) {
-			for (const auto&[srcBuffer, copyRegions] : copyRegionsPerBuffer) {
-				commandBuffer->copyBuffer(srcBuffer, dstBuffer, static_cast<uint32_t>(copyRegions.size()), copyRegions.data());
-			}
-		}, ::vk::QueueFlagBits::eTransfer).Wait();
+		// Only a mapping records a write here, and only host-visible memory can be mapped; device-local
+		// writes travel through DeliverPendingUploads() instead.
+		kor::log::Error("[buffer] a write to a per-frame buffer the CPU cannot map was queued for "
+		                "propagation; it was dropped");
 	}
 
 	VmaAllocation Buffer::getAllocation() const {

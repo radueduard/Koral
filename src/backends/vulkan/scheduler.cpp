@@ -167,10 +167,17 @@ namespace kor::vk
         const auto& vkCommandBuffer = dynamic_cast<kor::vk::CommandBuffer&>(commandBuffer);
         commandBuffer.Reset();
         commandBuffer.Begin();
-        renderFunc(commandBuffer);
+        _buildingFrame = true;
+        try {
+            renderFunc(commandBuffer);
+        } catch (...) {
+            _buildingFrame = false;
+            throw;
+        }
 
         // After the render callback, which may Execute() work of its own.
         auto pending = TakePending();
+        _buildingFrame = false;
 
         SubmitInfo submitInfo {
             .waitSemaphores = { frame.getImageAvailableSemaphore() },

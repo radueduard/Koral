@@ -70,10 +70,17 @@ namespace kor::ogl
         const auto& frame = CurrentFrame();
         auto& commandBuffer = frame.Commands();
         commandBuffer.Reset();
-        renderFunc(commandBuffer.Begin());
+        _buildingFrame = true;
+        try {
+            renderFunc(commandBuffer.Begin());
+        } catch (...) {
+            _buildingFrame = false;
+            throw;
+        }
 
         // After the render callback, which may Execute() work of its own.
         auto pending = TakePending();
+        _buildingFrame = false;
 
         // The GPU cannot be told to wait, so the CPU does. WaitFor() says as much.
         for (const auto& token : pending.waits) token.Wait();
