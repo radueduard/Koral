@@ -186,9 +186,12 @@ namespace kor {
 
             /**
              * @brief Creates the window, brings the graphics device up, and initializes the scene.
-             * @return The window. It owns the scene, the surface and the default framebuffer.
+             * @return The window, which owns the scene, the surface and the default framebuffer. When
+             *         any of that cannot be brought up — no display, no driver for the API, a
+             *         windowing platform this session lacks — a poisoned resource saying why
+             *         (eWindowCreationFailed), with everything half-made already torn down.
              */
-            std::unique_ptr<Window> Build();
+            [[nodiscard]] Resource<Window> Build();
         };
 
         /** @brief Constructs the window from a builder. Prefer Builder::Build(). */
@@ -303,6 +306,13 @@ namespace kor {
         void LateUpdate();
 
     private:
+        /** @brief How far construction got, so Release() undoes exactly that much. */
+        enum class Stage : std::uint8_t { eNone, eGlfw, eDevice, eRuntime, eScene };
+        Stage _stage = Stage::eNone;
+        /** @brief The constructor's work: GLFW, the device, the scheduler, the GUI, the modules, the scene. */
+        void BringUp(Builder& createInfo);
+        /** @brief Tears down whatever has been brought up; the destructor, and a constructor that threw. */
+        void Release();
     	static void FramebufferResize(GLFWwindow* handle, int width, int height);
 
         GLFWwindow* _window = nullptr;

@@ -81,3 +81,4 @@ This table is kept in sync with `gfx::Describe()` in `src/core/error.cpp`.
 | `eDescriptorConflict` | Descriptor declarations conflict across the pipeline's shader stages. | Align (set, binding) declarations across stages. |
 | `eShaderCompileFailed` | Shader compilation or linking failed. | See the message for the compiler diagnostics. |
 | `eConfigInvalid` | The `koral.json` config file is malformed, or a key has the wrong type. | Fix the JSON; see [configuration.md](configuration.md) for the schema. |
+| `eWindowCreationFailed` | The window, its surface or the graphics device behind it could not be created. | See the message: usually no display, no GPU driver for the chosen API, or a windowing platform this session lacks. |

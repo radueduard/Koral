@@ -46,6 +46,17 @@ namespace kor {
         _imguiIni(createInfo.imguiIni.string()),
         _scene(std::move(createInfo.scene))
     {
+        try {
+            BringUp(createInfo);
+        } catch (...) {
+            // The destructor does not run for a constructor that threw: undo what was set up.
+            Release();
+            throw;
+        }
+    }
+
+    void Window::BringUp(Builder& createInfo)
+    {
         Context::_window = this;
         Context::_activeAPI = createInfo.api; // backend selection keys off this, not the window
 
@@ -86,9 +97,13 @@ namespace kor {
             initGlfwVulkanLoader();
         }
 
-        if (const auto result = glfwInit(); result != GLFW_TRUE) {
-            std::cerr << "Failed to initialize GLFW: " << result << std::endl;
+        if (glfwInit() != GLFW_TRUE) {
+            const char* description = nullptr;
+            glfwGetError(&description);
+            throw std::runtime_error(std::string("GLFW could not initialize: ")
+                                     + (description ? description : "no reason given"));
         }
+        _stage = Stage::eGlfw;
 
 #ifndef NDEBUG
         const int platform = glfwGetPlatform();
@@ -138,7 +153,10 @@ namespace kor {
             nullptr);
 
         if (_window == nullptr) {
-            std::cerr << "Failed to create window" << std::endl;
+            const char* description = nullptr;
+            glfwGetError(&description);
+            throw std::runtime_error(std::string("GLFW could not create the window: ")
+                                     + (description ? description : "no reason given"));
         }
 
         glfwSetWindowUserPointer(_window, this);
@@ -200,6 +218,7 @@ namespace kor {
         } else if (_api == API::eVulkan) {
             kor::vk::Context::Init();
         }
+        _stage = Stage::eDevice;
 
         _surface = kor::Surface::Create(*this);
         Context::_scheduler = Scheduler::Builder()
@@ -208,6 +227,7 @@ namespace kor {
             // Scheduler::Initialize adopts before anything reads it.
             .SetImageCount(2)
             .Build();
+        if (!Context::_scheduler.Valid()) throw std::runtime_error(Context::_scheduler.Failure()->message);
         Context::_scheduler->Initialize();
         _framebuffer = Framebuffer::CreateDefault();
         kor::GUI::Init();
@@ -232,13 +252,20 @@ namespace kor {
         // constructed much earlier — before the device — and this is the point at which there is
         // finally something for them to build resources against.
         ModuleHost::Initialize();
+        _stage = Stage::eRuntime;
 
         _scene->Initialize();
+        _stage = Stage::eScene;
     }
 
-    std::unique_ptr<Window> Window::Builder::Build()
+    Resource<Window> Window::Builder::Build()
     {
-        return std::make_unique<Window>(*this);
+        try {
+            return Resource<Window>(std::make_unique<Window>(*this), title);
+        } catch (const std::exception& e) {
+            log::Error("[window] could not be created: {}", e.what());
+            return Resource<Window>::Failed(Error{.code = ErrorCode::eWindowCreationFailed, .message = e.what()}, title);
+        }
     }
 
     // Defaulted here rather than in the header, and it has to stay that way.
@@ -262,30 +289,43 @@ namespace kor {
         return _framebuffer;
     }
 
-    Window::~Window() {
-        Context::Scheduler().WaitIdle();
-        // One-off submissions still held for the GPU, before the scene and modules whose resources
-        // their records may keep alive.
-        detail::collectRetired(/*all=*/true);
-        // The scene goes first: it holds resources the modules created, and those have to be
-        // released while the module that made them is still alive to release them properly.
-        _scene.reset();
-        ModuleHost::Shutdown();
-        GUI::Shutdown();
+    Window::~Window() { Release(); }
+
+    void Window::Release() {
+        // Torn down as far as it was brought up: all of it for a window that was built, only the
+        // first steps for a constructor that threw part-way.
+        if (_stage >= Stage::eRuntime) {
+            Context::Scheduler().WaitIdle();
+            // One-off submissions still held for the GPU, before the scene and modules whose resources
+            // their records may keep alive.
+            detail::collectRetired(/*all=*/true);
+            // The scene goes first: it holds resources the modules created, and those have to be
+            // released while the module that made them is still alive to release them properly.
+            _scene.reset();
+            ModuleHost::Shutdown();
+            GUI::Shutdown();
+        }
         _framebuffer.Reset();
-        Context::_scheduler.reset();
-        if (_api == API::eVulkan) {
+        if (Context::_scheduler.Valid()) Context::_scheduler->WaitIdle();
+        Context::_scheduler.Reset();
+        if (_stage >= Stage::eDevice && _api == API::eVulkan) {
             vk::Context::StopTokens();
         }
         delete Context::_repository;
         delete Context::_mainThreadExecutor;
         delete Context::_backgroundExecutor;
+        Context::_repository = nullptr;
+        Context::_mainThreadExecutor = nullptr;
+        Context::_backgroundExecutor = nullptr;
         _surface.reset();
-        if (_api == API::eVulkan) {
+        if (_stage >= Stage::eDevice && _api == API::eVulkan) {
             vk::Context::Destroy();
         }
-        glfwDestroyWindow(_window);
-        glfwTerminate();
+        if (_window) glfwDestroyWindow(_window);
+        _window = nullptr;
+        if (_stage >= Stage::eGlfw) glfwTerminate();
+        if (Context::_window == this) Context::_window = nullptr;
+        _stage = Stage::eNone;
     }
 
     bool Window::ShouldClose() const

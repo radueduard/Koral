@@ -200,6 +200,7 @@ namespace kor
             .SetPlatform(config.platform)
             .SetImguiIni(config.imguiIni)
             .Build();
+        if (!window.Valid()) return EXIT_FAILURE;   // already reported, with the reason
 
         while (!window->ShouldClose()) {
             glfwPollEvents();
@@ -257,7 +258,7 @@ namespace kor
             Input::Update();
             window->LateUpdate();
         }
-        window.reset();
+        window.Reset();
         return EXIT_SUCCESS;
     }
 }

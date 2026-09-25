@@ -12,6 +12,7 @@
 
 #include "api.h"
 #include "commandBuffer.h"
+#include "resource.h"
 #include "token.h"
 
 namespace kor
@@ -67,8 +68,11 @@ namespace kor
             /** @brief Sets the minimum number of swap-chain images. */
             /** @brief Sets the number of swap-chain images to request. */
             Builder& SetImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
-            /** @brief Creates the scheduler for the active backend. Owned by the caller. */
-            [[nodiscard]] std::unique_ptr<Scheduler> Build() const;
+            /**
+             * @brief Creates the scheduler for the active backend.
+             * @return The scheduler; poisoned, with the reason, when the active API has no scheduler.
+             */
+            [[nodiscard]] Resource<Scheduler> Build() const;
         };
 
         virtual ~Scheduler() = default;

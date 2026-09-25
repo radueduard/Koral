@@ -22,16 +22,16 @@ namespace kor
         _commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
     }
 
-    std::unique_ptr<Scheduler> Scheduler::Builder::Build() const
+    Resource<Scheduler> Scheduler::Builder::Build() const
     {
         switch (Context::ActiveAPI()) {
         case API::eOpenGL:
-            return std::make_unique<ogl::Scheduler>(*this);
+            return Resource<Scheduler>(std::make_unique<ogl::Scheduler>(*this), "Scheduler");
         case API::eVulkan:
-            return std::make_unique<vk::Scheduler>(*this);
-        default:
-            throw std::runtime_error("Unknown graphics API!");
+            return Resource<Scheduler>(std::make_unique<vk::Scheduler>(*this), "Scheduler");
         }
+        return Resource<Scheduler>::Failed(
+            Error{.code = ErrorCode::eUnknownApi, .message = "No scheduler exists for the active graphics API."}, "Scheduler");
     }
 
     Scheduler::Scheduler(const Builder& createInfo) :

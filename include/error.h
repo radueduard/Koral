@@ -83,6 +83,9 @@ namespace kor
 
         // --- frame graph ---
         eFrameGraphInvalid,    ///< Render passes declared something the frame graph cannot schedule.
+
+        // --- window ---
+        eWindowCreationFailed, ///< The window, its surface or the graphics device behind it could not be brought up.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */

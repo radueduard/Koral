@@ -122,14 +122,14 @@ kor::Window& kor::Context::Window()
     return *_window;
 }
 
-std::unique_ptr<kor::Scheduler> kor::Context::_scheduler {};
+kor::Resource<kor::Scheduler> kor::Context::_scheduler {};
 
 kor::Scheduler& kor::Context::Scheduler()
 {
-    if (_scheduler == nullptr) {
+    if (!_scheduler.Valid()) {
         throw std::runtime_error("No scheduler is linked to the current thread!");
     }
-    return *_scheduler;
+    return *_scheduler.Get();
 }
 
 kor::ResourceRef<const kor::Framebuffer> kor::Context::DefaultFramebuffer()

@@ -42,6 +42,7 @@ namespace kor
         case ErrorCode::eModuleLoadFailed:           return "eModuleLoadFailed";
         case ErrorCode::eFileNotReadable:            return "eFileNotReadable";
         case ErrorCode::eFrameGraphInvalid:          return "eFrameGraphInvalid";
+        case ErrorCode::eWindowCreationFailed:       return "eWindowCreationFailed";
         }
         return "eUnknown";
     }
@@ -107,6 +108,8 @@ namespace kor
             return "A file could not be opened for reading or writing, or its contents are not the shape expected.";
         case ErrorCode::eFrameGraphInvalid:
             return "The render passes declared something the frame graph cannot schedule: a resource nobody makes, one made twice, or passes that depend on each other in a circle.";
+        case ErrorCode::eWindowCreationFailed:
+            return "The window, its surface or the graphics device behind it could not be created.";
         }
         return "Unknown error.";
     }

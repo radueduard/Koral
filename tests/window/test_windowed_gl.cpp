@@ -155,33 +155,38 @@ public:
                            .SetVSync(false)
                            .SetAPI(kor::API::eOpenGL)
                            .Build();
+            if (!s_window.Valid()) {
+                s_reason = s_window.Failure()->message;
+                s_window.Reset();
+                s_scene = nullptr;
+            }
         } catch (const std::exception& e) {
             s_reason = e.what();
-            s_window.reset();
+            s_window.Reset();
             s_scene = nullptr;
         }
     }
 
     void TearDown() override {
-        if (s_window) {
+        if (s_window.Valid()) {
             kor::Context::DrainMainThread();
-            s_window.reset();
+            s_window.Reset();
         }
         s_scene = nullptr;
     }
 
-    static bool ready() { return s_window != nullptr; }
+    static bool ready() { return s_window.Valid(); }
     static const std::string& reason() { return s_reason; }
     static kor::Window& window() { return *s_window; }
     static GlOverlayScene& scene() { return *s_scene; }
 
 private:
-    static std::unique_ptr<kor::Window> s_window;
+    static kor::Resource<kor::Window> s_window;
     static GlOverlayScene* s_scene;
     static std::string s_reason;
 };
 
-std::unique_ptr<kor::Window> GlEnvironment::s_window;
+kor::Resource<kor::Window> GlEnvironment::s_window;
 GlOverlayScene* GlEnvironment::s_scene = nullptr;
 std::string GlEnvironment::s_reason = "no display";
 

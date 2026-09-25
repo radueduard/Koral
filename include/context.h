@@ -218,11 +218,10 @@ namespace kor {
     private:
         inline static kor::Window* _window = nullptr;
 
-        /// Owned outright, and declared rather than defined here: kor::Scheduler is only
-        /// forward-declared in this header, and unique_ptr's destructor needs the complete type.
-        /// Defined in context.cpp, which is also where the rest of this state ought to live.
-        /// @see the note below.
-        static KORAL_API std::unique_ptr<kor::Scheduler> _scheduler;
+        /// Declared rather than defined here: kor::Scheduler is only forward-declared in this
+        /// header, and destroying the resource needs the complete type. Defined in context.cpp,
+        /// which is also where the rest of this state ought to live. @see the note below.
+        static KORAL_API Resource<kor::Scheduler> _scheduler;
 
         inline static API _activeAPI = API::eVulkan;
         inline static bool _headless = false;
