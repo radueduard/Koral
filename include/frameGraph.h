@@ -50,6 +50,11 @@ namespace kor {
         Flags<Image::Usage> usage {};
         /** Size relative to the window, used when extent is unset: 0.5 is half resolution. */
         float scale = 1.f;
+        /**
+         * What `scale` is relative to, when not the main window: another window's screen
+         * (Window::ScreenName) — a target for a second view — or an image imported into the graph.
+         */
+        std::string sizeOf {};
         /** A fixed size instead, for targets that do not follow the window (a shadow map). */
         std::optional<glm::uvec2> extent {};
         glm::u32 mipLevels = 1;
@@ -319,7 +324,10 @@ namespace kor {
      */
     class KORAL_API FrameGraph {
     public:
-        /** The window's image. Write it to present; a pass that does is never dropped. */
+        /**
+         * The main window's image. Write it to present; a pass that does is never dropped. Another
+         * window's is its Window::ScreenName(), which a pass writes the same way.
+         */
         static constexpr std::string_view Screen = "screen";
 
         FrameGraph();
@@ -513,6 +521,7 @@ namespace kor {
         std::vector<Resource<Framebuffer>> _historyClears;  // what cleared a depth history, kept until rebuilt
         std::vector<std::string> _history;                  // the physical names, for the interface
         glm::uvec2 _extent {0, 0};
+        std::string _windows;   // every window's screen, size and whether it is shown: a change rebuilds
         mutable bool _dirty = true;
         bool _broken = false;
     };

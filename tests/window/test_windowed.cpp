@@ -1037,6 +1037,141 @@ TEST_F(VkWindowTest, AFrameGraphRefusesChangesWhilePassesRecord) {
     EXPECT_EQ(pair.readback->Read<float>(1).front(), 1.f);
 }
 
+// ---- more than one window ---------------------------------------------------------------------
+//
+// A scene opens a second window with a builder that has no scene. It shares the device, the frames
+// in flight and the frame graph; a pass draws into it by writing its ScreenName().
+
+namespace {
+    kor::Resource<kor::Window> openSecondWindow(const glm::uvec2 extent = {160, 120}) {
+        auto window = kor::Window::Builder().SetTitle("Koral second window").SetExtent(extent).Build();
+        // Give the compositor a moment to size and show it.
+        for (int i = 0; i < 20 && window.Valid() && window->IsPaused(); ++i) {
+            glfwPollEvents();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        return window;
+    }
+
+    // Clears `screen` to `colour`, and copies one texel of it out afterwards.
+    struct PaintAndRead {
+        LambdaPass* paint;
+        LambdaPass* read;
+        kor::Resource<kor::Buffer> readback;
+    };
+    PaintAndRead paintScreen(kor::FrameGraph& graph, const std::string& screen, const float colour) {
+        PaintAndRead out{.readback = kor::Buffer::RawBuilder{}
+            .SetRawSize(4)
+            .SetUsage(kor::Buffer::Usage::eTransferDst)
+            .SetType(kor::Buffer::Type::eReadback)
+            .Build()};
+        auto target = std::make_shared<kor::ResourceRef<const kor::Image>>();
+        out.paint = &graph.Add<LambdaPass>("Paint " + screen);
+        out.paint->setup = [=](kor::PassBuilder& b) { b.Write(screen, kor::Image::Usage::eTransferDst); };
+        out.paint->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(screen); };
+        out.paint->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, glm::vec4(colour, 0.f, 0.f, 1.f)); };
+        out.read = &graph.Add<LambdaPass>("Read " + screen);
+        out.read->setup = [=](kor::PassBuilder& b) { b.Read(screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
+        out.read->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(screen); };
+        out.read->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.readback)](kor::CommandBuffer& cb) {
+            cb.CopyImageToBuffer(*target, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+        };
+        return out;
+    }
+
+    // The red channel of a B8G8R8A8 (or R8G8B8A8) texel, whichever the swap chain chose.
+    glm::u8 redOf(const kor::Resource<kor::Buffer>& readback, const kor::Image& screen) {
+        const auto texel = readback->Read<glm::u8>(4);
+        return screen.PixelFormat() == kor::Image::Format::eBGRA8_UNORM ? texel[2] : texel[0];
+    }
+}
+
+TEST_F(VkWindowTest, ASecondWindowShowsWhatAPassDrawsIntoIt) {
+    auto& scene = VkEnvironment::scene();
+    auto second = openSecondWindow();
+    ASSERT_TRUE(second.Valid()) << (second.Failure() ? second.Failure()->message : "");
+    if (second->IsPaused()) GTEST_SKIP() << "the compositor never sized the second window";
+
+    EXPECT_FALSE(second->IsMain());
+    EXPECT_TRUE(kor::Context::Window().IsMain());
+    EXPECT_NE(second->ScreenName(), kor::Context::Window().ScreenName());
+    ASSERT_EQ(kor::Context::Windows().size(), 2u);
+    EXPECT_EQ(kor::Context::Windows()[1], second.Get());
+
+    {
+        kor::FrameGraph graph;
+        auto paint = paintScreen(graph, second->ScreenName(), 1.f);
+        for (int frame = 0; frame < 3; ++frame) {
+            drawGraphFrame(scene, graph);
+            EXPECT_TRUE(second->IsShownThisFrame());
+            const auto screen = second->DefaultFramebuffer()->ColorImage(0);
+            EXPECT_EQ(redOf(paint.readback, *screen), 255) << "frame " << frame;
+        }
+        EXPECT_TRUE(graph.SkippedPasses().empty());
+    }
+    second.Reset();
+    drawFrame(scene);   // the closed window is retired once its last frame is done
+    EXPECT_EQ(kor::Context::Windows().size(), 1u);
+}
+
+// A window with nothing to show into this frame — minimized, say — has its passes skipped, not the
+// whole graph broken.
+TEST_F(VkWindowTest, PassesDrawingIntoAHiddenWindowAreSkipped) {
+    auto& scene = VkEnvironment::scene();
+    auto second = openSecondWindow();
+    ASSERT_TRUE(second.Valid());
+    kor::FrameGraph graph;
+    auto intoSecond = paintScreen(graph, second->ScreenName(), 1.f);
+    auto intoMain = paintScreen(graph, std::string(kor::FrameGraph::Screen), 0.5f);
+
+    second->Pause();
+    drawGraphFrame(scene, graph);
+    EXPECT_FALSE(second->IsShownThisFrame());
+    ASSERT_EQ(graph.SkippedPasses().size(), 2u) << "painting it, and reading it back";
+    EXPECT_EQ(graph.Schedule().size(), 2u) << "the main window's passes still run";
+
+    second->Unpause();
+    drawGraphFrame(scene, graph);
+    EXPECT_TRUE(second->IsShownThisFrame());
+    EXPECT_TRUE(graph.SkippedPasses().empty());
+    EXPECT_EQ(redOf(intoSecond.readback, *second->DefaultFramebuffer()->ColorImage(0)), 255);
+}
+
+// Closing a second window in the middle of a frame — from a scene's Update — is safe: the frame that
+// acquired its image still presents it, and it is destroyed once that frame is done.
+TEST_F(VkWindowTest, ASecondWindowClosedMidFrameIsRetiredSafely) {
+    auto& scene = VkEnvironment::scene();
+    auto second = openSecondWindow();
+    ASSERT_TRUE(second.Valid());
+    kor::FrameGraph graph;
+    auto paint = paintScreen(graph, second->ScreenName(), 1.f);
+    drawGraphFrame(scene, graph);
+
+    scene.onUpdate = [&] { second.Reset(); scene.onUpdate = nullptr; };
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(kor::Context::Windows().size(), 1u);
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(graph.SkippedPasses().size(), 2u) << "nothing left to draw into";
+}
+
+// An image can follow a second window's size instead of the main one's.
+TEST_F(VkWindowTest, AGraphImageCanFollowASecondWindowsSize) {
+    auto& scene = VkEnvironment::scene();
+    auto second = openSecondWindow({200, 100});
+    ASSERT_TRUE(second.Valid());
+    if (second->IsPaused()) GTEST_SKIP() << "the compositor never sized the second window";
+    kor::FrameGraph graph;
+    auto& make = graph.Add<LambdaPass>("Make");
+    make.setup = [&](kor::PassBuilder& b) {
+        b.Create("view", {.format = kor::Image::Format::eRGBA8_UNORM, .usage = kor::Image::Usage::eTransferDst,
+                          .scale = 0.5f, .sizeOf = second->ScreenName()}).SideEffect();
+    };
+    drawGraphFrame(scene, graph);
+    const auto view = graph.ImageNamed("view");
+    ASSERT_TRUE(view.Alive());
+    EXPECT_EQ(glm::uvec2(view->Extent()), glm::max(second->Extent() / 2u, glm::uvec2(1)));
+}
+
 // ---- per-frame device-local buffers ---------------------------------------------------------
 //
 // The same promise as the two tests above, for memory the CPU cannot map. A write there is staged, and

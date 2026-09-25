@@ -113,10 +113,28 @@ namespace kor {
         return ReadPrevious(name);
     }
 
+    namespace {
+        bool isScreen(const std::string_view name) {
+            return name == FrameGraph::Screen || name.starts_with("screen:");
+        }
+
+        // The image the window with this screen name shows, or empty when no open window has it.
+        ResourceRef<const Image> screenImage(const std::string_view name) {
+            for (Window* window : Context::Windows()) {
+                if (window->ScreenName() != name) continue;
+                const auto framebuffer = window->DefaultFramebuffer();
+                return framebuffer.Valid() && !framebuffer->ColorAttachments().empty()
+                    ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
+            }
+            return {};
+        }
+    }
+
     ResourceRef<const Image> PassResources::ImageNamed(const std::string_view name) const {
-        if (name == FrameGraph::Screen) {
-            const auto framebuffer = Context::DefaultFramebuffer();
-            return framebuffer.Valid() ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
+        if (isScreen(name)) {
+            auto image = screenImage(name);
+            if (!image.Alive()) log::Error("[frame graph] no open window shows '{}'", name);
+            return image;
         }
         const auto it = _graph._images.find(name);
         if (it == _graph._images.end()) {
@@ -337,6 +355,18 @@ namespace kor {
         std::set<std::string> imported{std::string(Screen)};
         for (const auto& name : _importedImages | std::views::keys) imported.insert(name);
         for (const auto& name : _importedBuffers | std::views::keys) imported.insert(name);
+        for (const Window* window : Context::Windows())
+            if (!window->IsMain() && window->IsShownThisFrame()) imported.insert(window->ScreenName());
+        // Another window not shown this frame — minimized, closed, opened halfway through it — has no
+        // image to draw into. Its screen is made by a stand-in pass that is switched off, so the passes
+        // drawing into it are skipped for the frame, exactly as passes needing a disabled pass's output.
+        std::set<std::string> hidden;
+        for (const auto& decl : decls)
+            for (const auto& use : decl.uses)
+                if (use.resource.starts_with("screen:") && !imported.contains(use.resource)) hidden.insert(use.resource);
+        for (const auto& name : hidden)
+            decls.push_back({.name = std::format("window '{}' (not shown)", name),
+                             .uses = {{name, graph::Access::eCreate}}, .enabled = false});
 
         const auto compiled = graph::compile(decls, imported);
         if (!compiled) {
@@ -392,8 +422,17 @@ namespace kor {
             if (const auto it = imageDescs.find(name); it != imageDescs.end()) {
                 plan.image = true;
                 plan.imageDesc = it->second;
+                glm::uvec2 base = _extent;
+                if (const auto& of = plan.imageDesc.sizeOf; !of.empty() && !plan.imageDesc.extent) {
+                    ResourceRef<const Image> reference = isScreen(of) ? screenImage(of) : ResourceRef<const Image>{};
+                    if (const auto imported = _importedImages.find(of); !isScreen(of) && imported != _importedImages.end())
+                        reference = imported->second;
+                    if (reference.Alive()) base = glm::uvec2(reference->Extent());
+                    else problems.push_back(std::format("'{}' is sized after '{}', which is neither an open window's "
+                                                        "screen nor an imported image.", name, of));
+                }
                 plan.size = plan.imageDesc.extent.value_or(glm::max(
-                    glm::uvec2(glm::vec2(_extent) * plan.imageDesc.scale), glm::uvec2(1)));
+                    glm::uvec2(glm::vec2(base) * plan.imageDesc.scale), glm::uvec2(1)));
                 plan.imageUsage = imageUsage[name];
                 if (keepsHistory) plan.imageUsage |= Image::Usage::eTransferSrc;
                 if (plan.imageUsage.Value() == 0) problems.push_back(std::format(
@@ -589,17 +628,13 @@ namespace kor {
             _schedule.push_back({pass->Name(), compiled->level[i]});
         }
         _dependencies = compiled->dependencies;
-        for (const auto index : compiled->culled) _culled.push_back(_passes[index]->Name());
+        // By declaration, not by pass: the stand-ins for windows not shown have a name but no pass.
+        for (const auto index : compiled->culled) _culled.push_back(decls[index].name);
         for (const auto& [index, resource, source] : compiled->skipped)
-            _skipped.push_back({_passes[index]->Name(), resource, _passes[source]->Name()});
+            _skipped.push_back({decls[index].name, resource, decls[source].name});
 
         // ---- Initialize what changed ------------------------------------------------------------------
         // A pass is initialized again only when something it names is not what it was given last time.
-        const auto screen = [] {
-            const auto framebuffer = Context::DefaultFramebuffer();
-            return framebuffer.Valid() && !framebuffer->ColorAttachments().empty()
-                ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
-        }();
         const PassResources resources(*this);
         for (RenderPass* pass : _order) {
             const auto& decl = declarations[static_cast<std::size_t>(
@@ -607,7 +642,8 @@ namespace kor {
             std::vector<glm::u64> signature;
             for (const auto& use : decl.uses) {
                 const std::string name = use.access == graph::Access::eReadPrevious ? "previous " + use.resource : use.resource;
-                if (use.resource == Screen) {
+                if (isScreen(use.resource)) {
+                    const auto screen = screenImage(use.resource);
                     signature.push_back(screen.Alive() ? reinterpret_cast<std::uintptr_t>(screen.Get()) : 0);
                     signature.push_back(screen.Alive() ? screen->Generation() : 0);
                     continue;
@@ -664,6 +700,18 @@ namespace kor {
         if (_passes.empty()) return false;
         if (const glm::uvec2 extent = Context::Window().Extent(); extent != _extent) {
             _extent = extent;
+            _dirty = true;
+        }
+        // A window opened, closed, shown, hidden or resized changes which screens exist and how big
+        // what follows them is.
+        std::string windows;
+        for (const Window* window : Context::Windows()) {
+            const auto size = window->Extent();
+            windows += std::format("{} {}x{} {};", window->ScreenName(), size.x, size.y,
+                                   window->IsMain() || window->IsShownThisFrame());
+        }
+        if (windows != _windows) {
+            _windows = std::move(windows);
             _dirty = true;
         }
         if (_dirty) Build();
