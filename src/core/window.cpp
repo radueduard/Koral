@@ -1,8 +1,6 @@
 //
 // Created by radue on 10/13/2024.
 //
-#include <GL/glew.h>
-
 #include <window.h>
 #include <framebuffer.h>
 
@@ -78,17 +76,6 @@ namespace kor {
             case WindowPlatform::eAuto:    break;
         }
 
-        // OpenGL is the exception to the choice: GLEW (our OpenGL function loader) resolves entry
-        // points through GLX, so a Wayland-platform GLFW window (EGL context) makes glewInit() fail
-        // with "No GLX display". Pin OpenGL to X11/XWayland regardless of the request, and say so if
-        // the user explicitly asked for Wayland.
-        if (createInfo.api == API::eOpenGL) {
-            if (createInfo.platform == WindowPlatform::eWayland)
-                std::cerr << "[window] OpenGL requires X11/XWayland (GLEW is GLX-only); "
-                             "ignoring the Wayland request" << std::endl;
-            requestedPlatform = GLFW_PLATFORM_X11;
-        }
-
         if (requestedPlatform != GLFW_ANY_PLATFORM) {
             if (glfwPlatformSupported(requestedPlatform))
                 glfwInitHint(GLFW_PLATFORM, requestedPlatform);
@@ -123,7 +110,7 @@ namespace kor {
                   << std::endl;
 #endif
 
-        glfwWindowHint(GLFW_CLIENT_API, createInfo.api == API::eOpenGL ? GLFW_OPENGL_API : GLFW_NO_API);
+        glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, createInfo.resizable);
         glfwWindowHint(GLFW_DECORATED, createInfo.decorated);
         glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, createInfo.transparentFramebuffer);
@@ -188,14 +175,6 @@ namespace kor {
             _extent = { static_cast<glm::u32>(fbw), static_cast<glm::u32>(fbh) };
         }
 
-        // glfwMakeContextCurrent is invalid on a GLFW_NO_API (Vulkan) window;
-        // it would emit GLFW_NO_WINDOW_CONTEXT and pollute the error state.
-        if (_api == API::eOpenGL) {
-            glfwMakeContextCurrent(_window);
-            // OpenGL presents through GLFW's buffer swap; map vsync onto the swap interval.
-            glfwSwapInterval(_vsync ? 1 : 0);
-        }
-
         // glfwSetWindowPos is unsupported on Wayland (compositors deny client
         // positioning). Skip the centering dance entirely there.
         if (!_fullscreen && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {
@@ -214,17 +193,7 @@ namespace kor {
             }
         }
 
-        if (_api == API::eOpenGL) {
-            glewExperimental = GL_TRUE;
-            if (const auto result = glewInit(); result != GLEW_OK) {
-                // Without a function loader every later GL call is a null pointer;
-                // fail loudly here instead of crashing somewhere confusing.
-                throw std::runtime_error(std::string("Failed to initialize GLEW: ")
-                    + reinterpret_cast<const char*>(glewGetErrorString(result)));
-            }
-        } else if (_api == API::eVulkan) {
-            kor::vk::Context::Init();
-        }
+        kor::vk::Context::Init();
         _stage = Stage::eDevice;
 
         _surface = kor::Surface::Create(*this);
@@ -241,7 +210,7 @@ namespace kor {
 
         // Register input callbacks AFTER GUI::Init() so that our callbacks can
         // safely forward events to ImGui. We use install_callbacks=false in
-        // ImGui's init (see vulkan/gui.cpp and open_gl/gui.cpp) so ImGui does
+        // ImGui's init (see vulkan/gui.cpp) so ImGui does
         // NOT install its own GLFW callbacks; our callbacks are the sole chain.
         Time::Setup();
         Input::Setup(_window);

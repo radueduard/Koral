@@ -45,8 +45,7 @@
  *     .Build();
  * @endcode
  *
- * @note The equirectangular projection runs as a compute shader on the GPU. It is verified on
- *       Vulkan; on OpenGL, cube *views* are a gap in the backend rather than in this module.
+ * @note The equirectangular projection runs as a compute shader on the GPU.
  */
 
 #pragma once

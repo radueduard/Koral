@@ -43,9 +43,6 @@ target_link_libraries(koral-image-import PRIVATE
         spdlog::spdlog
         OpenImageIO::OpenImageIO
         KTX::ktx
-        # KTX1 files name their format with a GL enum, so reading one means knowing the GL
-        # constants. Headers only — no context is created here.
-        GLEW::GLEW
         # Vulkan for the VkFormat enum a KTX2 file names its format with, again as constants:
         # the module talks to the device only through Koral.
         Vulkan::Vulkan

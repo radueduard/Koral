@@ -220,8 +220,6 @@ Build it once; it serves all three consumers.
   `WaitFor` token the CPU has yet to signal holds up the present (not the recording or the submit).
   Timelines track the highest value a submitted GPU operation will signal to tell the cases apart.
   Found by synchronization validation (VUID-vkQueuePresentKHR-pWaitSemaphores-03268).
-- *OpenGL.* The CPU waits for `WaitFor` tokens before submitting; frame completion is a
-  `glFenceSync` polled by the next `Draw`.
 - *Not done:* a real second (async compute) queue. `Execute` refuses a command buffer from another
   queue; cross-queue work goes through `Submit` + tokens, and needs queue-family ownership
   transfers once a separate family is used.
@@ -277,8 +275,7 @@ job via `koral.json` (which already reserves Hub-only keys like `libraries`).
   reactor thread (`vk::TokenReactor`) waits-any over every GPU-backed timeline with a parked
   coroutine plus a private wake timeline, and hands due coroutines to the executor they suspended
   on (main thread → main, else background pool). Submitted tokens are held by the command buffer
-  until it is re-recorded, so fire-and-forget is safe. OpenGL blocks the submitting thread
-  instead. Still open: cancellation (a `Task` destroyed while parked leaves a dangling handle).
+  until it is re-recorded, so fire-and-forget is safe. Still open: cancellation (a `Task` destroyed while parked leaves a dangling handle).
 - **Feature enum** finalization and granularity.
 - **Secondary command buffers** under dynamic rendering (intra-pass parallelism) — later /
   optional; separate-pass parallelism via §5 + §6 captures most of the win.

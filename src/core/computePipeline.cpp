@@ -8,7 +8,6 @@
 #include <log.h>
 #include <surface.h>
 
-#include "../backends/open_gl/computePipeline.h"
 #include "../backends/vulkan/computePipeline.h"
 
 #include "context.h"
@@ -31,13 +30,11 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<ComputePipeline> {
-            return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<ComputePipeline, vk::ComputePipeline>(*this)
-                : kor::MakeBackendPtr<ComputePipeline, ogl::ComputePipeline>(*this);
+            return kor::MakeBackendPtr<ComputePipeline, vk::ComputePipeline>(*this);
         });
     }
 

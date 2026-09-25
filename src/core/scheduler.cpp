@@ -14,7 +14,6 @@
 
 #include <GLFW/glfw3.h>
 
-#include "../backends/open_gl/scheduler.h"
 #include "../backends/vulkan/scheduler.h"
 
 namespace kor
@@ -27,8 +26,6 @@ namespace kor
     Resource<Scheduler> Scheduler::Builder::Build() const
     {
         switch (Context::ActiveAPI()) {
-        case API::eOpenGL:
-            return Resource<Scheduler>(std::make_unique<ogl::Scheduler>(*this), "Scheduler");
         case API::eVulkan:
             return Resource<Scheduler>(std::make_unique<vk::Scheduler>(*this), "Scheduler");
         }

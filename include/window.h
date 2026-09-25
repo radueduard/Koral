@@ -106,7 +106,7 @@ namespace kor {
              * // a pass: .Write(top->ScreenName(), kor::Image::Usage::eTransferDst), then Blit into it
              * @endcode
              *
-             * Only under Vulkan so far; under OpenGL the result is poisoned, saying so. The API, the
+             * The API, the
              * platform and the ImGui layout file are the main window's, so their setters do nothing here.
              * Destroying it closes it, at the end of whatever frame is using it.
              */
@@ -186,8 +186,7 @@ namespace kor {
              * @brief Selects the Linux windowing system to open on, X11 or Wayland.
              *
              * Ignored on Windows and macOS. WindowPlatform::eAuto takes whichever the session
-             * provides. OpenGL always resolves to X11 whatever this says, so a Wayland session runs
-             * it through XWayland.
+             * provides.
              *
              * @see WindowPlatform
              */

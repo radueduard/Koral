@@ -52,7 +52,7 @@ Read `cb.Outcome()` (a `gfx::VoidResult`) or `cb.Errors()` after recording; `Sub
 — `Submit()`, buffer reads and writes — where the failure is an event rather than a thing.
 
 Each error carries a `gfx::ErrorCode`, a human `message`, the source location, and optionally a
-`cause`. Backend (Vulkan/OpenGL) exceptions never cross the API boundary — they are converted to a
+`cause`. Backend (Vulkan) exceptions never cross the API boundary — they are converted to a
 `gfx::Error` (`eBackend`, with the original message preserved, unless a more specific code applies).
 
 This table is kept in sync with `gfx::Describe()` in `src/core/error.cpp`.
@@ -61,7 +61,7 @@ This table is kept in sync with `gfx::Describe()` in `src/core/error.cpp`.
 |------|-------------|---------------------|
 | `eNone` | No error. | Success sentinel. |
 | `eUnknownApi` | The active graphics API is not recognised or supported. | Internal: an unhandled `gfx::API` value. |
-| `eBackend` | A backend (Vulkan/OpenGL) operation failed. | Allocation/creation failed; see the message for the backend cause. |
+| `eBackend` | A backend (Vulkan) operation failed. | Allocation/creation failed; see the message for the backend cause. |
 | `eInvalidArgument` | An argument passed to a builder or command was invalid. | Check the offending setter's value. |
 | `eUniformBufferTooLarge` | Uniform buffers may be at most 65536 bytes. | Reduce the size or use a storage buffer (`Usage::eStorage`). |
 | `eBufferSizeInvalid` | Buffer size and instance count must be strictly positive. | Set a size/instance count greater than zero. |

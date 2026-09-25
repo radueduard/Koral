@@ -767,16 +767,6 @@ namespace kor {
             auto all = WhenAll(std::move(tasks));
             all.Wait();
             if (const auto result = all.Take(); !result) log::Error("[frame graph] a pass failed to run: {}", result.error());
-        } else {
-            // OpenGL is bound to this thread, so its passes run here, one after another — in order,
-            // which is also every CPU pass before the GPU passes that depend on it.
-            for (std::size_t i = 0; i < _order.size(); ++i) {
-                try {
-                    RunTimed(*_order[i], _order[i]->RunsOnCpu(), recorded[i], recordMs[i]);
-                } catch (const std::exception& e) {
-                    log::Error("[frame graph] pass '{}' failed to run: {}", _order[i]->Name(), e.what());
-                }
-            }
         }
         _recording = false;
         const double recordWall = millisecondsSince(recordStart);

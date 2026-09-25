@@ -1,20 +1,9 @@
-// Shared, backend-agnostic body for the raster-vs-compute Y-orientation parity
-// tests. Included by both windowed executables (Vulkan: test_windowed.cpp,
-// OpenGL: test_windowed_gl.cpp) so the exact same checks run on both backends.
+// The raster-vs-compute Y-orientation checks, used by the windowed suite
+// (test_windowed.cpp).
 //
 // What it proves: a triangle/quad drawn by the RASTERIZER and the same pattern
-// written by a COMPUTE shader's imageStore must land identically. On Vulkan that
-// is trivially true. On OpenGL it is only true because imageStore is Y-flipped at
-// transpile (injectStorageImageYFlip in backends/open_gl/shader.cpp) to match the
-// glClipControl'd rasterizer — remove that flip and the compute test fails on GL.
-//
-// Each test reads its offscreen target back and checks it against a backend-aware
-// reference rather than comparing the two backends' buffers directly: GL's
-// CopyImageToBuffer (glGetTextureSubImage) returns rows bottom-up while Vulkan's
-// returns them top-down, so the raw buffers are vertically mirrored for identical
-// content. Asserting each against the correct half for its backend isolates the
-// image orientation (what the fix touches) from that readback quirk. Both tests
-// also blit their image to the screen, exercising the present path.
+// written by a COMPUTE shader's imageStore must land identically.
+// Both tests also blit their image to the screen, exercising the present path.
 
 #pragma once
 
@@ -64,8 +53,7 @@ inline kor::ResourceRef<const kor::Shader> loadShader(const char* file, kor::Sha
         .GetOrBuild(key);
 }
 
-// Copy an image back to host memory. Rows come out top-down on Vulkan and
-// bottom-up on OpenGL (see the file header) — expectHalfSplit accounts for that.
+// Copy an image back to host memory, rows top-down.
 inline std::vector<Pixel> readback(const kor::Resource<kor::Image>& image) {
     kor::Buffer::RawBuilder rb;
     rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
@@ -155,16 +143,11 @@ inline Result computeTopHalf() {
     return Result{ std::move(image), std::move(px) };
 }
 
-// Assert the readback is the top-half-green / bottom-half-black pattern, in the
-// half appropriate to this backend's readback row order (see the file header).
-// Both the raster and the compute readback must satisfy this identical check, so
+// Assert the readback is the top-half-green / bottom-half-black pattern (rows come
+// back top-down, so green is in the low rows). Both the raster and the compute readback must satisfy this identical check, so
 // passing it on both means the two are pixel-identical.
 inline void expectHalfSplit(const std::vector<Pixel>& px) {
     ASSERT_EQ(px.size(), static_cast<std::size_t>(kW) * kH);
-
-    // Vulkan reads back top-down (green half = low rows); GL reads back bottom-up
-    // (green half = high rows). The rendered image is the same either way.
-    const bool greenInLowRows = (kor::Context::ActiveAPI() == kor::API::eVulkan);
 
     int greenRows = 0, blackRows = 0;
     for (std::uint32_t y = 0; y < kH; ++y) {
@@ -172,7 +155,7 @@ inline void expectHalfSplit(const std::vector<Pixel>& px) {
         // exact edge coverage at the clip-space boundary.
         if (y == kH / 2 - 1 || y == kH / 2) continue;
 
-        const bool expectGreen = greenInLowRows ? (y < kH / 2) : (y >= kH / 2);
+        const bool expectGreen = y < kH / 2;
         for (std::uint32_t x = 0; x < kW; ++x) {
             const Pixel& p = px[y * kW + x];
             if (expectGreen) {

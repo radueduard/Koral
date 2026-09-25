@@ -204,7 +204,7 @@ For compatibility, the original singular form is still read:
 | `--modules-dir <dir>`                | Prepend a module search directory. Repeatable.                                       |
 | `--title <text>`                     | Window title.                                                                        |
 | `--width <n>`, `--height <n>`        | Window size.                                                                         |
-| `--api <name>`                       | `Vulkan` or `OpenGL`.                                                                |
+| `--api <name>`                       | `Vulkan` (OpenGL is only in Koral 1.x).                                              |
 | `--platform <name>`                  | Linux windowing system: `auto`, `x11` or `wayland` (ignored elsewhere).             |
 | `--imgui-ini <file>`                 | Where ImGui saves its layout (default: beside `koral.json`).                         |
 | `--fullscreen` / `--no-fullscreen`   | Open fullscreen.                                                                     |
@@ -228,10 +228,6 @@ take effect with no clue as to why.
 `wayland`, or `auto`. `auto` (the default) lets GLFW choose — normally Wayland when a Wayland session
 is present, X11 otherwise. It is ignored on Windows and macOS, and a request for a platform this GLFW
 build or session cannot provide falls back to automatic selection with a warning.
-
-One exception: **OpenGL always runs on X11/XWayland**, because the OpenGL loader resolves entry points
-through GLX and cannot drive a Wayland/EGL context. Selecting `wayland` together with the OpenGL
-backend is ignored (with a warning); use Vulkan for a native Wayland window.
 
 The platform also decides **ImGui multi-viewport** (dragging panels out into their own OS windows). It
 is enabled everywhere *except* Wayland: viewports need the app to place a window at an absolute screen

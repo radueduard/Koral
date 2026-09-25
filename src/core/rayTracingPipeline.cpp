@@ -60,8 +60,6 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api == API::eOpenGL)
-            return Fail(ErrorCode::eRayTracingUnsupported, "Ray tracing pipelines are not supported on the OpenGL backend.");
         if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 

@@ -102,8 +102,16 @@ namespace kor
             };
 
             if (equalsIgnoringCase("vulkan")) return API::eVulkan;
-            if (equalsIgnoringCase("opengl")) return API::eOpenGL;
             return std::nullopt;
+        }
+
+        /** @brief Where to find the OpenGL backend, for a project that still asks for it. */
+        std::string openGlGone(const std::string_view name)
+        {
+            const bool isOpenGl = std::ranges::equal(name, std::string_view("opengl"), [](const char a, const char b) {
+                return std::tolower(static_cast<unsigned char>(a)) == b;
+            });
+            return isOpenGl ? " (the OpenGL backend is only in Koral 1.x)" : "";
         }
 
         std::optional<WindowPlatform> parsePlatform(std::string_view name)
@@ -171,7 +179,7 @@ namespace kor
                 if (r.api) {
                     const auto parsed = parseApi(*r.api);
                     if (!parsed)
-                        return invalid(std::format("'rendering.api' is '{}'; expected 'Vulkan' or 'OpenGL'", *r.api));
+                        return invalid(std::format("'rendering.api' is '{}'; expected 'Vulkan'{}", *r.api, openGlGone(*r.api)));
                     config.api = *parsed;
                 }
 
@@ -319,7 +327,7 @@ namespace kor
                 if (!value(text)) return invalid("missing value for --api");
                 const auto parsed = parseApi(text);
                 if (!parsed)
-                    return invalid(std::format("--api expects 'Vulkan' or 'OpenGL', got '{}'", text));
+                    return invalid(std::format("--api expects 'Vulkan', got '{}'{}", text, openGlGone(text)));
                 api = *parsed;
             }
             else if (arg == "--platform") {
@@ -430,7 +438,7 @@ namespace kor
             "  --title <text>      Window title\n"
             "  --width <n>         Window width\n"
             "  --height <n>        Window height\n"
-            "  --api <name>        Graphics backend: Vulkan or OpenGL\n"
+            "  --api <name>        Graphics backend: Vulkan\n"
             "  --platform <name>   Linux windowing system: auto, x11 or wayland\n"
             "  --gpu <which>       GPU to use: an index from the startup listing, or part of a device name (Vulkan only)\n"
             "  --imgui-ini <file>  Where ImGui saves its layout (default: beside koral.json)\n"

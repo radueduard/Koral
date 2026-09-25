@@ -145,7 +145,7 @@ namespace kor
          * choice — the best suitable device, discrete first. Otherwise an index into the device
          * list the runtime logs at startup, or a case-insensitive substring of a device name
          * ("radeon", "GeForce RTX 4070"). A preference that matches nothing falls back to the
-         * automatic choice with a warning. The OpenGL backend cannot choose a device; ignored there.
+         * automatic choice with a warning.
          */
         std::string gpu;
 
@@ -192,7 +192,7 @@ namespace kor
          * @brief Overlay command-line overrides onto this config.
          *
          * @p args are the arguments alone — no program name, no scene library. Recognised flags:
-         * `--width N`, `--height N`, `--title S`, `--api Vulkan|OpenGL`,
+         * `--width N`, `--height N`, `--title S`, `--api Vulkan`,
          * `--platform auto|x11|wayland` (Linux only), `--gpu INDEX|NAME` (Vulkan only),
          * `--imgui-ini FILE`, `--assets DIR`,
          * `--shaders DIR` (both repeatable, both prepended so the last one given is searched first),

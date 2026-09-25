@@ -36,34 +36,3 @@ include(GoogleTest)
 # validation layers are found via VK_ADD_LAYER_PATH set by the runtime itself.
 gtest_discover_tests(koral_window_tests
         DISCOVERY_MODE PRE_TEST)
-
-# OpenGL windowed parity tests. Separate executable: one windowed context per
-# process (same constraint as the Vulkan windowed test), and the two backends
-# cannot share a process anyway.
-add_executable(koral_window_tests_gl
-        test_windowed_gl.cpp
-)
-
-target_link_libraries(koral_window_tests_gl PRIVATE
-        Koral
-        # Vertex formats come from the mesh module, linked here the way a project links it.
-        koral-mesh
-        GTest::gtest
-        GTest::gtest_main
-        magic_enum::magic_enum
-        glm::glm
-        spdlog::spdlog
-        imgui::imgui
-        glfw
-)
-
-target_include_directories(koral_window_tests_gl PRIVATE
-        ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_BINARY_DIR}/include
-        ${CMAKE_SOURCE_DIR})
-
-# No special environment: kor::Window pins OpenGL windows to the X11 platform
-# itself (GLEW needs GLX), and GL needs no Vulkan loader. The test skips
-# gracefully when no display is available.
-gtest_discover_tests(koral_window_tests_gl
-        DISCOVERY_MODE PRE_TEST)

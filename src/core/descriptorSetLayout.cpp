@@ -118,7 +118,7 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<DescriptorSetLayout> {

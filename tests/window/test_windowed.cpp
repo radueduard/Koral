@@ -1,12 +1,11 @@
 // Windowed Vulkan integration tests: boot a real window + surface + swap chain +
 // scheduler + ImGui, render frames (with an ImGui overlay and a GuiImage),
 // resize, and — the parity part — verify that a rasterized triangle and the same
-// pattern written by a compute imageStore both present the same way (the Vulkan
-// side of the orientation parity checked identically on GL in test_windowed_gl).
+// pattern written by a compute imageStore both present the same way.
 //
 // The window/context is created once for the whole binary by VkEnvironment and
-// shared by every test through the VkWindowTest fixture (mirroring the OpenGL
-// windowed suite and the headless GpuTest). A real display (X11/Wayland) and a
+// shared by every test through the VkWindowTest fixture (mirroring the headless
+// GpuTest). A real display (X11/Wayland) and a
 // WSI-capable Vulkan loader must be available; tests skip gracefully otherwise.
 // One windowed Vulkan context per process — a second corrupts the heap (GLFW +
 // the Vulkan/ImGui statics don't survive re-initialization) — so everything runs
@@ -523,8 +522,7 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
 // -----------------------------------------------------------------------------
 // Y-orientation parity (see orientation_shared.h): a top-half quad drawn by the
 // rasterizer and the same pattern written by a compute imageStore must land in
-// the same place, and both are blit to the screen. This is the Vulkan reference
-// for the identical check run on OpenGL in test_windowed_gl.cpp.
+// the same place, and both are blit to the screen.
 // -----------------------------------------------------------------------------
 // The GUI extras with a real backend behind them: the viewport must actually get a texture handle for
 // its image (the one thing a headless test cannot check), be laid out to a real size, and survive a

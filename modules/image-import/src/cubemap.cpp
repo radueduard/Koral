@@ -42,31 +42,12 @@ namespace kimg
                 "Image");
         }
 
-        /**
-         * @brief Says once, out loud, that cube *sampling* is a gap in the OpenGL backend.
-         *
-         * The loading below works on either backend — six layers of an ordinary 2D image — but the
-         * GL backend binds a view's underlying image rather than the view object, so a cube view of
-         * those layers is bound as the 2D array it is stored as. Better said than silently sampled
-         * wrong. Vulkan is unaffected.
-         */
-        void warnAboutOpenGlOnce()
-        {
-            static bool said = false;
-            if (said || kor::Context::ActiveAPI() != kor::API::eOpenGL) return;
-            said = true;
-            kor::log::Warn("[image] cubemaps load on the OpenGL backend but cannot yet be sampled as "
-                           "cubes there: an image view is bound as its underlying image, so a cube "
-                           "view reads as a 2D array. Vulkan is unaffected.");
-        }
-
         /** @brief Creates the six-layer image the faces are uploaded into. */
         kor::Resource<kor::Image> makeCubeImage(const glm::uvec2 faceExtent, const kor::Image::Format format,
                                                 const bool generateMipmaps, const bool storage)
         {
             // Six 2D layers is what makes an image cube-compatible; the engine sets the Vulkan
             // create flag on exactly that shape. @see kor::ImageView::Type::eCube
-            warnAboutOpenGlOnce();
 
             // Sampled as a cube map, uploaded into, and read back when the mip chain is built —
             // named in full because setUsage replaces the default set rather than adding to it.

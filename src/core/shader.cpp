@@ -2,7 +2,6 @@
 // Created by radue on 2/21/2026.
 //
 
-#include "../backends/open_gl/shader.h"
 #include "../backends/vulkan/shader.h"
 
 #include <shader.h>
@@ -150,16 +149,14 @@ namespace kor {
                         b.path.string());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // Construction compiles the shader; a compile/parse failure throws and is
         // surfaced as a kor::Error (eShaderCompileFailed unless a more specific cause).
         // The backends read the builder's fields directly, so they must see the resolved one.
         return Guard(ErrorCode::eShaderCompileFailed, [&]() -> std::unique_ptr<Shader> {
-            return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<Shader, vk::Shader>(b)
-                : kor::MakeBackendPtr<Shader, ogl::Shader>(b);
+            return kor::MakeBackendPtr<Shader, vk::Shader>(b);
         });
     }
 

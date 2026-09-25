@@ -57,10 +57,6 @@ namespace kor
      * @warning Submit the work that signals a token before the work that waits for it. A queue runs
      *          its submissions in turn, so a submission waiting on one that comes after it on the
      *          same queue waits forever — and everything submitted behind it with it.
-     *
-     * Under OpenGL, which has nothing like this, a submission blocks the calling thread instead:
-     * until every waited token is ready before it starts, and until the GPU is done before
-     * signalling.
      */
     struct SubmitInfo {
         std::vector<Token> waitFor; ///< Held back until all of these have happened.
@@ -781,7 +777,7 @@ namespace kor
          * @brief Launches the bound pipeline's mesh-shader workgroups.
          * @param taskCountX,taskCountY,taskCountZ Number of workgroups per axis.
          *
-         * Requires mesh-shader support; unavailable on the OpenGL backend.
+         * Requires mesh-shader support.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
         CommandBuffer& DrawMeshTasks(glm::u32 taskCountX = 1, glm::u32 taskCountY = 1, glm::u32 taskCountZ = 1,
@@ -1254,7 +1250,7 @@ namespace kor
         // ---- Tracked-state updates ------------------------------------------------------------
         //
         // The state mutations the commands above perform, split out from the commands themselves so
-        // the OpenGL backend can re-apply them at replay time as well as record time. Callers must
+        // a backend can re-apply them at replay time as well as record time. Callers must
         // already have validated the resource: these only touch _state.
 
         /** @brief Records that a render pass opened on this framebuffer, clearing the pipeline and viewport bindings. */
@@ -1332,14 +1328,13 @@ namespace kor
         virtual CommandBuffer& DoDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) = 0;
         /// @param indexCount Already resolved from the bound mesh when the caller left it defaulted.
         virtual CommandBuffer& DoDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) = 0;
-        /// Unimplemented on OpenGL, where it is a no-op.
         virtual CommandBuffer& DoDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) { return *this; }
 
         virtual CommandBuffer& DoPushConstantBlock(const void* data, glm::u32 size, glm::u32 offset) = 0;
 
         virtual CommandBuffer& DoBindComputePipeline(ResourceRef<const ComputePipeline> pipeline) = 0;
         virtual CommandBuffer& DoBindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline) = 0;
-        /// Defaults to reporting ray tracing as unsupported, like TraceRays; OpenGL leaves it alone.
+        /// Defaults to reporting ray tracing as unsupported, like TraceRays.
         virtual CommandBuffer& DoBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
         virtual CommandBuffer& DoBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
         virtual CommandBuffer& DoBindMesh(ResourceRef<const Mesh> mesh) = 0;
@@ -1347,7 +1342,6 @@ namespace kor
         virtual CommandBuffer& DoDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
         virtual CommandBuffer& DoDrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
         virtual CommandBuffer& DoDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
-        /// Unimplemented on OpenGL, where it is a no-op.
         virtual CommandBuffer& DoDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) { return *this; }
         virtual CommandBuffer& DoClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset, glm::u64 size) = 0;
         virtual CommandBuffer& DoClearColorImage(ResourceRef<const Image> image, glm::vec4 color) = 0;

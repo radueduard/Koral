@@ -173,9 +173,8 @@ namespace kor
              * @brief Everything the buffer may be used for.
              *
              * Every role that costs nothing to declare is on by default, which for a buffer is
-             * nearly all of them: on Vulkan these are plain usage bits that place no constraint on
-             * the allocation, and the OpenGL backend chooses its bind target per call rather than
-             * from these flags. So a buffer that is only ever a uniform block pays nothing for also
+             * nearly all of them: they are plain usage bits that place no constraint on the
+             * allocation. So a buffer that is only ever a uniform block pays nothing for also
              * claiming it could be a vertex buffer, and the flags stop being something to get right
              * at a point far from where the mistake shows up.
              *

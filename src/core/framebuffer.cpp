@@ -8,7 +8,6 @@
 #include <window.h>
 #include <surface.h>
 
-#include "../backends/open_gl/framebuffer.h"
 #include "../backends/vulkan/framebuffer.h"
 
 #include "image.h"
@@ -170,13 +169,11 @@ namespace kor {
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Framebuffer> {
-            return (api == API::eVulkan)
-                ? MakeBackendPtr<Framebuffer, vk::Framebuffer>(*this)
-                : MakeBackendPtr<Framebuffer, ogl::Framebuffer>(*this);
+            return MakeBackendPtr<Framebuffer, vk::Framebuffer>(*this);
         });
     }
 
@@ -191,8 +188,6 @@ namespace kor {
 
     kor::Resource<Framebuffer> Framebuffer::CreateDefault(const Window& window) {
         switch (Context::ActiveAPI()) {
-        case API::eOpenGL:
-            return kor::MakeBackendResource<Framebuffer, ogl::Framebuffer>();
         case API::eVulkan:
             return kor::MakeBackendResource<Framebuffer, vk::Framebuffer>(window);
         default:

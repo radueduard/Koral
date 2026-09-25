@@ -23,8 +23,7 @@ namespace kor {
          * @brief Constructs the surface for a window. Prefer Create().
          *
          * The parameter is unnamed because the base keeps nothing: what a surface *is* differs
-         * entirely between APIs — a VkSurfaceKHR on Vulkan, nothing at all on OpenGL, where the
-         * context is the window — so the backend subclass takes what it needs and this holds no
+         * entirely between APIs — a VkSurfaceKHR on Vulkan — so the backend subclass takes what it needs and this holds no
          * state to share.
          */
         explicit Surface(const kor::Window&) {}

@@ -8,7 +8,6 @@
 #include <surface.h>
 #include <window.h>
 
-#include "../backends/open_gl/graphicsPipeline.h"
 #include "../backends/vulkan/graphicsPipeline.h"
 
 #include "context.h"
@@ -115,7 +114,7 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // The vertex layout becomes locations here rather than when it was set, because the shader
@@ -136,9 +135,7 @@ namespace kor
         // Construction runs Validate() (which may throw BackendException with a specific
         // code) and the backend Setup(); Guard() turns any escape into a kor::Error.
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<GraphicsPipeline> {
-            return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(resolved)
-                : kor::MakeBackendPtr<GraphicsPipeline, ogl::GraphicsPipeline>(resolved);
+            return kor::MakeBackendPtr<GraphicsPipeline, vk::GraphicsPipeline>(resolved);
         });
     }
 

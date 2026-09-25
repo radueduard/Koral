@@ -8,7 +8,6 @@
 #include <framebuffer.h>
 #include <surface.h>
 
-#include "../backends/open_gl/image.h"
 #include "../backends/vulkan/image.h"
 #include "../../include/window.h"
 
@@ -57,7 +56,7 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         // Construct and (optionally) upload inside Guard(): any backend exception becomes a
@@ -66,9 +65,7 @@ namespace kor
         // The object, not a Resource: Materialize() builds the owning Resource around it. The
         // upload below needs a ResourceRef, so it takes an unsafe (untracked) one — sound here
         // because the image cannot outlive this scope before we hand it over.
-        std::unique_ptr<Image> image = (api == API::eVulkan)
-            ? kor::MakeBackendPtr<Image, vk::Image>(*this)
-            : kor::MakeBackendPtr<Image, ogl::Image>(*this);
+        std::unique_ptr<Image> image = kor::MakeBackendPtr<Image, vk::Image>(*this);
 
         const auto imageRef = ResourceRef<const Image>(image.get());
 
@@ -368,8 +365,6 @@ namespace kor
 
         if (Context::ActiveAPI() == API::eVulkan)
             return vk::Image::isFormatSupported(format, usage);
-        if (Context::ActiveAPI() == API::eOpenGL)
-            return ogl::Image::isFormatSupported(format, usage);
         return false;
     }
 

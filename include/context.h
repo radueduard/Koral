@@ -64,7 +64,6 @@ namespace kor {
      * Must be set before the device exists — i.e. before the window is built or
      * Context::InitHeadless runs. The runtime sets this from `rendering.gpu` in koral.json
      * or the `--gpu` flag; call it directly only when embedding Koral without the runtime.
-     * The OpenGL backend cannot choose a device and ignores this.
      */
     KORAL_API void SetPreferredGpu(std::string_view preference);
 
@@ -73,16 +72,14 @@ namespace kor {
 
     /** @brief The graphics backend a context runs on. */
     enum class API : std::uint8_t {
-        eOpenGL,    ///< OpenGL. Broadest hardware support; no ray tracing or mesh shaders.
-        eVulkan,    ///< Vulkan. The default, and the only backend with ray tracing.
+        eVulkan,    ///< Vulkan: the only one since Koral 2 (OpenGL stays in 1.x).
     };
 
     /**
      * @brief Which windowing system to open the window on. Linux only; ignored elsewhere.
      *
      * On Linux a GLFW build can target both X11 and Wayland, and picks one automatically at startup.
-     * eAuto keeps that automatic choice (with one exception: OpenGL is always pinned to X11, because
-     * GLEW resolves entry points through GLX and cannot drive a Wayland/EGL context). eX11 and
+     * eAuto keeps that automatic choice. eX11 and
      * eWayland force the respective platform when the GLFW build and the running session support it,
      * falling back to automatic selection with a warning when they do not.
      */
@@ -168,8 +165,8 @@ namespace kor {
          * Not every GPU does -- older/integrated GPUs and MoltenVK (macOS) commonly lack it. Check
          * this before building an AccelerationStructure or RayTracingPipeline: on a device without
          * support they still build cleanly into a poisoned resource with a clear error rather than
-         * crashing, but this lets a caller decide not to attempt ray tracing at all. False under
-         * the OpenGL backend, and before any window/headless context exists.
+         * crashing, but this lets a caller decide not to attempt ray tracing at all. False before
+         * any window/headless context exists.
          */
         static KORAL_API bool SupportsRayTracing();
 

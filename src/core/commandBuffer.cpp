@@ -11,7 +11,6 @@
 #include <framebuffer.h>
 #include <surface.h>
 
-#include "../backends/open_gl/commandBuffer.h"
 #include "../backends/vulkan/commandBuffer.h"
 
 #include "buffer.h"
@@ -207,7 +206,7 @@ namespace kor
         // API, and ApplyDynamicDefaults() reaches back through the virtual Set* overrides. There is
         // no recording left to join, and appending here would invalidate EmitRecords()' walk. Run it
         // where it stands, which also keeps it in the right order relative to the command that
-        // triggered it. This mirrors the OpenGL backend's own `_executing` guard.
+        // triggered it.
         // Every transfer command already says which resource it reads from and which it writes to,
         // because the barrier resolver needs exactly that — so the usage those roles require can be
         // checked here, once, instead of in each of the dozen commands that perform one. A command
@@ -899,8 +898,7 @@ namespace kor
     // One shape for all of them: refuse the call without a graphics pipeline bound, mark the
     // tracking bit that stops applyDynamicDefaults stamping the pipeline's own value over this
     // one, then hand the emit to the backend. Backends implement only the do* half, so neither
-    // the guard nor the bit can be forgotten by one of them — which is exactly what had happened
-    // to OpenGL, whose setters chained up to none of this.
+    // the guard nor the bit can be forgotten by one of them.
 #define KORAL_DYNAMIC_STATE_SETTER_GUARD(bit, name)                                            \
         if (!_state.boundGraphicsPipeline.has_value())                                       \
             return RecordError(ErrorCode::eNoGraphicsPipelineBound,                               \
@@ -1594,8 +1592,6 @@ namespace kor
     std::unique_ptr<CommandBuffer> CommandBuffer::Create(const Flags<Usage> usage)
     {
         switch (Context::ActiveAPI()) {
-        case API::eOpenGL:
-            return std::make_unique<ogl::CommandBuffer>(usage);
         case API::eVulkan:
             {
                 const auto& queue = vk::Context::Device().requestQueue(getQueueFlagsFromUsage(usage));

@@ -11,7 +11,6 @@
 #include <framebuffer.h>
 #include <surface.h>
 
-#include "../backends/open_gl/descriptorSet.h"
 #include "../backends/vulkan/descriptorSet.h"
 
 #include <ranges>
@@ -674,13 +673,11 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<DescriptorSet> {
-            return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<DescriptorSet, vk::DescriptorSet>(*this)
-                : kor::MakeBackendPtr<DescriptorSet, ogl::DescriptorSet>(*this);
+            return kor::MakeBackendPtr<DescriptorSet, vk::DescriptorSet>(*this);
         });
     }
 

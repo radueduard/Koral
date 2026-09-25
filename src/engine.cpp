@@ -12,7 +12,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include "framebuffer.h"
@@ -142,11 +141,7 @@ namespace kor
 
         // Before the device exists — the Vulkan backend reads it while picking the physical
         // device, which happens inside InitHeadless / the window build below.
-        if (!config.gpu.empty()) {
-            if (config.api == API::eOpenGL)
-                log::Warn("[engine] a GPU preference ('{}') only applies to the Vulkan backend; OpenGL uses whichever device the driver gives it", config.gpu);
-            SetPreferredGpu(config.gpu);
-        }
+        if (!config.gpu.empty()) SetPreferredGpu(config.gpu);
 
         // Headless path: a library exporting CreateJob runs on a device-only context
         // and terminates — no window, surface, swap chain or GUI. Run() returns a

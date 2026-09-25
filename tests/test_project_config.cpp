@@ -43,7 +43,7 @@ TEST(ProjectConfig, ReadsEveryKey)
         "schemaVersion": 1,
         "name": "My Game",
         "rendering": {
-            "api": "OpenGL",
+            "api": "Vulkan",
             "platform": "wayland",
             "window": {
                 "width": 1600, "height": 900,
@@ -59,7 +59,7 @@ TEST(ProjectConfig, ReadsEveryKey)
     })", kBase);
 
     ASSERT_TRUE(result) << result.error().message;
-    EXPECT_EQ(config.api, API::eOpenGL);
+    EXPECT_EQ(config.api, API::eVulkan);
     EXPECT_EQ(config.title, "My Game");
     EXPECT_EQ(config.extent.x, 1600u);
     EXPECT_EQ(config.extent.y, 900u);
@@ -83,7 +83,6 @@ TEST(ProjectConfig, ReadsEveryKey)
 TEST(ProjectConfig, AbsentKeysLeaveTheLayerBeneathAlone)
 {
     ProjectConfig config;
-    config.api = API::eOpenGL;
     config.title = "From the binary";
     config.vsync = false;
     config.assetDirectories = { "/compiled/in" };
@@ -93,7 +92,6 @@ TEST(ProjectConfig, AbsentKeysLeaveTheLayerBeneathAlone)
     ASSERT_TRUE(result) << result.error().message;
     EXPECT_EQ(config.extent.x, 800u);
     EXPECT_EQ(config.extent.y, 720u);              // the default, untouched
-    EXPECT_EQ(config.api, API::eOpenGL);           // still what the binary asked for
     EXPECT_EQ(config.title, "From the binary");
     EXPECT_FALSE(config.vsync);
     ASSERT_EQ(config.assetDirectories.size(), 1u);
@@ -240,11 +238,19 @@ TEST(ProjectConfig, UnknownApiIsAnErrorAndNamesTheOffendingValue)
     EXPECT_NE(result.error().message.find("Metal"), std::string::npos);
 }
 
+// OpenGL was a backend until Koral 2: a project still asking for it is told where it went.
+TEST(ProjectConfig, OpenGlIsRefusedWithWhereItWent)
+{
+    ProjectConfig config;
+    const auto result = config.Merge(R"({ "rendering": { "api": "OpenGL" } })", kBase);
+    ASSERT_FALSE(result);
+    EXPECT_NE(result.error().message.find("1.x"), std::string::npos) << result.error().message;
+}
+
 TEST(ProjectConfig, ApiNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)
 {
     for (const auto* name : { "Vulkan", "vulkan", "VULKAN", "eVulkan" }) {
         ProjectConfig config;
-        config.api = API::eOpenGL;
         ASSERT_TRUE(config.Merge(
             std::string(R"({ "rendering": { "api": ")") + name + R"(" } })", kBase)) << name;
         EXPECT_EQ(config.api, API::eVulkan) << name;
@@ -475,13 +481,13 @@ TEST(ProjectConfig, FlagsOverrideTheConfigFile)
         }
     })", kBase));
 
-    ASSERT_TRUE(override_(config, { "--width", "1920", "--no-vsync", "--api", "OpenGL" }));
+    ASSERT_TRUE(override_(config, { "--width", "1920", "--no-vsync", "--api", "vulkan" }));
 
     EXPECT_EQ(config.extent.x, 1920u);   // overridden
     EXPECT_EQ(config.extent.y, 720u);    // from the file, untouched
     EXPECT_FALSE(config.vsync);          // overridden
     EXPECT_TRUE(config.fullscreen);      // from the file, untouched
-    EXPECT_EQ(config.api, API::eOpenGL); // overridden
+    EXPECT_EQ(config.api, API::eVulkan);
 }
 
 TEST(ProjectConfig, NegativeFlagsTurnConfigSettingsOff)

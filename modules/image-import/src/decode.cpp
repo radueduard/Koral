@@ -11,7 +11,6 @@
 #include <OpenImageIO/imageio.h>
 #include <ktx.h>
 #include <vulkan/vulkan_core.h>
-#include <GL/glew.h>
 
 #include <buffer.h>
 #include <commandBuffer.h>
@@ -219,54 +218,100 @@ namespace kimg::detail
             }
         };
 
+        // The GL internal formats a KTX1 file names its format with — Khronos-assigned values, so
+        // written out here rather than taken from a GL header this module would otherwise need.
+        namespace gl {
+            constexpr ktx_uint32_t COMPRESSED_R11_EAC = 0x9270;
+            constexpr ktx_uint32_t COMPRESSED_RED_RGTC1 = 0x8DBB;
+            constexpr ktx_uint32_t COMPRESSED_RG11_EAC = 0x9272;
+            constexpr ktx_uint32_t COMPRESSED_RGB8_ETC2 = 0x9274;
+            constexpr ktx_uint32_t COMPRESSED_RGBA8_ETC2_EAC = 0x9278;
+            constexpr ktx_uint32_t COMPRESSED_RGBA_ASTC_4x4_KHR = 0x93B0;
+            constexpr ktx_uint32_t COMPRESSED_RGBA_ASTC_6x6_KHR = 0x93B4;
+            constexpr ktx_uint32_t COMPRESSED_RGBA_ASTC_8x8_KHR = 0x93B7;
+            constexpr ktx_uint32_t COMPRESSED_RGBA_BPTC_UNORM_ARB = 0x8E8C;
+            constexpr ktx_uint32_t COMPRESSED_RGBA_S3TC_DXT1_EXT = 0x83F1;
+            constexpr ktx_uint32_t COMPRESSED_RGBA_S3TC_DXT3_EXT = 0x83F2;
+            constexpr ktx_uint32_t COMPRESSED_RGBA_S3TC_DXT5_EXT = 0x83F3;
+            constexpr ktx_uint32_t COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB = 0x8E8E;
+            constexpr ktx_uint32_t COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB = 0x8E8F;
+            constexpr ktx_uint32_t COMPRESSED_RGB_S3TC_DXT1_EXT = 0x83F0;
+            constexpr ktx_uint32_t COMPRESSED_RG_RGTC2 = 0x8DBD;
+            constexpr ktx_uint32_t COMPRESSED_SIGNED_R11_EAC = 0x9271;
+            constexpr ktx_uint32_t COMPRESSED_SIGNED_RED_RGTC1 = 0x8DBC;
+            constexpr ktx_uint32_t COMPRESSED_SIGNED_RG11_EAC = 0x9273;
+            constexpr ktx_uint32_t COMPRESSED_SIGNED_RG_RGTC2 = 0x8DBE;
+            constexpr ktx_uint32_t COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR = 0x93D0;
+            constexpr ktx_uint32_t COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR = 0x93D4;
+            constexpr ktx_uint32_t COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR = 0x93D7;
+            constexpr ktx_uint32_t COMPRESSED_SRGB8_ALPHA8_ETC2_EAC = 0x9279;
+            constexpr ktx_uint32_t COMPRESSED_SRGB8_ETC2 = 0x9275;
+            constexpr ktx_uint32_t COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB = 0x8E8D;
+            constexpr ktx_uint32_t COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT = 0x8C4D;
+            constexpr ktx_uint32_t COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT = 0x8C4E;
+            constexpr ktx_uint32_t COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT = 0x8C4F;
+            constexpr ktx_uint32_t COMPRESSED_SRGB_S3TC_DXT1_EXT = 0x8C4C;
+            constexpr ktx_uint32_t R16 = 0x822A;
+            constexpr ktx_uint32_t R32F = 0x822E;
+            constexpr ktx_uint32_t R8 = 0x8229;
+            constexpr ktx_uint32_t RG16 = 0x822C;
+            constexpr ktx_uint32_t RG32F = 0x8230;
+            constexpr ktx_uint32_t RG8 = 0x822B;
+            constexpr ktx_uint32_t RGBA16 = 0x805B;
+            constexpr ktx_uint32_t RGBA16F = 0x881A;
+            constexpr ktx_uint32_t RGBA32F = 0x8814;
+            constexpr ktx_uint32_t RGBA8 = 0x8058;
+            constexpr ktx_uint32_t SRGB8_ALPHA8 = 0x8C43;
+        }
+
         std::expected<kor::Image::Format, kor::Error> formatFromGl(const ktx_uint32_t glInternalFormat) {
             switch (glInternalFormat) {
-                case GL_R8: return kor::Image::Format::eR8_UNORM;
-                case GL_RG8: return kor::Image::Format::eRG8_UNORM;
-                case GL_RGBA8: return kor::Image::Format::eRGBA8_UNORM;
-                case GL_SRGB8_ALPHA8: return kor::Image::Format::eRGBA8_SRGB;
+                case gl::R8: return kor::Image::Format::eR8_UNORM;
+                case gl::RG8: return kor::Image::Format::eRG8_UNORM;
+                case gl::RGBA8: return kor::Image::Format::eRGBA8_UNORM;
+                case gl::SRGB8_ALPHA8: return kor::Image::Format::eRGBA8_SRGB;
 
-                case GL_R16: return kor::Image::Format::eR16_UNORM;
-                case GL_RG16: return kor::Image::Format::eRG16_UNORM;
-                case GL_RGBA16: return kor::Image::Format::eRGBA16_UNORM;
-                case GL_RGBA16F: return kor::Image::Format::eRGBA16_SFLOAT;
+                case gl::R16: return kor::Image::Format::eR16_UNORM;
+                case gl::RG16: return kor::Image::Format::eRG16_UNORM;
+                case gl::RGBA16: return kor::Image::Format::eRGBA16_UNORM;
+                case gl::RGBA16F: return kor::Image::Format::eRGBA16_SFLOAT;
 
-                case GL_R32F: return kor::Image::Format::eR32_SFLOAT;
-                case GL_RG32F: return kor::Image::Format::eRG32_SFLOAT;
-                case GL_RGBA32F: return kor::Image::Format::eRGBA32_SFLOAT;
+                case gl::R32F: return kor::Image::Format::eR32_SFLOAT;
+                case gl::RG32F: return kor::Image::Format::eRG32_SFLOAT;
+                case gl::RGBA32F: return kor::Image::Format::eRGBA32_SFLOAT;
 
-                case GL_COMPRESSED_RGB_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGB_UNORM;
-                case GL_COMPRESSED_SRGB_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGB_SRGB;
-                case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGBA_UNORM;
-                case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGBA_SRGB;
-                case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT: return kor::Image::Format::eBC2_UNORM;
-                case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT: return kor::Image::Format::eBC2_SRGB;
-                case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT: return kor::Image::Format::eBC3_UNORM;
-                case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT: return kor::Image::Format::eBC3_SRGB;
-                case GL_COMPRESSED_RED_RGTC1: return kor::Image::Format::eBC4_UNORM;
-                case GL_COMPRESSED_SIGNED_RED_RGTC1: return kor::Image::Format::eBC4_SNORM;
-                case GL_COMPRESSED_RG_RGTC2: return kor::Image::Format::eBC5_UNORM;
-                case GL_COMPRESSED_SIGNED_RG_RGTC2: return kor::Image::Format::eBC5_SNORM;
-                case GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB: return kor::Image::Format::eBC6H_UFLOAT;
-                case GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB: return kor::Image::Format::eBC6H_SFLOAT;
-                case GL_COMPRESSED_RGBA_BPTC_UNORM_ARB: return kor::Image::Format::eBC7_UNORM;
-                case GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB: return kor::Image::Format::eBC7_SRGB;
+                case gl::COMPRESSED_RGB_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGB_UNORM;
+                case gl::COMPRESSED_SRGB_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGB_SRGB;
+                case gl::COMPRESSED_RGBA_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGBA_UNORM;
+                case gl::COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT: return kor::Image::Format::eBC1_RGBA_SRGB;
+                case gl::COMPRESSED_RGBA_S3TC_DXT3_EXT: return kor::Image::Format::eBC2_UNORM;
+                case gl::COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT: return kor::Image::Format::eBC2_SRGB;
+                case gl::COMPRESSED_RGBA_S3TC_DXT5_EXT: return kor::Image::Format::eBC3_UNORM;
+                case gl::COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT: return kor::Image::Format::eBC3_SRGB;
+                case gl::COMPRESSED_RED_RGTC1: return kor::Image::Format::eBC4_UNORM;
+                case gl::COMPRESSED_SIGNED_RED_RGTC1: return kor::Image::Format::eBC4_SNORM;
+                case gl::COMPRESSED_RG_RGTC2: return kor::Image::Format::eBC5_UNORM;
+                case gl::COMPRESSED_SIGNED_RG_RGTC2: return kor::Image::Format::eBC5_SNORM;
+                case gl::COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_ARB: return kor::Image::Format::eBC6H_UFLOAT;
+                case gl::COMPRESSED_RGB_BPTC_SIGNED_FLOAT_ARB: return kor::Image::Format::eBC6H_SFLOAT;
+                case gl::COMPRESSED_RGBA_BPTC_UNORM_ARB: return kor::Image::Format::eBC7_UNORM;
+                case gl::COMPRESSED_SRGB_ALPHA_BPTC_UNORM_ARB: return kor::Image::Format::eBC7_SRGB;
 
-                case GL_COMPRESSED_RGBA_ASTC_4x4_KHR: return kor::Image::Format::eASTC_4x4_UNORM;
-                case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR: return kor::Image::Format::eASTC_4x4_SRGB;
-                case GL_COMPRESSED_RGBA_ASTC_6x6_KHR: return kor::Image::Format::eASTC_6x6_UNORM;
-                case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR: return kor::Image::Format::eASTC_6x6_SRGB;
-                case GL_COMPRESSED_RGBA_ASTC_8x8_KHR: return kor::Image::Format::eASTC_8x8_UNORM;
-                case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR: return kor::Image::Format::eASTC_8x8_SRGB;
+                case gl::COMPRESSED_RGBA_ASTC_4x4_KHR: return kor::Image::Format::eASTC_4x4_UNORM;
+                case gl::COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR: return kor::Image::Format::eASTC_4x4_SRGB;
+                case gl::COMPRESSED_RGBA_ASTC_6x6_KHR: return kor::Image::Format::eASTC_6x6_UNORM;
+                case gl::COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR: return kor::Image::Format::eASTC_6x6_SRGB;
+                case gl::COMPRESSED_RGBA_ASTC_8x8_KHR: return kor::Image::Format::eASTC_8x8_UNORM;
+                case gl::COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR: return kor::Image::Format::eASTC_8x8_SRGB;
 
-                case GL_COMPRESSED_RGB8_ETC2: return kor::Image::Format::eETC2_RGB8_UNORM;
-                case GL_COMPRESSED_SRGB8_ETC2: return kor::Image::Format::eETC2_RGB8_SRGB;
-                case GL_COMPRESSED_RGBA8_ETC2_EAC: return kor::Image::Format::eETC2_RGBA8_UNORM;
-                case GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC: return kor::Image::Format::eETC2_RGBA8_SRGB;
-                case GL_COMPRESSED_R11_EAC: return kor::Image::Format::eEAC_R11_UNORM;
-                case GL_COMPRESSED_SIGNED_R11_EAC: return kor::Image::Format::eEAC_R11_SNORM;
-                case GL_COMPRESSED_RG11_EAC: return kor::Image::Format::eEAC_RG11_UNORM;
-                case GL_COMPRESSED_SIGNED_RG11_EAC: return kor::Image::Format::eEAC_RG11_SNORM;
+                case gl::COMPRESSED_RGB8_ETC2: return kor::Image::Format::eETC2_RGB8_UNORM;
+                case gl::COMPRESSED_SRGB8_ETC2: return kor::Image::Format::eETC2_RGB8_SRGB;
+                case gl::COMPRESSED_RGBA8_ETC2_EAC: return kor::Image::Format::eETC2_RGBA8_UNORM;
+                case gl::COMPRESSED_SRGB8_ALPHA8_ETC2_EAC: return kor::Image::Format::eETC2_RGBA8_SRGB;
+                case gl::COMPRESSED_R11_EAC: return kor::Image::Format::eEAC_R11_UNORM;
+                case gl::COMPRESSED_SIGNED_R11_EAC: return kor::Image::Format::eEAC_R11_SNORM;
+                case gl::COMPRESSED_RG11_EAC: return kor::Image::Format::eEAC_RG11_UNORM;
+                case gl::COMPRESSED_SIGNED_RG11_EAC: return kor::Image::Format::eEAC_RG11_SNORM;
 
                 default:
                     return std::unexpected(kor::Error{ .code = kor::ErrorCode::eInvalidArgument,

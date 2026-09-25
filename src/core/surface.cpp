@@ -13,8 +13,7 @@
 
 namespace kor {
     std::unique_ptr<kor::Surface> Surface::Create(const kor::Window& window) {
-        switch (window.GraphicsAPI()) {
-            case API::eOpenGL: return std::make_unique<kor::Surface>(window);
+        switch (Context::ActiveAPI()) {
             case API::eVulkan: return std::make_unique<kor::vk::Surface>(window);
             default: throw std::runtime_error("Unknown API");
         }

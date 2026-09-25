@@ -806,10 +806,10 @@ namespace kor
          * @brief Fills in every clear value this pass did not set from @p framebuffer's own.
          *
          * Called by CommandBuffer::BeginRendering while it records, and the reason a clear value is
-         * a property of the *record* rather than of the framebuffer: OpenGL replays its records
-         * after the fact, so a value read at replay time would be whatever the framebuffer holds
-         * then — the last one written, for every pass in the frame — rather than what each pass was
-         * recorded with. Resolving here makes both backends agree.
+         * a property of the *record* rather than of the framebuffer: records are emitted after the
+         * fact, so a value read then would be whatever the framebuffer holds at that point — the
+         * last one written, for every pass in the frame — rather than what each pass was recorded
+         * with.
          */
         void ResolveClearValues(const kor::Framebuffer& framebuffer);
 

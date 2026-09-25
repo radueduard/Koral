@@ -42,7 +42,7 @@ namespace kor
 
         // --- generic ---
         eUnknownApi,           ///< The active graphics API is not recognised/supported.
-        eBackend,              ///< A backend (Vulkan/OpenGL) operation failed; see message.
+        eBackend,              ///< A backend (Vulkan) operation failed; see message.
         eInvalidArgument,      ///< A builder/command argument was invalid.
 
         // --- buffer ---

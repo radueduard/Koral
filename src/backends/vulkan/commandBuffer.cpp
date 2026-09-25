@@ -240,7 +240,6 @@ namespace kor::vk
         return defer("SetViewport", [=, this] {
             // Koral's canonical clip space is Vulkan's own, so the viewport is passed straight
             // through for every framebuffer — no negative height, no default/offscreen split.
-            // OpenGL is what adapts (see ogl Scheduler::Initialize).
             const ::vk::Viewport viewport = ::vk::Viewport()
                 .setX(static_cast<float>(x))
                 .setY(static_cast<float>(y))
@@ -315,9 +314,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetFrontFace(const FrontFace frontFace)
     {
         return defer("SetFrontFace", [=, this] {
-            // Winding is canonical (Vulkan) too, so this is a plain pass-through. GL agrees
-            // because GL_UPPER_LEFT negates NDC Y, which flips its window-space winding to
-            // match — see ogl Scheduler::Initialize.
+            // Winding is canonical (Vulkan) too, so this is a plain pass-through.
             _handle.setFrontFace(getVkFrontFace(frontFace));
         });
     }
@@ -1085,7 +1082,6 @@ namespace kor::vk
         // recorded frame, instead of at the position they were written. That is what stopped the
         // GUI appearing: it drew first and the scene then painted over it.
         //
-        // The OpenGL backend's Run has always enqueued, so this also makes the two agree.
         // Koral commands recorded from inside the lambda still work: Enqueue() sees _emitting
         // and runs them in place, preserving order. They are past barrier resolution by then,
         // though, so anything needing synchronisation must say so with an explicit Barrier() —

@@ -1,10 +1,8 @@
-// Scheduler::Execute / WaitFor / frameCompletion, written once and run by both windowed suites
-// (the seam has a Vulkan and an OpenGL implementation, and both must order work the same way).
+// Scheduler::Execute / WaitFor / frameCompletion, as the windowed suite checks them.
 //
 // Each check takes the suite's own drawFrame, because a frame is the only thing that runs executed
-// work. Completion is observed by drawing until the token is ready rather than by Wait(): OpenGL
-// signals a frame's completion from the *next* Draw, so a blocking wait on the main thread would
-// never return there.
+// work. Completion is observed by drawing until the token is ready rather than by Wait(), so the
+// checks hold for a backend that signals a frame's completion only from the next Draw.
 
 #pragma once
 
@@ -126,8 +124,8 @@ inline void aCoroutineResumesWhenItsFrameCompletes(const DrawFrame& draw) {
     EXPECT_TRUE(resumed.load());
 }
 
-// The frame is held back until another thread says go. Under Vulkan the GPU waits and the CPU
-// carries on; under OpenGL the CPU waits instead. Either way the frame completes only afterwards.
+// The frame is held back until another thread says go: the GPU waits and the CPU carries on, and
+// the frame completes only afterwards.
 inline void aFrameWaitsForAToken(const DrawFrame& draw) {
     const auto since = logMark();
     const kor::Token go = kor::Token::Create();

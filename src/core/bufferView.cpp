@@ -2,7 +2,6 @@
 // Created by radue on 12.09.2026.
 //
 
-#include "../backends/open_gl/bufferView.h"
 #include "../backends/vulkan/bufferView.h"
 
 #include <bufferView.h>
@@ -107,13 +106,11 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<BufferView> {
-            return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<BufferView, vk::BufferView>(*this)
-                : kor::MakeBackendPtr<BufferView, ogl::BufferView>(*this);
+            return kor::MakeBackendPtr<BufferView, vk::BufferView>(*this);
         });
     }
 

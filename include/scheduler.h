@@ -195,8 +195,7 @@ namespace kor
          * signal costs the CPU nothing. One the CPU has yet to signal holds up the frame's
          * *present* until it does — Vulkan does not let a present depend on a signal nobody has
          * submitted — so signal it from another thread or a coroutine, never from code that only
-         * runs after this frame. Under OpenGL, which cannot make the GPU wait, the CPU waits
-         * before submitting instead.
+         * runs after this frame.
          */
         void WaitFor(const Token& token);
 

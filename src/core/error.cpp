@@ -55,7 +55,7 @@ namespace kor
         case ErrorCode::eUnknownApi:
             return "The active graphics API is not recognised or supported.";
         case ErrorCode::eBackend:
-            return "A backend (Vulkan/OpenGL) operation failed.";
+            return "A backend (Vulkan) operation failed.";
         case ErrorCode::eInvalidArgument:
             return "An argument passed to a builder or command was invalid.";
         case ErrorCode::eUniformBufferTooLarge:

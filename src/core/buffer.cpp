@@ -2,7 +2,6 @@
 // Created by radue on 2/18/2026.
 //
 
-#include "../backends/open_gl/buffer.h"
 #include "../backends/vulkan/buffer.h"
 
 #include <algorithm>
@@ -45,15 +44,13 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan) {
+        if (api != API::eVulkan) {
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
         }
 
         // Backend allocation/creation may throw; convert any escape into a kor::Error.
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Buffer> {
-            return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<Buffer, vk::Buffer>(*this)
-                : kor::MakeBackendPtr<Buffer, ogl::Buffer>(*this);
+            return kor::MakeBackendPtr<Buffer, vk::Buffer>(*this);
         });
     }
 

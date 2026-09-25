@@ -2,7 +2,6 @@
 // Created by radue on 2/20/2026.
 //
 
-#include "../backends/open_gl/sampler.h"
 #include "../backends/vulkan/sampler.h"
 
 #include <sampler.h>
@@ -20,13 +19,11 @@ namespace kor
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
         const auto api = Context::ActiveAPI();
-        if (api != API::eOpenGL && api != API::eVulkan)
+        if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Sampler> {
-            return (api == API::eVulkan)
-                ? kor::MakeBackendPtr<Sampler, vk::Sampler>(*this)
-                : kor::MakeBackendPtr<Sampler, ogl::Sampler>(*this);
+            return kor::MakeBackendPtr<Sampler, vk::Sampler>(*this);
         });
     }
 

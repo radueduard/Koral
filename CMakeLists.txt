@@ -117,9 +117,6 @@ find_package(Jasper REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
-find_package(OpenGL REQUIRED)
-find_package(GLEW CONFIG REQUIRED)
-find_package(glad CONFIG REQUIRED)
 # Assimp is found here but linked only by modules/model-import — the engine itself no longer reads
 # model files. Kept at this level so the module (a subdirectory) sees the imported target.
 find_package(assimp REQUIRED)
@@ -256,7 +253,6 @@ endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
 target_link_libraries(${PROJECT_NAME} PRIVATE magic_enum::magic_enum)
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
-target_link_libraries(${PROJECT_NAME} PRIVATE GLEW::GLEW OpenGL::GL)
 # assimp is deliberately absent: model importing lives in modules/model-import, which links it.
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
@@ -320,10 +316,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio)
 
 # KTX and OpenImageIO are deliberately absent: image IO lives in modules/image, which links them.
 
-if(UNIX AND NOT APPLE)
-    target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GLX)
-endif()
-
 # The duplicate-fmt band-aid that used to live here (-Wl,--allow-multiple-definition, and MSVC's
 # /FORCE:MULTIPLE beside it) moved to modules/image along with OpenImageIO, which is what dragged a
 # second copy of fmt into the link. Koral no longer links it, so it no longer needs the flag.
@@ -355,7 +347,6 @@ if(MSVC)
     target_compile_options(${PROJECT_NAME} PUBLIC /utf-8)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE glad::glad)
 
 # std::stacktrace support (GCC libstdc++). fail()/warn() in builder.h capture a
 # stacktrace; the symbols live in libstdc++exp. PUBLIC so consumers that

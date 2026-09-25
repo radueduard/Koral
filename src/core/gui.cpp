@@ -10,7 +10,6 @@
 #include "framebuffer.h"
 #include "surface.h"
 
-#include "../backends/open_gl/gui.h"
 #include "../backends/vulkan/gui.h"
 #include "../backends/vulkan/device.h"
 #include "../backends/vulkan/vulkanContext.h"
@@ -297,8 +296,6 @@ kor::Resource<kor::GuiImage> kor::GuiImage::Create(kor::ResourceRef<const kor::I
     auto handle = [&] {
         switch (Context::ActiveAPI())
         {
-        case API::eOpenGL:
-            return kor::MakeBackendResource<kor::GuiImage, kor::ogl::GuiImage>(image, layer, level);
         case API::eVulkan:
             return kor::MakeBackendResource<kor::GuiImage, kor::vk::GuiImage>(image, layer, level);
         default:
@@ -354,9 +351,6 @@ void kor::GUI::Init()
 
     switch (Context::ActiveAPI())
     {
-    case API::eOpenGL:
-         ogl::GUI::Init();
-        break;
     case API::eVulkan:
         vk::GUI::Init();
         break;
@@ -371,9 +365,6 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
 {
     switch (Context::ActiveAPI())
     {
-    case API::eOpenGL:
-        ogl::GUI::NewFrame();
-        break;
     case API::eVulkan:
         vk::GUI::NewFrame();
         break;
@@ -436,9 +427,6 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
     ImDrawData* draw_data = ImGui::GetDrawData();
     switch (Context::ActiveAPI())
     {
-    case API::eOpenGL:
-        ogl::GUI::Render(commandBuffer, draw_data);
-        break;
     case API::eVulkan:
         vk::GUI::Render(commandBuffer, draw_data);
         break;
@@ -534,9 +522,6 @@ void kor::GUI::Shutdown()
 {
     switch (Context::ActiveAPI())
     {
-    case API::eOpenGL:
-        ogl::GUI::Shutdown();
-        break;
     case API::eVulkan:
         vk::GUI::Shutdown();
         break;
