@@ -269,31 +269,35 @@ namespace kor::vk
         return reinterpret_cast<ImTextureID>(_descriptorSets[frameIndex]);
     }
 
-    void GUI::Init()
+    void GUI::Init(GLFWwindow* window, const SwapChain& swapChain)
     {
-        _descriptorPool = kor::vk::DescriptorPool::Builder()
-            .addPoolSize(::vk::DescriptorType::eSampler, 1000)
-            .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
-            .addPoolSize(::vk::DescriptorType::eSampledImage, 1000)
-            .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)
-            .addPoolSize(::vk::DescriptorType::eUniformTexelBuffer, 1000)
-            .addPoolSize(::vk::DescriptorType::eStorageTexelBuffer, 1000)
-            .addPoolSize(::vk::DescriptorType::eUniformBuffer, 1000)
-            .addPoolSize(::vk::DescriptorType::eStorageBuffer, 1000)
-            .setMaxSets(1000 * 8)
-            .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
-            .build();
+        // One pool for every interface: ImGui allocates a font descriptor and one per texture from it.
+        if (!_descriptorPool) {
+            _descriptorPool = kor::vk::DescriptorPool::Builder()
+                .addPoolSize(::vk::DescriptorType::eSampler, 1000)
+                .addPoolSize(::vk::DescriptorType::eCombinedImageSampler, 1000)
+                .addPoolSize(::vk::DescriptorType::eSampledImage, 1000)
+                .addPoolSize(::vk::DescriptorType::eStorageImage, 1000)
+                .addPoolSize(::vk::DescriptorType::eUniformTexelBuffer, 1000)
+                .addPoolSize(::vk::DescriptorType::eStorageTexelBuffer, 1000)
+                .addPoolSize(::vk::DescriptorType::eUniformBuffer, 1000)
+                .addPoolSize(::vk::DescriptorType::eStorageBuffer, 1000)
+                .setMaxSets(1000 * 8)
+                .setPoolFlags(::vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind | ::vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet)
+                .build();
+        }
 
-        if (!ImGui_ImplGlfw_InitForVulkan(*kor::Context::Window(), false)) {
+        if (!ImGui_ImplGlfw_InitForVulkan(window, false)) {
             throw std::runtime_error("Failed to initialize ImGui for GLFW");
         }
 
         const auto& queue = vk::Context::Device().requestQueue(::vk::QueueFlagBits::eGraphics);
 
-        const auto& vkScheduler = dynamic_cast<const vk::Scheduler&>(kor::Context::Scheduler());
-        static std::vector colorAttachmentFormats = {
-            static_cast<VkFormat>(getVkFormat(vkScheduler.getSwapChain().image()->PixelFormat()))
-        };
+        // Kept alive by the pipeline-rendering info ImGui copies: one per interface would dangle, so the
+        // format is looked up per call and held in storage that outlives every Init.
+        static std::vector<VkFormat> formatStorage;
+        formatStorage.assign(1, static_cast<VkFormat>(getVkFormat(swapChain.image()->PixelFormat())));
+        const auto& colorAttachmentFormats = formatStorage;
 
         const auto pipelineRenderingCreateInfo = VkPipelineRenderingCreateInfo {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
@@ -315,8 +319,8 @@ namespace kor::vk
             .DescriptorPool = **_descriptorPool,
             .RenderPass = VK_NULL_HANDLE,
             .MinImageCount = 2,
-            .ImageCount = vkScheduler.ImageCount(),
-            .MSAASamples = static_cast<VkSampleCountFlagBits>(vkScheduler.getSwapChain().getVkSamples()),
+            .ImageCount = kor::Context::Scheduler().ImageCount(),
+            .MSAASamples = static_cast<VkSampleCountFlagBits>(swapChain.getVkSamples()),
             .UseDynamicRendering = true,
             .PipelineRenderingCreateInfo = pipelineRenderingCreateInfo,
             .CheckVkResultFn = [](const VkResult err)
@@ -340,9 +344,10 @@ namespace kor::vk
         ImGui_ImplVulkan_NewFrame();
     }
 
-    void GUI::Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data)
+    void GUI::Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data,
+                     const kor::ResourceRef<kor::Framebuffer>& framebuffer)
     {
-        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*kor::Context::DefaultFramebuffer());
+        const auto& vkFramebuffer = dynamic_cast<const vk::Framebuffer&>(*framebuffer);
         const auto& vkColorImageView = dynamic_cast<const vk::ImageView&>(*vkFramebuffer.ColorAttachment(0));
         const auto& vkImage = dynamic_cast<const vk::Image&>(*vkColorImageView.SourceImage());
 
@@ -362,7 +367,13 @@ namespace kor::vk
         // captured, all of which outlive the frame.
         const ::vk::ImageView colorView = *vkColorImageView;
         const auto extent = vkImage.Extent();
-        commandBuffer.Run([colorView, extent, draw_data](kor::CommandBuffer& cb) {
+        // Emitted when the frame's command buffer ends, by which time another scene's interface — or
+        // none — may be the current ImGui context. The backend reads the current one, so this one is
+        // made current again for the draw.
+        ImGuiContext* context = ImGui::GetCurrentContext();
+        commandBuffer.Run([colorView, extent, draw_data, context](kor::CommandBuffer& cb) {
+            ImGuiContext* previous = ImGui::GetCurrentContext();
+            ImGui::SetCurrentContext(context);
             const auto& raw = dynamic_cast<const vk::CommandBuffer&>(cb);
 
             auto colorAttachment = ::vk::RenderingAttachmentInfo()
@@ -386,12 +397,11 @@ namespace kor::vk
             }
 
             raw->endRendering();
+            ImGui::SetCurrentContext(previous);
         });
 
-        commandBuffer.ImageBarrier({
-            vkColorImageView.SourceImage(),
-            ResourceAccess::ePresent
-        });
+        // Left in the colour-attachment layout: the scheduler makes every window's image presentable
+        // once the whole frame is recorded.
     }
 
     void GUI::Shutdown()
@@ -399,7 +409,10 @@ namespace kor::vk
         drainPendingRemovals(/*all=*/true);
         ImGui_ImplVulkan_Shutdown();
         ImGui_ImplGlfw_Shutdown();
+    }
 
+    void GUI::ReleaseShared()
+    {
         delete _descriptorPool;
         _descriptorPool = nullptr;
     }

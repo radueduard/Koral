@@ -3,6 +3,7 @@
 //
 
 #include "gui.h"
+#include "interface.h"
 
 #include "context.h"
 #include "scene.h"
@@ -12,6 +13,7 @@
 
 #include "../backends/vulkan/gui.h"
 #include "../backends/vulkan/device.h"
+#include "../backends/vulkan/surface.h"
 #include "../backends/vulkan/vulkanContext.h"
 
 #include <imgui.h>
@@ -24,16 +26,8 @@
 #include <vector>
 #include <GLFW/glfw3.h>
 #include <map>
-
-namespace {
-    // Process-wide, and deliberately not a static data member of GUI: one copy per loaded
-    // module is the bug this exists to avoid. Reached only through kor::GUI's exported
-    // members, so every caller — engine or module — lands on this one.
-    std::map<kor::Font, ImFont*>& fonts() {
-        static std::map<kor::Font, ImFont*> instance;
-        return instance;
-    }
-}
+#include <unordered_map>
+#include <mutex>
 
 #include "commandBuffer.h"
 #include "input.h"
@@ -108,9 +102,21 @@ namespace
     }
 }
 
+namespace
+{
+    // How many loaded modules registered each copy: on ELF platforms every one shares Koral's, so one
+    // unloading must not take Koral's own entry with it.
+    std::map<void (*)(ImGuiContext*), int>& imguiModuleReferences()
+    {
+        static std::map<void (*)(ImGuiContext*), int> references;
+        return references;
+    }
+}
+
 void kor::detail::RegisterImGuiModule(const ImGuiModule& imguiModule)
 {
     auto& modules = imguiModules();
+    ++imguiModuleReferences()[imguiModule.setCurrentContext];
 
     // The registrar is an inline variable, so it is constructed once per module — but a module that
     // shares Koral's ImGui (every ELF/Mach-O one) reports the identical pointers, and registering
@@ -122,9 +128,18 @@ void kor::detail::RegisterImGuiModule(const ImGuiModule& imguiModule)
     modules.push_back(imguiModule);
 
     // Registration normally happens while the module loads, long before there is a context to hand
-    // out; GUI::Init() picks these up. A module that arrives after the GUI is up is bound here.
+    // out. A module that arrives while an interface is current is bound to it here.
     if (ImGui::GetCurrentContext())
         bindImGuiModule(imguiModule, ImGui::GetCurrentContext());
+}
+
+void kor::detail::UnregisterImGuiModule(void (*setCurrentContext)(ImGuiContext*))
+{
+    auto& references = imguiModuleReferences();
+    const auto it = references.find(setCurrentContext);
+    if (it == references.end() || --it->second > 0) return;
+    references.erase(it);
+    std::erase_if(imguiModules(), [&](const ImGuiModule& known) { return known.setCurrentContext == setCurrentContext; });
 }
 
 ImFont* AddFont(const std::filesystem::path& path, const float size)
@@ -143,7 +158,7 @@ ImFont* AddFont(const std::filesystem::path& path, const float size)
     return ImGui::GetIO().Fonts->AddFontFromFileTTF(iconPath.c_str(), iconFontSize, &config, icons_ranges);
 }
 
-void kor::GUI::DefineStyle()
+void kor::Interface::DefineStyle()
 {
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 5.0f;
@@ -225,13 +240,13 @@ void kor::GUI::DefineStyle()
 
 
     auto& io = ImGui::GetIO();
-    fonts()[Font::eRegular] = AddFont(kor::AssetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
-    fonts()[Font::eBold] = AddFont(kor::AssetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
-    fonts()[Font::eItalic] = AddFont(kor::AssetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
-    fonts()[Font::eBlack] = AddFont(kor::AssetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
-    fonts()[Font::eLight] = AddFont(kor::AssetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
+    _fonts[Font::eRegular] = AddFont(kor::AssetPath("fonts/Inter_28pt-Regular.ttf"), 28.0f);
+    _fonts[Font::eBold] = AddFont(kor::AssetPath("fonts/Inter_28pt-Bold.ttf"), 32.0f);
+    _fonts[Font::eItalic] = AddFont(kor::AssetPath("fonts/Inter_28pt-Italic.ttf"), 28.0f);
+    _fonts[Font::eBlack] = AddFont(kor::AssetPath("fonts/Inter_28pt-Black.ttf"), 36.0f);
+    _fonts[Font::eLight] = AddFont(kor::AssetPath("fonts/Inter_28pt-Light.ttf"), 26.0f);
 
-    io.FontDefault = fonts()[Font::eRegular];
+    io.FontDefault = _fonts[Font::eRegular];
     io.FontGlobalScale = .55f;
 
     // When panels can detach into their own OS windows, those windows are real, opaque top-level
@@ -249,43 +264,23 @@ void kor::GUI::DefineStyle()
 
 namespace
 {
-    // Every handle that has been made and not yet destroyed.
-    //
-    // Refs, not owners: a handle belongs to whoever created it, and one that is dropped disappears
-    // from here on the next frame. Process-wide and in this translation unit rather than inline in
-    // the header, so a handle created by a scene or a module lands in the same list the GUI walks.
-    // @see kor::GuiImage::Refresh
-    std::vector<kor::ResourceRef<kor::GuiImage>>& liveImages()
-    {
-        static std::vector<kor::ResourceRef<kor::GuiImage>> images;
-        return images;
-    }
-
     /**
      * @brief Stops the interface chasing a pointer that is not moving.
      *
      * A captured cursor is parked: the OS pointer does not move and only the movement is reported.
      * GLFW still delivers a position, though — an ever-growing virtual one — and the ImGui backend
      * takes it at face value, so within a few frames of aiming a camera the interface believes the
-     * pointer has slid off the screen. Whatever the scene keyed on hovering, including the viewport
-     * that captured the mouse in the first place, then stops being hovered and hands the cursor
-     * back: the capture lets go by itself, and the faster the mouse moves the sooner it happens.
-     *
+     * pointer has slid off the screen, and whatever keyed on hovering lets the capture go by itself.
      * So while the cursor is captured the interface is told, once per frame, that the pointer is
-     * exactly where it was when the capture began. Queued as an event rather than written to
-     * io.MousePos, so ImGui's own NewFrame derives a zero delta from it as it would from any other.
+     * exactly where it was when the capture began.
      */
-    void freezePointerWhileCaptured()
+    void freezePointerWhileCaptured(const kor::Input& input, std::optional<ImVec2>& parked)
     {
-        // Where the pointer was when the capture began; empty while nothing is captured.
-        static std::optional<ImVec2> parked;
-
         ImGuiIO& io = ImGui::GetIO();
-        if (kor::Input::CurrentCursorMode() != kor::Input::CursorMode::eCaptured) {
+        if (input.CurrentCursorMode() != kor::Input::CursorMode::eCaptured) {
             parked.reset();
             return;
         }
-
         if (!parked) parked = io.MousePos;
         io.AddMousePosEvent(parked->x, parked->y);
     }
@@ -293,6 +288,12 @@ namespace
 
 kor::Resource<kor::GuiImage> kor::GuiImage::Create(kor::ResourceRef<const kor::Image> image, glm::u32 layer, glm::u32 level)
 {
+    // A handle is the current interface's texture: without one there is no backend to make it with.
+    if (!kor::Interface::Current())
+        return kor::Resource<kor::GuiImage>::Failed(kor::Error{.code = kor::ErrorCode::eInvalidArgument,
+            .message = "GuiImage::Create needs a scene with an interface (Scene::EnableInterface) to be the current one"});
+    kor::Interface::Current()->MakeCurrent();
+
     auto handle = [&] {
         switch (Context::ActiveAPI())
         {
@@ -303,66 +304,176 @@ kor::Resource<kor::GuiImage> kor::GuiImage::Create(kor::ResourceRef<const kor::I
         }
     }();
 
-    // Registered so the GUI can bring it up to date each frame. Without this a handle shows whatever
-    // its image held at this moment, for ever.
-    if (handle) liveImages().emplace_back(kor::ResourceRef<kor::GuiImage>(handle));
+    // Registered with the interface it was made in, which brings it up to date each frame. Without
+    // this a handle shows whatever its image held at this moment, for ever.
+    if (handle) kor::Interface::Current()->Track(kor::ResourceRef<kor::GuiImage>(handle));
     return handle;
 }
 
-void kor::GUI::Init()
+namespace
 {
-    ImGui::CreateContext();
-    // ImGuizmo::SetImGuiContext(ImGui::GetCurrentContext());
+    // What a scene without an interface leaves current: nothing, so a stray ImGui call fails loudly
+    // instead of drawing into another scene's interface.
+    thread_local const kor::Interface* g_currentInterface = nullptr;
 
-    // Before anything else touches ImGui: hand the context and its allocators to every module that
-    // registered a copy of ImGui as it loaded — the scene library above all, which on Windows has
-    // its own null GImGui until this runs. See the block comment in gui.h.
-    bindImGuiModules(ImGui::GetCurrentContext());
+    // ---- ImGui's own GLFW callbacks, run with the right context --------------------------------------
+    //
+    // ImGui's GLFW backend keeps its state in the current context. The windows it opens for undocked
+    // panels get callbacks of its own (close, move, resize), as does the monitor list, and GLFW runs
+    // them while polling events — outside every scene, with no context current. Each is wrapped so it
+    // runs with the context of the interface it belongs to.
+
+    struct ContextScope {
+        ImGuiContext* previous;
+        explicit ContextScope(ImGuiContext* context) : previous(ImGui::GetCurrentContext()) { ImGui::SetCurrentContext(context); }
+        ~ContextScope() { ImGui::SetCurrentContext(previous); }
+    };
+
+    struct PlatformWindowCallbacks {
+        ImGuiContext* context = nullptr;
+        GLFWwindowclosefun close = nullptr;
+        GLFWwindowposfun pos = nullptr;
+        GLFWwindowsizefun size = nullptr;
+    };
+
+    std::unordered_map<GLFWwindow*, PlatformWindowCallbacks>& platformWindowCallbacks()
+    {
+        static std::unordered_map<GLFWwindow*, PlatformWindowCallbacks> table;
+        return table;
+    }
+
+    void platformWindowClosed(GLFWwindow* window)
+    {
+        const auto it = platformWindowCallbacks().find(window);
+        if (it == platformWindowCallbacks().end() || !it->second.close) return;
+        const ContextScope scope(it->second.context);
+        it->second.close(window);
+    }
+
+    void platformWindowMoved(GLFWwindow* window, const int x, const int y)
+    {
+        const auto it = platformWindowCallbacks().find(window);
+        if (it == platformWindowCallbacks().end() || !it->second.pos) return;
+        const ContextScope scope(it->second.context);
+        it->second.pos(window, x, y);
+    }
+
+    void platformWindowResized(GLFWwindow* window, const int width, const int height)
+    {
+        const auto it = platformWindowCallbacks().find(window);
+        if (it == platformWindowCallbacks().end() || !it->second.size) return;
+        const ContextScope scope(it->second.context);
+        it->second.size(window, width, height);
+    }
+
+    // Every live interface's context, and ImGui's monitor callback, which each of them wants run.
+    std::vector<ImGuiContext*>& interfaceContexts()
+    {
+        static std::vector<ImGuiContext*> contexts;
+        return contexts;
+    }
+
+    GLFWmonitorfun& imguiMonitorCallback()
+    {
+        static GLFWmonitorfun callback = nullptr;
+        return callback;
+    }
+
+    void monitorsChanged(GLFWmonitor* monitor, const int event)
+    {
+        if (!imguiMonitorCallback()) return;
+        for (ImGuiContext* context : interfaceContexts()) {
+            const ContextScope scope(context);
+            imguiMonitorCallback()(monitor, event);
+        }
+    }
+
+    void claimMonitorCallback()
+    {
+        // ImGui's GLFW backend installs its own on every Init, and restores the one before on every
+        // Shutdown; either way it ends up as the one GLFW calls, outside every context.
+        if (const auto previous = glfwSetMonitorCallback(interfaceContexts().empty() ? nullptr : monitorsChanged);
+            previous && previous != monitorsChanged)
+            imguiMonitorCallback() = previous;
+    }
+}
+
+kor::Interface* kor::Interface::Current()
+{
+    const auto* scene = Scene::Current();
+    return scene && scene->_interface ? scene->_interface.get() : nullptr;
+}
+
+void kor::Interface::MakeCurrent() const
+{
+    // Koral's own ImGui and every loaded library's — the scene library above all, which on Windows
+    // has globals of its own. See the block comment in gui.h.
+    if (g_currentInterface == this && ImGui::GetCurrentContext() == _context) return;
+    bindImGuiModules(_context);
+    ImGui::SetCurrentContext(_context);
+    g_currentInterface = this;
+}
+
+void kor::Interface::MakeNoneCurrent()
+{
+    if (!g_currentInterface && !ImGui::GetCurrentContext()) return;
+    bindImGuiModules(nullptr);
+    ImGui::SetCurrentContext(nullptr);
+    g_currentInterface = nullptr;
+}
+
+kor::Interface::Interface(Scene& scene, const InterfaceSettings& settings) : _scene(scene)
+{
+    ImGuiContext* previous = ImGui::GetCurrentContext();
+    _context = ImGui::CreateContext();
+    ImGui::SetCurrentContext(_context);
+    bindImGuiModules(_context);
+    g_currentInterface = this;
 
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    if (settings.docking) io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    // Point ImGui at the layout file the config resolved (by default beside koral.json). io.IniFilename
-    // holds the pointer rather than copying, so it must reference storage that outlives the context —
-    // the window's own string does. An empty path leaves ImGui's default (imgui.ini in the CWD) in
-    // place. ImGui will not create missing directories itself, so make the parent before it saves.
-    if (const std::string& iniPath = Context::Window().ImguiIniPath(); !iniPath.empty()) {
-        if (const auto parent = std::filesystem::path(iniPath).parent_path(); !parent.empty()) {
+    // io.IniFilename keeps the pointer, so it points into this object. ImGui will not create missing
+    // directories itself, so the parent is made before it first saves. Empty keeps the layout in memory.
+    if (!settings.iniFile.empty()) {
+        _iniFile = settings.iniFile.string();
+        if (const auto parent = settings.iniFile.parent_path(); !parent.empty()) {
             std::error_code ec;
             std::filesystem::create_directories(parent, ec);
         }
-        io.IniFilename = iniPath.c_str();
+        io.IniFilename = _iniFile.c_str();
+    } else {
+        io.IniFilename = nullptr;
     }
 
-    // Multi-viewport: let panels be dragged out of the main window into their own OS windows.
-    // Enabled on every platform except Wayland, and set *before* the backend Init below so the
-    // GLFW/Vulkan/GL backends install their viewport hooks (they check this flag at init time).
-    //
-    // Wayland is the exception, and it is not a matter of decorations or a transparent framebuffer:
-    // ImGui viewports require the platform to place a window at an absolute screen position
-    // (Platform_SetWindowPos), and Wayland deliberately denies clients any global coordinate — GLFW's
-    // Wayland backend returns GLFW_FEATURE_UNAVAILABLE from glfwSetWindowPos (the same reason the
-    // custom title-bar drag in Render() cannot move the window there). Secondary viewports would all
-    // pile up wherever the compositor decides, so under Wayland they stay off and panels dock inside
-    // the main window as before. Switch the window to X11/XWayland (--platform x11) to get viewports.
-    const bool viewportsSupported = glfwGetPlatform() != GLFW_PLATFORM_WAYLAND;
-    if (viewportsSupported)
+    // Panels dragged out into OS windows of their own. Not under Wayland: ImGui has to place those
+    // windows at absolute positions, which Wayland denies every client. Set before the backends
+    // initialise, which is when they install their viewport hooks.
+    if (settings.viewports && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND)
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
+    GLFWwindow* window = *scene.SceneWindow();
     switch (Context::ActiveAPI())
     {
     case API::eVulkan:
-        vk::GUI::Init();
+        vk::GUI::Init(window, dynamic_cast<const vk::Surface&>(scene.SceneWindow().RenderSurface()).swapChain());
         break;
     default:
         throw std::runtime_error("Unsupported graphics API");
     }
 
     DefineStyle();
+    scene.SceneInput().SetInterfaceContext(_context);
+    interfaceContexts().push_back(_context);
+    claimMonitorCallback();
+
+    // Leave things as they were: an interface may be made from inside another scene's hooks.
+    if (previous) ImGui::SetCurrentContext(previous);
 }
 
-void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
+void kor::Interface::Render(kor::CommandBuffer& commandBuffer)
 {
+    MakeCurrent();
     switch (Context::ActiveAPI())
     {
     case API::eVulkan:
@@ -372,10 +483,10 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
         throw std::runtime_error("Unsupported graphics API");
     }
 
-    freezePointerWhileCaptured();
+    static thread_local std::map<const Interface*, std::optional<ImVec2>> parked;
+    freezePointerWhileCaptured(_scene.SceneInput(), parked[this]);
 
     ImGui::NewFrame();
-    // ImGuizmo::BeginFrame();
     constexpr ImGuiDockNodeFlags dockSpaceFlags = ImGuiDockNodeFlags_PassthruCentralNode;
 
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking;
@@ -384,161 +495,142 @@ void kor::GUI::Render(kor::CommandBuffer& commandBuffer, Scene& scene)
     ImGui::SetNextWindowSize(viewport->WorkSize);
     ImGui::SetNextWindowViewport(viewport->ID);
 
-    // The host window is a container for the dock space and nothing else, so it has no chrome of its
-    // own: no title bar, no border, and no padding — padding here would inset every docked window from
-    // the edges of the screen and leave a frame of background around the whole interface.
-    //
-    // No title bar even when the window is undecorated. An undecorated window used to get a *drawn*
-    // one here, with its own close/maximise/minimise buttons and drag handling; that is gone, so an
-    // undecorated window is exactly what it says — bare. Moving and closing it is then the
-    // application's business (kor::Window::Close, glfwSetWindowPos), which is where those decisions
-    // belong.
+    // The host window is a container for the dock space and nothing else: no title bar, no border,
+    // no padding — padding would inset every docked window from the edges of the screen.
     window_flags |= ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize
                   | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar;
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    ImGui::Begin(Context::Window().Title().c_str(), nullptr, window_flags);
+    ImGui::Begin(_scene.SceneWindow().Title().c_str(), nullptr, window_flags);
     ImGui::PopStyleVar(2);
 
-    const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
-    ImGui::DockSpace(dockSpaceId, ImVec2(0.0f, 0.0f), dockSpaceFlags);
+    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable) {
+        const ImGuiID dockSpaceId = ImGui::GetID("MainDockSpace");
+        ImGui::DockSpace(dockSpaceId, ImVec2(0.0f, 0.0f), dockSpaceFlags);
+    }
 
-    scene.RenderUI();
-    // After the scene's, so a module's own panels (a camera inspector, a physics debug window)
-    // layer over the project's interface rather than under it.
+    _scene.RenderUI();
+    // After the scene's, so a module's own panels layer over the project's interface.
     ModuleHost::RenderUI();
 
     ImGui::End();
     ImGui::Render();
 
-    // Every handle that ImGui may sample, brought up to date in *this* frame's commands: after the
-    // interface has been built (so a handle created during RenderUI is included) and before the draws
-    // that read it are recorded. Recorded rather than submitted separately, which is what lets the
-    // engine's barrier resolution see the read and transition the image the handle copies from.
-    //
-    // Dead handles are dropped here rather than anywhere else — nothing else walks this list, and a
-    // scene that creates and drops handles as it runs would otherwise grow it without bound.
-    std::erase_if(liveImages(), [](const ResourceRef<GuiImage>& handle) { return !handle.Alive(); });
-    for (const auto& handle : liveImages()) {
+    // Every handle ImGui may sample, brought up to date in *this* frame's commands — recorded rather
+    // than submitted separately, which is what lets the engine's barriers see the read.
+    std::erase_if(_images, [](const ResourceRef<GuiImage>& handle) { return !handle.Alive(); });
+    for (const auto& handle : _images)
         if (handle.Valid()) const_cast<GuiImage&>(*handle).Refresh(commandBuffer);
-    }
 
-    ImDrawData* draw_data = ImGui::GetDrawData();
+    ImDrawData* drawData = ImGui::GetDrawData();
     switch (Context::ActiveAPI())
     {
     case API::eVulkan:
-        vk::GUI::Render(commandBuffer, draw_data);
+        vk::GUI::Render(commandBuffer, drawData, _scene.SceneWindow().DefaultFramebuffer());
         break;
     default:
         throw std::runtime_error("Unsupported graphics API");
     }
-
-    // The secondary platform windows are deliberately *not* rendered here. @see RenderPlatformWindows
 }
 
-namespace
+void kor::Interface::AttachPlatformWindows()
 {
-    // Which of ImGui's windows Input has been told about, so each is attached once.
-    std::vector<GLFWwindow*> g_attachedPlatformWindows;
-
-    void attachPlatformWindowsToInput()
-    {
-        const ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
-
-        std::vector<GLFWwindow*> present;
-        for (ImGuiViewport* viewport : platformIO.Viewports) {
-            // The main viewport's window is the engine's own, already attached.
-            if (viewport->Flags & ImGuiViewportFlags_IsPlatformWindow && viewport->PlatformHandle != nullptr) {
-                auto* window = static_cast<GLFWwindow*>(viewport->PlatformHandle);
-                if (window == *kor::Context::Window()) continue;
-                present.push_back(window);
-            }
+    // The windows ImGui opened for undocked panels feed the scene's input: an undocked panel is a
+    // separate OS window, and without this the pointer over one reaches ImGui but never the scene,
+    // so a camera driven by the mouse stops the moment its viewport is floating.
+    const ImGuiPlatformIO& platformIO = ImGui::GetPlatformIO();
+    GLFWwindow* own = *_scene.SceneWindow();
+    std::vector<GLFWwindow*> present;
+    for (ImGuiViewport* viewport : platformIO.Viewports) {
+        if (viewport->Flags & ImGuiViewportFlags_IsPlatformWindow && viewport->PlatformHandle != nullptr) {
+            auto* window = static_cast<GLFWwindow*>(viewport->PlatformHandle);
+            if (window != own) present.push_back(window);
         }
-
-        for (auto* window : present) {
-            if (std::ranges::find(g_attachedPlatformWindows, window) == g_attachedPlatformWindows.end()) {
-                kor::Input::AttachTo(window);
-                g_attachedPlatformWindows.push_back(window);
-            }
-        }
-
-        // Gone: a panel redocked or closed. Told to Input before ImGui destroys the window.
-        std::erase_if(g_attachedPlatformWindows, [&present](GLFWwindow* window) {
-            if (std::ranges::find(present, window) != present.end()) return false;
-            kor::Input::DetachFrom(window);
-            return true;
-        });
     }
+    auto& input = _scene.SceneInput();
+    for (auto* window : present) {
+        if (std::ranges::find(_platformWindows, window) == _platformWindows.end()) {
+            input.AttachTo(window);
+            _platformWindows.push_back(window);
+            // ImGui's own callbacks on the window, wrapped to run in this interface's context.
+            PlatformWindowCallbacks callbacks{.context = _context};
+            callbacks.close = glfwSetWindowCloseCallback(window, platformWindowClosed);
+            callbacks.pos = glfwSetWindowPosCallback(window, platformWindowMoved);
+            callbacks.size = glfwSetWindowSizeCallback(window, platformWindowResized);
+            platformWindowCallbacks()[window] = callbacks;
+        }
+    }
+    // Gone: a panel redocked or closed. Detached before ImGui destroys the window.
+    std::erase_if(_platformWindows, [&](GLFWwindow* window) {
+        if (std::ranges::find(present, window) != present.end()) return false;
+        input.DetachFrom(window);
+        platformWindowCallbacks().erase(window);
+        return true;
+    });
 }
 
-void kor::GUI::RenderPlatformWindows()
+void kor::Interface::RenderPlatformWindows()
 {
+    MakeCurrent();
     const ImGuiIO& io = ImGui::GetIO();
     if (!(io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)) return;
 
-    // Called after the frame's command buffer has been submitted, and that is the whole point of it
-    // being a separate function.
-    //
-    // ImGui::RenderPlatformWindowsDefault() does not record into our command buffer — it builds command
-    // buffers of its own, for each undocked window's own swap chain, and *submits them there and then*.
-    // Called from inside Render() it therefore ran before the frame's barriers had even been emitted
-    // (they are resolved at CommandBuffer::End(), after the recording callback returns), so a panel
-    // floating outside the main window sampled an image that nothing had transitioned yet: the layout
-    // was still eUndefined and every frame of a drag produced a validation error and a grey window.
-    //
-    // Nothing about a docked panel showed the problem, because a docked one is drawn by the main
-    // window's own draw list — inside our command buffer, after our barriers, in order.
-    GLFWwindow* backup_ctx = glfwGetCurrentContext();
+    // After the frame's command buffer has been submitted, and that is the whole point of it being
+    // separate: ImGui builds and submits a command buffer of its own for each undocked window, and
+    // called from inside the recording it would sample images nothing had transitioned yet.
+    GLFWwindow* backupContext = glfwGetCurrentContext();
     ImGui::UpdatePlatformWindows();
-
-    // The windows ImGui just created or destroyed, handed to Input.
-    //
-    // An undocked panel is a *separate OS window*, and GLFW delivers events to the window they happen
-    // over — so without this the pointer moving across an undocked viewport reaches ImGui (which
-    // installs its own callbacks on those windows) but never reaches kor::Input, and a camera driven
-    // by the mouse simply stops responding the moment its viewport is floating. Done right after
-    // UpdatePlatformWindows, which is what creates and destroys them.
-    attachPlatformWindowsToInput();
-
-    // ImGui's Vulkan backend submits and presents each platform window on the shared queue itself,
-    // so it takes the same lock as every other submit.
+    AttachPlatformWindows();
     {
         std::unique_lock<std::mutex> queueLock;
         if (Context::ActiveAPI() == API::eVulkan) queueLock = vk::Context::Device().lockQueues();
         ImGui::RenderPlatformWindowsDefault();
     }
-    // Those submissions bypass the epoch every other one signals, and they draw our images. An
-    // epoch marker after them, in submission order, covers them: nothing they used is destroyed
-    // until the GPU is past it.
+    // Those submissions bypass the epoch every other one signals, and they draw our images. An epoch
+    // marker after them covers them: nothing they used is destroyed until the GPU is past it.
     if (Context::ActiveAPI() == API::eVulkan && ImGui::GetPlatformIO().Viewports.Size > 1) {
         const auto& device = vk::Context::Device();
         device.markEpoch(device.requestQueue(::vk::QueueFlagBits::eGraphics));
     }
-    glfwMakeContextCurrent(backup_ctx);
+    glfwMakeContextCurrent(backupContext);
 }
 
-void kor::GUI::Shutdown()
+kor::Interface::~Interface()
 {
+    MakeCurrent();
+    auto& input = _scene.SceneInput();
+    for (auto* window : _platformWindows) {
+        input.DetachFrom(window);
+        platformWindowCallbacks().erase(window);
+    }
+    input.SetInterfaceContext(nullptr);
     switch (Context::ActiveAPI())
     {
     case API::eVulkan:
         vk::GUI::Shutdown();
         break;
     default:
-        throw std::runtime_error("Unsupported graphics API");
+        break;
     }
-
-    // Take the context back before destroying it, so no module is left holding a pointer to freed
-    // memory. A scene's RenderUI() is not called after shutdown, but its destructor still runs.
-    // Named explicitly in the call below because clearing it includes clearing our own GImGui, and
-    // the no-argument DestroyContext() destroys whatever that points at.
-    ImGuiContext* context = ImGui::GetCurrentContext();
+    // Take the context back from every library before destroying it, so none is left holding a
+    // pointer to freed memory.
     bindImGuiModules(nullptr);
-    ImGui::DestroyContext(context);
+    ImGui::DestroyContext(_context);
+    ImGui::SetCurrentContext(nullptr);
+    g_currentInterface = nullptr;
+    std::erase(interfaceContexts(), _context);
+    claimMonitorCallback();
+}
+
+ImFont* kor::Interface::GetFont(const Font font) const
+{
+    return _fonts.at(font);
 }
 
 ImFont* kor::GUI::GetFont(const Font font)
 {
-    return fonts().at(font);
+    const auto* interface = Interface::Current();
+    if (!interface) throw std::logic_error("GUI::GetFont outside a scene with an interface (Scene::EnableInterface)");
+    return interface->GetFont(font);
 }

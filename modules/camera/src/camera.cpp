@@ -7,6 +7,7 @@
 #include <context.h>
 #include <log.h>
 #include <window.h>
+#include <scene.h>
 
 namespace kcam
 {
@@ -25,9 +26,10 @@ namespace kcam
         case Kind::eNone:
             return std::nullopt;
         case Kind::eWindow:
-            // A job has no window to follow; the aspect stays as it was configured.
-            if (kor::Context::IsHeadless()) return std::nullopt;
-            return kor::Context::Window().Extent();
+            // The window of the scene the camera belongs to, current while it updates. A job has no
+            // window to follow; the aspect stays as it was configured.
+            if (const auto* scene = kor::Scene::Current()) return scene->SceneWindow().Extent();
+            return std::nullopt;
         case Kind::eFramebuffer:
             if (!framebuffer.Valid()) return std::nullopt;
             return framebuffer->Extent();

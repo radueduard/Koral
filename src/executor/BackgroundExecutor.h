@@ -11,6 +11,7 @@
 #include <asio/post.hpp>
 
 #include "task.h"
+#include "scene.h"
 
 class BackgroundExecutor : public kor::Executor {
 public:
@@ -19,8 +20,13 @@ public:
 
     ~BackgroundExecutor() override { Shutdown(); }
 
+    // The scene current where the coroutine suspended is current again where it resumes, so
+    // `Window::` and its kind keep meaning its scene across a thread switch.
     void Enqueue(std::coroutine_handle<> h) override {
-        asio::post(pool_, [h]() mutable { h.resume(); });
+        asio::post(pool_, [h, scene = kor::detail::CurrentSceneLife()]() mutable {
+            kor::detail::SceneScope scope(scene);
+            h.resume();
+        });
     }
 
     void Post(std::function<void()> work) override {

@@ -28,6 +28,7 @@
 namespace kor {
     class CommandBuffer;
     class FrameGraph;
+    class Scene;
     class Framebuffer;
     class RenderPass;
 
@@ -421,13 +422,16 @@ namespace kor {
         [[nodiscard]] GraphTiming Timing() const;
 
         /**
-         * @brief An image of the graph's by name — for a screenshot or a debug view. Empty before the
-         *        first frame.
+         * @brief An image of the graph's by name — for a screenshot, a debug view, another scene.
+         *        Empty before the first frame.
          *
          * An image asked for here is kept to itself from then on (not shared with others, see
-         * SetAliasing), so what it holds after the frame is what the passes left in it.
+         * SetAliasing), so what it holds after the frame is what the passes left in it. @p usage is
+         * what the caller will do with it — Image::Usage::eTransferSrc to blit or copy it elsewhere —
+         * and the graph makes the image with that from its next frame on (the image returned before
+         * then may not have it yet: check UsageFlags()).
          */
-        [[nodiscard]] ResourceRef<const Image> ImageNamed(std::string_view name) const;
+        [[nodiscard]] ResourceRef<const Image> ImageNamed(std::string_view name, Flags<Image::Usage> usage = {}) const;
 
         /**
          * @brief Whether images (and device-local buffers) never needed at the same time share
@@ -451,6 +455,11 @@ namespace kor {
     private:
         friend class PassResources;
         friend class RenderPass;
+        friend class Scene;
+
+        /** @brief The scene the graph belongs to; a graph that belongs to none uses the current scene. */
+        [[nodiscard]] Scene* OwnerScene() const;
+        Scene* _scene = nullptr;
 
         void Adopt(std::unique_ptr<RenderPass> pass);
         bool Build();
@@ -494,7 +503,7 @@ namespace kor {
         std::vector<std::vector<std::size_t>> _dependencies;               // per position in _order
         std::vector<std::unique_ptr<RenderPass>> _refused;                 // added when the graph could not take them
         glm::u64 _nextId = 1;
-        mutable std::set<std::string, std::less<>> _kept;   // names ImageNamed was asked for: never shared
+        mutable std::map<std::string, Flags<Image::Usage>, std::less<>> _kept;   // asked for by name: never shared, and made with these too
         bool _aliasing = true;
         MemoryUse _memory;
         std::thread::id _owner;
@@ -521,7 +530,6 @@ namespace kor {
         std::vector<Resource<Framebuffer>> _historyClears;  // what cleared a depth history, kept until rebuilt
         std::vector<std::string> _history;                  // the physical names, for the interface
         glm::uvec2 _extent {0, 0};
-        std::string _windows;   // every window's screen, size and whether it is shown: a change rebuilds
         mutable bool _dirty = true;
         bool _broken = false;
     };

@@ -182,10 +182,6 @@ namespace kor {
         return Materialize<Framebuffer>(*this, "Framebuffer", where);
     }
 
-    kor::Resource<Framebuffer> Framebuffer::CreateDefault() {
-        return CreateDefault(Context::Window());
-    }
-
     kor::Resource<Framebuffer> Framebuffer::CreateDefault(const Window& window) {
         switch (Context::ActiveAPI()) {
         case API::eVulkan:

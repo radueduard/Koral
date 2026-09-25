@@ -289,6 +289,22 @@ namespace kor
         }
     }
 
+    namespace
+    {
+        void pinLibraryOf(const void* address)
+        {
+#ifdef _WIN32
+            HMODULE module = nullptr;
+            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                               static_cast<LPCWSTR>(address), &module);
+#else
+            Dl_info info{};
+            if (dladdr(address, &info) && info.dli_fname)
+                (void)dlopen(info.dli_fname, RTLD_NOW | RTLD_NOLOAD | RTLD_NODELETE);
+#endif
+        }
+    }
+
     void ModuleHost::Register(const ModuleDescriptor* descriptor, const CreateModuleFn create)
     {
         if (!descriptor || descriptor->id.empty() || !create) {
@@ -309,6 +325,10 @@ namespace kor
         modules().push_back({ .name = std::string(descriptor->id),
                               .descriptor = descriptor,
                               .create = create });
+
+        // A module lives as long as the process, even when it arrived with a scene library that is
+        // later unloaded: its instance, its descriptor and its hooks are all still reachable from here.
+        pinLibraryOf(descriptor);
 
         if (resolved()) {
             log::Warn("[module] '{}' registered after startup; its lifecycle hooks will not run. "
@@ -420,6 +440,7 @@ namespace kor
         }
         forEach([](Module& m) { m.Initialize(); });
     }
+    void ModuleHost::FixedUpdate() { forEach([](Module& m) { m.FixedUpdate(); }); }
     void ModuleHost::Update()     { forEach([](Module& m) { m.Update(); }); }
     void ModuleHost::LateUpdate() { forEach([](Module& m) { m.LateUpdate(); }); }
     void ModuleHost::RenderUI()   { forEach([](Module& m) { m.RenderUI(); }); }

@@ -4,6 +4,7 @@
 
 #include "tokenState.h"
 #include "task.h"
+#include "scene.h"
 
 #include <algorithm>
 
@@ -41,7 +42,7 @@ namespace kor::detail {
         // this coroutine parked on a value nobody is going to reach again.
         if (reached.load(std::memory_order_acquire) >= value) return nullptr;
         if (gpu && gpu->counter() >= value) return nullptr;
-        auto waiter = std::make_shared<WaiterSlot>(value, handle, resumeInline ? nullptr : resumeExecutor());
+        auto waiter = std::make_shared<WaiterSlot>(value, handle, resumeInline ? nullptr : resumeExecutor(), CurrentSceneLife());
         waiters.push_back(waiter);
         // The GPU tells nobody when it gets there; the backend has to be looking.
         if (gpu) gpu->watch();
@@ -93,8 +94,13 @@ namespace kor::detail {
             // Claimed only when the resume actually runs: until then the coroutine may still be
             // destroyed, and its awaiter's Cancel() must be able to win.
             if (w->executor) {
-                w->executor->Post([w] { if (w->claim(WaiterSlot::eResumed)) w->handle.resume(); });
+                w->executor->Post([w] {
+                    if (!w->claim(WaiterSlot::eResumed)) return;
+                    SceneScope scope(w->scene);
+                    w->handle.resume();
+                });
             } else if (w->claim(WaiterSlot::eResumed)) {
+                SceneScope scope(w->scene);
                 w->handle.resume();
             }
         }

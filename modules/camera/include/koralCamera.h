@@ -480,23 +480,6 @@ namespace kcam
 
         /** @brief The keys and mouse button this controller answers to. */
         Bindings bindings;
-
-        /**
-         * @brief The window this camera is flown from, by its Window::ScreenName(): it takes input
-         *        only while that window has the keyboard focus. Empty: any of the application's windows.
-         *
-         * With a second window showing another camera, each camera listens to its own window, so
-         * the same WASD flies whichever one the user is looking at:
-         *
-         * @code
-         * mainCamera.window = std::string(kor::FrameGraph::Screen);   // "screen", the main window
-         * topCamera.window = top->ScreenName();
-         * @endcode
-         *
-         * A name rather than a reference: the main window is the runtime's, not something a scene
-         * holds, and a name goes on meaning "that window" without keeping it alive. @see kor::Input::FocusedWindow
-         */
-        std::string window;
     };
 
     /**
@@ -659,14 +642,14 @@ namespace kcam
         /** @brief Follows nothing. */
         [[nodiscard]] static AspectSource None() { return { }; }
 
-        /** @brief Follows the window. */
+        /** @brief Follows the window of the scene the camera was made in. */
         [[nodiscard]] static AspectSource Window() { return { .kind = Kind::eWindow }; }
 
         /** @brief Follows a framebuffer — the usual answer for a scene rendered off-screen. */
         [[nodiscard]] static AspectSource Of(kor::ResourceRef<const kor::Framebuffer> framebuffer)
         { return { .kind = Kind::eFramebuffer, .framebuffer = std::move(framebuffer) }; }
 
-        /** @brief Follows a window of the application's — the main one or a second one. */
+        /** @brief Follows a window: another scene's, say. Window() is the camera's own scene's. */
         [[nodiscard]] static KCAM_API AspectSource Of(const kor::Window& window);
 
         /** @brief Follows one image, for a scene whose target is not a whole framebuffer. */

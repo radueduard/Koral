@@ -40,8 +40,8 @@ namespace kor
     //  SetAllocatorFunctions()". The registrar below is an inline variable, so every module that
     //  includes this header constructs its own copy when that module loads, and the function
     //  pointers it hands over are resolved inside that module — they are the way to reach *its*
-    //  ImGui globals. GUI::Init() then points every registered module at the one context it
-    //  creates. A no-op on the platforms that never had the problem, where every module reports the
+    //  ImGui globals. The engine then points every registered module at the context of whichever
+    //  scene's interface is being drawn. A no-op on the platforms that never had the problem, where every module reports the
     //  same pointers anyway.
     // ---------------------------------------------------------------------------
     namespace detail
@@ -64,6 +64,8 @@ namespace kor
         // Named imguiModule, not module: `module` is a context-sensitive keyword since C++20 and
         // MSVC pre-scans for it at the start of a line, which is where a statement using it lands.
         KORAL_API void RegisterImGuiModule(const ImGuiModule& imguiModule);
+        /** @brief Forgets a module's ImGui as the module unloads — a scene library unloaded by the application. */
+        KORAL_API void UnregisterImGuiModule(void (*setCurrentContext)(ImGuiContext*));
 
         // Deliberately neither KORAL_API nor defined out of line: this has to be compiled into the
         // module that includes the header rather than imported from Koral, or every module would
@@ -83,6 +85,10 @@ namespace kor
                     &ImGui::SetCurrentContext,
                     &ImGui::SetAllocatorFunctions,
                 });
+            }
+            ~ImGuiModuleRegistrar()
+            {
+                UnregisterImGuiModule(&ImGui::SetCurrentContext);
             }
         };
 
@@ -106,9 +112,11 @@ namespace kor
      * The image must be in a shader-readable state when ImGui draws, which is the frame's end — so
      * a target rendered this frame needs no special handling.
      */
+    class Interface;
+
     class KORAL_API GuiImage
     {
-        friend class GUI;
+        friend class Interface;
     public:
         virtual ~GuiImage() = default;
 
@@ -137,7 +145,7 @@ namespace kor
         /**
          * @brief Brings the handle up to date with the image behind it, in the frame's own commands.
          *
-         * Called by GUI::Render on every live handle, once a frame, after the scene has drawn its
+         * Called by the scene's interface on every live handle, once a frame, after the scene has drawn its
          * interface and before ImGui's draws are recorded. Private and dispatched through this class:
          * a handle is refreshed by the GUI or not at all.
          *
@@ -159,58 +167,21 @@ namespace kor
     };
 
     /**
-     * @brief The Dear ImGui integration: one context, styled, with fonts and icons loaded.
+     * @brief Dear ImGui in a scene: what a scene's interface offers beyond ImGui itself.
      *
-     * The runtime brings this up with the window and renders it at the end of every frame, calling
-     * Scene::RenderUI in between. A scene therefore only calls ImGui functions — the lifecycle here
-     * is the engine's business, and the one member worth reaching for is GetFont().
+     * A scene has an interface when it asks for one (Scene::EnableInterface): its own ImGui context,
+     * styled, with fonts and icons loaded, drawn over its window, with Scene::RenderUI called every
+     * frame. Including this header is what hands a scene library the engine's ImGui; a scene that does
+     * not want an interface need not include it, or have ImGui at all.
      */
     class GUI
     {
     public:
-        /** @brief Creates the ImGui context, loads the fonts and starts the backend. Called once by the window. */
-        KORAL_API static void Init();
-
         /**
-         * @brief Runs one ImGui frame and records its draws.
-         * @param commandBuffer The frame's command buffer.
-         * @param scene The scene whose RenderUI() supplies the interface.
-         */
-        KORAL_API static void Render(kor::CommandBuffer& commandBuffer, Scene& scene);
-
-        /**
-         * @brief Draws the panels that float outside the main window, in their own windows.
-         *
-         * **Must be called after the frame's command buffer has been submitted**, which is why it is
-         * not part of Render(): it does not record into that command buffer but builds and submits its
-         * own, one per undocked window. Called from inside the recording it would run before the
-         * frame's barriers were emitted, and an undocked panel showing a render target would sample it
-         * in an undefined layout.
-         *
-         * A no-op when multi-viewport is off — under Wayland, for one, where a client cannot place a
-         * window at an absolute position. The runtime calls this; an embedder driving the scheduler
-         * itself has to, right after Scheduler::Draw returns.
-         */
-        KORAL_API static void RenderPlatformWindows();
-
-        /** @brief Destroys the ImGui context and its backend. Called once by the window. */
-        KORAL_API static void Shutdown();
-
-        /**
-         * @brief One of the loaded interface fonts, for ImGui::PushFont.
-         * @param font Which weight.
+         * @brief One of the loaded interface fonts of the current scene, for ImGui::PushFont.
          * @return The font. Each carries the FontAwesome icon glyphs merged in, so an icon can be
          *         written straight into a label.
          */
         KORAL_API static ImFont* GetFont(Font font);
-
-    private:
-        KORAL_API static void DefineStyle();
-        // The loaded fonts deliberately do NOT live here. A static data member defined in the
-        // header gives the executable and every scene .so its own copy, so GUI::Init would fill
-        // one map and a module's GetFont would read another and find it empty. The map lives in
-        // gui.cpp and is reached only through the exported accessors above.
     };
-
-
 }

@@ -45,6 +45,7 @@
 #include <glm/glm.hpp>
 
 #include <input.h>
+#include <scene.h>
 
 #include <koralCamera.h>
 
@@ -246,8 +247,8 @@ namespace kgui
         static kcam::Modifier HeldModifiers()
         {
             const auto either = [](const kor::Key left, const kor::Key right) {
-                return kor::Input::IsKeyHeld(left) || kor::Input::IsKeyPressed(left)
-                    || kor::Input::IsKeyHeld(right) || kor::Input::IsKeyPressed(right);
+                return kor::Scene::Input::IsKeyHeld(left) || kor::Scene::Input::IsKeyPressed(left)
+                    || kor::Scene::Input::IsKeyHeld(right) || kor::Scene::Input::IsKeyPressed(right);
             };
 
             auto modifiers = kcam::Modifier::eNone;
@@ -282,11 +283,11 @@ namespace kgui
          */
         static std::optional<kcam::Input> FirstInputPressed()
         {
-            if (const auto key = kor::Input::FirstKeyPressed(); key && !IsModifier(*key))
+            if (const auto key = kor::Scene::Input::FirstKeyPressed(); key && !IsModifier(*key))
                 return kcam::Input::FromKey(*key, HeldModifiers());
 
-            if (!kor::Input::InterfaceWantsMouse()) {
-                if (const auto button = kor::Input::FirstMouseButtonPressed())
+            if (!kor::Scene::Input::InterfaceWantsMouse()) {
+                if (const auto button = kor::Scene::Input::FirstMouseButtonPressed())
                     return kcam::Input::FromMouse(*button, HeldModifiers());
             }
             return std::nullopt;

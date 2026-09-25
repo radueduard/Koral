@@ -14,6 +14,8 @@
 #include <imgui_impl_glfw.h>
 #include <magic_enum/magic_enum.hpp>
 
+#include <imgui_internal.h>
+
 #include "window.h"
 
 // kor::Key's values are GLFW's key codes, which run to 348 — well past magic_enum's default
@@ -29,111 +31,40 @@ struct magic_enum::customize::enum_range<kor::Key>
 
 
 namespace kor {
+	struct Input::State {
+		std::unordered_map<Key, KeyState> keys;
+		std::unordered_map<MouseButton, KeyState> buttons;
+
+		glm::vec2 lastMousePosition {};
+		glm::vec2 mousePosition {};        ///< In the scene's own window's client space.
+		glm::vec2 mouseDelta {};
+		glm::vec2 scrollDelta {};
+
+		/// The cursor in virtual-desktop coordinates, the only space every window shares and so the
+		/// only one a delta can be taken in — the pointer may cross into an undocked panel.
+		glm::vec2 globalMousePosition {};
+		bool hasMousePosition = false;
+
+		std::vector<GLFWwindow*> windows;   ///< the scene's own first
+		CursorMode cursorMode = CursorMode::eNormal;
+		ImGuiContext* interface = nullptr;
+	};
+
 	namespace {
-		// Process-wide input state. There is one *main* window, but not one window: an undocked
-		// interface panel is an OS window of its own and its events have to reach the same state, or
-		// the pointer stops existing the moment it leaves the main one. Encapsulated in this TU;
-		// reached through Input's methods.
-		struct InputState {
-			std::unordered_map<Key, KeyState> keyboardKeyStates;
-			std::unordered_map<MouseButton, KeyState> mouseButtonStates;
+		// Which scene's input each OS window feeds. Process-wide, because GLFW's callbacks are plain
+		// functions and a window is all they are handed.
+		std::unordered_map<GLFWwindow*, Input*>& routes() {
+			static std::unordered_map<GLFWwindow*, Input*> table;
+			return table;
+		}
 
-			glm::vec2 lastMousePosition;
-			glm::vec2 mousePosition;        ///< In the main window's client space, as it always was.
-			glm::vec2 mouseDelta;
-			glm::vec2 scrollDelta;
+		Input* routeOf(GLFWwindow* handle) {
+			const auto it = routes().find(handle);
+			return it == routes().end() ? nullptr : it->second;
+		}
 
-			/// The cursor in virtual-desktop coordinates, which is the only space every window shares
-			/// and therefore the only one a delta can be taken in. @see Callbacks::MouseMoveCallback
-			glm::vec2 globalMousePosition {};
-			bool hasMousePosition = false;
-
-			GLFWwindow* mainWindow = nullptr;
-			std::vector<GLFWwindow*> attachedWindows;
-			/// The application's other windows (Window::Builder()): theirs is a kor::Window, not ImGui's.
-			std::vector<GLFWwindow*> engineWindows;
-			Input::CursorMode cursorMode = Input::CursorMode::eNormal;
-
-			void setup(GLFWwindow* window)
-			{
-				// Remembered so the callbacks can tell the engine's own window from the others they
-				// are now installed on. @see Input::AttachTo
-				mainWindow = window;
-
-				// Cleared rather than seeded key by key. A key's state is created by the callback
-				// that first reports it, so there is nothing to pre-fill — and seeding by walking
-				// the enumeration was worse than useless: see Update().
-				keyboardKeyStates.clear();
-				mouseButtonStates.clear();
-
-				// Initialize mouse position to the actual cursor position to avoid a
-				// large spurious delta on the very first frame.
-				double cx = 0.0, cy = 0.0;
-				if (window) {
-					glfwGetCursorPos(window, &cx, &cy);
-				}
-				mousePosition     = { static_cast<float>(cx), static_cast<float>(cy) };
-				lastMousePosition = mousePosition;
-				mouseDelta        = { 0.0f, 0.0f };
-				scrollDelta       = { 0.0f, 0.0f };
-
-				// The same position in the space deltas are taken in, so the first movement after
-				// startup is a movement rather than a jump from the origin.
-				int windowX = 0, windowY = 0;
-				if (window) glfwGetWindowPos(window, &windowX, &windowY);
-				globalMousePosition = { static_cast<float>(windowX) + static_cast<float>(cx),
-				                        static_cast<float>(windowY) + static_cast<float>(cy) };
-				hasMousePosition = window != nullptr;
-			}
-
-			void update()
-			{
-				// Over what is *in* the maps, not over what magic_enum can see of the enumerations.
-				// magic_enum only reflects values within [-128, 128] unless told otherwise, and
-				// kor::Key runs to 348 — so Escape (256), the modifiers (340-347) and the whole
-				// keypad were never advanced from ePressed to eHeld and never cleared from
-				// eReleased. IsKeyHeld() answered false for every one of them, for ever: Shift-to-
-				// boost and any binding on Escape simply did nothing. @see reference_magic_enum_range
-				const auto advance = [](auto& states) {
-					for (auto& state : states | std::views::values) {
-						if (state == KeyState::ePressed)       state = KeyState::eHeld;
-						else if (state == KeyState::eReleased) state = KeyState::eNotPressed;
-					}
-				};
-				advance(keyboardKeyStates);
-				advance(mouseButtonStates);
-
-				// mouseDelta is accumulated by mouseMoveCallback during the frame;
-				// reset it here so the next frame starts from zero.
-				lastMousePosition = mousePosition;
-				mouseDelta  = { 0.0f, 0.0f };
-				scrollDelta = { 0.0f, 0.0f };
-			}
-		};
-
-		InputState g_input;
-	}
-
-	void Input::Setup(GLFWwindow* window) { g_input.setup(window); }
-
-	// Installed on every window input is read from. The engine's callbacks forward each event to ImGui
-	// themselves (see below), which is why they *replace* rather than chain: ImGui installs equivalents
-	// on the windows it creates, and running both would deliver every event twice.
-	void Input::InstallCallbacks(GLFWwindow* window)
-	{
-		glfwSetKeyCallback(window, Input::Callbacks::KeyCallback);
-		glfwSetCursorPosCallback(window, Input::Callbacks::MouseMoveCallback);
-		glfwSetMouseButtonCallback(window, Input::Callbacks::MouseButtonCallback);
-		glfwSetScrollCallback(window, Input::Callbacks::ScrollCallback);
-		glfwSetWindowFocusCallback(window, Input::Callbacks::FocusCallback);
-		glfwSetCharCallback(window, Input::Callbacks::CharCallback);
-		glfwSetCursorEnterCallback(window, Input::Callbacks::CursorEnterCallback);
-	}
-
-	namespace
-	{
-		// The cursor is a per-window setting in GLFW, so a mode is applied to each window input is read
-		// from — otherwise it would come back the moment the pointer crossed into an undocked panel.
+		// The cursor is a per-window setting in GLFW, so a mode is applied to each window the input
+		// reads from — otherwise it would come back the moment the pointer crossed into an undocked panel.
 		void applyCursorMode(GLFWwindow* window, const Input::CursorMode mode)
 		{
 			switch (mode) {
@@ -153,111 +84,126 @@ namespace kor {
 				break;
 			}
 		}
+
+		// Events over a scene's windows go to *its* interface. ImGui's GLFW backend keeps its state per
+		// context, so the scene's context has to be the current one while the event is forwarded.
+		struct InterfaceScope {
+			ImGuiContext* previous = nullptr;
+			bool active = false;
+			explicit InterfaceScope(const Input* input, ImGuiContext* context) {
+				if (!input || !context) return;
+				previous = ImGui::GetCurrentContext();
+				ImGui::SetCurrentContext(context);
+				active = true;
+			}
+			~InterfaceScope() { if (active) ImGui::SetCurrentContext(previous); }
+		};
 	}
 
-	void Input::SetCursorMode(const CursorMode mode)
+	Input::Input() : _state(new State) {}
+
+	Input::~Input()
 	{
-		auto& state = g_input;
-		if (state.cursorMode == mode) return;
-		state.cursorMode = mode;
-
-		for (auto* window : state.attachedWindows) applyCursorMode(window, mode);
-
-		// Capturing warps the cursor and releasing it puts it back, and either would arrive as an
-		// enormous delta on the next report. Dropping the baseline makes the next one re-establish it
-		// instead, so the frame the mode changes reports no movement rather than a fling.
-		state.hasMousePosition = false;
-		state.mouseDelta = { 0.f, 0.f };
+		for (auto* window : _state->windows) routes().erase(window);
+		delete _state;
 	}
 
-	Input::CursorMode Input::CurrentCursorMode() { return g_input.cursorMode; }
+	void Input::SetInterfaceContext(ImGuiContext* context) { _state->interface = context; }
 
-	namespace {
-		// The interface lives in the main window and in the windows ImGui opens for undocked panels.
-		// A second application window is neither: a click there is not a click on a panel.
-		bool forwardsToInterface(GLFWwindow* handle) {
-			return std::ranges::find(g_input.engineWindows, handle) == g_input.engineWindows.end();
-		}
-	}
-
-	void Input::AttachEngineWindow(GLFWwindow* window)
+	// Installed on every window input is read from. The engine's callbacks forward each event to ImGui
+	// themselves (see below), which is why they *replace* rather than chain.
+	void Input::InstallCallbacks(GLFWwindow* window)
 	{
-		if (window == nullptr) return;
-		if (std::ranges::find(g_input.engineWindows, window) == g_input.engineWindows.end())
-			g_input.engineWindows.push_back(window);
-		AttachTo(window);
-	}
-
-	Window* Input::FocusedWindow()
-	{
-		for (Window* window : Context::Windows())
-			if (window->IsFocused()) return window;
-		return nullptr;
-	}
-
-	Window* Input::HoveredWindow()
-	{
-		for (Window* window : Context::Windows())
-			if (glfwGetWindowAttrib(**window, GLFW_HOVERED) == GLFW_TRUE) return window;
-		return nullptr;
+		glfwSetKeyCallback(window, Callbacks::KeyCallback);
+		glfwSetCursorPosCallback(window, Callbacks::MouseMoveCallback);
+		glfwSetMouseButtonCallback(window, Callbacks::MouseButtonCallback);
+		glfwSetScrollCallback(window, Callbacks::ScrollCallback);
+		glfwSetWindowFocusCallback(window, Callbacks::FocusCallback);
+		glfwSetCharCallback(window, Callbacks::CharCallback);
+		glfwSetCursorEnterCallback(window, Callbacks::CursorEnterCallback);
 	}
 
 	void Input::AttachTo(GLFWwindow* window)
 	{
 		if (window == nullptr) return;
-		auto& attached = g_input.attachedWindows;
-		if (std::ranges::find(attached, window) != attached.end()) return;
-
-		attached.push_back(window);
+		auto& windows = _state->windows;
+		if (std::ranges::find(windows, window) == windows.end()) windows.push_back(window);
+		// The newest attachment wins: a window handed from one scene to the next (a scene replaced in
+		// it) is simply attached to the new scene's input.
+		routes()[window] = this;
 		InstallCallbacks(window);
 		// A window that appears mid-capture — an undocked panel — has to arrive in the same mode as
 		// the rest, or the cursor would reappear as soon as the pointer entered it.
-		applyCursorMode(window, g_input.cursorMode);
+		applyCursorMode(window, _state->cursorMode);
+
+		if (windows.size() == 1) {
+			// The scene's own window: the starting position, so the first frame reports no movement.
+			double cx = 0.0, cy = 0.0;
+			glfwGetCursorPos(window, &cx, &cy);
+			int windowX = 0, windowY = 0;
+			glfwGetWindowPos(window, &windowX, &windowY);
+			_state->mousePosition = { static_cast<float>(cx), static_cast<float>(cy) };
+			_state->lastMousePosition = _state->mousePosition;
+			_state->globalMousePosition = { static_cast<float>(windowX + cx), static_cast<float>(windowY + cy) };
+			_state->hasMousePosition = true;
+		}
 	}
 
 	void Input::DetachFrom(GLFWwindow* window)
 	{
-		auto& attached = g_input.attachedWindows;
-		std::erase(attached, window);
-		std::erase(g_input.engineWindows, window);
+		std::erase(_state->windows, window);
+		if (routeOf(window) == this) routes().erase(window);
 		// The callbacks are not cleared: this is called for a window ImGui is about to destroy, and
 		// touching a window mid-destruction is worse than leaving pointers on something about to go.
 	}
 
-	std::vector<GLFWwindow*> Input::AttachedWindows() { return g_input.attachedWindows; }
-	void Input::Update() { g_input.update(); }
+	const std::vector<GLFWwindow*>& Input::AttachedWindows() const { return _state->windows; }
 
-    KeyState Input::StateOf(const Key key) {
-        return g_input.keyboardKeyStates[key];
-    }
+	void Input::SetCursorMode(const CursorMode mode)
+	{
+		if (_state->cursorMode == mode) return;
+		_state->cursorMode = mode;
+		for (auto* window : _state->windows) applyCursorMode(window, mode);
+		// Capturing warps the cursor and releasing it puts it back, and either would arrive as an
+		// enormous delta on the next report. Dropping the baseline makes the next one re-establish it.
+		_state->hasMousePosition = false;
+		_state->mouseDelta = { 0.f, 0.f };
+	}
 
-    KeyState Input::MouseButtonState(const MouseButton button) {
-        return g_input.mouseButtonStates[button];
-    }
+	Input::CursorMode Input::CurrentCursorMode() const { return _state->cursorMode; }
 
-    bool Input::IsKeyPressed(const Key key) {
-        return g_input.keyboardKeyStates[key] == KeyState::ePressed;
-    }
+	void Input::Update()
+	{
+		// Over what is *in* the maps, not over what magic_enum can see of the enumerations: it only
+		// reflects [-128, 128] unless told otherwise, and kor::Key runs to 348. @see reference_magic_enum_range
+		const auto advance = [](auto& states) {
+			for (auto& state : states | std::views::values) {
+				if (state == KeyState::ePressed)       state = KeyState::eHeld;
+				else if (state == KeyState::eReleased) state = KeyState::eNotPressed;
+			}
+		};
+		advance(_state->keys);
+		advance(_state->buttons);
+		_state->lastMousePosition = _state->mousePosition;
+		_state->mouseDelta  = { 0.0f, 0.0f };
+		_state->scrollDelta = { 0.0f, 0.0f };
+	}
 
-    bool Input::IsKeyHeld(const Key key) {
-        return g_input.keyboardKeyStates[key] == KeyState::eHeld;
-    }
+	namespace {
+		KeyState stateIn(const auto& states, const auto key) {
+			const auto it = states.find(key);
+			return it == states.end() ? KeyState::eNotPressed : it->second;
+		}
+	}
 
-    bool Input::IsKeyReleased(const Key key) {
-        return g_input.keyboardKeyStates[key] == KeyState::eReleased;
-    }
-
-    bool Input::IsMouseButtonPressed(const MouseButton button) {
-        return g_input.mouseButtonStates[button] == KeyState::ePressed;
-    }
-
-    bool Input::IsMouseButtonHeld(const MouseButton button) {
-        return g_input.mouseButtonStates[button] == KeyState::eHeld;
-    }
-
-    bool Input::IsMouseButtonReleased(const MouseButton button) {
-        return g_input.mouseButtonStates[button] == KeyState::eReleased;
-    }
+    KeyState Input::StateOf(const Key key) const { return stateIn(_state->keys, key); }
+    KeyState Input::MouseButtonState(const MouseButton button) const { return stateIn(_state->buttons, button); }
+    bool Input::IsKeyPressed(const Key key) const { return StateOf(key) == KeyState::ePressed; }
+    bool Input::IsKeyHeld(const Key key) const { return StateOf(key) == KeyState::eHeld; }
+    bool Input::IsKeyReleased(const Key key) const { return StateOf(key) == KeyState::eReleased; }
+    bool Input::IsMouseButtonPressed(const MouseButton button) const { return MouseButtonState(button) == KeyState::ePressed; }
+    bool Input::IsMouseButtonHeld(const MouseButton button) const { return MouseButtonState(button) == KeyState::eHeld; }
+    bool Input::IsMouseButtonReleased(const MouseButton button) const { return MouseButtonState(button) == KeyState::eReleased; }
 
     std::string Input::Describe(const Key key) {
         // "eLeftShift" -> "Left Shift". The enumerator's spelling is the only name a key has here;
@@ -285,169 +231,118 @@ namespace kor {
         return "Mouse " + std::to_string(static_cast<int>(button) + 1);
     }
 
-    std::optional<Key> Input::FirstKeyPressed() {
-        // Over what has been reported, not over the enumeration: the map holds exactly the keys the
-        // callbacks have seen, which is a handful rather than 120. @see InputState::update
-        for (const auto& [key, state] : g_input.keyboardKeyStates) {
+    std::optional<Key> Input::FirstKeyPressed() const {
+        for (const auto& [key, state] : _state->keys)
             if (state == KeyState::ePressed) return key;
-        }
         return std::nullopt;
     }
 
-    std::optional<MouseButton> Input::FirstMouseButtonPressed() {
-        for (const auto& [button, state] : g_input.mouseButtonStates) {
+    std::optional<MouseButton> Input::FirstMouseButtonPressed() const {
+        for (const auto& [button, state] : _state->buttons)
             if (state == KeyState::ePressed) return button;
-        }
         return std::nullopt;
     }
 
-    bool Input::InterfaceWantsMouse() {
-        // GetIO() asserts outright with no context, and "no interface" is a state a job, a test and
-        // an application without a GUI are all legitimately in — so it is answered, not crashed on.
-        return ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantCaptureMouse;
+    bool Input::InterfaceWantsMouse() const {
+        // Read straight off the scene's own context: another scene's may be the current one.
+        return _state->interface != nullptr && _state->interface->IO.WantCaptureMouse;
     }
 
-    bool Input::InterfaceWantsKeyboard() {
-        return ImGui::GetCurrentContext() != nullptr && ImGui::GetIO().WantCaptureKeyboard;
+    bool Input::InterfaceWantsKeyboard() const {
+        return _state->interface != nullptr && _state->interface->IO.WantCaptureKeyboard;
     }
 
-	const glm::vec2& Input::MousePosition() {
-        return g_input.mousePosition;
+    const glm::vec2& Input::MousePosition() const { return _state->mousePosition; }
+    const glm::vec2& Input::MousePositionDelta() const { return _state->mouseDelta; }
+    const glm::vec2& Input::MouseScrollDelta() const { return _state->scrollDelta; }
+    const glm::vec2& Input::LastMousePosition() const { return _state->lastMousePosition; }
+
+    // ---- callbacks ----------------------------------------------------------------------------------
+    // Each finds the scene the window feeds, forwards the event to that scene's interface (if it has
+    // one), and records it in that scene's input.
+
+    void Input::Callbacks::KeyCallback(GLFWwindow* handle, const int key, const int scancode, const int action, const int mods) {
+        Input* input = routeOf(handle);
+        if (!input) return;
+        {
+            const InterfaceScope scope(input, input->_state->interface);
+            if (scope.active) ImGui_ImplGlfw_KeyCallback(handle, key, scancode, action, mods);
+        }
+        auto& state = input->_state->keys[static_cast<Key>(key)];
+        switch (action) {
+        case GLFW_PRESS:   state = KeyState::ePressed; break;
+        case GLFW_RELEASE: state = KeyState::eReleased; break;
+        default: break;   // GLFW_REPEAT: still held
+        }
     }
 
-    const glm::vec2& Input::MousePositionDelta() {
-        return g_input.mouseDelta;
+    void Input::Callbacks::MouseMoveCallback(GLFWwindow* handle, const double x, const double y) {
+        Input* input = routeOf(handle);
+        if (!input) return;
+        {
+            const InterfaceScope scope(input, input->_state->interface);
+            if (scope.active) ImGui_ImplGlfw_CursorPosCallback(handle, x, y);
+        }
+        auto& state = *input->_state;
+        // Converted to virtual-desktop coordinates, which every window shares, so a delta taken as the
+        // pointer crosses from the scene's window into one of its undocked panels means the same thing.
+        int windowX = 0, windowY = 0;
+        glfwGetWindowPos(handle, &windowX, &windowY);
+        const glm::vec2 global = { static_cast<float>(windowX) + static_cast<float>(x),
+                                   static_cast<float>(windowY) + static_cast<float>(y) };
+        if (state.hasMousePosition) state.mouseDelta += global - state.globalMousePosition;
+        state.globalMousePosition = global;
+        state.hasMousePosition = true;
+        // Window-local, and only from the scene's own window: where the cursor is in the picture it drew.
+        if (!state.windows.empty() && handle == state.windows.front())
+            state.mousePosition = { static_cast<float>(x), static_cast<float>(y) };
     }
 
-    const glm::vec2& Input::MouseScrollDelta() {
-        return g_input.scrollDelta;
+    void Input::Callbacks::MouseButtonCallback(GLFWwindow* handle, const int button, const int action, const int mods) {
+        Input* input = routeOf(handle);
+        if (!input) return;
+        {
+            const InterfaceScope scope(input, input->_state->interface);
+            if (scope.active) ImGui_ImplGlfw_MouseButtonCallback(handle, button, action, mods);
+        }
+        auto& state = input->_state->buttons[static_cast<MouseButton>(button)];
+        if (action == GLFW_PRESS) state = KeyState::ePressed;
+        else if (action == GLFW_RELEASE) state = KeyState::eReleased;
     }
 
-    const glm::vec2& Input::LastMousePosition()
-    {
-		return g_input.lastMousePosition;
+    void Input::Callbacks::ScrollCallback(GLFWwindow* handle, const double x, const double y) {
+        Input* input = routeOf(handle);
+        if (!input) return;
+        {
+            const InterfaceScope scope(input, input->_state->interface);
+            if (scope.active) ImGui_ImplGlfw_ScrollCallback(handle, x, y);
+        }
+        input->_state->scrollDelta += glm::vec2 { x, y };
     }
 
-    void Input::Callbacks::KeyCallback(GLFWwindow * handle, int key, int scancode, const int action, const int mods) {
-    	if (forwardsToInterface(handle)) ImGui_ImplGlfw_KeyCallback(handle, key, scancode, action, mods);
-
-    	auto& state = g_input;
-    	const auto k = static_cast<Key>(key);
-
-    	switch (action) {
-    	case GLFW_PRESS:
-    		state.keyboardKeyStates[k] = KeyState::ePressed;
-    		break;
-    	case GLFW_RELEASE:
-    		state.keyboardKeyStates[k] = KeyState::eReleased;
-    		break;
-    	default:
-    		break;
-    	}
-
-    	if (mods & GLFW_MOD_SHIFT) {
-    		state.keyboardKeyStates[Key::eLeftShift] = KeyState::eHeld;
-		} else {
-			if (state.keyboardKeyStates[Key::eLeftShift] == KeyState::eHeld) {
-				state.keyboardKeyStates[Key::eLeftShift] = KeyState::eNotPressed;
-			}
-		}
-    	if (mods & GLFW_MOD_CONTROL) {
-    		state.keyboardKeyStates[Key::eLeftControl] = KeyState::eHeld;
-		} else {
-			if (state.keyboardKeyStates[Key::eLeftControl] == KeyState::eHeld) {
-				state.keyboardKeyStates[Key::eLeftControl] = KeyState::eNotPressed;
-			}
-		}
-    	if (mods & GLFW_MOD_ALT) {
-    		state.keyboardKeyStates[Key::eLeftAlt] = KeyState::eHeld;
-		} else {
-			if (state.keyboardKeyStates[Key::eLeftAlt] == KeyState::eHeld) {
-				state.keyboardKeyStates[Key::eLeftAlt] = KeyState::eNotPressed;
-			}
-		}
+    void Input::Callbacks::FocusCallback(GLFWwindow* handle, const int focus) {
+        Input* input = routeOf(handle);
+        if (!input) return;
+        {
+            const InterfaceScope scope(input, input->_state->interface);
+            if (scope.active) ImGui_ImplGlfw_WindowFocusCallback(handle, focus);
+        }
+        // Only a scene's own window carries a kor::Window in its user pointer; an undocked panel's
+        // holds ImGui's data, and reading a kor::Window out of that was a segfault once.
+        if (!input->_state->windows.empty() && handle == input->_state->windows.front()) {
+            if (auto* window = static_cast<Window*>(glfwGetWindowUserPointer(handle))) window->_focused = focus;
+        }
     }
 
-	void Input::Callbacks::MouseMoveCallback(GLFWwindow *handle, const double x, const double y) {
-		if (forwardsToInterface(handle)) ImGui_ImplGlfw_CursorPosCallback(handle, x, y);
-
-		auto& state = g_input;
-
-		// The position arrives relative to whichever window the pointer is over, and once an interface
-		// panel can be undocked that is not always the main one. Two windows' client coordinates are
-		// different spaces, so a delta taken across them would be nonsense — the pointer appears to
-		// jump by the distance between the windows. Converted here to virtual-desktop coordinates,
-		// which every window shares, so the delta means the same thing whichever one is under it.
-		int windowX = 0, windowY = 0;
-		glfwGetWindowPos(handle, &windowX, &windowY);
-		const glm::vec2 global = { static_cast<float>(windowX) + static_cast<float>(x),
-		                           static_cast<float>(windowY) + static_cast<float>(y) };
-
-		// Accumulate delta so scene.Update() sees the full movement for this frame. Skipped for the
-		// first report from a newly attached window: there is no previous position in this space to
-		// subtract, and taking one would spike the delta by wherever the window happens to be.
-		if (state.hasMousePosition) state.mouseDelta += global - state.globalMousePosition;
-		state.globalMousePosition = global;
-		state.hasMousePosition = true;
-
-		// Kept window-local, and only from the main window, because that is what it has always meant:
-		// where the cursor is *in the window you drew*.
-		if (handle == state.mainWindow) {
-			state.mousePosition = { static_cast<float>(x), static_cast<float>(y) };
-		}
+    void Input::Callbacks::CharCallback(GLFWwindow* handle, const unsigned int codepoint) {
+        Input* input = routeOf(handle);
+        const InterfaceScope scope(input, input ? input->_state->interface : nullptr);
+        if (scope.active) ImGui_ImplGlfw_CharCallback(handle, codepoint);
     }
 
-	void Input::Callbacks::MouseButtonCallback(GLFWwindow *handle, int button, const int action, int mods) {
-		if (forwardsToInterface(handle)) ImGui_ImplGlfw_MouseButtonCallback(handle, button, action, mods);
-
-		auto& state = g_input;
-    	const auto b = static_cast<MouseButton>(button);
-    	switch (action) {
-    	case GLFW_PRESS:
-    		state.mouseButtonStates[b] = KeyState::ePressed;
-    		break;
-    	case GLFW_RELEASE:
-    		state.mouseButtonStates[b] = KeyState::eReleased;
-    		break;
-    	default:
-    		break;
-    	}
+    void Input::Callbacks::CursorEnterCallback(GLFWwindow* handle, const int entered) {
+        Input* input = routeOf(handle);
+        const InterfaceScope scope(input, input ? input->_state->interface : nullptr);
+        if (scope.active) ImGui_ImplGlfw_CursorEnterCallback(handle, entered);
     }
-
-	void Input::Callbacks::ScrollCallback(GLFWwindow *handle, const double x, const double y) {
-		if (forwardsToInterface(handle)) ImGui_ImplGlfw_ScrollCallback(handle, x, y);
-
-		g_input.scrollDelta += glm::vec2 { x, y };
-    }
-
-	void Input::Callbacks::FocusCallback(GLFWwindow* handle, int focus)
-	{
-		if (forwardsToInterface(handle)) ImGui_ImplGlfw_WindowFocusCallback(handle, focus);
-
-		// Only the engine's own window carries a kor::Window in its user pointer. These callbacks are
-		// installed on other windows too now — an undocked interface panel is one — and ImGui keeps
-		// *its* own data there, so reading a kor::Window out of it would be reading whatever ImGui put
-		// there and writing through it. That was a straight segfault the first time a panel was
-		// undocked. @see Input::AttachTo
-		if (handle != g_input.mainWindow && forwardsToInterface(handle)) return;
-
-		if (auto* window = static_cast<Window*>(glfwGetWindowUserPointer(handle))) {
-			window->_focused = focus;
-		}
-	}
-
-	void Input::Callbacks::CharCallback(GLFWwindow* handle, unsigned int codepoint)
-	{
-		if (forwardsToInterface(handle)) ImGui_ImplGlfw_CharCallback(handle, codepoint);
-	}
-
-	void Input::Callbacks::CursorEnterCallback(GLFWwindow* handle, int entered)
-	{
-		if (forwardsToInterface(handle)) ImGui_ImplGlfw_CursorEnterCallback(handle, entered);
-	}
-
-	void Input::Callbacks::CloseCallback(GLFWwindow* handle)
-	{
-		glfwSetWindowShouldClose(handle, GLFW_TRUE);
-	}
 }

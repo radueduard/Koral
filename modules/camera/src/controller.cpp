@@ -7,7 +7,7 @@
 #include <cmath>
 
 #include <input.h>
-#include <window.h>
+#include <scene.h>
 
 namespace kcam
 {
@@ -15,13 +15,24 @@ namespace kcam
     {
         constexpr float kMaxPitch = glm::radians(89.f);
 
+        /**
+         * @brief The input of the scene the camera belongs to — current while it updates — or null for a
+         *        camera outside any, which then reads nothing held but what is always held.
+         */
+        kor::Input* sceneInput()
+        {
+            auto* scene = kor::Scene::Current();
+            return scene ? &scene->SceneInput() : nullptr;
+        }
+
         /** @brief Whether a key is down at all — the frame it goes down included. */
         bool down(const kor::Key key)
         {
             // Both states, not just eHeld: a key is ePressed on the frame it arrives and eHeld only
             // from the next one. Asking for eHeld alone costs a frame on every action and, worse,
             // makes a chord depend on the order its keys happened to be polled in.
-            return kor::Input::IsKeyPressed(key) || kor::Input::IsKeyHeld(key);
+            const kor::Input* input = sceneInput();
+            return input && (input->IsKeyPressed(key) || input->IsKeyHeld(key));
         }
 
         /** @brief Whether every modifier @p required names is down. Left and right count the same. */
@@ -49,9 +60,12 @@ namespace kcam
             case Input::Type::eKey:
                 return down(static_cast<kor::Key>(input.code)) && modifiersHeld(input.modifiers);
             case Input::Type::eMouseButton:
-                return (kor::Input::IsMouseButtonPressed(static_cast<kor::MouseButton>(input.code)) ||
-                        kor::Input::IsMouseButtonHeld(static_cast<kor::MouseButton>(input.code)))
-                    && modifiersHeld(input.modifiers);
+                if (const kor::Input* scene = sceneInput()) {
+                    const auto button = static_cast<kor::MouseButton>(input.code);
+                    return (scene->IsMouseButtonPressed(button) || scene->IsMouseButtonHeld(button))
+                        && modifiersHeld(input.modifiers);
+                }
+                return false;
             case Input::Type::eNone:
                 break;
             }
@@ -63,10 +77,10 @@ namespace kcam
         {
             float raw = 0.f;
             switch (axis.source) {
-            case AxisSource::eMouseX:  raw = kor::Input::MousePositionDelta().x; break;
-            case AxisSource::eMouseY:  raw = kor::Input::MousePositionDelta().y; break;
-            case AxisSource::eScrollX: raw = kor::Input::MouseScrollDelta().x; break;
-            case AxisSource::eScrollY: raw = kor::Input::MouseScrollDelta().y; break;
+            case AxisSource::eMouseX:  raw = (sceneInput() ? sceneInput()->MousePositionDelta() : glm::vec2(0.f)).x; break;
+            case AxisSource::eMouseY:  raw = (sceneInput() ? sceneInput()->MousePositionDelta() : glm::vec2(0.f)).y; break;
+            case AxisSource::eScrollX: raw = (sceneInput() ? sceneInput()->MouseScrollDelta() : glm::vec2(0.f)).x; break;
+            case AxisSource::eScrollY: raw = (sceneInput() ? sceneInput()->MouseScrollDelta() : glm::vec2(0.f)).y; break;
             case AxisSource::eNone:    return 0.f;
             }
             return raw * axis.sensitivity * (axis.invert ? -1.f : 1.f);
@@ -125,14 +139,6 @@ namespace kcam
         // so taking the grip back resumes rather than re-derives.
         if (_released) { applyCursor(false); _looking = false; return; }
 
-        // Another window has the keyboard: the input is meant for whatever that one shows.
-        if (const auto* focused = kor::Input::FocusedWindow();
-            !_controller.window.empty() && (!focused || focused->ScreenName() != _controller.window)) {
-            applyCursor(false);
-            _looking = false;
-            return;
-        }
-
         switch (_controller.kind) {
             case Controller::Kind::eFly:   fly(camera, dt); break;
             case Controller::Kind::eOrbit: orbit(camera); break;
@@ -173,12 +179,12 @@ namespace kcam
 
         if (looking) {
             _holdingCursor = true;
-            kor::Input::SetCursorMode(_controller.cursor == Controller::Cursor::eHide
+            if (auto* input = sceneInput()) input->SetCursorMode(_controller.cursor == Controller::Cursor::eHide
                 ? kor::Input::CursorMode::eHidden
                 : kor::Input::CursorMode::eCaptured);
         } else {
             _holdingCursor = false;
-            kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
+            if (auto* input = sceneInput()) input->SetCursorMode(kor::Input::CursorMode::eNormal);
         }
     }
 
@@ -195,7 +201,7 @@ namespace kcam
             // the mouse as soon as the pointer is over any window, so without this a look that began on
             // the scene would end the moment the pointer crossed a panel.
             if (_looking) return true;
-            return !kor::Input::InterfaceWantsMouse();
+            return !(sceneInput() && sceneInput()->InterfaceWantsMouse());
         }
         }
     }
@@ -222,7 +228,7 @@ namespace kcam
 
         // The keyboard is only ever ImGui's while something is being typed into, which is a question
         // the scene has no better answer to — so this one stays automatic even when input does not.
-        if (kor::Input::InterfaceWantsKeyboard() && _controller.input != Controller::Input::eEnabled) return;
+        if ((sceneInput() && sceneInput()->InterfaceWantsKeyboard()) && _controller.input != Controller::Input::eEnabled) return;
         if (_controller.input == Controller::Input::eDisabled) return;
 
         glm::vec3 move { 0.f };

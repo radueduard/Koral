@@ -53,13 +53,21 @@ namespace kor::vk
         glm::u64 _boundGeneration = 0;
     };
 
+    class SwapChain;
+
+    // The Vulkan half of a scene's interface. Each call works on the current ImGui context — the
+    // scene's — except the descriptor pool, which every interface shares.
     class GUI
     {
     public:
-        static void Init();
+        static void Init(GLFWwindow* window, const SwapChain& swapChain);
         static void NewFrame();
-        static void Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data);
+        /** @brief Records the draws into @p framebuffer's colour image, loading what the frame drew. */
+        static void Render(kor::CommandBuffer& commandBuffer, ImDrawData* draw_data,
+                           const kor::ResourceRef<kor::Framebuffer>& framebuffer);
         static void Shutdown();
+        /** @brief Destroys the shared descriptor pool, once no interface is left. */
+        static void ReleaseShared();
 
     private:
         static kor::vk::DescriptorPool* _descriptorPool;

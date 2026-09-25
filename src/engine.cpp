@@ -14,6 +14,7 @@
 #include <vector>
 #include <GLFW/glfw3.h>
 
+#include "app.h"
 #include "framebuffer.h"
 #include "gui.h"
 #include "imageView.h"
@@ -174,88 +175,46 @@ namespace kor
             return failed ? EXIT_FAILURE : EXIT_SUCCESS;
         }
 
-        // Loading the scene library is also what pulls in every module it links, each of which
-        // registers itself as it is loaded. Resolving here — after that, before the device — is why
-        // a project can use a module without naming it anywhere.
-        auto scene = SceneManager::LoadScene(scenePath);
-        if (const auto resolved = ModuleHost::Resolve(); !resolved) {
-            log::Error("[engine] {}", resolved.error().message);
+        // The windowed path: the application, the project's library of scenes, and the one it names.
+        std::unique_ptr<App> app;
+        try {
+            // Each scene with an interface keeps its layout beside the project's (imgui.<scene>.ini).
+            std::filesystem::path interfaceDirectory;
+            if (!config.imguiIni.empty()) interfaceDirectory = config.imguiIni.parent_path();
+            app = std::make_unique<App>(AppSettings{
+                .api = config.api,
+                .platform = config.platform,
+                .gpu = config.gpu,
+                .interfaceDirectory = interfaceDirectory,
+            });
+        } catch (const std::exception& e) {
+            log::Error("[engine] {}", e.what());
             return EXIT_FAILURE;
         }
 
-        auto window = Window::Builder(std::move(scene))
-            .SetTitle(config.title.empty() ? scenePath.string() : config.title)
-            .SetExtent(config.extent)
-            .SetFullscreen(config.fullscreen)
-            .SetResizable(config.resizable)
-            .SetDecorated(config.decorated)
-            .SetTransparentFramebuffer(config.transparentFramebuffer)
-            .SetVSync(config.vsync)
-            .SetAPI(config.api)
-            .SetPlatform(config.platform)
-            .SetImguiIni(config.imguiIni)
-            .Build();
-        if (!window.Valid()) return EXIT_FAILURE;   // already reported, with the reason
-
-        while (!window->ShouldClose()) {
-            glfwPollEvents();
-            Context::DrainMainThread();
-
-            if (window->IsPaused()) {
-                Input::Update();
-                continue;
-            }
-            auto& scene = *window->_scene;
-            if (window->HasResized()) {
-                // Modules first, so that anything the scene reads from one in its own OnResize —
-                // a camera's projection, say — already reflects the new size.
-                ModuleHost::OnResize(window->Extent());
-                scene.OnResize(window->Extent());
-            }
-            Time::Update();
-            Context::Scheduler().Draw([&](CommandBuffer& commandBuffer) {
-                Context::Repository().Update();
-                // The fixed frame order every module is written against: modules move things, the
-                // scene reacts, modules settle what the scene changed, the scene sees the settled state, then the
-                // frame is recorded.
-                ModuleHost::Update();
-                scene.Update();
-                ModuleHost::LateUpdate();
-                scene.LateUpdate();
-
-                ModuleHost::Render(commandBuffer);
-                scene.Render(commandBuffer);
-                // The scene's render passes, recorded in parallel and run ahead of this command buffer.
-                const bool graphTouchedScreen = scene.Graph().Execute();
-                ModuleHost::RenderOverlay(commandBuffer);
-
-                // A frame that never touched the window's framebuffer gets it cleared here, to the
-                // colour the framebuffer itself was given. That is the case for a scene that renders
-                // everything into its own targets and only shows them through the interface — which,
-                // without this, would present whatever the swap-chain image happened to hold: last
-                // frame's picture, or uninitialised memory.
-                //
-                // *Before* the GUI on purpose. Clearing after it would wipe the interface, and the
-                // interface is the one thing such a scene draws.
-                if (const auto framebuffer = Context::DefaultFramebuffer();
-                    framebuffer.Valid() && !framebuffer->ColorAttachments().empty()) {
-                    if (const auto screen = framebuffer->ColorImage(0);
-                        !commandBuffer.HasTouched(screen) && !graphTouchedScreen) {
-                        commandBuffer.BeginRendering();
-                        commandBuffer.EndRendering();
-                    }
-                }
-
-                GUI::Render(commandBuffer, scene);
-            });
-            // After Draw, not inside it: the panels floating outside the main window submit command
-            // buffers of their own, and those must follow the frame's — which is only submitted when
-            // Draw returns. @see GUI::RenderPlatformWindows
-            GUI::RenderPlatformWindows();
-            Input::Update();
-            for (Window* open : Context::Windows()) open->LateUpdate();
+        // Loading the library is also what pulls in every module it links, each registering itself as
+        // it is loaded; the application resolves and starts them before the first scene opens.
+        const auto names = app->LoadLibrary(scenePath);
+        if (!names) {
+            log::Error("[engine] {}", names.error().message);
+            return EXIT_FAILURE;
         }
-        window.Reset();
-        return EXIT_SUCCESS;
+        const std::string start = !config.scene.empty() ? config.scene : names->empty() ? std::string() : names->front();
+        if (start.empty()) {
+            log::Error("[engine] '{}' offers no scenes", scenePath.string());
+            return EXIT_FAILURE;
+        }
+
+        const WindowSettings window {
+            .title = config.title.empty() ? scenePath.stem().string() : config.title,
+            .extent = config.extent,
+            .resizable = config.resizable,
+            .fullscreen = config.fullscreen,
+            .decorated = config.decorated,
+            .transparentFramebuffer = config.transparentFramebuffer,
+            .vsync = config.vsync,
+        };
+        if (!app->Open(start, window)) return EXIT_FAILURE;   // already reported, with the reason
+        return app->Run();
     }
 }

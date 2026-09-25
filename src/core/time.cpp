@@ -2,74 +2,42 @@
 // Created by radue on 2/24/2026.
 //
 
-#include <chrono>
+#include <algorithm>
+#include <cmath>
+
 #include "gtime.h"
 
 namespace kor
 {
-    namespace {
-        // Process-wide time state: there is only ever one window, so this need not
-        // be per-window. Encapsulated in this TU; reached through Time's methods.
-        struct TimeState
-        {
-            float timeSinceStart = 0;
-
-            std::chrono::time_point<std::chrono::high_resolution_clock> lastFrameStart;
-            float frameDeltaTime;
-
-            std::chrono::time_point<std::chrono::high_resolution_clock> lastFixedPoint;
-            float fixedDeltaTime;
-            bool shouldRunFixedUpdate = false;
-
-            void setup()
-            {
-                const auto now = std::chrono::high_resolution_clock::now();
-                lastFrameStart = now;
-                lastFixedPoint = now;
-                shouldRunFixedUpdate = false;
-                fixedDeltaTime = std::chrono::milliseconds(1000 / 60).count();
-            }
-
-            void update()
-            {
-                const auto now = std::chrono::high_resolution_clock::now();
-                frameDeltaTime = std::chrono::duration_cast<std::chrono::duration<double>>(now - lastFrameStart).count();
-                lastFrameStart = now;
-                timeSinceStart += frameDeltaTime;
-
-                if (now - lastFixedPoint >= std::chrono::duration<double>(1.0 / 60.0)) {
-                    shouldRunFixedUpdate = true;
-                    fixedDeltaTime = std::chrono::duration_cast<std::chrono::duration<double>>(now - lastFixedPoint).count();
-                    lastFixedPoint = now;
-                } else {
-                    shouldRunFixedUpdate = false;
-                }
-            }
-        };
-
-        TimeState g_time;
-    }
-
-    /**
-     *
-     * @return The time in seconds it took to render the last frame. This is updated at the end of each frame,
-     * so it represents the time taken for the previous frame, not the current one.
-     */
-    float Time::FrameTime()
+    void Time::SetTimeScale(const float scale)
     {
-        return g_time.frameDeltaTime;
+        _timeScale = std::max(scale, 0.f);
     }
 
-    float Time::FixedDeltaTime()
+    void Time::SetFixedDeltaTime(const float seconds)
     {
-        return g_time.fixedDeltaTime;
+        _fixedDeltaTime = std::max(seconds, 1e-4f);
+        _fixedAccumulator = std::min(_fixedAccumulator, _fixedDeltaTime);
     }
 
-    float Time::WindowTime()
+    void Time::Advance(const float frameTime)
     {
-        return g_time.timeSinceStart;
+        _frameTime = frameTime;
+        _elapsed += frameTime * _timeScale;
+        ++_frames;
     }
 
-    void Time::Setup() { g_time.setup(); }
-    void Time::Update() { g_time.update(); }
+    std::uint32_t Time::TakeFixedSteps()
+    {
+        _fixedAccumulator += _frameTime * _timeScale;
+        auto steps = static_cast<std::uint32_t>(std::floor(_fixedAccumulator / _fixedDeltaTime));
+        _fixedAccumulator -= static_cast<float>(steps) * _fixedDeltaTime;
+        if (steps > MaxFixedSteps) {
+            // Behind by more than a frame can catch up on: run what it can and let the rest go,
+            // or every slow frame makes the next one slower still.
+            steps = MaxFixedSteps;
+        }
+        _fixedAccumulator = std::clamp(_fixedAccumulator, 0.f, _fixedDeltaTime);
+        return steps;
+    }
 }

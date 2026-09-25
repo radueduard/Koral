@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <functional>
+
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -70,10 +72,11 @@ inline std::vector<Pixel> readback(const kor::Resource<kor::Image>& image) {
 // Blit the image to the default framebuffer (the swap chain) and present one
 // frame. Secondary to the readback assertion — it exercises the blit-to-screen
 // path the user actually cares about, on both backends.
+// One application frame in which the test's scene records @p record. Each suite defines it.
+void drawSharedFrame(const std::function<void(kor::CommandBuffer&)>& record);
+
 inline void blitToScreen(const kor::Resource<kor::Image>& image) {
-    glfwPollEvents();
-    kor::Context::DrainMainThread();
-    kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
+    drawSharedFrame([&](kor::CommandBuffer& cb) {
         cb.BlitToScreen(image);
     });
 }

@@ -35,6 +35,7 @@
 
 #include <context.h>
 #include <gtime.h>
+#include <scene.h>
 #include <resource.h>
 
 namespace kgui
@@ -103,7 +104,7 @@ namespace kgui
         /** @brief Records this frame's time, oldest sample falling off the end. */
         void Sample()
         {
-            const float milliseconds = kor::Time::FrameTime() * 1000.f;
+            const float milliseconds = (kor::Scene::Current() ? kor::Scene::Time::UnscaledFrameTime() : 0.f) * 1000.f;
             _frames[_next] = milliseconds;
             _next = (_next + 1) % History;
             if (_filled < History) ++_filled;
@@ -153,7 +154,7 @@ namespace kgui
             ImGui::PlotLines("##frames", _frames.data(), static_cast<int>(_filled),
                              static_cast<int>(_next % History), nullptr, 0.f, ceiling, ImVec2(-FLT_MIN, 60.f));
 
-            ImGui::TextDisabled("%.1f s since the window opened", kor::Time::WindowTime());
+            ImGui::TextDisabled("%.1f s since the window opened", (kor::Scene::Current() ? kor::Scene::Time::Elapsed() : 0.f));
         }
 
         static void DrawResources()

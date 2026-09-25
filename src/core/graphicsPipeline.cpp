@@ -3,6 +3,7 @@
 //
 
 #include <graphicsPipeline.h>
+#include "current.h"
 #include <descriptorSetLayout.h>
 #include <framebuffer.h>
 #include <surface.h>
@@ -171,7 +172,8 @@ namespace kor
         _inputAssemblyState(createInfo.inputAssemblyState),
         _rasterizationState(createInfo.rasterizationState),
         _multisampleState(createInfo.multisampleState),
-        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value() : Context::DefaultFramebuffer()),
+        _framebuffer(createInfo.framebuffer.has_value() ? createInfo.framebuffer.value()
+                   : kor::ResourceRef<const Framebuffer>(detail::CurrentWindow("A graphics pipeline naming no framebuffer").DefaultFramebuffer())),
         _depthStencilState(createInfo.depthStencilState),
         _colorBlendState(createInfo.colorBlendState),
         _vertexAttributeDescriptions(createInfo.vertexAttributeDescriptions),

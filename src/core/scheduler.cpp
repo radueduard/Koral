@@ -2,6 +2,7 @@
 // Created by eduard on 11.03.2026.
 //
 
+#include <algorithm>
 #include <memory>
 
 #include <log.h>
@@ -58,6 +59,15 @@ namespace kor
         std::lock_guard lock(_pendingMutex);
         (placement == Placement::eBeforeFrame ? _pending.before : _pending.after).push_back(std::move(commandBuffer));
         return _frameTimeline.At(_frameNumber);
+    }
+
+    bool Scheduler::QueuedWorkTouches(const ResourceRef<const Image>& image)
+    {
+        std::lock_guard lock(_pendingMutex);
+        const auto touches = [&](const std::vector<std::unique_ptr<CommandBuffer>>& list) {
+            return std::ranges::any_of(list, [&](const auto& cb) { return cb && cb->HasTouched(image); });
+        };
+        return touches(_pending.before) || touches(_pending.after);
     }
 
     void Scheduler::WaitFor(const Token& token)

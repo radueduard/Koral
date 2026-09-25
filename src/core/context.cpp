@@ -114,25 +114,6 @@ std::filesystem::path kor::ShaderPath(const std::filesystem::path& relativePath)
     return resolveAgainstRoots(relativePath, Shader::SearchPaths());
 }
 
-std::vector<kor::Window*>& kor::Context::WindowList()
-{
-    static std::vector<kor::Window*> windows;
-    return windows;
-}
-
-std::vector<kor::Window*> kor::Context::Windows()
-{
-    return WindowList();
-}
-
-kor::Window& kor::Context::Window()
-{
-    if (_window == nullptr) {
-        throw std::runtime_error("No window is linked to the current thread!");
-    }
-    return *_window;
-}
-
 kor::Resource<kor::Scheduler> kor::Context::_scheduler {};
 
 kor::Scheduler& kor::Context::Scheduler()
@@ -141,15 +122,6 @@ kor::Scheduler& kor::Context::Scheduler()
         throw std::runtime_error("No scheduler is linked to the current thread!");
     }
     return *_scheduler.Get();
-}
-
-kor::ResourceRef<const kor::Framebuffer> kor::Context::DefaultFramebuffer()
-{
-    if (_window == nullptr)
-    {
-        throw std::runtime_error("There is no default framebuffer!");
-    }
-    return _window->DefaultFramebuffer();
 }
 
 kor::SwitchAwaiter kor::Context::SwitchToMainThread() {
@@ -196,20 +168,20 @@ bool kor::Context::IsHeadless()
 
 bool kor::Context::HasDevice() noexcept
 {
-    return _window != nullptr || _headless;
+    return _scheduler.Valid() || _headless;
 }
 
 bool kor::Context::SupportsRayTracing()
 {
     if (_activeAPI != API::eVulkan) return false;
-    if (_window == nullptr && !_headless) return false;
+    if (!_scheduler.Valid() && !_headless) return false;
     return kor::vk::Context::Device().supportsRayTracing();
 }
 
 void kor::Context::InitHeadless(const API api)
 {
-    if (_window != nullptr)
-        throw std::runtime_error("Context::InitHeadless: a window is already active; headless mode is mutually exclusive with a window.");
+    if (_scheduler.Valid())
+        throw std::runtime_error("Context::InitHeadless: an application is already running; headless mode is mutually exclusive with one.");
     if (_headless)
         throw std::runtime_error("Context::InitHeadless: a headless context is already active.");
     if (api != API::eVulkan)

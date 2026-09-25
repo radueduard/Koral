@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <unordered_set>
 
 #include "api.h"
@@ -20,6 +21,7 @@ struct GLFWwindow;
 namespace kor
 {
     class Surface;
+    class Window;
 
     /**
      * @brief One frame in flight: the swap-chain image it draws into and the command buffer it records with.
@@ -123,11 +125,14 @@ namespace kor
         }
 
         /**
-         * @brief Runs one whole frame: acquire an image, record, submit and present.
-         * @param renderFunc Callback that records the frame's work; the run loop passes one that
-         *        updates resources and calls Scene::Render.
+         * @brief Runs one whole frame: acquire an image from each window, record, submit and present
+         *        them all.
+         * @param windows The windows to draw this frame. One that cannot be given an image this frame
+         *        is left out, and says so: Window::IsShownThisFrame.
+         * @param renderFunc Records the frame's work; the application passes one that runs every
+         *        shown scene.
          */
-        virtual void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) { _started = true; }
+        virtual void Draw(std::span<Window* const> windows, const std::function<void(kor::CommandBuffer&)>& renderFunc) { _started = true; }
 
         /** @brief Whether the first frame has begun. Before it has, there is no current image to speak of. */
     	[[nodiscard]] bool HasStarted() const { return _started; }
@@ -184,6 +189,14 @@ namespace kor
          * Usage::eCompute on an ordinary device does.
          */
         Token Execute(std::unique_ptr<CommandBuffer> commandBuffer, Placement placement = Placement::eBeforeFrame);
+
+        /**
+         * @brief Whether any command buffer handed to Execute() for the frame being built uses @p image.
+         *
+         * What the application asks before clearing a window nothing drew into: a graph of a scene's,
+         * or any other work handed over for the frame, counts as drawing into it.
+         */
+        [[nodiscard]] bool QueuedWorkTouches(const ResourceRef<const Image>& image);
 
         /**
          * @brief Holds the next frame back, on the GPU, until @p token has happened.

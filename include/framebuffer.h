@@ -210,9 +210,7 @@ namespace kor
 
         virtual ~Framebuffer() = default;
 
-        /** @brief Creates the window's default framebuffer over the swap chain. Called by the window; use Context::DefaultFramebuffer() to reach it. */
-        static Resource<Framebuffer> CreateDefault();
-        /** @brief The same, for @p window: every window has its own. Called by the window. */
+        /** @brief Creates @p window's default framebuffer over its swap chain. The application's to call; a scene reaches it as Window::DefaultFramebuffer(). */
         static Resource<Framebuffer> CreateDefault(const Window& window);
 
         /** @brief How many colour targets it has. */

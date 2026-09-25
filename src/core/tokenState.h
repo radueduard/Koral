@@ -19,6 +19,7 @@
 namespace kor { struct Executor; }
 
 namespace kor::detail {
+    struct SceneLife;
     /**
      * The GPU half of a timeline, supplied by the backend once a token is first handed to a GPU
      * submission. From then on the backend object is the source of truth: the GPU can move the
@@ -49,9 +50,11 @@ namespace kor::detail {
         std::uint64_t value;
         std::coroutine_handle<> handle;
         Executor* executor; // null: resume inline on the signalling thread
+        std::shared_ptr<SceneLife> scene;   // current where it suspended, current again where it resumes
         std::atomic<int> state{eWaiting};
 
-        WaiterSlot(const std::uint64_t v, const std::coroutine_handle<> h, Executor* e) : value(v), handle(h), executor(e) {}
+        WaiterSlot(const std::uint64_t v, const std::coroutine_handle<> h, Executor* e, std::shared_ptr<SceneLife> s)
+            : value(v), handle(h), executor(e), scene(std::move(s)) {}
 
         bool claim(const State to) noexcept {
             int expected = eWaiting;

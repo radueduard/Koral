@@ -13,6 +13,8 @@
 
 #include <gtest/gtest.h>
 
+#include <dlfcn.h>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -21,6 +23,7 @@
 #include <fstream>
 #include <thread>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <string_view>
 
@@ -40,6 +43,7 @@
 #include "imageView.h"
 #include "buffer.h"
 #include "log.h"
+#include "app.h"
 #include "context.h"
 #include "gui.h"
 #include "image.h"
@@ -62,6 +66,8 @@ namespace {
 // ImGui-on-Vulkan path (GuiImage blit helper, textured widget, font access).
 class OverlayScene : public kor::Scene {
 public:
+    OverlayScene() { EnableInterface(); }
+
     void Initialize() override {
         _image = kor::Image::Builder{}
                      .SetType(kor::Image::Type::e2D)
@@ -117,13 +123,18 @@ public:
     }
 
     void Render(kor::CommandBuffer& cb) override {
-        // Into the viewport's own target first, so the interface has something to show — and so the
-        // target is rendered into at whatever size it now is.
-        cb.BeginRendering(viewportFramebuffer);
-        cb.EndRendering();
+        if (drawDefault) {
+            // Into the viewport's own target first, so the interface has something to show — and so
+            // the target is rendered into at whatever size it now is.
+            cb.BeginRendering(viewportFramebuffer);
+            cb.EndRendering();
 
-        cb.BeginRendering();   // default framebuffer: clears the swap-chain image
-        cb.EndRendering();
+            cb.BeginRendering();   // default framebuffer: clears the swap-chain image
+            cb.EndRendering();
+        }
+        // A test's own graph, run as a scene's own is: in the frame, with the scene current.
+        if (extraGraph) extraGraph->Execute();
+        if (onRender) onRender(cb);
     }
 
     void RenderUI() override {
@@ -166,6 +177,12 @@ public:
     glm::uvec2 lastResize{0, 0};
     /// Runs inside the frame, where a scene's own Update would write its per-frame data.
     std::function<void()> onUpdate;
+    /// Records a test's own work into the frame, after (or, with drawDefault off, instead of) the scene's.
+    std::function<void(kor::CommandBuffer&)> onRender;
+    /// A graph of a test's own, executed in the frame as the scene's own graph is.
+    kor::FrameGraph* extraGraph = nullptr;
+    /// Whether Render draws the viewport target and the screen.
+    bool drawDefault = true;
 
     kgui::Viewport viewport;
     // A colour target as a scene would actually make one: sampled and rendered into, with no transfer
@@ -203,19 +220,18 @@ private:
     kor::Resource<kor::GuiImage> _guiImage;
 };
 
-// Drives one engine-style frame through the scheduler.
-void drawFrame(kor::Scene& scene) {
-    glfwPollEvents();
-    kor::Context::DrainMainThread();
-    kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        kor::Context::Repository().Update();
-        scene.Update();
-        scene.Render(cb);
-        kor::GUI::Render(cb, scene);
-    });
-    // Exactly where the runtime calls it: after the frame is submitted, never inside the recording.
-    // @see kor::GUI::RenderPlatformWindows
-    kor::GUI::RenderPlatformWindows();
+// Drives one frame of the application: every scene, exactly as the runtime runs it.
+void drawFrame(kor::Scene&) {
+    kor::App::Current().Frame();
+}
+
+// One frame in which the scene records @p record — instead of its own drawing unless @p drawDefault.
+void drawCustomFrame(OverlayScene& scene, std::function<void(kor::CommandBuffer&)> record, const bool drawDefault = false) {
+    scene.onRender = std::move(record);
+    scene.drawDefault = drawDefault;
+    kor::App::Current().Frame();
+    scene.onRender = nullptr;
+    scene.drawDefault = true;
 }
 
 // ---- shared Vulkan window, created once for the whole binary -----------------
@@ -227,53 +243,43 @@ void drawFrame(kor::Scene& scene) {
 class VkEnvironment : public ::testing::Environment {
 public:
     void SetUp() override {
-        auto scenePtr = std::make_unique<OverlayScene>();
-        s_scene = scenePtr.get();
         try {
-            s_window = kor::Window::Builder(std::move(scenePtr))
-                           .SetTitle("Koral windowed test")
-                           .SetExtent({320, 240})
-                           .SetResizable(true)
-                           .SetVSync(false)
-                           .SetAPI(kor::API::eVulkan)
-                           // X11 deliberately: ImGui's multi-viewport needs to place a window at an
-                           // absolute screen position, which Wayland denies, so viewports — and with
-                           // them everything about *undocked* panels — are off there. Testing them at
-                           // all means asking for the platform that has them.
-                           .SetPlatform(kor::WindowPlatform::eX11)
-                           .Build();
-            if (!s_window.Valid()) {
-                s_reason = s_window.Failure()->message;
-                s_window.Reset();
-                s_scene = nullptr;
+            // X11 deliberately: ImGui's multi-viewport needs to place a window at an absolute screen
+            // position, which Wayland denies, so viewports — and with them everything about *undocked*
+            // panels — are off there. Testing them at all means asking for the platform that has them.
+            s_app = std::make_unique<kor::App>(kor::AppSettings{.api = kor::API::eVulkan, .platform = kor::WindowPlatform::eX11});
+            s_scene = static_cast<OverlayScene*>(s_app->Open("Overlay", std::make_unique<OverlayScene>(), {
+                .title = "Koral windowed test", .extent = {320, 240}, .resizable = true, .vsync = false}));
+            if (!s_scene) {
+                s_reason = "the test scene's window could not be opened";
+                s_app.reset();
             }
         } catch (const std::exception& e) {
             s_reason = e.what();
-            s_window.Reset();
+            s_app.reset();
             s_scene = nullptr;
         }
     }
 
     void TearDown() override {
-        if (s_window.Valid()) {
-            kor::Context::DrainMainThread();
-            s_window.Reset(); // WaitIdle + full teardown of the presentation stack
-        }
+        if (s_app) kor::Context::DrainMainThread();
         s_scene = nullptr;
+        s_app.reset();   // every scene shut down, then the device
     }
 
-    static bool ready() { return s_window.Valid(); }
+    static bool ready() { return s_scene != nullptr; }
     static const std::string& reason() { return s_reason; }
-    static kor::Window& window() { return *s_window; }
+    static kor::Window& window() { return s_scene->SceneWindow(); }
     static OverlayScene& scene() { return *s_scene; }
+    static kor::App& app() { return *s_app; }
 
 private:
-    static kor::Resource<kor::Window> s_window;
+    static std::unique_ptr<kor::App> s_app;
     static OverlayScene* s_scene;
     static std::string s_reason;
 };
 
-kor::Resource<kor::Window> VkEnvironment::s_window;
+std::unique_ptr<kor::App> VkEnvironment::s_app;
 OverlayScene* VkEnvironment::s_scene = nullptr;
 std::string VkEnvironment::s_reason = "no display";
 
@@ -284,7 +290,13 @@ protected:
             GTEST_SKIP() << "windowed Vulkan context unavailable: " << VkEnvironment::reason();
         }
         EXPECT_EQ(kor::Context::ActiveAPI(), kor::API::eVulkan);
+        // A test body runs as the scene's code would: with the scene current.
+        _scope = std::make_unique<kor::detail::SceneScope>(&VkEnvironment::scene());
     }
+    void TearDown() override { _scope.reset(); }
+
+private:
+    std::unique_ptr<kor::detail::SceneScope> _scope;
 };
 
 // Render frames with an ImGui overlay (acquire/record/submit/present + the whole
@@ -301,7 +313,6 @@ TEST_F(VkWindowTest, RenderResizeAndPresent) {
     // Phase 1: render enough frames to cycle every in-flight frame slot twice.
     for (int i = 0; i < 8 && !window.ShouldClose(); ++i) {
         drawFrame(scene);
-        window.LateUpdate();
     }
     EXPECT_GE(scene.updates, 1);
 
@@ -312,7 +323,6 @@ TEST_F(VkWindowTest, RenderResizeAndPresent) {
     for (int i = 0; i < 20; ++i) glfwPollEvents();
     for (int i = 0; i < 12 && !window.ShouldClose(); ++i) {
         drawFrame(scene);
-        window.LateUpdate();
     }
 }
 
@@ -693,16 +703,10 @@ namespace {
 
     // A frame the way the runtime draws one: the graph runs after Scene::Render.
     void drawGraphFrame(kor::Scene& scene, kor::FrameGraph& graph) {
-        glfwPollEvents();
-        kor::Context::DrainMainThread();
-        kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-            kor::Context::Repository().Update();
-            scene.Update();
-            scene.Render(cb);
-            graph.Execute();
-            kor::GUI::Render(cb, scene);
-        });
-        kor::GUI::RenderPlatformWindows();
+        auto& overlay = static_cast<OverlayScene&>(scene);
+        overlay.extraGraph = &graph;
+        kor::App::Current().Frame();
+        overlay.extraGraph = nullptr;
         kor::Context::Scheduler().WaitIdle();
     }
 
@@ -1035,139 +1039,307 @@ TEST_F(VkWindowTest, AFrameGraphRefusesChangesWhilePassesRecord) {
     EXPECT_EQ(pair.readback->Read<float>(1).front(), 1.f);
 }
 
-// ---- more than one window ---------------------------------------------------------------------
+// ---- more than one scene -----------------------------------------------------------------------
 //
-// A scene opens a second window with a builder that has no scene. It shares the device, the frames
-// in flight and the frame graph; a pass draws into it by writing its ScreenName().
+// An application runs any number of scenes, each in its own window with its own input, clock and
+// frame graph; Navigator changes what a window shows.
 
 namespace {
-    kor::Resource<kor::Window> openSecondWindow(const glm::uvec2 extent = {160, 120}) {
-        auto window = kor::Window::Builder().SetTitle("Koral second window").SetExtent(extent).Build();
-        // Give the compositor a moment to size and show it.
-        for (int i = 0; i < 20 && window.Valid() && window->IsPaused(); ++i) {
-            glfwPollEvents();
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        return window;
+    // What scenes did, kept outside them: most of these outlive the scene they count.
+    std::map<std::string, int>& events() {
+        static std::map<std::string, int> counts;
+        return counts;
     }
 
-    // Clears `screen` to `colour`, and copies one texel of it out afterwards.
-    struct PaintAndRead {
-        LambdaPass* paint;
-        LambdaPass* read;
+    // Paints its own window one shade of red through its own frame graph, and copies a texel back.
+    class PaintScene final : public kor::Scene {
+    public:
+        explicit PaintScene(const float red = 1.f) : red(red) {}
+        explicit PaintScene(const kor::SceneArgs& arguments) : red(static_cast<float>(arguments.Number("red", 1.0))) {}
+
+        void Initialize() override {
+            ++events()["initialize " + Name()];
+            readback = kor::Buffer::RawBuilder{}.SetRawSize(4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback).Build();
+            auto target = std::make_shared<kor::ResourceRef<const kor::Image>>();
+            auto& paint = Graph().Add<LambdaPass>("Paint");
+            paint.setup = [](kor::PassBuilder& b) { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); };
+            paint.initialize = [target](const kor::PassResources& r) { *target = r.ImageNamed(kor::FrameGraph::Screen); };
+            paint.record = [target, red = red](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, glm::vec4(red, 0.f, 0.f, 1.f)); };
+            auto& read = Graph().Add<LambdaPass>("Read");
+            read.setup = [](kor::PassBuilder& b) { b.Read(kor::FrameGraph::Screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
+            read.initialize = [target](const kor::PassResources& r) { *target = r.ImageNamed(kor::FrameGraph::Screen); };
+            read.record = [target, out = kor::ResourceRef<const kor::Buffer>(readback)](kor::CommandBuffer& cb) {
+                cb.CopyImageToBuffer(*target, out, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+            };
+        }
+        void Update() override {
+            ++updates;
+            currentInUpdate = kor::Scene::Current();
+            extentInUpdate = Window::Extent();
+        }
+        void OnSuspend() override { ++events()["suspend " + Name()]; }
+        void OnResume() override { ++events()["resume " + Name()]; }
+        void Shutdown() override { ++events()["shutdown " + Name()]; }
+
+        [[nodiscard]] glm::u8 Red() const {
+            const auto texel = readback->Read<glm::u8>(4);
+            return SceneWindow().DefaultFramebuffer()->ColorImage(0)->PixelFormat() == kor::Image::Format::eBGRA8_UNORM ? texel[2] : texel[0];
+        }
+
+        float red;
+        int updates = 0;
+        kor::Scene* currentInUpdate = nullptr;
+        glm::uvec2 extentInUpdate {0};
         kor::Resource<kor::Buffer> readback;
     };
-    PaintAndRead paintScreen(kor::FrameGraph& graph, const std::string& screen, const float colour) {
-        PaintAndRead out{.readback = kor::Buffer::RawBuilder{}
-            .SetRawSize(4)
-            .SetUsage(kor::Buffer::Usage::eTransferDst)
-            .SetType(kor::Buffer::Type::eReadback)
-            .Build()};
-        auto target = std::make_shared<kor::ResourceRef<const kor::Image>>();
-        out.paint = &graph.Add<LambdaPass>("Paint " + screen);
-        out.paint->setup = [=](kor::PassBuilder& b) { b.Write(screen, kor::Image::Usage::eTransferDst); };
-        out.paint->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(screen); };
-        out.paint->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, glm::vec4(colour, 0.f, 0.f, 1.f)); };
-        out.read = &graph.Add<LambdaPass>("Read " + screen);
-        out.read->setup = [=](kor::PassBuilder& b) { b.Read(screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
-        out.read->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(screen); };
-        out.read->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.readback)](kor::CommandBuffer& cb) {
-            cb.CopyImageToBuffer(*target, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
-        };
-        return out;
-    }
 
-    // The red channel of a B8G8R8A8 (or R8G8B8A8) texel, whichever the swap chain chose.
-    glm::u8 redOf(const kor::Resource<kor::Buffer>& readback, const kor::Image& screen) {
-        const auto texel = readback->Read<glm::u8>(4);
-        return screen.PixelFormat() == kor::Image::Format::eBGRA8_UNORM ? texel[2] : texel[0];
+    const kor::WindowSettings kSmall { .title = "Koral second scene", .extent = {160, 120}, .vsync = false };
+
+    void settle() {
+        kor::App::Current().Frame();
+        kor::Context::Scheduler().WaitIdle();
     }
 }
 
-TEST_F(VkWindowTest, ASecondWindowShowsWhatAPassDrawsIntoIt) {
-    auto& scene = VkEnvironment::scene();
-    auto second = openSecondWindow();
-    ASSERT_TRUE(second.Valid()) << (second.Failure() ? second.Failure()->message : "");
-    if (second->IsPaused()) GTEST_SKIP() << "the compositor never sized the second window";
+TEST_F(VkWindowTest, TwoScenesEachDrawTheirOwnWindow) {
+    auto& app = VkEnvironment::app();
+    auto* second = app.Open<PaintScene>(kSmall, 1.f);
+    ASSERT_NE(second, nullptr);
+    ASSERT_EQ(app.Scenes().size(), 2u);
+    EXPECT_EQ(app.Scenes()[1], second);
+    EXPECT_NE(&second->SceneWindow(), &VkEnvironment::scene().SceneWindow());
+    EXPECT_NE(&second->SceneInput(), &VkEnvironment::scene().SceneInput());
 
-    EXPECT_FALSE(second->IsMain());
-    EXPECT_TRUE(kor::Context::Window().IsMain());
-    EXPECT_NE(second->ScreenName(), kor::Context::Window().ScreenName());
-    ASSERT_EQ(kor::Context::Windows().size(), 2u);
-    EXPECT_EQ(kor::Context::Windows()[1], second.Get());
+    for (int frame = 0; frame < 3; ++frame) settle();
+    if (second->SceneWindow().IsPaused()) GTEST_SKIP() << "the compositor never sized the second window";
+    EXPECT_EQ(second->Red(), 255) << "the scene drew into a window, and it was not its own";
+    EXPECT_GE(second->updates, 1);
 
+    events().clear();
+    app.Close(*second);
+    settle();
+    EXPECT_EQ(app.Scenes().size(), 1u);
+    EXPECT_EQ(events()["shutdown Koral second scene"], 1);
+}
+
+// Inside a scene's hooks the scene is current, and Window:: is its own window.
+TEST_F(VkWindowTest, EachSceneIsCurrentInItsOwnHooks) {
+    auto& app = VkEnvironment::app();
+    auto* second = app.Open<PaintScene>(kSmall, 0.5f);
+    ASSERT_NE(second, nullptr);
+    for (int frame = 0; frame < 2; ++frame) settle();
+    if (second->SceneWindow().IsPaused()) GTEST_SKIP() << "the compositor never sized the second window";
+    EXPECT_EQ(second->currentInUpdate, second);
+    EXPECT_EQ(second->extentInUpdate, second->SceneWindow().Extent());
+    EXPECT_NE(second->extentInUpdate, VkEnvironment::scene().SceneWindow().Extent()) << "the windows differ in size";
+    app.Close(*second);
+    settle();
+}
+
+namespace {
+    kor::Task<void> notingTheSceneOnTheBackground(kor::Scene** seen, std::thread::id* thread) {
+        co_await kor::Context::SwitchToBackgroundThread();
+        *thread = std::this_thread::get_id();
+        *seen = kor::Scene::Current();
+    }
+}
+
+// A coroutine started in a scene is still in it after moving thread: `Window::` in a loader means the
+// window of the scene that started it.
+TEST_F(VkWindowTest, ACoroutineStartedInASceneResumesInIt) {
+    kor::Scene* seen = nullptr;
+    std::thread::id thread;
+    auto task = notingTheSceneOnTheBackground(&seen, &thread);   // started with the fixture's scene current
+    task.Wait();
+    EXPECT_NE(thread, std::this_thread::get_id());
+    EXPECT_EQ(seen, &VkEnvironment::scene());
+}
+
+// Keys go to the scene whose window they happen in, and to no other.
+TEST_F(VkWindowTest, KeysGoToTheSceneWhoseWindowTheyHappenIn) {
+    auto& app = VkEnvironment::app();
+    auto* second = app.Open<PaintScene>(kSmall, 1.f);
+    ASSERT_NE(second, nullptr);
+    settle();
+
+    kor::Input::Callbacks::KeyCallback(*second->SceneWindow(), GLFW_KEY_J, 0, GLFW_PRESS, 0);
+    EXPECT_TRUE(second->SceneInput().IsKeyPressed(kor::Key::eJ));
+    EXPECT_FALSE(VkEnvironment::scene().SceneInput().IsKeyPressed(kor::Key::eJ));
     {
-        kor::FrameGraph graph;
-        auto paint = paintScreen(graph, second->ScreenName(), 1.f);
-        for (int frame = 0; frame < 3; ++frame) {
-            drawGraphFrame(scene, graph);
-            EXPECT_TRUE(second->IsShownThisFrame());
-            const auto screen = second->DefaultFramebuffer()->ColorImage(0);
-            EXPECT_EQ(redOf(paint.readback, *screen), 255) << "frame " << frame;
-        }
-        EXPECT_TRUE(graph.SkippedPasses().empty());
+        kor::detail::SceneScope scope(second);
+        EXPECT_TRUE(kor::Scene::Input::IsKeyPressed(kor::Key::eJ)) << "Input:: is the current scene's";
     }
-    second.Reset();
-    drawFrame(scene);   // the closed window is retired once its last frame is done
-    EXPECT_EQ(kor::Context::Windows().size(), 1u);
+    settle();
+    EXPECT_TRUE(second->SceneInput().IsKeyHeld(kor::Key::eJ)) << "a frame later the press is a hold";
+    kor::Input::Callbacks::KeyCallback(*second->SceneWindow(), GLFW_KEY_J, 0, GLFW_RELEASE, 0);
+    app.Close(*second);
+    settle();
 }
 
-// A window with nothing to show into this frame — minimized, say — has its passes skipped, not the
-// whole graph broken.
-TEST_F(VkWindowTest, PassesDrawingIntoAHiddenWindowAreSkipped) {
-    auto& scene = VkEnvironment::scene();
-    auto second = openSecondWindow();
-    ASSERT_TRUE(second.Valid());
-    kor::FrameGraph graph;
-    auto intoSecond = paintScreen(graph, second->ScreenName(), 1.f);
-    auto intoMain = paintScreen(graph, std::string(kor::FrameGraph::Screen), 0.5f);
+// What a window shows changes after the frame: replaced, pushed over, popped back.
+TEST_F(VkWindowTest, NavigationReplacesPushesAndPops) {
+    auto& app = VkEnvironment::app();
+    app.Register<PaintScene>("First");
+    app.Register<PaintScene>("Second");
+    events().clear();
 
-    second->Pause();
-    drawGraphFrame(scene, graph);
-    EXPECT_FALSE(second->IsShownThisFrame());
-    ASSERT_EQ(graph.SkippedPasses().size(), 2u) << "painting it, and reading it back";
-    EXPECT_EQ(graph.Schedule().size(), 2u) << "the main window's passes still run";
+    auto* first = app.Open("First", kSmall, {{"red", "1"}});
+    ASSERT_NE(first, nullptr);
+    GLFWwindow* window = *first->SceneWindow();
+    EXPECT_EQ(static_cast<PaintScene*>(first)->red, 1.f) << "the arguments reach the scene";
 
-    second->Unpause();
-    drawGraphFrame(scene, graph);
-    EXPECT_TRUE(second->IsShownThisFrame());
-    EXPECT_TRUE(graph.SkippedPasses().empty());
-    EXPECT_EQ(redOf(intoSecond.readback, *second->DefaultFramebuffer()->ColorImage(0)), 255);
+    {   // From inside the scene, as a scene would.
+        kor::detail::SceneScope scope(first);
+        kor::Navigator::Push("Second", {{"red", "0.5"}});
+    }
+    EXPECT_EQ(app.Scenes().back(), first) << "nothing changes until the frame is over";
+    settle();
+    auto* second = app.Scenes().back();
+    EXPECT_NE(second, first);
+    EXPECT_EQ(second->Name(), "Second");
+    EXPECT_EQ(*second->SceneWindow(), window) << "pushed over it in the same window";
+    EXPECT_EQ(events()["suspend First"], 1);
+    const int firstUpdates = static_cast<PaintScene*>(first)->updates;
+    settle();
+    EXPECT_EQ(static_cast<PaintScene*>(first)->updates, firstUpdates) << "a covered scene is not updated";
+
+    app.Pop(*second);
+    settle();
+    EXPECT_EQ(app.Scenes().back(), first);
+    EXPECT_EQ(events()["shutdown Second"], 1);
+    EXPECT_EQ(events()["resume First"], 1);
+
+    app.Replace(*first, "Second");
+    settle();
+    EXPECT_EQ(events()["shutdown First"], 1);
+    EXPECT_EQ(app.Scenes().back()->Name(), "Second");
+    EXPECT_EQ(*app.Scenes().back()->SceneWindow(), window) << "replaced in the same window";
+
+    app.Close(*app.Scenes().back());
+    settle();
+    EXPECT_EQ(app.Scenes().size(), 1u);
+    EXPECT_EQ(events()["shutdown Second"], 2);
 }
 
-// Closing a second window in the middle of a frame — from a scene's Update — is safe: the frame that
-// acquired its image still presents it, and it is destroyed once that frame is done.
-TEST_F(VkWindowTest, ASecondWindowClosedMidFrameIsRetiredSafely) {
-    auto& scene = VkEnvironment::scene();
-    auto second = openSecondWindow();
-    ASSERT_TRUE(second.Valid());
-    kor::FrameGraph graph;
-    auto paint = paintScreen(graph, second->ScreenName(), 1.f);
-    drawGraphFrame(scene, graph);
-
-    scene.onUpdate = [&] { second.Reset(); scene.onUpdate = nullptr; };
-    drawGraphFrame(scene, graph);
-    EXPECT_EQ(kor::Context::Windows().size(), 1u);
-    drawGraphFrame(scene, graph);
-    EXPECT_EQ(graph.SkippedPasses().size(), 2u) << "nothing left to draw into";
+// A minimized window's scene is not updated or drawn — it has nowhere to draw.
+TEST_F(VkWindowTest, AMinimizedWindowsSceneIsNotUpdated) {
+    auto& app = VkEnvironment::app();
+    auto* second = app.Open<PaintScene>(kSmall, 1.f);
+    ASSERT_NE(second, nullptr);
+    settle();
+    second->SceneWindow().Pause();
+    const int updates = second->updates;
+    settle();
+    EXPECT_EQ(second->updates, updates);
+    EXPECT_FALSE(second->SceneWindow().IsShownThisFrame());
+    second->SceneWindow().Unpause();
+    settle();
+    if (!second->SceneWindow().IsPaused()) EXPECT_EQ(second->updates, updates + 1);
+    app.Close(*second);
+    settle();
 }
 
-// An image can follow a second window's size instead of the main one's.
-TEST_F(VkWindowTest, AGraphImageCanFollowASecondWindowsSize) {
-    auto& scene = VkEnvironment::scene();
-    auto second = openSecondWindow({200, 100});
-    ASSERT_TRUE(second.Valid());
-    if (second->IsPaused()) GTEST_SKIP() << "the compositor never sized the second window";
-    kor::FrameGraph graph;
-    auto& make = graph.Add<LambdaPass>("Make");
-    make.setup = [&](kor::PassBuilder& b) {
-        b.Create("view", {.format = kor::Image::Format::eRGBA8_UNORM, .usage = kor::Image::Usage::eTransferDst,
-                          .scale = 0.5f, .sizeOf = second->ScreenName()}).SideEffect();
+namespace {
+    class SteppedScene final : public kor::Scene {
+    public:
+        void FixedUpdate() override {
+            ++steps;
+            ++stepsThisFrame;
+            stepSawTheStep = stepSawTheStep && Time::FrameTime() == Time::FixedDeltaTime() && Time::Get().InFixedStep();
+        }
+        void Update() override {
+            mostStepsInAFrame = std::max(mostStepsInAFrame, stepsThisFrame);
+            stepsThisFrame = 0;
+            updateSawTheFrame = updateSawTheFrame && !Time::Get().InFixedStep();
+        }
+        int steps = 0, stepsThisFrame = 0, mostStepsInAFrame = 0;
+        bool stepSawTheStep = true, updateSawTheFrame = true;
     };
-    drawGraphFrame(scene, graph);
-    const auto view = graph.ImageNamed("view");
-    ASSERT_TRUE(view.Alive());
-    EXPECT_EQ(glm::uvec2(view->Extent()), glm::max(second->Extent() / 2u, glm::uvec2(1)));
+}
+
+// FixedUpdate runs once per fixed step of the scene's own time: never with its time stopped, at most
+// Time::MaxFixedSteps a frame however far behind, and with FrameTime() being the step inside it.
+TEST_F(VkWindowTest, FixedStepsFollowTheScenesOwnTime) {
+    auto& app = VkEnvironment::app();
+    auto* scene = app.Open<SteppedScene>(kSmall);
+    ASSERT_NE(scene, nullptr);
+    settle();
+    if (scene->SceneWindow().IsPaused()) GTEST_SKIP() << "the compositor never sized the window";
+
+    // A step far longer than the test: none is due.
+    scene->SceneTime().SetFixedDeltaTime(1000.f);
+    for (int frame = 0; frame < 3; ++frame) settle();
+    EXPECT_EQ(scene->steps, 0);
+
+    // A step far shorter than a frame: every frame is behind, and catches up only so far.
+    scene->SceneTime().SetFixedDeltaTime(1e-4f);
+    for (int frame = 0; frame < 4; ++frame) settle();
+    EXPECT_GT(scene->steps, 0);
+    EXPECT_LE(scene->mostStepsInAFrame, static_cast<int>(kor::Time::MaxFixedSteps));
+    EXPECT_TRUE(scene->stepSawTheStep) << "inside FixedUpdate, FrameTime() is the step";
+    EXPECT_TRUE(scene->updateSawTheFrame);
+    EXPECT_GE(scene->SceneTime().FixedStepFraction(), 0.f);
+    EXPECT_LE(scene->SceneTime().FixedStepFraction(), 1.f);
+
+    // Its time stopped: no step, whatever the rate — and no other scene's clock is touched.
+    scene->SceneTime().SetTimeScale(0.f);
+    const int steps = scene->steps;
+    for (int frame = 0; frame < 3; ++frame) settle();
+    EXPECT_EQ(scene->steps, steps);
+    EXPECT_EQ(VkEnvironment::scene().SceneTime().TimeScale(), 1.f);
+
+    app.Close(*scene);
+    settle();
+}
+
+// A library of scenes, loaded while the application runs: its scenes opened by name, the library
+// loaded again with them reopened, then unloaded with every window that showed one. @see sceneLibrary.h
+TEST_F(VkWindowTest, ASceneLibraryIsLoadedOpenedReloadedAndUnloaded) {
+    auto& app = VkEnvironment::app();
+    const std::filesystem::path library = KORAL_TEST_SCENE_LIBRARY;
+    const auto alive = [&] {
+        // A second handle to the loaded library, released at once so it cannot keep it loaded.
+        void* handle = dlopen(library.c_str(), RTLD_NOW | RTLD_NOLOAD);
+        if (!handle) return -1;
+        const auto count = reinterpret_cast<int (*)()>(dlsym(handle, "KoralTestScenesAlive"));
+        const int result = count ? count() : -1;
+        dlclose(handle);
+        return result;
+    };
+
+    const auto names = app.LoadLibrary(library);
+    ASSERT_TRUE(names) << names.error().message;
+    EXPECT_EQ(*names, (std::vector<std::string>{"Library.Plain", "Library.Arguments", "Library.Interface"}));
+    EXPECT_FALSE(app.LoadLibrary(library)) << "loading it twice is refused; ReloadLibrary is for that";
+
+    ASSERT_NE(app.Open("Library.Plain", kSmall), nullptr);
+    auto* withArguments = app.Open("Library.Arguments", kSmall, {{"level", "3"}});
+    ASSERT_NE(withArguments, nullptr);
+    EXPECT_EQ(withArguments->SceneWindow().Title(), "level 3") << "the arguments reached the scene";
+    auto* withInterface = app.Open("Library.Interface", kSmall);
+    ASSERT_NE(withInterface, nullptr);
+    EXPECT_TRUE(withInterface->HasInterface());
+    for (int frame = 0; frame < 2; ++frame) settle();
+    EXPECT_EQ(alive(), 3);
+    EXPECT_EQ(app.Scenes().size(), 4u);
+
+    // Reloaded: every window showing one of its scenes closes, and opens again with the same scene.
+    ASSERT_TRUE(app.ReloadLibrary(library));
+    EXPECT_EQ(app.Scenes().size(), 4u);
+    EXPECT_EQ(alive(), 3);
+    const auto scenes = app.Scenes();
+    const auto reopened = std::ranges::find_if(scenes, [](const kor::Scene* s) { return s->Name() == "Library.Arguments"; });
+    ASSERT_NE(reopened, scenes.end());
+    EXPECT_EQ((*reopened)->SceneWindow().Title(), "level 3") << "reopened with the arguments it had";
+    for (int frame = 0; frame < 2; ++frame) settle();
+
+    // Unloaded: its windows close, its names are gone, and so is the library itself.
+    ASSERT_TRUE(app.UnloadLibrary(library));
+    EXPECT_EQ(app.Scenes().size(), 1u);
+    EXPECT_EQ(alive(), -1) << "the library is still loaded";
+    EXPECT_EQ(app.Open("Library.Plain", kSmall), nullptr);
+    settle();
 }
 
 // ---- per-frame device-local buffers ---------------------------------------------------------
@@ -1397,7 +1569,7 @@ TEST_F(VkWindowTest, MeasurePerFrameBufferWriteCost) {
 // Forced rather than dragged: a window placed outside the main viewport's rectangle is exactly what
 // makes ImGui promote it to a platform window, which is the same state undocking produces.
 TEST_F(VkWindowTest, AViewportSurvivesBeingGivenItsOwnWindow) {
-    if (!(ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)) {
+    if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {   // where the interface turns viewports off
         GTEST_SKIP() << "multi-viewport is off on this platform (Wayland); nothing can undock";
     }
 
@@ -1421,35 +1593,35 @@ TEST_F(VkWindowTest, AViewportSurvivesBeingGivenItsOwnWindow) {
 // camera the instant aiming began, which is the classic version of this bug.
 TEST_F(VkWindowTest, CapturingTheCursorReportsNoMovementForIt) {
     auto& scene = VkEnvironment::scene();
-    ASSERT_EQ(kor::Input::CurrentCursorMode(), kor::Input::CursorMode::eNormal);
+    ASSERT_EQ(VkEnvironment::scene().SceneInput().CurrentCursorMode(), kor::Input::CursorMode::eNormal);
 
     for (int i = 0; i < 3; ++i) drawFrame(scene);
 
-    kor::Input::SetCursorMode(kor::Input::CursorMode::eCaptured);
-    EXPECT_EQ(kor::Input::CurrentCursorMode(), kor::Input::CursorMode::eCaptured);
-    EXPECT_EQ(glfwGetInputMode(*kor::Context::Window(), GLFW_CURSOR), GLFW_CURSOR_DISABLED);
+    VkEnvironment::scene().SceneInput().SetCursorMode(kor::Input::CursorMode::eCaptured);
+    EXPECT_EQ(VkEnvironment::scene().SceneInput().CurrentCursorMode(), kor::Input::CursorMode::eCaptured);
+    EXPECT_EQ(glfwGetInputMode(*VkEnvironment::scene().SceneWindow(), GLFW_CURSOR), GLFW_CURSOR_DISABLED);
 
     drawFrame(scene);
-    EXPECT_EQ(kor::Input::MousePositionDelta(), glm::vec2(0.f, 0.f))
+    EXPECT_EQ(VkEnvironment::scene().SceneInput().MousePositionDelta(), glm::vec2(0.f, 0.f))
         << "the warp that capturing performs was reported as movement";
 
-    kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
-    EXPECT_EQ(glfwGetInputMode(*kor::Context::Window(), GLFW_CURSOR), GLFW_CURSOR_NORMAL);
+    VkEnvironment::scene().SceneInput().SetCursorMode(kor::Input::CursorMode::eNormal);
+    EXPECT_EQ(glfwGetInputMode(*VkEnvironment::scene().SceneWindow(), GLFW_CURSOR), GLFW_CURSOR_NORMAL);
 
     drawFrame(scene);
-    EXPECT_EQ(kor::Input::MousePositionDelta(), glm::vec2(0.f, 0.f))
+    EXPECT_EQ(VkEnvironment::scene().SceneInput().MousePositionDelta(), glm::vec2(0.f, 0.f))
         << "releasing the cursor was reported as movement";
 
     // Hidden is the middle setting: invisible, but still free to move.
-    kor::Input::SetCursorMode(kor::Input::CursorMode::eHidden);
-    EXPECT_EQ(glfwGetInputMode(*kor::Context::Window(), GLFW_CURSOR), GLFW_CURSOR_HIDDEN);
-    kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
+    VkEnvironment::scene().SceneInput().SetCursorMode(kor::Input::CursorMode::eHidden);
+    EXPECT_EQ(glfwGetInputMode(*VkEnvironment::scene().SceneWindow(), GLFW_CURSOR), GLFW_CURSOR_HIDDEN);
+    VkEnvironment::scene().SceneInput().SetCursorMode(kor::Input::CursorMode::eNormal);
 }
 
 // A window attached while the cursor is captured has to arrive in the same mode, or the cursor
 // reappears the moment the pointer crosses into an undocked panel.
 TEST_F(VkWindowTest, AWindowAttachedWhileCapturedArrivesCaptured) {
-    kor::Input::SetCursorMode(kor::Input::CursorMode::eCaptured);
+    VkEnvironment::scene().SceneInput().SetCursorMode(kor::Input::CursorMode::eCaptured);
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -1457,13 +1629,13 @@ TEST_F(VkWindowTest, AWindowAttachedWhileCapturedArrivesCaptured) {
     ASSERT_NE(second, nullptr);
     EXPECT_EQ(glfwGetInputMode(second, GLFW_CURSOR), GLFW_CURSOR_NORMAL) << "not attached yet";
 
-    kor::Input::AttachTo(second);
+    VkEnvironment::scene().SceneInput().AttachTo(second);
     EXPECT_EQ(glfwGetInputMode(second, GLFW_CURSOR), GLFW_CURSOR_DISABLED);
 
-    kor::Input::SetCursorMode(kor::Input::CursorMode::eNormal);
+    VkEnvironment::scene().SceneInput().SetCursorMode(kor::Input::CursorMode::eNormal);
     EXPECT_EQ(glfwGetInputMode(second, GLFW_CURSOR), GLFW_CURSOR_NORMAL) << "and follows a change";
 
-    kor::Input::DetachFrom(second);
+    VkEnvironment::scene().SceneInput().DetachFrom(second);
     glfwDestroyWindow(second);
 }
 
@@ -1480,23 +1652,23 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
     // asserting on the list's *size* made this test fail for a reason that has nothing to do with
     // what it covers.
     const auto timesAttached = [](GLFWwindow* window) {
-        const auto attached = kor::Input::AttachedWindows();
+        const auto attached = VkEnvironment::scene().SceneInput().AttachedWindows();
         return std::ranges::count(attached, window);
     };
 
-    const auto before = kor::Input::AttachedWindows();
+    const auto before = VkEnvironment::scene().SceneInput().AttachedWindows();
     ASSERT_FALSE(before.empty()) << "the main window should be attached";
-    EXPECT_EQ(before.front(), *kor::Context::Window());
+    EXPECT_EQ(before.front(), *VkEnvironment::scene().SceneWindow());
 
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     GLFWwindow* second = glfwCreateWindow(64, 64, "second", nullptr, nullptr);
     ASSERT_NE(second, nullptr);
 
-    kor::Input::AttachTo(second);
+    VkEnvironment::scene().SceneInput().AttachTo(second);
     EXPECT_EQ(timesAttached(second), 1);
     // Attaching twice is not an error and does not double up — the GUI calls it every frame.
-    kor::Input::AttachTo(second);
+    VkEnvironment::scene().SceneInput().AttachTo(second);
     EXPECT_EQ(timesAttached(second), 1);
 
     // A frame with the extra window attached must be no different from one without.
@@ -1504,9 +1676,9 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
     for (int i = 0; i < 3; ++i) drawFrame(scene);
     EXPECT_EQ(timesAttached(second), 1) << "a frame must not disturb a window attached by hand";
 
-    kor::Input::DetachFrom(second);
+    VkEnvironment::scene().SceneInput().DetachFrom(second);
     EXPECT_EQ(timesAttached(second), 0);
-    EXPECT_EQ(timesAttached(*kor::Context::Window()), 1) << "and must leave the main window attached";
+    EXPECT_EQ(timesAttached(*VkEnvironment::scene().SceneWindow()), 1) << "and must leave the main window attached";
     glfwDestroyWindow(second);
 
     for (int i = 0; i < 2; ++i) drawFrame(scene);
@@ -1602,8 +1774,8 @@ TEST_F(VkWindowTest, AnUntouchedScreenIsClearedByTheRuntime) {
     auto& scene = VkEnvironment::scene();
     bool cleared = false;
 
-    kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        const auto framebuffer = kor::Context::DefaultFramebuffer();
+    drawCustomFrame(VkEnvironment::scene(), [&](kor::CommandBuffer& cb) {
+        const auto framebuffer = VkEnvironment::scene().SceneWindow().DefaultFramebuffer();
         ASSERT_TRUE(framebuffer.Valid());
         ASSERT_FALSE(framebuffer->ColorAttachments().empty());
         const auto screen = framebuffer->ColorImage(0);
@@ -1618,9 +1790,7 @@ TEST_F(VkWindowTest, AnUntouchedScreenIsClearedByTheRuntime) {
         // ...and now it has, which is what stops the runtime clearing it a second time.
         EXPECT_TRUE(cb.HasTouched(screen));
 
-        kor::GUI::Render(cb, scene);
     });
-    kor::GUI::RenderPlatformWindows();
 
     EXPECT_TRUE(cleared);
 }
@@ -1629,16 +1799,14 @@ TEST_F(VkWindowTest, AnUntouchedScreenIsClearedByTheRuntime) {
 TEST_F(VkWindowTest, ATouchedScreenIsNotClearedAgain) {
     auto& scene = VkEnvironment::scene();
 
-    kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        const auto framebuffer = kor::Context::DefaultFramebuffer();
+    drawCustomFrame(VkEnvironment::scene(), [&](kor::CommandBuffer& cb) {
+        const auto framebuffer = VkEnvironment::scene().SceneWindow().DefaultFramebuffer();
         const auto screen = framebuffer->ColorImage(0);
 
         cb.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
         EXPECT_TRUE(cb.HasTouched(screen)) << "a clear is an interaction with the framebuffer";
 
-        kor::GUI::Render(cb, scene);
     });
-    kor::GUI::RenderPlatformWindows();
 }
 
 // The case the two above left open, and it shipped in 0.1.0: a scene whose entire output is
@@ -1662,8 +1830,8 @@ TEST_F(VkWindowTest, BlittingToTheScreenCountsAsTouchingIt) {
         .Build();
     ASSERT_TRUE(canvas);
 
-    kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
-        const auto framebuffer = kor::Context::DefaultFramebuffer();
+    drawCustomFrame(VkEnvironment::scene(), [&](kor::CommandBuffer& cb) {
+        const auto framebuffer = VkEnvironment::scene().SceneWindow().DefaultFramebuffer();
         ASSERT_TRUE(framebuffer.Valid());
         const auto screen = framebuffer->ColorImage(0);
 
@@ -1674,9 +1842,7 @@ TEST_F(VkWindowTest, BlittingToTheScreenCountsAsTouchingIt) {
             << "a blit to the screen is the whole output of a compute-rasterizer scene; if the "
                "runtime cannot see it, it clears the picture away";
 
-        kor::GUI::Render(cb, scene);
     });
-    kor::GUI::RenderPlatformWindows();
 }
 
 // GPU timers over the real frame path, which is the one thing the headless timer tests cannot
@@ -1693,20 +1859,18 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
     double milliseconds = 0.0;
 
     for (int frame = 0; frame < budget && !found; ++frame) {
-        kor::Context::Scheduler().Draw([&](kor::CommandBuffer& cb) {
+        drawCustomFrame(VkEnvironment::scene(), [&](kor::CommandBuffer& cb) {
             // Fetched per frame: the default framebuffer's colour attachment is the swap-chain
             // image this frame presents, so a reference taken once outside the loop goes stale
             // the moment the chain rotates.
-            const auto framebuffer = kor::Context::DefaultFramebuffer();
+            const auto framebuffer = VkEnvironment::scene().SceneWindow().DefaultFramebuffer();
             ASSERT_TRUE(framebuffer.Valid());
             const auto screen = framebuffer->ColorImage(0);
 
             cb.Timer("frame.clear", [&](kor::CommandBuffer& inner) {
                 inner.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
             });
-            kor::GUI::Render(cb, scene);
         });
-        kor::GUI::RenderPlatformWindows();
 
         for (const auto& f : kor::Context::Scheduler().Frames()) {
             for (const auto& timing : f.get().Commands().Timings()) {
@@ -1791,7 +1955,7 @@ TEST_F(VkWindowTest, ComputeTriangleOrientationToScreen) {
 // so the swap-chain image a frame is presented from can be copied, read back or shown elsewhere
 // without reaching into the swap chain.
 TEST_F(VkWindowTest, TheDefaultFramebuffersImagesAreReachableByName) {
-    const auto framebuffer = kor::Context::DefaultFramebuffer();
+    const auto framebuffer = VkEnvironment::scene().SceneWindow().DefaultFramebuffer();
     ASSERT_TRUE(framebuffer.Valid());
     ASSERT_TRUE(framebuffer->IsDefault());
 
@@ -1854,14 +2018,10 @@ TEST_F(VkWindowTest, AnExecutedCommandBufferUsesTheCopyOfTheFrameItRunsIn) {
         const kor::Token done = scheduler.Execute(std::move(copy));
 
         // This frame writes its own copy; the previous frame's still holds the previous value.
-        glfwPollEvents();
-        scheduler.Draw([&](kor::CommandBuffer& cb) {
+        drawCustomFrame(VkEnvironment::scene(), [&](kor::CommandBuffer&) {
             const std::array<glm::u32, 1> v{ value };
             perFrame->Write(std::span<const glm::u32>(v), 0);
-            scene.Render(cb);
-            kor::GUI::Render(cb, scene);
-        });
-        kor::GUI::RenderPlatformWindows();
+        }, /*drawDefault=*/true);
 
         ASSERT_TRUE(seam::drawUntil(done, [&] { drawFrame(scene); }));
         EXPECT_EQ(destination->Read<glm::u32>(1).front(), value)
@@ -1891,3 +2051,8 @@ TEST_F(VkWindowTest, AFrameWaitsForAToken) {
 // deletes the environment.
 static ::testing::Environment* const kVkEnv =
     ::testing::AddGlobalTestEnvironment(new VkEnvironment);
+
+// Each suite supplies the frame the shared orientation helpers draw with.
+void orient::drawSharedFrame(const std::function<void(kor::CommandBuffer&)>& record) {
+    drawCustomFrame(VkEnvironment::scene(), record);
+}

@@ -10,20 +10,15 @@
 #include <filesystem>
 #include <glm/glm.hpp>
 
-#include "input.h"
-#include "context.h"
-#include "gtime.h"
 #include "api.h"
-// Scene is only ever held by pointer here, so it is forward-declared rather than included. That is
-// deliberate and worth keeping: scene.h pulls in gui.h, whose inline registrar makes *every* includer
-// an ImGui client — which is right for a scene library and wrong for, say, a camera module that only
-// wanted the window's extent. A translation unit that actually uses a Scene includes scene.h itself.
+#include "resource.h"
 
 namespace kor
 {
     class Surface;
     class Framebuffer;
-    class Engine;
+    class App;
+    class Input;
     namespace vk { class Scheduler; }
 }
 
@@ -33,215 +28,62 @@ struct GLFWimage;
 struct GLFWvidmode;
 
 namespace kor {
-    class Scene;
+    /**
+     * @brief What a window is opened with.
+     *
+     * Designated initialisers name just what differs from the defaults:
+     *
+     * @code
+     * kor::Navigator::Open("Inspector", {.title = "Buffers", .extent = {640, 360}});
+     * @endcode
+     *
+     * The runtime reads the first scene's from koral.json.
+     */
+    struct WindowSettings {
+        std::string title = "Koral";               ///< Text in the title bar.
+        glm::uvec2 extent = { 1280, 720 };          ///< Initial size of the drawable area, in pixels.
+        bool resizable = true;                      ///< Whether the user may resize it.
+        bool fullscreen = false;                    ///< Whether to open fullscreen on the primary monitor.
+        bool decorated = true;                      ///< Whether the OS draws a title bar and border.
+        bool transparentFramebuffer = false;        ///< Whether the framebuffer's alpha composites with the desktop.
+        bool vsync = true;                          ///< Whether presentation waits for the display's refresh.
+    };
 
     /**
-     * @brief The application window, the surface it presents to, and the scene drawn into it.
+     * @brief One scene's OS window: the surface it presents to, its swap chain and its default
+     *        framebuffer.
      *
-     * Building a Window is what brings the graphics device up: it creates the OS window, the
-     * surface, the swap chain, the scheduler that owns the frames in flight, the default
-     * framebuffer and the GUI, and then calls Scene::Initialize on the scene it was given. Tearing
-     * it down does the reverse, and waits for the device to go idle first.
+     * Every scene has exactly one, opened by the application along with the scene (App::Open,
+     * Navigator::Open) and reached inside the scene as `Window::` (Scene::Window) or from outside as
+     * Scene::SceneWindow(). Replacing the scene in it (Navigator::Replace, Push) keeps the window; the
+     * window closes with the last scene shown in it.
      *
-     * A scene does not normally construct one. The runtime builds the window from the project's
-     * configuration before the first frame and drives it; reach the live one through
-     * Context::Window() and the image being drawn to through DefaultFramebuffer().
-     *
-     * The runtime builds one, the application's, with the scene. A scene may open more with a
-     * builder that has no scene (Builder()): those share the device, the frames and the frame graph,
-     * and are drawn into through their ScreenName(). Context::Windows() lists them all.
-     *
-     * A window is neither copyable nor thread-safe: every method here
-     * must be called from the thread that created it, which is the thread the scene is driven on.
+     * Neither copyable nor thread-safe: everything here is called from the thread the application
+     * runs on.
      */
     class KORAL_API Window {
         friend class Input;
-        friend class Input::Callbacks;
-        friend class kor::Engine;
-        friend class Time;
+        friend class App;
+        friend class kor::vk::Scheduler;
     public:
-        /**
-         * @brief Settings the window is created with, and the scene it will run.
-         *
-         * Every setter returns the builder, so they chain; Build() then creates the window. The
-         * scene is the one argument with no default, because a window exists to draw one — it is
-         * passed to the constructor and its ownership moves into the window.
-         *
-         * These are the same settings the runtime reads out of koral.json, so a project usually
-         * configures its window there rather than through this type.
-         */
-        struct KORAL_API Builder {
-            std::string title = "GFXFramework";                 ///< Text in the title bar.
-            glm::uvec2 extent = { 1280, 720 };                  ///< Initial size of the drawable area, in pixels.
-            bool resizable = true;                              ///< Whether the user may resize the window.
-            bool fullscreen = false;                            ///< Whether to open fullscreen on the primary monitor.
-            bool decorated = true;                              ///< Whether the OS draws a title bar and border.
-            bool transparentFramebuffer = false;                ///< Whether the framebuffer's alpha composites with the desktop.
-            bool vsync = true;                                  ///< Whether presentation waits for the display's refresh.
-            API api = API::eVulkan;                             ///< Graphics backend to bring up.
-            WindowPlatform platform = WindowPlatform::eAuto;    ///< Linux windowing system to open on.
-            std::filesystem::path imguiIni;                     ///< Where Dear ImGui persists its layout; empty keeps its default (imgui.ini in the working directory).
-            /// The scene the window will initialize and draw. No `= nullptr` initializer: a default
-            /// member initializer on a unique_ptr instantiates its destructor right here, which needs
-            /// Scene complete — the very thing this header no longer requires. It is null anyway.
-            std::unique_ptr<Scene> scene;
 
-            // Out of line, all of them — including the constructor, whose by-value parameter is
-            // destroyed when it returns: every one of these has to destroy a unique_ptr<Scene>, and
-            // that needs Scene complete, which this header no longer makes it. Defined in window.cpp,
-            // which does include scene.h.
-
-            /** @param scene The scene to run. Ownership passes to the window that is built. */
-            explicit Builder(std::unique_ptr<Scene> scene);
-            /**
-             * @brief A window with no scene of its own: a second window, opened by a scene that is
-             *        already running in the main one.
-             *
-             * It shares everything the main window brought up — the device, the frames, the frame
-             * graph — and adds only an OS window, a swap chain and a default framebuffer. The scene
-             * draws into it through the frame graph, by writing its ScreenName().
-             *
-             * @code
-             * top = kor::Window::Builder().SetTitle("Top view").SetExtent({640, 480}).Build();
-             * // a pass: .Write(top->ScreenName(), kor::Image::Usage::eTransferDst), then Blit into it
-             * @endcode
-             *
-             * The API, the
-             * platform and the ImGui layout file are the main window's, so their setters do nothing here.
-             * Destroying it closes it, at the end of whatever frame is using it.
-             */
-            Builder();
-            ~Builder();
-            Builder(Builder&&) noexcept;
-            Builder& operator=(Builder&&) noexcept;
-
-            /** @brief Sets the text shown in the title bar. */
-            Builder& SetTitle(const std::string& title) {
-                this->title = title;
-                return *this;
-            }
-
-            /** @brief Sets the initial size of the drawable area, in pixels. */
-            Builder& SetExtent(const glm::uvec2& extent) {
-                this->extent = extent;
-                return *this;
-            }
-
-            /**
-             * @brief Sets whether the user may resize the window.
-             *
-             * A resize recreates the swap chain and the default framebuffer, and the scene is told
-             * through Scene::OnResize. Fixing the size does not exempt a scene from handling that:
-             * a fullscreen window still adopts the monitor's resolution.
-             */
-            Builder& SetResizable(bool resizable) {
-                this->resizable = resizable;
-                return *this;
-            }
-
-            /** @brief Sets whether the window opens fullscreen on the primary monitor, at that monitor's resolution. */
-            Builder& SetFullscreen(bool fullscreen) {
-                this->fullscreen = fullscreen;
-                return *this;
-            }
-
-            /** @brief Sets whether the OS draws a title bar and border around the window. */
-            Builder& SetDecorated(bool decorated) {
-                this->decorated = decorated;
-                return *this;
-            }
-
-            /**
-             * @brief Sets whether the framebuffer's alpha channel composites with the desktop.
-             *
-             * Requires a compositor that supports it, and is what makes a decorationless overlay
-             * window possible. What shows through is whatever alpha the scene leaves in the
-             * swap-chain image.
-             */
-            Builder& SetTransparentFramebuffer(bool transparent) {
-                this->transparentFramebuffer = transparent;
-                return *this;
-            }
-
-            /**
-             * @brief Sets vertical sync.
-             *
-             * Enabled (the default), frames are presented in step with the display: no tearing, and
-             * the frame rate is capped to the refresh rate. Disabled, frames present as soon as they
-             * are ready — uncapped, and free to tear. Turn it off to measure how fast a scene
-             * actually renders.
-             */
-            Builder& SetVSync(bool vsync) {
-                this->vsync = vsync;
-                return *this;
-            }
-
-            /** @brief Selects the graphics backend the window and everything drawn in it will use. */
-            Builder& SetAPI(API api) {
-                this->api = api;
-                return *this;
-            }
-
-            /**
-             * @brief Selects the Linux windowing system to open on, X11 or Wayland.
-             *
-             * Ignored on Windows and macOS. WindowPlatform::eAuto takes whichever the session
-             * provides.
-             *
-             * @see WindowPlatform
-             */
-            Builder& SetPlatform(WindowPlatform platform) {
-                this->platform = platform;
-                return *this;
-            }
-
-            /**
-             * @brief Sets the file Dear ImGui persists its window layout to.
-             *
-             * Empty keeps ImGui's default, imgui.ini in the working directory — which means the
-             * layout follows whoever launched the program rather than the project. Naming a path
-             * gives the project its own layout; missing parent directories are created.
-             */
-            Builder& SetImguiIni(std::filesystem::path imguiIni) {
-                this->imguiIni = std::move(imguiIni);
-                return *this;
-            }
-
-            /**
-             * @brief Creates the window, brings the graphics device up, and initializes the scene.
-             * @return The window, which owns the scene, the surface and the default framebuffer. When
-             *         any of that cannot be brought up — no display, no driver for the API, a
-             *         windowing platform this session lacks — a poisoned resource saying why
-             *         (eWindowCreationFailed), with everything half-made already torn down.
-             */
-            [[nodiscard]] Resource<Window> Build();
-        };
-
-        /** @brief Constructs the window from a builder. Prefer Builder::Build(). */
-        explicit Window(Builder&);
-
-        /** @brief Waits for the device to go idle, then tears down the scene, the GUI and the device. */
+        /** @brief Waits for nothing: the application retires a window once the frames using it are done. */
         ~Window();
 
         Window(const Window &) = delete;
         Window &operator=(const Window &) = delete;
-
-        // Not movable: the context lists windows by address.
         Window(Window &&) = delete;
         Window &operator=(Window &&) = delete;
 
         /**
          * @brief Whether the window has been asked to close, by the user or by Close().
-         * @return true once the request has been made; the frame in progress still completes.
+         *
+         * The application answers it after the frame: Scene::OnCloseRequested decides, and by default
+         * the window closes with every scene shown in it.
          */
         [[nodiscard]] bool ShouldClose() const;
 
-        /**
-         * @brief Asks the window to close.
-         *
-         * Sets the same flag the OS close button does, so ShouldClose() reports it and the run loop
-         * exits after the current frame. Nothing is destroyed here.
-         */
+        /** @brief Asks the window to close, as its close button does. */
         void Close();
 
         /** @brief The underlying GLFW window handle, for code that has to talk to GLFW directly. */
@@ -252,8 +94,8 @@ namespace kor {
 
         /**
          * @brief Whether the window currently has no drawable area, i.e. it is minimized.
-         * @return true while the framebuffer is zero-sized. Rendering into a zero-sized swap chain
-         *         is invalid, so the run loop skips the frame entirely while this holds.
+         *
+         * The scene shown in it is not updated or drawn while this holds.
          */
         [[nodiscard]] bool IsPaused() const { return _paused; }
 
@@ -268,110 +110,67 @@ namespace kor {
         /** @brief Whether the framebuffer's alpha composites with the desktop. */
         [[nodiscard]] bool IsFramebufferTransparent() const { return _transparentFramebuffer; }
 
-        /** @brief Marks the window paused, so the run loop stops rendering it. Set automatically when it is minimized. */
+        /** @brief Marks the window paused. Set automatically when it is minimized. */
         void Pause() { _paused = true; }
 
-        /** @brief Clears the paused state, so rendering resumes. */
+        /** @brief Clears the paused state. */
         void Unpause() { _paused = false; }
 
         /** @brief Changes the text in the title bar. */
         void SetTitle(const std::string &title);
 
-        /** @brief The graphics backend this window was brought up on. */
-        [[nodiscard]] API GraphicsAPI() const { return _api; }
-
         /** @brief The text currently in the title bar. */
         [[nodiscard]] const std::string& Title() const { return _title; }
 
         /**
-         * @brief The file Dear ImGui persists its layout to, or empty for ImGui's own default.
-         *
-         * The string itself backs ImGui's io.IniFilename, which keeps the pointer rather than a
-         * copy, so it stays valid for as long as the window does.
-         */
-        [[nodiscard]] const std::string& ImguiIniPath() const { return _imguiIni; }
-
-        /**
          * @brief The default framebuffer: the swap-chain image this frame is presented from.
          *
-         * This is what a scene renders into when it opens a pass without naming a framebuffer. It
-         * is recreated on resize, so hold the reference for a frame, not for the run.
+         * What a pass renders into when it opens one without naming a framebuffer, and what the frame
+         * graph calls FrameGraph::Screen. Recreated on resize, so hold the reference for a frame.
          */
         [[nodiscard]] kor::ResourceRef<kor::Framebuffer> DefaultFramebuffer() const;
 
         /**
          * @brief Whether the drawable area changed size since the last frame.
-         * @return true for the one frame that follows the resize; LateUpdate() clears it.
-         *
-         * The run loop turns this into a Scene::OnResize call, which is where a scene should
-         * rebuild anything sized to the window.
+         * @return true for the one frame that follows the resize. The application turns it into a
+         *         Scene::OnResize call.
          */
         [[nodiscard]] bool HasResized() const { return _hasResized; }
 
         /** @brief The presentation surface the swap chain was created for. */
         [[nodiscard]] const kor::Surface& RenderSurface() const { return *_surface; }
 
-        /** @brief Whether this is the application's window — the one built with the scene — rather than a second one. */
-        [[nodiscard]] bool IsMain() const { return !_secondary; }
-
-        /**
-         * @brief The name the frame graph knows this window's image by: FrameGraph::Screen for the
-         *        main window, "screen:<n>" for another.
-         *
-         * A pass writes it to draw into the window. Whenever the window is not shown in a frame —
-         * minimized, or opened during it — passes that use it are skipped for that frame, as passes
-         * needing a disabled pass's output are (FrameGraph::SkippedPasses).
-         */
-        [[nodiscard]] const std::string& ScreenName() const { return _screenName; }
-
-        /**
-         * @brief Whether the frame being built draws into this window: it had an image to draw into
-         *        when the frame started. Always true for the main window during a frame.
-         */
-        [[nodiscard]] bool IsShownThisFrame() const { return _shownThisFrame; }
-
         /**
          * @brief Loads an image from disk and makes it the window's icon.
-         * @param iconPath Image file to load; anything stb_image reads, converted to RGBA.
          *
          * Replaces any icon set earlier. A file that fails to load leaves the icon unchanged.
          */
         void SetIcon(const std::filesystem::path& iconPath);
 
-        /** @brief Whether the window currently has input focus. */
+        /** @brief Whether the window currently has keyboard focus. */
         [[nodiscard]] bool IsFocused() const { return _focused; }
 
-        /**
-         * @brief End-of-frame bookkeeping: clears the one-frame flags, HasResized() among them.
-         *
-         * The run loop calls this after the frame has been submitted. A scene should not.
-         */
-        void LateUpdate();
+        /** @brief Whether the frame being built draws into this window: it had an image when the frame started. */
+        [[nodiscard]] bool IsShownThisFrame() const { return _shownThisFrame; }
 
     private:
-        friend class kor::vk::Scheduler;
+        /** @brief Opens the OS window, its surface, swap chain and default framebuffer. The application's to call. */
+        explicit Window(const WindowSettings& settings);
 
-        /** @brief How far construction got, so Release() undoes exactly that much. */
-        enum class Stage : std::uint8_t { eNone, eGlfw, eDevice, eRuntime, eScene };
-        Stage _stage = Stage::eNone;
-        /** @brief The constructor's work: GLFW, the device, the scheduler, the GUI, the modules, the scene. */
-        void BringUp(Builder& createInfo);
-        /** @brief A second window's: its OS window, surface, swap chain and framebuffer, and nothing shared. */
-        void BringUpSecondary(const Builder& createInfo);
-        /** @brief The surface, shared: the scheduler holds a window's for the frame it presents. */
-        [[nodiscard]] std::shared_ptr<kor::Surface> SharedSurface() const { return _surface; }
-        /** @brief Tears down whatever has been brought up; the destructor, and a constructor that threw. */
-        void Release();
+        /** @brief Ends the frame's one-frame flags: HasResized() among them. */
+        void LateUpdate();
+
+        /** @brief Hands the surface and OS window over, for the application to destroy once no frame uses them. */
+        void Retire(std::shared_ptr<kor::Surface>& surface, GLFWwindow*& window);
+
     	static void FramebufferResize(GLFWwindow* handle, int width, int height);
+        static void CloseRequested(GLFWwindow* handle);
 
         GLFWwindow* _window = nullptr;
         GLFWmonitor* _monitor = nullptr;
         GLFWimage* _icon = nullptr;
         const GLFWvidmode *_videoMode = nullptr;
         std::shared_ptr<kor::Surface> _surface;
-        bool _secondary = false;
-        bool _shownThisFrame = false;
-        std::string _screenName;
 
         std::string _title;
         glm::uvec2 _extent;
@@ -380,16 +179,13 @@ namespace kor {
         bool _decorated;
         bool _transparentFramebuffer;
         bool _vsync;
-        API _api;
-        std::string _imguiIni;
 
         kor::Resource<kor::Framebuffer> _framebuffer;
 
-        std::unique_ptr<Scene> _scene;
-
         bool _paused = false;
-        bool _closed = false;
+        bool _closeRequested = false;
         bool _focused = true;
         bool _hasResized = false;
+        bool _shownThisFrame = false;
     };
 }

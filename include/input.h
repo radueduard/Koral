@@ -16,9 +16,12 @@ struct GLFWwindow;
 
 #include "api.h"
 
+struct ImGuiContext;
+
 namespace kor {
     class Window;
-    class Engine;
+    class App;
+    class Scene;
 
     /**
      * @brief A physical key, identified by its position on a US layout.
@@ -192,114 +195,104 @@ namespace kor {
 
 
     /**
-     * @brief Keyboard and mouse state for the current frame.
+     * @brief One scene's keyboard and mouse: what they did this frame, while its window had them.
      *
-     * Polled, not event-driven: the run loop samples the devices once per frame, so every call
+     * Every scene has its own, reached inside it as `Input::` (Scene::Input) and from outside as
+     * Scene::SceneInput(). Events go to the scene whose window they happen in — or one of the windows
+     * its interface opened for an undocked panel — so two scenes in two windows never see each other's
+     * keys, and the one the user is typing into is the one that hears it.
+     *
+     * Polled, not event-driven: the application samples the devices once per frame, so every call
      * within a frame sees the same answer and nothing is missed between them.
      *
      * @code
      * void MyScene::Update() {
-     *     if (kor::Input::IsKeyHeld(kor::Key::eW)) camera.moveForward(kor::Time::FrameTime());
-     *     if (kor::Input::IsKeyPressed(kor::Key::eSpace)) jump();     // once per press
+     *     if (Input::IsKeyHeld(kor::Key::eW)) camera.MoveForward(Time::FrameTime());
+     *     if (Input::IsKeyPressed(kor::Key::eSpace)) Jump();     // once per press
      * }
      * @endcode
      *
-     * Everything is static: there is one keyboard and one mouse, whichever window they are used in, so
-     * there is one input state. FocusedWindow() says which window that is.
-     *
-     * @note These report the raw device, whether or not Dear ImGui is using it. A scene that reacts
-     *       to a click while the user is dragging an ImGui window should check ImGui's own
-     *       WantCaptureMouse / WantCaptureKeyboard first.
+     * @note These report the raw device, whether or not the scene's interface is using it. A scene
+     *       that reacts to a click while the user is dragging a panel checks InterfaceWantsMouse().
      */
     class KORAL_API Input {
-    	friend class Window;
-    	friend class Engine;
     public:
+        Input();
+        ~Input();
+        Input(const Input&) = delete;
+        Input& operator=(const Input&) = delete;
+
         /** @brief Where @p key is in the press-hold-release cycle this frame. */
-        static KeyState StateOf(Key key);
+        [[nodiscard]] KeyState StateOf(Key key) const;
 
         /** @brief Where @p button is in the press-hold-release cycle this frame. */
-        static KeyState MouseButtonState(MouseButton button);
+        [[nodiscard]] KeyState MouseButtonState(MouseButton button) const;
 
         /** @brief Whether @p key went down this frame. True for one frame per press. */
-        static bool IsKeyPressed(Key key);
+        [[nodiscard]] bool IsKeyPressed(Key key) const;
 
         /** @brief Whether @p key is being held, having gone down on an earlier frame. */
-        static bool IsKeyHeld(Key key);
+        [[nodiscard]] bool IsKeyHeld(Key key) const;
 
         /** @brief Whether @p key came up this frame. True for one frame per release. */
-        static bool IsKeyReleased(Key key);
+        [[nodiscard]] bool IsKeyReleased(Key key) const;
 
         /** @brief Whether @p button went down this frame. True for one frame per press. */
-        static bool IsMouseButtonPressed(MouseButton button);
+        [[nodiscard]] bool IsMouseButtonPressed(MouseButton button) const;
 
         /** @brief Whether @p button is being held, having gone down on an earlier frame. */
-        static bool IsMouseButtonHeld(MouseButton button);
+        [[nodiscard]] bool IsMouseButtonHeld(MouseButton button) const;
 
         /** @brief Whether @p button came up this frame. True for one frame per release. */
-        static bool IsMouseButtonReleased(MouseButton button);
+        [[nodiscard]] bool IsMouseButtonReleased(MouseButton button) const;
 
         /**
          * @brief A readable name for @p key, as an interface would show it: "Left Shift", "F1", "A".
          *
          * Derived from the enumerator rather than a table, so a key added to kor::Key is named without
-         * anything else being edited. It is here, out-of-line, because deriving it needs reflection
-         * over an enumeration whose values run past the usual limit — a trap paid for once, in the
-         * engine, instead of by everyone who writes a key-rebinding interface.
+         * anything else being edited.
          */
         [[nodiscard]] static std::string Describe(Key key);
 
         /** @brief A readable name for @p button: "Left Mouse", "Middle Mouse". @see Describe(Key) */
         [[nodiscard]] static std::string Describe(MouseButton button);
 
-        /**
-         * @brief The first key that went down this frame, if any.
-         *
-         * What completes a rebind: arm the control, then take whatever the user presses next. Which
-         * key is "first" among several pressed in one frame is unspecified — pressing two at once is
-         * not a thing a rebinding interface can honour anyway.
-         */
-        [[nodiscard]] static std::optional<Key> FirstKeyPressed();
+        /** @brief The first key that went down this frame, if any: what completes a rebind. */
+        [[nodiscard]] std::optional<Key> FirstKeyPressed() const;
 
-        /** @brief The first mouse button that went down this frame, if any. @see firstKeyPressed */
-        [[nodiscard]] static std::optional<MouseButton> FirstMouseButtonPressed();
+        /** @brief The first mouse button that went down this frame, if any. @see FirstKeyPressed */
+        [[nodiscard]] std::optional<MouseButton> FirstMouseButtonPressed() const;
 
         /**
-         * @brief Whether the interface is using the pointer this frame — a panel hovered, a slider
-         *        dragged, a menu open.
+         * @brief Whether the scene's interface is using the pointer this frame — a panel hovered, a
+         *        slider dragged, a menu open. False for a scene without one.
          *
-         * What to ask before acting on the mouse yourself, so a camera does not fly off while an
-         * ImGui window is being dragged. It is answered here, by the engine, rather than by each
-         * caller asking ImGui: a module that only wants this one bool would otherwise have to be an
-         * ImGui client — link it, and be handed the engine's context at load — for a question that
-         * is really about input.
-         *
-         * False when there is no interface at all: a headless job, or a test. That is the answer
-         * that lets the same code run in both.
+         * What to ask before acting on the mouse yourself, so a camera does not fly off while a panel
+         * is being dragged.
          */
-        [[nodiscard]] static bool InterfaceWantsMouse();
+        [[nodiscard]] bool InterfaceWantsMouse() const;
 
-        /** @brief Whether the interface is using the keyboard — text is being typed into it. @see interfaceWantsMouse */
-        [[nodiscard]] static bool InterfaceWantsKeyboard();
+        /** @brief Whether the scene's interface is using the keyboard — text is being typed into it. */
+        [[nodiscard]] bool InterfaceWantsKeyboard() const;
 
-        /** @brief Cursor position in pixels, measured from the top-left of the drawable area. */
-        static const glm::vec2& MousePosition();
+        /** @brief Cursor position in pixels, from the top-left of the scene's window. */
+        [[nodiscard]] const glm::vec2& MousePosition() const;
 
-        /** @brief How far the cursor moved since the previous frame, in pixels. The value to drive a look-around camera with. */
-        static const glm::vec2& MousePositionDelta();
+        /** @brief How far the cursor moved since the previous frame, in pixels. What drives a look-around camera. */
+        [[nodiscard]] const glm::vec2& MousePositionDelta() const;
 
-        /** @brief How far the wheel turned this frame. Y is the usual vertical wheel; X is horizontal scrolling where the device has it. */
-        static const glm::vec2& MouseScrollDelta();
+        /** @brief How far the wheel turned this frame. Y is the usual vertical wheel. */
+        [[nodiscard]] const glm::vec2& MouseScrollDelta() const;
 
         /** @brief Where the cursor was on the previous frame, in pixels. */
-        static const glm::vec2& LastMousePosition();
+        [[nodiscard]] const glm::vec2& LastMousePosition() const;
 
         /**
-         * @brief What the cursor does while the application runs.
+         * @brief What the cursor does over this scene's windows.
          *
-         * @ref eCaptured is what a camera wants while it is being aimed: the pointer stops moving
-         * across the screen, so it cannot leave the window, reach the edge of the desktop, or land on
-         * something and click it — and the movement keeps arriving as deltas, without limit.
+         * @ref eCaptured is what a camera wants while it is being aimed: the pointer stops moving, so
+         * it cannot leave the window or land on something and click it, and the movement keeps
+         * arriving as deltas, without limit.
          */
         enum class CursorMode : std::uint8_t {
             eNormal,    ///< Visible, and free to move. The default.
@@ -308,80 +301,56 @@ namespace kor {
         };
 
         /**
-         * @brief Sets what the cursor does.
-         * @param mode The behaviour to switch to. Setting the mode it is already in does nothing.
+         * @brief Sets what the cursor does over this scene's windows — its own and any panel its
+         *        interface undocked.
          *
-         * Applies to every attached window, so the behaviour does not change as the pointer crosses
-         * from the main window to an undocked panel.
-         *
-         * The movement delta is *rebased* across the change rather than carried over: a mode switch
-         * moves the cursor (capturing it warps it, releasing it puts it back), and reporting that as
-         * movement would fling a camera the moment aiming began. The frame of the switch therefore
-         * reports no movement at all.
-         *
-         * Raw, unaccelerated movement is used while captured where the platform has it, which is what
-         * an aimed camera wants — desktop pointer acceleration is tuned for reaching menus.
+         * The frame the mode changes reports no movement: capturing warps the cursor and releasing it
+         * puts it back, and reporting that as movement would fling a camera the moment aiming began.
          */
-        static void SetCursorMode(CursorMode mode);
+        void SetCursorMode(CursorMode mode);
 
         /** @brief What the cursor is currently doing. */
-        [[nodiscard]] static CursorMode CurrentCursorMode();
+        [[nodiscard]] CursorMode CurrentCursorMode() const;
 
         /**
-         * @brief Starts reading input from another window as well as the main one.
-         * @param window The GLFW window to listen to. Attaching one twice does nothing.
+         * @brief Starts reading input from another OS window as well as the scene's own.
          *
-         * The engine listens to the window it created, and that is the whole story until something
-         * else opens one — which is exactly what an *undocked* interface panel is: ImGui gives it its
-         * own OS window, and events over it are delivered to that window, not to the main one. Without
-         * this, the pointer moving over an undocked viewport produces no delta at all and a camera
-         * driven by it simply stops responding.
-         *
-         * The GUI attaches and releases ImGui's windows as they come and go, so a project that uses
-         * the interface needs to call none of this. It is public for the other case: an application
-         * that opens a window of its own and wants the engine's input from it too.
-         *
-         * Positions are reported in *virtual desktop* coordinates from the moment more than one window
-         * is attached, so a delta stays meaningful as the pointer crosses from one to another.
+         * The interface does this for the windows it opens for undocked panels, so a camera keeps
+         * responding while the pointer is over one. Attaching one twice does nothing.
          */
-        static void AttachTo(GLFWwindow* window);
+        void AttachTo(GLFWwindow* window);
 
-        /** @brief Stops reading input from @p window. Called for you when ImGui closes one. */
-        static void DetachFrom(GLFWwindow* window);
+        /** @brief Stops reading input from @p window. */
+        void DetachFrom(GLFWwindow* window);
 
-        /** @brief Every window input is currently read from, the main one first. */
-        [[nodiscard]] static std::vector<GLFWwindow*> AttachedWindows();
+        /** @brief Every window this reads from, the scene's own first. */
+        [[nodiscard]] const std::vector<GLFWwindow*>& AttachedWindows() const;
 
-        /**
-         * @brief The application window with keyboard focus — the main one or a second one — or null
-         *        when none has it (an undocked interface panel does, or another application).
-         *
-         * Keys are the same keys whichever window has focus. This is how a scene with several windows
-         * decides which one they are meant for: a camera flown only while its window is focused.
-         */
-        [[nodiscard]] static Window* FocusedWindow();
-
-        /** @brief The application window the pointer is over, or null. @see FocusedWindow */
-        [[nodiscard]] static Window* HoveredWindow();
+        /** @brief The ImGui context events over these windows are forwarded to, if the scene has an interface. Internal. */
+        void SetInterfaceContext(ImGuiContext* context);
 
     private:
-        static void Setup(GLFWwindow* window);
-        /** @brief Attaches a second application window: its events are the engine's, never the interface's. */
-        static void AttachEngineWindow(GLFWwindow* window);
+        friend class App;
+        struct State;
 
-        /** @brief Points a window's GLFW callbacks at the engine's. @see attachTo */
+        /** @brief End of frame: presses become holds, releases become nothing, deltas start over. */
+        void Update();
+
         static void InstallCallbacks(GLFWwindow* window);
-        static void Update();
 
-    	struct KORAL_API Callbacks {
-    		static void KeyCallback(GLFWwindow*, int, int, int, int);
-    		static void MouseMoveCallback(GLFWwindow*, double, double);
-    		static void MouseButtonCallback(GLFWwindow*, int, int, int);
-    		static void ScrollCallback(GLFWwindow*, double, double);
-    	    static void FocusCallback(GLFWwindow*, int);
-    	    static void CharCallback(GLFWwindow*, unsigned int);
-    	    static void CursorEnterCallback(GLFWwindow*, int);
-    	    static void CloseCallback(GLFWwindow*);
-    	};
+    public:
+        /** @brief The GLFW callbacks every attached window is given. Internal. */
+        struct Callbacks {
+            static void KeyCallback(GLFWwindow*, int, int, int, int);
+            static void MouseMoveCallback(GLFWwindow*, double, double);
+            static void MouseButtonCallback(GLFWwindow*, int, int, int);
+            static void ScrollCallback(GLFWwindow*, double, double);
+            static void FocusCallback(GLFWwindow*, int);
+            static void CharCallback(GLFWwindow*, unsigned int);
+            static void CursorEnterCallback(GLFWwindow*, int);
+        };
+
+    private:
+        State* _state;
     };
 }

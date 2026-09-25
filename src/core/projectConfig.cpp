@@ -75,6 +75,7 @@ namespace kor
         {
             std::optional<int> schemaVersion;
             std::optional<std::string> name;
+            std::optional<std::string> scene;   // which of the library's scenes opens first
             std::optional<RenderingDocument> rendering;
             std::optional<PathsDocument> paths;
 
@@ -172,6 +173,7 @@ namespace kor
             // The project's name is the window title unless the file names one explicitly — which
             // the Hub never does, because in its UI the project simply *is* its name.
             if (doc.name) config.title = *doc.name;
+            if (doc.scene) config.scene = *doc.scene;
 
             if (doc.rendering) {
                 const auto& r = *doc.rendering;
@@ -317,6 +319,11 @@ namespace kor
             else if (arg == "--height") {
                 if (const auto error = number(extent.y)) return invalid(*error);
             }
+            else if (arg == "--scene") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --scene");
+                scene = text;
+            }
             else if (arg == "--title") {
                 std::string_view text;
                 if (!value(text)) return invalid("missing value for --title");
@@ -435,6 +442,7 @@ namespace kor
             "  --shaders <dir>     Prepend a directory to search for relative shader paths (repeatable)\n"
             "  --module <name>     Load an additional module, by name or path (repeatable)\n"
             "  --modules-dir <dir> Prepend a directory to search for modules (repeatable)\n"
+            "  --scene <name>      Which of the library's scenes to open (default: koral.json's, else the first)\n"
             "  --title <text>      Window title\n"
             "  --width <n>         Window width\n"
             "  --height <n>        Window height\n"

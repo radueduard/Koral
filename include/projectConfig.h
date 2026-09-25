@@ -128,6 +128,12 @@ namespace kor
          */
         std::vector<std::string> modules;
 
+        /**
+         * @brief Which of the scene library's scenes the runtime opens: `"scene"` in koral.json, or
+         *        `--scene`. Empty opens the first the library lists.
+         */
+        std::string scene;
+
         /** @brief Window title. Empty means the engine falls back to the scene library's name. */
         std::string title;
 

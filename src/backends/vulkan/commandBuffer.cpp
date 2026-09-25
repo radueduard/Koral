@@ -3,6 +3,9 @@
 //
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include "commandBuffer.h"
+#include "surface.h"
+#include "../../core/current.h"
+#include <window.h>
 
 #include <ranges>
 #include <iostream>
@@ -661,7 +664,8 @@ namespace kor::vk
     }
 
     kor::CommandBuffer& CommandBuffer::DoBlitToScreen(ResourceRef<const kor::Image> srcImage, kor::Blit blitInfo) {
-        ResourceRef<const kor::Image> dstImage =  dynamic_cast<const Scheduler&>(kor::Context::Scheduler()).getSwapChain().image();
+        ResourceRef<const kor::Image> dstImage = dynamic_cast<const kor::vk::Surface&>(
+            kor::detail::CurrentWindow("BlitToScreen").RenderSurface()).swapChain().image();
         Barrier({}, {
             {
                 srcImage,

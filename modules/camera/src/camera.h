@@ -17,6 +17,7 @@
 #include <context.h>
 #include <window.h>
 #include <gtime.h>
+#include <scene.h>
 
 #include <koralCamera.h>
 
@@ -138,7 +139,12 @@ namespace kcam
          */
         void AutomaticUpdate() override
         {
-            _controller.update(*this, kor::Time::FrameTime());
+            // In the scene the camera was made in: its input drives the controller, its window is
+            // the one "follow the window" means, its clock times the movement. A camera made outside
+            // any scene — a headless job's — has none of those, and is only serialized.
+            const auto life = _scene.lock();
+            kor::detail::SceneScope scope(life && life->scene ? life : nullptr);
+            _controller.update(*this, kor::Scene::Current() ? kor::Scene::Time::FrameTime() : 0.f);
             // Everything that changes the matrices comes before they are written out: a resize,
             // then the jitter for this frame. Serialized once, at the end, so the GPU and every
             // getter agree for the whole frame.
@@ -203,7 +209,8 @@ namespace kcam
         [[nodiscard]] virtual glm::vec4 depthRange() const = 0;
         template<typename BuilderType>
         explicit CameraBase(const BuilderType& builder)
-            : _name(builder.name), _position(builder.position), _rotation(glm::normalize(builder.rotation))
+            : _name(builder.name), _position(builder.position), _rotation(glm::normalize(builder.rotation)),
+              _scene(kor::detail::CurrentSceneLife())
         {
             _controller.set(builder.controller);
             _controller.setReleased(builder.released);
@@ -222,8 +229,8 @@ namespace kcam
          */
         [[nodiscard]] virtual std::optional<glm::uvec2> renderExtent() const
         {
-            if (kor::Context::IsHeadless()) return std::nullopt;
-            return kor::Context::Window().Extent();
+            if (const auto* scene = kor::Scene::Current()) return scene->SceneWindow().Extent();
+            return std::nullopt;
         }
 
     private:
@@ -274,6 +281,7 @@ namespace kcam
         glm::vec3 _position;
         glm::quat _rotation;
         CameraController _controller;
+        std::weak_ptr<kor::detail::SceneLife> _scene;   // the scene it was made in
 
         bool _jitterEnabled = false;
         glm::u32 _jitterIndex = 0;

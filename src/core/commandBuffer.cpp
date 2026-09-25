@@ -3,6 +3,8 @@
 //
 
 #include <commandBuffer.h>
+#include "current.h"
+#include <window.h>
 #include "tokenState.h"
 #include <cstring>
 #include <mutex>
@@ -144,7 +146,7 @@ namespace kor
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
 
-    RenderInfo::RenderInfo() : RenderInfo(Context::DefaultFramebuffer()) {}
+    RenderInfo::RenderInfo() : RenderInfo(detail::CurrentWindow("A RenderInfo naming no framebuffer").DefaultFramebuffer()) {}
 
     RenderInfo::RenderInfo(const kor::ResourceRef<const kor::Framebuffer>& framebuffer) : _framebuffer(framebuffer)
     {
@@ -1326,7 +1328,8 @@ namespace kor
         }
         // No pass, or one whose framebuffer says nothing: the window is the only size left to assume,
         // and it is the right one for the default framebuffer.
-        return Context::Window().Extent();
+        if (const auto* window = detail::CurrentWindowOrNull()) return window->Extent();
+        return { 1, 1 };
     }
 
     CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
@@ -1466,7 +1469,9 @@ namespace kor
 
     kor::ResourceRef<const Image> CommandBuffer::ScreenImage()
     {
-        const auto framebuffer = Context::DefaultFramebuffer();
+        const auto* window = detail::CurrentWindowOrNull();
+        if (!window) return {};
+        const auto framebuffer = window->DefaultFramebuffer();
         if (!framebuffer.Valid() || framebuffer->ColorAttachments().empty()) return {};
         return framebuffer->ColorImage(0);
     }

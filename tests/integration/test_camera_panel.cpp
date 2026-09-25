@@ -134,8 +134,9 @@ TEST(CameraPanelNaming, TheEngineNamesEveryKeyAndButton) {
     EXPECT_EQ(kor::Input::Describe(kor::MouseButton::e5), "Mouse 5");
 
     // Nothing is pressed in a test, which is the answer a rebind waits on rather than a crash.
-    EXPECT_FALSE(kor::Input::FirstKeyPressed().has_value());
-    EXPECT_FALSE(kor::Input::FirstMouseButtonPressed().has_value());
+    const kor::Input input;   // a scene's, before anything has been pressed
+    EXPECT_FALSE(input.FirstKeyPressed().has_value());
+    EXPECT_FALSE(input.FirstMouseButtonPressed().has_value());
 }
 
 } // namespace

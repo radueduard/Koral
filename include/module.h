@@ -116,6 +116,9 @@ namespace kor
          */
         virtual void Initialize() {}
 
+        /** @brief Called once per fixed step of the scene's time, before Scene::FixedUpdate. @see Scene::FixedUpdate */
+        virtual void FixedUpdate() {}
+
         /** @brief Called once per frame, before Scene::Update. Where input-driven work belongs. */
         virtual void Update() {}
 
@@ -255,6 +258,7 @@ namespace kor
         [[nodiscard]] static KORAL_API std::vector<std::string_view> LoadedModules();
 
         // ---- per-frame dispatch, in the order the run loop calls them ----
+        static KORAL_API void FixedUpdate();
         static KORAL_API void Update();
         static KORAL_API void LateUpdate();
         static KORAL_API void Render(CommandBuffer& commandBuffer);

@@ -23,6 +23,7 @@ namespace kor {
     class Scheduler;
     class Framebuffer;
     class Window;
+    class App;
 
     /**
      * @brief Resolve @p relativePath against the asset search roots; first existing wins.
@@ -92,34 +93,20 @@ namespace kor {
     /**
      * @brief Process-wide access to whatever the runtime has brought up.
      *
-     * Everything here is static, because there is one device and one scheduler per process, and one
-     * application window (Window()) — any others a scene opens are listed by Windows(). A scene
-     * reaches the pieces it needs through this rather than being handed them:
+     * Everything here is static, because there is one device and one scheduler per process. What
+     * belongs to a scene — its window, its input, its clock — is the scene's (`Window::`, `Input::`,
+     * `Time::` inside it), not here.
      *
-     * @code
-     * const auto extent = kor::Context::Window().Extent();
-     * commandBuffer.BeginRendering(kor::Context::DefaultFramebuffer());
-     * @endcode
-     *
-     * The accessors are only valid once a context exists — after the window has been built, or
-     * after InitHeadless(). Calling them from a scene is always safe: by the time Initialize() runs,
-     * everything below is up.
+     * The accessors are only valid once a context exists — once the application (kor::App) has
+     * brought the device up, or after InitHeadless(). Calling them from a scene is always safe: by
+     * the time Initialize() runs, everything below is up.
      */
     class Context
     {
-        friend class kor::Window;
+        friend class kor::App;
         friend class kor::Scheduler;
         friend struct kor::detail::TimelineState; // picks the executor an awaiting coroutine resumes on
     public:
-        /** @brief The application window. Not valid in a headless context, which has none. */
-        static KORAL_API kor::Window& Window();
-
-        /**
-         * @brief Every open window: the application's first, then any a scene opened, in the order
-         *        they were opened. Empty in a headless context.
-         */
-        [[nodiscard]] static KORAL_API std::vector<kor::Window*> Windows();
-
         /** @brief The frame scheduler: swap chain, frames in flight, and which image is current. */
         static KORAL_API kor::Scheduler& Scheduler();
 
@@ -171,14 +158,6 @@ namespace kor {
         static KORAL_API bool SupportsRayTracing();
 
         /**
-         * @brief The framebuffer wrapping the swap-chain image this frame presents.
-         * @return The window's default framebuffer — the same one CommandBuffer::BeginRendering
-         *         uses when called without one. Recreated on resize, so hold it for a frame rather
-         *         than for the run.
-         */
-        static KORAL_API kor::ResourceRef<const kor::Framebuffer> DefaultFramebuffer();
-
-        /**
          * @brief Awaitable that moves the rest of a coroutine onto the main thread.
          *
          * The thread the run loop drives, and the only one that may touch the device. Anything a
@@ -220,9 +199,6 @@ namespace kor {
         [[nodiscard]] static KORAL_API bool HasRepository() noexcept;
 
     private:
-        inline static kor::Window* _window = nullptr;
-        /// Every window, main first. Defined in context.cpp, for the reason given at the end of this class.
-        static KORAL_API std::vector<kor::Window*>& WindowList();
 
         /// Declared rather than defined here: kor::Scheduler is only forward-declared in this
         /// header, and destroying the resource needs the complete type. Defined in context.cpp,

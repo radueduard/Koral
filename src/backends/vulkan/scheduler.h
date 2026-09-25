@@ -58,10 +58,7 @@ namespace kor::vk
     	Scheduler(const Scheduler &) = delete;
     	Scheduler &operator=(const Scheduler &) = delete;
 
-    	void Draw(const std::function<void(kor::CommandBuffer&)>& renderFunc) override;
-
-    	/// The main window's swap chain.
-    	[[nodiscard]] const kor::vk::SwapChain &getSwapChain() const;
+    	void Draw(std::span<kor::Window* const> windows, const std::function<void(kor::CommandBuffer&)>& renderFunc) override;
 
     	void RetireWindow(std::shared_ptr<kor::Surface> surface, GLFWwindow* window) override;
 

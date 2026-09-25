@@ -3,6 +3,7 @@
 //
 
 #include "frameGraph.h"
+#include "scene.h"
 
 #include <algorithm>
 #include <array>
@@ -113,29 +114,20 @@ namespace kor {
         return ReadPrevious(name);
     }
 
-    namespace {
-        bool isScreen(const std::string_view name) {
-            return name == FrameGraph::Screen || name.starts_with("screen:");
-        }
+    Scene* FrameGraph::OwnerScene() const { return _scene ? _scene : Scene::Current(); }
 
-        // The image the window with this screen name shows, or empty when no open window has it.
-        ResourceRef<const Image> screenImage(const std::string_view name) {
-            for (Window* window : Context::Windows()) {
-                if (window->ScreenName() != name) continue;
-                const auto framebuffer = window->DefaultFramebuffer();
-                return framebuffer.Valid() && !framebuffer->ColorAttachments().empty()
-                    ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
-            }
-            return {};
+    namespace {
+        // The image the scene's window shows this frame, or empty when there is no scene to ask.
+        ResourceRef<const Image> screenOf(const Scene* scene) {
+            if (!scene) return {};
+            const auto framebuffer = scene->SceneWindow().DefaultFramebuffer();
+            return framebuffer.Valid() && !framebuffer->ColorAttachments().empty()
+                ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
         }
     }
 
     ResourceRef<const Image> PassResources::ImageNamed(const std::string_view name) const {
-        if (isScreen(name)) {
-            auto image = screenImage(name);
-            if (!image.Alive()) log::Error("[frame graph] no open window shows '{}'", name);
-            return image;
-        }
+        if (name == FrameGraph::Screen) return screenOf(_graph.OwnerScene());
         const auto it = _graph._images.find(name);
         if (it == _graph._images.end()) {
             log::Error("[frame graph] no image named '{}'", name);
@@ -192,14 +184,20 @@ namespace kor {
         return img.Alive() ? glm::uvec2(img->Extent()) : glm::uvec2(0);
     }
 
-    ResourceRef<const Image> FrameGraph::ImageNamed(const std::string_view name) const {
+    ResourceRef<const Image> FrameGraph::ImageNamed(const std::string_view name, const Flags<Image::Usage> usage) const {
         const auto it = _images.find(name);
         if (it == _images.end()) return {};
-        // Whoever asks means to look at it after the frame, so it gets an image to itself. Not from
-        // a pass recording, though: nothing here may change then.
-        if (!_recording && !_kept.contains(name)) {
-            _kept.emplace(name);
-            if (_aliasing) _dirty = true;
+        // Whoever asks means to look at it after the frame, so it gets an image to itself — made with
+        // whatever they said they would do with it. Not from a pass recording: nothing may change then.
+        if (!_recording) {
+            const auto kept = _kept.find(name);
+            if (kept == _kept.end()) {
+                _kept.emplace(std::string(name), usage);
+                if (_aliasing || usage.Value() != 0) _dirty = true;
+            } else if ((kept->second | usage) != kept->second) {
+                kept->second |= usage;
+                _dirty = true;
+            }
         }
         return it->second;
     }
@@ -355,18 +353,6 @@ namespace kor {
         std::set<std::string> imported{std::string(Screen)};
         for (const auto& name : _importedImages | std::views::keys) imported.insert(name);
         for (const auto& name : _importedBuffers | std::views::keys) imported.insert(name);
-        for (const Window* window : Context::Windows())
-            if (!window->IsMain() && window->IsShownThisFrame()) imported.insert(window->ScreenName());
-        // Another window not shown this frame — minimized, closed, opened halfway through it — has no
-        // image to draw into. Its screen is made by a stand-in pass that is switched off, so the passes
-        // drawing into it are skipped for the frame, exactly as passes needing a disabled pass's output.
-        std::set<std::string> hidden;
-        for (const auto& decl : decls)
-            for (const auto& use : decl.uses)
-                if (use.resource.starts_with("screen:") && !imported.contains(use.resource)) hidden.insert(use.resource);
-        for (const auto& name : hidden)
-            decls.push_back({.name = std::format("window '{}' (not shown)", name),
-                             .uses = {{name, graph::Access::eCreate}}, .enabled = false});
 
         const auto compiled = graph::compile(decls, imported);
         if (!compiled) {
@@ -424,16 +410,15 @@ namespace kor {
                 plan.imageDesc = it->second;
                 glm::uvec2 base = _extent;
                 if (const auto& of = plan.imageDesc.sizeOf; !of.empty() && !plan.imageDesc.extent) {
-                    ResourceRef<const Image> reference = isScreen(of) ? screenImage(of) : ResourceRef<const Image>{};
-                    if (const auto imported = _importedImages.find(of); !isScreen(of) && imported != _importedImages.end())
-                        reference = imported->second;
+                    ResourceRef<const Image> reference;
+                    if (const auto imported = _importedImages.find(of); imported != _importedImages.end()) reference = imported->second;
                     if (reference.Alive()) base = glm::uvec2(reference->Extent());
-                    else problems.push_back(std::format("'{}' is sized after '{}', which is neither an open window's "
-                                                        "screen nor an imported image.", name, of));
+                    else problems.push_back(std::format("'{}' is sized after '{}', which is not an imported image.", name, of));
                 }
                 plan.size = plan.imageDesc.extent.value_or(glm::max(
                     glm::uvec2(glm::vec2(base) * plan.imageDesc.scale), glm::uvec2(1)));
                 plan.imageUsage = imageUsage[name];
+                if (const auto kept = _kept.find(name); kept != _kept.end()) plan.imageUsage |= kept->second;
                 if (keepsHistory) plan.imageUsage |= Image::Usage::eTransferSrc;
                 if (plan.imageUsage.Value() == 0) problems.push_back(std::format(
                     "'{}': no pass says how it uses it. Give its Create a usage, or the Read/Write that uses it one.", name));
@@ -628,7 +613,6 @@ namespace kor {
             _schedule.push_back({pass->Name(), compiled->level[i]});
         }
         _dependencies = compiled->dependencies;
-        // By declaration, not by pass: the stand-ins for windows not shown have a name but no pass.
         for (const auto index : compiled->culled) _culled.push_back(decls[index].name);
         for (const auto& [index, resource, source] : compiled->skipped)
             _skipped.push_back({decls[index].name, resource, decls[source].name});
@@ -642,8 +626,8 @@ namespace kor {
             std::vector<glm::u64> signature;
             for (const auto& use : decl.uses) {
                 const std::string name = use.access == graph::Access::eReadPrevious ? "previous " + use.resource : use.resource;
-                if (isScreen(use.resource)) {
-                    const auto screen = screenImage(use.resource);
+                if (use.resource == Screen) {
+                    const auto screen = screenOf(OwnerScene());
                     signature.push_back(screen.Alive() ? reinterpret_cast<std::uintptr_t>(screen.Get()) : 0);
                     signature.push_back(screen.Alive() ? screen->Generation() : 0);
                     continue;
@@ -688,9 +672,12 @@ namespace kor {
         // before it waits: a token resumes whoever awaits it on the executor they awaited from, and the
         // main thread is blocked until every pass has run.
         Task<void> RunOnBackground(RenderPass& pass, const bool onCpu, std::unique_ptr<CommandBuffer>& out, double& ms,
-                                   std::vector<Token> after) {
+                                   std::vector<Token> after, std::shared_ptr<detail::SceneLife> scene) {
             co_await Context::SwitchToBackgroundThread();
             if (!after.empty()) co_await WhenAll(std::move(after));
+            // The scene the graph belongs to is current while its passes record, as it is while the
+            // scene runs: `Window::` in a pass, and a render pass opened without a framebuffer, are its.
+            detail::SceneScope scope(scene);
             RunTimed(pass, onCpu, out, ms);
         }
     }
@@ -698,20 +685,14 @@ namespace kor {
     bool FrameGraph::Execute() {
         _owner = std::this_thread::get_id();
         if (_passes.empty()) return false;
-        if (const glm::uvec2 extent = Context::Window().Extent(); extent != _extent) {
+        Scene* scene = OwnerScene();
+        if (!scene) {
+            log::Error("[frame graph] runs inside a scene: its window is the one it draws into");
+            return false;
+        }
+        detail::SceneScope scope(scene);
+        if (const glm::uvec2 extent = scene->SceneWindow().Extent(); extent != _extent) {
             _extent = extent;
-            _dirty = true;
-        }
-        // A window opened, closed, shown, hidden or resized changes which screens exist and how big
-        // what follows them is.
-        std::string windows;
-        for (const Window* window : Context::Windows()) {
-            const auto size = window->Extent();
-            windows += std::format("{} {}x{} {};", window->ScreenName(), size.x, size.y,
-                                   window->IsMain() || window->IsShownThisFrame());
-        }
-        if (windows != _windows) {
-            _windows = std::move(windows);
             _dirty = true;
         }
         if (_dirty) Build();
@@ -755,14 +736,15 @@ namespace kor {
         std::vector<double> recordMs(_order.size(), 0.0);
         const auto recordStart = Clock::now();
         _recording = true;
-        if (Context::ActiveAPI() == API::eVulkan) {
+        {
             std::vector<Task<void>> tasks;
             tasks.reserve(_order.size());
             for (std::size_t i = 0; i < _order.size(); ++i) {
                 std::vector<Token> after;
                 for (const auto dependency : _dependencies[i])
                     if (_order[dependency]->RunsOnCpu()) after.push_back(tasks[dependency].Completion());
-                tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), recorded[i], recordMs[i], std::move(after)));
+                tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), recorded[i], recordMs[i], std::move(after),
+                                                scene->Life().lock()));
             }
             auto all = WhenAll(std::move(tasks));
             all.Wait();
@@ -799,14 +781,12 @@ namespace kor {
         double gpuSum = 0.0;
         for (const RenderPass* pass : _order) gpuSum += stats.passes[pass->Name()].gpuMs;
         stats.graph.gpuMs = gpuSum;
-        stats.frameMs[stats.next] = Time::FrameTime() * 1000.f;
+        stats.frameMs[stats.next] = scene->SceneTime().UnscaledFrameTime() * 1000.f;
         stats.gpuMs[stats.next] = static_cast<float>(gpuSum);
         stats.next = (stats.next + 1) % Stats::History;
 
         bool touchedScreen = false;
-        const auto framebuffer = Context::DefaultFramebuffer();
-        const auto screen = framebuffer.Valid() && !framebuffer->ColorAttachments().empty()
-            ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
+        const auto screen = screenOf(scene);
         for (auto& cb : recorded) {
             if (!cb) continue;  // a CPU pass, or one that threw (already reported)
             if (screen.Alive() && cb->HasTouched(screen)) touchedScreen = true;

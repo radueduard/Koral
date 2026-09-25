@@ -13,6 +13,7 @@ namespace kor
     class Engine;
     class Context;
     class Window;
+    class App;
 }
 
 namespace kor::vk
@@ -28,6 +29,7 @@ namespace kor::vk
     class KORAL_API Context
     {
         friend class kor::Window;
+        friend class kor::App;
         friend class kor::Engine;
         friend class kor::Context;
     public:
