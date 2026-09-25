@@ -158,6 +158,15 @@ namespace kor {
         static KORAL_API bool SupportsRayTracing();
 
         /**
+         * @brief Whether the device has a second queue for compute to run alongside the frame's
+         *        graphics work (CommandBuffer::Usage::eAsyncCompute, PassBuilder::AsyncCompute).
+         *
+         * Without one, that work still runs — in order, on the frame's queue — so this is for
+         * reporting, not a precondition. False before any device exists.
+         */
+        static KORAL_API bool SupportsAsyncCompute();
+
+        /**
          * @brief Awaitable that moves the rest of a coroutine onto the main thread.
          *
          * The thread the run loop drives, and the only one that may touch the device. Anything a

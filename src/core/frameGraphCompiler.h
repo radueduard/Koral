@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -48,6 +49,19 @@ namespace kor::graph {
         std::string resource;
         Access access;
         std::string as {};  ///< eConsume only: the name the modified resource goes by afterwards.
+        /**
+         * eRead and eReadPrevious: the state the read needs the resource in; 0 is unknown. See
+         * `layout` for what passes on different queues may do with it at the same time.
+         */
+        std::uint32_t state = 0;
+        /**
+         * The state is a layout the resource has to be moved into — an image. Reads of a resource
+         * without one (a buffer) in a known state never keep passes on different queues apart. Reads
+         * of one with a layout do only when every read of it this frame is in that one state and GPU
+         * passes make it before any reads it: the pass that makes it last then moves it into that
+         * state for all of them (CompiledGraph::handoffs), so no reader changes it under another.
+         */
+        bool layout = false;
     };
 
     struct PassDecl {
@@ -68,6 +82,11 @@ namespace kor::graph {
          * previous frame the GPU produced.
          */
         bool cpu = false;
+        /**
+         * Runs on the async compute queue, alongside the graphics passes it is not ordered against.
+         * Ignored for a CPU pass.
+         */
+        bool async = false;
     };
 
     struct CompiledGraph {
@@ -95,11 +114,40 @@ namespace kor::graph {
          */
         std::vector<std::vector<std::size_t>> dependencies;
 
+        /** One per entry of `order`: runs on the async compute queue. */
+        std::vector<bool> async;
+        /**
+         * One per entry of `order`: the pass on the *other* queue it has to wait for, if any — the
+         * latest one it depends on there, which a queue running in order makes stand for every
+         * earlier one. Only GPU passes; a CPU pass is done before any GPU work is submitted.
+         */
+        std::vector<std::optional<std::size_t>> waits;
+        /**
+         * Orderings the compiler added, as (earlier, later) positions in `order`: passes on different
+         * queues that nothing orders would run at the same time, and when they share a resource one
+         * would change it — its layout, say — under the other. So the later one waits.
+         */
+        std::vector<std::pair<std::size_t, std::size_t>> serialized;
+
+        /** A resource the pass at `pass` leaves in `state` when it is done, for readers on both queues. */
+        struct Handoff {
+            std::size_t pass;
+            std::string resource;   ///< The physical resource.
+            std::uint32_t state;
+            bool operator==(const Handoff&) const = default;
+        };
+        std::vector<Handoff> handoffs;
+
         /** A resource the graph creates, and the span of `order` positions that use it. */
         struct Lifetime {
             std::string resource;
             std::size_t first;
             std::size_t last;
+            /**
+             * An async pass uses it. Positions in `order` then say nothing about when it is in use
+             * relative to the other queue's passes, so it must not share memory.
+             */
+            bool async = false;
         };
         /** Created resources some kept pass uses, in order of first use. Imported ones are not listed. */
         std::vector<Lifetime> lifetimes;

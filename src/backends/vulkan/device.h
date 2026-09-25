@@ -106,6 +106,10 @@ namespace kor::vk {
 
         [[nodiscard]] const Queue& requestQueue(::vk::QueueFlags type) const;
         [[nodiscard]] const Queue& requestPresentQueue(const kor::vk::Surface& surface) const;
+        // A second queue of the frame's (graphics) family, for compute that runs alongside the frame:
+        // the same family, so resources pass between the two with no ownership transfers. The frame's
+        // own queue on a device whose graphics family has only the one.
+        [[nodiscard]] const Queue& requestAsyncComputeQueue() const;
         void freeQueues() const;
 
         // A command buffer with a pool of its own, from a free list. A pool may only be used by one
@@ -136,6 +140,9 @@ namespace kor::vk {
     private:
         mutable std::vector<Queue::Family> _queueFamilies {};
         mutable std::vector<std::unique_ptr<Queue>> _queuesInUse {};
+        // Kept out of _queuesInUse, so requestQueue() never hands it out for ordinary work.
+        mutable std::unique_ptr<Queue> _asyncComputeQueue;
+        mutable bool _asyncComputeChosen = false;
         mutable std::mutex _queuesMutex;   // guards the lazily filled _queuesInUse
         mutable std::mutex _queueMutex;    // see lockQueues()
 

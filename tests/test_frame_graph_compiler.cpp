@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -23,6 +24,8 @@ Use create(std::string r) { return {std::move(r), Access::eCreate}; }
 Use read(std::string r)   { return {std::move(r), Access::eRead}; }
 Use write(std::string r)  { return {std::move(r), Access::eWrite}; }
 Use readPrevious(std::string r) { return {std::move(r), Access::eReadPrevious}; }
+Use readIn(std::string r, const std::uint32_t state) { return {std::move(r), Access::eRead, {}, state, true}; }
+PassDecl async(PassDecl decl) { decl.async = true; return decl; }
 
 std::vector<std::string> names(const std::vector<PassDecl>& passes, const std::vector<std::size_t>& indices) {
     std::vector<std::string> out;
@@ -474,6 +477,112 @@ TEST(FrameGraphCompiler, AResourceReadAndAnotherWrittenByOnePassDoNotShare) {
     const std::vector<CompiledGraph::Lifetime> lifetimes{{"a", 0, 1}, {"b", 1, 2}};
     const auto slots = packLifetimes(lifetimes, {"k", "k"});
     EXPECT_NE(slots[0], slots[1]);
+}
+
+
+// ---- the async compute queue --------------------------------------------------------------------
+
+// Occlusion-style: SSAO on the async queue beside SSR, both only sampling the G-buffer.
+std::vector<PassDecl> asyncFrame(const std::uint32_t ssaoState, const std::uint32_t ssrState) {
+    return {
+        pass("gbuffer",         {create("depth"), create("normal"), create("albedo")}),
+        async(pass("ssao",      {readIn("depth", ssaoState), readIn("normal", ssaoState), create("ao")})),
+        pass("ssr",             {readIn("depth", ssrState), readIn("normal", ssrState), read("albedo"), create("reflections")}),
+        pass("composite",       {read("albedo"), read("ao"), read("reflections"), write("screen")}),
+    };
+}
+
+TEST(FrameGraphCompiler, WithoutAsyncPassesNothingWaitsAcrossQueues) {
+    const auto compiled = compile(deferredFrame(), {"screen"});
+    ASSERT_TRUE(compiled);
+    EXPECT_EQ(compiled->async, (std::vector<bool>{false, false, false, false}));
+    for (const auto& wait : compiled->waits) EXPECT_FALSE(wait.has_value());
+    EXPECT_TRUE(compiled->serialized.empty());
+}
+
+TEST(FrameGraphCompiler, AnAsyncPassWaitsOnlyForWhatItNeedsFromTheOtherQueue) {
+    const auto compiled = compile(asyncFrame(1, 1), {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    const auto& passes = asyncFrame(1, 1);
+    EXPECT_EQ(names(passes, compiled->order), (std::vector<std::string>{"gbuffer", "ssao", "ssr", "composite"}));
+    EXPECT_EQ(compiled->async, (std::vector<bool>{false, true, false, false}));
+    EXPECT_EQ(compiled->waits[1], std::optional<std::size_t>(0)) << "ssao needs the G-buffer";
+    EXPECT_FALSE(compiled->waits[2].has_value()) << "ssr runs beside ssao: both only read, in the same state";
+    EXPECT_EQ(compiled->waits[3], std::optional<std::size_t>(1)) << "composite needs the ao";
+    EXPECT_TRUE(compiled->serialized.empty());
+    // The G-buffer pass leaves depth and normals in the state both read them in.
+    using H = CompiledGraph::Handoff;
+    EXPECT_EQ(compiled->handoffs, (std::vector<H>{{0, "depth", 1}, {0, "normal", 1}}));
+}
+
+TEST(FrameGraphCompiler, AReaderInAnotherStateAnywhereKeepsTheQueuesApart) {
+    // Composite also samples depth, as something else: no one state to leave it in.
+    auto passes = asyncFrame(1, 1);
+    passes[3].uses.push_back(readIn("depth", 2));
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(compiled->serialized, (std::vector<std::pair<std::size_t, std::size_t>>{{1, 2}}));
+    EXPECT_TRUE(std::ranges::none_of(compiled->handoffs, [](const auto& h) { return h.resource == "depth"; }));
+}
+
+TEST(FrameGraphCompiler, ReadsOfAResourceWithoutALayoutOverlapWithNoHandoff) {
+    // Two passes reading one buffer, on different queues.
+    const std::vector<PassDecl> passes{
+        pass("make", {create("lights")}),
+        async(pass("cull", {{"lights", Access::eRead, {}, 1, false}, create("tiles")})),
+        pass("shadows", {{"lights", Access::eRead, {}, 1, false}, create("shadowMap")}),
+        pass("light", {read("tiles"), read("shadowMap"), write("screen")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_TRUE(compiled->serialized.empty());
+    EXPECT_TRUE(compiled->handoffs.empty());
+    EXPECT_EQ(compiled->waits[3], std::optional<std::size_t>(1));
+}
+
+TEST(FrameGraphCompiler, PassesNeedingOneResourceInDifferentStatesDoNotOverlap) {
+    // Sampled by one and read as storage by the other: an image in two layouts at once.
+    const auto compiled = compile(asyncFrame(1, 2), {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(compiled->serialized, (std::vector<std::pair<std::size_t, std::size_t>>{{1, 2}}));
+    EXPECT_EQ(compiled->waits[2], std::optional<std::size_t>(1)) << "ssr now waits for ssao";
+}
+
+TEST(FrameGraphCompiler, ReadsInAnUnknownStateDoNotOverlap) {
+    const auto compiled = compile(asyncFrame(0, 0), {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(compiled->serialized, (std::vector<std::pair<std::size_t, std::size_t>>{{1, 2}}));
+}
+
+TEST(FrameGraphCompiler, AWaitStandsForEveryEarlierPassOnThatQueue) {
+    // b and c on the async queue in a chain; d needs both but waits only for c, which follows b.
+    const std::vector<PassDecl> passes{
+        pass("a", {create("x")}),
+        async(pass("b", {read("x"), create("y")})),
+        async(pass("c", {read("y"), create("z")})),
+        pass("d", {read("y"), read("z"), write("screen")}),
+    };
+    const auto compiled = compile(passes, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(compiled->waits[1], std::optional<std::size_t>(0));
+    EXPECT_FALSE(compiled->waits[2].has_value()) << "b is on its own queue, before it";
+    EXPECT_EQ(compiled->waits[3], std::optional<std::size_t>(2));
+}
+
+TEST(FrameGraphCompiler, WhatAnAsyncPassUsesNeverSharesMemory) {
+    const auto compiled = compile(asyncFrame(1, 1), {"screen"});
+    ASSERT_TRUE(compiled);
+    for (const auto& lifetime : compiled->lifetimes)
+        EXPECT_EQ(lifetime.async, lifetime.resource == "depth" || lifetime.resource == "normal" || lifetime.resource == "ao")
+            << lifetime.resource;
+}
+
+TEST(FrameGraphCompiler, ACpuPassIsNeverAsync) {
+    auto decl = async(pass("prepare", {create("list")}));
+    decl.cpu = true;
+    const auto compiled = compile({decl, pass("draw", {read("list"), write("screen")})}, {"screen"});
+    ASSERT_TRUE(compiled) << compiled.error().message;
+    EXPECT_EQ(compiled->async, (std::vector<bool>{false, false}));
 }
 
 TEST(FrameGraphCompiler, AnEmptyGraphIsFine) {

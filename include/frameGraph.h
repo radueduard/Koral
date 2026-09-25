@@ -139,6 +139,21 @@ namespace kor {
         PassBuilder& ReadPrevious(std::string_view name, Flags<Image::Usage> usage);
         PassBuilder& ReadPrevious(std::string_view name, Flags<Buffer::Usage> usage);
 
+        /**
+         * @brief Runs the pass on the async compute queue, alongside the graphics passes it does not
+         *        depend on — SSAO beside the shadow maps, light culling beside the depth pre-pass.
+         *
+         * For a pass that records compute dispatches and copies only. The graph orders it against
+         * the other queue by what it reads and writes, and keeps it apart from passes it is not
+         * ordered against that need a resource it uses in another state: declare reads with their
+         * usage (`Read("depth", Image::Usage::eSampled)`) so two passes that only sample the same
+         * image may overlap. Resources it uses never share memory with others.
+         *
+         * A pass that uses the screen stays on the graphics queue. On a device with no second queue
+         * (Context::SupportsAsyncCompute) it runs in order with the rest, which is always correct.
+         */
+        PassBuilder& AsyncCompute();
+
     private:
         friend class FrameGraph;
         struct Impl;
@@ -382,6 +397,7 @@ namespace kor {
         struct Scheduled {
             std::string name;
             glm::u32 level;
+            bool async = false;  ///< Runs on the async compute queue.
         };
         /** @brief The passes that run, in order. Passes on one level do not depend on each other. */
         [[nodiscard]] const std::vector<Scheduled>& Schedule() const { return _schedule; }
@@ -480,6 +496,9 @@ namespace kor {
         std::vector<std::unique_ptr<RenderPass>> _passes;
         std::vector<RenderPass*> _order;      // what runs, in order
         std::vector<Scheduled> _schedule;
+        std::vector<bool> _async;                                          // per position in _order
+        std::vector<std::optional<std::size_t>> _waits;                    // per position: the other queue's pass it waits for
+        std::vector<std::vector<ImageBarrier>> _handoffs;                  // per position: images it leaves for readers on both queues
         std::vector<std::string> _culled;
         std::vector<Skipped> _skipped;
         std::map<std::string, ResourceRef<const Image>, std::less<>> _images;    // every name, imported or made

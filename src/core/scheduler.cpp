@@ -44,7 +44,7 @@ namespace kor
     Scheduler::Scheduler(const Builder& createInfo) :
         _imageCount(createInfo.imageCount) {}
 
-    Token Scheduler::Execute(std::unique_ptr<CommandBuffer> commandBuffer, const Placement placement)
+    Token Scheduler::Execute(std::unique_ptr<CommandBuffer> commandBuffer, ExecuteInfo info)
     {
         if (!commandBuffer) {
             log::Error("[scheduler] Execute was handed no command buffer");
@@ -56,16 +56,25 @@ namespace kor
                        "Drop the End() call before handing it over.");
             return {};
         }
+        const std::uint32_t queue = QueueOf(*commandBuffer);
+        std::erase_if(info.after, [](const Token& token) { return token.Ready(); });
         std::lock_guard lock(_pendingMutex);
-        (placement == Placement::eBeforeFrame ? _pending.before : _pending.after).push_back(std::move(commandBuffer));
-        return _frameTimeline.At(_frameNumber);
+        const Token done = _executeTimelines[{queue, info.placement}].Next();
+        (info.placement == Placement::eBeforeFrame ? _pending.before : _pending.after).push_back(Executed{
+            .commandBuffer = std::move(commandBuffer),
+            .after = std::move(info.after),
+            .group = info.group,
+            .done = done,
+            .queue = queue,
+        });
+        return done;
     }
 
     bool Scheduler::QueuedWorkTouches(const ResourceRef<const Image>& image)
     {
         std::lock_guard lock(_pendingMutex);
-        const auto touches = [&](const std::vector<std::unique_ptr<CommandBuffer>>& list) {
-            return std::ranges::any_of(list, [&](const auto& cb) { return cb && cb->HasTouched(image); });
+        const auto touches = [&](const std::vector<Executed>& list) {
+            return std::ranges::any_of(list, [&](const Executed& e) { return e.commandBuffer && e.commandBuffer->HasTouched(image); });
         };
         return touches(_pending.before) || touches(_pending.after);
     }
@@ -88,6 +97,7 @@ namespace kor
         std::lock_guard lock(_pendingMutex);
         Pending taken = std::move(_pending);
         _pending = {};
+        taken.previousCompletion = _frameTimeline.At(_frameNumber - 1);
         taken.completion = _frameTimeline.At(_frameNumber++);
         return taken;
     }

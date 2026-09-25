@@ -4,6 +4,8 @@
 
 #pragma once
 #include <glm/fwd.hpp>
+#include <cstdint>
+#include <map>
 #include <vector>
 #include <functional>
 #include <memory>
@@ -164,13 +166,32 @@ namespace kor
             eAfterFrame,  ///< Behind it: work that uses what the frame produced.
         };
 
+        /** @brief How an executed command buffer is fitted into the frame. @see Execute */
+        struct ExecuteInfo {
+            /** Before or after the frame's own command buffer. */
+            Placement placement = Placement::eBeforeFrame;
+            /**
+             * Held back on the GPU until all of these have happened — typically the tokens earlier
+             * Execute() calls returned, for work on another queue (Usage::eAsyncCompute) whose results
+             * this uses. Work on the same queue as a token's needs none: a queue runs in order.
+             */
+            std::vector<Token> after {};
+            /**
+             * For work that orders itself — a frame graph. Command buffers sharing a non-zero group
+             * are ordered against each other only by `after`, and so may run at the same time on
+             * different queues. Everything else is ordered conservatively: a command buffer waits for
+             * all work handed over before it, on every queue, that is not in its own group.
+             */
+            std::uintptr_t group = 0;
+        };
+
         /**
-         * @brief Adds a command buffer recorded elsewhere — another thread, a coroutine — to the next frame.
+         * @brief Adds a command buffer recorded elsewhere — another thread, a coroutine, a frame
+         *        graph's pass — to the next frame.
          * @param commandBuffer Begun and recorded, but **not** ended: the frame ends it, so that its
          *        barriers are worked out in the order it actually runs. Any thread may hand one over.
-         * @param placement Before or after the frame's own command buffer. Several with the same
-         *        placement run in the order they were handed over.
-         * @return The frame's completion token (see FrameCompletion()): the work is done when it is.
+         * @return A token signalled once the GPU has finished this command buffer — no later than
+         *         the frame's completion (FrameCompletion()).
          *
          * @code
          * kor::Task<void> Simulate(kor::ResourceRef<const kor::Buffer> particles) {
@@ -179,16 +200,24 @@ namespace kor
          *     cb->Begin();
          *     cb->BindComputePipeline(step).BindDescriptorSet(0, set).Dispatch(groups, 1, 1);
          *     co_await kor::Context::Scheduler().Execute(std::move(cb));
-         *     // the frame that ran it has finished on the GPU
+         *     // the GPU has run it
          * }
          * @endcode
          *
+         * Several with the same placement run in the order they were handed over. One created with
+         * Usage::eAsyncCompute runs on a queue of its own, alongside the frame's graphics work: it
+         * waits for everything handed over before it (unless `group` says otherwise), and whatever
+         * uses its results names its token in `after` — or waits for it by being handed over later.
+         *
          * The scheduler keeps the command buffer until the GPU is done with it. The resources it
-         * uses are the caller's to keep alive until then, as for the frame's own. Under Vulkan it
-         * must run on the frame's queue, which a command buffer created with Usage::eGraphics or
-         * Usage::eCompute on an ordinary device does.
+         * uses are the caller's to keep alive until then, as for the frame's own.
          */
-        Token Execute(std::unique_ptr<CommandBuffer> commandBuffer, Placement placement = Placement::eBeforeFrame);
+        Token Execute(std::unique_ptr<CommandBuffer> commandBuffer, ExecuteInfo info);
+
+        /** @brief Execute() with only a placement. */
+        Token Execute(std::unique_ptr<CommandBuffer> commandBuffer, Placement placement = Placement::eBeforeFrame) {
+            return Execute(std::move(commandBuffer), ExecuteInfo{ .placement = placement });
+        }
 
         /**
          * @brief Whether any command buffer handed to Execute() for the frame being built uses @p image.
@@ -237,17 +266,32 @@ namespace kor
 
     protected:
     	virtual void CreateFrames() = 0;
+        /**
+         * @brief Which queue @p commandBuffer runs on, as a number the backend understands. Work on
+         *        one queue runs in the order it is submitted; across queues only what waits is ordered.
+         */
+        [[nodiscard]] virtual std::uint32_t QueueOf(const CommandBuffer& commandBuffer) const { return 0; }
         explicit Scheduler(const Builder& createInfo);
     	bool _started = false;
         /// Set by the backend's Draw from just before the render callback until the frame's work is taken.
         bool _buildingFrame = false;
 
+        /** @brief One command buffer handed to Execute(), as the frame receives it. */
+        struct Executed {
+            std::unique_ptr<CommandBuffer> commandBuffer;
+            std::vector<Token> after;
+            std::uintptr_t group = 0;
+            Token done;       ///< What Execute() returned; the submission that runs it signals it.
+            std::uint32_t queue = 0;
+        };
+
         /** @brief What a frame picks up from Execute(), WaitFor() and FrameCompletion(). */
         struct Pending {
-            std::vector<std::unique_ptr<CommandBuffer>> before;
-            std::vector<std::unique_ptr<CommandBuffer>> after;
+            std::vector<Executed> before;
+            std::vector<Executed> after;
             std::vector<Token> waits;
-            Token completion; ///< Signalled by this frame's submission.
+            Token completion;          ///< Signalled by this frame's submission.
+            Token previousCompletion;  ///< The frame before's: work on another queue waits for it.
         };
 
         /**
@@ -266,6 +310,12 @@ namespace kor
         std::mutex _pendingMutex;
         Pending _pending;
         Timeline _frameTimeline;
+        /**
+         * The tokens Execute() returns, one timeline per queue and placement: a timeline's values must
+         * rise in the order its semaphore is signalled, and work of one queue and placement is
+         * submitted in the order it was handed over.
+         */
+        std::map<std::pair<std::uint32_t, Placement>, Timeline> _executeTimelines;
         std::uint64_t _frameNumber = 1; ///< The frame being built; its completion is _frameTimeline.At() it.
     };
 }

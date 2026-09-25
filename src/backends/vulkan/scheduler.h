@@ -4,6 +4,7 @@
 
 #pragma once
 #include <glm/fwd.hpp>
+#include <map>
 
 #include "device.h"
 #include "swapChain.h"
@@ -62,6 +63,9 @@ namespace kor::vk
 
     	void RetireWindow(std::shared_ptr<kor::Surface> surface, GLFWwindow* window) override;
 
+    protected:
+    	[[nodiscard]] std::uint32_t QueueOf(const kor::CommandBuffer& commandBuffer) const override;
+
     private:
     	/// Rebuild @p window's swap chain at its current size and re-point its default framebuffer.
     	static void recreateSwapChain(kor::Window& window);
@@ -78,6 +82,9 @@ namespace kor::vk
     	};
     	std::vector<Retired> _retired;
     	bool _drawnOnce = false;
+    	// One per queue: every submission of a frame signals its queue's next value, which is what
+    	// work on another queue waits for.
+    	std::map<glm::u32, kor::Timeline> _queueTimelines;
 
     public:
 	    void WaitIdle() const override;

@@ -292,7 +292,14 @@ namespace kor
         enum class Usage : std::uint8_t {
             eGraphics = 1 << 0, ///< Draws and render passes. Also permits compute and transfers on every device.
             eCompute = 1 << 1,  ///< Compute dispatches, without the graphics pipeline.
-            eTransfer = 1 << 2  ///< Copies, blits and clears only. The narrowest, and on discrete GPUs often a dedicated transfer queue.
+            eTransfer = 1 << 2, ///< Copies, blits and clears only. The narrowest, and on discrete GPUs often a dedicated transfer queue.
+            /**
+             * Compute (and copies) that runs alongside the frame's graphics work, on a queue of its
+             * own — handed to Scheduler::Execute, which orders it by the tokens it waits for. On a
+             * device with no second queue (Context::SupportsAsyncCompute) it runs in order on the
+             * frame's, which is always correct, only not overlapped.
+             */
+            eAsyncCompute = 1 << 3
         };
 
         // ---- Lifecycle ------------------------------------------------------------------------

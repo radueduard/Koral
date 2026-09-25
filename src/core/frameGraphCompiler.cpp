@@ -273,13 +273,103 @@ namespace kor::graph {
             std::ranges::sort(out.dependencies[i]);
         }
 
+        // ---- queues ---------------------------------------------------------------------------------
+        const std::size_t m = out.order.size();
+        const auto gpu = [&](const std::size_t i) { return !passes[out.order[i]].cpu; };
+        out.async.resize(m, false);
+        for (std::size_t i = 0; i < m; ++i) out.async[i] = gpu(i) && passes[out.order[i]].async;
+        out.waits.resize(m);
+        if (std::ranges::find(out.async, true) != out.async.end()) {
+            // What each pass touches, by physical resource — last frame's copy is a resource of its
+            // own — and the state it reads it in; a pass that changes it has `changes` instead.
+            constexpr std::uint32_t changes = UINT32_MAX;
+            std::vector<std::map<std::string, std::uint32_t>> touched(m);
+            std::set<std::string> layouts;   // resources whose read states are layouts
+            for (std::size_t i = 0; i < m; ++i) {
+                for (const auto& use : passes[out.order[i]].uses) {
+                    const bool reads = use.access == Access::eRead || use.access == Access::eReadPrevious;
+                    const std::string name = use.access == Access::eReadPrevious ? "previous:" + root(use.resource) : root(use.resource);
+                    const std::uint32_t state = reads && use.state != 0 ? use.state : changes;
+                    if (use.layout) layouts.insert(name);
+                    const auto [it, fresh] = touched[i].try_emplace(name, state);
+                    if (!fresh && it->second != state) it->second = changes;  // two different needs in one pass
+                }
+            }
+            // A resource with a layout its readers can share across queues: read in one state only,
+            // after the GPU passes that make it. The last of those moves it into that state.
+            struct Shared { std::size_t maker; std::uint32_t state; };
+            std::map<std::string, std::optional<Shared>> shareable;
+            for (const auto& name : layouts) {
+                std::optional<std::uint32_t> state;
+                std::optional<std::size_t> lastMaker, firstReader;
+                bool ok = true;
+                for (std::size_t i = 0; i < m && ok; ++i) {
+                    const auto it = touched[i].find(name);
+                    if (it == touched[i].end()) continue;
+                    if (it->second == changes) {
+                        ok = gpu(i) && !firstReader;   // made on the GPU, before anything reads it
+                        lastMaker = i;
+                    } else {
+                        ok = !state || *state == it->second;
+                        state = it->second;
+                        if (!firstReader) firstReader = i;
+                    }
+                }
+                if (ok && lastMaker && state) shareable[name] = Shared{*lastMaker, *state};
+                else shareable[name] = std::nullopt;
+            }
+            // Whether passes on different queues, ordered by nothing, can run at the same time: they
+            // may when all they share is read — and read in one known state, or with no layout at all.
+            const auto conflict = [&](const std::size_t i, const std::size_t j) {
+                return std::ranges::any_of(touched[i], [&](const auto& use) {
+                    const auto other = touched[j].find(use.first);
+                    if (other == touched[j].end()) return false;
+                    if (use.second == changes || other->second == changes || other->second != use.second) return true;
+                    if (!layouts.contains(use.first)) return false;
+                    const auto& shared = shareable[use.first];
+                    if (!shared) return true;
+                    const CompiledGraph::Handoff handoff{shared->maker, use.first, shared->state};
+                    if (std::ranges::find(out.handoffs, handoff) == out.handoffs.end()) out.handoffs.push_back(handoff);
+                    return false;
+                });
+            };
+            // reach[j][i]: j runs after i — through dependencies, and the orderings added here.
+            std::vector<std::vector<bool>> reach(m, std::vector<bool>(m, false));
+            const auto after = [&](const std::size_t j, const std::size_t i) {
+                reach[j][i] = true;
+                for (std::size_t k = 0; k < i; ++k) if (reach[i][k]) reach[j][k] = true;
+            };
+            std::optional<std::size_t> waitedUpTo[2];   // per queue: the latest pass on the other it waited for
+            for (std::size_t j = 0; j < m; ++j) {
+                for (const auto d : out.dependencies[j]) after(j, d);
+                if (!gpu(j)) continue;
+                for (std::size_t i = 0; i < j; ++i) {
+                    if (!gpu(i) || out.async[i] == out.async[j] || reach[j][i]) continue;
+                    if (!conflict(i, j)) continue;
+                    out.serialized.emplace_back(i, j);
+                    after(j, i);
+                }
+                // The latest pass it needs from the other queue — unless an earlier pass on its own
+                // queue already waited for that one or a later one, which its queue running in order
+                // passes on.
+                for (std::size_t i = j; i-- > 0;) {
+                    if (!gpu(i) || out.async[i] == out.async[j] || !reach[j][i]) continue;
+                    auto& already = waitedUpTo[out.async[j] ? 1 : 0];
+                    if (!already || *already < i) { out.waits[j] = i; already = i; }
+                    break;
+                }
+            }
+        }
+
         // ---- lifetimes of what the graph creates, per physical resource -----------------------------
         std::map<std::string, std::pair<std::size_t, std::size_t>> spans;  // root -> first, last
+        std::set<std::string> asyncUsed;
         for (const auto& [name, info] : resources) {
             const std::string physical = root(name);
             if (imported.contains(physical)) continue;  // not the graph's to allocate
             const auto touch = [&](const std::size_t p) {
                 if (!keep[p]) return;
+                if (!passes[p].cpu && passes[p].async) asyncUsed.insert(physical);
                 auto [it, fresh] = spans.try_emplace(physical, position[p], position[p]);
                 if (!fresh) {
                     it->second.first = std::min(it->second.first, position[p]);
@@ -295,7 +385,7 @@ namespace kor::graph {
             // Copied into the next frame's history after the last pass, and read before the first.
             if (!out.order.empty()) spans[physical] = { 0, out.order.size() - 1 };
         }
-        for (const auto& [name, span] : spans) out.lifetimes.push_back({name, span.first, span.second});
+        for (const auto& [name, span] : spans) out.lifetimes.push_back({name, span.first, span.second, asyncUsed.contains(name)});
         out.history.assign(history.begin(), history.end());
         std::ranges::sort(out.lifetimes, {}, &CompiledGraph::Lifetime::first);
         for (const auto& alias : aliasOf | std::views::keys) out.aliases[alias] = root(alias);

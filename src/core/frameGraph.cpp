@@ -42,14 +42,35 @@ namespace kor {
         return *this;
     }
 
+    namespace {
+        // The states a read can declare, as the compiler compares them. An image is read in a
+        // layout: sampled, or copied from — anything else (storage, attachments, several usages at
+        // once) is left unknown, which keeps passes on different queues from reading it together.
+        // A buffer has no layout, so any two reads of one agree.
+        constexpr std::uint32_t sampledState = 1, transferSrcState = 2, bufferReadState = 1;
+
+        graph::Use imageRead(std::string name, const graph::Access access, const Flags<Image::Usage> usage) {
+            const std::uint32_t state = usage == Flags<Image::Usage>(Image::Usage::eSampled) ? sampledState
+                                      : usage == Flags<Image::Usage>(Image::Usage::eTransferSrc) ? transferSrcState : 0;
+            return {std::move(name), access, {}, state, true};
+        }
+
+        // What the pass that makes an image leaves it as, for readers that share a state.
+        ResourceAccess handoffAccess(const std::uint32_t state) {
+            return state == transferSrcState ? ResourceAccess::eTransferSrc : ResourceAccess::eAllShaderRead;
+        }
+    }
+
     PassBuilder& PassBuilder::Read(const std::string_view name, const Flags<Image::Usage> usage) {
         _impl.imageUses.emplace_back(std::string(name), usage);
-        return Read(name);
+        _impl.decl.uses.push_back(imageRead(std::string(name), graph::Access::eRead, usage));
+        return *this;
     }
 
     PassBuilder& PassBuilder::Read(const std::string_view name, const Flags<Buffer::Usage> usage) {
         _impl.bufferUses.emplace_back(std::string(name), usage);
-        return Read(name);
+        _impl.decl.uses.push_back({std::string(name), graph::Access::eRead, {}, bufferReadState, false});
+        return *this;
     }
 
     PassBuilder& PassBuilder::Write(const std::string_view name) {
@@ -106,12 +127,19 @@ namespace kor {
 
     PassBuilder& PassBuilder::ReadPrevious(const std::string_view name, const Flags<Image::Usage> usage) {
         _impl.previousImageUses.emplace_back(std::string(name), usage);
-        return ReadPrevious(name);
+        _impl.decl.uses.push_back(imageRead(std::string(name), graph::Access::eReadPrevious, usage));
+        return *this;
     }
 
     PassBuilder& PassBuilder::ReadPrevious(const std::string_view name, const Flags<Buffer::Usage> usage) {
         _impl.previousBufferUses.emplace_back(std::string(name), usage);
-        return ReadPrevious(name);
+        _impl.decl.uses.push_back({std::string(name), graph::Access::eReadPrevious, {}, bufferReadState, false});
+        return *this;
+    }
+
+    PassBuilder& PassBuilder::AsyncCompute() {
+        _impl.decl.async = true;
+        return *this;
     }
 
     Scene* FrameGraph::OwnerScene() const { return _scene ? _scene : Scene::Current(); }
@@ -348,7 +376,15 @@ namespace kor {
             declarations.push_back(std::move(impl));
         }
         std::vector<graph::PassDecl> decls;
-        for (const auto& d : declarations) decls.push_back(d.decl);
+        for (auto& d : declarations) {
+            // The screen's image is acquired and presented on the graphics queue, and waited for there.
+            if (d.decl.async && std::ranges::any_of(d.decl.uses, [](const graph::Use& use) { return use.resource == Screen; })) {
+                log::Warn("[frame graph] pass '{}' uses the screen, so it runs on the graphics queue rather than "
+                          "the async compute queue", d.decl.name);
+                d.decl.async = false;
+            }
+            decls.push_back(d.decl);
+        }
 
         std::set<std::string> imported{std::string(Screen)};
         for (const auto& name : _importedImages | std::views::keys) imported.insert(name);
@@ -438,7 +474,8 @@ namespace kor {
             } else {
                 continue;
             }
-            if (shareable) shareKeys[i] = plan.shape;
+            // What an async pass uses is in use at times the order does not describe.
+            if (shareable && !compiled->lifetimes[i].async) shareKeys[i] = plan.shape;
         }
         if (!problems.empty()) {
             std::string message;
@@ -610,9 +647,16 @@ namespace kor {
         for (std::size_t i = 0; i < compiled->order.size(); ++i) {
             RenderPass* pass = _passes[compiled->order[i]].get();
             _order.push_back(pass);
-            _schedule.push_back({pass->Name(), compiled->level[i]});
+            _schedule.push_back({pass->Name(), compiled->level[i], compiled->async[i]});
         }
         _dependencies = compiled->dependencies;
+        _async = compiled->async;
+        _waits = compiled->waits;
+        _handoffs.assign(_order.size(), {});
+        for (const auto& [pass, resource, state] : compiled->handoffs) {
+            if (const auto it = _images.find(resource); it != _images.end())
+                _handoffs[pass].push_back({it->second, handoffAccess(state)});
+        }
         for (const auto index : compiled->culled) _culled.push_back(decls[index].name);
         for (const auto& [index, resource, source] : compiled->skipped)
             _skipped.push_back({decls[index].name, resource, decls[source].name});
@@ -653,15 +697,19 @@ namespace kor {
 
         // Runs a CPU pass, or records a GPU one inside a GPU timer scope named after it; either way
         // timing the CPU side.
-        void RunTimed(RenderPass& pass, const bool onCpu, std::unique_ptr<CommandBuffer>& out, double& ms) {
+        void RunTimed(RenderPass& pass, const bool onCpu, const bool async, const std::vector<ImageBarrier>& handoffs,
+                      std::unique_ptr<CommandBuffer>& out, double& ms) {
             const auto start = Clock::now();
             if (onCpu) {
                 static_cast<CpuPass&>(pass).Run();
             } else {
-                auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+                auto cb = CommandBuffer::Create(async ? CommandBuffer::Usage::eAsyncCompute : CommandBuffer::Usage::eGraphics);
                 cb->Begin();
                 cb->BeginTimer(pass.Name());
                 static_cast<const RenderPass&>(pass).Record(*cb);
+                // Images read on both queues next, left in the state they are read in — so no reader
+                // moves one under another running at the same time.
+                if (!handoffs.empty()) cb->Barrier({}, handoffs);
                 cb->EndTimer();
                 out = std::move(cb);
             }
@@ -671,14 +719,15 @@ namespace kor {
         // Runs on the background pool once the CPU passes this one depends on are done. It moves there
         // before it waits: a token resumes whoever awaits it on the executor they awaited from, and the
         // main thread is blocked until every pass has run.
-        Task<void> RunOnBackground(RenderPass& pass, const bool onCpu, std::unique_ptr<CommandBuffer>& out, double& ms,
+        Task<void> RunOnBackground(RenderPass& pass, const bool onCpu, const bool async, const std::vector<ImageBarrier>& handoffs,
+                                   std::unique_ptr<CommandBuffer>& out, double& ms,
                                    std::vector<Token> after, std::shared_ptr<detail::SceneLife> scene) {
             co_await Context::SwitchToBackgroundThread();
             if (!after.empty()) co_await WhenAll(std::move(after));
             // The scene the graph belongs to is current while its passes record, as it is while the
             // scene runs: `Window::` in a pass, and a render pass opened without a framebuffer, are its.
             detail::SceneScope scope(scene);
-            RunTimed(pass, onCpu, out, ms);
+            RunTimed(pass, onCpu, async, handoffs, out, ms);
         }
     }
 
@@ -743,7 +792,7 @@ namespace kor {
                 std::vector<Token> after;
                 for (const auto dependency : _dependencies[i])
                     if (_order[dependency]->RunsOnCpu()) after.push_back(tasks[dependency].Completion());
-                tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), recorded[i], recordMs[i], std::move(after),
+                tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), _async[i], _handoffs[i], recorded[i], recordMs[i], std::move(after),
                                                 scene->Life().lock()));
             }
             auto all = WhenAll(std::move(tasks));
@@ -785,12 +834,22 @@ namespace kor {
         stats.gpuMs[stats.next] = static_cast<float>(gpuSum);
         stats.next = (stats.next + 1) % Stats::History;
 
+        // Handed over in order, as one group: the graph orders its own passes, so a pass on the async
+        // queue waits only for the pass on the graphics queue it needs — and the other way round —
+        // and runs alongside the rest.
         bool touchedScreen = false;
         const auto screen = screenOf(scene);
-        for (auto& cb : recorded) {
+        const auto group = reinterpret_cast<std::uintptr_t>(this);
+        std::vector<Token> done(_order.size());
+        std::optional<std::size_t> lastAsync;
+        for (std::size_t i = 0; i < recorded.size(); ++i) {
+            auto& cb = recorded[i];
             if (!cb) continue;  // a CPU pass, or one that threw (already reported)
             if (screen.Alive() && cb->HasTouched(screen)) touchedScreen = true;
-            scheduler.Execute(std::move(cb));
+            Scheduler::ExecuteInfo info{ .group = group };
+            if (_waits[i]) info.after.push_back(done[*_waits[i]]);
+            if (_async[i]) lastAsync = i;
+            done[i] = scheduler.Execute(std::move(cb), std::move(info));
         }
 
         // After the last pass: what this frame left becomes the next frame's previous frame.
@@ -802,7 +861,10 @@ namespace kor {
                 if (h.previousBuffer.Valid()) keep->CopyBuffer(h.buffer, h.previousBuffer);
                 ++h.frames;
             }
-            scheduler.Execute(std::move(keep));
+            // After every pass, the async ones included.
+            Scheduler::ExecuteInfo info{ .group = group };
+            if (lastAsync) info.after.push_back(done[*lastAsync]);
+            scheduler.Execute(std::move(keep), std::move(info));
         }
         return touchedScreen;
     }
@@ -824,7 +886,10 @@ namespace kor {
     void FrameGraph::DrawSchedule() {
         if (ImGui::Begin("Frame Graph", &_showSchedule)) {
             ImGui::TextDisabled("Passes on one level do not depend on each other.");
-            for (const auto& [name, level] : _schedule) ImGui::Text("%*s%u  %s", static_cast<int>(level * 2), "", level, name.c_str());
+            for (const auto& [name, level, async] : _schedule)
+                ImGui::Text("%*s%u  %s%s", static_cast<int>(level * 2), "", level, name.c_str(), async ? "  (async compute)" : "");
+            if (std::ranges::any_of(_schedule, &Scheduled::async) && !Context::SupportsAsyncCompute())
+                ImGui::TextDisabled("This device has no async compute queue: async passes run in order.");
             if (!_skipped.empty()) {
                 ImGui::Separator();
                 ImGui::TextDisabled("Skipped (an input comes from a disabled pass):");

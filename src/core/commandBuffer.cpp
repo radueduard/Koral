@@ -1599,8 +1599,11 @@ namespace kor
         switch (Context::ActiveAPI()) {
         case API::eVulkan:
             {
-                const auto& queue = vk::Context::Device().requestQueue(getQueueFlagsFromUsage(usage));
-                return vk::Context::Device().requestCommandBuffer(queue);
+                const auto& device = vk::Context::Device();
+                const auto& queue = usage & Usage::eAsyncCompute
+                    ? device.requestAsyncComputeQueue()
+                    : device.requestQueue(getQueueFlagsFromUsage(usage));
+                return device.requestCommandBuffer(queue);
             }
         default:
             throw std::runtime_error("Unknown API");

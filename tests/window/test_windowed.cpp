@@ -1004,6 +1004,113 @@ TEST_F(VkWindowTest, AFrameGraphCpuPassRunsBeforeTheGpuPassesThatUseIt) {
     EXPECT_FALSE(graph.PassTimings()[0].gpuMeasured) << "a CPU pass has no GPU time";
 }
 
+// ---- async compute ----------------------------------------------------------------------------
+
+namespace {
+    // fill (graphics) -> copy (async) -> read (graphics), with a graphics pass beside the copy that
+    // samples the same source: both only read it as a transfer source, so they may overlap.
+    struct AsyncChain {
+        LambdaPass* fill;
+        LambdaPass* copy;
+        LambdaPass* beside;
+        LambdaPass* read;
+        kor::Resource<kor::Buffer> readback;
+        kor::Resource<kor::Buffer> besideReadback;
+    };
+    AsyncChain addAsyncChain(kor::FrameGraph& graph, const float value) {
+        AsyncChain out{.readback = makeReadback(), .besideReadback = makeReadback()};
+        auto a = std::make_shared<kor::ResourceRef<const kor::Image>>();
+        auto b = std::make_shared<kor::ResourceRef<const kor::Image>>();
+        const kor::ImageDesc desc{.format = kor::Image::Format::eR32_SFLOAT, .usage = kor::Image::Usage::eTransferDst};
+        out.fill = &graph.Add<LambdaPass>("Fill");
+        out.fill->setup = [=](kor::PassBuilder& b) { b.Create("a", desc); };
+        out.fill->initialize = [=](const kor::PassResources& r) { *a = r.ImageNamed("a"); };
+        out.fill->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*a, glm::vec4(value)); };
+        out.copy = &graph.Add<LambdaPass>("Copy");
+        out.copy->setup = [=](kor::PassBuilder& p) { p.Read("a", kor::Image::Usage::eTransferSrc).Create("b", desc).AsyncCompute(); };
+        out.copy->initialize = [=](const kor::PassResources& r) { *a = r.ImageNamed("a"); *b = r.ImageNamed("b"); };
+        out.copy->record = [=](kor::CommandBuffer& cb) { cb.CopyImage(*a, *b); };
+        out.beside = &graph.Add<LambdaPass>("Beside");
+        out.beside->setup = [=](kor::PassBuilder& p) { p.Read("a", kor::Image::Usage::eTransferSrc).SideEffect(); };
+        out.beside->initialize = [=](const kor::PassResources& r) { *a = r.ImageNamed("a"); };
+        out.beside->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.besideReadback)](kor::CommandBuffer& cb) {
+            cb.CopyImageToBuffer(*a, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+        };
+        out.read = &graph.Add<LambdaPass>("Read");
+        out.read->setup = [=](kor::PassBuilder& p) { p.Read("b", kor::Image::Usage::eTransferSrc).SideEffect(); };
+        out.read->initialize = [=](const kor::PassResources& r) { *b = r.ImageNamed("b"); };
+        out.read->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.readback)](kor::CommandBuffer& cb) {
+            cb.CopyImageToBuffer(*b, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+        };
+        return out;
+    }
+}
+
+// A pass on the async compute queue gets what the graphics queue made before it, and the graphics
+// pass after it gets what it made — frame after frame, with frames in flight overlapping.
+TEST_F(VkWindowTest, AFrameGraphRunsAnAsyncComputePassBetweenGraphicsPasses) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto chain = addAsyncChain(graph, 4.f);
+
+    drawGraphFrame(scene, graph);
+    ASSERT_EQ(graph.Schedule().size(), 4u);
+    for (const auto& scheduled : graph.Schedule())
+        EXPECT_EQ(scheduled.async, scheduled.name == "Copy") << scheduled.name;
+    EXPECT_EQ(chain.readback->Read<float>(1).front(), 4.f);
+    EXPECT_EQ(chain.besideReadback->Read<float>(1).front(), 4.f);
+    if (!kor::Context::SupportsAsyncCompute()) GTEST_LOG_(INFO) << "no async compute queue here: ran in order";
+
+    // Without waiting in between: the copy of one frame must not run under the last one's reads.
+    auto& overlay = static_cast<OverlayScene&>(scene);
+    overlay.extraGraph = &graph;
+    for (int frame = 0; frame < 6; ++frame) kor::App::Current().Frame();
+    overlay.extraGraph = nullptr;
+    kor::Context::Scheduler().WaitIdle();
+    EXPECT_EQ(chain.readback->Read<float>(1).front(), 4.f);
+}
+
+// What an async pass uses never shares memory: the order says nothing about when it is in use
+// relative to the graphics queue.
+TEST_F(VkWindowTest, AFrameGraphDoesNotShareWhatAnAsyncPassUses) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto chain = addAsyncChain(graph, 2.f);
+    auto after = addFillAndRead(graph, "later", 5.f);   // same shape, made after 'a' and 'b' are done with
+    after.fill->setup = [fill = after.fill->setup](kor::PassBuilder& b) { fill(b); b.Read("b", kor::Image::Usage::eTransferSrc); };
+
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(graph.Memory().resources, 3u);
+    EXPECT_EQ(graph.Memory().allocations, 3u) << "'a' and 'b' are used by the async pass";
+    EXPECT_EQ(chain.readback->Read<float>(1).front(), 2.f);
+    EXPECT_EQ(after.readback->Read<float>(1).front(), 5.f);
+}
+
+// A command buffer handed to Execute on the async queue: work after it waits for the token it
+// returned, and the token is its own — ready once the GPU has run it.
+TEST_F(VkWindowTest, AnAsyncComputeCommandBufferIsWaitedForByTheTokenItReturns) {
+    auto& scheduler = kor::Context::Scheduler();
+    auto source = kor::Buffer::RawBuilder{}.SetRawSize(sizeof(float))
+        .SetUsage(kor::Buffer::Usage::eTransferDst | kor::Buffer::Usage::eTransferSrc).Build();
+    auto readback = makeReadback();
+
+    auto fill = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eAsyncCompute);
+    fill->Begin();
+    fill->FillBuffer(source, std::array{9.f});
+    const kor::Token filled = scheduler.Execute(std::move(fill));
+
+    auto copy = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eGraphics);
+    copy->Begin();
+    copy->CopyBuffer(source, readback);
+    const kor::Token copied = scheduler.Execute(std::move(copy), {.after = {filled}});
+
+    drawFrame(VkEnvironment::scene());
+    scheduler.WaitIdle();
+    EXPECT_TRUE(filled.Ready());
+    EXPECT_TRUE(copied.Ready());
+    EXPECT_EQ(readback->Read<float>(1).front(), 9.f);
+}
+
 TEST_F(VkWindowTest, AFrameGraphRefusesACpuPassFedByTheGpu) {
     auto& scene = VkEnvironment::scene();
     kor::FrameGraph graph;

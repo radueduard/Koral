@@ -178,6 +178,13 @@ bool kor::Context::SupportsRayTracing()
     return kor::vk::Context::Device().supportsRayTracing();
 }
 
+bool kor::Context::SupportsAsyncCompute()
+{
+    if (!HasDevice()) return false;
+    const auto& device = kor::vk::Context::Device();
+    return &device.requestAsyncComputeQueue() != &device.requestQueue(::vk::QueueFlagBits::eGraphics);
+}
+
 void kor::Context::InitHeadless(const API api)
 {
     if (_scheduler.Valid())

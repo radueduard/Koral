@@ -265,6 +265,7 @@ namespace kor::vk {
         {
             queue->operator*().waitIdle();
         }
+        if (_asyncComputeQueue) (**_asyncComputeQueue).waitIdle();
     }
 
     std::pair<::vk::Semaphore, std::uint64_t> Device::nextEpoch(const Queue& queue) const {
@@ -327,6 +328,23 @@ namespace kor::vk {
         throw std::runtime_error("Device::RequestQueue: Failed to find a queue with this type!");
     }
 
+    const Queue& Device::requestAsyncComputeQueue() const {
+        const Queue& frame = requestQueue(::vk::QueueFlagBits::eGraphics);
+        std::lock_guard lock(_queuesMutex);
+        if (!_asyncComputeChosen) {
+            _asyncComputeChosen = true;
+            for (auto& family : _queueFamilies) {
+                if (family.getIndex() != frame.getFamily().getIndex()) continue;
+                try {
+                    _asyncComputeQueue = family.RequestQueue();
+                } catch (const std::runtime_error&) {
+                    // The family's only queue is the frame's: async compute runs on it, in order.
+                }
+            }
+        }
+        return _asyncComputeQueue ? *_asyncComputeQueue : frame;
+    }
+
     const Queue& Device::requestPresentQueue(const kor::vk::Surface& surface) const {
         std::lock_guard lock(_queuesMutex);
         for (const auto& queue : _queuesInUse)
@@ -365,6 +383,8 @@ namespace kor::vk {
         }
         std::lock_guard lock(_queuesMutex);
         _queuesInUse.clear();
+        _asyncComputeQueue.reset();
+        _asyncComputeChosen = false;
     }
 
     std::unique_ptr<CommandBuffer> Device::requestCommandBuffer(const kor::vk::Queue& queue) const {
