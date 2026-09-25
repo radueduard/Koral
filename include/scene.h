@@ -10,6 +10,7 @@
 #include "api.h"
 // Not for anything declared below: RenderUI() makes every scene an ImGui client, and including this
 // is what registers the scene library's own copy of ImGui with the engine.
+#include "frameGraph.h"
 #include "gui.h"
 
 namespace kor
@@ -81,9 +82,24 @@ namespace kor
          * @param commandBuffer The frame's command buffer, already open for recording.
          *
          * Record draws and dispatches here; do not begin, end or submit the command buffer, which
-         * the runtime does around this call.
+         * the runtime does around this call. A scene built from render passes (Graph()) may leave
+         * this empty: the passes run ahead of it.
          */
-        virtual void Render(kor::CommandBuffer& commandBuffer) = 0;
+        virtual void Render(kor::CommandBuffer& commandBuffer) {}
+
+        /**
+         * @brief The scene's render passes. Add them in Initialize; the runtime runs them every
+         *        frame, in parallel where they allow, ahead of Render.
+         *
+         * @code
+         * void MyScene::Initialize() {
+         *     Graph().add<GBufferPass>();
+         *     Graph().add<SSAOPass>();
+         *     Graph().add<CompositePass>();   // writes kor::FrameGraph::Screen
+         * }
+         * @endcode
+         */
+        [[nodiscard]] kor::FrameGraph& Graph() { return _graph; }
 
         /**
          * @brief Called once per frame to define the scene's Dear ImGui interface.
@@ -112,6 +128,9 @@ namespace kor
         // contract every module is written against. A scene sits in the middle of the sandwich, so
         // it has no second slot to run in — what would follow its own Update is simply the rest of
         // Update, and what would follow its own Render is the rest of Render.
+
+    private:
+        kor::FrameGraph _graph;
     };
 }
 

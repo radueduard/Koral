@@ -277,6 +277,14 @@ namespace kor {
             return _state ? _state->name : empty;
         }
 
+        /**
+         * @brief Gives the resource a label for diagnostics — what an error about it calls it
+         *        ("Unsynchronised access to 'gbuffer.normal'") instead of just its type.
+         */
+        void SetName(std::string name) {
+            if (_state) _state->name = std::move(name);
+        }
+
         /** @brief Attempt to rebuild a poisoned resource. @see ResourceStateBase::Retry */
         bool Retry() { return _state && _state->Retry(); }
 

@@ -227,6 +227,8 @@ namespace kor
 
                 ModuleHost::Render(commandBuffer);
                 scene.Render(commandBuffer);
+                // The scene's render passes, recorded in parallel and run ahead of this command buffer.
+                const bool graphTouchedScreen = scene.Graph().Execute();
                 ModuleHost::RenderOverlay(commandBuffer);
 
                 // A frame that never touched the window's framebuffer gets it cleared here, to the
@@ -240,7 +242,7 @@ namespace kor
                 if (const auto framebuffer = Context::DefaultFramebuffer();
                     framebuffer.Valid() && !framebuffer->ColorAttachments().empty()) {
                     if (const auto screen = framebuffer->ColorImage(0);
-                        !commandBuffer.HasTouched(screen)) {
+                        !commandBuffer.HasTouched(screen) && !graphTouchedScreen) {
                         commandBuffer.BeginRendering();
                         commandBuffer.EndRendering();
                     }
