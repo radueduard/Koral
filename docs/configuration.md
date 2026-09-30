@@ -12,6 +12,7 @@ share no code: this schema is the whole contract between them.
 {
   "schemaVersion": 1,
   "name": "My Game",
+  "scene": "Menu",
   "rendering": {
     "api": "Vulkan",
     "platform": "auto",
@@ -38,6 +39,9 @@ share no code: this schema is the whole contract between them.
 Every key is optional. Drop the ones you do not care about; they keep whatever value the layer
 beneath them set. `name` is the window title unless `rendering.window.title` overrides it.
 
+`scene` names which of the library's scenes the runtime opens (a library can offer several — see
+[Scenes and the application](scenes.md)); without it, the first the library lists opens.
+
 The Hub's own keys — `color`, `frameworkVersion`, `kind`, `libraries` — mean nothing to the runtime
 and are ignored, along with any key from a newer Hub than the runtime knows about.
 
@@ -46,8 +50,8 @@ and are ignored, along with any key from a newer Hub than the runtime knows abou
 Settings are applied in this order, each overriding the one before it:
 
 1. **The scene library's own defaults.** A project may export
-   `extern "C" kor::ProjectConfig* CreateProjectConfig()` alongside `CreateScene`. This is how the
-   project wants to be run, compiled into the binary.
+   `extern "C" kor::ProjectConfig* CreateProjectConfig()` alongside its scenes (`KORAL_SCENES`). This
+   is how the project wants to be run, compiled into the binary.
 2. **`koral.json`.** What its author configured, changeable without recompiling. This is the normal
    place to put things.
 3. **Command-line flags.** The last word, for overriding one option on one run.
@@ -202,6 +206,7 @@ For compatibility, the original singular form is still read:
 | `--shaders <dir>`                    | Prepend a shader search directory. Repeatable.                                       |
 | `--module <name>`                    | Load an additional module, by name or path. Repeatable.                              |
 | `--modules-dir <dir>`                | Prepend a module search directory. Repeatable.                                       |
+| `--scene <name>`                     | Which of the library's scenes to open.                                               |
 | `--title <text>`                     | Window title.                                                                        |
 | `--width <n>`, `--height <n>`        | Window size.                                                                         |
 | `--api <name>`                       | `Vulkan` (OpenGL is only in Koral 1.x).                                              |
@@ -212,6 +217,7 @@ For compatibility, the original singular form is still read:
 | `--borderless` / `--decorated`       | Drop or keep the window decorations.                                                 |
 | `--transparent` / `--no-transparent` | Transparent framebuffer.                                                             |
 | `--vsync` / `--no-vsync`             | Wait for vertical blank.                                                             |
+| `--hot-reload`                       | Reload the scene library when it is rebuilt, keeping each scene's `State()`.          |
 | `--help`                             | Print the above.                                                                     |
 
 Flags are for a one-off run, not for wiring a project up — that is what the file is for.
@@ -227,7 +233,9 @@ take effect with no clue as to why.
 `rendering.platform` (or `--platform`) picks the windowing system a Linux build opens on: `x11`,
 `wayland`, or `auto`. `auto` (the default) lets GLFW choose — normally Wayland when a Wayland session
 is present, X11 otherwise. It is ignored on Windows and macOS, and a request for a platform this GLFW
-build or session cannot provide falls back to automatic selection with a warning.
+build or session cannot provide falls back to automatic selection with a warning. A program using `kor::App` directly can also
+pass `WindowPlatform::eNone`: no windowing system at all, for offscreen scenes on a machine with no
+display.
 
 The platform also decides **ImGui multi-viewport** (dragging panels out into their own OS windows). It
 is enabled everywhere *except* Wayland: viewports need the app to place a window at an absolute screen

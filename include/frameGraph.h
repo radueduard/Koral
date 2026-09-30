@@ -192,15 +192,13 @@ namespace kor {
      * - **Record** (any thread, every frame, alongside the other passes): record commands. It is
      *   `const`, so it cannot change the pass — per-frame values belong in Prepare — and the graph
      *   refuses to be changed while passes record. What it must not do on top of that is change
-     *   state it shares with others, or wait for the main thread, which is blocked until every pass memory, although the compiler already knows their lifetimes.
-- Cost
+     *   state it shares with others, or wait for the main thread, which is blocked until every pass
      *   has recorded.
      *
      * Initialize runs again only when something the pass uses changed: a resource it names was
      * reallocated (the window resized, say) or an import it names now refers to something else.
      * A pass whose Initialize also depends on something outside the graph asks for it to run
-     * again with RequestInitialize(). memory, although the compiler already knows their lifetimes.
-- Cost
+     * again with RequestInitialize().
      *
      * @code
      * class SSAOPass final : public kor::RenderPass {
@@ -212,29 +210,7 @@ namespace kor {
      *                           .usage = kor::Image::Usage::eStorage | kor::Image::Usage::eSampled});
      *     }
      *     void Initialize(const kor::PassResources& r) override { ... build pipeline and set ... }
-     *     void Record(kor::CommandBuffer& cb) const override { cb.BindComputePipeline(...).Dispatch(...); } - **Record** (any thread, every frame, alongside the other passes): record commands. It is
-   `const`, so it cannot change the pass — per-frame values belong in Prepare — and the graph
-   refuses to be changed while passes record. What it must not do on top of that is change
-   state it shares with others, or wait for the main thread, which is blocked until every pass me
-   has recorded.
- Initialize runs again only when something the pass uses changed: a resource it names was
- reallocated (the window resized, say) or an import it names now refers to something else.
- A pass whose Initialize also depends on something outside the graph asks for it to run
- again with RequestInitialize(). memory, although the compiler already knows their lifetimes.
- @code
- class SSAOPass final : public kor::RenderPass {
- public:
-     SSAOPass() : RenderPass("SSAO") {}
-     void Setup(kor::PassBuilder& b) override {
-         b.Read("gbuffer.position").Read("gbuffer.normal")
-          .Create("ssao", {.format = kor::Image::Format::eR8_UNORM,
-                           .usage = kor::Image::Usage::eStorage | kor::Image::Usage::eSampled});
-     }
-     void Initialize(const kor::PassResources& r) override { ... build pipeline and set ... }
-     void Record(kor::CommandBuffer& cb) const override { cb.BindComputePipeline(...).Dispatch(..
- };
- @endcode
-/
+     *     void Record(kor::CommandBuffer& cb) const override { cb.BindComputePipeline(...).Dispatch(...); }
      * };
      * @endcode
      */
