@@ -304,6 +304,29 @@ KORAL_API void koral_pass_async_compute(KoralPassBuilder* builder);
 /** An image of the graph's, by name. Borrowed: valid until the pass is initialized again. */
 KORAL_API KoralImage* koral_pass_image(KoralPassResources* resources, const char* name);
 
+/* ---- debug lines --------------------------------------------------------------------------------- */
+
+/** How a debug shape is drawn: its colour, for how many seconds (0: this frame), and over everything or not. */
+typedef struct KoralDebugStyle {
+    float r, g, b, a;
+    float duration;
+    bool on_top;
+} KoralDebugStyle;
+
+/* Into the current scene's debug lines; a null style is opaque white, for this frame. */
+KORAL_API void koral_debug_line(const float from[3], const float to[3], const KoralDebugStyle* style);
+KORAL_API void koral_debug_box(const float min[3], const float max[3], const KoralDebugStyle* style);
+KORAL_API void koral_debug_sphere(const float center[3], float radius, const KoralDebugStyle* style);
+KORAL_API void koral_debug_arrow(const float from[3], const float to[3], const KoralDebugStyle* style);
+
+/**
+ * Adds a pass drawing the scene's debug lines over its screen, with the camera @p view_projection
+ * writes (16 floats, column-major) each frame. @p depth names a depth image of the graph's to test the
+ * lines against; null draws them on top.
+ */
+KORAL_API KoralStatus koral_graph_add_debug_pass(KoralScene* scene, void (*view_projection)(float out[16], void* user),
+                                                 void* user, const char* depth);
+
 #ifdef __cplusplus
 }
 #endif

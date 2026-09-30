@@ -14,6 +14,7 @@
 #include "app.h"
 #include "buffer.h"
 #include "commandBuffer.h"
+#include "debugDraw.h"
 #include "computePipeline.h"
 #include "descriptorSet.h"
 #include "frameGraph.h"
@@ -688,6 +689,49 @@ KoralImage* koral_pass_image(KoralPassResources* resources, const char* name)
 {
     if (!resources || !name) return nullptr;
     return resources->pass->Image(*resources->resources, name);
+}
+
+// ---- debug lines ------------------------------------------------------------------------------------------
+
+namespace
+{
+    kor::DebugStyle styleOf(const KoralDebugStyle* style)
+    {
+        if (!style) return {};
+        return {.color = {style->r, style->g, style->b, style->a}, .duration = style->duration, .onTop = style->on_top};
+    }
+    glm::vec3 vec3Of(const float* v) { return {v[0], v[1], v[2]}; }
+}
+
+void koral_debug_line(const float from[3], const float to[3], const KoralDebugStyle* style)
+{
+    guardedVoid([&] { kor::Scene::Debug::Line(vec3Of(from), vec3Of(to), styleOf(style)); });
+}
+void koral_debug_box(const float min[3], const float max[3], const KoralDebugStyle* style)
+{
+    guardedVoid([&] { kor::Scene::Debug::Box(vec3Of(min), vec3Of(max), styleOf(style)); });
+}
+void koral_debug_sphere(const float center[3], const float radius, const KoralDebugStyle* style)
+{
+    guardedVoid([&] { kor::Scene::Debug::Sphere(vec3Of(center), radius, styleOf(style)); });
+}
+void koral_debug_arrow(const float from[3], const float to[3], const KoralDebugStyle* style)
+{
+    guardedVoid([&] { kor::Scene::Debug::Arrow(vec3Of(from), vec3Of(to), styleOf(style)); });
+}
+
+KoralStatus koral_graph_add_debug_pass(KoralScene* scene, void (*viewProjection)(float out[16], void* user), void* user, const char* depth)
+{
+    if (!scene) return fail("koral_graph_add_debug_pass needs a scene");
+    return guarded([&] {
+        auto* s = sceneOf(scene);
+        s->Graph().Add<kor::DebugDrawPass>(s->SceneDebug(), [viewProjection, user] {
+            glm::mat4 matrix(1.f);
+            if (viewProjection) viewProjection(&matrix[0][0], user);
+            return matrix;
+        }, std::string(kor::FrameGraph::Screen), depth ? std::string(depth) : std::string());
+        return KORAL_OK;
+    }, KORAL_ERROR);
 }
 
 } // extern "C"

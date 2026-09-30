@@ -139,6 +139,7 @@ namespace kor
         bool modulesUp = false;
         bool inFrame = false;
         std::optional<Clock::time_point> lastFrame;
+        std::uint64_t frameNumber = 0;
 
         // ---- bringing things up ----------------------------------------------------------------------
 
@@ -738,7 +739,9 @@ namespace kor
         // Input fed since the last frame arrives now, with the OS windows' events polled above; the
         // gamepads go to whichever scene's window has focus; then the actions follow from all of it.
         Input::PollGamepads();
+        ++impl.frameNumber;
         for (const auto& stage : impl.stages) {
+            stage->Top()._debug.BeginFrame(impl.frameNumber);
             Input& input = *stage->Top()._input;
             if (!stage->window->IsOffscreen()) input.ApplyGamepads(stage->window->IsFocused());
             input.ApplyFed();
@@ -862,6 +865,7 @@ namespace kor
 
         for (const auto& stage : impl.stages) {
             stage->Top()._input->Update();
+            stage->Top()._debug.EndFrame(stage->Top()._time.FrameTime());
             stage->window->LateUpdate();
             for (const auto& view : stage->Top()._views) view->_window->LateUpdate();
         }

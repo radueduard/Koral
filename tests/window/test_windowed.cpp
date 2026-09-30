@@ -1750,6 +1750,65 @@ TEST_F(VkWindowTest, ASceneViewShowsOneOfTheScenesOwnViews) {
     settle();
 }
 
+// ---- debug lines ------------------------------------------------------------------------------------
+
+// A line drawn in Update shows in the frame it was drawn in — through a DebugDrawPass, over what the
+// scene drew — and is gone the next, unless it was given time to stay.
+TEST_F(VkWindowTest, DebugLinesAreDrawnForTheirFrameOrTheirDuration) {
+    class Lines final : public kor::Scene {
+    public:
+        void Initialize() override {
+            readback = kor::Buffer::RawBuilder{}.SetRawSize(32 * 32 * 4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback).Build();
+            auto screen = std::make_shared<kor::ResourceRef<const kor::Image>>();
+            auto& clear = Graph().Add<LambdaPass>("Clear");
+            clear.setup = [](kor::PassBuilder& b) { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); };
+            clear.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
+            clear.record = [screen](kor::CommandBuffer& cb) { cb.ClearColorImage(*screen, glm::vec4(0.f, 0.f, 0.f, 1.f)); };
+            // Clip space is world space here: a line along y = 0 crosses the middle row.
+            Graph().Add<kor::DebugDrawPass>(SceneDebug(), [] { return glm::mat4(1.f); });
+            auto& read = Graph().Add<LambdaPass>("Read");
+            read.setup = [](kor::PassBuilder& b) { b.Read(kor::FrameGraph::Screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
+            read.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
+            read.record = [screen, out = kor::ResourceRef<const kor::Buffer>(readback)](kor::CommandBuffer& cb) {
+                cb.CopyImageToBuffer(*screen, out);
+            };
+        }
+        void Update() override {
+            if (drawLine) Debug::Line({-1.f, 0.f, 0.5f}, {1.f, 0.f, 0.5f}, {.color = {1.f, 0.f, 0.f, 1.f}, .duration = duration});
+            drawLine = false;
+        }
+        [[nodiscard]] glm::u8 RedAt(const int x, const int y) const { return readback->Read<glm::u8>(32 * 32 * 4)[(y * 32 + x) * 4]; }
+        // y = 0 falls between the two middle rows; the rasterizer's edge rule picks one of them.
+        [[nodiscard]] glm::u8 RedInTheMiddle() const { return std::max(RedAt(16, 15), RedAt(16, 16)); }
+        kor::Resource<kor::Buffer> readback;
+        bool drawLine = false;
+        float duration = 0.f;
+    };
+    auto& app = VkEnvironment::app();
+    auto* scene = app.OpenOffscreen<Lines>({.extent = {32, 32}});
+    ASSERT_NE(scene, nullptr);
+    settle();
+
+    scene->drawLine = true;
+    settle();
+    EXPECT_EQ(scene->RedInTheMiddle(), 255) << "the line crosses the middle";
+    EXPECT_EQ(scene->RedAt(16, 4), 0) << "and nothing else";
+    EXPECT_EQ(scene->SceneDebug().LineCount(), 0u) << "for its frame only";
+    settle();
+    EXPECT_EQ(scene->RedInTheMiddle(), 0) << "gone the next frame";
+
+    scene->drawLine = true;
+    scene->duration = 60.f;
+    settle();
+    settle();
+    EXPECT_EQ(scene->SceneDebug().LineCount(), 1u) << "given time, it stays";
+    EXPECT_EQ(scene->RedInTheMiddle(), 255);
+
+    app.Close(*scene);
+    settle();
+}
+
 // ---- state scenes share ---------------------------------------------------------------------------
 
 namespace {

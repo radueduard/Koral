@@ -36,6 +36,7 @@ add_executable(koral_tests
         test_frame_graph_compiler.cpp
         test_reflect.cpp
         test_input_bindings.cpp
+        test_debug_draw.cpp
 )
 
 target_link_libraries(koral_tests PRIVATE

@@ -228,6 +228,20 @@ namespace kor
     float Scene::Time::TimeScale() { return Get().TimeScale(); }
     void Scene::Time::SetTimeScale(const float scale) { Get().SetTimeScale(scale); }
 
+    // ---- Debug:: ------------------------------------------------------------------------------------
+
+    kor::DebugDraw& Scene::Debug::Get() { return required("Debug").SceneDebug(); }
+    void Scene::Debug::Line(const glm::vec3 from, const glm::vec3 to, const Style& style) { Get().Line(from, to, style); }
+    void Scene::Debug::Box(const glm::vec3 min, const glm::vec3 max, const Style& style) { Get().Box(min, max, style); }
+    void Scene::Debug::Box(const glm::mat4& transform, const Style& style) { Get().Box(transform, style); }
+    void Scene::Debug::Circle(const glm::vec3 center, const glm::vec3 normal, const float radius, const Style& style) { Get().Circle(center, normal, radius, style); }
+    void Scene::Debug::Sphere(const glm::vec3 center, const float radius, const Style& style) { Get().Sphere(center, radius, style); }
+    void Scene::Debug::Arrow(const glm::vec3 from, const glm::vec3 to, const Style& style) { Get().Arrow(from, to, style); }
+    void Scene::Debug::Point(const glm::vec3 position, const float size, const Style& style) { Get().Point(position, size, style); }
+    void Scene::Debug::Axes(const glm::mat4& transform, const float size, const float duration) { Get().Axes(transform, size, duration); }
+    void Scene::Debug::Grid(const glm::vec3 center, const float size, const int cells, const Style& style) { Get().Grid(center, size, cells, style); }
+    void Scene::Debug::Frustum(const glm::mat4& viewProjection, const Style& style) { Get().Frustum(viewProjection, style); }
+
     // ---- state ---------------------------------------------------------------------------------------
 
     std::string Scene::SaveState()

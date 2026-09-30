@@ -18,6 +18,7 @@
 
 #include "api.h"
 #include "commandBuffer.h"
+#include "debugDraw.h"
 #include "frameGraph.h"
 #include "gtime.h"
 #include "input.h"
@@ -329,6 +330,8 @@ namespace kor
         [[nodiscard]] kor::Window& SceneWindow() const;
         [[nodiscard]] kor::Input& SceneInput() const { return *_input; }
         [[nodiscard]] kor::Time& SceneTime() { return _time; }
+        /** @brief The scene's debug lines. @see Debug */
+        [[nodiscard]] kor::DebugDraw& SceneDebug() { return _debug; }
         [[nodiscard]] const kor::Time& SceneTime() const { return _time; }
 
         /** @brief The name the scene was opened under. */
@@ -408,6 +411,22 @@ namespace kor
             [[nodiscard]] static glm::vec2 Axis2D(std::string_view x, std::string_view y);
         };
 
+        /** @brief The current scene's debug lines. @see kor::DebugDraw */
+        struct KORAL_API Debug {
+            using Style = kor::DebugDraw::Style;
+            [[nodiscard]] static kor::DebugDraw& Get();
+            static void Line(glm::vec3 from, glm::vec3 to, const Style& style = {});
+            static void Box(glm::vec3 min, glm::vec3 max, const Style& style = {});
+            static void Box(const glm::mat4& transform, const Style& style = {});
+            static void Circle(glm::vec3 center, glm::vec3 normal, float radius, const Style& style = {});
+            static void Sphere(glm::vec3 center, float radius, const Style& style = {});
+            static void Arrow(glm::vec3 from, glm::vec3 to, const Style& style = {});
+            static void Point(glm::vec3 position, float size = 0.1f, const Style& style = {});
+            static void Axes(const glm::mat4& transform, float size = 1.f, float duration = 0.f);
+            static void Grid(glm::vec3 center, float size, int cells, const Style& style = {});
+            static void Frustum(const glm::mat4& viewProjection, const Style& style = {});
+        };
+
         /** @brief The current scene's clock. @see kor::Time */
         struct KORAL_API Time {
             [[nodiscard]] static kor::Time& Get();
@@ -442,6 +461,7 @@ namespace kor
         kor::Window* _window = nullptr;               // the application's; shared by a window's scene stack
         std::unique_ptr<kor::Input> _input;
         kor::Time _time;
+        kor::DebugDraw _debug;
         std::unique_ptr<Interface> _interface;
         std::optional<InterfaceSettings> _interfaceRequest;
         std::shared_ptr<detail::SceneLife> _life;
