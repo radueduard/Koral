@@ -19,6 +19,11 @@
 #include "scene.h"
 #include "window.h"
 
+// <windows.h> defines LoadLibrary as LoadLibraryA/W, which would rename App::LoadLibrary below in any
+// file that included it first — and then no longer match the library's own. Not in this header.
+#pragma push_macro("LoadLibrary")
+#undef LoadLibrary
+
 namespace kor
 {
     /** @brief What the application brings up once, for every scene it will run. */
@@ -254,3 +259,5 @@ namespace kor
         static void Quit();
     };
 }
+
+#pragma pop_macro("LoadLibrary")

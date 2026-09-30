@@ -15,6 +15,7 @@
 #include "current.h"
 #include "framebuffer.h"
 #include "interface.h"
+#include "parseNumber.h"
 
 namespace kor
 {
@@ -137,10 +138,7 @@ namespace kor
     {
         const auto it = _values.find(std::string(key));
         if (it == _values.end()) return fallback;
-        double value = 0.0;
-        const auto& text = it->second;
-        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), value);
-        return error == std::errc{} && end == text.data() + text.size() ? value : fallback;
+        return detail::ParseFloating<double>(it->second).value_or(fallback);
     }
 
     long long SceneArgs::Integer(const std::string_view key, const long long fallback) const

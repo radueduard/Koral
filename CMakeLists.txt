@@ -343,8 +343,11 @@ endif()
 # Caught by the "Verify the SDK links standalone" step, which builds exactly that project. Worth
 # keeping in mind that anything leaking out of the public headers becomes a consumer's problem —
 # the same reason the SDK vendors glm/spdlog/fmt/imgui in the first place.
+#
+# /Zc:preprocessor for the same reason: KORAL_REFLECT (reflect.h) walks its __VA_ARGS__, which MSVC's
+# traditional preprocessor passes on as one argument, and consumers expand it in their own code.
 if(MSVC)
-    target_compile_options(${PROJECT_NAME} PUBLIC /utf-8)
+    target_compile_options(${PROJECT_NAME} PUBLIC /utf-8 /Zc:preprocessor)
 endif()
 
 

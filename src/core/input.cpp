@@ -23,6 +23,7 @@
 
 #include "window.h"
 #include "log.h"
+#include "parseNumber.h"
 
 #include <format>
 
@@ -694,10 +695,9 @@ namespace kor {
         if (name.starts_with('-')) { scale = -1.f; name.remove_prefix(1); }
         if (const auto star = name.find('*'); star != std::string_view::npos) {
             const auto factor = name.substr(star + 1);
-            float parsed = 0.f;
-            const auto [end, ec] = std::from_chars(factor.data(), factor.data() + factor.size(), parsed);
-            if (ec != std::errc{} || end != factor.data() + factor.size()) return std::nullopt;
-            scale *= parsed;
+            const auto parsed = detail::ParseFloating<float>(factor);
+            if (!parsed) return std::nullopt;
+            scale *= *parsed;
             name = name.substr(0, star);
         }
         const auto dot = name.find('.');

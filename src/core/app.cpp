@@ -6,6 +6,7 @@
 #include "app.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cctype>
 #include <format>
@@ -19,6 +20,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#undef LoadLibrary   // App::LoadLibrary, not Win32's
 #else
 #include <dlfcn.h>
 #endif
@@ -53,8 +55,21 @@ namespace kor
         void* openLibrary(const std::filesystem::path& path, std::string& error)
         {
 #ifdef _WIN32
-            HMODULE module = LoadLibraryW(path.wstring().c_str());
+            // Windows locks a loaded DLL, so the linker could not write the next build over it and
+            // ReloadLibrary would have nothing to reload. What is loaded is a copy, taken per load (a
+            // name Windows has not seen, so it cannot hand back the old module); the library's own
+            // directory is still searched for what it depends on.
+            static std::atomic<unsigned> loads = 0;
+            std::error_code ec;
+            const auto copies = std::filesystem::temp_directory_path(ec) / "koral-libraries" / std::to_string(GetCurrentProcessId());
+            auto copy = copies / std::format("{}-{}{}", path.stem().string(), loads++, path.extension().string());
+            std::filesystem::create_directories(copies, ec);
+            if (ec || !std::filesystem::copy_file(path, copy, std::filesystem::copy_options::overwrite_existing, ec))
+                copy = path;   // no copy: loaded in place, which works, but locks it
+            SetDllDirectoryW(path.parent_path().wstring().c_str());
+            HMODULE module = LoadLibraryExW(copy.wstring().c_str(), nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
             if (!module) error = std::format("LoadLibrary failed ({})", GetLastError());
+            SetDllDirectoryW(nullptr);
             return module;
 #else
             void* module = dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -75,7 +90,14 @@ namespace kor
         void closeLibrary(void* library)
         {
 #ifdef _WIN32
+            wchar_t loadedFrom[MAX_PATH] {};
+            const DWORD length = GetModuleFileNameW(static_cast<HMODULE>(library), loadedFrom, MAX_PATH);
             FreeLibrary(static_cast<HMODULE>(library));
+            // The copy openLibrary made; a library loaded in place is not in koral-libraries.
+            std::error_code ec;
+            const std::filesystem::path copy(std::wstring(loadedFrom, length));
+            if (length != 0 && copy.parent_path().parent_path().filename() == "koral-libraries")
+                std::filesystem::remove(copy, ec);
 #else
             dlclose(library);
 #endif
