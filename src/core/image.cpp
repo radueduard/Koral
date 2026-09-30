@@ -278,11 +278,10 @@ namespace kor
         // image's state, decides nothing is required, and the GPU reads an untransitioned image.
         _trackedAccess.clear();
 
-        // The views handed out by View() are views of the storage that has just been replaced. They
-        // cannot be repaired — an ImageView is built against an image and a resize is a new image —
-        // so they are dropped, and the next caller gets a view of the image that now exists. Without
-        // this a resized render target keeps handing out views of freed storage.
-        for (auto& view : _defaultViews) view = {};
+        // The views handed out by View() are kept: a view rebuilds itself against the new storage
+        // the next time it is used (it compares generations), so whatever holds one — a framebuffer
+        // made from this image, a descriptor set — keeps working. Dropping them here once left every
+        // framebuffer built from an Image holding a dead view after its first Resize.
 
         // Anything holding a handle to the old image — an image view above all — finds out through this.
         ++_generation;

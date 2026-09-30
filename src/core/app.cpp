@@ -116,6 +116,7 @@ namespace kor
         struct Stage {
             std::unique_ptr<Window> window;
             WindowSettings settings;
+            std::optional<OffscreenSettings> offscreen;   ///< Set for an offscreen window.
             std::vector<Hosted> stack;
             [[nodiscard]] Scene& Top() const { return *stack.back().scene; }
         };
@@ -161,8 +162,15 @@ namespace kor
             modulesUp = true;
         }
 
+        std::unique_ptr<Window> OpenWindow(const OffscreenSettings& offscreenSettings)
+        {
+            return std::unique_ptr<Window>(new Window(offscreenSettings));
+        }
+
         std::unique_ptr<Window> OpenWindow(const WindowSettings& windowSettings)
         {
+            if (settings.platform == WindowPlatform::eNone)
+                throw std::runtime_error("the application has no windowing system (WindowPlatform::eNone): open it offscreen");
             std::unique_ptr<Window> window(new Window(windowSettings));
             window->_surface = Surface::Create(*window);
             dynamic_cast<vk::Surface&>(*window->_surface).CreateSwapChain(*window, Context::Scheduler().ImageCount());
@@ -185,6 +193,12 @@ namespace kor
             scene._window = stage.window.get();
             scene._name = hosted.name;
             scene._input->AttachTo(**stage.window);
+            if (scene._interfaceRequest && stage.window->IsOffscreen()) {
+                // An interface is drawn with ImGui's platform backend, which needs an OS window.
+                log::Warn("[app] '{}' asked for an interface, but it is offscreen: whoever shows it draws the interface",
+                          hosted.name);
+                scene._interfaceRequest.reset();
+            }
             if (scene._interfaceRequest) {
                 auto interfaceSettings = *scene._interfaceRequest;
                 scene._interfaceRequest.reset();
@@ -232,7 +246,8 @@ namespace kor
             return hosted;
         }
 
-        Scene* OpenStage(const WindowSettings& windowSettings, Hosted hosted)
+        template<typename Settings>
+        Scene* OpenStage(const Settings& windowSettings, Hosted hosted)
         {
             StartModules();
             auto stage = std::make_unique<Stage>();
@@ -243,7 +258,8 @@ namespace kor
                 if (hosted.scene) hosted.destroy(hosted.scene);
                 return nullptr;
             }
-            stage->settings = windowSettings;
+            if constexpr (std::is_same_v<Settings, OffscreenSettings>) stage->offscreen = windowSettings;
+            else stage->settings = windowSettings;
             stage->stack.push_back(std::move(hosted));
             Stage& added = *stages.emplace_back(std::move(stage));
             Host(added, added.stack.back());
@@ -362,6 +378,7 @@ namespace kor
         switch (s.platform) {
             case WindowPlatform::eX11:     platform = GLFW_PLATFORM_X11;     break;
             case WindowPlatform::eWayland: platform = GLFW_PLATFORM_WAYLAND; break;
+            case WindowPlatform::eNone:    platform = GLFW_PLATFORM_NULL;    break;
             case WindowPlatform::eAuto:    break;
         }
         if (platform != GLFW_ANY_PLATFORM) {
@@ -552,14 +569,16 @@ namespace kor
         // What to open again: each affected window's settings (at its current size) and its stack.
         struct Reopen {
             WindowSettings settings;
+            std::optional<OffscreenSettings> offscreen;
             std::vector<std::pair<std::string, SceneArgs>> stack;
         };
         std::vector<Reopen> reopen;
         for (const auto& stage : impl.stages) {
             if (!std::ranges::any_of(stage->stack, [&](const auto& h) { return h.library == it->get(); })) continue;
-            Reopen entry{.settings = stage->settings};
+            Reopen entry{.settings = stage->settings, .offscreen = stage->offscreen};
             entry.settings.extent = stage->window->Extent();
             entry.settings.title = stage->window->Title();
+            if (entry.offscreen) entry.offscreen->extent = stage->window->Extent();
             for (const auto& hosted : stage->stack) entry.stack.emplace_back(hosted.name, hosted.arguments);
             reopen.push_back(std::move(entry));
         }
@@ -567,11 +586,12 @@ namespace kor
         if (const auto unloaded = UnloadLibrary(path); !unloaded) return unloaded;
         if (const auto loaded = LoadLibrary(path); !loaded) return std::unexpected(loaded.error());
 
-        for (const auto& [settings, stack] : reopen) {
+        for (const auto& [settings, offscreen, stack] : reopen) {
             if (stack.empty()) continue;
             Scene* bottom = nullptr;
             try {
-                bottom = impl.OpenStage(settings, impl.Make(stack.front().first, stack.front().second));
+                auto made = impl.Make(stack.front().first, stack.front().second);
+                bottom = offscreen ? impl.OpenStage(*offscreen, std::move(made)) : impl.OpenStage(settings, std::move(made));
             } catch (const std::exception& e) {
                 log::Error("[app] reopening '{}': {}", stack.front().first, e.what());
             }
@@ -611,6 +631,26 @@ namespace kor
     {
         if (!scene) return nullptr;
         return _impl->OpenStage(window, Impl::Hosted{.name = std::move(name), .scene = scene.release(),
+                                                     .destroy = [](Scene* s) { delete s; }});
+    }
+
+    Scene* App::OpenOffscreen(const std::string_view name, const OffscreenSettings& target, const SceneArgs& arguments)
+    {
+        auto& impl = *_impl;
+        Impl::Hosted hosted;
+        try {
+            hosted = impl.Make(name, arguments);
+        } catch (const std::exception& e) {
+            log::Error("[app] {}", e.what());
+            return nullptr;
+        }
+        return impl.OpenStage(target, std::move(hosted));
+    }
+
+    Scene* App::OpenOffscreen(std::string name, std::unique_ptr<Scene> scene, const OffscreenSettings& target)
+    {
+        if (!scene) return nullptr;
+        return _impl->OpenStage(target, Impl::Hosted{.name = std::move(name), .scene = scene.release(),
                                                      .destroy = [](Scene* s) { delete s; }});
     }
 
@@ -657,20 +697,34 @@ namespace kor
         }
         impl.ApplyRequests();
         if (impl.stages.empty()) return false;
+        // Input fed since the last frame arrives now, with the OS windows' events polled above.
+        for (const auto& stage : impl.stages) stage->Top()._input->ApplyFed();
 
         // The frame's clock: one real delta, which each scene scales by its own time scale.
         const auto now = Clock::now();
         const float frameTime = impl.lastFrame ? std::chrono::duration<float>(now - *impl.lastFrame).count() : 0.f;
         impl.lastFrame = now;
 
+        // Offscreen windows first: a scene that shows one — an editor's viewport — then shows what
+        // it drew this frame, not the last.
         std::vector<Impl::Stage*> active;
         std::vector<Window*> windows;
-        for (const auto& stage : impl.stages) {
-            stage->Top()._time.Advance(frameTime);
-            stage->window->_shownThisFrame = false;   // until the scheduler gives it an image
-            if (stage->window->IsPaused()) continue;
-            active.push_back(stage.get());
-            windows.push_back(stage->window.get());
+        for (const bool offscreen : {true, false}) {
+            for (const auto& stage : impl.stages) {
+                Window& window = *stage->window;
+                if (window.IsOffscreen() != offscreen) continue;
+                stage->Top()._time.Advance(frameTime);
+                window._shownThisFrame = false;   // until the scheduler gives it an image
+                if (window.IsPaused()) continue;
+                active.push_back(stage.get());
+                if (offscreen) {
+                    // Its image is always there to draw into, at whatever size it was last asked for.
+                    window.ApplyResize();
+                    window._shownThisFrame = true;
+                } else {
+                    windows.push_back(&window);
+                }
+            }
         }
 
         if (active.empty()) {
@@ -780,6 +834,11 @@ namespace kor
     Scene* Navigator::Open(const std::string_view name, const WindowSettings& window, const SceneArgs& arguments)
     {
         return App::Current().Open(name, window, arguments);
+    }
+
+    Scene* Navigator::OpenOffscreen(const std::string_view name, const OffscreenSettings& target, const SceneArgs& arguments)
+    {
+        return App::Current().OpenOffscreen(name, target, arguments);
     }
 
     void Navigator::Replace(const std::string_view name, const SceneArgs& arguments)

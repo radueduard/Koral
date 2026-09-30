@@ -23,7 +23,10 @@ namespace kor
     /** @brief What the application brings up once, for every scene it will run. */
     struct AppSettings {
         API api = API::eVulkan;
-        /** The Linux windowing system to open windows on. */
+        /**
+         * The Linux windowing system to open windows on. WindowPlatform::eNone opens none at all —
+         * only offscreen windows (OpenOffscreen) — and needs no display: a server, a test, a batch job.
+         */
         WindowPlatform platform = WindowPlatform::eAuto;
         /** How many frames the CPU may run ahead of the GPU: how many copies a per-frame resource has. */
         glm::u32 framesInFlight = 2;
@@ -127,6 +130,25 @@ namespace kor
             return static_cast<S*>(Open(std::string(window.title), std::make_unique<S>(std::forward<Args>(arguments)...), window));
         }
 
+        /**
+         * @brief Opens the scene registered as @p name in an offscreen window: an image rather than
+         *        an OS window. @see Window::IsOffscreen
+         *
+         * For a scene another shows — an editor's game view, a preview, a thumbnail — or one nobody
+         * shows: a server, a batch render, a test. It is drawn every frame it is not paused, before
+         * the scenes in OS windows, so one that shows its Window::Image() shows this frame's.
+         */
+        Scene* OpenOffscreen(std::string_view name, const OffscreenSettings& target = {}, const SceneArgs& arguments = {});
+
+        /** @brief Opens a scene the caller made, under @p name, offscreen. */
+        Scene* OpenOffscreen(std::string name, std::unique_ptr<Scene> scene, const OffscreenSettings& target = {});
+
+        /** @brief Makes a @p S from @p arguments and opens it offscreen. */
+        template<std::derived_from<Scene> S, typename... Args>
+        S* OpenOffscreen(const OffscreenSettings& target, Args&&... arguments) {
+            return static_cast<S*>(OpenOffscreen(std::string(target.title), std::make_unique<S>(std::forward<Args>(arguments)...), target));
+        }
+
         /** @brief The scene each window shows, in the order the windows were opened. */
         [[nodiscard]] std::vector<Scene*> Scenes() const;
 
@@ -169,6 +191,8 @@ namespace kor
     struct KORAL_API Navigator {
         /** @brief Opens @p name in a window of its own. @see App::Open */
         static Scene* Open(std::string_view name, const WindowSettings& window = {}, const SceneArgs& arguments = {});
+        /** @brief Opens @p name offscreen. @see App::OpenOffscreen */
+        static Scene* OpenOffscreen(std::string_view name, const OffscreenSettings& target = {}, const SceneArgs& arguments = {});
         /** @brief Shows @p name in this window instead of the current scene, which is shut down. */
         static void Replace(std::string_view name, const SceneArgs& arguments = {});
         /** @brief Shows @p name in this window over the current scene, which is suspended until Pop. */

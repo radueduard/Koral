@@ -46,3 +46,13 @@ include(GoogleTest)
 # validation layers are found via VK_ADD_LAYER_PATH set by the runtime itself.
 gtest_discover_tests(koral_window_tests
         DISCOVERY_MODE PRE_TEST)
+
+# An application with no windowing system, running offscreen scenes only. Its own executable: an
+# application is one per process. Needs a Vulkan device but no display.
+add_executable(koral_headless_app_tests test_headless_app.cpp)
+target_link_libraries(koral_headless_app_tests PRIVATE Koral GTest::gtest GTest::gtest_main glm::glm spdlog::spdlog imgui::imgui)
+target_include_directories(koral_headless_app_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_BINARY_DIR}/include
+        ${CMAKE_SOURCE_DIR})
+gtest_discover_tests(koral_headless_app_tests DISCOVERY_MODE PRE_TEST)

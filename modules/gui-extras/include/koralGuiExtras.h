@@ -22,6 +22,7 @@
  *     _stats.Draw();     // kgui::StatsPanel — frame time, and what the engine is holding
  *
  *     _viewport.Draw("Scene");                                      // kgui::Viewport
+ *     _gameView.Draw("Game", *_game);                               // kgui::SceneView: an offscreen scene
  *     _gizmo.Manipulate(_viewport, view, projection, _transform);   // kgui::Gizmo, over it
  * }
  * @endcode
@@ -59,6 +60,7 @@
 #include "koralStatsPanel.h"
 #include "koralViewport.h"
 #include "koralGizmo.h"
+#include "koralSceneView.h"
 
 // Not included here, on purpose: <koralCameraPanel.h> draws the *camera module's* cameras, so it needs
 // koral-camera linked as well and refuses to compile without it. Including it from this umbrella would

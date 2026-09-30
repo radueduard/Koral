@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ namespace kor
 {
     class Surface;
     class Framebuffer;
+    class Image;
     class App;
     class Input;
     namespace vk { class Scheduler; }
@@ -31,15 +33,22 @@ struct GLFWvidmode;
 
 namespace kor {
     struct WindowSettings;
+    struct OffscreenSettings;
 
     /**
-     * @brief One scene's OS window: the surface it presents to, its swap chain and its default
-     *        framebuffer.
+     * @brief Where a scene is drawn: an OS window — the surface it presents to, its swap chain and
+     *        its default framebuffer — or an image of the application's (an *offscreen* window).
      *
      * Every scene has exactly one, opened by the application along with the scene (App::Open,
-     * Navigator::Open) and reached inside the scene as `Window::` (Scene::Window) or from outside as
-     * Scene::SceneWindow(). Replacing the scene in it (Navigator::Replace, Push) keeps the window; the
-     * window closes with the last scene shown in it.
+     * App::OpenOffscreen, Navigator::Open) and reached inside the scene as `Window::` (Scene::Window)
+     * or from outside as Scene::SceneWindow(). Replacing the scene in it (Navigator::Replace, Push)
+     * keeps the window; the window closes with the last scene shown in it.
+     *
+     * An offscreen window is the same to the scene drawn into it — its default framebuffer, the frame
+     * graph's Screen, a render pass opened without a framebuffer — but has no OS window: what the
+     * scene draws stays in Image(), for another scene to show (an editor's viewport, a preview) or for
+     * the program to read. It is shown every frame it is not paused, sized by Resize(), and gets its
+     * input from whoever feeds it (Input::FeedKey and the rest, kgui::SceneView).
      *
      * Neither copyable nor thread-safe: everything here is called from the thread the application
      * runs on.
@@ -83,7 +92,28 @@ namespace kor {
         /** @brief Asks the window to close, as its close button does. */
         void Close();
 
-        /** @brief The underlying GLFW window handle, for code that has to talk to GLFW directly. */
+        /** @brief Whether it is an image rather than an OS window. @see App::OpenOffscreen */
+        [[nodiscard]] bool IsOffscreen() const { return _offscreen; }
+
+        /**
+         * @brief What the scene in it draws: its default framebuffer's colour image.
+         *
+         * For an offscreen window, the picture itself — sampled by another scene, shown in an
+         * interface, copied or saved. Made with Image::Usage::eSampled, eTransferSrc and eTransferDst
+         * as well as eColorAttachment. Replaced on a resize; its generation says so.
+         */
+        [[nodiscard]] ResourceRef<const kor::Image> Image() const;
+
+        /**
+         * @brief Asks for a new size for the drawable area.
+         *
+         * An offscreen window takes it at the start of the next frame, when the scene in it gets
+         * OnResize. An OS window asks the platform, which may or may not agree; the resize then
+         * arrives as the user's would.
+         */
+        void Resize(glm::uvec2 extent);
+
+        /** @brief The underlying GLFW window handle, for code that has to talk to GLFW directly. Null offscreen. */
         [[nodiscard]] GLFWwindow* operator*() const { return _window; }
 
         /** @brief Current size of the drawable area in pixels, which is not the window's outer size on a scaled display. */
@@ -157,6 +187,11 @@ namespace kor {
     private:
         /** @brief Opens the OS window, its surface, swap chain and default framebuffer. The application's to call. */
         explicit Window(const WindowSettings& settings);
+        /** @brief Makes an offscreen window: its image and default framebuffer. The application's to call. */
+        explicit Window(const OffscreenSettings& settings);
+
+        /** @brief Takes a size asked for with Resize, for an offscreen window. At the start of a frame. */
+        void ApplyResize();
 
         /** @brief Ends the frame's one-frame flags: HasResized() among them. */
         void LateUpdate();
@@ -189,6 +224,12 @@ namespace kor {
         bool _focused = true;
         bool _hasResized = false;
         bool _shownThisFrame = false;
+
+        bool _offscreen = false;
+        Format _offscreenFormat = Format::eRGBA8_UNORM;
+        std::optional<glm::uvec2> _requestedExtent;
+        kor::Resource<kor::Image> _offscreenColor;
+        kor::Resource<kor::Image> _offscreenDepth;
     };
 
     /**
@@ -216,5 +257,23 @@ namespace kor {
          * pass, say) wants UNORM, one that wants the hardware to encode on write wants SRGB.
          */
         std::vector<Window::Format> formats = { Window::Format::eBGRA8_UNORM, Window::Format::eRGBA8_UNORM };
+    };
+
+    /**
+     * @brief What an offscreen window is made with. @see App::OpenOffscreen
+     *
+     * @code
+     * auto* game = app.OpenOffscreen("Level", {.extent = {1280, 720}});
+     * // in the editor's RenderUI: _view.Draw("Game", *game);   (kgui::SceneView)
+     * @endcode
+     */
+    struct OffscreenSettings {
+        std::string title = "Offscreen";            ///< What Window::Title() says; nothing shows it.
+        glm::uvec2 extent = { 1280, 720 };          ///< Initial size of the image, in pixels.
+        /**
+         * The image's format: eRGBA8_UNORM or eRGBA8_SRGB. An image is never BGRA, so a BGRA one is
+         * taken as its RGBA counterpart.
+         */
+        Window::Format format = Window::Format::eRGBA8_UNORM;
     };
 }

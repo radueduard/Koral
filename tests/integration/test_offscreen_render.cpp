@@ -1503,27 +1503,37 @@ TEST_F(GpuTest, AnImageBindsWithoutAViewBeingBuilt) {
     EXPECT_FALSE(framebuffer->ImageNamed("nosuchtarget").Valid());
 }
 
-// The view an image hands out is a view of *its storage*, and a resize replaces that storage. The
-// cache has to be dropped with it or the next binding gets a view of freed memory.
-TEST_F(GpuTest, ResizingAnImageDropsTheViewsItHandedOut) {
+// A resize replaces an image's storage, and the views it handed out follow it: they rebuild against
+// the new storage the next time they are used. So a framebuffer made from the image — whose views
+// are those — still renders after a Framebuffer::Resize. Dropping them instead once left every such
+// framebuffer holding a dead view after its first resize.
+TEST_F(GpuTest, ResizingAnImageKeepsTheViewsItHandedOut) {
     auto image = Image::Builder{}
         .SetFormat(Image::Format::eRGBA8_UNORM)
         .SetExtent(glm::uvec2{8, 8})
-        .SetUsage(Image::Usage::eSampled | Image::Usage::eColorAttachment)
+        .SetUsage(Image::Usage::eSampled | Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
         .Build();
     ASSERT_TRUE(image.Valid());
-
     const auto before = image->View(kor::ImageShape::e2D);
     ASSERT_TRUE(before.Valid());
+    auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = image, .clear = glm::vec4(0.f, 0.f, 1.f, 1.f) }).Build();
+    ASSERT_TRUE(framebuffer.Valid());
+
     const auto generationBefore = image->Generation();
-
-    const_cast<Image&>(*image).Resize({16, 16, 1});
+    framebuffer->Resize({16, 16});
     ASSERT_NE(image->Generation(), generationBefore) << "the resize did not replace the image";
+    EXPECT_TRUE(before.Valid()) << "the view outlives the storage it was made for";
+    EXPECT_EQ(image->View(kor::ImageShape::e2D).Get(), before.Get());
 
-    const auto after = image->View(kor::ImageShape::e2D);
-    ASSERT_TRUE(after.Valid());
-    EXPECT_NE(after.Get(), before.Get())
-        << "the image handed out a view of the storage the resize threw away";
+    Buffer::RawBuilder rb;
+    rb.SetRawSize(16 * 16 * 4).SetUsage(Buffer::Usage::eTransferDst).SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(framebuffer).EndRendering();
+        cb.CopyImageToBuffer(image, readback);
+    }, CommandBuffer::Usage::eGraphics).Wait();
+    const auto texels = readback->Read<glm::u8>(16 * 16 * 4);
+    EXPECT_EQ(texels[4 * (16 * 16 - 1) + 2], 255) << "the resized framebuffer rendered into all of the new storage";
 }
 
 // Binding an image to a binding its usage does not allow says which flag is missing, rather than

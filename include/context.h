@@ -88,6 +88,7 @@ namespace kor {
         eAuto,
         eX11,
         eWayland,
+        eNone,      ///< No windowing system: only offscreen windows. Needs no display, on any OS.
     };
 
     /**

@@ -329,12 +329,39 @@ namespace kor {
         /** @brief The ImGui context events over these windows are forwarded to, if the scene has an interface. Internal. */
         void SetInterfaceContext(ImGuiContext* context);
 
+        // ---- input from elsewhere ----------------------------------------------------------------
+        // For a scene with no OS window of its own to read — an offscreen one — whose host forwards
+        // what happens over the view it shows it in (kgui::SceneView does). What is fed takes effect
+        // at the start of the scene's next frame, as an OS window's events do: a key fed down reads
+        // as pressed there, then held.
+
+        /** @brief A key went down, or up. */
+        void FeedKey(Key key, bool down);
+        /** @brief A mouse button went down, or up. */
+        void FeedMouseButton(MouseButton button, bool down);
+        /** @brief Where the pointer is, in the scene's window's pixels. Moves nothing: see FeedMouseDelta. */
+        void FeedMousePosition(glm::vec2 position);
+        /** @brief How far the pointer moved, in pixels: MousePositionDelta(). */
+        void FeedMouseDelta(glm::vec2 delta);
+        /** @brief How far the wheel turned: MouseScrollDelta(). */
+        void FeedScroll(glm::vec2 delta);
+        /** @brief Everything down released: for a host that stops feeding, so nothing is left held. */
+        void ReleaseAll();
+        /**
+         * @brief Feeds what @p source saw this frame: the keys (with @p keyboard) and the buttons,
+         *        movement and scroll (with @p mouse) that went down, came up or moved.
+         */
+        void FeedFrom(const Input& source, bool keyboard, bool mouse);
+
     private:
         friend class App;
         struct State;
 
         /** @brief End of frame: presses become holds, releases become nothing, deltas start over. */
         void Update();
+
+        /** @brief Start of frame: what was fed since the last one arrives, as an OS window's events do. */
+        void ApplyFed();
 
         static void InstallCallbacks(GLFWwindow* window);
 

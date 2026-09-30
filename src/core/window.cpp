@@ -3,6 +3,8 @@
 //
 #include <window.h>
 #include <framebuffer.h>
+#include <image.h>
+#include <imageView.h>
 
 #include <iostream>
 #include <stdexcept>
@@ -86,9 +88,77 @@ namespace kor {
         }
     }
 
+    Window::Window(const OffscreenSettings& settings) :
+        _title(settings.title),
+        _extent(glm::max(settings.extent, glm::uvec2(1))),
+        _resizable(true),
+        _fullscreen(false),
+        _decorated(false),
+        _transparentFramebuffer(false),
+        _vsync(false),
+        _offscreen(true)
+    {
+        // An image is never BGRA: those formats are a display's, not something to create.
+        _offscreenFormat = settings.format == Format::eBGRA8_SRGB || settings.format == Format::eRGBA8_SRGB
+            ? Format::eRGBA8_SRGB : Format::eRGBA8_UNORM;
+        const auto format = _offscreenFormat == Format::eRGBA8_SRGB ? kor::Image::Format::eRGBA8_SRGB : kor::Image::Format::eRGBA8_UNORM;
+
+        _offscreenColor = kor::Image::Builder()
+            .SetExtent(_extent)
+            .SetFormat(format)
+            .SetUsage(kor::Image::Usage::eColorAttachment | kor::Image::Usage::eSampled
+                      | kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst)
+            .Build();
+        _offscreenDepth = kor::Image::Builder()
+            .SetExtent(_extent)
+            .SetFormat(kor::Image::Format::eD32_SFLOAT_S8_UINT)
+            .SetUsage(kor::Image::Usage::eDepthStencilAttachment)
+            .Build();
+        _offscreenColor.SetName(_title + " color");
+        _offscreenDepth.SetName(_title + " depth");
+        // The same targets, names and clears as a window's own, so a scene cannot tell the two apart.
+        _framebuffer = Framebuffer::Builder()
+            .AddColor({ .name = "color", .view = _offscreenColor, .clear = glm::vec4(0.f) })
+            .SetDepthStencil({ .name = "depth", .view = _offscreenDepth })
+            .Build();
+        if (!_framebuffer.Valid())
+            throw std::runtime_error("the offscreen window's framebuffer could not be made: "
+                                     + (_framebuffer.Failure() ? _framebuffer.Failure()->message : std::string("no reason given")));
+    }
+
     Window::Format Window::PixelFormat() const
     {
+        if (_offscreen) return _offscreenFormat;
         return dynamic_cast<const vk::Surface&>(*_surface).swapChain().getWindowFormat();
+    }
+
+    ResourceRef<const kor::Image> Window::Image() const
+    {
+        // A ref to the Resource that owns the image — which notices the window going — rather than
+        // the framebuffer's (a view's pointer back to its image, which does not).
+        if (_offscreen) return ResourceRef<const kor::Image>(_offscreenColor);
+        if (_surface) return dynamic_cast<const vk::Surface&>(*_surface).swapChain().image();
+        return {};
+    }
+
+    void Window::Resize(const glm::uvec2 extent)
+    {
+        if (extent.x == 0 || extent.y == 0) return;
+        if (_offscreen) {
+            if (extent != _extent) _requestedExtent = extent;
+            else _requestedExtent.reset();
+            return;
+        }
+        if (_window) glfwSetWindowSize(_window, static_cast<int>(extent.x), static_cast<int>(extent.y));
+    }
+
+    void Window::ApplyResize()
+    {
+        if (!_requestedExtent) return;
+        _extent = *_requestedExtent;
+        _requestedExtent.reset();
+        if (_framebuffer.Valid()) _framebuffer->Resize(_extent);
+        _hasResized = true;
     }
 
     Window::~Window() {
@@ -123,11 +193,12 @@ namespace kor {
     void Window::SetTitle(const std::string& title)
     {
         _title = title;
-        glfwSetWindowTitle(_window, title.c_str());
+        if (_window) glfwSetWindowTitle(_window, title.c_str());
     }
 
     void Window::SetIcon(const std::filesystem::path& iconPath)
     {
+        if (!_window) return;   // offscreen: nothing to put an icon on
         const auto image = new GLFWimage;
         const std::string iconPathStr = iconPath.string();
         image->pixels = stbi_load(iconPathStr.c_str(), &image->width, &image->height, nullptr, 4);

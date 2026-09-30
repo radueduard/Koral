@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <ranges>
 #include <unordered_map>
 #include <GLFW/glfw3.h>
@@ -48,6 +49,9 @@ namespace kor {
 		std::vector<GLFWwindow*> windows;   ///< the scene's own first
 		CursorMode cursorMode = CursorMode::eNormal;
 		ImGuiContext* interface = nullptr;
+
+		/// Fed from elsewhere, applied with the next Update so the scene sees it next frame. @see FeedKey
+		std::vector<std::function<void(State&)>> fed;
 	};
 
 	namespace {
@@ -187,6 +191,66 @@ namespace kor {
 		_state->lastMousePosition = _state->mousePosition;
 		_state->mouseDelta  = { 0.0f, 0.0f };
 		_state->scrollDelta = { 0.0f, 0.0f };
+	}
+
+	void Input::ApplyFed()
+	{
+		auto fed = std::move(_state->fed);
+		_state->fed.clear();
+		for (const auto& event : fed) event(*_state);
+	}
+
+	namespace {
+		void press(KeyState& state, const bool down) {
+			if (down) { if (state != KeyState::eHeld) state = KeyState::ePressed; }
+			else if (state == KeyState::ePressed || state == KeyState::eHeld) state = KeyState::eReleased;
+		}
+	}
+
+	void Input::FeedKey(const Key key, const bool down) {
+		_state->fed.emplace_back([=](State& s) { press(s.keys[key], down); });
+	}
+
+	void Input::FeedMouseButton(const MouseButton button, const bool down) {
+		_state->fed.emplace_back([=](State& s) { press(s.buttons[button], down); });
+	}
+
+	void Input::FeedMousePosition(const glm::vec2 position) {
+		_state->fed.emplace_back([=](State& s) { s.mousePosition = position; });
+	}
+
+	void Input::FeedMouseDelta(const glm::vec2 delta) {
+		_state->fed.emplace_back([=](State& s) { s.mouseDelta += delta; });
+	}
+
+	void Input::FeedScroll(const glm::vec2 delta) {
+		_state->fed.emplace_back([=](State& s) { s.scrollDelta += delta; });
+	}
+
+	void Input::ReleaseAll() {
+		_state->fed.emplace_back([](State& s) {
+			for (auto& state : s.keys | std::views::values) press(state, false);
+			for (auto& state : s.buttons | std::views::values) press(state, false);
+		});
+	}
+
+	void Input::FeedFrom(const Input& source, const bool keyboard, const bool mouse) {
+		if (&source == this) return;
+		const auto& from = *source._state;
+		if (keyboard) {
+			for (const auto& [key, state] : from.keys) {
+				if (state == KeyState::ePressed) FeedKey(key, true);
+				else if (state == KeyState::eReleased) FeedKey(key, false);
+			}
+		}
+		if (mouse) {
+			for (const auto& [button, state] : from.buttons) {
+				if (state == KeyState::ePressed) FeedMouseButton(button, true);
+				else if (state == KeyState::eReleased) FeedMouseButton(button, false);
+			}
+			if (from.mouseDelta != glm::vec2(0.f)) FeedMouseDelta(from.mouseDelta);
+			if (from.scrollDelta != glm::vec2(0.f)) FeedScroll(from.scrollDelta);
+		}
 	}
 
 	namespace {

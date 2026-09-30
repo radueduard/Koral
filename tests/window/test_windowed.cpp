@@ -169,6 +169,7 @@ public:
         }
         if (drawLogPanel) log.Draw();
         if (drawStatsPanel) stats.Draw();
+        if (onRenderUI) onRenderUI();
     }
 
     void OnResize(glm::uvec2 extent) override { lastResize = extent; }
@@ -179,6 +180,8 @@ public:
     std::function<void()> onUpdate;
     /// Records a test's own work into the frame, after (or, with drawDefault off, instead of) the scene's.
     std::function<void(kor::CommandBuffer&)> onRender;
+    /// Draws a test's own interface, inside the scene's ImGui frame.
+    std::function<void()> onRenderUI;
     /// A graph of a test's own, executed in the frame as the scene's own graph is.
     kor::FrameGraph* extraGraph = nullptr;
     /// Whether Render draws the viewport target and the screen.
@@ -1438,6 +1441,153 @@ TEST_F(VkWindowTest, CopyingAWindowsBgraImageToAnRgbaOneIsRefused) {
     cb->CopyImage(screen, copy);
     EXPECT_FALSE(cb->Errors().empty());
     cb->Reset();
+}
+
+// ---- offscreen scenes ---------------------------------------------------------------------------
+
+namespace {
+    // Remembers what its input said in each Update, for the tests that feed it.
+    class ListeningScene final : public kor::Scene {
+    public:
+        void Update() override {
+            spacePressed = Input::IsKeyPressed(kor::Key::eSpace);
+            spaceHeld = Input::IsKeyHeld(kor::Key::eSpace);
+            spaceReleased = Input::IsKeyReleased(kor::Key::eSpace);
+            leftPressed = Input::IsMouseButtonPressed(kor::MouseButton::eLeft);
+            mouse = Input::MousePosition();
+            delta = Input::MousePositionDelta();
+            ++updates;
+        }
+        void OnResize(const glm::uvec2 extent) override { resizedTo = extent; }
+        bool spacePressed = false, spaceHeld = false, spaceReleased = false, leftPressed = false;
+        glm::vec2 mouse{0.f}, delta{0.f};
+        glm::uvec2 resizedTo{0, 0};
+        int updates = 0;
+    };
+}
+
+// An offscreen scene draws exactly as one in a window does — its passes write FrameGraph::Screen —
+// and what it drew is its window's image, for anything else to show or read.
+TEST_F(VkWindowTest, AnOffscreenSceneDrawsIntoItsOwnImage) {
+    auto& app = VkEnvironment::app();
+    auto* scene = app.OpenOffscreen<PaintScene>({.title = "Offscreen", .extent = {64, 48}}, 0.5f);
+    ASSERT_NE(scene, nullptr);
+    for (int frame = 0; frame < 2; ++frame) settle();
+
+    const auto& window = scene->SceneWindow();
+    EXPECT_TRUE(window.IsOffscreen());
+    EXPECT_EQ(*window, nullptr) << "no OS window behind it";
+    EXPECT_EQ(window.Extent(), glm::uvec2(64, 48));
+    EXPECT_TRUE(window.IsShownThisFrame());
+    ASSERT_TRUE(window.Image().Alive());
+    EXPECT_EQ(window.Image()->Extent(), glm::uvec3(64, 48, 1));
+    EXPECT_FALSE(window.Image()->IsBgrOrder());
+    EXPECT_EQ(scene->currentInUpdate, scene);
+    EXPECT_EQ(scene->extentInUpdate, glm::uvec2(64, 48)) << "Window:: is its own window";
+    EXPECT_NEAR(scene->Red(), 128, 1) << "what it painted is in its image";
+    EXPECT_EQ(std::ranges::count(app.Scenes(), scene), 1);
+
+    app.Close(*scene);
+    settle();
+}
+
+// Resized when asked — by the program, or by a view showing it — at the start of the next frame, and
+// the scene gets OnResize as it would from a window dragged by hand.
+TEST_F(VkWindowTest, AnOffscreenWindowIsResizedWhenAskedAndItsSceneHearsOfIt) {
+    auto& app = VkEnvironment::app();
+    auto* scene = app.OpenOffscreen<ListeningScene>({.extent = {64, 64}});
+    ASSERT_NE(scene, nullptr);
+    settle();
+    const auto generation = scene->SceneWindow().Image()->Generation();
+
+    scene->SceneWindow().Resize({100, 30});
+    EXPECT_EQ(scene->SceneWindow().Extent(), glm::uvec2(64, 64)) << "not until the next frame";
+    settle();
+    EXPECT_EQ(scene->SceneWindow().Extent(), glm::uvec2(100, 30));
+    EXPECT_EQ(scene->resizedTo, glm::uvec2(100, 30));
+    EXPECT_EQ(scene->SceneWindow().Image()->Extent(), glm::uvec3(100, 30, 1));
+    EXPECT_NE(scene->SceneWindow().Image()->Generation(), generation) << "a view holding it notices";
+
+    app.Close(*scene);
+    settle();
+}
+
+// Input fed to a scene arrives the way an OS window's does: pressed on the next frame, then held.
+TEST_F(VkWindowTest, InputFedToAnOffscreenSceneArrivesAsAWindowsWould) {
+    auto& app = VkEnvironment::app();
+    auto* scene = app.OpenOffscreen<ListeningScene>({.extent = {64, 64}});
+    ASSERT_NE(scene, nullptr);
+    settle();
+
+    auto& input = scene->SceneInput();
+    input.FeedKey(kor::Key::eSpace, true);
+    input.FeedMouseButton(kor::MouseButton::eLeft, true);
+    input.FeedMousePosition({10.f, 20.f});
+    input.FeedMouseDelta({3.f, -4.f});
+    settle();
+    EXPECT_TRUE(scene->spacePressed);
+    EXPECT_TRUE(scene->leftPressed);
+    EXPECT_EQ(scene->mouse, glm::vec2(10.f, 20.f));
+    EXPECT_EQ(scene->delta, glm::vec2(3.f, -4.f));
+
+    settle();
+    EXPECT_FALSE(scene->spacePressed);
+    EXPECT_TRUE(scene->spaceHeld) << "and then held, until it is fed up";
+    EXPECT_EQ(scene->delta, glm::vec2(0.f)) << "movement is per frame";
+
+    input.ReleaseAll();
+    settle();
+    EXPECT_FALSE(scene->spaceHeld);
+    EXPECT_TRUE(scene->spaceReleased) << "released, the frame after it was fed up";
+
+    app.Close(*scene);
+    settle();
+}
+
+// An interface needs an OS window to be drawn over: an offscreen scene that asks for one is told so
+// and runs without it — whoever shows it draws the interface.
+TEST_F(VkWindowTest, AnOffscreenSceneRunsWithoutTheInterfaceItAskedFor) {
+    class WantsAnInterface final : public kor::Scene {
+    public:
+        WantsAnInterface() { EnableInterface(); }
+        void RenderUI() override { ++drawn; }
+        int drawn = 0;
+    };
+    auto& app = VkEnvironment::app();
+    auto* scene = app.OpenOffscreen<WantsAnInterface>({.extent = {32, 32}});
+    ASSERT_NE(scene, nullptr);
+    settle();
+    EXPECT_FALSE(scene->HasInterface());
+    EXPECT_EQ(scene->drawn, 0);
+    app.Close(*scene);
+    settle();
+}
+
+// An editor's game view: a panel in one scene's interface showing another, offscreen, sized to the
+// panel and — while the pointer is over it — given the editor's input.
+TEST_F(VkWindowTest, ASceneViewShowsAnOffscreenSceneSizedToThePanel) {
+    auto& app = VkEnvironment::app();
+    auto& editor = VkEnvironment::scene();
+    auto* game = app.OpenOffscreen<ListeningScene>({.extent = {16, 16}});
+    ASSERT_NE(game, nullptr);
+
+    kgui::SceneView view;
+    bool drawn = false;
+    editor.onRenderUI = [&] {
+        ImGui::SetNextWindowSize(ImVec2(200.f, 150.f), ImGuiCond_Always);
+        ImGui::SetNextWindowPos(ImVec2(10.f, 10.f), ImGuiCond_Always);
+        drawn = view.Draw("Game", *game);
+    };
+    for (int frame = 0; frame < 4; ++frame) settle();
+    editor.onRenderUI = nullptr;
+
+    ASSERT_TRUE(drawn);
+    EXPECT_EQ(game->SceneWindow().Extent(), view.View().size()) << "sized to the panel's content";
+    EXPECT_EQ(game->resizedTo, view.View().size());
+    EXPECT_TRUE(view.View().Showing()) << "its image, with a handle the interface can draw";
+
+    app.Close(*game);
+    settle();
 }
 
 // A library of scenes, loaded while the application runs: its scenes opened by name, the library
