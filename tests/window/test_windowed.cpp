@@ -1546,6 +1546,67 @@ TEST_F(VkWindowTest, InputFedToAnOffscreenSceneArrivesAsAWindowsWould) {
     settle();
 }
 
+// Actions and axes follow whatever they are bound to — keys, buttons, a gamepad — with a stick's dead
+// zone taken off and a diagonal on the keyboard no faster than straight on.
+TEST_F(VkWindowTest, ActionsAndAxesFollowTheKeysAndGamepadsTheyAreBoundTo) {
+    class Player final : public kor::Scene {
+    public:
+        void Initialize() override {
+            Input::Get().BindAction("Jump", {kor::Key::eSpace, kor::GamepadButton::eA});
+            Input::Get().BindAxis("MoveX", {{kor::Key::eD, 1.f}, {kor::Key::eA, -1.f}, kor::GamepadAxis::eLeftX});
+            Input::Get().BindAxis("MoveY", {{kor::Key::eW, 1.f}, {kor::Key::eS, -1.f}});
+        }
+        void Update() override {
+            jump = Input::Get().ActionState("Jump");
+            moveX = Input::Get().Axis("MoveX");
+            move = Input::Get().Axis2D("MoveX", "MoveY");
+            aHeld = Input::Get().IsGamepadButtonHeld(kor::GamepadButton::eA);
+        }
+        kor::KeyState jump = kor::KeyState::eNotPressed;
+        float moveX = 0.f;
+        glm::vec2 move{0.f};
+        bool aHeld = false;
+    };
+    auto& app = VkEnvironment::app();
+    auto* player = app.OpenOffscreen<Player>({.extent = {16, 16}});
+    ASSERT_NE(player, nullptr);
+    settle();
+    auto& input = player->SceneInput();
+
+    input.FeedKey(kor::Key::eSpace, true);
+    settle();
+    EXPECT_EQ(player->jump, kor::KeyState::ePressed);
+    input.FeedGamepadButton(kor::GamepadButton::eA, true);   // a second source, while the first is down
+    settle();
+    EXPECT_EQ(player->jump, kor::KeyState::eHeld) << "still one press";
+    input.FeedKey(kor::Key::eSpace, false);
+    settle();
+    EXPECT_EQ(player->jump, kor::KeyState::eHeld) << "A is still down";
+    EXPECT_TRUE(player->aHeld);
+    input.FeedGamepadButton(kor::GamepadButton::eA, false);
+    settle();
+    EXPECT_EQ(player->jump, kor::KeyState::eReleased);
+
+    input.FeedKey(kor::Key::eD, true);
+    input.FeedKey(kor::Key::eW, true);
+    settle();
+    EXPECT_EQ(player->moveX, 1.f);
+    EXPECT_NEAR(glm::length(player->move), 1.f, 1e-5f) << "a diagonal is no faster";
+    input.FeedKey(kor::Key::eD, false);
+    input.FeedKey(kor::Key::eW, false);
+
+    input.FeedGamepadAxis(kor::GamepadAxis::eLeftX, 0.1f);
+    settle();
+    EXPECT_EQ(player->moveX, 0.f) << "inside the dead zone";
+    input.FeedGamepadAxis(kor::GamepadAxis::eLeftX, -0.575f);
+    settle();
+    EXPECT_NEAR(player->moveX, -0.5f, 1e-4f) << "past it, stretched back over the rest of the travel";
+    EXPECT_TRUE(input.IsGamepadConnected(0)) << "a fed gamepad counts as connected";
+
+    app.Close(*player);
+    settle();
+}
+
 // An interface needs an OS window to be drawn over: an offscreen scene that asks for one is told so
 // and runs without it — whoever shows it draws the interface.
 TEST_F(VkWindowTest, AnOffscreenSceneRunsWithoutTheInterfaceItAskedFor) {

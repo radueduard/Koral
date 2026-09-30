@@ -735,8 +735,15 @@ namespace kor
         }
         impl.ApplyRequests();
         if (impl.stages.empty()) return false;
-        // Input fed since the last frame arrives now, with the OS windows' events polled above.
-        for (const auto& stage : impl.stages) stage->Top()._input->ApplyFed();
+        // Input fed since the last frame arrives now, with the OS windows' events polled above; the
+        // gamepads go to whichever scene's window has focus; then the actions follow from all of it.
+        Input::PollGamepads();
+        for (const auto& stage : impl.stages) {
+            Input& input = *stage->Top()._input;
+            if (!stage->window->IsOffscreen()) input.ApplyGamepads(stage->window->IsFocused());
+            input.ApplyFed();
+            input.UpdateActions();
+        }
 
         // The frame's clock: one real delta, which each scene scales by its own time scale.
         const auto now = Clock::now();

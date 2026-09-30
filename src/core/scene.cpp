@@ -201,6 +201,19 @@ namespace kor
     const glm::vec2& Scene::Input::LastMousePosition() { return Get().LastMousePosition(); }
     void Scene::Input::SetCursorMode(const CursorMode mode) { Get().SetCursorMode(mode); }
     Scene::Input::CursorMode Scene::Input::CurrentCursorMode() { return Get().CurrentCursorMode(); }
+    bool Scene::Input::IsGamepadConnected(const int pad) { return Get().IsGamepadConnected(pad); }
+    KeyState Scene::Input::GamepadButtonState(const GamepadButton button, const int pad) { return Get().GamepadButtonState(button, pad); }
+    bool Scene::Input::IsGamepadButtonPressed(const GamepadButton button, const int pad) { return Get().IsGamepadButtonPressed(button, pad); }
+    bool Scene::Input::IsGamepadButtonHeld(const GamepadButton button, const int pad) { return Get().IsGamepadButtonHeld(button, pad); }
+    float Scene::Input::GamepadAxisValue(const GamepadAxis axis, const int pad) { return Get().GamepadAxisValue(axis, pad); }
+    void Scene::Input::BindAction(std::string action, std::vector<InputSource> sources) { Get().BindAction(std::move(action), std::move(sources)); }
+    void Scene::Input::BindAxis(std::string axis, std::vector<InputSource> sources) { Get().BindAxis(std::move(axis), std::move(sources)); }
+    KeyState Scene::Input::ActionState(const std::string_view action) { return Get().ActionState(action); }
+    bool Scene::Input::IsActionPressed(const std::string_view action) { return Get().IsActionPressed(action); }
+    bool Scene::Input::IsActionHeld(const std::string_view action) { return Get().IsActionHeld(action); }
+    bool Scene::Input::IsActionReleased(const std::string_view action) { return Get().IsActionReleased(action); }
+    float Scene::Input::Axis(const std::string_view axis) { return Get().Axis(axis); }
+    glm::vec2 Scene::Input::Axis2D(const std::string_view x, const std::string_view y) { return Get().Axis2D(x, y); }
 
     // ---- Time:: -----------------------------------------------------------------------------------
 

@@ -10,11 +10,13 @@
 #include <unordered_map>
 #include <vector>
 
+#include <string_view>
 #include <glm/vec2.hpp>
 
 struct GLFWwindow;
 
 #include "api.h"
+#include "reflect.h"
 
 struct ImGuiContext;
 
@@ -167,6 +169,59 @@ namespace kor {
         eRight = e2,
         eMiddle = e3
     };
+
+    /** @brief A gamepad's buttons, laid out as on an Xbox controller (GLFW's gamepad mapping). */
+    enum class GamepadButton : std::uint8_t {
+        eA, eB, eX, eY,
+        eLeftBumper, eRightBumper,
+        eBack, eStart, eGuide,
+        eLeftThumb, eRightThumb,
+        eDpadUp, eDpadRight, eDpadDown, eDpadLeft,
+    };
+
+    /** @brief A gamepad's axes: sticks from -1 to 1 (down is +1 on Y), triggers from 0 to 1. */
+    enum class GamepadAxis : std::uint8_t {
+        eLeftX, eLeftY, eRightX, eRightY, eLeftTrigger, eRightTrigger,
+    };
+
+    /**
+     * @brief Something an action or an axis is bound to: a key, a mouse button, a gamepad button or
+     *        a gamepad axis. @see Input::BindAction
+     *
+     * Each has a name, which is what bindings are saved as and what a rebinding screen shows:
+     * "Key.Space", "Key.W", "Mouse.Left", "Gamepad.A", "Gamepad.DpadUp", "GamepadAxis.LeftX".
+     */
+    struct KORAL_API InputSource {
+        enum class Kind : std::uint8_t { eKey, eMouseButton, eGamepadButton, eGamepadAxis };
+        Kind kind = Kind::eKey;
+        std::uint16_t code = 0;
+        /** For an axis: what it contributes, times the source's value — a key, fully down, is 1. -1 turns it round. */
+        float scale = 1.f;
+
+        InputSource() = default;
+        InputSource(Key key, float scale = 1.f) : kind(Kind::eKey), code(static_cast<std::uint16_t>(key)), scale(scale) {}                       // NOLINT(*-explicit-constructor)
+        InputSource(MouseButton button, float scale = 1.f) : kind(Kind::eMouseButton), code(static_cast<std::uint16_t>(button)), scale(scale) {} // NOLINT(*-explicit-constructor)
+        InputSource(GamepadButton button, float scale = 1.f) : kind(Kind::eGamepadButton), code(static_cast<std::uint16_t>(button)), scale(scale) {} // NOLINT(*-explicit-constructor)
+        InputSource(GamepadAxis axis, float scale = 1.f) : kind(Kind::eGamepadAxis), code(static_cast<std::uint16_t>(axis)), scale(scale) {}    // NOLINT(*-explicit-constructor)
+
+        /** @brief Its name: "Key.Space", "Gamepad.A"; an axis scaled by -1 is "-GamepadAxis.LeftY". */
+        [[nodiscard]] std::string Name() const;
+        /** @brief The source a name names. */
+        [[nodiscard]] static std::optional<InputSource> Parse(std::string_view name);
+        bool operator==(const InputSource&) const = default;
+    };
+
+    /** @brief What a scene's actions and axes are bound to, by name: what a settings file saves. @see Input::Bindings */
+    struct KORAL_API InputBindings {
+        struct Entry {
+            std::string name;
+            std::vector<std::string> sources;   ///< InputSource names.
+        };
+        std::vector<Entry> actions;
+        std::vector<Entry> axes;
+    };
+    KORAL_REFLECT(InputBindings::Entry, name, sources)
+    KORAL_REFLECT(InputBindings, actions, axes)
 
     /** @brief Modifier keys and locks, as a set of bits. */
     enum class SpecialKey : std::uint8_t {
@@ -329,6 +384,51 @@ namespace kor {
         /** @brief The ImGui context events over these windows are forwarded to, if the scene has an interface. Internal. */
         void SetInterfaceContext(ImGuiContext* context);
 
+        // ---- gamepads -----------------------------------------------------------------------------
+        // Every connected gamepad, numbered from 0 in the order they were found. Only the scene whose
+        // window has focus sees them — a scene in a window behind it is not steered by the pad — and
+        // an offscreen scene gets them fed (FeedFrom, kgui::SceneView).
+
+        static constexpr int MaxGamepads = 4;
+
+        [[nodiscard]] bool IsGamepadConnected(int pad = 0) const;
+        /** @brief The gamepad's name, as its driver reports it; empty when none is connected there. */
+        [[nodiscard]] std::string GamepadName(int pad = 0) const;
+        [[nodiscard]] KeyState GamepadButtonState(GamepadButton button, int pad = 0) const;
+        [[nodiscard]] bool IsGamepadButtonPressed(GamepadButton button, int pad = 0) const;
+        [[nodiscard]] bool IsGamepadButtonHeld(GamepadButton button, int pad = 0) const;
+        [[nodiscard]] bool IsGamepadButtonReleased(GamepadButton button, int pad = 0) const;
+        /** @brief An axis, with the dead zone taken off a stick's: a stick at rest reads 0. */
+        [[nodiscard]] float GamepadAxisValue(GamepadAxis axis, int pad = 0) const;
+        /** @brief How far a stick must move before it reads anything: 0.15 of its travel by default. */
+        void SetGamepadDeadZone(float deadZone);
+
+        // ---- actions and axes ---------------------------------------------------------------------
+        // What the scene means rather than which key: "Jump" is Space, or A, or the left mouse
+        // button — whichever the player uses, and whatever they rebind it to.
+        //
+        //     Input::Get().BindAction("Jump", {kor::Key::eSpace, kor::GamepadButton::eA});
+        //     Input::Get().BindAxis("MoveX", {{kor::Key::eD, 1.f}, {kor::Key::eA, -1.f}, kor::GamepadAxis::eLeftX});
+        //     if (Input::Get().IsActionPressed("Jump")) Jump();
+        //     position.x += Input::Get().Axis("MoveX") * speed * Time::FrameTime();
+
+        /** @brief Binds @p action to @p sources, replacing what it was bound to. */
+        void BindAction(std::string action, std::vector<InputSource> sources);
+        /** @brief Binds @p axis to @p sources: their values, times their scales, summed and kept in [-1, 1]. */
+        void BindAxis(std::string axis, std::vector<InputSource> sources);
+        /** @brief Down when any of its sources is down; pressed the frame the first goes down. */
+        [[nodiscard]] KeyState ActionState(std::string_view action) const;
+        [[nodiscard]] bool IsActionPressed(std::string_view action) const { return ActionState(action) == KeyState::ePressed; }
+        [[nodiscard]] bool IsActionHeld(std::string_view action) const { return ActionState(action) == KeyState::eHeld; }
+        [[nodiscard]] bool IsActionReleased(std::string_view action) const { return ActionState(action) == KeyState::eReleased; }
+        [[nodiscard]] float Axis(std::string_view axis) const;
+        /** @brief Two axes as one direction, no longer than 1: diagonal on a keyboard is not faster. */
+        [[nodiscard]] glm::vec2 Axis2D(std::string_view x, std::string_view y) const;
+        /** @brief Every binding, by name: to save, or to show on a rebinding screen. */
+        [[nodiscard]] InputBindings Bindings() const;
+        /** @brief Replaces every binding. A source name it cannot read is reported and skipped. */
+        void SetBindings(const InputBindings& bindings);
+
         // ---- input from elsewhere ----------------------------------------------------------------
         // For a scene with no OS window of its own to read — an offscreen one — whose host forwards
         // what happens over the view it shows it in (kgui::SceneView does). What is fed takes effect
@@ -345,6 +445,10 @@ namespace kor {
         void FeedMouseDelta(glm::vec2 delta);
         /** @brief How far the wheel turned: MouseScrollDelta(). */
         void FeedScroll(glm::vec2 delta);
+        /** @brief A gamepad button went down, or up. */
+        void FeedGamepadButton(GamepadButton button, bool down, int pad = 0);
+        /** @brief Where a gamepad axis is now. */
+        void FeedGamepadAxis(GamepadAxis axis, float value, int pad = 0);
         /** @brief Everything down released: for a host that stops feeding, so nothing is left held. */
         void ReleaseAll();
         /**
@@ -362,6 +466,13 @@ namespace kor {
 
         /** @brief Start of frame: what was fed since the last one arrives, as an OS window's events do. */
         void ApplyFed();
+
+        /** @brief Start of frame: reads every gamepad, once for all scenes. */
+        static void PollGamepads();
+        /** @brief Start of frame: this scene's view of the gamepads — the polled one when @p focused, none otherwise. */
+        void ApplyGamepads(bool focused);
+        /** @brief Start of frame, after everything else arrived: what the actions are now. */
+        void UpdateActions();
 
         static void InstallCallbacks(GLFWwindow* window);
 

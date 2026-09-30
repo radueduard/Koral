@@ -173,6 +173,20 @@ KORAL_API void koral_input_mouse_delta(float* x, float* y);
 KORAL_API void koral_input_scroll(float* x, float* y);
 /** 0 normal, 1 hidden, 2 captured. */
 KORAL_API void koral_input_set_cursor_mode(int mode);
+/* Gamepads: buttons and axes numbered as kor::GamepadButton / kor::GamepadAxis (GLFW's order). */
+KORAL_API bool koral_input_gamepad_connected(int pad);
+KORAL_API KoralKeyState koral_input_gamepad_button(int button, int pad);
+KORAL_API float koral_input_gamepad_axis(int axis, int pad);
+
+/* Actions and axes, bound to sources by name — "Key.Space,Gamepad.A", "Key.D,-Key.A,GamepadAxis.LeftX". */
+KORAL_API KoralStatus koral_input_bind_action(const char* action, const char* sources);
+KORAL_API KoralStatus koral_input_bind_axis(const char* axis, const char* sources);
+KORAL_API KoralKeyState koral_input_action(const char* action);
+KORAL_API float koral_input_axis(const char* axis);
+/** Every binding, as JSON (kor::InputBindings); and loaded back. */
+KORAL_API const char* koral_input_bindings(void);
+KORAL_API KoralStatus koral_input_set_bindings(const char* json);
+
 /** Feeds an offscreen scene input: its window has none of its own. */
 KORAL_API void koral_input_feed_key(KoralScene* scene, int key, bool down);
 KORAL_API void koral_input_feed_mouse_button(KoralScene* scene, int button, bool down);

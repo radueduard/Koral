@@ -393,6 +393,66 @@ void koral_input_feed_mouse_position(KoralScene* scene, const float x, const flo
     if (scene) sceneOf(scene)->SceneInput().FeedMousePosition({x, y});
 }
 
+bool koral_input_gamepad_connected(const int pad) { return guarded([&] { return kor::Scene::Input::IsGamepadConnected(pad); }, false); }
+KoralKeyState koral_input_gamepad_button(const int button, const int pad)
+{
+    return guarded([&] { return static_cast<KoralKeyState>(kor::Scene::Input::GamepadButtonState(static_cast<kor::GamepadButton>(button), pad)); }, KORAL_NOT_PRESSED);
+}
+float koral_input_gamepad_axis(const int axis, const int pad)
+{
+    return guarded([&] { return kor::Scene::Input::GamepadAxisValue(static_cast<kor::GamepadAxis>(axis), pad); }, 0.f);
+}
+
+namespace
+{
+    std::vector<kor::InputSource> sourcesOf(const char* list)
+    {
+        std::vector<kor::InputSource> sources;
+        std::string_view rest = list ? list : "";
+        while (!rest.empty()) {
+            const auto comma = rest.find(',');
+            std::string_view name = rest.substr(0, comma);
+            while (!name.empty() && name.front() == ' ') name.remove_prefix(1);
+            while (!name.empty() && name.back() == ' ') name.remove_suffix(1);
+            if (!name.empty()) {
+                const auto source = kor::InputSource::Parse(name);
+                if (!source) throw std::runtime_error("'" + std::string(name) + "' names nothing that can be pressed");
+                sources.push_back(*source);
+            }
+            if (comma == std::string_view::npos) break;
+            rest.remove_prefix(comma + 1);
+        }
+        return sources;
+    }
+}
+
+KoralStatus koral_input_bind_action(const char* action, const char* sources)
+{
+    return guarded([&] { kor::Scene::Input::BindAction(action, sourcesOf(sources)); return KORAL_OK; }, KORAL_ERROR);
+}
+KoralStatus koral_input_bind_axis(const char* axis, const char* sources)
+{
+    return guarded([&] { kor::Scene::Input::BindAxis(axis, sourcesOf(sources)); return KORAL_OK; }, KORAL_ERROR);
+}
+KoralKeyState koral_input_action(const char* action)
+{
+    return guarded([&] { return static_cast<KoralKeyState>(kor::Scene::Input::ActionState(action)); }, KORAL_NOT_PRESSED);
+}
+float koral_input_axis(const char* axis) { return guarded([&] { return kor::Scene::Input::Axis(axis); }, 0.f); }
+const char* koral_input_bindings(void)
+{
+    return guarded([] { return keep(kor::ToJson(kor::Scene::Input::Get().Bindings())); }, keep("null"));
+}
+KoralStatus koral_input_set_bindings(const char* json)
+{
+    return guarded([&] {
+        kor::InputBindings bindings;
+        if (const auto read = kor::FromJson(bindings, json ? json : ""); !read) return fail(read.error().message);
+        kor::Scene::Input::Get().SetBindings(bindings);
+        return KORAL_OK;
+    }, KORAL_ERROR);
+}
+
 float koral_time_frame(void) { return guarded([] { return kor::Scene::Time::FrameTime(); }, 0.f); }
 float koral_time_fixed_step(void) { return guarded([] { return kor::Scene::Time::FixedDeltaTime(); }, 0.f); }
 float koral_time_elapsed(void) { return guarded([] { return kor::Scene::Time::Elapsed(); }, 0.f); }

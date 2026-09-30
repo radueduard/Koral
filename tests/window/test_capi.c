@@ -44,13 +44,16 @@ static void initialize(KoralScene* scene, void* user) {
     pass.initialize = initialize_pass;
     pass.record = record;
     koral_graph_add_pass(scene, "Paint", &pass);
+    CHECK(koral_input_bind_action("Jump", "Key.Space, Gamepad.A") == KORAL_OK, "bind an action");
+    CHECK(koral_input_bind_action("Nope", "Key.Nothing") == KORAL_ERROR, "a source that is not one is refused");
+    CHECK(strstr(koral_input_bindings(), "Gamepad.A") != NULL, "the bindings, as JSON");
 }
 static void update(KoralScene* scene, void* user) {
     Paint* paint = (Paint*)user;
     (void)scene;
     ++paint->updates;
     koral_window_extent(&paint->width, &paint->height);
-    if (koral_input_key(KORAL_KEY_SPACE) == KORAL_PRESSED) paint->spacePressedAt = paint->updates;
+    if (koral_input_action("Jump") == KORAL_PRESSED) paint->spacePressedAt = paint->updates;
 }
 static const char* save_state(void* user) {
     Paint* paint = (Paint*)user;

@@ -393,6 +393,19 @@ namespace kor
             [[nodiscard]] static CursorMode CurrentCursorMode();
             [[nodiscard]] static std::string Describe(Key key) { return kor::Input::Describe(key); }
             [[nodiscard]] static std::string Describe(MouseButton button) { return kor::Input::Describe(button); }
+            [[nodiscard]] static bool IsGamepadConnected(int pad = 0);
+            [[nodiscard]] static KeyState GamepadButtonState(GamepadButton button, int pad = 0);
+            [[nodiscard]] static bool IsGamepadButtonPressed(GamepadButton button, int pad = 0);
+            [[nodiscard]] static bool IsGamepadButtonHeld(GamepadButton button, int pad = 0);
+            [[nodiscard]] static float GamepadAxisValue(GamepadAxis axis, int pad = 0);
+            static void BindAction(std::string action, std::vector<InputSource> sources);
+            static void BindAxis(std::string axis, std::vector<InputSource> sources);
+            [[nodiscard]] static KeyState ActionState(std::string_view action);
+            [[nodiscard]] static bool IsActionPressed(std::string_view action);
+            [[nodiscard]] static bool IsActionHeld(std::string_view action);
+            [[nodiscard]] static bool IsActionReleased(std::string_view action);
+            [[nodiscard]] static float Axis(std::string_view axis);
+            [[nodiscard]] static glm::vec2 Axis2D(std::string_view x, std::string_view y);
         };
 
         /** @brief The current scene's clock. @see kor::Time */
