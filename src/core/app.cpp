@@ -368,6 +368,21 @@ namespace kor
         struct Reopen;
         std::vector<Reopen> Capture(const std::function<bool(const Hosted&)>& affected);
         void Restore(const std::vector<Reopen>& reopen);
+
+        /** @brief Every scene in each affected window shut down and destroyed — the windows kept, to refill. */
+        void Empty(const std::function<bool(const Hosted&)>& affected)
+        {
+            if (Context::_scheduler.Valid()) Context::_scheduler->WaitIdle();
+            for (auto& stage : stages) {
+                if (!std::ranges::any_of(stage->stack, affected)) continue;
+                while (!stage->stack.empty()) {
+                    Destroy(stage->stack.back());
+                    stage->stack.pop_back();
+                }
+            }
+            if (Context::_scheduler.Valid()) Context::_scheduler->WaitIdle();
+            detail::collectRetired(/*all=*/true);
+        }
     };
 
     // ---- construction ------------------------------------------------------------------------------
@@ -571,6 +586,7 @@ namespace kor
     // ---- reopening what was open, with its state --------------------------------------------------
 
     struct App::Impl::Reopen {
+        Stage* stage = nullptr;   ///< The window it was in, kept and refilled when it still exists.
         WindowSettings settings;
         std::optional<OffscreenSettings> offscreen;
         struct Scene_ { std::string name; SceneArgs arguments; std::string state; };
@@ -584,7 +600,7 @@ namespace kor
         std::vector<Reopen> reopen;
         for (const auto& stage : stages) {
             if (!std::ranges::any_of(stage->stack, affected)) continue;
-            Reopen entry{.settings = stage->settings, .offscreen = stage->offscreen};
+            Reopen entry{.stage = stage.get(), .settings = stage->settings, .offscreen = stage->offscreen};
             entry.settings.extent = stage->window->Extent();
             entry.settings.title = stage->window->Title();
             if (entry.offscreen) entry.offscreen->extent = stage->window->Extent();
@@ -608,8 +624,28 @@ namespace kor
                 log::Error("[app] '{}' could not take back its state: {}", entry.name, restored.error().message);
             return made;
         };
-        for (const auto& [settings, offscreen, stack] : reopen) {
+        for (const auto& [kept, settings, offscreen, stack] : reopen) {
             if (stack.empty()) continue;
+            // Kept, emptied window: the scenes are made again in it, and it never closes.
+            if (kept && std::ranges::any_of(stages, [&](const auto& s) { return s.get() == kept && s->stack.empty(); })) {
+                for (const auto& entry : stack) {
+                    try {
+                        auto made = remake(entry);
+                        if (!kept->stack.empty()) {
+                            Scene& covered = kept->Top();
+                            detail::SceneScope scope(&covered);
+                            covered.OnSuspend();
+                        }
+                        kept->stack.push_back(std::move(made));
+                        Host(*kept, kept->stack.back());
+                    } catch (const std::exception& e) {
+                        log::Error("[app] reopening '{}': {}", entry.name, e.what());
+                        break;
+                    }
+                }
+                if (kept->stack.empty()) CloseStage(*kept);
+                continue;
+            }
             Scene* bottom = nullptr;
             try {
                 auto made = remake(stack.front());
@@ -642,7 +678,9 @@ namespace kor
         if (it == impl.libraries.end()) return LoadLibrary(path).transform([](auto&&) {});
 
         const Impl::Library* library = it->get();
-        const auto reopen = impl.Capture([&](const Impl::Hosted& h) { return h.library == library; });
+        const auto affected = [&](const Impl::Hosted& h) { return h.library == library; };
+        const auto reopen = impl.Capture(affected);
+        impl.Empty(affected);   // the windows stay: nothing of the library's is left in them to close
         if (const auto unloaded = UnloadLibrary(path); !unloaded) return unloaded;
         if (const auto loaded = LoadLibrary(path); !loaded) return std::unexpected(loaded.error());
         impl.Restore(reopen);
@@ -657,18 +695,7 @@ namespace kor
         const auto affected = [&](const Impl::Hosted& h) { return std::ranges::find(names, h.name) != names.end(); };
         const auto reopen = impl.Capture(affected);
         if (reopen.empty()) return {};
-        if (Context::_scheduler.Valid()) Context::_scheduler->WaitIdle();
-        for (bool closed = true; closed;) {
-            closed = false;
-            for (auto& stage : impl.stages) {
-                if (!std::ranges::any_of(stage->stack, affected)) continue;
-                impl.CloseStage(*stage);
-                closed = true;
-                break;
-            }
-        }
-        if (Context::_scheduler.Valid()) Context::_scheduler->WaitIdle();
-        detail::collectRetired(/*all=*/true);
+        impl.Empty(affected);   // in place: each window stays open and is refilled
         impl.Restore(reopen);
         return {};
     }

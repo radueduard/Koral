@@ -42,8 +42,8 @@ beneath them set. `name` is the window title unless `rendering.window.title` ove
 `scene` names which of the library's scenes the runtime opens (a library can offer several — see
 [Scenes and the application](scenes.md)); without it, the first the library lists opens.
 
-The Hub's own keys — `color`, `frameworkVersion`, `kind`, `libraries` — mean nothing to the runtime
-and are ignored, along with any key from a newer Hub than the runtime knows about.
+The Hub's own keys — `color`, `frameworkVersion`, `kind`, `libraries`, `build` — mean nothing to the
+runtime and are ignored, along with any key from a newer Hub than the runtime knows about.
 
 ## The three layers
 
@@ -242,6 +242,27 @@ is enabled everywhere *except* Wayland: viewports need the app to place a window
 position, and Wayland deliberately withholds global coordinates (GLFW reports the operation as
 unavailable), so detached panels could not be placed. This is a positioning limit, not something a
 borderless or transparent window works around — run on `x11` if you want viewports under Linux.
+
+## A project with its own build
+
+The Hub normally owns a project's `CMakeLists.txt`: it writes it from `koral.json` on every build, and
+git-ignores it. A project that is more than one scene library — an engine with modules, tests and
+tools — writes its own instead, and says so:
+
+```json
+"build": { "ownCMakeLists": true, "target": "KoralEditor" }
+```
+
+- `ownCMakeLists`: the Hub never writes or git-ignores `CMakeLists.txt`. It still writes the
+  machine-local `CMakePresets.json` (Debug, Release, RelWithDebInfo and MinSizeRel, each building into
+  `cmake-build-<profile>`) and the IDE run configurations.
+- `target`: the CMake target whose library ▶ and the IDEs run, when it isn't named after the project.
+
+The project's CMake has to keep the scaffold's contract:
+- find the SDK with `find_package(Koral CONFIG REQUIRED)`, through the preset's `CMAKE_PREFIX_PATH`;
+- put the target's library at the top of the build directory, where the Hub looks for
+  `<build dir>/lib<target>.so` (`<target>.dll`, `lib<target>.dylib`);
+- optionally, run it from a `run` target through the preset's `KORAL_RUNTIME`.
 
 ## ImGui layout file
 

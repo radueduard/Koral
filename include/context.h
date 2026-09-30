@@ -102,11 +102,14 @@ namespace kor {
      * brought the device up, or after InitHeadless(). Calling them from a scene is always safe: by
      * the time Initialize() runs, everything below is up.
      */
+    namespace detail { struct ParallelAccess; }
+
     class Context
     {
         friend class kor::App;
         friend class kor::Scheduler;
         friend struct kor::detail::TimelineState; // picks the executor an awaiting coroutine resumes on
+        friend struct kor::detail::ParallelAccess; // hands ParallelFor the background pool
     public:
         /** @brief The frame scheduler: swap chain, frames in flight, and which image is current. */
         static KORAL_API kor::Scheduler& Scheduler();
@@ -145,6 +148,8 @@ namespace kor {
          * exists yet, such as which image formats it supports. @see Image::IsFormatSupported
          */
         [[nodiscard]] static KORAL_API bool HasDevice() noexcept;
+        /** @brief Whether there is a scheduler — frames to run — as an application has and a headless job does not. */
+        [[nodiscard]] static KORAL_API bool HasScheduler() noexcept;
 
         /**
          * @brief Whether the active device supports ray tracing (acceleration structures + the

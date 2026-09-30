@@ -101,12 +101,12 @@ namespace kor
         //
         // Acceleration structures are safe for a different reason, and it is worth writing down
         // because it is an assumption rather than a property: a build is submitted through
-        // Device::runSingleTimeCommand, and AccelerationStructure::Build waits on the token it
-        // returns before returning itself. The build has
-        // therefore fully completed on the GPU before any command buffer that traces against it
-        // is even recorded, so no barrier can be missing. Move AS builds onto a user-recorded
-        // command buffer — a per-frame TLAS rebuild for dynamic geometry would do it — and that
-        // stops being true, at which point they need real tracking here.
+        // Device::runSingleTimeCommand as an upload (detail::noteUpload), so every frame and every
+        // one-off submitted after it waits for it on the GPU — a semaphore wait, which is a full
+        // memory dependency. No command buffer that traces against it can run before it is built,
+        // so no barrier can be missing. Move AS builds onto a user-recorded command buffer — a
+        // per-frame TLAS rebuild for dynamic geometry would do it — and that stops being true, at
+        // which point they need real tracking here.
         bool synchronisable(const DescriptorType type)
         {
             switch (type) {
@@ -1553,11 +1553,18 @@ namespace kor
         command(*commandBuffer);
         commandBuffer->End();
 
+        // After every upload not yet done: what it reads may be what they write.
         const Token done = Token::Create();
-        if (auto submitted = commandBuffer->Submit({.signal = {done}}); !submitted) {
+        if (auto submitted = commandBuffer->Submit({.waitFor = detail::pendingUploads(), .signal = {done}}); !submitted) {
             kor::log::Error("[command] single-time command failed: {}", submitted.error().ToString());
         }
         detail::retireAfter(done, std::shared_ptr<CommandBuffer>(std::move(commandBuffer)));
+        return done;
+    }
+
+    Token CommandBuffer::Upload(const std::function<void(kor::CommandBuffer&)>& command, const Usage usage) {
+        const Token done = SingleTimeCommand(command, usage);
+        detail::noteUpload(done);
         return done;
     }
 

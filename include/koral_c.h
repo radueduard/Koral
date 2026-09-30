@@ -143,6 +143,16 @@ KORAL_API uint32_t koral_buffer_copy_count(KoralBuffer* buffer);
 KORAL_API KoralStatus koral_buffer_read(KoralBuffer* buffer, void* into, uint64_t bytes, uint64_t offset);
 KORAL_API KoralStatus koral_buffer_write(KoralBuffer* buffer, const void* data, uint64_t bytes, uint64_t offset);
 
+/**
+ * Buffer::ReadAsync: starts copying @p bytes from @p offset out, without waiting, and returns what they
+ * will be read from. @p done (the caller's) is signalled once they can be: then koral_readback_read.
+ */
+typedef struct KoralReadback KoralReadback;
+typedef struct KoralToken KoralToken;
+KORAL_API KoralReadback* koral_buffer_read_async(KoralBuffer* buffer, uint64_t bytes, uint64_t offset, KoralToken** done);
+KORAL_API KoralStatus koral_readback_read(KoralReadback* readback, void* into);
+KORAL_API void koral_readback_destroy(KoralReadback* readback);
+
 /** Buffer::Map: a ConstMapping (mutable false) or a MutableMapping (true) over bytes, until released. */
 typedef struct KoralMapping KoralMapping;
 KORAL_API KoralMapping* koral_buffer_map(KoralBuffer* buffer, uint64_t bytes, uint64_t offset, bool mutable_);
@@ -472,7 +482,7 @@ KORAL_API uint32_t koral_acceleration_structure_structure_type(KoralAcceleration
 
 /* ==== kor::Token ======================================================================================= */
 
-typedef struct KoralToken KoralToken;   /* a copy of a kor::Token: the caller's, freed with koral_token_destroy */
+/* KoralToken: a copy of a kor::Token, the caller's, freed with koral_token_destroy (declared with ReadAsync above). */
 KORAL_API KoralToken* koral_token_create(void);
 KORAL_API KoralToken* koral_token_copy(KoralToken* token);
 KORAL_API void koral_token_destroy(KoralToken* token);

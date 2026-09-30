@@ -2,6 +2,7 @@
 // Created by radue on 2/28/2026.
 //
 
+#include "../../core/tokenState.h"
 #include "image.h"
 
 #include <image.h>
@@ -220,9 +221,10 @@ namespace kor::vk
     }
 
     void Image::Clear(const ::vk::ClearValue& clearValue) const {
-        Context::Device().runSingleTimeCommand([this, clearValue](const kor::vk::CommandBuffer& commandBuffer) {
+        // Not waited for: what uses the image on the GPU waits for the clear there.
+        kor::detail::noteUpload(Context::Device().runSingleTimeCommand([this, clearValue](const kor::vk::CommandBuffer& commandBuffer) {
             Clear(commandBuffer, clearValue);
-        }, ::vk::QueueFlagBits::eGraphics).Wait();
+        }, ::vk::QueueFlagBits::eGraphics));
     }
 
     void Image::DoResize(const glm::uvec3 &extent) {

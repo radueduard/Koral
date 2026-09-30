@@ -9,6 +9,7 @@
 #include <algorithm>
 
 #include "context.h"
+#include "scheduler.h"
 #include "log.h"
 #include "../executor/BackgroundExecutor.h"
 #include "../executor/MainThreadExecutor.h"
@@ -194,6 +195,28 @@ namespace kor::detail {
         if (entry.ready()) return; // already done with: `owned` is released on the way out
         std::lock_guard lock(retiredMutex);
         retired.push_back(std::move(entry));
+    }
+
+    namespace {
+        std::mutex uploadsMutex;
+        std::vector<Token> uploads;
+    }
+
+    void noteUpload(const Token& token) {
+        if (token.Ready()) return;
+        {
+            std::lock_guard lock(uploadsMutex);
+            std::erase_if(uploads, [](const Token& t) { return t.Ready(); });
+            uploads.push_back(token);
+        }
+        // The frame being built — or the next, between frames — waits for it on the GPU.
+        if (Context::HasScheduler()) Context::Scheduler().WaitFor(token);
+    }
+
+    std::vector<Token> pendingUploads() {
+        std::lock_guard lock(uploadsMutex);
+        std::erase_if(uploads, [](const Token& t) { return t.Ready(); });
+        return uploads;
     }
 
     void collectRetired(const bool all) {

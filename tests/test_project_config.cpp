@@ -403,6 +403,28 @@ TEST(ProjectConfig, MissingImguiIniFlagValueIsAnError)
     EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
 }
 
+// A project that writes its own CMakeLists says so in a section only the Hub reads. The runtime must
+// take the rest of the file exactly as it would without it.
+TEST(ProjectConfig, IgnoresTheHubsBuildSection)
+{
+    ProjectConfig config;
+    const auto result = config.Merge(R"({
+      "schemaVersion": 1,
+      "name": "KoralEngine",
+      "color": [0.84, 0.53, 0.77],
+      "frameworkVersion": "source",
+      "kind": "Scene",
+      "scene": "Editor",
+      "build": { "ownCMakeLists": true, "target": "KoralEditor" },
+      "rendering": { "api": "Vulkan", "window": { "width": 1600, "height": 900 } }
+    })", kBase);
+
+    ASSERT_TRUE(result) << result.error().message;
+    EXPECT_EQ(config.title, "KoralEngine");
+    EXPECT_EQ(config.scene, "Editor");
+    EXPECT_EQ(config.extent.x, 1600u);
+}
+
 // koral.json IS the Hub's project file. The Hub writes it, we read it, and the two share no code —
 // they cannot, the Hub is a separate Rust program that consumes engine *releases*. This schema is
 // therefore the entire contract between them, and this is that contract: a document exactly as the

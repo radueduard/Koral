@@ -462,15 +462,30 @@ namespace kor::vk {
         const auto [semaphore, value] = Context::Tokens().resolve(done);
         const auto commandBuffers = std::array { **commandBuffer };
 
+        // After every upload not yet done, as a one-off submitted through kor::CommandBuffer is.
+        std::vector<::vk::Semaphore> waitSemaphores;
+        std::vector<std::uint64_t> waitValues;
+        std::vector<::vk::PipelineStageFlags> waitStages;
+        for (const auto& upload : detail::pendingUploads()) {
+            const auto [waitSemaphore, waitValue] = Context::Tokens().resolve(upload);
+            waitSemaphores.push_back(waitSemaphore);
+            waitValues.push_back(waitValue);
+            waitStages.push_back(::vk::PipelineStageFlagBits::eAllCommands);
+        }
+
         try {
             {
                 const auto lock = lockQueues();
                 const auto [epochSemaphore, epochValue] = nextEpoch(queue);
                 const auto semaphores = std::array { semaphore, epochSemaphore };
                 const auto values = std::array { value, epochValue };
-                auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo().setSignalSemaphoreValues(values);
+                auto timelineInfo = ::vk::TimelineSemaphoreSubmitInfo()
+                    .setWaitSemaphoreValues(waitValues)
+                    .setSignalSemaphoreValues(values);
                 try {
                     queue->submit(::vk::SubmitInfo()
+                        .setWaitSemaphores(waitSemaphores)
+                        .setWaitDstStageMask(waitStages)
                         .setCommandBuffers(commandBuffers)
                         .setSignalSemaphores(semaphores)
                         .setPNext(&timelineInfo));

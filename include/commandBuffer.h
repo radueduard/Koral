@@ -332,16 +332,29 @@ namespace kor
          * @endcode
          *
          * The command buffer itself is kept alive until the GPU is done with it, so dropping the token
-         * is safe. The resources its commands use are not: keep them alive until the token has
-         * happened, exactly as for the frame's own command buffer.
+         * is safe, and so are the resources its commands use: Koral destroys a GPU object only once
+         * the GPU is past everything submitted before it went.
          *
          * Right for setup and readback, wrong for anything per-frame, which should record into the
-         * frame's own command buffer instead. Two one-offs are not ordered against each other unless
-         * one waits for the other's token. A failure inside is logged, not thrown; the token is still
-         * signalled, so nothing waits for it forever.
+         * frame's own command buffer instead. It runs after every Upload() before it; otherwise two
+         * one-offs are not ordered against each other unless one waits for the other's token. A
+         * failure inside is logged, not thrown; the token is still signalled, so nothing waits for it
+         * forever.
          */
         [[nodiscard("wait() on it for results to read, or (void) it to fire and forget")]]
         static Token SingleTimeCommand(const std::function<void(kor::CommandBuffer&)>& command, Usage usage = Usage::eGraphics);
+
+        /**
+         * @brief One-off GPU work whose results only the GPU reads — an upload, a build — submitted
+         *        without the CPU waiting for it.
+         *
+         * Later GPU work is held back on the GPU until it is done instead: the frame being built (or
+         * the next), and every one-off submitted after it. So a texture uploaded in Initialize is
+         * complete before anything samples it, and a Read() after a Write() sees the write, with no
+         * stall on the CPU. The token is signalled once the GPU has done it, for anyone who wants to
+         * know.
+         */
+        static Token Upload(const std::function<void(kor::CommandBuffer&)>& command, Usage usage = Usage::eTransfer);
 
         /**
          * @brief Opens recording, discarding anything recorded before.

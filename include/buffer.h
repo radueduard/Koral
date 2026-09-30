@@ -26,6 +26,7 @@
 #include "context.h"
 #include "resource.h"
 #include "scheduler.h"
+#include "task.h"
 
 namespace kor
 {
@@ -440,9 +441,12 @@ namespace kor
                             const auto stagingRef = ResourceRef<const Buffer>(stagingBuffer.get());
 
                             stagingBuffer->Write(data, 0);
-                            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                            // Not waited for: what reads the buffer on the GPU waits for it there.
+                            // The staging buffer is safe to drop meanwhile — Koral destroys a GPU
+                            // object only once the GPU is past what was submitted before it went.
+                            (void)CommandBuffer::Upload([&](CommandBuffer& commandBuffer) {
                                 commandBuffer.CopyBuffer(stagingRef, bufferRef, byteSize);
-                            }, CommandBuffer::Usage::eTransfer).Wait();
+                            });
                             break;
                         }
                         case Type::eStaging:
@@ -544,9 +548,9 @@ namespace kor
                     const auto stagingBuffer = stagingBuilder.Build();
 
                     stagingBuffer->WriteAt<T>(0, data);
-                    CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                    (void)CommandBuffer::Upload([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), elemBytes, 0, index * elemBytes);
-                    }, CommandBuffer::Usage::eTransfer).Wait();
+                    });
                     break;
                 }
                 case Type::eStaging:
@@ -648,6 +652,43 @@ namespace kor
          * @throws std::out_of_range if the range runs past the end of the buffer.
          * @throws std::runtime_error if the buffer is currently mapped; write through the mapping instead.
          */
+        /**
+         * @brief Read(), without the wait: `co_await` it, and the coroutine resumes — where it
+         *        suspended — once the GPU has copied the data out. The buffer must outlive it.
+         *
+         * @code
+         * kor::Task<void> Physics::FetchContacts() {
+         *     const auto contacts = co_await _contacts->ReadAsync<Contact>();   // no stall
+         *     for (const auto& contact : contacts) Report(contact);
+         * }
+         * @endcode
+         */
+        template <typename T> requires std::is_trivially_copyable_v<T>
+        [[nodiscard]] Task<std::vector<T>> ReadAsync(glm::u64 count = WholeSize, const glm::u64 offset = 0) const
+        {
+            // Memory the CPU can see is read as it is: there is nothing for the GPU to do.
+            if (_type != Type::eDeviceLocal) co_return Read<T>(count, offset);
+
+            const auto elemCapacity = static_cast<glm::u64>(_size / sizeof(T));
+            if (offset > elemCapacity) throw std::out_of_range("Offset exceeds buffer element capacity");
+            if (count == WholeSize) count = elemCapacity - offset;
+            ValidateElementRange<T>(offset, count, "ReadAsync");
+            const auto byteSize = CheckedByteSize<T>(count, "ReadAsync");
+            const auto byteOffset = offset * static_cast<glm::u64>(sizeof(T));
+
+            Builder<std::byte> stagingBuilder;
+            stagingBuilder
+                .SetInstanceCount(ToBuilderSize(byteSize, "ReadAsync"))
+                .SetUsage(Usage::eTransferDst)
+                .SetType(Type::eReadback);
+            const auto staging = stagingBuilder.Build();
+            const Token copied = CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                commandBuffer.CopyBuffer(ResourceRef<const Buffer>(*this), staging, byteSize, byteOffset, 0);
+            }, CommandBuffer::Usage::eTransfer);
+            co_await copied;
+            co_return staging->Read<T>(count, 0);
+        }
+
         template <typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
             requires RangeOf<R, T> && std::is_trivially_copyable_v<T>
         void Write(R&& elements, const glm::u64 offset = 0) {
@@ -685,9 +726,11 @@ namespace kor
                         .SetType(Type::eStaging);
                     auto stagingBuffer = stagingBuilder.Build();
                     stagingBuffer->Write(data, 0);
-                    CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                    // Not waited for: the frame, and any one-off after this — a Read() included —
+                    // waits for it on the GPU instead.
+                    (void)CommandBuffer::Upload([&](CommandBuffer& commandBuffer) {
                         commandBuffer.CopyBuffer(stagingBuffer, ResourceRef<const Buffer>(*this), byteSize, 0, byteOffset);
-                    }, CommandBuffer::Usage::eTransfer).Wait();
+                    });
                     break;
                 }
                 case Type::eStaging:

@@ -145,6 +145,8 @@ void kor::Context::DrainMainThread() {
     _mainThreadExecutor->Drain();
 }
 
+bool kor::Context::HasScheduler() noexcept { return _scheduler.Valid(); }
+
 bool kor::Context::HasRepository() noexcept {
     return _repository != nullptr;
 }

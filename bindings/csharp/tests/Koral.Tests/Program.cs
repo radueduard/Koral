@@ -38,6 +38,8 @@ foreach (var name in cases.Keys)
     // Under `dotnet Koral.Tests.dll`, the process is dotnet itself: hand it the assembly again.
     if (Path.GetFileNameWithoutExtension(Environment.ProcessPath!) == "dotnet") start.ArgumentList.Add(typeof(Cases).Assembly.Location);
     start.ArgumentList.Add(name);
+    // In-place updates need the runtime told before it starts; the other cases cover the mode without it.
+    if (name.StartsWith("InPlace")) start.Environment["DOTNET_MODIFIABLE_ASSEMBLIES"] = "debug";
     using var process = Process.Start(start)!;
     var output = process.StandardOutput.ReadToEndAsync();
     var error = process.StandardError.ReadToEndAsync();

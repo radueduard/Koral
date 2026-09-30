@@ -119,6 +119,15 @@ namespace kor::detail {
     void retireAfter(std::vector<Token> tokens, std::shared_ptr<void> owned);
 
     /**
+     * One-off GPU work the CPU did not wait for — an upload, a build — whose results later GPU work
+     * reads. Every later one-off submission waits for it on the GPU, and so does the next frame, so
+     * nothing reads what it has not finished writing, and the CPU never stalls for it.
+     */
+    KORAL_API void noteUpload(const Token& token);
+    /** What noteUpload() recorded and the GPU has not finished yet: what a one-off submission waits for. */
+    KORAL_API std::vector<Token> pendingUploads();
+
+    /**
      * Releases everything retired whose token has happened. With `all`, waits for the rest first and
      * releases those too — for shutdown, while whatever they hold can still be destroyed properly.
      */

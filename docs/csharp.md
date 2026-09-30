@@ -130,6 +130,9 @@ protected override async void Initialize()
 }
 ```
 
+`Buffer.ReadAsync<T>()` is `Read<T>()` without the stall: `var hits = await _hits.ReadAsync<Hit>();`.
+Writes and initial data never wait in the first place (see [Parallel work and waiting](parallel.md)).
+
 An exception from an `async void` hook is reported like any hook's (logged, and `App.HookFailed`) rather
 than ending the process.
 
@@ -151,12 +154,36 @@ deriving from `Koral.Scene` is a scene, registered under its class name or its `
 Scripts are compiled with `System`, `System.Numerics`, `System.Linq`, `System.Collections.Generic` and
 `Koral` imported. A `.dll` beside them is referenced too.
 
-With `--hot-reload`, an edit to a script (or a rebuild of the assembly) is picked up once the files have
-stopped changing. Every open scene from it is opened again from the new code, with its state. A member
-added in the edit starts at its default; one removed is dropped. An edit that does not compile is
-reported (file, line and error) and changes nothing. Each build is loaded into a collectible
-`AssemblyLoadContext` and unloaded once the scenes it made are gone, so reloading all day does not grow
-the process.
+With `--hot-reload`, a saved edit is picked up once the files have stopped changing, and does as
+little as it can:
+
+| The edit changes | What happens |
+|---|---|
+| Only method bodies (`Update`, `Record`, `Prepare`, a helper) | Applied to the running code in place, as .NET Hot Reload does: nothing reopens, and the next frame runs the new code. |
+| A pass's `Setup` or `Initialize` | Applied in place, and that pass's graph set up again. |
+| A scene's constructor or `Initialize`, or any constructor | Applied, and the scenes affected reopened in their windows, with their state. |
+| Anything else: a field, a signature, a class, an initializer | A new build: every scene from the scripts reopened in its window, with its state. |
+
+An edit that does not compile is reported (file, line and error) and changes nothing. A scene's state
+across a reopen is its `[Keep]` members (or `State()`): a member added in the edit starts at its default,
+one removed is dropped.
+
+In-place updates need the process started with `DOTNET_MODIFIABLE_ASSEMBLIES=debug`; `koral-dotnet`
+restarts itself with it when it is missing. The runtime does not allow them **while a debugger is
+attached**: under one, every edit reopens its scenes instead, still in their windows with their state.
+Run without debugging (Ctrl+F5 in VS Code) to have edits applied in place.
+
+Each build is written to a temporary folder with its `.pdb` and loaded from there, so a debugger finds
+its symbols and breakpoints in the scripts bind.
+
+### From VS Code
+
+The Hub writes `.vscode/` for a C# project, pointed at this machine's SDK and .NET (and so not committed):
+
+- **F5** starts the scenes under the C# debugger; breakpoints in `src/` stop.
+- **Ctrl+F5** starts them without it, with edits applied in place.
+- **Terminal → Run Task → Koral: Run scenes** does the same from a terminal.
+- `settings.json` points the C# extension at the .NET the Hub found, for completion.
 
 An SDK built with `-DKORAL_BUILD_DOTNET=ON` has it in `lib/koral-dotnet/`. It needs the .NET 10
 runtime: run it as `koral-dotnet`, or as `dotnet lib/koral-dotnet/koral-dotnet.dll`.

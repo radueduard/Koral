@@ -65,9 +65,27 @@ public abstract unsafe class RenderPass
         if (Native != IntPtr.Zero) KoralNative.koral_pass_request_initialize(Native);
     }
 
+    // Every C# pass in a graph, weakly: what a hot reload re-runs Setup and Initialize on when their code changed.
+    private static readonly List<WeakReference<RenderPass>> InGraphs = [];
+
+    /// <summary>The C# passes in a graph now, of <paramref name="type"/> (or anything deriving from it).</summary>
+    internal static IReadOnlyList<RenderPass> Live(Type type)
+    {
+        lock (InGraphs)
+        {
+            InGraphs.RemoveAll(w => !w.TryGetTarget(out var p) || p.Native == IntPtr.Zero);
+            return InGraphs.Select(w => w.TryGetTarget(out var p) ? p : null)
+                .Where(p => p is not null && type.IsInstanceOfType(p)).ToList()!;
+        }
+    }
+
+    /// <summary>Its graph set up again and this pass initialized again, before the next frame.</summary>
+    internal void Reinitialize() => RequestInitialize();
+
     /// <summary>Adds this pass to <paramref name="graph"/>; a pass Koral implements natively overrides it.</summary>
     internal virtual IntPtr AddTo(IntPtr graph)
     {
+        lock (InGraphs) InGraphs.Add(new WeakReference<RenderPass>(this));
         var callbacks = new KoralPassCallbacks
         {
             user = (void*)GCHandle.ToIntPtr(GCHandle.Alloc(this)),

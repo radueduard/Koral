@@ -141,6 +141,12 @@ namespace kor::capi
 using namespace kor;
 using namespace kor::capi;
 
+struct KoralReadback {
+    Resource<Buffer> staging;          // device-local: where the GPU copies it to
+    std::vector<std::byte> bytes;      // host-visible: read at once
+    glm::u64 size = 0;
+};
+
 struct KoralMapping {
     std::optional<Buffer::MutableMapping<std::byte>> mutableMapping;
     std::optional<Buffer::ConstMapping<std::byte>> constMapping;
@@ -263,6 +269,47 @@ KoralStatus koral_buffer_write(KoralBuffer* r, const void* data, const uint64_t 
         return KORAL_OK;
     }, KORAL_ERROR);
 }
+
+KoralReadback* koral_buffer_read_async(KoralBuffer* r, const uint64_t bytes, const uint64_t offset, KoralToken** done)
+{
+    return Guarded([&]() -> KoralReadback* {
+        const auto& buffer = Get<Buffer>(r);
+        auto readback = std::make_unique<KoralReadback>();
+        readback->size = bytes;
+        Token copied = Token::Create();
+        if (buffer.MemoryType() != Buffer::Type::eDeviceLocal) {
+            readback->bytes = buffer.Read<std::byte>(bytes, offset);   // memory the CPU sees: nothing to wait for
+            copied.Signal();
+        } else {
+            readback->staging = Buffer::Builder<std::byte>()
+                .SetInstanceCount(static_cast<glm::i64>(bytes))
+                .SetUsage(Buffer::Usage::eTransferDst)
+                .SetType(Buffer::Type::eReadback)
+                .Build();
+            copied = CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+                commandBuffer.CopyBuffer(RefOf<Buffer>(r), readback->staging, bytes, offset, 0);
+            }, CommandBuffer::Usage::eTransfer);
+        }
+        if (done) *done = new KoralToken{copied};
+        return readback.release();
+    }, static_cast<KoralReadback*>(nullptr));
+}
+
+KoralStatus koral_readback_read(KoralReadback* readback, void* into)
+{
+    if (!readback || (!into && readback->size)) return Fail("koral_readback_read needs a readback and somewhere to put it");
+    return Guarded([&] {
+        if (readback->staging.Valid()) {
+            const auto bytes = readback->staging->Read<std::byte>(readback->size, 0);
+            std::memcpy(into, bytes.data(), bytes.size());
+        } else {
+            std::memcpy(into, readback->bytes.data(), readback->bytes.size());
+        }
+        return KORAL_OK;
+    }, KORAL_ERROR);
+}
+
+void koral_readback_destroy(KoralReadback* readback) { GuardedVoid([&] { delete readback; }); }
 
 KoralMapping* koral_buffer_map(KoralBuffer* r, const uint64_t bytes, const uint64_t offset, const bool mutable_)
 {

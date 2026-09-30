@@ -184,7 +184,8 @@ namespace kimg::detail
             .SetType(kor::Buffer::Type::eStaging)
             .Build();
 
-        kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
+        // Not waited for: the GPU orders what reads the image after it (CommandBuffer::Upload).
+        (void)kor::CommandBuffer::Upload([&](kor::CommandBuffer& commandBuffer) {
             commandBuffer.CopyBufferToImage(staging, image, kor::Copy {
                 .imageOffset = { 0, 0, 0 },
                 .imageExtent = extent,
@@ -192,7 +193,7 @@ namespace kimg::detail
                 .imageLayerCount = 1,
                 .imageMipLevel = mip,
             });
-        }).Wait();
+        }, kor::CommandBuffer::Usage::eGraphics);
     }
 
     void finishUpload(const kor::ResourceRef<const kor::Image>& image, const bool generateMipmaps)
@@ -202,10 +203,17 @@ namespace kimg::detail
         // is what keeps the refusal out of the log for a caller who simply passed `true`.
         const bool mips = generateMipmaps && !kor::Image::IsBlockCompressed(image->PixelFormat());
 
-        kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
+        (void)kor::CommandBuffer::Upload([&](kor::CommandBuffer& commandBuffer) {
             if (mips) commandBuffer.GenerateMipmaps(image);
-            commandBuffer.Barrier({}, {{ image, kor::ResourceAccess::eAllShaderRead }});
-        }).Wait();
+            // Ready for the first way a shader can read it: the read-only layout is invalid for an
+            // image that isn't sampled, so a storage one goes to the general layout, and one no
+            // shader reads stays where the copy left it.
+            const auto usage = image->UsageFlags();
+            if (usage & kor::Image::Usage::eSampled)
+                commandBuffer.Barrier({}, {{ image, kor::ResourceAccess::eAllShaderRead }});
+            else if (usage & kor::Image::Usage::eStorage)
+                commandBuffer.Barrier({}, {{ image, kor::ResourceAccess::eAllShaderReadWrite }});
+        }, kor::CommandBuffer::Usage::eGraphics);
     }
 
     // ---- KTX ------------------------------------------------------------------------------------

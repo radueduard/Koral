@@ -103,8 +103,8 @@ public sealed class Lines : Scene
 /// <summary>Awaits GPU work and a Task from its hooks, and notes where it resumed.</summary>
 public sealed class Waiter : Scene
 {
-    public Scene? ResumedIn, DelayedIn;
-    public int[] Filled = [];
+    public Scene? ResumedIn, DelayedIn, ReadIn;
+    public int[] Filled = [], ReadLater = [];
 
     protected override async void Initialize()
     {
@@ -115,6 +115,9 @@ public sealed class Waiter : Scene
         Filled = buffer.Read<int>();
         await Task.Delay(5);
         DelayedIn = Current;
+        using var gpuOnly = new Buffer.Builder<int>().SetData(new[] { 3, 1, 4, 1, 5 }).SetType(Buffer.Type.eDeviceLocal).Build();
+        ReadLater = await gpuOnly.ReadAsync<int>();   // the upload, then the copy out: neither waited for
+        ReadIn = Current;
     }
 }
 
@@ -285,10 +288,12 @@ public static class Cases
         using var app = Check.HeadlessApp();
         var waiter = (Waiter)app.OpenOffscreen("Waiter", new Waiter(), Offscreen(8));
         var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (waiter.DelayedIn is null && DateTime.UtcNow < deadline) app.Frame();
+        while (waiter.ReadIn is null && DateTime.UtcNow < deadline) app.Frame();
         Check.That(ReferenceEquals(waiter.ResumedIn, waiter), "after GPU work, in its scene");
         Check.That(waiter.Filled.SequenceEqual([7, 7, 7, 7]), $"with the work done: [{string.Join(", ", waiter.Filled)}]");
         Check.That(ReferenceEquals(waiter.DelayedIn, waiter), "and after an ordinary Task, too");
+        Check.That(ReferenceEquals(waiter.ReadIn, waiter), "and after ReadAsync");
+        Check.That(waiter.ReadLater.SequenceEqual([3, 1, 4, 1, 5]), $"with what it read: [{string.Join(", ", waiter.ReadLater)}]");
     }
 
     /// <summary>Debug lines, drawn by a DebugDrawPass whose camera is C# — and let go of with the scene.</summary>
@@ -384,9 +389,10 @@ public static class Cases
     private const string Broken = "public sealed class Counter : Scene { this does not compile }";
 
     // By name each time: a reload replaces the scene, so the object from before it is no longer it.
-    private static object? Field(App app, string name)
+    private static object? Field(App app, string name, string scene = "Counter") => Field(app.FindScene(scene)!, name);
+
+    private static object? Field(Scene scene, string name)
     {
-        var scene = app.FindScene("Counter")!;
         var type = scene.GetType();
         return (object?)type.GetField(name)?.GetValue(scene) ?? type.GetProperty(name)?.GetValue(scene);
     }
@@ -445,6 +451,99 @@ public static class Cases
         if (before.Target is not Scene scene) return;   // gone altogether: certainly not open
         Check.That(!scene.IsOpen, "the scene from before the reload is not open");
         Check.Equal("", scene.Name, "and is refused rather than read");
+    }
+
+    private const string Ticking = """
+        public sealed class Tick : Scene
+        {
+            [Keep] public int Frames;
+            public static int Initialized;
+            protected override void Initialize() { Initialized += 1; Graph.Add(new Paint()); }
+            protected override void Update() { Frames += 1; }
+        }
+
+        public sealed class Paint() : RenderPass("Paint")
+        {
+            public static int Setups, Initializes;
+            private Image? _screen;
+            public override void Setup(PassBuilder builder) { Setups += 1; builder.Write(FrameGraph.Screen, Image.Usage.eTransferDst).SideEffect(); }
+            public override void Initialize(PassResources resources) { Initializes += 1; _screen = resources.ImageNamed(FrameGraph.Screen); }
+            public override void Record(CommandBuffer commandBuffer) => commandBuffer.ClearColorImage(_screen!, new Vector4(1, 0, 0, 1));
+        }
+        """;
+
+    private static int Static(Scene scene, string type, string field) =>
+        (int)scene.GetType().Assembly.GetType(type)!.GetField(field)!.GetValue(null)!;
+
+    /// <summary>
+    /// Edits applied to the running code: a body edit changes nothing else, a pass's Setup or Initialize is
+    /// run again, a scene's Initialize reopens only it — and a new field is a new build.
+    /// </summary>
+    public static void InPlaceEditsKeepWhatIsRunning()
+    {
+        var directory = Directory.CreateTempSubdirectory("koral-inplace-");
+        try
+        {
+            var script = Path.Combine(directory.FullName, "Tick.cs");
+            File.WriteAllText(script, Ticking);
+            using var app = Check.HeadlessApp();
+            using var host = new ScriptHost(app, directory.FullName);
+            Check.That(host.UpdatesInPlace, "in-place updates are on (DOTNET_MODIFIABLE_ASSEMBLIES=debug)");
+            host.Load();
+            app.OpenOffscreen("Tick", Offscreen(8));
+            Frames(app, 2);
+            var scene = app.FindScene("Tick")!;
+            Check.Equal(2, Field(app, "Frames", "Tick"), "it runs");
+
+            void Edit(string from, string to)
+            {
+                var text = File.ReadAllText(script);
+                Check.That(text.Contains(from), $"the script has '{from}'");
+                File.WriteAllText(script, text.Replace(from, to));
+                Check.That(host.Reload(), $"'{to}' applies");
+            }
+
+            Edit("Frames += 1;", "Frames += 100;");
+            Check.Equal(ReloadKind.InPlace, host.LastReload, "a body edit is applied in place");
+            Check.That(ReferenceEquals(app.FindScene("Tick"), scene), "the very same scene carries on");
+            Frames(app, 1);
+            Check.Equal(102, Field(app, "Frames", "Tick"), "running the new Update");
+            Check.Equal(1, Static(scene, "Tick", "Initialized"), "not initialized again");
+
+            var setups = Static(scene, "Paint", "Setups");
+            var initializes = Static(scene, "Paint", "Initializes");
+            Edit("new Vector4(1, 0, 0, 1)", "new Vector4(0, 1, 0, 1)");
+            Check.Equal(ReloadKind.InPlace, host.LastReload, "a pass's Record edit, in place");
+            Frames(app, 1);
+            Check.Equal(setups, Static(scene, "Paint", "Setups"), "Record's edit does not set the graph up again");
+
+            Edit("Initializes += 1;", "Initializes += 1; _ = resources;");
+            Check.Equal(ReloadKind.InPlace, host.LastReload, "a pass's Initialize edit, in place");
+            Frames(app, 1);
+            Check.Equal(initializes + 1, Static(scene, "Paint", "Initializes"), "and the pass initialized again");
+            Check.That(Static(scene, "Paint", "Setups") > setups, "its graph set up again");
+            Check.That(ReferenceEquals(app.FindScene("Tick"), scene), "the scene still the same one");
+
+            Edit("Initialized += 1;", "Initialized += 10;");
+            Check.Equal(ReloadKind.ScenesReopened, host.LastReload, "a scene's Initialize edit reopens it");
+            Check.That(!ReferenceEquals(app.FindScene("Tick"), scene), "a new scene");
+            Check.Equal(11, Static(app.FindScene("Tick")!, "Tick", "Initialized"), "initialized by the new code");
+            Check.Equal(302, Field(app, "Frames", "Tick"), "with its state kept");
+
+            Edit("[Keep] public int Frames;", "[Keep] public int Frames;\n    public int Added = 5;");
+            Check.Equal(ReloadKind.Full, host.LastReload, "a new field is a new build");
+            Check.Equal(5, Field(app, "Added", "Tick"), "whose code runs");
+            Check.Equal(302, Field(app, "Frames", "Tick"), "with the state kept");
+
+            File.WriteAllText(script, File.ReadAllText(script).Replace("Frames += 100;", "Frames += ;"));
+            Check.That(!host.Reload(), "a broken edit applies nothing");
+            Frames(app, 1);
+            Check.Equal(402, Field(app, "Frames", "Tick"), "and the last good code runs on");
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]

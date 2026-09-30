@@ -344,6 +344,9 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial uint koral_buffer_copy_count(IntPtr buffer);
     [LibraryImport(Library)] internal static partial int koral_buffer_read(IntPtr buffer, void* into, ulong bytes, ulong offset);
     [LibraryImport(Library)] internal static partial int koral_buffer_write(IntPtr buffer, void* data, ulong bytes, ulong offset);
+    [LibraryImport(Library)] internal static partial IntPtr koral_buffer_read_async(IntPtr buffer, ulong bytes, ulong offset, IntPtr* done);
+    [LibraryImport(Library)] internal static partial int koral_readback_read(IntPtr readback, void* into);
+    [LibraryImport(Library)] internal static partial void koral_readback_destroy(IntPtr readback);
     [LibraryImport(Library)] internal static partial IntPtr koral_buffer_map(IntPtr buffer, ulong bytes, ulong offset, byte mutable_);
     [LibraryImport(Library)] internal static partial void koral_mapping_release(IntPtr mapping);
     [LibraryImport(Library)] internal static partial void* koral_mapping_data(IntPtr mapping);

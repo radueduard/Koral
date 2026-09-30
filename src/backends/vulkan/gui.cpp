@@ -2,6 +2,7 @@
 // Created by radue on 3/17/2026.
 //
 
+#include "../../core/tokenState.h"
 #include "gui.h"
 
 #include <algorithm>
@@ -259,9 +260,10 @@ namespace kor::vk
         // Filled once, now, on its own submit: there may be no frame in progress — a scene creating a
         // handle in Initialize is the ordinary case — and a handle should show something immediately
         // rather than a frame later. Every frame after this, Refresh() records the same blit.
-        Context::Device().runSingleTimeCommand([this](CommandBuffer& commandBuffer) {
+        // Not waited for: the frame that draws the interface waits for it on the GPU.
+        kor::detail::noteUpload(Context::Device().runSingleTimeCommand([this](CommandBuffer& commandBuffer) {
             recordBlit(commandBuffer);
-        }, ::vk::QueueFlagBits::eGraphics).Wait();
+        }, ::vk::QueueFlagBits::eGraphics));
     }
 
     ImTextureID GuiImage::operator*() const {

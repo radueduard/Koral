@@ -162,6 +162,25 @@ public sealed unsafe partial class Buffer : Resource
             KoralNative.Check(KoralNative.koral_buffer_read(Handle, pointer, (ulong)(into.Length * sizeof(T)), offset * (ulong)sizeof(T)));
     }
 
+    /// <summary>
+    /// ReadAsync&lt;T&gt;(count, offset): <see cref="Read{T}(ulong, ulong)"/> without making the CPU wait for the GPU:
+    /// the copy out is started, and the await resumes, next frame or later, with what it read.
+    /// </summary>
+    /// <example><code>var contacts = await _contacts.ReadAsync&lt;Contact&gt;();   // no stall</code></example>
+    public Task<T[]> ReadAsync<T>(ulong count = WholeSize, ulong offset = 0) where T : unmanaged
+    {
+        if (count == WholeSize) count = Size / (ulong)sizeof(T) - offset;
+        var done = IntPtr.Zero;
+        var readback = KoralNative.Check(KoralNative.koral_buffer_read_async(Handle, count * (ulong)sizeof(T), offset * (ulong)sizeof(T), &done));
+        return Readback.Finish<T>(readback, new Token(done), count);
+    }
+
+    /// <summary>Copies what a readback holds into <paramref name="values"/>.</summary>
+    internal static void ReadInto<T>(IntPtr readback, T[] values) where T : unmanaged
+    {
+        fixed (T* pointer = values) KoralNative.Check(KoralNative.koral_readback_read(readback, pointer));
+    }
+
     /// <summary>Write(elements, offset): from the <paramref name="offset"/>th T.</summary>
     public void Write<T>(ReadOnlySpan<T> elements, ulong offset = 0) where T : unmanaged
     {
@@ -281,6 +300,25 @@ public sealed unsafe partial class Buffer : Resource
             if (_native == IntPtr.Zero) return;
             KoralNative.koral_mapping_release(_native);
             _native = IntPtr.Zero;
+        }
+    }
+}
+
+/// <summary>The awaiting half of <see cref="Buffer.ReadAsync{T}"/>: C# can't await in an unsafe context.</summary>
+internal static class Readback
+{
+    public static async Task<T[]> Finish<T>(IntPtr readback, Token done, ulong count) where T : unmanaged
+    {
+        try
+        {
+            await done;
+            var values = new T[count];
+            Buffer.ReadInto(readback, values);
+            return values;
+        }
+        finally
+        {
+            KoralNative.koral_readback_destroy(readback);
         }
     }
 }

@@ -2,6 +2,7 @@
 // Created by radue on 6/23/2026.
 //
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#include "../../core/tokenState.h"
 #include "accelerationStructure.h"
 
 #include <vector>
@@ -255,11 +256,15 @@ namespace kor::vk
         buildInfo.setDstAccelerationStructure(_handle)
             .setScratchData(::vk::DeviceOrHostAddressKHR().setDeviceAddress(scratchAddress));
 
-        Context::Device().runSingleTimeCommand([&](kor::vk::CommandBuffer& commandBuffer) {
+        // Not waited for: anything tracing against it — the frame, or a later build of a structure
+        // over it — waits for the build on the GPU. The scratch goes once the GPU is past it.
+        kor::detail::noteUpload(Context::Device().runSingleTimeCommand([&](kor::vk::CommandBuffer& commandBuffer) {
             commandBuffer->buildAccelerationStructuresKHR(buildInfo, rangeInfos);
-        }, ::vk::QueueFlagBits::eCompute).Wait();
+        }, ::vk::QueueFlagBits::eCompute));
 
-        Context::Allocator().FreeBuffer(scratchBuffer, scratchAllocation);
+        Context::DestroyWhenUnused([scratchBuffer, scratchAllocation] {
+            Context::Allocator().FreeBuffer(scratchBuffer, scratchAllocation);
+        });
 
         _deviceAddress = Context::Device()->getAccelerationStructureAddressKHR(
             ::vk::AccelerationStructureDeviceAddressInfoKHR().setAccelerationStructure(_handle));

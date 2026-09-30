@@ -276,11 +276,11 @@ namespace kimg
         constexpr glm::u32 kLocalSize = 8;   // matches [numthreads(8, 8, 1)] in equirectToCube.slang
         const glm::u32 groups = (faceSize + kLocalSize - 1) / kLocalSize;
 
-        kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
+        (void)kor::CommandBuffer::Upload([&](kor::CommandBuffer& commandBuffer) {
             commandBuffer.BindComputePipeline(pipeline);
             commandBuffer.BindDescriptorSet(0, set);
             commandBuffer.Dispatch(groups, groups, kFaceCount);
-        }, kor::CommandBuffer::Usage::eCompute).Wait();
+        }, kor::CommandBuffer::Usage::eCompute);
 
         detail::finishUpload(cube, generateMipmaps);
         return cube;

@@ -87,25 +87,26 @@ namespace kor
                     staging.ErrorPtr()));
             }
 
-            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
+            // One submission, not waited for: whatever samples the image — the frame, or a one-off
+            // after this — waits for it on the GPU. The staging buffer may go meanwhile; Koral
+            // destroys a GPU object only once the GPU is past what was submitted before it went.
+            (void)CommandBuffer::Upload([&](CommandBuffer& commandBuffer) {
                 commandBuffer.CopyBufferToImage(staging, imageRef, kor::Copy {
                     .imageBaseArrayLayer = 0,
                     .imageLayerCount = image->ArrayLayers(),
                     .imageMipLevel = 0,
                 });
-            }).Wait();
-
-            if (image->MipLevels() > 1) {
-                CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                    commandBuffer.GenerateMipmaps(imageRef);
-                }).Wait();
-            }
-
-            // Leave the image shader-readable: the copy/mip commands leave it in a
-            // transfer-destination state, but descriptors bind sampled images as read-only.
-            CommandBuffer::SingleTimeCommand([&](CommandBuffer& commandBuffer) {
-                commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::eAllShaderRead }});
-            }).Wait();
+                if (image->MipLevels() > 1) commandBuffer.GenerateMipmaps(imageRef);
+                // Leave it ready for the first way it can be read by a shader: descriptors bind a
+                // sampled image read-only, a storage image in the general layout. An image a shader
+                // can't read at all stays where the copy left it; the read-only layout would be
+                // invalid for it (VUID-VkImageMemoryBarrier-oldLayout-01211).
+                const auto usage = image->UsageFlags();
+                if (usage & Image::Usage::eSampled)
+                    commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::eAllShaderRead }});
+                else if (usage & Image::Usage::eStorage)
+                    commandBuffer.Barrier({}, {{ imageRef, ResourceAccess::eAllShaderReadWrite }});
+            }, CommandBuffer::Usage::eGraphics);
         }
 
         return image;

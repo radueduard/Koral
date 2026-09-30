@@ -4,6 +4,8 @@
   scenes, views, navigation, shared state, scene libraries, hot reload with state.
 - [The frame graph](frame-graph.md) — passes, resources, memory sharing, async compute, debug lines.
 - [Input](input.md) — keys, mouse, gamepads, actions and axes, rebinding, feeding offscreen scenes.
+- [Parallel work and waiting](parallel.md) — `kor::ParallelFor`, and uploads and readbacks that don't
+  stall the CPU.
 - [Reflection and serialization](reflection.md) — describing types, JSON, the inspector.
 - [Scenes in C#](csharp.md) — the C# bindings, `koral-dotnet`, and scripts reloaded while they run.
 - [The C interface](c-api.md) — `koral_c.h`, for bindings to other languages.
