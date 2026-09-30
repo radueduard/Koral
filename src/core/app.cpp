@@ -511,7 +511,10 @@ namespace kor
                     .library = owner});
             }
         } else if (const auto createScene = reinterpret_cast<Scene* (*)()>(symbolOf(handle, "CreateScene"))) {
-            // The older single-scene library: one scene, named after the file.
+            // The older single-scene library: one scene, named after the file — and unversioned, so a
+            // library built against an older kor::Scene cannot be told apart and would crash.
+            log::Warn("[app] '{}' exports CreateScene, which cannot be checked against this runtime; "
+                      "export its scenes with KORAL_SCENES (sceneLibrary.h) instead", canonical.filename().string());
             names.push_back(canonical.stem().string());
             impl.registry.insert_or_assign(names.back(), Impl::Registration{
                 .make = [createScene](const SceneArgs&) {
