@@ -21,6 +21,7 @@
 #include "frameGraph.h"
 #include "gtime.h"
 #include "input.h"
+#include "reflect.h"
 #include "window.h"
 
 namespace kor
@@ -278,6 +279,28 @@ namespace kor
         virtual bool OnCloseRequested() { return true; }
 
         /**
+         * @brief The scene's state that outlives the scene: a reflected member (KORAL_REFLECT), or
+         *        nothing — the default.
+         *
+         * What App::ReloadLibrary carries across a rebuild of the scene's library: saved (as
+         * JSON, by field name) before the old scene goes and loaded into the new one after its
+         * constructor, *before* Initialize — which sees it, and should not reset it. A field added
+         * in the rebuild keeps its default, one removed is dropped. Also what SaveState and
+         * LoadState read and write, for saving a game or an editor's play-mode snapshot.
+         *
+         * @code
+         * struct Progress { glm::vec3 camera; int level = 1; };
+         * KORAL_REFLECT(Progress, camera, level)
+         *
+         * class Game final : public kor::Scene {
+         *     Progress _progress;
+         *     kor::Ref State() override { return _progress; }
+         * };
+         * @endcode
+         */
+        virtual kor::Ref State() { return {}; }
+
+        /**
          * @brief Called once, before the scene is destroyed: the GPU has finished with it and
          *        everything — members, frame graph, modules — is still alive.
          *
@@ -310,6 +333,11 @@ namespace kor
 
         /** @brief The name the scene was opened under. */
         [[nodiscard]] const std::string& Name() const { return _name; }
+
+        /** @brief State() as JSON; "null" for a scene with none. */
+        [[nodiscard]] std::string SaveState();
+        /** @brief Loads JSON saved by SaveState into State(). @see FromJson */
+        VoidResult LoadState(std::string_view json);
 
         /** @brief Whether the scene has an interface. @see EnableInterface */
         [[nodiscard]] bool HasInterface() const { return _interface != nullptr; }

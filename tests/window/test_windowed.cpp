@@ -1735,7 +1735,7 @@ TEST_F(VkWindowTest, ASceneLibraryIsLoadedOpenedReloadedAndUnloaded) {
 
     const auto names = app.LoadLibrary(library);
     ASSERT_TRUE(names) << names.error().message;
-    EXPECT_EQ(*names, (std::vector<std::string>{"Library.Plain", "Library.Arguments", "Library.Interface"}));
+    EXPECT_EQ(*names, (std::vector<std::string>{"Library.Plain", "Library.Arguments", "Library.Interface", "Library.Stateful"}));
     EXPECT_FALSE(app.LoadLibrary(library)) << "loading it twice is refused; ReloadLibrary is for that";
 
     ASSERT_NE(app.Open("Library.Plain", kSmall), nullptr);
@@ -1764,6 +1764,34 @@ TEST_F(VkWindowTest, ASceneLibraryIsLoadedOpenedReloadedAndUnloaded) {
     EXPECT_EQ(app.Scenes().size(), 1u);
     EXPECT_EQ(alive(), -1) << "the library is still loaded";
     EXPECT_EQ(app.Open("Library.Plain", kSmall), nullptr);
+    settle();
+}
+
+// A rebuilt library's scenes come back with the state they had: saved before the old code goes, given
+// to the new scene before its Initialize.
+TEST_F(VkWindowTest, AReloadedScenesStateSurvivesTheReload) {
+    auto& app = VkEnvironment::app();
+    const std::filesystem::path library = KORAL_TEST_SCENE_LIBRARY;
+    ASSERT_TRUE(app.LoadLibrary(library));
+    auto* scene = app.Open("Library.Stateful", kSmall);
+    ASSERT_NE(scene, nullptr);
+    for (int frame = 0; frame < 3; ++frame) settle();
+    scene->State().Field("note").As<std::string>() = "kept";
+    const int frames = scene->State().Field("frames").As<int>();
+    EXPECT_GE(frames, 3);
+    EXPECT_NE(scene->SaveState().find("\"note\":\"kept\""), std::string::npos);
+
+    ASSERT_TRUE(app.ReloadLibrary(library));
+    const auto scenes = app.Scenes();
+    const auto reopened = std::ranges::find_if(scenes, [](const kor::Scene* s) { return s->Name() == "Library.Stateful"; });
+    ASSERT_NE(reopened, scenes.end());
+    ASSERT_NE(*reopened, nullptr);
+    EXPECT_EQ((*reopened)->State().Field("note").As<std::string>(), "kept");
+    EXPECT_EQ((*reopened)->State().Field("frames").As<int>(), frames) << "restored, and not a frame run yet";
+    settle();
+    EXPECT_EQ((*reopened)->State().Field("frames").As<int>(), frames + 1) << "and it carries on from there";
+
+    ASSERT_TRUE(app.UnloadLibrary(library));
     settle();
 }
 

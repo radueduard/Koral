@@ -6,6 +6,7 @@
 #include <gui.h>   // one of its scenes has an interface, so the library registers its ImGui
 
 #include <atomic>
+#include <string>
 
 namespace
 {
@@ -28,6 +29,24 @@ namespace
         long long level;
     };
 
+    // What a scene keeps across a reload of this library.
+    struct Progress {
+        int frames = 0;
+        std::string note;
+    };
+    KORAL_REFLECT(Progress, frames, note)
+
+    class StatefulScene final : public kor::Scene {
+    public:
+        StatefulScene() { ++g_alive; }
+        ~StatefulScene() override { --g_alive; }
+        kor::Ref State() override { return progress; }
+        void Initialize() override { framesAtInitialize = progress.frames; }
+        void Update() override { ++progress.frames; }
+        Progress progress;
+        int framesAtInitialize = -1;
+    };
+
     class InterfaceScene final : public kor::Scene {
     public:
         InterfaceScene() { ++g_alive; EnableInterface(); }
@@ -46,4 +65,5 @@ KORAL_SCENES(
     KORAL_SCENE("Library.Plain", PlainScene),
     KORAL_SCENE("Library.Arguments", ArgumentScene),
     KORAL_SCENE("Library.Interface", InterfaceScene),
+    KORAL_SCENE("Library.Stateful", StatefulScene),
 )

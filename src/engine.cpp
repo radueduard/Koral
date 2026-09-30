@@ -215,6 +215,31 @@ namespace kor
             .vsync = config.vsync,
         };
         if (!app->Open(start, window)) return EXIT_FAILURE;   // already reported, with the reason
-        return app->Run();
+        if (!config.hotReload) return app->Run();
+
+        // Development: the library is watched, and reloaded — every scene from it reopened with its
+        // Scene::State() — once a rebuild has finished writing it. A write is taken as finished when
+        // the file has stopped changing for a moment, so a linker still writing is not caught halfway.
+        log::Info("[engine] hot reload: watching '{}'", scenePath.string());
+        using Clock = std::chrono::steady_clock;
+        std::error_code ec;
+        auto loaded = std::filesystem::last_write_time(scenePath, ec);
+        std::optional<std::filesystem::file_time_type> seen;
+        Clock::time_point seenAt {}, checkedAt {};
+        while (app->Frame()) {
+            const auto now = Clock::now();
+            if (now - checkedAt < std::chrono::milliseconds(250)) continue;
+            checkedAt = now;
+            const auto written = std::filesystem::last_write_time(scenePath, ec);
+            if (ec || written == loaded) { seen.reset(); continue; }
+            if (!seen || *seen != written) { seen = written; seenAt = now; continue; }
+            if (now - seenAt < std::chrono::milliseconds(500)) continue;
+            log::Info("[engine] '{}' was rebuilt: reloading", scenePath.filename().string());
+            if (const auto reloaded = app->ReloadLibrary(scenePath); !reloaded)
+                log::Error("[engine] the rebuilt library could not be loaded: {}", reloaded.error().message);
+            loaded = written;
+            seen.reset();
+        }
+        return EXIT_SUCCESS;
     }
 }

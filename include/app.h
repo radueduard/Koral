@@ -104,7 +104,8 @@ namespace kor
 
         /**
          * @brief Loads the library again — rebuilt, say — and reopens the scenes that were open from
-         *        it, with the arguments and window settings they had.
+         *        it, with the arguments and window settings they had, and each with its Scene::State()
+         *        as it was.
          */
         VoidResult ReloadLibrary(const std::filesystem::path& path);
 

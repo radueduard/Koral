@@ -313,6 +313,8 @@ namespace kor
             else if (arg == "--no-transparent") transparentFramebuffer = false;
             else if (arg == "--vsync")          vsync = true;
             else if (arg == "--no-vsync")       vsync = false;
+            else if (arg == "--hot-reload")     hotReload = true;
+            else if (arg == "--no-hot-reload")  hotReload = false;
             else if (arg == "--width") {
                 if (const auto error = number(extent.x)) return invalid(*error);
             }
@@ -454,6 +456,7 @@ namespace kor
             "  --resizable         Allow the window to resize  (--no-resizable)\n"
             "  --borderless        Drop the window decorations (--decorated)\n"
             "  --transparent       Transparent framebuffer     (--no-transparent)\n"
-            "  --vsync             Wait for vertical blank     (--no-vsync)\n";
+            "  --vsync             Wait for vertical blank     (--no-vsync)\n"
+            "  --hot-reload        Reload the scene library when it is rebuilt, keeping each scene's state\n";
     }
 }

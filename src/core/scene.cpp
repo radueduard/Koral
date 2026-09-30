@@ -215,6 +215,21 @@ namespace kor
     float Scene::Time::TimeScale() { return Get().TimeScale(); }
     void Scene::Time::SetTimeScale(const float scale) { Get().SetTimeScale(scale); }
 
+    // ---- state ---------------------------------------------------------------------------------------
+
+    std::string Scene::SaveState()
+    {
+        const Ref state = State();
+        return state.Valid() ? ToJson(state) : std::string("null");
+    }
+
+    VoidResult Scene::LoadState(const std::string_view json)
+    {
+        const Ref state = State();
+        if (!state.Valid() || json.empty() || json == "null") return {};
+        return FromJson(state, json);
+    }
+
     // ---- views --------------------------------------------------------------------------------------
 
     View::View(Scene& scene, std::string name, const OffscreenSettings& target)

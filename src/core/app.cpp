@@ -572,7 +572,8 @@ namespace kor
         struct Reopen {
             WindowSettings settings;
             std::optional<OffscreenSettings> offscreen;
-            std::vector<std::pair<std::string, SceneArgs>> stack;
+            struct Scene_ { std::string name; SceneArgs arguments; std::string state; };
+            std::vector<Scene_> stack;
         };
         std::vector<Reopen> reopen;
         for (const auto& stage : impl.stages) {
@@ -581,31 +582,43 @@ namespace kor
             entry.settings.extent = stage->window->Extent();
             entry.settings.title = stage->window->Title();
             if (entry.offscreen) entry.offscreen->extent = stage->window->Extent();
-            for (const auto& hosted : stage->stack) entry.stack.emplace_back(hosted.name, hosted.arguments);
+            // Each scene's State(), saved while its library's code is still there to run.
+            for (const auto& hosted : stage->stack) {
+                detail::SceneScope scope(hosted.scene);
+                entry.stack.push_back({hosted.name, hosted.arguments, hosted.scene->SaveState()});
+            }
             reopen.push_back(std::move(entry));
         }
 
         if (const auto unloaded = UnloadLibrary(path); !unloaded) return unloaded;
         if (const auto loaded = LoadLibrary(path); !loaded) return std::unexpected(loaded.error());
 
+        // Made again, given back what they saved — after the constructor, before Initialize.
+        const auto remake = [&](const Reopen::Scene_& entry) {
+            auto made = impl.Make(entry.name, entry.arguments);
+            detail::SceneScope scope(made.scene);
+            if (const auto restored = made.scene->LoadState(entry.state); !restored)
+                log::Error("[app] '{}' could not take back its state: {}", entry.name, restored.error().message);
+            return made;
+        };
         for (const auto& [settings, offscreen, stack] : reopen) {
             if (stack.empty()) continue;
             Scene* bottom = nullptr;
             try {
-                auto made = impl.Make(stack.front().first, stack.front().second);
+                auto made = remake(stack.front());
                 bottom = offscreen ? impl.OpenStage(*offscreen, std::move(made)) : impl.OpenStage(settings, std::move(made));
             } catch (const std::exception& e) {
-                log::Error("[app] reopening '{}': {}", stack.front().first, e.what());
+                log::Error("[app] reopening '{}': {}", stack.front().name, e.what());
             }
             Impl::Stage* stage = bottom ? impl.StageOf(bottom) : nullptr;
             for (std::size_t i = 1; stage && i < stack.size(); ++i) {
                 try {
                     Scene& covered = stage->Top();
                     { detail::SceneScope scope(&covered); covered.OnSuspend(); }
-                    stage->stack.push_back(impl.Make(stack[i].first, stack[i].second));
+                    stage->stack.push_back(remake(stack[i]));
                     impl.Host(*stage, stage->stack.back());
                 } catch (const std::exception& e) {
-                    log::Error("[app] reopening '{}': {}", stack[i].first, e.what());
+                    log::Error("[app] reopening '{}': {}", stack[i].name, e.what());
                     break;
                 }
             }

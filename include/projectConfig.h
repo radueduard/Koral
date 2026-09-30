@@ -169,6 +169,11 @@ namespace kor
 
         /** @brief Whether presentation waits for the display's refresh. */
         bool vsync = true;
+        /**
+         * @brief Reload the scene library when it is rebuilt, keeping each scene's Scene::State():
+         *        `--hot-reload`. For development; off by default.
+         */
+        bool hotReload = false;
 
         /**
          * @brief Where Dear ImGui persists its layout (window positions, docking). Empty until a
