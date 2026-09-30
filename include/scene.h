@@ -12,6 +12,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -57,6 +58,26 @@ namespace kor
         /** @brief The current scene's life, to carry into work that runs later or elsewhere. Null outside one. */
         [[nodiscard]] KORAL_API std::shared_ptr<SceneLife> CurrentSceneLife();
 
+        /**
+         * @brief Makes @p window the one `Window::` — and a render pass opened without a framebuffer —
+         *        means on this thread, instead of the current scene's own. Null changes nothing.
+         *
+         * What a View's frame graph records under: its target is the window its passes draw into.
+         */
+        class KORAL_API WindowScope {
+        public:
+            explicit WindowScope(kor::Window* window);
+            ~WindowScope();
+            WindowScope(const WindowScope&) = delete;
+            WindowScope& operator=(const WindowScope&) = delete;
+        private:
+            kor::Window* _previous = nullptr;
+            bool _set = false;
+        };
+
+        /** @brief The window a WindowScope set on this thread, if any. */
+        [[nodiscard]] KORAL_API kor::Window* CurrentWindowOverride();
+
         kor::Window* CurrentWindowOrNull();
     }
 
@@ -94,6 +115,57 @@ namespace kor
 
     private:
         std::map<std::string, std::string> _values;
+    };
+
+    /**
+     * @brief Another way of looking at a scene: a frame graph of its own, drawing into an image of its
+     *        own, over the same scene state. @see Scene::AddView
+     *
+     * An editor's scene view and game view, a preview, a picture-in-picture, split screen: one scene
+     * — one world, updated once — drawn several times. Each view's graph has its own passes and its
+     * own Screen (the view's image); inside its passes `Window::` is the view's target, so its size
+     * is the view's. Input and Time stay the scene's.
+     *
+     * @code
+     * void Editor::Initialize() {
+     *     auto& game = AddView("Game", {.extent = {1280, 720}});
+     *     game.Graph().Add<ForwardPass>(_world, _gameCamera);
+     * }
+     * void Editor::RenderUI() { _gameView.Draw("Game", *FindView("Game")); }   // kgui::SceneView
+     * @endcode
+     *
+     * Views are drawn after the scene's Update and LateUpdate and before its own Render and graph,
+     * so what the scene draws — and its interface — can show this frame's view images.
+     */
+    class KORAL_API View {
+    public:
+        ~View();
+        View(const View&) = delete;
+        View& operator=(const View&) = delete;
+
+        [[nodiscard]] const std::string& Name() const { return _name; }
+        /** @brief The view's render passes. Their FrameGraph::Screen is Image(). */
+        [[nodiscard]] kor::FrameGraph& Graph() { return _graph; }
+        /** @brief The offscreen window the view draws into: its size, its framebuffer, its image. */
+        [[nodiscard]] kor::Window& Target() { return *_window; }
+        [[nodiscard]] const kor::Window& Target() const { return *_window; }
+        /** @brief What the view drew. @see Window::Image */
+        [[nodiscard]] ResourceRef<const kor::Image> Image() const;
+        /** @brief Asks for a new size, taken at the start of the next frame. @see Window::Resize */
+        void Resize(glm::uvec2 extent);
+        /** @brief Whether it is drawn at all. A view nobody is looking at can be switched off. */
+        [[nodiscard]] bool Enabled() const { return _enabled; }
+        void SetEnabled(bool enabled) { _enabled = enabled; }
+
+    private:
+        friend class Scene;
+        friend class App;
+        View(Scene& scene, std::string name, const OffscreenSettings& target);
+
+        std::string _name;
+        std::unique_ptr<kor::Window> _window;
+        kor::FrameGraph _graph;
+        bool _enabled = true;
     };
 
     /** @brief How a scene's interface is set up. @see Scene::EnableInterface */
@@ -218,6 +290,19 @@ namespace kor
         /** @brief The scene's render passes, run every frame ahead of Render. */
         [[nodiscard]] kor::FrameGraph& Graph() { return _graph; }
 
+        /**
+         * @brief Adds a view: a frame graph drawing this scene into an image of its own. @see View
+         *
+         * From Initialize on (it needs the device). A view by the same name is replaced.
+         */
+        View& AddView(std::string name, const OffscreenSettings& target = {});
+        /** @brief Removes a view, between frames. Its image goes once no frame in flight uses it. */
+        void RemoveView(std::string_view name);
+        /** @brief The view named @p name, or null. */
+        [[nodiscard]] View* FindView(std::string_view name);
+        /** @brief Every view, in the order they were added — the order they are drawn in. */
+        [[nodiscard]] const std::vector<std::unique_ptr<View>>& Views() const { return _views; }
+
         [[nodiscard]] kor::Window& SceneWindow() const;
         [[nodiscard]] kor::Input& SceneInput() const { return *_input; }
         [[nodiscard]] kor::Time& SceneTime() { return _time; }
@@ -316,5 +401,6 @@ namespace kor
         std::optional<InterfaceSettings> _interfaceRequest;
         std::shared_ptr<detail::SceneLife> _life;
         kor::FrameGraph _graph;
+        std::vector<std::unique_ptr<View>> _views;   // after the graph: destroyed first
     };
 }

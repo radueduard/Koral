@@ -133,6 +133,8 @@ namespace kor
         std::vector<std::unique_ptr<Library>> libraries;
         std::vector<std::unique_ptr<Stage>> stages;
         std::vector<Request> requests;
+        struct SharedEntry { std::weak_ptr<void> object; std::string type; };
+        std::map<std::string, SharedEntry, std::less<>> shared;
         bool deviceUp = false;
         bool modulesUp = false;
         bool inFrame = false;
@@ -654,6 +656,29 @@ namespace kor
                                                      .destroy = [](Scene* s) { delete s; }});
     }
 
+    std::shared_ptr<void> App::FindShared(const std::string& key, const std::type_info& type)
+    {
+        const auto it = _impl->shared.find(key);
+        if (it == _impl->shared.end()) return nullptr;
+        auto object = it->second.object.lock();
+        if (!object) { _impl->shared.erase(it); return nullptr; }
+        // By name, not by type_info identity: a scene library has type_info objects of its own.
+        if (it->second.type != type.name())
+            throw std::logic_error(std::format("'{}' is shared as another type than the one asked for", key));
+        return object;
+    }
+
+    void App::KeepShared(const std::string& key, const std::type_info& type, std::shared_ptr<void> object)
+    {
+        _impl->shared.insert_or_assign(key, Impl::SharedEntry{ .object = object, .type = type.name() });
+    }
+
+    bool App::IsShared(const std::string& key) const
+    {
+        const auto it = _impl->shared.find(key);
+        return it != _impl->shared.end() && !it->second.object.expired();
+    }
+
     std::vector<Scene*> App::Scenes() const
     {
         std::vector<Scene*> scenes;
@@ -717,6 +742,11 @@ namespace kor
                 window._shownThisFrame = false;   // until the scheduler gives it an image
                 if (window.IsPaused()) continue;
                 active.push_back(stage.get());
+                // Its views' images, at whatever size they were last asked for.
+                for (const auto& view : stage->Top()._views) {
+                    view->_window->ApplyResize();
+                    view->_window->_shownThisFrame = view->Enabled();
+                }
                 if (offscreen) {
                     // Its image is always there to draw into, at whatever size it was last asked for.
                     window.ApplyResize();
@@ -733,6 +763,21 @@ namespace kor
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             return true;
         }
+
+        // A window nothing drew into is cleared to its framebuffer's colour, rather than showing
+        // whatever its image held — before the interface, which would otherwise be wiped: for a
+        // scene that shows everything through its interface, it is all there is.
+        const auto clearIfUntouched = [](CommandBuffer& commandBuffer, const Window& window, const bool graphTouchedScreen) {
+            if (const auto framebuffer = window.DefaultFramebuffer();
+                framebuffer.Valid() && !framebuffer->ColorAttachments().empty()) {
+                if (const auto screen = framebuffer->ColorImage(0);
+                    !commandBuffer.HasTouched(screen) && !graphTouchedScreen
+                    && !Context::Scheduler().QueuedWorkTouches(screen)) {
+                    commandBuffer.BeginRendering(RenderInfo(framebuffer));
+                    commandBuffer.EndRendering();
+                }
+            }
+        };
 
         impl.inFrame = true;
         Context::Scheduler().Draw(windows, [&](CommandBuffer& commandBuffer) {
@@ -765,24 +810,20 @@ namespace kor
                 ModuleHost::LateUpdate();
                 scene.LateUpdate();
 
+                // Its views, before its own drawing: what it draws, and its interface, can show them.
+                for (const auto& view : scene._views) {
+                    if (!view->Enabled()) continue;
+                    detail::WindowScope target(view->_window.get());
+                    clearIfUntouched(commandBuffer, *view->_window, view->_graph.Execute());
+                }
+
                 ModuleHost::Render(commandBuffer);
                 scene.Render(commandBuffer);
                 // The scene's render passes, recorded in parallel and run ahead of this command buffer.
                 const bool graphTouchedScreen = scene.Graph().Execute();
                 ModuleHost::RenderOverlay(commandBuffer);
 
-                // A window nothing drew into is cleared to its framebuffer's colour, rather than showing
-                // whatever its swap-chain image held — before the interface, which would otherwise be
-                // wiped: for a scene that shows everything through its interface, it is all there is.
-                if (const auto framebuffer = window.DefaultFramebuffer();
-                    framebuffer.Valid() && !framebuffer->ColorAttachments().empty()) {
-                    if (const auto screen = framebuffer->ColorImage(0);
-                        !commandBuffer.HasTouched(screen) && !graphTouchedScreen
-                        && !Context::Scheduler().QueuedWorkTouches(screen)) {
-                        commandBuffer.BeginRendering(RenderInfo(framebuffer));
-                        commandBuffer.EndRendering();
-                    }
-                }
+                clearIfUntouched(commandBuffer, window, graphTouchedScreen);
 
                 if (scene._interface) scene._interface->Render(commandBuffer);
             }
@@ -802,6 +843,7 @@ namespace kor
         for (const auto& stage : impl.stages) {
             stage->Top()._input->Update();
             stage->window->LateUpdate();
+            for (const auto& view : stage->Top()._views) view->_window->LateUpdate();
         }
         return true;
     }

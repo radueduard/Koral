@@ -2,7 +2,8 @@
  * @file koralSceneView.h
  * @brief Another scene, shown in a panel of this one's interface: an editor's game view.
  *
- * The scene shown is offscreen (App::OpenOffscreen): it draws into an image rather than an OS window,
+ * The scene shown is offscreen (App::OpenOffscreen) — or it is one of this scene's own views
+ * (Scene::AddView), shown the same way without the input. An offscreen scene draws into an image rather than an OS window,
  * and this is what puts that image on screen and gives the scene what a window would have — a size
  * that follows the panel, and the input of whoever is using the panel.
  *
@@ -59,6 +60,18 @@ namespace kgui
             if (drawn && _viewport.size() != window.Extent()) window.Resize(_viewport.size());
 
             Feed(scene, drawn);
+            return drawn;
+        }
+
+        /**
+         * @brief Draws the panel showing one of the current scene's views (Scene::AddView), sized
+         *        to the panel. A view shares its scene's input, so nothing is fed.
+         */
+        bool Draw(const char* title, kor::View& view, bool* open = nullptr)
+        {
+            _viewport.SetImage(view.Image());
+            const bool drawn = _viewport.Draw(title, open);
+            if (drawn && _viewport.size() != view.Target().Extent()) view.Resize(_viewport.size());
             return drawn;
         }
 

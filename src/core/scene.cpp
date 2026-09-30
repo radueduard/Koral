@@ -4,6 +4,8 @@
 
 #include "scene.h"
 
+#include <algorithm>
+
 #include <charconv>
 #include <cctype>
 #include <format>
@@ -23,6 +25,7 @@ namespace kor
         // Held as the life rather than the scene, so a scene destroyed while current on some thread
         // reads as gone instead of dangling.
         thread_local std::shared_ptr<detail::SceneLife> t_current;
+        thread_local kor::Window* t_window = nullptr;
 
         Scene& required(const char* what)
         {
@@ -46,10 +49,22 @@ namespace kor
 
     std::shared_ptr<detail::SceneLife> detail::CurrentSceneLife() { return t_current; }
 
+    detail::WindowScope::WindowScope(kor::Window* window)
+    {
+        if (!window) return;
+        _previous = std::exchange(t_window, window);
+        _set = true;
+    }
+
+    detail::WindowScope::~WindowScope() { if (_set) t_window = _previous; }
+
+    kor::Window* detail::CurrentWindowOverride() { return t_window; }
+
     Scene* Scene::Current() { return t_current ? t_current->scene : nullptr; }
 
     kor::Window* detail::CurrentWindowOrNull()
     {
+        if (t_window) return t_window;
         if (const Scene* scene = Scene::Current(); scene && scene->_window) return scene->_window;
         if (App::Exists()) {
             const auto scenes = App::Current().Scenes();
@@ -149,7 +164,12 @@ namespace kor
 
     // ---- Window:: ---------------------------------------------------------------------------------
 
-    kor::Window& Scene::Window::Get() { return required("Window").SceneWindow(); }
+    kor::Window& Scene::Window::Get()
+    {
+        // Inside a view's passes, the view's target: its size is the one they draw at.
+        if (auto* window = detail::CurrentWindowOverride()) return *window;
+        return required("Window").SceneWindow();
+    }
     glm::uvec2 Scene::Window::Extent() { return Get().Extent(); }
     bool Scene::Window::HasResized() { return Get().HasResized(); }
     bool Scene::Window::IsPaused() { return Get().IsPaused(); }
@@ -194,4 +214,39 @@ namespace kor
     std::uint64_t Scene::Time::FrameCount() { return Get().FrameCount(); }
     float Scene::Time::TimeScale() { return Get().TimeScale(); }
     void Scene::Time::SetTimeScale(const float scale) { Get().SetTimeScale(scale); }
+
+    // ---- views --------------------------------------------------------------------------------------
+
+    View::View(Scene& scene, std::string name, const OffscreenSettings& target)
+        : _name(std::move(name))
+    {
+        OffscreenSettings settings = target;
+        if (settings.title == OffscreenSettings{}.title) settings.title = scene.Name() + " / " + _name;
+        _window.reset(new kor::Window(settings));
+        _graph._scene = &scene;
+        _graph._target = _window.get();
+    }
+
+    View::~View() = default;
+
+    ResourceRef<const kor::Image> View::Image() const { return _window->Image(); }
+
+    void View::Resize(const glm::uvec2 extent) { _window->Resize(extent); }
+
+    View& Scene::AddView(std::string name, const OffscreenSettings& target)
+    {
+        std::erase_if(_views, [&](const auto& view) { return view->Name() == name; });
+        return *_views.emplace_back(new View(*this, std::move(name), target));
+    }
+
+    void Scene::RemoveView(const std::string_view name)
+    {
+        std::erase_if(_views, [&](const auto& view) { return view->Name() == name; });
+    }
+
+    View* Scene::FindView(const std::string_view name)
+    {
+        const auto it = std::ranges::find_if(_views, [&](const auto& view) { return view->Name() == name; });
+        return it == _views.end() ? nullptr : it->get();
+    }
 }

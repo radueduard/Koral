@@ -144,18 +144,26 @@ namespace kor {
 
     Scene* FrameGraph::OwnerScene() const { return _scene ? _scene : Scene::Current(); }
 
+    Window* FrameGraph::TargetWindow() const
+    {
+        if (_target) return _target;
+        const Scene* scene = OwnerScene();
+        return scene ? &scene->SceneWindow() : nullptr;
+    }
+
     namespace {
-        // The image the scene's window shows this frame, or empty when there is no scene to ask.
-        ResourceRef<const Image> screenOf(const Scene* scene) {
-            if (!scene) return {};
-            const auto framebuffer = scene->SceneWindow().DefaultFramebuffer();
+        // The image the graph's screen is this frame — its view's, or its scene's window's — or empty
+        // when there is nothing to ask.
+        ResourceRef<const Image> screenOf(const Window* window) {
+            if (!window) return {};
+            const auto framebuffer = window->DefaultFramebuffer();
             return framebuffer.Valid() && !framebuffer->ColorAttachments().empty()
                 ? framebuffer->ColorImage(0) : ResourceRef<const Image>{};
         }
     }
 
     ResourceRef<const Image> PassResources::ImageNamed(const std::string_view name) const {
-        if (name == FrameGraph::Screen) return screenOf(_graph.OwnerScene());
+        if (name == FrameGraph::Screen) return screenOf(_graph.TargetWindow());
         const auto it = _graph._images.find(name);
         if (it == _graph._images.end()) {
             log::Error("[frame graph] no image named '{}'", name);
@@ -671,7 +679,7 @@ namespace kor {
             for (const auto& use : decl.uses) {
                 const std::string name = use.access == graph::Access::eReadPrevious ? "previous " + use.resource : use.resource;
                 if (use.resource == Screen) {
-                    const auto screen = screenOf(OwnerScene());
+                    const auto screen = screenOf(TargetWindow());
                     signature.push_back(screen.Alive() ? reinterpret_cast<std::uintptr_t>(screen.Get()) : 0);
                     signature.push_back(screen.Alive() ? screen->Generation() : 0);
                     continue;
@@ -721,12 +729,13 @@ namespace kor {
         // main thread is blocked until every pass has run.
         Task<void> RunOnBackground(RenderPass& pass, const bool onCpu, const bool async, const std::vector<ImageBarrier>& handoffs,
                                    std::unique_ptr<CommandBuffer>& out, double& ms,
-                                   std::vector<Token> after, std::shared_ptr<detail::SceneLife> scene) {
+                                   std::vector<Token> after, std::shared_ptr<detail::SceneLife> scene, Window* target) {
             co_await Context::SwitchToBackgroundThread();
             if (!after.empty()) co_await WhenAll(std::move(after));
             // The scene the graph belongs to is current while its passes record, as it is while the
             // scene runs: `Window::` in a pass, and a render pass opened without a framebuffer, are its.
             detail::SceneScope scope(scene);
+            detail::WindowScope window(target);
             RunTimed(pass, onCpu, async, handoffs, out, ms);
         }
     }
@@ -740,7 +749,8 @@ namespace kor {
             return false;
         }
         detail::SceneScope scope(scene);
-        if (const glm::uvec2 extent = scene->SceneWindow().Extent(); extent != _extent) {
+        detail::WindowScope window(_target);
+        if (const glm::uvec2 extent = TargetWindow()->Extent(); extent != _extent) {
             _extent = extent;
             _dirty = true;
         }
@@ -793,7 +803,7 @@ namespace kor {
                 for (const auto dependency : _dependencies[i])
                     if (_order[dependency]->RunsOnCpu()) after.push_back(tasks[dependency].Completion());
                 tasks.push_back(RunOnBackground(*_order[i], _order[i]->RunsOnCpu(), _async[i], _handoffs[i], recorded[i], recordMs[i], std::move(after),
-                                                scene->Life().lock()));
+                                                scene->Life().lock(), _target));
             }
             auto all = WhenAll(std::move(tasks));
             all.Wait();
@@ -838,7 +848,7 @@ namespace kor {
         // queue waits only for the pass on the graphics queue it needs — and the other way round —
         // and runs alongside the rest.
         bool touchedScreen = false;
-        const auto screen = screenOf(scene);
+        const auto screen = screenOf(TargetWindow());
         const auto group = reinterpret_cast<std::uintptr_t>(this);
         std::vector<Token> done(_order.size());
         std::optional<std::size_t> lastAsync;

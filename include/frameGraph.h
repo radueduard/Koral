@@ -476,6 +476,9 @@ namespace kor {
         /** @brief The scene the graph belongs to; a graph that belongs to none uses the current scene. */
         [[nodiscard]] Scene* OwnerScene() const;
         Scene* _scene = nullptr;
+        friend class View;
+        Window* _target = nullptr;   ///< What Screen is: a View's target; the owner scene's window when null.
+        [[nodiscard]] Window* TargetWindow() const;
 
         void Adopt(std::unique_ptr<RenderPass> pass);
         bool Build();

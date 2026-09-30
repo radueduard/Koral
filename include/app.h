@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <typeinfo>
 #include <vector>
 
 #include "api.h"
@@ -149,6 +150,34 @@ namespace kor
             return static_cast<S*>(OpenOffscreen(std::string(target.title), std::make_unique<S>(std::forward<Args>(arguments)...), target));
         }
 
+        // ---- state scenes share --------------------------------------------------------------------
+
+        /**
+         * @brief The object shared under @p key — made from @p arguments by the first to ask, and the
+         *        same one for everyone after, for as long as anyone holds it.
+         *
+         * How scenes share state without globals: an editor and the game it runs offscreen looking at
+         * one world, a menu and a level sharing the player's profile.
+         *
+         * @code
+         * // in both scenes' Initialize
+         * _world = kor::App::Current().Shared<World>("level");
+         * @endcode
+         *
+         * Held by nobody, it goes; the next to ask makes a new one. Asking for a key as a different
+         * type than it was made as throws std::logic_error.
+         */
+        template<typename T, typename... Args>
+        std::shared_ptr<T> Shared(const std::string& key, Args&&... arguments) {
+            if (auto existing = FindShared(key, typeid(T))) return std::static_pointer_cast<T>(existing);
+            auto made = std::make_shared<T>(std::forward<Args>(arguments)...);
+            KeepShared(key, typeid(T), made);
+            return made;
+        }
+
+        /** @brief Whether something is shared under @p key and still held. */
+        [[nodiscard]] bool IsShared(const std::string& key) const;
+
         /** @brief The scene each window shows, in the order the windows were opened. */
         [[nodiscard]] std::vector<Scene*> Scenes() const;
 
@@ -172,6 +201,9 @@ namespace kor
         void Close(Scene& shown);
 
     private:
+        std::shared_ptr<void> FindShared(const std::string& key, const std::type_info& type);
+        void KeepShared(const std::string& key, const std::type_info& type, std::shared_ptr<void> object);
+
         struct Impl;
         std::unique_ptr<Impl> _impl;
     };

@@ -17,6 +17,8 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
+#include <tuple>
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -866,8 +868,8 @@ TEST_F(VkWindowTest, AFrameGraphSharesMemoryBetweenImagesNeverAliveTogether) {
 TEST_F(VkWindowTest, AFrameGraphImageAskedForByNameIsNotShared) {
     auto& scene = VkEnvironment::scene();
     kor::FrameGraph graph;
-    addFillAndRead(graph, "a", 1.f);
-    addFillAndRead(graph, "b", 2.f);
+    const auto a = addFillAndRead(graph, "a", 1.f);   // kept: their passes copy into these
+    const auto b = addFillAndRead(graph, "b", 2.f);
     drawGraphFrame(scene, graph);
     ASSERT_EQ(graph.Memory().allocations, 1u);
 
@@ -1588,6 +1590,132 @@ TEST_F(VkWindowTest, ASceneViewShowsAnOffscreenSceneSizedToThePanel) {
 
     app.Close(*game);
     settle();
+}
+
+// ---- views ----------------------------------------------------------------------------------------
+
+namespace {
+    // A scene drawn twice: two views, each clearing its own screen to its own colour and reading one
+    // texel back, and noting what `Window::` was while it recorded.
+    class TwoViews final : public kor::Scene {
+    public:
+        struct Seen { const kor::Window* window = nullptr; glm::uvec2 extent{0, 0}; };
+
+        void Initialize() override {
+            for (const auto& [name, red, extent] : {std::tuple{"Left", 0.25f, glm::uvec2{40, 30}},
+                                                    std::tuple{"Right", 0.75f, glm::uvec2{20, 10}}}) {
+                auto& view = AddView(name, {.extent = extent});
+                auto readback = std::make_shared<kor::Resource<kor::Buffer>>(kor::Buffer::RawBuilder{}.SetRawSize(4)
+                    .SetUsage(kor::Buffer::Usage::eTransferDst).SetType(kor::Buffer::Type::eReadback).Build());
+                auto seen = std::make_shared<Seen>();
+                readbacks[name] = readback;
+                seens[name] = seen;
+                auto target = std::make_shared<kor::ResourceRef<const kor::Image>>();
+                auto& paint = view.Graph().Add<LambdaPass>("Paint");
+                paint.setup = [](kor::PassBuilder& b) {
+                    b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst | kor::Image::Usage::eTransferSrc).SideEffect();
+                };
+                paint.initialize = [target](const kor::PassResources& r) { *target = r.ImageNamed(kor::FrameGraph::Screen); };
+                paint.record = [target, readback, seen, red](kor::CommandBuffer& cb) {
+                    seen->window = &Window::Get();
+                    seen->extent = Window::Extent();
+                    cb.ClearColorImage(*target, glm::vec4(red, 0.f, 0.f, 1.f));
+                    cb.CopyImageToBuffer(*target, kor::ResourceRef<const kor::Buffer>(*readback), kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+                };
+            }
+        }
+        [[nodiscard]] glm::u8 Red(const std::string& view) const { return (*readbacks.at(view))->Read<glm::u8>(4)[0]; }
+
+        std::map<std::string, std::shared_ptr<kor::Resource<kor::Buffer>>> readbacks;
+        std::map<std::string, std::shared_ptr<Seen>> seens;
+    };
+}
+
+// One scene, two views: each its own graph and its own image, and inside a view's passes `Window::`
+// is the view's target.
+TEST_F(VkWindowTest, ASceneDrawsEachOfItsViewsIntoItsOwnImage) {
+    auto& app = VkEnvironment::app();
+    auto* scene = app.OpenOffscreen<TwoViews>({.extent = {16, 16}});
+    ASSERT_NE(scene, nullptr);
+    for (int frame = 0; frame < 2; ++frame) settle();
+
+    ASSERT_EQ(scene->Views().size(), 2u);
+    auto* left = scene->FindView("Left");
+    auto* right = scene->FindView("Right");
+    ASSERT_NE(left, nullptr);
+    ASSERT_NE(right, nullptr);
+    EXPECT_EQ(left->Image()->Extent(), glm::uvec3(40, 30, 1));
+    EXPECT_EQ(right->Image()->Extent(), glm::uvec3(20, 10, 1));
+    EXPECT_NEAR(scene->Red("Left"), 64, 1);
+    EXPECT_NEAR(scene->Red("Right"), 191, 1);
+    EXPECT_EQ(scene->seens["Left"]->window, &left->Target()) << "Window:: in a view's pass is the view's target";
+    EXPECT_EQ(scene->seens["Left"]->extent, glm::uvec2(40, 30));
+    EXPECT_EQ(scene->seens["Right"]->extent, glm::uvec2(20, 10));
+
+    // Resized, its passes see the new size; switched off, it is not drawn.
+    left->Resize({50, 20});
+    right->SetEnabled(false);
+    const auto rightSeen = scene->seens["Right"]->extent;
+    settle();
+    EXPECT_EQ(scene->seens["Left"]->extent, glm::uvec2(50, 20));
+    EXPECT_EQ(left->Image()->Extent(), glm::uvec3(50, 20, 1));
+    scene->seens["Right"]->extent = {};
+    settle();
+    EXPECT_EQ(scene->seens["Right"]->extent, glm::uvec2(0, 0)) << "a view switched off is not drawn";
+    (void)rightSeen;
+
+    scene->RemoveView("Right");
+    EXPECT_EQ(scene->FindView("Right"), nullptr);
+    settle();
+
+    app.Close(*scene);
+    settle();
+}
+
+// A view shown in the scene's own interface, sized to the panel.
+TEST_F(VkWindowTest, ASceneViewShowsOneOfTheScenesOwnViews) {
+    auto& editor = VkEnvironment::scene();
+    auto& view = editor.AddView("Preview", {.extent = {8, 8}});
+    kgui::SceneView panel;
+    editor.onRenderUI = [&] {
+        ImGui::SetNextWindowSize(ImVec2(120.f, 90.f), ImGuiCond_Always);
+        panel.Draw("Preview", view);
+    };
+    for (int frame = 0; frame < 3; ++frame) settle();
+    editor.onRenderUI = nullptr;
+    EXPECT_EQ(view.Target().Extent(), panel.View().size());
+    EXPECT_TRUE(panel.View().Showing());
+    editor.RemoveView("Preview");
+    settle();
+}
+
+// ---- state scenes share ---------------------------------------------------------------------------
+
+namespace {
+    struct World {
+        explicit World(const int seed = 0) : seed(seed) {}
+        int seed;
+        int edits = 0;
+    };
+}
+
+// Two scenes asking for one key get one object; nobody holding it, it goes, and the next to ask
+// makes a new one.
+TEST_F(VkWindowTest, ScenesShareStateByKeyWithoutGlobals) {
+    auto& app = VkEnvironment::app();
+    auto first = app.Shared<World>("world", 7);
+    auto second = app.Shared<World>("world", 99);
+    ASSERT_EQ(first.get(), second.get()) << "the second asker gets the first one's";
+    EXPECT_EQ(second->seed, 7) << "made from the first asker's arguments";
+    first->edits = 3;
+    EXPECT_EQ(second->edits, 3);
+    EXPECT_TRUE(app.IsShared("world"));
+    EXPECT_THROW((void)app.Shared<int>("world"), std::logic_error) << "one key, one type";
+
+    first.reset();
+    second.reset();
+    EXPECT_FALSE(app.IsShared("world")) << "held by nobody, it is gone";
+    EXPECT_EQ(app.Shared<World>("world", 1)->seed, 1) << "and the next to ask makes a new one";
 }
 
 // A library of scenes, loaded while the application runs: its scenes opened by name, the library

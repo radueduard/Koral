@@ -56,6 +56,7 @@ namespace kor {
     class KORAL_API Window {
         friend class Input;
         friend class App;
+        friend class View;
         friend class kor::vk::Scheduler;
     public:
         /**
