@@ -229,6 +229,17 @@ namespace kor
         static std::optional<std::filesystem::path> Find(const std::filesystem::path& startDirectory);
 
         /**
+         * @brief Which config file to read, if any.
+         *
+         * In order: an explicit `--config` in @p args; the KORAL_CONFIG environment variable; the
+         * nearest koral.json at or above @p searchFrom; the same search from the working directory.
+         * A config named explicitly and then not found is an error: the user asked for settings
+         * that would silently not be applied.
+         */
+        static std::expected<std::optional<std::filesystem::path>, std::string> Locate(
+            std::span<const std::string> args, const std::filesystem::path& searchFrom);
+
+        /**
          * @brief Register @ref assetDirectories and @ref shaderDirectories as search roots, ahead of
          *        the engine's own. Call once, before any resource is loaded.
          */

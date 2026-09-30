@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Scenes as C# source, compiled in-process and reloaded while they run: Roslyn into a collectible
+       AssemblyLoadContext per build, unloaded once the scenes it made are gone. Managed only, so it
+       runs wherever Koral does. -->
+  <PropertyGroup>
+    <RootNamespace>Koral.Scripting</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Koral/Koral.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
+  </ItemGroup>
+</Project>

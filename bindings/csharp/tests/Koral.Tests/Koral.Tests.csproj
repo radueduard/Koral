@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Koral from C#, end to end on a real device, with no display (Platform.None): each case in a
+       process of its own, since an application is one per process. Run it with no arguments for all
+       of them; ctest does. KORAL_LIBRARY or KORAL_SDK says where the native library is. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RollForward>LatestMajor</RollForward>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Koral.Scripting/Koral.Scripting.csproj" />
+  </ItemGroup>
+</Project>

@@ -264,6 +264,16 @@ TEST(ProjectConfig, ReadsTheWindowingPlatform)
     EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
 }
 
+TEST(ProjectConfig, NoPlatformAtAllIsOne)
+{
+    kor::ProjectConfig config;
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "platform": "none" } })", kBase));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eNone) << "offscreen scenes only, on any OS";
+    config.platform = kor::WindowPlatform::eAuto;
+    ASSERT_TRUE(override_(config, { "--platform", "none" }));
+    EXPECT_EQ(config.platform, kor::WindowPlatform::eNone);
+}
+
 TEST(ProjectConfig, PlatformDefaultsToAutoAndIsLeftAloneWhenAbsent)
 {
     ProjectConfig config;                              // default

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- koral-dotnet: the runtime, for scenes written in C#. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>koral-dotnet</AssemblyName>
+    <RootNamespace>Koral.Runner</RootNamespace>
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Koral.Scripting/Koral.Scripting.csproj" />
+  </ItemGroup>
+</Project>

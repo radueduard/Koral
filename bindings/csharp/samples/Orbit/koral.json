@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "Orbit",
+  "scene": "Orbit",
+  "rendering": {
+    "window": { "width": 960, "height": 540 }
+  }
+}

@@ -5,6 +5,7 @@
 - [The frame graph](frame-graph.md) — passes, resources, memory sharing, async compute, debug lines.
 - [Input](input.md) — keys, mouse, gamepads, actions and axes, rebinding, feeding offscreen scenes.
 - [Reflection and serialization](reflection.md) — describing types, JSON, the inspector.
+- [Scenes in C#](csharp.md) — the C# bindings, `koral-dotnet`, and scripts reloaded while they run.
 - [The C interface](c-api.md) — `koral_c.h`, for bindings to other languages.
 - [Configuring a project](configuration.md) — `koral.json` and the runtime's flags.
 - [Errors](errors.md) — `kor::Error`, `Result`, and how failures are reported.

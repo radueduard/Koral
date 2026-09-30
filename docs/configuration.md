@@ -210,7 +210,7 @@ For compatibility, the original singular form is still read:
 | `--title <text>`                     | Window title.                                                                        |
 | `--width <n>`, `--height <n>`        | Window size.                                                                         |
 | `--api <name>`                       | `Vulkan` (OpenGL is only in Koral v1).                                              |
-| `--platform <name>`                  | Linux windowing system: `auto`, `x11` or `wayland` (ignored elsewhere).             |
+| `--platform <name>`                  | Windowing system: `auto`, `x11` or `wayland` (Linux only), or `none` (anywhere).     |
 | `--imgui-ini <file>`                 | Where ImGui saves its layout (default: beside `koral.json`).                         |
 | `--fullscreen` / `--no-fullscreen`   | Open fullscreen.                                                                     |
 | `--resizable` / `--no-resizable`     | Allow the window to be resized.                                                      |
@@ -233,9 +233,9 @@ take effect with no clue as to why.
 `rendering.platform` (or `--platform`) picks the windowing system a Linux build opens on: `x11`,
 `wayland`, or `auto`. `auto` (the default) lets GLFW choose — normally Wayland when a Wayland session
 is present, X11 otherwise. It is ignored on Windows and macOS, and a request for a platform this GLFW
-build or session cannot provide falls back to automatic selection with a warning. A program using `kor::App` directly can also
-pass `WindowPlatform::eNone`: no windowing system at all, for offscreen scenes on a machine with no
-display.
+build or session cannot provide falls back to automatic selection with a warning. `none`, on any OS,
+is no windowing system at all (`WindowPlatform::eNone`): only offscreen scenes, on a machine with no
+display — a server, a test, a batch render.
 
 The platform also decides **ImGui multi-viewport** (dragging panels out into their own OS windows). It
 is enabled everywhere *except* Wayland: viewports need the app to place a window at an absolute screen

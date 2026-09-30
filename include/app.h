@@ -109,6 +109,16 @@ namespace kor
          */
         VoidResult ReloadLibrary(const std::filesystem::path& path);
 
+        /**
+         * @brief Closes every window showing one of the scenes registered as @p names and opens it
+         *        again from what is registered under that name *now* — each scene with its
+         *        Scene::State() as it was. Between frames.
+         *
+         * What reloading scenes whose code is not a library does: scenes written in another
+         * language, recompiled in-process and registered again under the same names.
+         */
+        VoidResult ReloadScenes(const std::vector<std::string>& names);
+
         /** @brief Every scene name that can be opened. */
         [[nodiscard]] std::vector<std::string> SceneNames() const;
 
@@ -181,6 +191,12 @@ namespace kor
 
         /** @brief The scene each window shows, in the order the windows were opened. */
         [[nodiscard]] std::vector<Scene*> Scenes() const;
+
+        /**
+         * @brief Whether @p scene is open: shown, or suspended under another. A Scene* from before a
+         *        reload is not — the reload opened a new scene in its place; find that in Scenes().
+         */
+        [[nodiscard]] bool IsOpen(const Scene* scene) const;
 
         // ---- running -------------------------------------------------------------------------------
 

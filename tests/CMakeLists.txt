@@ -86,3 +86,29 @@ option(KORAL_BUILD_WINDOW_TESTS "Build the GFX windowed integration tests" ON)
 if(KORAL_BUILD_WINDOW_TESTS)
     add_subdirectory(window)
 endif()
+
+# The C# bindings, end to end: scenes, passes, input, state, and scripts reloaded while they run. One
+# process per case (Koral.Tests runs each in its own); no display needed.
+if(KORAL_BUILD_DOTNET)
+    add_custom_target(koral_dotnet_tests ALL
+            COMMAND "${KORAL_DOTNET_EXECUTABLE}" build "${KORAL_DOTNET_DIR}/tests/Koral.Tests" -c Release --nologo
+                    -o "${KORAL_DOTNET_OUT}/tests"
+            WORKING_DIRECTORY "${KORAL_DOTNET_DIR}"
+            USES_TERMINAL
+            COMMENT "Building the C# tests")
+    add_dependencies(koral_dotnet_tests koral_dotnet)
+    add_test(NAME CSharp.Bindings COMMAND "${KORAL_DOTNET_EXECUTABLE}" "${KORAL_DOTNET_OUT}/tests/Koral.Tests.dll")
+    set_tests_properties(CSharp.Bindings PROPERTIES
+            ENVIRONMENT "KORAL_LIBRARY=$<TARGET_FILE:Koral>"
+            TIMEOUT 600)
+
+    # The C# enumerations and P/Invokes are generated from the C++ headers and koral_c.h: these fail when
+    # one of those changed and the bindings were not generated again.
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME CSharp.EnumsMatchTheHeaders
+                COMMAND "${Python3_EXECUTABLE}" "${KORAL_DOTNET_DIR}/tools/generate_enums.py" --check)
+        add_test(NAME CSharp.InteropMatchesTheCInterface
+                COMMAND "${Python3_EXECUTABLE}" "${KORAL_DOTNET_DIR}/tools/generate_native.py" --check)
+    endif()
+endif()

@@ -364,6 +364,10 @@ namespace kor
         {
             requests.push_back(std::move(request));
         }
+
+        struct Reopen;
+        std::vector<Reopen> Capture(const std::function<bool(const Hosted&)>& affected);
+        void Restore(const std::vector<Reopen>& reopen);
     };
 
     // ---- construction ------------------------------------------------------------------------------
@@ -564,42 +568,41 @@ namespace kor
         return {};
     }
 
-    VoidResult App::ReloadLibrary(const std::filesystem::path& path)
-    {
-        auto& impl = *_impl;
-        std::error_code ec;
-        const auto canonical = std::filesystem::weakly_canonical(path, ec);
-        const auto it = std::ranges::find_if(impl.libraries, [&](const auto& l) { return l->path == canonical; });
-        if (it == impl.libraries.end()) return LoadLibrary(path).transform([](auto&&) {});
+    // ---- reopening what was open, with its state --------------------------------------------------
 
-        // What to open again: each affected window's settings (at its current size) and its stack.
-        struct Reopen {
-            WindowSettings settings;
-            std::optional<OffscreenSettings> offscreen;
-            struct Scene_ { std::string name; SceneArgs arguments; std::string state; };
-            std::vector<Scene_> stack;
-        };
+    struct App::Impl::Reopen {
+        WindowSettings settings;
+        std::optional<OffscreenSettings> offscreen;
+        struct Scene_ { std::string name; SceneArgs arguments; std::string state; };
+        std::vector<Scene_> stack;
+    };
+
+    std::vector<App::Impl::Reopen> App::Impl::Capture(const std::function<bool(const Hosted&)>& affected)
+    {
+        // Each affected window's settings (at its current size) and its stack — with each scene's
+        // State(), saved while the code that knows it is still there to run.
         std::vector<Reopen> reopen;
-        for (const auto& stage : impl.stages) {
-            if (!std::ranges::any_of(stage->stack, [&](const auto& h) { return h.library == it->get(); })) continue;
+        for (const auto& stage : stages) {
+            if (!std::ranges::any_of(stage->stack, affected)) continue;
             Reopen entry{.settings = stage->settings, .offscreen = stage->offscreen};
             entry.settings.extent = stage->window->Extent();
             entry.settings.title = stage->window->Title();
             if (entry.offscreen) entry.offscreen->extent = stage->window->Extent();
-            // Each scene's State(), saved while its library's code is still there to run.
             for (const auto& hosted : stage->stack) {
                 detail::SceneScope scope(hosted.scene);
                 entry.stack.push_back({hosted.name, hosted.arguments, hosted.scene->SaveState()});
             }
             reopen.push_back(std::move(entry));
         }
+        return reopen;
+    }
 
-        if (const auto unloaded = UnloadLibrary(path); !unloaded) return unloaded;
-        if (const auto loaded = LoadLibrary(path); !loaded) return std::unexpected(loaded.error());
-
-        // Made again, given back what they saved — after the constructor, before Initialize.
+    void App::Impl::Restore(const std::vector<Reopen>& reopen)
+    {
+        // Made again from whatever is registered under their names now, and given back what they
+        // saved — after the constructor, before Initialize.
         const auto remake = [&](const Reopen::Scene_& entry) {
-            auto made = impl.Make(entry.name, entry.arguments);
+            auto made = Make(entry.name, entry.arguments);
             detail::SceneScope scope(made.scene);
             if (const auto restored = made.scene->LoadState(entry.state); !restored)
                 log::Error("[app] '{}' could not take back its state: {}", entry.name, restored.error().message);
@@ -610,17 +613,17 @@ namespace kor
             Scene* bottom = nullptr;
             try {
                 auto made = remake(stack.front());
-                bottom = offscreen ? impl.OpenStage(*offscreen, std::move(made)) : impl.OpenStage(settings, std::move(made));
+                bottom = offscreen ? OpenStage(*offscreen, std::move(made)) : OpenStage(settings, std::move(made));
             } catch (const std::exception& e) {
                 log::Error("[app] reopening '{}': {}", stack.front().name, e.what());
             }
-            Impl::Stage* stage = bottom ? impl.StageOf(bottom) : nullptr;
+            Stage* stage = bottom ? StageOf(bottom) : nullptr;
             for (std::size_t i = 1; stage && i < stack.size(); ++i) {
                 try {
                     Scene& covered = stage->Top();
                     { detail::SceneScope scope(&covered); covered.OnSuspend(); }
                     stage->stack.push_back(remake(stack[i]));
-                    impl.Host(*stage, stage->stack.back());
+                    Host(*stage, stage->stack.back());
                 } catch (const std::exception& e) {
                     log::Error("[app] reopening '{}': {}", stack[i].name, e.what());
                     break;
@@ -628,6 +631,45 @@ namespace kor
             }
         }
         Interface::MakeNoneCurrent();
+    }
+
+    VoidResult App::ReloadLibrary(const std::filesystem::path& path)
+    {
+        auto& impl = *_impl;
+        std::error_code ec;
+        const auto canonical = std::filesystem::weakly_canonical(path, ec);
+        const auto it = std::ranges::find_if(impl.libraries, [&](const auto& l) { return l->path == canonical; });
+        if (it == impl.libraries.end()) return LoadLibrary(path).transform([](auto&&) {});
+
+        const Impl::Library* library = it->get();
+        const auto reopen = impl.Capture([&](const Impl::Hosted& h) { return h.library == library; });
+        if (const auto unloaded = UnloadLibrary(path); !unloaded) return unloaded;
+        if (const auto loaded = LoadLibrary(path); !loaded) return std::unexpected(loaded.error());
+        impl.Restore(reopen);
+        return {};
+    }
+
+    VoidResult App::ReloadScenes(const std::vector<std::string>& names)
+    {
+        auto& impl = *_impl;
+        if (impl.inFrame)
+            return std::unexpected(Error{.code = ErrorCode::eInvalidArgument, .message = "ReloadScenes is for between frames"});
+        const auto affected = [&](const Impl::Hosted& h) { return std::ranges::find(names, h.name) != names.end(); };
+        const auto reopen = impl.Capture(affected);
+        if (reopen.empty()) return {};
+        if (Context::_scheduler.Valid()) Context::_scheduler->WaitIdle();
+        for (bool closed = true; closed;) {
+            closed = false;
+            for (auto& stage : impl.stages) {
+                if (!std::ranges::any_of(stage->stack, affected)) continue;
+                impl.CloseStage(*stage);
+                closed = true;
+                break;
+            }
+        }
+        if (Context::_scheduler.Valid()) Context::_scheduler->WaitIdle();
+        detail::collectRetired(/*all=*/true);
+        impl.Restore(reopen);
         return {};
     }
 
@@ -702,6 +744,15 @@ namespace kor
         for (const auto& stage : _impl->stages)
             if (!stage->stack.empty()) scenes.push_back(&stage->Top());
         return scenes;
+    }
+
+    bool App::IsOpen(const Scene* scene) const
+    {
+        if (!scene) return false;
+        for (const auto& stage : _impl->stages)
+            for (const auto& hosted : stage->stack)
+                if (hosted.scene == scene) return true;
+        return false;
     }
 
     // ---- running --------------------------------------------------------------------------------------

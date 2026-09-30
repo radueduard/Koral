@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Koral from C#: the scene runtime, input, time, debug lines and a rendering subset, over koral_c.h.
+       Pure managed code — the one native library it needs is the SDK's own Koral, found at run time
+       (see NativeLibraryResolver), so the same assembly runs on Windows, Linux and macOS. -->
+  <PropertyGroup>
+    <RootNamespace>Koral</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsAotCompatible>false</IsAotCompatible>
+    <PackageId>Koral</PackageId>
+    <Description>C# bindings for the Koral framework.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Koral.Scripting" />
+  </ItemGroup>
+</Project>

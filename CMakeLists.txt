@@ -466,6 +466,12 @@ install(FILES ${CMAKE_BINARY_DIR}/include/api.h
 # What this SDK is, for tools that meet it only on disk (Koral Hub): which graphics APIs it has, the
 # scene-library interface it speaks (read from sceneLibrary.h, so the two cannot drift), and what it
 # can do. An SDK without this file is one from before it existed: v1, with OpenGL and CreateScene.
+# Declared here, ahead of its build rules at the end, because it is also a capability.
+option(KORAL_BUILD_DOTNET "Build the C# bindings and koral-dotnet (needs the .NET 10 SDK)" OFF)
+set(KORAL_CAPABILITY_EXTRA "")
+if(KORAL_BUILD_DOTNET)
+    set(KORAL_CAPABILITY_EXTRA ", \"csharp\"")
+endif()
 file(STRINGS ${CMAKE_SOURCE_DIR}/include/sceneLibrary.h KORAL_SCENE_ABI_LINE REGEX "#define KORAL_SCENE_ABI_VERSION")
 string(REGEX MATCH "[0-9]+" KORAL_SCENE_ABI_VERSION "${KORAL_SCENE_ABI_LINE}")
 file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
@@ -475,7 +481,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
   \"apis\": [\"Vulkan\"],
   \"sceneAbiVersion\": ${KORAL_SCENE_ABI_VERSION},
   \"features\": [\"sceneTable\", \"offscreenScenes\", \"views\", \"hotReload\", \"stateReload\", \"cApi\",
-               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\"]
+               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\"${KORAL_CAPABILITY_EXTRA}]
 }
 ")
 install(FILES ${CMAKE_BINARY_DIR}/capabilities.json DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral)
@@ -969,6 +975,31 @@ if(KORAL_BUILD_MODULES)
     add_dependencies(stage
             koral-camera koral-gui-extras koral-mesh
             koral-image-import koral-image-export koral-image-compress koral-model-import)
+endif()
+
+# ---------------------------------------------------------------------------
+# C# bindings (bindings/csharp): the Koral, Koral.Scripting and koral-dotnet assemblies, built by the
+# .NET SDK. They are managed code only — the same assemblies on every OS — so all this does is run
+# `dotnet`, and install koral-dotnet where its resolver looks for the native library from:
+# <prefix>/lib/koral-dotnet, beside lib (Linux, macOS) and bin (Windows).
+# ---------------------------------------------------------------------------
+if(KORAL_BUILD_DOTNET)
+    find_program(KORAL_DOTNET_EXECUTABLE dotnet
+            HINTS "$ENV{DOTNET_ROOT}" "$ENV{HOME}/.dotnet" "$ENV{ProgramFiles}/dotnet"
+            REQUIRED)
+    set(KORAL_DOTNET_DIR "${CMAKE_SOURCE_DIR}/bindings/csharp")
+    set(KORAL_DOTNET_OUT "${CMAKE_BINARY_DIR}/dotnet")
+    add_custom_target(koral_dotnet ALL
+            COMMAND "${KORAL_DOTNET_EXECUTABLE}" publish "${KORAL_DOTNET_DIR}/src/Koral.Runner" -c Release --nologo
+                    -o "${KORAL_DOTNET_OUT}/koral-dotnet"
+            WORKING_DIRECTORY "${KORAL_DOTNET_DIR}"
+            USES_TERMINAL
+            COMMENT "Building the C# bindings and koral-dotnet")
+    add_dependencies(koral_dotnet ${PROJECT_NAME})
+    add_dependencies(stage koral_dotnet)
+    install(DIRECTORY "${KORAL_DOTNET_OUT}/koral-dotnet/"
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/koral-dotnet
+            USE_SOURCE_PERMISSIONS)
 endif()
 
 # ---------------------------------------------------------------------------

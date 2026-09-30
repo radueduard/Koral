@@ -4,6 +4,8 @@
 
 #include "projectConfig.h"
 
+#include <cstdlib>
+
 #include <algorithm>
 #include <cctype>
 #include <charconv>
@@ -130,6 +132,7 @@ namespace kor
             if (equalsIgnoringCase("auto"))    return WindowPlatform::eAuto;
             if (equalsIgnoringCase("x11"))     return WindowPlatform::eX11;
             if (equalsIgnoringCase("wayland")) return WindowPlatform::eWayland;
+            if (equalsIgnoringCase("none"))    return WindowPlatform::eNone;
             return std::nullopt;
         }
 
@@ -188,7 +191,7 @@ namespace kor
                 if (r.platform) {
                     const auto parsed = parsePlatform(*r.platform);
                     if (!parsed)
-                        return invalid(std::format("'rendering.platform' is '{}'; expected 'auto', 'x11' or 'wayland'", *r.platform));
+                        return invalid(std::format("'rendering.platform' is '{}'; expected 'auto', 'x11', 'wayland' or 'none'", *r.platform));
                     config.platform = *parsed;
                 }
 
@@ -344,7 +347,7 @@ namespace kor
                 if (!value(text)) return invalid("missing value for --platform");
                 const auto parsed = parsePlatform(text);
                 if (!parsed)
-                    return invalid(std::format("--platform expects 'auto', 'x11' or 'wayland', got '{}'", text));
+                    return invalid(std::format("--platform expects 'auto', 'x11', 'wayland' or 'none', got '{}'", text));
                 platform = *parsed;
             }
             else if (arg == "--gpu") {
@@ -449,7 +452,7 @@ namespace kor
             "  --width <n>         Window width\n"
             "  --height <n>        Window height\n"
             "  --api <name>        Graphics backend: Vulkan\n"
-            "  --platform <name>   Linux windowing system: auto, x11 or wayland\n"
+            "  --platform <name>   Windowing system: auto, x11 or wayland (Linux), or none (offscreen only)\n"
             "  --gpu <which>       GPU to use: an index from the startup listing, or part of a device name (Vulkan only)\n"
             "  --imgui-ini <file>  Where ImGui saves its layout (default: beside koral.json)\n"
             "  --fullscreen        Open fullscreen             (--no-fullscreen)\n"
@@ -458,5 +461,28 @@ namespace kor
             "  --transparent       Transparent framebuffer     (--no-transparent)\n"
             "  --vsync             Wait for vertical blank     (--no-vsync)\n"
             "  --hot-reload        Reload the scene library when it is rebuilt, keeping each scene's state\n";
+    }
+
+    std::expected<std::optional<std::filesystem::path>, std::string> ProjectConfig::Locate(
+        const std::span<const std::string> args, const std::filesystem::path& searchFrom)
+    {
+        const auto mustExist = [](std::filesystem::path file, const std::string_view origin)
+            -> std::expected<std::optional<std::filesystem::path>, std::string>
+        {
+            std::error_code ec;
+            if (!std::filesystem::is_regular_file(file, ec))
+                return std::unexpected(std::format("config file '{}' ({}) does not exist", file.string(), origin));
+            return file;
+        };
+        for (std::size_t i = 0; i < args.size(); ++i) {
+            if (args[i] != "--config") continue;
+            if (i + 1 >= args.size()) return std::unexpected("missing value for --config");
+            return mustExist(args[i + 1], "--config");
+        }
+        if (const char* fromEnv = std::getenv("KORAL_CONFIG"); fromEnv != nullptr && *fromEnv != '\0')
+            return mustExist(fromEnv, "KORAL_CONFIG");
+        std::error_code ec;
+        if (auto found = Find(std::filesystem::absolute(searchFrom, ec))) return found;
+        return Find(std::filesystem::current_path(ec));
     }
 }
