@@ -112,7 +112,7 @@ namespace kor
             const bool isOpenGl = std::ranges::equal(name, std::string_view("opengl"), [](const char a, const char b) {
                 return std::tolower(static_cast<unsigned char>(a)) == b;
             });
-            return isOpenGl ? " (the OpenGL backend is only in Koral 1.x)" : "";
+            return isOpenGl ? " (the OpenGL backend is only in Koral v1)" : "";
         }
 
         std::optional<WindowPlatform> parsePlatform(std::string_view name)

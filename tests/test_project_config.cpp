@@ -238,13 +238,13 @@ TEST(ProjectConfig, UnknownApiIsAnErrorAndNamesTheOffendingValue)
     EXPECT_NE(result.error().message.find("Metal"), std::string::npos);
 }
 
-// OpenGL was a backend until Koral 2: a project still asking for it is told where it went.
+// OpenGL is a v1 backend: a project on v2 still asking for it is told where it went.
 TEST(ProjectConfig, OpenGlIsRefusedWithWhereItWent)
 {
     ProjectConfig config;
     const auto result = config.Merge(R"({ "rendering": { "api": "OpenGL" } })", kBase);
     ASSERT_FALSE(result);
-    EXPECT_NE(result.error().message.find("1.x"), std::string::npos) << result.error().message;
+    EXPECT_NE(result.error().message.find("Koral v1"), std::string::npos) << result.error().message;
 }
 
 TEST(ProjectConfig, ApiNameIsCaseInsensitiveAndAcceptsTheEnumeratorSpelling)

@@ -463,6 +463,23 @@ install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
 install(FILES ${CMAKE_BINARY_DIR}/include/api.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
+# What this SDK is, for tools that meet it only on disk (Koral Hub): which graphics APIs it has, the
+# scene-library interface it speaks (read from sceneLibrary.h, so the two cannot drift), and what it
+# can do. An SDK without this file is one from before it existed: v1, with OpenGL and CreateScene.
+file(STRINGS ${CMAKE_SOURCE_DIR}/include/sceneLibrary.h KORAL_SCENE_ABI_LINE REGEX "#define KORAL_SCENE_ABI_VERSION")
+string(REGEX MATCH "[0-9]+" KORAL_SCENE_ABI_VERSION "${KORAL_SCENE_ABI_LINE}")
+file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
+  \"schemaVersion\": 1,
+  \"version\": \"${PROJECT_VERSION}\",
+  \"line\": 2,
+  \"apis\": [\"Vulkan\"],
+  \"sceneAbiVersion\": ${KORAL_SCENE_ABI_VERSION},
+  \"features\": [\"sceneTable\", \"offscreenScenes\", \"views\", \"hotReload\", \"stateReload\", \"cApi\",
+               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\"]
+}
+")
+install(FILES ${CMAKE_BINARY_DIR}/capabilities.json DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral)
+
 # Koral's own shaders and assets, into the layout src/core/paths.cpp looks for
 # (<libdir>/../share/Koral/<kind>). Shipping the binary without these gives a library that
 # builds and then cannot find a single shader at runtime.

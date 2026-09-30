@@ -73,7 +73,7 @@ namespace kor {
 
     /** @brief The graphics backend a context runs on. */
     enum class API : std::uint8_t {
-        eVulkan,    ///< Vulkan: the only one since Koral 2 (OpenGL stays in 1.x).
+        eVulkan,    ///< Vulkan: the only one on the v2 line (OpenGL stays on v1).
     };
 
     /**

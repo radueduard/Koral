@@ -209,7 +209,7 @@ For compatibility, the original singular form is still read:
 | `--scene <name>`                     | Which of the library's scenes to open.                                               |
 | `--title <text>`                     | Window title.                                                                        |
 | `--width <n>`, `--height <n>`        | Window size.                                                                         |
-| `--api <name>`                       | `Vulkan` (OpenGL is only in Koral 1.x).                                              |
+| `--api <name>`                       | `Vulkan` (OpenGL is only in Koral v1).                                              |
 | `--platform <name>`                  | Linux windowing system: `auto`, `x11` or `wayland` (ignored elsewhere).             |
 | `--imgui-ini <file>`                 | Where ImGui saves its layout (default: beside `koral.json`).                         |
 | `--fullscreen` / `--no-fullscreen`   | Open fullscreen.                                                                     |
