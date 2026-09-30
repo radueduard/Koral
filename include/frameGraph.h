@@ -51,10 +51,7 @@ namespace kor {
         Flags<Image::Usage> usage {};
         /** Size relative to the window, used when extent is unset: 0.5 is half resolution. */
         float scale = 1.f;
-        /**
-         * What `scale` is relative to, when not the main window: another window's screen
-         * (Window::ScreenName) — a target for a second view — or an image imported into the graph.
-         */
+        /** What `scale` is relative to, when not the graph's screen: an image imported into the graph. */
         std::string sizeOf {};
         /** A fixed size instead, for targets that do not follow the window (a shadow map). */
         std::optional<glm::uvec2> extent {};

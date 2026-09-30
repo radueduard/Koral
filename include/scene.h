@@ -334,10 +334,14 @@ namespace kor
         /** @brief The name the scene was opened under. */
         [[nodiscard]] const std::string& Name() const { return _name; }
 
-        /** @brief State() as JSON; "null" for a scene with none. */
-        [[nodiscard]] std::string SaveState();
-        /** @brief Loads JSON saved by SaveState into State(). @see FromJson */
-        VoidResult LoadState(std::string_view json);
+        /**
+         * @brief The scene's state as JSON: State(), by default; "null" for a scene with none.
+         *        Overridden by a scene whose state is not one reflected object — one written in
+         *        another language keeps its own.
+         */
+        [[nodiscard]] virtual std::string SaveState();
+        /** @brief Loads JSON saved by SaveState: into State(), by default. @see FromJson */
+        virtual VoidResult LoadState(std::string_view json);
 
         /** @brief Whether the scene has an interface. @see EnableInterface */
         [[nodiscard]] bool HasInterface() const { return _interface != nullptr; }

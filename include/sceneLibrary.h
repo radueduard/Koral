@@ -41,8 +41,8 @@ namespace kor
  * A library exporting the older `CreateScene` instead is one scene, named after the library file.
  */
 extern "C" {
-    /** @brief Bumped whenever the table below changes shape. A library built against another is refused. */
-    #define KORAL_SCENE_ABI_VERSION 1u
+    /** @brief Bumped whenever the table below — or kor::Scene, which a library derives from — changes shape. A library built against another is refused. */
+    #define KORAL_SCENE_ABI_VERSION 2u
 
     /** @brief One scene a library offers. */
     struct KoralSceneEntry {

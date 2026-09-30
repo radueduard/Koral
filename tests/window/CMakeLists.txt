@@ -56,3 +56,10 @@ target_include_directories(koral_headless_app_tests PRIVATE
         ${CMAKE_BINARY_DIR}/include
         ${CMAKE_SOURCE_DIR})
 gtest_discover_tests(koral_headless_app_tests DISCOVERY_MODE PRE_TEST)
+
+# The C interface, driven from C (which is also the check that koral_c.h is C). No display needed.
+add_executable(koral_capi_test test_capi.c)
+set_target_properties(koral_capi_test PROPERTIES C_STANDARD 11 LINKER_LANGUAGE CXX)
+target_link_libraries(koral_capi_test PRIVATE Koral)
+target_include_directories(koral_capi_test PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
+add_test(NAME CApi.DrivesASceneFromC COMMAND koral_capi_test)
