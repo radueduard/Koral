@@ -499,6 +499,7 @@ namespace kor {
         std::vector<bool> _async;                                          // per position in _order
         std::vector<std::optional<std::size_t>> _waits;                    // per position: the other queue's pass it waits for
         std::vector<std::vector<ImageBarrier>> _handoffs;                  // per position: images it leaves for readers on both queues
+        std::set<std::string> _demoted;                                    // async passes already told they run on graphics
         std::vector<std::string> _culled;
         std::vector<Skipped> _skipped;
         std::map<std::string, ResourceRef<const Image>, std::less<>> _images;    // every name, imported or made

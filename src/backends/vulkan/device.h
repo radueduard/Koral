@@ -110,6 +110,9 @@ namespace kor::vk {
         // the same family, so resources pass between the two with no ownership transfers. The frame's
         // own queue on a device whose graphics family has only the one.
         [[nodiscard]] const Queue& requestAsyncComputeQueue() const;
+        // The two families a resource used by both queues is shared between, when the async compute
+        // queue is of a family of its own; empty when it is not (and exclusive sharing is right).
+        [[nodiscard]] std::vector<glm::u32> sharedFamilies() const;
         void freeQueues() const;
 
         // A command buffer with a pool of its own, from a free list. A pool may only be used by one

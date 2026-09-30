@@ -297,7 +297,9 @@ namespace kor
              * Compute (and copies) that runs alongside the frame's graphics work, on a queue of its
              * own — handed to Scheduler::Execute, which orders it by the tokens it waits for. On a
              * device with no second queue (Context::SupportsAsyncCompute) it runs in order on the
-             * frame's, which is always correct, only not overlapped.
+             * frame's, which is always correct, only not overlapped. Where that queue is a family of its
+             * own (Context::AsyncComputeIsSeparateFamily), what it shares with graphics work must be
+             * made with SetSharedAcrossQueues.
              */
             eAsyncCompute = 1 << 3
         };

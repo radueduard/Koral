@@ -391,6 +391,22 @@ namespace kor {
                           "the async compute queue", d.decl.name);
                 d.decl.async = false;
             }
+            // Two queue families: what an async pass imports has to have been made shared between them.
+            if (d.decl.async && Context::AsyncComputeIsSeparateFamily()) {
+                for (const auto& use : d.decl.uses) {
+                    bool unshared = false;
+                    if (const auto image = _importedImages.find(use.resource); image != _importedImages.end())
+                        unshared = image->second.Valid() && !image->second->IsSharedAcrossQueues();
+                    if (const auto buffer = _importedBuffers.find(use.resource); buffer != _importedBuffers.end())
+                        unshared = buffer->second.Valid() && !buffer->second->IsSharedAcrossQueues();
+                    if (!unshared) continue;
+                    if (_demoted.insert(d.decl.name).second)
+                        log::Warn("[frame graph] pass '{}' imports '{}', which was not made shared across queues "
+                                  "(SetSharedAcrossQueues), so it runs on the graphics queue", d.decl.name, use.resource);
+                    d.decl.async = false;
+                    break;
+                }
+            }
             decls.push_back(d.decl);
         }
 
@@ -438,13 +454,16 @@ namespace kor {
             BufferDesc bufferDesc;
             Flags<Buffer::Usage> bufferUsage {};
             bool perFrame = false;
+            bool shared = false;   ///< An async pass uses it, and the queues are two families.
             glm::u64 bytes = 0;
         };
+        const bool separateFamily = Context::AsyncComputeIsSeparateFamily();
         std::vector<Planned> planned(compiled->lifetimes.size());
         std::vector<std::string> shareKeys(compiled->lifetimes.size());
         std::vector<std::string> problems;
         for (std::size_t i = 0; i < compiled->lifetimes.size(); ++i) {
             const std::string& name = compiled->lifetimes[i].resource;
+            planned[i].shared = separateFamily && compiled->lifetimes[i].async;
             const bool keepsHistory = history.contains(name);
             Planned& plan = planned[i];
             plan.name = name;
@@ -531,7 +550,7 @@ namespace kor {
             if (first.image) {
                 Flags<Image::Usage> usage {};
                 for (const auto i : slot) usage |= planned[i].imageUsage;
-                std::string key = std::format("{} usage {}", first.shape, static_cast<unsigned>(usage.Value()));
+                std::string key = std::format("{} usage {}{}", first.shape, static_cast<unsigned>(usage.Value()), first.shared ? " shared" : "");
                 if (slot.size() == 1 && shareKeys[slot.front()].empty()) key += " own " + first.name;
                 auto allocation = takeReusable(key);
                 if (!allocation) {
@@ -540,6 +559,7 @@ namespace kor {
                         .SetUsage(usage)
                         .SetExtent(first.size)
                         .SetMipLevels(first.imageDesc.mipLevels)
+                        .SetSharedAcrossQueues(first.shared)
                         .Build();
                     allocation = Allocated{.key = key, .id = _nextId++, .image = std::move(image)};
                 }
@@ -552,12 +572,13 @@ namespace kor {
             } else {
                 Flags<Buffer::Usage> usage {};
                 for (const auto i : slot) usage |= planned[i].bufferUsage;
-                std::string key = std::format("{} usage {}", first.shape, static_cast<unsigned>(usage.Value()));
+                std::string key = std::format("{} usage {}{}", first.shape, static_cast<unsigned>(usage.Value()), first.shared ? " shared" : "");
                 if (slot.size() == 1 && shareKeys[slot.front()].empty()) key += " own " + first.name;
                 auto allocation = takeReusable(key);
                 if (!allocation) {
                     Buffer::RawBuilder builder;
-                    builder.SetRawSize(first.bufferDesc.size).SetUsage(usage).SetType(first.bufferDesc.type);
+                    builder.SetRawSize(first.bufferDesc.size).SetUsage(usage).SetType(first.bufferDesc.type)
+                        .SetSharedAcrossQueues(first.shared);
                     if (first.perFrame) builder.SetIsPerFrame(true);
                     auto buffer = builder.Build();
                     allocation = Allocated{.key = key, .id = _nextId++, .buffer = std::move(buffer)};
@@ -606,6 +627,7 @@ namespace kor {
                         .SetUsage(usage)
                         .SetExtent(plan->size)
                         .SetMipLevels(plan->imageDesc.mipLevels)
+                        .SetSharedAcrossQueues(separateFamily)   // an async pass may read last frame's
                         .Build();
                     entry.previousImage.SetName(name + " (previous frame)");
                     entry.id = _nextId++;
@@ -625,6 +647,7 @@ namespace kor {
                         .SetRawSize(plan->bufferDesc.size)
                         .SetUsage(usage)
                         .SetType(plan->bufferDesc.type)
+                        .SetSharedAcrossQueues(separateFamily)
                         .Build();
                     entry.previousBuffer.SetName(name + " (previous frame)");
                     entry.id = _nextId++;

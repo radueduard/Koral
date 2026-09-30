@@ -10,7 +10,9 @@
 #include "../../core/tokenState.h"
 #include "timeline.h"
 
+#include <cstdlib>
 #include <iostream>
+#include <string_view>
 #include <ranges>
 #include <thread>
 #include <unordered_map>
@@ -333,16 +335,35 @@ namespace kor::vk {
         std::lock_guard lock(_queuesMutex);
         if (!_asyncComputeChosen) {
             _asyncComputeChosen = true;
-            for (auto& family : _queueFamilies) {
-                if (family.getIndex() != frame.getFamily().getIndex()) continue;
-                try {
-                    _asyncComputeQueue = family.RequestQueue();
-                } catch (const std::runtime_error&) {
-                    // The family's only queue is the frame's: async compute runs on it, in order.
+            // A second queue of the frame's family where there is one — nothing to share or transfer —
+            // and a family of compute queues otherwise, which is what AMD and Intel offer instead.
+            // KORAL_ASYNC_COMPUTE=separate-family takes the second even where the first exists, to
+            // exercise that path on a device that would not.
+            const char* forced = std::getenv("KORAL_ASYNC_COMPUTE");
+            const bool separate = forced && std::string_view(forced) == "separate-family";
+            if (!separate) {
+                for (auto& family : _queueFamilies) {
+                    if (family.getIndex() != frame.getFamily().getIndex()) continue;
+                    try { _asyncComputeQueue = family.RequestQueue(); } catch (const std::runtime_error&) {}
                 }
             }
+            if (!_asyncComputeQueue) {
+                for (auto& family : _queueFamilies) {
+                    const auto flags = family.getProperties().queueFlags;
+                    if (!(flags & ::vk::QueueFlagBits::eCompute) || (flags & ::vk::QueueFlagBits::eGraphics)) continue;
+                    try { _asyncComputeQueue = family.RequestQueue(); break; } catch (const std::runtime_error&) {}
+                }
+            }
+            // Neither: async compute runs on the frame's queue, in order.
         }
         return _asyncComputeQueue ? *_asyncComputeQueue : frame;
+    }
+
+    std::vector<glm::u32> Device::sharedFamilies() const {
+        const Queue& async = requestAsyncComputeQueue();
+        const Queue& frame = requestQueue(::vk::QueueFlagBits::eGraphics);
+        if (async.getFamily().getIndex() == frame.getFamily().getIndex()) return {};
+        return { frame.getFamily().getIndex(), async.getFamily().getIndex() };
     }
 
     const Queue& Device::requestPresentQueue(const kor::vk::Surface& surface) const {

@@ -449,6 +449,7 @@ namespace kor
 
     Image::Image(const Builder& createInfo) :
         _isPerFrame(createInfo.isPerFrame),
+        _sharedAcrossQueues(createInfo.sharedAcrossQueues),
         _type(createInfo.type),
         _format(createInfo.format),
         _extent(createInfo.extent),

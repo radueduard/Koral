@@ -226,6 +226,12 @@ namespace kor
         /** @brief Describes the image to create, and optionally the pixels to fill it with. */
         struct KORAL_API Builder : kor::Builder {
             bool isPerFrame = false;                    ///< Whether to allocate one copy per frame in flight.
+            /**
+             * Used by work on the graphics queue and the async compute queue when those are separate
+             * queue families (Context::AsyncComputeIsSeparateFamily). The frame graph sets it for what
+             * its async passes use; anything else an async pass touches needs it too.
+             */
+            bool sharedAcrossQueues = false;
             Type type = Type::e2D;                      ///< How many dimensions it has.
             Format format = Format::eRGBA8_UNORM;       ///< What one pixel holds.
             glm::uvec3 extent = { 1, 1, 1 };            ///< Size in pixels. Unused dimensions are 1.
@@ -258,6 +264,11 @@ namespace kor
              */
             Builder& SetIsPerFrame(const bool isPerFrame) {
                 this->isPerFrame = isPerFrame;
+                return *this;
+            }
+            /** @brief @see sharedAcrossQueues */
+            Builder& SetSharedAcrossQueues(const bool shared) {
+                this->sharedAcrossQueues = shared;
                 return *this;
             }
 
@@ -545,6 +556,8 @@ namespace kor
 
         /** @brief Whether the image holds a separate copy per frame in flight. */
         [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
+        /** @brief Whether it can be used from both the graphics and the async compute queue family. @see Builder::sharedAcrossQueues */
+        [[nodiscard]] bool IsSharedAcrossQueues() const { return _sharedAcrossQueues; }
 
         /**
          * @brief Which of its copies a command recorded now uses.
@@ -620,6 +633,7 @@ namespace kor
 
         explicit Image(const Builder&);
         bool _isPerFrame = false;
+        bool _sharedAcrossQueues = false;
         /// Set for a swap chain's images: which one it acquired for the frame. @see CopyIndex
         std::function<glm::u32()> _copySelector;
         Type _type;

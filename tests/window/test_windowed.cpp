@@ -1065,6 +1065,9 @@ TEST_F(VkWindowTest, AFrameGraphRunsAnAsyncComputePassBetweenGraphicsPasses) {
     EXPECT_EQ(chain.readback->Read<float>(1).front(), 4.f);
     EXPECT_EQ(chain.besideReadback->Read<float>(1).front(), 4.f);
     if (!kor::Context::SupportsAsyncCompute()) GTEST_LOG_(INFO) << "no async compute queue here: ran in order";
+    // KORAL_ASYNC_COMPUTE=separate-family runs this on a compute queue family of its own, as on AMD.
+    if (const char* forced = std::getenv("KORAL_ASYNC_COMPUTE"); forced && std::string(forced) == "separate-family")
+        EXPECT_TRUE(kor::Context::AsyncComputeIsSeparateFamily());
 
     // Without waiting in between: the copy of one frame must not run under the last one's reads.
     auto& overlay = static_cast<OverlayScene&>(scene);
@@ -1095,8 +1098,9 @@ TEST_F(VkWindowTest, AFrameGraphDoesNotShareWhatAnAsyncPassUses) {
 // returned, and the token is its own — ready once the GPU has run it.
 TEST_F(VkWindowTest, AnAsyncComputeCommandBufferIsWaitedForByTheTokenItReturns) {
     auto& scheduler = kor::Context::Scheduler();
+    // Used on both queues: shared, for a device whose async queue is a family of its own.
     auto source = kor::Buffer::RawBuilder{}.SetRawSize(sizeof(float))
-        .SetUsage(kor::Buffer::Usage::eTransferDst | kor::Buffer::Usage::eTransferSrc).Build();
+        .SetUsage(kor::Buffer::Usage::eTransferDst | kor::Buffer::Usage::eTransferSrc).SetSharedAcrossQueues(true).Build();
     auto readback = makeReadback();
 
     auto fill = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eAsyncCompute);

@@ -185,6 +185,11 @@ bool kor::Context::SupportsAsyncCompute()
     return &device.requestAsyncComputeQueue() != &device.requestQueue(::vk::QueueFlagBits::eGraphics);
 }
 
+bool kor::Context::AsyncComputeIsSeparateFamily()
+{
+    return HasDevice() && !kor::vk::Context::Device().sharedFamilies().empty();
+}
+
 void kor::Context::InitHeadless(const API api)
 {
     if (_scheduler.Valid())

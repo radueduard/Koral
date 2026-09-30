@@ -65,7 +65,7 @@ namespace kor::vk
             }
         }
 
-        const auto imageCreateInfo = ::vk::ImageCreateInfo()
+        auto imageCreateInfo = ::vk::ImageCreateInfo()
             .setImageType(type)
             .setFormat(format)
             .setExtent(::vk::Extent3D(_extent.x, _extent.y, _extent.z))
@@ -77,6 +77,12 @@ namespace kor::vk
             .setSharingMode(::vk::SharingMode::eExclusive)
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(imageCreateFlags);
+        // Used from both queues, and those are two families: concurrent, so neither needs the image
+        // handed over. Only then — concurrent images lose compression on some GPUs.
+        const auto families = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<glm::u32>{};
+        if (!families.empty()) {
+            imageCreateInfo.setSharingMode(::vk::SharingMode::eConcurrent).setQueueFamilyIndices(families);
+        }
 
         const auto frameCount = _isPerFrame ? kor::Context::Scheduler().ImageCount() : 1;
         for (uint32_t i = 0; i < frameCount; i++)
@@ -233,7 +239,7 @@ namespace kor::vk
                 if (images[i]) Context::Allocator().FreeImage(images[i], allocations[i]);
         });
 
-        const auto imageCreateInfo = ::vk::ImageCreateInfo()
+        auto imageCreateInfo = ::vk::ImageCreateInfo()
             .setImageType(getVkImageType(_type))
             .setFormat(_vkFormat)
             .setExtent(::vk::Extent3D(extent.x, extent.y, extent.z))
@@ -245,6 +251,10 @@ namespace kor::vk
             .setSharingMode(::vk::SharingMode::eExclusive)
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(_arrayLayers == 6 ? ::vk::ImageCreateFlagBits::eCubeCompatible : ::vk::ImageCreateFlags());
+        const auto resizeFamilies = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<glm::u32>{};
+        if (!resizeFamilies.empty()) {
+            imageCreateInfo.setSharingMode(::vk::SharingMode::eConcurrent).setQueueFamilyIndices(resizeFamilies);
+        }
 
         for (glm::u32 frameIndex = 0; frameIndex < static_cast<glm::u32>(_images.size()); ++frameIndex) {
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);

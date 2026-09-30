@@ -145,6 +145,7 @@ namespace kor
 
     Buffer::Buffer(const RawBuilder& createInfo) :
         _isPerFrame(createInfo._isPerFrame),
+        _sharedAcrossQueues(createInfo._sharedAcrossQueues),
         _size(createInfo._size),
         _usage(createInfo._usage),
         _type(createInfo._type) {}

@@ -168,6 +168,13 @@ namespace kor {
         static KORAL_API bool SupportsAsyncCompute();
 
         /**
+         * @brief Whether the async compute queue is of a queue family of its own — as on AMD and
+         *        Intel. Then a resource both queues use must be made shared
+         *        (Image::Builder::sharedAcrossQueues); the frame graph does that for its own.
+         */
+        static KORAL_API bool AsyncComputeIsSeparateFamily();
+
+        /**
          * @brief Awaitable that moves the rest of a coroutine onto the main thread.
          *
          * The thread the run loop drives, and the only one that may touch the device. Anything a

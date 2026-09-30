@@ -544,6 +544,30 @@ namespace kor::vk
             dstStageMask |= getVkPipelineStageFlags(barrier.DstAccess());
         }
 
+        // A queue without graphics — the async compute queue, on a device whose second queue is of a
+        // compute family — cannot name graphics stages, nor wait on accesses only they make. Those
+        // came from the graphics queue, which a semaphore the submission waits on already made
+        // available and visible; what is left of the barrier is its own stages and the transition.
+        if (!(_queue.getFamily().getProperties().queueFlags & ::vk::QueueFlagBits::eGraphics)) {
+            constexpr auto computeStages = ::vk::PipelineStageFlagBits::eTopOfPipe | ::vk::PipelineStageFlagBits::eDrawIndirect
+                | ::vk::PipelineStageFlagBits::eComputeShader | ::vk::PipelineStageFlagBits::eTransfer
+                | ::vk::PipelineStageFlagBits::eBottomOfPipe | ::vk::PipelineStageFlagBits::eHost;
+            constexpr auto computeAccess = ::vk::AccessFlagBits::eIndirectCommandRead | ::vk::AccessFlagBits::eUniformRead
+                | ::vk::AccessFlagBits::eShaderRead | ::vk::AccessFlagBits::eShaderWrite | ::vk::AccessFlagBits::eTransferRead
+                | ::vk::AccessFlagBits::eTransferWrite | ::vk::AccessFlagBits::eHostRead | ::vk::AccessFlagBits::eHostWrite
+                | ::vk::AccessFlagBits::eMemoryRead | ::vk::AccessFlagBits::eMemoryWrite;
+            dstStageMask &= computeStages;
+            if (!dstStageMask) dstStageMask = ::vk::PipelineStageFlagBits::eAllCommands;
+            for (auto& barrier : vkBufferBarriers) {
+                barrier.srcAccessMask &= computeAccess;
+                barrier.dstAccessMask &= computeAccess;
+            }
+            for (auto& barrier : vkImageBarriers) {
+                barrier.srcAccessMask &= computeAccess;
+                barrier.dstAccessMask &= computeAccess;
+            }
+        }
+
         _handle.pipelineBarrier(
             srcStageMask,
             dstStageMask,

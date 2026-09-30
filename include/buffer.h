@@ -168,6 +168,7 @@ namespace kor
          */
         struct KORAL_API RawBuilder : Builder {
             bool _isPerFrame = false;               ///< Whether the buffer holds one copy per frame in flight.
+            bool _sharedAcrossQueues = false;       ///< Used from both queue families. @see Image::Builder::sharedAcrossQueues
             glm::i64 _size = 0;                     ///< Size in bytes.
             /**
              * @brief Everything the buffer may be used for.
@@ -223,6 +224,12 @@ namespace kor
              * frames come round, which is what stops a write from landing in memory the GPU is
              * still reading. Adds the transfer usages that propagation needs.
              */
+            /** @brief @see Image::Builder::sharedAcrossQueues */
+            RawBuilder& SetSharedAcrossQueues(const bool shared) {
+                _sharedAcrossQueues = shared;
+                return *this;
+            }
+
             RawBuilder& SetIsPerFrame(const bool value) {
                 _isPerFrame = value;
                 _usage |= Usage::eTransferSrc;
@@ -1088,6 +1095,7 @@ namespace kor
 
         /** @brief Whether the buffer holds a separate copy per frame in flight. */
         [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
+        [[nodiscard]] bool IsSharedAcrossQueues() const { return _sharedAcrossQueues; }
 
         /**
          * @brief GPU device address of this buffer, for use as a buffer_reference in
@@ -1197,6 +1205,7 @@ namespace kor
         }
 
         bool _isPerFrame = false;
+        bool _sharedAcrossQueues = false;
         glm::u64 _size = 64;
         Flags<Usage> _usage = Usage::eUniform;
         Type _type = Type::eDynamic;

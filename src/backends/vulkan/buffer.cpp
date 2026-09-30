@@ -65,10 +65,12 @@ namespace kor::vk
 			break;
 		}
 
-		const auto bufferInfo = ::vk::BufferCreateInfo()
+		auto bufferInfo = ::vk::BufferCreateInfo()
 			.setSize(_size)
 			.setUsage(getVkBufferUsageFlags(_usage))
 			.setSharingMode(::vk::SharingMode::eExclusive);
+		const auto families = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<glm::u32>{};
+		if (!families.empty()) bufferInfo.setSharingMode(::vk::SharingMode::eConcurrent).setQueueFamilyIndices(families);
 
 
 		const auto frameCount = _isPerFrame ? kor::Context::Scheduler().ImageCount() : 1;
