@@ -61,6 +61,7 @@
 #include "koralViewport.h"
 #include "koralGizmo.h"
 #include "koralSceneView.h"
+#include "koralInspector.h"
 
 // Not included here, on purpose: <koralCameraPanel.h> draws the *camera module's* cameras, so it needs
 // koral-camera linked as well and refuses to compile without it. Including it from this umbrella would

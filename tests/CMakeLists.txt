@@ -34,6 +34,7 @@ add_executable(koral_tests
         test_token.cpp
         test_task.cpp
         test_frame_graph_compiler.cpp
+        test_reflect.cpp
 )
 
 target_link_libraries(koral_tests PRIVATE

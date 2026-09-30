@@ -269,4 +269,48 @@ TEST_F(HeadlessImGui, GradientEditorAndFileBrowserDraw) {
     });
 }
 
+namespace inspected {
+    enum class Mode { eOff, eOn };
+    KORAL_REFLECT_ENUM(Mode, eOff, eOn)
+    struct Part { glm::vec3 color{1.f}; std::string name = "part"; };
+    inline void KoralReflect(kor::TypeBuilder<Part>& t) {
+        t.Name("InspectedPart");
+        t.Field("color", &Part::color).Color();
+        t.Field("name", &Part::name).Tooltip("What it is called");
+    }
+    struct Everything {
+        bool flag = true; std::int32_t count = 3; std::uint8_t small = 2; float speed = 1.f; double precise = 0.5;
+        std::string label = "hello"; glm::vec2 v2{0.f}; glm::vec4 v4{1.f}; glm::ivec3 cell{1}; glm::uvec2 size{4};
+        glm::quat rotation{1.f, 0.f, 0.f, 0.f}; glm::mat4 transform{1.f}; Mode mode = Mode::eOn;
+        Part part; std::vector<Part> parts{Part{}, Part{}}; std::uint64_t id = 7;
+    };
+    inline void KoralReflect(kor::TypeBuilder<Everything>& t) {
+        t.Name("InspectedEverything");
+        t.Field("flag", &Everything::flag); t.Field("count", &Everything::count).Range(0, 10);
+        t.Field("small", &Everything::small); t.Field("speed", &Everything::speed); t.Field("precise", &Everything::precise);
+        t.Field("label", &Everything::label); t.Field("v2", &Everything::v2); t.Field("v4", &Everything::v4);
+        t.Field("cell", &Everything::cell); t.Field("size", &Everything::size); t.Field("rotation", &Everything::rotation);
+        t.Field("transform", &Everything::transform); t.Field("mode", &Everything::mode); t.Field("part", &Everything::part);
+        t.Field("parts", &Everything::parts); t.Field("id", &Everything::id).ReadOnly();
+    }
+}
+
+// Every kind of field gets its editor, nested structs and arrays opened, in a real ImGui frame — and
+// drawing it changes nothing.
+TEST_F(HeadlessImGui, TheInspectorDrawsAnEditorForEveryKindOfField) {
+    inspected::Everything everything;
+    const std::string before = kor::ToJson(everything);
+    bool changed = true;
+    for (int i = 0; i < 2; ++i) {
+        frame([&] {
+            ImGui::Begin("Properties");
+            ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+            changed = kgui::Inspect("Everything", everything);
+            ImGui::End();
+        });
+    }
+    EXPECT_FALSE(changed);
+    EXPECT_EQ(kor::ToJson(everything), before);
+}
+
 } // namespace
