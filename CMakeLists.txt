@@ -475,6 +475,12 @@ set(KORAL_CAPABILITY_EXTRA "")
 if(KORAL_BUILD_DOTNET)
     set(KORAL_CAPABILITY_EXTRA ", \"csharp\"")
 endif()
+# The Kotlin bindings (bindings/kotlin) are a Gradle build of their own: built into a Maven repository the
+# SDK carries (share/Koral/maven), and tested from ctest.
+option(KORAL_BUILD_KOTLIN "Build the Kotlin bindings into the SDK and test them (needs JDK 25: KORAL_JAVA_HOME, or JAVA_HOME)" OFF)
+if(KORAL_BUILD_KOTLIN)
+    set(KORAL_CAPABILITY_EXTRA "${KORAL_CAPABILITY_EXTRA}, \"kotlin\"")
+endif()
 file(STRINGS ${CMAKE_SOURCE_DIR}/include/sceneLibrary.h KORAL_SCENE_ABI_LINE REGEX "#define KORAL_SCENE_ABI_VERSION")
 string(REGEX MATCH "[0-9]+" KORAL_SCENE_ABI_VERSION "${KORAL_SCENE_ABI_LINE}")
 file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
@@ -1003,6 +1009,36 @@ if(KORAL_BUILD_DOTNET)
     install(DIRECTORY "${KORAL_DOTNET_OUT}/koral-dotnet/"
             DESTINATION ${CMAKE_INSTALL_LIBDIR}/koral-dotnet
             USE_SOURCE_PERMISSIONS)
+endif()
+
+# ---------------------------------------------------------------------------
+# The Kotlin bindings, when KORAL_BUILD_KOTLIN is on: Gradle publishes koral and koral-ui (the JVM libraries,
+# managed code only) into a Maven repository, installed as share/Koral/maven — what a Kotlin project's
+# build adds as a repository to depend on koral:koral-ui:<version>.
+# ---------------------------------------------------------------------------
+if(KORAL_BUILD_KOTLIN)
+    set(KORAL_JAVA_HOME "$ENV{JAVA_HOME}" CACHE PATH "The JDK (25 or later) the Kotlin bindings are built with")
+    set(KORAL_KOTLIN_DIR "${CMAKE_SOURCE_DIR}/bindings/kotlin")
+    set(KORAL_KOTLIN_REPO "${CMAKE_BINARY_DIR}/kotlin/maven")
+    if(WIN32)
+        set(KORAL_GRADLEW "${KORAL_KOTLIN_DIR}/gradlew.bat")
+    else()
+        set(KORAL_GRADLEW "${KORAL_KOTLIN_DIR}/gradlew")
+    endif()
+    add_custom_target(koral_kotlin ALL
+            COMMAND ${CMAKE_COMMAND} -E env "JAVA_HOME=${KORAL_JAVA_HOME}"
+                    "${KORAL_GRADLEW}" publishAllPublicationsToSdkRepository --console=plain -q
+                    "-PkoralRepo=${KORAL_KOTLIN_REPO}" "-PkoralVersion=${PROJECT_VERSION}"
+            WORKING_DIRECTORY "${KORAL_KOTLIN_DIR}"
+            USES_TERMINAL
+            COMMENT "Building the Kotlin bindings")
+    add_dependencies(koral_kotlin ${PROJECT_NAME})
+    add_dependencies(stage koral_kotlin)
+    install(DIRECTORY "${KORAL_KOTLIN_REPO}/" DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/maven)
+    # The Gradle wrapper, for the Hub to put in the Kotlin projects it makes: they build with no Gradle installed.
+    install(PROGRAMS "${KORAL_KOTLIN_DIR}/gradlew" "${KORAL_KOTLIN_DIR}/gradlew.bat"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/kotlin/wrapper)
+    install(DIRECTORY "${KORAL_KOTLIN_DIR}/gradle/wrapper/" DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/kotlin/wrapper/gradle/wrapper)
 endif()
 
 # ---------------------------------------------------------------------------
