@@ -48,6 +48,10 @@ namespace kor {
 		glm::vec2 mousePosition {};        ///< In the scene's own window's client space.
 		glm::vec2 mouseDelta {};
 		glm::vec2 scrollDelta {};
+		std::u32string typed;                ///< This frame's text. @see TypedText
+		std::vector<Key> repeated;           ///< Keys that repeated this frame.
+		/// Interfaces other than ImGui that say they are using the pointer or the keyboard.
+		std::unordered_map<const void*, std::pair<bool, bool>> claims;
 
 		/// The cursor in virtual-desktop coordinates, the only space every window shares and so the
 		/// only one a delta can be taken in — the pointer may cross into an undocked panel.
@@ -225,6 +229,8 @@ namespace kor {
 		_state->lastMousePosition = _state->mousePosition;
 		_state->mouseDelta  = { 0.0f, 0.0f };
 		_state->scrollDelta = { 0.0f, 0.0f };
+		_state->typed.clear();
+		_state->repeated.clear();
 	}
 
 	void Input::ApplyFed()
@@ -261,6 +267,14 @@ namespace kor {
 		_state->fed.emplace_back([=](State& s) { s.scrollDelta += delta; });
 	}
 
+	void Input::FeedText(const std::u32string_view text) {
+		_state->fed.emplace_back([text = std::u32string(text)](State& s) { s.typed += text; });
+	}
+
+	void Input::FeedKeyRepeat(const Key key) {
+		_state->fed.emplace_back([=](State& s) { s.repeated.push_back(key); });
+	}
+
 	void Input::ReleaseAll() {
 		_state->fed.emplace_back([](State& s) {
 			for (auto& state : s.keys | std::views::values) press(state, false);
@@ -280,6 +294,8 @@ namespace kor {
 				if (state == KeyState::ePressed) FeedKey(key, true);
 				else if (state == KeyState::eReleased) FeedKey(key, false);
 			}
+			if (!from.typed.empty()) FeedText(from.typed);
+			for (const Key key : from.repeated) FeedKeyRepeat(key);
 			// The gamepads go where the keys do: to whatever has focus.
 			for (int pad = 0; pad < MaxGamepads; ++pad) {
 				const auto& p = from.pads[pad];
@@ -356,12 +372,27 @@ namespace kor {
     }
 
     bool Input::InterfaceWantsMouse() const {
+        for (const auto& [mouse, keyboard] : _state->claims | std::views::values)
+            if (mouse) return true;
         // Read straight off the scene's own context: another scene's may be the current one.
         return _state->interface != nullptr && _state->interface->IO.WantCaptureMouse;
     }
 
     bool Input::InterfaceWantsKeyboard() const {
+        for (const auto& [mouse, keyboard] : _state->claims | std::views::values)
+            if (keyboard) return true;
         return _state->interface != nullptr && _state->interface->IO.WantCaptureKeyboard;
+    }
+
+    void Input::ClaimInterface(const void* claimer, const bool mouse, const bool keyboard) {
+        if (!mouse && !keyboard) _state->claims.erase(claimer);
+        else _state->claims[claimer] = {mouse, keyboard};
+    }
+
+    std::u32string_view Input::TypedText() const { return _state->typed; }
+
+    bool Input::IsKeyRepeated(const Key key) const {
+        return std::ranges::find(_state->repeated, key) != _state->repeated.end();
     }
 
     const glm::vec2& Input::MousePosition() const { return _state->mousePosition; }
@@ -384,7 +415,8 @@ namespace kor {
         switch (action) {
         case GLFW_PRESS:   state = KeyState::ePressed; break;
         case GLFW_RELEASE: state = KeyState::eReleased; break;
-        default: break;   // GLFW_REPEAT: still held
+        case GLFW_REPEAT:  input->_state->repeated.push_back(static_cast<Key>(key)); break;   // still held
+        default: break;
         }
     }
 
@@ -448,8 +480,11 @@ namespace kor {
 
     void Input::Callbacks::CharCallback(GLFWwindow* handle, const unsigned int codepoint) {
         Input* input = routeOf(handle);
-        const InterfaceScope scope(input, input ? input->_state->interface : nullptr);
-        if (scope.active) ImGui_ImplGlfw_CharCallback(handle, codepoint);
+        {
+            const InterfaceScope scope(input, input ? input->_state->interface : nullptr);
+            if (scope.active) ImGui_ImplGlfw_CharCallback(handle, codepoint);
+        }
+        if (input) input->_state->typed.push_back(static_cast<char32_t>(codepoint));
     }
 
     void Input::Callbacks::CursorEnterCallback(GLFWwindow* handle, const int entered) {

@@ -62,6 +62,12 @@ int main(void) {
 - **Threads.** Everything runs on the thread that created the application, except a pass's `record`
   callback and the command-buffer calls made from it, which run on a worker thread alongside other passes.
 
+## Modules
+
+A module's C interface follows the same conventions in a header of its own: koral-ui's is
+`koralUI_c.h` ([Interfaces with koral-ui](ui.md#from-c)). It reports its failures through
+`koral_last_error()`, by way of `koral_set_last_error`.
+
 ## For a runtime of one's own
 
 `koral_project_load` reads a project the way the C++ runtime does: `koral.json` from `--config`,

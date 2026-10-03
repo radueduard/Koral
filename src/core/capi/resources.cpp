@@ -6,6 +6,7 @@
 #include <span>
 
 #include "capi.h"
+#include "capiInterop.h"
 
 #include "token.h"
 
@@ -159,6 +160,8 @@ extern "C" {
 // ---- results and the log -------------------------------------------------------------------------------
 
 const char* koral_last_error(void) { return LastError().c_str(); }
+void koral_set_last_error(const char* message) { LastError() = message ? message : ""; }
+
 
 void koral_log(const KoralLogLevel level, const char* message)
 {
@@ -1060,3 +1063,7 @@ void koral_token_signal(KoralToken* token) { if (token) GuardedVoid([&] { token-
 uint64_t koral_token_value(KoralToken* token) { return token ? token->token.Value() : 0; }
 
 } // extern "C"
+
+// ---- for modules' C interfaces (C++ linkage) --------------------------------------------------------------
+kor::ResourceRef<const kor::Image> kor::capi::ImageOf(KoralResource* handle) { return RefOf<Image>(handle); }
+KoralResource* kor::capi::BorrowImage(const ResourceRef<const Image>& image) { return Borrow(image); }

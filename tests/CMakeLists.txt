@@ -112,3 +112,23 @@ if(KORAL_BUILD_DOTNET)
                 COMMAND "${Python3_EXECUTABLE}" "${KORAL_DOTNET_DIR}/tools/generate_native.py" --check)
     endif()
 endif()
+
+# The Kotlin bindings: Gradle runs their tests (each class in a JVM of its own) against this build's Koral,
+# and the generated interop is checked against koral_c.h and koralUI_c.h like the C# one.
+if(KORAL_BUILD_KOTLIN)
+    set(KORAL_JBR "$ENV{KORAL_JBR}" CACHE PATH "A JetBrains Runtime 25: the Kotlin tests then cover structural hot reload too")
+    add_test(NAME Kotlin.Bindings
+            COMMAND "${KORAL_GRADLEW}" :tests:test --console=plain --rerun-tasks
+            WORKING_DIRECTORY "${KORAL_KOTLIN_DIR}")
+    set_tests_properties(Kotlin.Bindings PROPERTIES
+            ENVIRONMENT "JAVA_HOME=${KORAL_JAVA_HOME};KORAL_JBR=${KORAL_JBR};KORAL_LIBRARY=$<TARGET_FILE:Koral>"
+            TIMEOUT 900)
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME Kotlin.InteropMatchesTheCInterface
+                COMMAND "${Python3_EXECUTABLE}" "${KORAL_KOTLIN_DIR}/tools/generate_kotlin.py" --check)
+    endif()
+endif()
+
+# The UI module's tests live beside it, and need GTest from here.
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/ui/tests ${CMAKE_BINARY_DIR}/modules/ui/tests)

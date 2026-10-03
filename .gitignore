@@ -24,3 +24,6 @@
 
 # Dear ImGui dumps its window layout next to the working directory at exit.
 imgui.ini
+
+# Python bytecode from the binding generators
+__pycache__/

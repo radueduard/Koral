@@ -602,6 +602,38 @@ void koral_input_feed_mouse_button(KoralInput* i, const uint32_t b, const bool d
 void koral_input_feed_mouse_position(KoralInput* i, const float x, const float y) { GuardedVoid([&] { InputOf(i).FeedMousePosition({x, y}); }); }
 void koral_input_feed_mouse_delta(KoralInput* i, const float x, const float y) { GuardedVoid([&] { InputOf(i).FeedMouseDelta({x, y}); }); }
 void koral_input_feed_scroll(KoralInput* i, const float x, const float y) { GuardedVoid([&] { InputOf(i).FeedScroll({x, y}); }); }
+void koral_input_feed_text(KoralInput* i, const char* text)
+{
+    GuardedVoid([&] {
+        // UTF-8 to code points; a malformed byte stands for itself, as U+FFFD would hide what it was.
+        std::u32string out;
+        const std::string_view t = text ? text : "";
+        for (std::size_t k = 0; k < t.size();) {
+            const auto c = static_cast<unsigned char>(t[k]);
+            const std::size_t len = c < 0x80 ? 1 : (c >> 5) == 0x6 ? 2 : (c >> 4) == 0xE ? 3 : (c >> 3) == 0x1E ? 4 : 1;
+            char32_t cp = len == 1 ? c : c & (0xFF >> (len + 1));
+            for (std::size_t j = 1; j < len && k + j < t.size(); ++j) cp = (cp << 6) | (static_cast<unsigned char>(t[k + j]) & 0x3F);
+            out.push_back(cp);
+            k += len;
+        }
+        InputOf(i).FeedText(out);
+    });
+}
+void koral_input_feed_key_repeat(KoralInput* i, const uint32_t key) { GuardedVoid([&] { InputOf(i).FeedKeyRepeat(static_cast<Key>(key)); }); }
+const char* koral_input_typed_text(KoralInput* i)
+{
+    return Guarded([&] {
+        std::string out;
+        for (const char32_t cp : InputOf(i).TypedText()) {
+            if (cp < 0x80) out += static_cast<char>(cp);
+            else if (cp < 0x800) { out += static_cast<char>(0xC0 | (cp >> 6)); out += static_cast<char>(0x80 | (cp & 0x3F)); }
+            else if (cp < 0x10000) { out += static_cast<char>(0xE0 | (cp >> 12)); out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F)); out += static_cast<char>(0x80 | (cp & 0x3F)); }
+            else { out += static_cast<char>(0xF0 | (cp >> 18)); out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F)); out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F)); out += static_cast<char>(0x80 | (cp & 0x3F)); }
+        }
+        return Keep(std::move(out));
+    }, "");
+}
+bool koral_input_is_key_repeated(KoralInput* i, const uint32_t key) { return Guarded([&] { return InputOf(i).IsKeyRepeated(static_cast<Key>(key)); }, false); }
 void koral_input_feed_gamepad_button(KoralInput* i, const uint32_t b, const bool down, const int pad)
 {
     GuardedVoid([&] { InputOf(i).FeedGamepadButton(static_cast<GamepadButton>(b), down, pad); });

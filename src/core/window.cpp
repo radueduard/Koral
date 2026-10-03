@@ -76,7 +76,9 @@ namespace kor {
         _focused = glfwGetWindowAttrib(_window, GLFW_FOCUSED) == GLFW_TRUE;
 
         // Centred on the primary monitor, where the platform lets a client place its window at all.
-        if (!_fullscreen && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {
+        if (!_fullscreen && settings.position && CanBePositioned()) {
+            glfwSetWindowPos(_window, settings.position->x, settings.position->y);
+        } else if (!_fullscreen && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {
             if (const auto primaryMonitor = glfwGetPrimaryMonitor()) {
                 if (const auto videoMode = glfwGetVideoMode(primaryMonitor)) {
                     int monitorX, monitorY;
@@ -86,6 +88,28 @@ namespace kor {
                 }
             }
         }
+    }
+
+    bool Window::CanBePositioned() { return glfwGetPlatform() != GLFW_PLATFORM_WAYLAND && glfwGetPlatform() != GLFW_PLATFORM_NULL; }
+
+    bool Window::IsHovered() const { return _window != nullptr && glfwGetWindowAttrib(_window, GLFW_HOVERED) == GLFW_TRUE; }
+
+    glm::ivec2 Window::Position() const
+    {
+        if (_window == nullptr || !CanBePositioned()) return {};
+        int x = 0, y = 0;
+        glfwGetWindowPos(_window, &x, &y);
+        return { x, y };
+    }
+
+    void Window::SetPosition(const glm::ivec2 position)
+    {
+        if (_window != nullptr && CanBePositioned()) glfwSetWindowPos(_window, position.x, position.y);
+    }
+
+    void Window::Focus()
+    {
+        if (_window != nullptr) glfwFocusWindow(_window);
     }
 
     Window::Window(const OffscreenSettings& settings) :

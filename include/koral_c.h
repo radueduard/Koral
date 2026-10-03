@@ -47,6 +47,8 @@ typedef enum KoralStatus { KORAL_OK = 0, KORAL_ERROR = 1 } KoralStatus;
 
 /** Why the last call on this thread failed. Empty after a success. */
 KORAL_API const char* koral_last_error(void);
+/** Sets (or, with null, clears) koral_last_error: for a module's own C interface, so its failures are reported the same way. */
+KORAL_API void koral_set_last_error(const char* message);
 
 typedef enum KoralLogLevel { KORAL_LOG_INFO = 0, KORAL_LOG_WARN = 1, KORAL_LOG_ERROR = 2 } KoralLogLevel;
 /** kor::log::Info / Warn / Error. */
@@ -942,6 +944,12 @@ KORAL_API void koral_input_feed_mouse_button(KoralInput* input, uint32_t button,
 KORAL_API void koral_input_feed_mouse_position(KoralInput* input, float x, float y);
 KORAL_API void koral_input_feed_mouse_delta(KoralInput* input, float x, float y);
 KORAL_API void koral_input_feed_scroll(KoralInput* input, float x, float y);
+/** Input::FeedText: UTF-8 text, as code points the scene's TypedText() will hold. */
+KORAL_API void koral_input_feed_text(KoralInput* input, const char* text);
+KORAL_API void koral_input_feed_key_repeat(KoralInput* input, uint32_t key);
+/** Input::TypedText, as UTF-8. */
+KORAL_API const char* koral_input_typed_text(KoralInput* input);
+KORAL_API bool koral_input_is_key_repeated(KoralInput* input, uint32_t key);
 KORAL_API void koral_input_feed_gamepad_button(KoralInput* input, uint32_t button, bool down, int pad);
 KORAL_API void koral_input_feed_gamepad_axis(KoralInput* input, uint32_t axis, float value, int pad);
 KORAL_API void koral_input_release_all(KoralInput* input);

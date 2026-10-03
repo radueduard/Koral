@@ -182,6 +182,24 @@ namespace kor {
         /** @brief Whether the window currently has keyboard focus. */
         [[nodiscard]] bool IsFocused() const { return _focused; }
 
+        /** @brief Whether the pointer is over the window's drawable area. False for an offscreen window. */
+        [[nodiscard]] bool IsHovered() const;
+
+        /**
+         * @brief Where the window's drawable area starts on the desktop, in screen coordinates — (0, 0)
+         *        where the platform does not say (Wayland) or for an offscreen window. @see CanBePositioned
+         */
+        [[nodiscard]] glm::ivec2 Position() const;
+        /** @brief Moves the window. Nothing happens where the platform does not let a client place its windows. */
+        void SetPosition(glm::ivec2 position);
+        /** @brief Brings the window to the front and gives it the keyboard, where the platform allows. */
+        void Focus();
+        /**
+         * @brief Whether windows here can be asked where they are and put somewhere: true on Windows,
+         *        macOS and X11, false on Wayland, where only the compositor places windows.
+         */
+        [[nodiscard]] static bool CanBePositioned();
+
         /** @brief Whether the frame being built draws into this window: it had an image when the frame started. */
         [[nodiscard]] bool IsShownThisFrame() const { return _shownThisFrame; }
 
@@ -252,6 +270,9 @@ namespace kor {
         bool decorated = true;                      ///< Whether the OS draws a title bar and border.
         bool transparentFramebuffer = false;        ///< Whether the framebuffer's alpha composites with the desktop.
         bool vsync = true;                          ///< Whether presentation waits for the display's refresh.
+        /// Where on the desktop to open it, in screen coordinates; centred on the primary monitor when
+        /// not given. Ignored where the platform places windows itself. @see Window::CanBePositioned
+        std::optional<glm::ivec2> position;
         /**
          * The formats to present in, most wanted first; the first the display offers is used. The
          * default is plain 8-bit: a scene that writes sRGB-encoded values itself (a tone-mapping

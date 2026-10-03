@@ -30,7 +30,7 @@ namespace kor {
      *
      * Keys are reported by position, not by the character they produce, so eW is the same key on a
      * QWERTY and an AZERTY keyboard even though it prints differently. For text entry, take the
-     * characters from Dear ImGui rather than reading keys here.
+     * characters from Input::TypedText() rather than reading keys here.
      */
     enum class Key : std::uint16_t {
         eSpace = 32,
@@ -330,6 +330,29 @@ namespace kor {
         /** @brief Whether the scene's interface is using the keyboard — text is being typed into it. */
         [[nodiscard]] bool InterfaceWantsKeyboard() const;
 
+        /**
+         * @brief Says that an interface other than the scene's ImGui one — a koral-ui document, say —
+         *        is using the pointer or the keyboard. InterfaceWantsMouse/Keyboard answer true while
+         *        it does, so a camera stays put under a panel whichever library drew it.
+         *
+         * Sticky: it holds until the claimer says otherwise. Each @p claimer is counted on its own, so
+         * two interfaces over one window do not release each other's claim.
+         */
+        void ClaimInterface(const void* claimer, bool mouse, bool keyboard);
+
+        /**
+         * @brief The text typed this frame, as Unicode code points in the order they were typed —
+         *        what a text field inserts. Not keys: a shifted 'a' arrives here as 'A', and a dead
+         *        key followed by 'e' as 'é'.
+         */
+        [[nodiscard]] std::u32string_view TypedText() const;
+
+        /**
+         * @brief Whether @p key repeated this frame, as a key held down does after a moment — what
+         *        makes holding backspace delete more than one character. The press itself is not a repeat.
+         */
+        [[nodiscard]] bool IsKeyRepeated(Key key) const;
+
         /** @brief Cursor position in pixels, from the top-left of the scene's window. */
         [[nodiscard]] const glm::vec2& MousePosition() const;
 
@@ -445,6 +468,10 @@ namespace kor {
         void FeedMouseDelta(glm::vec2 delta);
         /** @brief How far the wheel turned: MouseScrollDelta(). */
         void FeedScroll(glm::vec2 delta);
+        /** @brief Text typed: TypedText(). */
+        void FeedText(std::u32string_view text);
+        /** @brief A held key repeated: IsKeyRepeated(). */
+        void FeedKeyRepeat(Key key);
         /** @brief A gamepad button went down, or up. */
         void FeedGamepadButton(GamepadButton button, bool down, int pad = 0);
         /** @brief Where a gamepad axis is now. */
