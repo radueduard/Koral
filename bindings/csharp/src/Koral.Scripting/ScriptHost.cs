@@ -462,9 +462,10 @@ public sealed class ScriptHost : IDisposable
             {
                 if (constructs || method.Name is "Initialize" or "State") reopen.Add(App.SceneNameOf(type));
             }
-            else if (constructs)
+            else if (constructs && !HotReload.IsClaimed(type))
             {
                 // Something a scene makes — a pass, a helper — made differently now: the scenes make theirs again.
+                // (Unless its library makes it again itself: an interface's widgets are built anew on reload.)
                 reopenAll = true;
             }
             else if (type.IsSubclassOf(typeof(RenderPass)) && method.Name is "Setup" or "Initialize")
@@ -474,6 +475,8 @@ public sealed class ScriptHost : IDisposable
         }
 
         foreach (var pass in passes.SelectMany(RenderPass.Live).Distinct()) pass.Reinitialize();
+        // The libraries built on Koral hear of it: an interface builds its widgets again, with the new code.
+        HotReload.NotifyUpdated(edited.Select(m => _assembly!.GetType(MetadataName(m.ContainingType))).OfType<Type>().Distinct().ToList());
 
         var names = reopenAll ? _scenes : _scenes.Where(reopen.Contains).ToList();
         LastReload = names.Count > 0 ? ReloadKind.ScenesReopened : ReloadKind.InPlace;

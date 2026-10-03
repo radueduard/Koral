@@ -314,7 +314,8 @@ public sealed unsafe class App : IDisposable, IResourceOwner
 
     void IResourceOwner.Disown(IDisposable resource)
     {
-        lock (_owned) _owned.Remove(resource);
+        // By reference: Resource.Equals is false once disposed, so Remove would never find it.
+        lock (_owned) _owned.RemoveAll(o => ReferenceEquals(o, resource));
     }
 
     internal static void Report(Scene scene, string hook, Exception exception)
@@ -329,16 +330,19 @@ public sealed unsafe class App : IDisposable, IResourceOwner
     {
         var factory = (Func<SceneArgs, Scene>)GCHandle.FromIntPtr(user).Target!;
         var made = SceneBridge.Constructing = [];
+        var others = SceneBridge.ConstructingOthers = [];
         try
         {
             var scene = factory(SceneArgs.FromJson(KoralNative.Text(argumentsJson)));
             foreach (var resource in made) resource.OwnedBy(scene);
+            foreach (var other in others) ((IResourceOwner)scene).Own(other);
             SceneBridge.LastMade = scene;
             return SceneBridge.CallbacksFor(scene);
         }
         catch (Exception e)
         {
             for (var i = made.Count - 1; i >= 0; --i) made[i].Dispose();
+            for (var i = others.Count - 1; i >= 0; --i) others[i].Dispose();
             // Every member zero: the scene is not opened, and Open says so.
             Log.Error($"[koral] a scene could not be made: {e}");
             return default;
@@ -346,6 +350,7 @@ public sealed unsafe class App : IDisposable, IResourceOwner
         finally
         {
             SceneBridge.Constructing = null;
+            SceneBridge.ConstructingOthers = null;
         }
     }
 }

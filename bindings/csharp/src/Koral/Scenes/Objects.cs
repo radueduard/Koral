@@ -194,6 +194,13 @@ public sealed unsafe partial class Input
     public void FeedKey(Key key, bool down) => KoralNative.koral_input_feed_key(Native, (uint)key, KoralNative.Bool(down));
     public void FeedMouseButton(MouseButton button, bool down) => KoralNative.koral_input_feed_mouse_button(Native, (uint)button, KoralNative.Bool(down));
     public void FeedMousePosition(Vector2 position) => KoralNative.koral_input_feed_mouse_position(Native, position.X, position.Y);
+    /// <summary>Input::FeedText: text typed, as <see cref="TypedText"/> will hold it.</summary>
+    public void FeedText(string text) => KoralNative.koral_input_feed_text(Native, text);
+    public void FeedKeyRepeat(Key key) => KoralNative.koral_input_feed_key_repeat(Native, (uint)key);
+    /// <summary>Input::TypedText: the text typed this frame — what a text field inserts.</summary>
+    public string TypedText => KoralNative.Text(KoralNative.koral_input_typed_text(Native));
+    /// <summary>Input::IsKeyRepeated: whether a held key repeated this frame.</summary>
+    public bool IsKeyRepeated(Key key) => KoralNative.koral_input_is_key_repeated(Native, (uint)key).AsBool();
     public void FeedMouseDelta(Vector2 delta) => KoralNative.koral_input_feed_mouse_delta(Native, delta.X, delta.Y);
     public void FeedScroll(Vector2 delta) => KoralNative.koral_input_feed_scroll(Native, delta.X, delta.Y);
     public void FeedGamepadButton(GamepadButton button, bool down, int pad = 0) => KoralNative.koral_input_feed_gamepad_button(Native, (uint)button, KoralNative.Bool(down), pad);

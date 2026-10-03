@@ -157,7 +157,8 @@ public abstract unsafe partial class Scene : IResourceOwner
 
     void IResourceOwner.Disown(IDisposable resource)
     {
-        lock (_resources) _resources.Remove(resource);
+        // By reference: Resource.Equals is false once disposed, so Remove would never find it.
+        lock (_resources) _resources.RemoveAll(o => ReferenceEquals(o, resource));
     }
 
     internal void ReleaseResources()
@@ -224,6 +225,8 @@ public abstract unsafe partial class Scene : IResourceOwner
         public static MouseButton? FirstMouseButtonPressed() => Get().FirstMouseButtonPressed();
         public static bool InterfaceWantsMouse => Get().InterfaceWantsMouse;
         public static bool InterfaceWantsKeyboard => Get().InterfaceWantsKeyboard;
+        public static string TypedText => Get().TypedText;
+        public static bool IsKeyRepeated(Key key) => Get().IsKeyRepeated(key);
         public static Vector2 MousePosition => Get().MousePosition;
         public static Vector2 MousePositionDelta => Get().MousePositionDelta;
         public static Vector2 MouseScrollDelta => Get().MouseScrollDelta;

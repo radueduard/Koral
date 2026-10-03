@@ -308,6 +308,7 @@ internal unsafe struct KoralDebugStyle
 internal static unsafe partial class KoralNative
 {
     [LibraryImport(Library)] internal static partial byte* koral_last_error();
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_set_last_error(string? message);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_log(int level, string? message);
     [LibraryImport(Library)] internal static partial byte* koral_error_describe(uint code);
     [LibraryImport(Library)] internal static partial void koral_resource_release(IntPtr resource);
@@ -773,6 +774,10 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_input_feed_mouse_position(IntPtr input, float x, float y);
     [LibraryImport(Library)] internal static partial void koral_input_feed_mouse_delta(IntPtr input, float x, float y);
     [LibraryImport(Library)] internal static partial void koral_input_feed_scroll(IntPtr input, float x, float y);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_input_feed_text(IntPtr input, string? text);
+    [LibraryImport(Library)] internal static partial void koral_input_feed_key_repeat(IntPtr input, uint key);
+    [LibraryImport(Library)] internal static partial byte* koral_input_typed_text(IntPtr input);
+    [LibraryImport(Library)] internal static partial byte koral_input_is_key_repeated(IntPtr input, uint key);
     [LibraryImport(Library)] internal static partial void koral_input_feed_gamepad_button(IntPtr input, uint button, byte down, int pad);
     [LibraryImport(Library)] internal static partial void koral_input_feed_gamepad_axis(IntPtr input, uint axis, float value, int pad);
     [LibraryImport(Library)] internal static partial void koral_input_release_all(IntPtr input);

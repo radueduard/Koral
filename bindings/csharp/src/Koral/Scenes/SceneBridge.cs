@@ -19,6 +19,8 @@ internal static unsafe class SceneBridge
 
     /// <summary>Resources made while a scene's constructor runs: its, once it exists.</summary>
     [ThreadStatic] internal static List<Resource>? Constructing;
+    /// <summary>The same, for what other assemblies make that a scene must own (a UI, say). @see Ownership</summary>
+    [ThreadStatic] internal static List<IDisposable>? ConstructingOthers;
 
     [ThreadStatic] private static IntPtr t_state;
 

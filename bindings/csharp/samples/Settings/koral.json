@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "name": "Settings",
+  "scene": "Settings",
+  "rendering": {
+    "window": { "width": 900, "height": 560 }
+  }
+}

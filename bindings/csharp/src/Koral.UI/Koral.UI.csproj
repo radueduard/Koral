@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- koral-ui from C#: element shaders, the canvas and widgets, over koralUI_c.h — the C++ API, class for
+       class. Managed code only; the native library is the SDK's koral-ui module, found beside Koral's. -->
+  <PropertyGroup>
+    <RootNamespace>Koral.UI</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsAotCompatible>false</IsAotCompatible>
+    <PackageId>Koral.UI</PackageId>
+    <Description>C# bindings for koral-ui, Koral's retained interface library.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Koral/Koral.csproj" />
+  </ItemGroup>
+</Project>

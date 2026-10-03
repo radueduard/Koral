@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Koral/Koral.csproj" />
     <Project Path="src/Koral.Scripting/Koral.Scripting.csproj" />
+    <Project Path="src/Koral.UI/Koral.UI.csproj" />
     <Project Path="src/Koral.Runner/Koral.Runner.csproj" />
   </Folder>
   <Folder Name="/tests/">

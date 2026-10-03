@@ -121,7 +121,7 @@ public sealed class Waiter : Scene
     }
 }
 
-public static class Cases
+public static partial class Cases
 {
     private static void Frames(App app, int count)
     {
