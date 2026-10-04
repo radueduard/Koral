@@ -185,7 +185,8 @@ The Hub writes `.vscode/` for a C# project, pointed at this machine's SDK and .N
 - **Terminal → Run Task → Koral: Run scenes** does the same from a terminal.
 - `settings.json` points the C# extension at the .NET the Hub found, for completion.
 
-An SDK built with `-DKORAL_BUILD_DOTNET=ON` has it in `lib/koral-dotnet/`. It needs the .NET 10
+An SDK staged on a machine with the .NET 10 SDK has it in `lib/koral-dotnet/`: `KORAL_BUILD_DOTNET`
+is on by default there (`-DKORAL_BUILD_DOTNET=OFF` leaves it out). It needs the .NET 10
 runtime: run it as `koral-dotnet`, or as `dotnet lib/koral-dotnet/koral-dotnet.dll`.
 
 ## Your own program
@@ -217,6 +218,23 @@ scenes only, on a machine with no display. The bindings' own tests run that way.
 `Koral.UI`, the C# binding of the koral-ui module, ships with koral-dotnet. Widgets, the canvas and
 element shaders read as they do in C++, and editing a widget while it runs rebuilds it in place with its
 state kept. See [Interfaces with koral-ui](ui.md#from-c-1).
+
+Everything the module has is there, under its C++ name: `LazyList`, `Intrinsic`, `CustomLayout`, `Themed`,
+`MenuBar` and `ContextMenu`, `Table`, `TreeNode`, `TabBar`, `Dropdown`, `DragValue`, `StepSlider`, `ColorPicker`,
+`GradientEditor`, `Plot`, `Modal`, `TitleBar`, `StatusBar` and the rest. A `TextStyle` has `Weight`, `Italic`,
+`Underline` and `LineThrough`, and with no colour of its own (`Color.Inherit`, the default) text is the theme's.
+`Themes.Koral`, `Material`, `Cupertino` and `Windows` are the four families of theme, each dark or light and in
+an accent — `Themes.Windows()` as Windows itself is set:
+
+```csharp
+var ui = new Ui(new Editor(), Themes.Material(dark: false, accent: Color.Hex(0x00897B)));
+ui.SetTheme(Themes.Windows());
+```
+
+On Windows the managed assembly and the engine are both `Koral.dll`, and .NET loads the managed one first. A
+native module that links against the engine would bind to the wrong one, so `Koral.UI` loads its module through
+`NativeLibraryResolver.LoadBesideKoral`, which has the `Koral.native.manifest` beside the engine in force while
+it does; a module loaded so is linked without a manifest of its own (`/MANIFEST:NO`).
 
 ## How it is built
 

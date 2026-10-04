@@ -112,15 +112,22 @@ namespace kor::vk
         const ::vk::SwapchainKHR oldSwapChain = _handle;
         const auto queueFamilyIndices = std::array { _presentQueue.getFamily().getIndex() };
 
-        const auto compositeAlpha = _transparent ?
-#ifdef _WIN32
-        ::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied
-#elifdef __APPLE__
-        ::vk::CompositeAlphaFlagBitsKHR::ePostMultiplied
-#else
-        ::vk::CompositeAlphaFlagBitsKHR::eOpaque
-#endif
-        : ::vk::CompositeAlphaFlagBitsKHR::eOpaque;
+        // A transparent window composites with the desktop only where the surface says it can: asking
+        // for a mode it does not offer is an error, and a window that was meant to be see-through and
+        // is opaque instead has to be something its owner can find out (Window::CompositesWithDesktop).
+        auto compositeAlpha = ::vk::CompositeAlphaFlagBitsKHR::eOpaque;
+        _composites = false;
+        if (_transparent) {
+            for (const auto wanted : { ::vk::CompositeAlphaFlagBitsKHR::ePreMultiplied, ::vk::CompositeAlphaFlagBitsKHR::ePostMultiplied }) {
+                if (!(surfaceCapabilities.supportedCompositeAlpha & wanted)) continue;
+                compositeAlpha = wanted;
+                _composites = true;
+                break;
+            }
+            if (!_composites)
+                kor::log::Warn("[window] a transparent window was asked for, but the display composites none ({}); it is opaque",
+                               ::vk::to_string(surfaceCapabilities.supportedCompositeAlpha));
+        }
 
         const auto createInfo = ::vk::SwapchainCreateInfoKHR()
             .setSurface(*_surface.get())

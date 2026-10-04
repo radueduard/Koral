@@ -91,6 +91,14 @@ namespace kor
     /** @brief Stable, human-readable one-line description of an error code. */
     [[nodiscard]] KORAL_API std::string_view Describe(ErrorCode code);
 
+    namespace detail {
+        /**
+         * @brief Throws for a ResourceRef used after what it refers to was destroyed — saying, in a debug
+         *        build, where it was used from: a lifetime bug shows up far from what caused it.
+         */
+        [[noreturn]] KORAL_API void ThrowDestroyedResource();
+    }
+
     /**
      * @brief A structured API error: a documented code, a human message, an origin,
      *        and optionally the error that caused it.

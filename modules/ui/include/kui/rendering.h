@@ -19,7 +19,7 @@
 
 namespace kor { class Window; }
 
-#include "api.h"
+#include "kuiApi.h"
 #include "canvas.h"
 
 namespace kui
@@ -68,6 +68,25 @@ namespace kui
         constexpr bool operator==(const BoxConstraints&) const = default;
     };
 
+    /** @brief Debugging aids. They are the process's: every interface in it shows them. */
+    namespace debug {
+        /**
+         * @brief Whether every render object is outlined where it was laid out, over what it paints:
+         *        what holds others in one colour, what holds nothing (a text, a control) in a fainter
+         *        one, and what is painted into a layer of its own (a repaint boundary) in a third.
+         *        For seeing where a container really is, and how big. Off by default.
+         */
+        KUI_API void SetPaintBounds(bool enabled);
+        [[nodiscard]] KUI_API bool PaintBounds();
+        /** @brief Changes each time a debugging aid does: what was painted before it has to be painted again. */
+        [[nodiscard]] KUI_API unsigned Revision();
+    }
+
+    struct Theme;
+
+    /** @brief What the pointer looks like: said by what is under it. @see Owner::cursor */
+    enum class PointerCursor : std::uint8_t { eArrow, eResizeHorizontal, eResizeVertical, eResizeDiagonal, eHand, eText };
+
     /** @brief Where a pointer event happened, and what it was. */
     struct PointerEvent {
         enum class Type : std::uint8_t { eDown, eMove, eUp, eCancel, eHover, eScroll, eEnter, eExit };
@@ -76,6 +95,9 @@ namespace kui
         glm::vec2 local {};             ///< In the receiving render object's own coordinates.
         glm::vec2 delta {};             ///< Movement since the last event, or the wheel's turn for eScroll.
         kor::MouseButton button = kor::MouseButton::eLeft;
+        /// For eDown, which everything under the pointer hears, deepest first: whether something
+        /// deeper has already taken this press (a button, a slider). What is behind can then leave it be.
+        bool taken = false;
     };
 
     /**
@@ -179,6 +201,13 @@ namespace kui
         [[nodiscard]] const std::shared_ptr<Layer>& OwnLayer();
         /** @brief For a repaint boundary: records its picture again if it needs it. */
         void RepaintIfNeeded();
+        /**
+         * @brief For a repaint boundary: the part of it — in its own coordinates — that is looked at, so
+         *        that what it holds outside that is left out of its picture. What scrolls it says so, and
+         *        says again before another part comes into view. Empty: all of it is painted.
+         */
+        void SetPaintCull(const std::optional<Rect>& cull);
+        [[nodiscard]] const std::optional<Rect>& PaintCull() const { return _cull; }
 
         // -- the pointer
         /** @brief Adds itself (and whatever under it is hit) to @p result when @p position, in its own coordinates, is over it. */
@@ -201,9 +230,19 @@ namespace kui
         virtual void FocusChanged(bool focused) {}
         /** @brief Each frame while it has the focus, @p dt seconds after the last: what blinks a caret. */
         virtual void FocusTick(float dt) {}
+        /** @brief Whether the keyboard can be given to it: what Tab goes to, from one to the next. */
+        [[nodiscard]] virtual bool Focusable() const { return false; }
+        /** @brief The theme everything under it is built, laid out and painted with, when it sets one (Themed): null otherwise. */
+        [[nodiscard]] virtual const Theme* ProvidedTheme() const { return nullptr; }
+        /** @brief The theme set nearest above it, or null: the view's own applies. */
+        [[nodiscard]] const Theme* InheritedTheme() const;
 
         /** @brief Where @p local, in its coordinates, is in the view's. */
         [[nodiscard]] glm::vec2 ToGlobal(glm::vec2 local) const;
+        /** @brief Where @p global — a point of the view — is in this object's own coordinates: through whatever moves or transforms it. */
+        [[nodiscard]] glm::vec2 ToLocal(glm::vec2 global) const;
+        /** @brief A point of this object's, in @p child 's coordinates. What draws a child anywhere but at its offset says where. */
+        [[nodiscard]] virtual glm::vec2 MapToChild(const RenderObject& child, const glm::vec2 point) const { return point - ChildOrigin(child); }
         /** @brief How deep in the tree it is: the root is 0. */
         [[nodiscard]] int Depth() const;
 
@@ -223,6 +262,7 @@ namespace kui
         RenderObject* _relayoutBoundary = nullptr;
         bool _needsLayout = true, _needsPaint = true, _hasLaidOut = false;
         std::shared_ptr<Layer> _layer;
+        std::optional<Rect> _cull;
     };
 
     /**
@@ -261,6 +301,39 @@ namespace kui
          */
         std::function<bool(RenderObject& source, DragData data, const Widget& feedback, glm::vec2 hotspot,
                            std::function<void(bool accepted)> onEnd)> beginDrag;
+        /**
+         * @brief Shows @p popup over everything else in the view — a menu, a dropdown's list — with its
+         *        top-left at @p at, in the view's coordinates. @p size is how big it will be, so that it
+         *        can be kept inside the view. A press anywhere outside it, or Escape, closes it; so does
+         *        closePopup, which whatever is in it calls once it has been used. One at a time: showing
+         *        another replaces it. Set by the view.
+         */
+        std::function<void(const Widget& popup, glm::vec2 at, glm::vec2 size)> showPopup;
+        std::function<void()> closePopup;
+        /// Asks that everything be built again, from the next frame: what it was built from — a theme set for
+        /// part of the view — has changed. Set by the view.
+        std::function<void()> reassemble;
+        /**
+         * @brief What the pointer should look like. The view makes it an arrow before it tells what is
+         *        under the pointer that the pointer moved (eHover); whatever wants another shape there —
+         *        the line between two panes, to say it can be dragged — sets it then; and the view shows
+         *        the pointer so, in whichever window it is in.
+         */
+        PointerCursor cursor = PointerCursor::eArrow;
+        /**
+         * @brief What the view shows by the pointer: a tip about what is under it. Emptied and said
+         *        afresh as the cursor is — whatever has a tip sets it when told the pointer moved over it
+         *        (the innermost: one around it leaves a tip already said alone).
+         */
+        std::string tooltip;
+        /// Told when the popup is closed by anything — a press outside it, Escape, another popup — and then
+        /// forgotten: whoever showed it sets this right after, to hear that it went.
+        std::function<void()> onPopupClosed;
+        /// Shift and Control, as the keyboard has them while a key is handed to what has the keyboard.
+        bool shift = false, control = false;
+        /// The system's clipboard, for what copies and pastes. Set by the view; empty where there is none.
+        std::function<std::string()> clipboardText;
+        std::function<void(const std::string&)> setClipboardText;
 
     private:
         std::vector<RenderObject*> _layout, _paint;

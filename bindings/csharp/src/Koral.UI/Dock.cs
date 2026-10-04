@@ -53,12 +53,55 @@ public sealed record DropTargetOptions
 
 /// <summary>kui::DockPanel: what one tab of a dock space shows.</summary>
 /// <remarks>Id is what the layout knows it by: the same from build to build.</remarks>
-public sealed record DockPanel(string Id, string Title, Widget Content, bool Closable = true);
+/// <remarks>
+/// Dockable false: it never docks — it floats on its own, and nothing can be docked into it. TitleBar false:
+/// floating on its own it is only its content, moved by dragging what of it takes no press.
+/// </remarks>
+public sealed record DockPanel(string Id, string Title, Widget Content, bool Closable = true, bool Dockable = true, bool TitleBar = true);
+
+/// <summary>kui::DockStyle: every size a dock space is drawn with. A size not given is koral-ui's own.</summary>
+public sealed record DockStyle
+{
+    public float? TitleBarHeight { get; set; }
+    public float? StripeWidth { get; set; }
+    public float? ButtonSize { get; set; }
+    public float? ButtonGap { get; set; }
+    public float? SeparatorGap { get; set; }
+    public float? TabPadding { get; set; }
+    public float? ResizeGrip { get; set; }
+    public float? MinFloatSize { get; set; }
+    public float? MinAreaSize { get; set; }
+    public float? Radius { get; set; }
+    /// <summary>How much of the space, at an edge, docks a drop there; of the middle, about its centre, makes it a tab; down a side's panel, puts it under.</summary>
+    public float? EdgeDropMargin { get; set; }
+    public float? CenterDropSize { get; set; }
+    public float? UnderDropStart { get; set; }
+
+    internal KuiDockStyle Native => new()
+    {
+        title_bar_height = TitleBarHeight ?? 0f, stripe_width = StripeWidth ?? 0f, button_size = ButtonSize ?? 0f, button_gap = ButtonGap ?? 0f,
+        separator_gap = SeparatorGap ?? 0f, tab_padding = TabPadding ?? 0f, resize_grip = ResizeGrip ?? 0f, min_float_size = MinFloatSize ?? 0f,
+        min_area_size = MinAreaSize ?? 0f, radius = Radius ?? 0f, edge_drop_margin = EdgeDropMargin ?? 0f, center_drop_size = CenterDropSize ?? 0f,
+        under_drop_start = UnderDropStart ?? 0f,
+    };
+}
+
+/// <summary>Where a panel is docked: a side's stripe, or the middle.</summary>
+public enum DockArea { Left, Right, BottomLeft, BottomRight, Center }
 
 /// <summary>kui::DockOptions.</summary>
 public sealed record DockOptions
 {
-    /// <summary>Whether a panel dragged out of the window gets an OS window of its own.</summary>
+    /// <summary>The space between two areas. Not given: koral-ui's own.</summary>
+    public float? Gap { get; set; }
+    /// <summary>Space added round a stripe's buttons, half each side of them.</summary>
+    public float? StripeGap { get; set; }
+    public DockStyle Style { get; set; } = new();
+    public DockOptions SetGap(float value) { Gap = value; return this; }
+    public DockOptions SetStripeGap(float value) { StripeGap = value; return this; }
+    public DockOptions SetStyle(DockStyle value) { Style = value; return this; }
+
+    /// <summary>Whether a panel dragged out of the window floats over the desktop, in one see-through window that lets the pointer through wherever no panel is.</summary>
     public bool MultiViewport { get; set; } = true;
     /// <summary>A panel's close button was clicked.</summary>
     public Action<string>? OnClosed { get; set; }
@@ -94,11 +137,19 @@ public sealed unsafe class DockLayout
     }
     /// <summary>Floats <paramref name="panel"/> over the dock space.</summary>
     public DockLayout Float(string panel, Rect rect) { KuiNative.kui_dock_layout_float(Native, panel, rect.Native); return this; }
-    /// <summary>Gives <paramref name="panel"/> a window of its own, where the dock space can open windows.</summary>
+    /// <summary>Floats <paramref name="panel"/> outside the window, over the desktop, where the dock space can.</summary>
+    /// <summary>Floats <paramref name="panel"/> over the dock space at <paramref name="at"/>, as big as what it shows.</summary>
+    public DockLayout Float(string panel, Vector2 at) { KuiNative.kui_dock_layout_float_at(Native, panel, at.Native()); return this; }
     public DockLayout PopOut(string panel, Vector2? size = null) { KuiNative.kui_dock_layout_pop_out(Native, panel, (size ?? new Vector2(480, 360)).Native()); return this; }
     public void Close(string panel) => KuiNative.kui_dock_layout_close(Native, panel);
     public void Open(string panel) => KuiNative.kui_dock_layout_open(Native, panel);
     public void Activate(string panel) => KuiNative.kui_dock_layout_activate(Native, panel);
+    /// <summary>Docks <paramref name="panel"/> in <paramref name="area"/>, in the <paramref name="part"/>-th part of a side from the top.</summary>
+    public DockLayout DockIn(string panel, DockArea area, int part = 0) { KuiNative.kui_dock_layout_dock_in(Native, panel, (uint)area, part); return this; }
+    /// <summary>Folds the panel's area away, when it is the one shown there.</summary>
+    public void Hide(string panel) => KuiNative.kui_dock_layout_hide(Native, panel);
+    /// <summary>Floating, or the one its area shows — and not closed.</summary>
+    public bool IsShown(string panel) => KuiNative.kui_dock_layout_is_shown(Native, panel) != 0;
     public bool IsOpen(string panel) => KuiNative.kui_dock_layout_is_open(Native, panel) != 0;
     public bool IsFloating(string panel) => KuiNative.kui_dock_layout_is_floating(Native, panel) != 0;
     /// <summary>The arrangement as text, for a settings file.</summary>
@@ -188,10 +239,13 @@ public static unsafe partial class Widgets
                     title = Marshal.StringToCoTaskMemUTF8(panels[i].Title),
                     content = Lend(panels[i].Content),
                     @fixed = KuiNative.Bool(!panels[i].Closable),
+                    undockable = KuiNative.Bool(!panels[i].Dockable),
+                    no_title_bar = KuiNative.Bool(!panels[i].TitleBar),
                 };
             var o = new KuiDockOptions
             {
                 single_viewport = KuiNative.Bool(!(options?.MultiViewport ?? true)),
+                gap = options?.Gap ?? 0f, stripe_gap = options?.StripeGap ?? -1f, style = (options?.Style ?? new DockStyle()).Native,
                 on_closed = Callbacks.Text(options?.OnClosed),
                 on_changed = Callbacks.Action(options?.OnChanged),
             };

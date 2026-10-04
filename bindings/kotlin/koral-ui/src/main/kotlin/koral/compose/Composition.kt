@@ -27,45 +27,6 @@ import koral.ui.interop.KuiNative
 /** The colour text and icons take when they are not given one: a Button's content takes its own. */
 val LocalContentColor = compositionLocalOf { Color.Unspecified }
 
-/** The colours, shapes and type the built-in controls draw with: koral-ui's kui::Theme. */
-data class Theme(
-    val background: Color, val surface: Color, val surfaceHover: Color, val surfacePressed: Color,
-    val primary: Color, val primaryHover: Color, val primaryPressed: Color, val onPrimary: Color,
-    val text: Color, val textMuted: Color, val border: Color, val focus: Color,
-    val radius: Dp, val controlHeight: Dp, val fontSize: TextUnit,
-) {
-    internal fun native(a: SegmentAllocator): MemorySegment = Struct(a.allocate(KuiLayouts.KuiTheme).also { KuiNative.kui_theme_dark(it) }, KuiLayouts.KuiTheme)
-        .color("background", background).color("surface", surface).color("surface_hover", surfaceHover)
-        .color("surface_pressed", surfacePressed).color("primary", primary).color("primary_hover", primaryHover)
-        .color("primary_pressed", primaryPressed).color("on_primary", onPrimary).color("text", text)
-        .color("text_muted", textMuted).color("border", border).color("focus", focus)
-        .float("radius", radius.value).float("control_height", controlHeight.value)
-        .float("text_style.size", fontSize.value).color("text_style.color", text)
-        .segment
-
-    companion object {
-        val Dark: Theme by lazy { of { KuiNative.kui_theme_dark(it) } }
-        val Light: Theme by lazy { of { KuiNative.kui_theme_light(it) } }
-
-        private fun of(fill: (MemorySegment) -> Unit): Theme = Arena.ofConfined().use { a ->
-            val t = a.allocate(KuiLayouts.KuiTheme)
-            fill(t)
-            fun c(name: String): Color {
-                val o = KuiLayouts.KuiTheme.byteOffset(java.lang.foreign.MemoryLayout.PathElement.groupElement(name))
-                fun f(i: Int) = t.get(java.lang.foreign.ValueLayout.JAVA_FLOAT, o + i * 4L)
-                return Color(f(0), f(1), f(2), f(3))
-            }
-            fun f(name: String) = t.get(java.lang.foreign.ValueLayout.JAVA_FLOAT, KuiLayouts.KuiTheme.byteOffset(java.lang.foreign.MemoryLayout.PathElement.groupElement(name)))
-            Theme(c("background"), c("surface"), c("surface_hover"), c("surface_pressed"), c("primary"), c("primary_hover"),
-                  c("primary_pressed"), c("on_primary"), c("text"), c("text_muted"), c("border"), c("focus"),
-                  f("radius").dp, f("control_height").dp,
-                  t.get(java.lang.foreign.ValueLayout.JAVA_FLOAT, KuiLayouts.KuiTheme.byteOffset(
-                      java.lang.foreign.MemoryLayout.PathElement.groupElement("text_style"),
-                      java.lang.foreign.MemoryLayout.PathElement.groupElement("size"))).sp)
-        }
-    }
-}
-
 /**
  * A node of the composition: what one composable emits. It turns itself into a koral-ui widget, and
  * keeps that widget until something about it changes — so an unchanged subtree is handed to koral-ui as
@@ -84,14 +45,31 @@ class UiNode internal constructor() {
     var modifier: Modifier = Modifier
         internal set(value) {
             // A new click lambda each recomposition is the same modifier: the callback forwards to the latest.
-            clickHandlers = value.elements().filterIsInstance<ClickableElement>().map { it.onClick }
-            dragSources = value.elements().filterIsInstance<DragSourceElement>()
-            dropTargets = value.elements().filterIsInstance<DropTargetElement>()
-            if (field != value) { field = value; invalidate() }
+            val all = value.elements()
+            clickHandlers = all.filterIsInstance<ClickableElement>().map { it.onClick }
+            dragSources = all.filterIsInstance<DragSourceElement>()
+            dropTargets = all.filterIsInstance<DropTargetElement>()
+            sizeHandlers = all.filterIsInstance<SizeChangedElement>().map { it.onChanged }
+            pointerHandlers = all.filterIsInstance<PointerInputElement>().map { it.scope }
+            if (field != value) {
+                field = value
+                elements = all
+                align = all.lastOrNull { it is AlignElement } as AlignElement?
+                weight = all.lastOrNull { it is WeightElement } as WeightElement?
+                invalidate()
+            }
         }
+    /** The modifier's elements, outermost first, and the two only a parent can apply: kept, not found again at every rebuild. */
+    internal var elements: List<Modifier.Element> = emptyList()
+        private set
+    private var align: AlignElement? = null
+    private var weight: WeightElement? = null
+    private val key = "n$id"
     internal var clickHandlers: List<() -> Unit> = emptyList()
     internal var dragSources: List<DragSourceElement> = emptyList()
     internal var dropTargets: List<DropTargetElement> = emptyList()
+    internal var sizeHandlers: List<(IntSize) -> Unit> = emptyList()
+    internal var pointerHandlers: List<PointerInputScope> = emptyList()
 
     // What the native callbacks forward to: changing them rebuilds nothing.
     internal var onClick: (() -> Unit)? = null
@@ -99,6 +77,8 @@ class UiNode internal constructor() {
     internal var onFloat: ((Float) -> Unit)? = null
     internal var onText: ((String) -> Unit)? = null
     internal var onSubmit: ((String) -> Unit)? = null
+    internal var onColor: ((Color) -> Unit)? = null
+    internal var onStops: ((List<ColorStop>) -> Unit)? = null
     internal var onDispose: (() -> Unit)? = null
 
     internal fun invalidate() {
@@ -110,7 +90,7 @@ class UiNode internal constructor() {
     }
 
     private fun release() {
-        if (cached != MemorySegment.NULL) KuiNative.kui_widget_release(cached)
+        if (cached !== MemorySegment.NULL) KuiNative.kui_widget_release(cached)
         cached = MemorySegment.NULL
     }
 
@@ -126,27 +106,29 @@ class UiNode internal constructor() {
 
     /** Its widget: the one made before, if nothing changed since. Borrowed: the node keeps it. */
     internal fun widget(): MemorySegment {
-        if (cached != MemorySegment.NULL) return cached
+        if (cached !== MemorySegment.NULL) return cached   // the one NULL there is: told apart by which it is, not by comparing addresses
         val temporaries = mutableListOf<MemorySegment>()
         try {
             val kids = children.map { child ->
                 // What only a parent can do with a child — share a Row's space, align it in a Box — wraps it here.
                 var h = child.widget()
-                child.modifier.elements().filterIsInstance<AlignElement>().lastOrNull()?.let { align ->
-                    h = Arena.ofConfined().use { a -> KuiNative.kui_stack_align(Struct(a, KuiLayouts.KuiAlignment)
+                val own = h
+                child.align?.let { align ->
+                    h = scratch { a -> KuiNative.kui_stack_align(Struct(a, KuiLayouts.KuiAlignment)
                         .float("x", align.alignment.horizontal).float("y", align.alignment.vertical).segment, h) }
                     temporaries += h
                 }
-                child.modifier.elements().filterIsInstance<WeightElement>().lastOrNull()?.let { w ->
+                child.weight?.let { w ->
                     h = if (w.fill) KuiNative.kui_expanded(h, w.weight) else KuiNative.kui_flexible(h, w.weight)
                     temporaries += h
                 }
-                KuiNative.kui_widget_set_key(h, "n${child.id}")
+                // The child's own widget has its key from when it was made; what wraps it here needs it too.
+                if (h !== own) scratch { a -> KuiNative.kui_widget_set_key_at(h, a.allocateFrom(child.key)) }
                 h
             }
             var made = make(this, kids)
-            made = applyModifiers(this, made, modifier)
-            KuiNative.kui_widget_set_key(made, "n$id")
+            made = applyModifiers(this, made, elements)
+            scratch { a -> KuiNative.kui_widget_set_key_at(made, a.allocateFrom(key)) }
             cached = made
             builds++
             return made
@@ -159,15 +141,40 @@ class UiNode internal constructor() {
 }
 
 /** Wraps [content] in what [modifier] adds, outermost first; returns the new handle, having let [content] go. */
-private fun applyModifiers(node: UiNode, content: MemorySegment, modifier: Modifier): MemorySegment {
+private fun applyModifiers(node: UiNode, content: MemorySegment, elements: List<Modifier.Element>): MemorySegment {
+    if (elements.isEmpty()) return content
     var h = content
-    val elements = modifier.elements()
     var click = elements.count { it is ClickableElement }
     var source = elements.count { it is DragSourceElement }
     var target = elements.count { it is DropTargetElement }
-    for (element in elements.asReversed()) {
+    var sized = elements.count { it is SizeChangedElement }
+    var pointed = elements.count { it is PointerInputElement }
+    scratch { a ->
+    var index = elements.size - 1
+    while (index >= 0) {
+        val element = elements[index]
         val inner = h
-        h = Arena.ofConfined().use { a ->
+        // A size round a background round padding — any two of them, in that order — is one box to koral-ui,
+        // which lays it out and paints it as the three it stands for.
+        var next = index
+        val padding = elements[next] as? PaddingElement
+        if (padding != null) next--
+        val background = if (next >= 0) elements[next] as? BackgroundElement else null
+        if (background != null) next--
+        val size = if (next >= 0) elements[next] as? SizeElement else null
+        if (size != null) next--
+        if (index - next >= 2) {
+            val options = Struct(a, KuiLayouts.KuiContainerOptions)
+                .float("width", size?.let { given(it.width) } ?: -1f).float("height", size?.let { given(it.height) } ?: -1f)
+            if (padding != null) options.floats("padding", padding.start.value, padding.top.value, padding.end.value, padding.bottom.value)
+            if (background != null) options.struct("decoration", decoration(a, color = background.color, shape = background.shape))
+            h = KuiNative.kui_container(options.segment, inner)
+            KuiNative.kui_widget_release(inner)
+            index = next
+            continue
+        }
+        index--
+        h = run {
             when (element) {
                 is PaddingElement -> KuiNative.kui_padding(Struct(a, KuiLayouts.KuiEdgeInsets)
                     .floats("left", element.start.value, element.top.value, element.end.value, element.bottom.value).segment, inner)
@@ -175,19 +182,56 @@ private fun applyModifiers(node: UiNode, content: MemorySegment, modifier: Modif
                 is BorderElement -> KuiNative.kui_decorated_box(
                     decoration(a, borderWidth = element.width.value, borderColor = element.color, shape = element.shape), inner)
                 is SizeElement -> KuiNative.kui_sized_box(given(element.width), given(element.height), inner)
-                is FillElement -> KuiNative.kui_constrained_box(Struct(a, KuiLayouts.KuiBoxConstraints)
-                    .float("min_width", if (element.width > 0f) Float.POSITIVE_INFINITY else 0f).float("max_width", Float.POSITIVE_INFINITY)
-                    .float("min_height", if (element.height > 0f) Float.POSITIVE_INFINITY else 0f).float("max_height", Float.POSITIVE_INFINITY)
-                    .segment, inner)
+                // A share of the room, where it is not all of it.
+                // All of the room there is that way, or a share of it — and, where there is no end to the room, as
+                // big as it is of itself, as Compose has it.
+                is FillElement -> KuiNative.kui_fractionally_sized_box(element.width.coerceIn(0f, 1f), element.height.coerceIn(0f, 1f), inner)
+                is IntrinsicElement -> KuiNative.kui_intrinsic(element.width, element.height, inner)
                 is ClickableElement -> KuiNative.kui_button_with_child(inner,
                     Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action,
                         if (element.enabled) (--click).let { i -> { node.clickHandlers.getOrNull(i)?.invoke() } } else null),
                     Struct(a, KuiLayouts.KuiButtonOptions).int("style", koral.ui.ButtonStyle.ePlain.value).float("width", Float.NaN)
                         .bool("has_padding", true).bool("enabled", element.enabled).segment).also { if (!element.enabled) click-- }
+                is SizeChangedElement -> {
+                    val i = --sized
+                    KuiNative.kui_size_observer(Callbacks.make(a, KuiLayouts.KuiPanAction, Callbacks.sizeAction,
+                        { _: Size, pixels: Size -> node.sizeHandlers.getOrNull(i)?.invoke(IntSize(pixels.width.toInt(), pixels.height.toInt())) }), inner)
+                }
+                is ConstraintsElement -> KuiNative.kui_constrained_box(Struct(a, KuiLayouts.KuiBoxConstraints)
+                    .float("min_width", if (element.minWidth.isSpecified) element.minWidth.value else 0f)
+                    .float("max_width", if (element.maxWidth.isSpecified) element.maxWidth.value else Float.POSITIVE_INFINITY)
+                    .float("min_height", if (element.minHeight.isSpecified) element.minHeight.value else 0f)
+                    .float("max_height", if (element.maxHeight.isSpecified) element.maxHeight.value else Float.POSITIVE_INFINITY).segment, inner)
+                is WrapElement -> KuiNative.kui_align(Struct(a, KuiLayouts.KuiAlignment)
+                    .float("x", element.alignment.horizontal).float("y", element.alignment.vertical).segment, inner)
+                is ShadowElement -> KuiNative.kui_decorated_box(Struct(a, KuiLayouts.KuiDecoration)
+                    .color("shadow_color", Color(0f, 0f, 0f, 0.35f)).float("shadow_blur", element.elevation.value * 2f)
+                    .floats("shadow_offset", 0f, element.elevation.value * 0.5f).struct("radius", radii(a, element.shape)).segment, inner)
+                is PointerInputElement -> {
+                    val i = --pointed
+                    KuiNative.kui_gesture_detector(pointerOptions(a) { node.pointerHandlers.getOrNull(i) }, inner)
+                }
                 is AlphaElement -> KuiNative.kui_opacity(element.alpha, inner)
                 is ClipElement -> KuiNative.kui_clip_rrect(radii(a, element.shape), inner)
                 is OffsetElement -> KuiNative.kui_translate(vec2(a, element.x.value, element.y.value), inner)
-                is ScrollElement -> KuiNative.kui_scroll_view(inner, if (element.vertical) koral.ui.Axis.eVertical.value else koral.ui.Axis.eHorizontal.value)
+                is ScrollElement -> {
+                    // It says where it is, and goes where its state was told to: made again when the state is told.
+                    val state = element.state
+                    state.attached = { node.invalidate() }
+                    KuiNative.kui_scroll_view_observed(inner, if (element.vertical) koral.ui.Axis.eVertical.value else koral.ui.Axis.eHorizontal.value,
+                        Callbacks.make(a, KuiLayouts.KuiPointAction, Callbacks.pointAction,
+                            { at: Offset -> state.value = Math.round(at.x); state.maxValue = Math.round(at.y) }), state.jumpTo, state.jump)
+                }
+                is TransformElement -> {
+                    // Grown, then turned, then moved: about the point of the box the origin names.
+                    val r = Math.toRadians(element.rotation.toDouble())
+                    val cos = Math.cos(r).toFloat(); val sin = Math.sin(r).toFloat()
+                    KuiNative.kui_transform_box(Struct(a, KuiLayouts.KuiTransform)
+                        .float("a", cos * element.scaleX).float("b", sin * element.scaleX).float("c", -sin * element.scaleY).float("d", cos * element.scaleY)
+                        .float("tx", element.translationX).float("ty", element.translationY).segment,
+                        Struct(a, KuiLayouts.KuiAlignment).float("x", element.originX * 2f - 1f).float("y", element.originY * 2f - 1f).segment, inner)
+                }
+                is AspectRatioElement -> KuiNative.kui_aspect_ratio(element.ratio, inner)
                 is DragSourceElement -> {
                     val i = --source
                     val data = Struct(a, KuiLayouts.KuiDragData).address("type", a.allocateFrom(element.data.type))
@@ -211,10 +255,11 @@ private fun applyModifiers(node: UiNode, content: MemorySegment, modifier: Modif
                         .struct("on_leave", Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, { node.dropTargets.getOrNull(i)?.onLeave?.invoke() }))
                     KuiNative.kui_drop_target(options.segment, inner)
                 }
-                is WeightElement, is AlignElement -> KuiNative.kui_widget_retain(inner)   // the parent's to apply
+                is WeightElement, is AlignElement, is FocusRequesterElement -> KuiNative.kui_widget_retain(inner)   // the parent's to apply
             }
         }
         KuiNative.kui_widget_release(inner)
+    }
     }
     return h
 }
@@ -223,10 +268,8 @@ private fun given(d: Dp) = if (d.value.isNaN()) -1f else d.value
 
 internal fun decoration(a: SegmentAllocator, color: Color = Color.Transparent, borderWidth: Float = 0f, borderColor: Color = Color.Transparent,
                         shape: Shape? = null): MemorySegment {
-    val s = Struct(a, KuiLayouts.KuiDecoration).color("color", color).float("border_width", borderWidth).color("border_color", borderColor)
-    s.segment.asSlice(KuiLayouts.KuiDecoration.byteOffset(java.lang.foreign.MemoryLayout.PathElement.groupElement("radius")), KuiLayouts.KuiRadii)
-        .copyFrom(radii(a, shape))
-    return s.segment
+    return Struct(a, KuiLayouts.KuiDecoration).color("color", color).float("border_width", borderWidth).color("border_color", borderColor)
+        .struct("radius", radii(a, shape)).segment
 }
 
 internal class UiApplier(root: UiNode) : AbstractApplier<UiNode>(root) {
@@ -268,8 +311,24 @@ private class FrameDispatcher : CoroutineDispatcher() {
  * A Compose interface on koral-ui: the composition, the Recomposer driving it, and the kui::Ui it builds.
  * Usually made by [setContent]; owned by the scene that made it.
  */
-class ComposeUi(theme: Theme = Theme.Dark, scale: Float = 1f, content: @Composable () -> Unit) : AutoCloseable {
-    internal val ui: MemorySegment = Arena.ofConfined().use { a -> KuiNative.kui_ui_new(MemorySegment.NULL, theme.native(a), scale) }
+class ComposeUi(theme: Theme = KoralDarkTheme, scale: Float = 1f, content: @Composable () -> Unit) : AutoCloseable {
+    internal val ui: MemorySegment = scratch { a -> KuiNative.kui_ui_new(MemorySegment.NULL, theme.native(a), scale) }
+    private val themeState = androidx.compose.runtime.mutableStateOf(theme)
+
+    /**
+     * The theme everything is drawn in. Setting another — `ui.theme = Themes.material(dark = false)` — changes
+     * the whole interface where it stands: koral-ui's own controls, and what the composables read of the theme.
+     */
+    var theme: Theme
+        get() = themeState.value
+        set(value) {
+            if (closed || value == themeState.value) return
+            themeState.value = value
+            scratch { a -> KuiNative.kui_ui_set_theme(ui, value.native(a)) }
+        }
+
+    /** Takes the keyboard from whatever has it: a text field being typed into. */
+    fun clearFocus() { if (!closed) KuiNative.kui_ui_clear_focus(ui) }
     private val root = UiNode().apply {
         // Compose's root lays its children over each other, from the top-start, as a Box does.
         make = { _, kids -> stack(kids, Alignment.TopStart) }
@@ -289,8 +348,8 @@ class ComposeUi(theme: Theme = Theme.Dark, scale: Float = 1f, content: @Composab
         scope.launch(start = CoroutineStart.UNDISPATCHED) { recomposer.runRecomposeAndApplyChanges() }
         drawReads.start()
         composition.setContent {
-            androidx.compose.runtime.CompositionLocalProvider(LocalTheme provides theme, LocalDrawReads provides drawReads,
-                                                            LocalComposeUi provides this, content = content)
+            androidx.compose.runtime.CompositionLocalProvider(LocalTheme provides themeState.value, LocalDrawReads provides drawReads,
+                                                            LocalComposeUi provides this) { DialogLayer(content) }
         }
         Ownership.adopt(this)
         ComposeReload.track(this)
@@ -299,15 +358,29 @@ class ComposeUi(theme: Theme = Theme.Dark, scale: Float = 1f, content: @Composab
     /** Recomposes what changed, hands koral-ui what that rebuilt, and lets it take the scene's input. */
     fun update() {
         if (closed) return
+        val start = System.nanoTime()
         Snapshot.sendApplyNotifications()
         dispatcher.pump()
-        clock.sendFrame(System.nanoTime())
+        LongPress.poll(start)
+        clock.sendFrame(start)
         dispatcher.pump()
         reportErrors()
-        if (rootChanged()) KuiNative.kui_ui_set_root(ui, root.widget())
+        val composed = System.nanoTime()
+        // Everything that changed is made again in one go, out of one arena.
+        if (scratch { _ -> rootChanged() }) KuiNative.kui_ui_set_root(ui, root.widget())
+        val made = System.nanoTime()
         KuiNative.kui_ui_update(ui)
         koral.checkLastError()
+        timings = Timings((composed - start) / 1e6, (made - composed) / 1e6, (System.nanoTime() - made) / 1e6)
     }
+
+    /**
+     * Where the last update's time went, in milliseconds: Compose recomposing what changed; the widgets of what
+     * that touched being made again and handed to koral-ui; and koral-ui building, laying out and painting them.
+     */
+    data class Timings(val recomposeMs: Double = 0.0, val widgetsMs: Double = 0.0, val nativeMs: Double = 0.0)
+    var timings = Timings()
+        private set
 
     private var reported: Throwable? = null
 
@@ -383,7 +456,7 @@ class UiPass(private val compose: ComposeUi, private val target: String? = null)
  * }
  * ```
  */
-fun Scene.setContent(theme: Theme = Theme.Dark, scale: Float = 1f, content: @Composable () -> Unit): ComposeUi {
+fun Scene.setContent(theme: Theme = KoralDarkTheme, scale: Float = 1f, content: @Composable () -> Unit): ComposeUi {
     val compose = ComposeUi(theme, scale, content)
     graph.add(UiPass(compose))
     beforeUpdate { compose.update() }
@@ -398,7 +471,7 @@ internal fun handles(a: SegmentAllocator, kids: List<MemorySegment>): MemorySegm
     return array
 }
 
-internal fun stack(kids: List<MemorySegment>, alignment: Alignment): MemorySegment = Arena.ofConfined().use { a ->
+internal fun stack(kids: List<MemorySegment>, alignment: Alignment): MemorySegment = scratch { a ->
     KuiNative.kui_stack(handles(a, kids), kids.size.toLong(), Struct(a, KuiLayouts.KuiAlignment)
         .float("x", alignment.horizontal).float("y", alignment.vertical).segment)
 }

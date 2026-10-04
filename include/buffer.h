@@ -43,6 +43,10 @@ namespace kor
         glm::u64 offset;                                    ///< Byte offset of the written region.
         glm::u64 byteSize;                                  ///< Length of the written region.
         std::unordered_set<glm::u32> buffersLeftToUpdate;   ///< Frames that have not received it yet.
+        /// The bytes that were written, when the write came with them (Write): the other frames' copies
+        /// are filled from here. Without them they are read back out of the copy that was written —
+        /// which, for memory the CPU maps but does not cache, is slower by orders of magnitude.
+        std::shared_ptr<const std::vector<std::byte>> data {};
 
         auto operator <=> (const PendingWrite& other) const {
             if (srcFrameIndex != other.srcFrameIndex) return srcFrameIndex <=> other.srcFrameIndex;
@@ -1008,11 +1012,13 @@ namespace kor
                     std::erase_if(_buffer->_pendingWrites, [&](const PendingWrite& w) {
                         return w.offset >= writeOffset && w.offset + w.byteSize <= writeOffset + writeSize;
                     });
+                    const auto* bytes = reinterpret_cast<const std::byte*>(data.data());
                     _buffer->_pendingWrites.emplace(
                         currentImageIndex,
                         writeOffset,
                         writeSize,
-                        kor::Context::Scheduler().ImageIndicesExcept(currentImageIndex)
+                        kor::Context::Scheduler().ImageIndicesExcept(currentImageIndex),
+                        std::make_shared<const std::vector<std::byte>>(bytes, bytes + writeSize)
                     );
                 }
             }

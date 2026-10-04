@@ -160,6 +160,7 @@ public static partial class Cases
         Check.That(failures.SequenceEqual(["Update"]), $"the throw was reported, and only it: [{string.Join(", ", failures)}]");
         Check.Equal(6ul, scene.SceneTime.FrameCount, "its clock");
 
+        Check.GpuIsDone();
         var texel = painter.Readback!.Read<byte>(4);
         Check.That(texel is [0, 255, 0, 255], $"the pass painted the screen green: [{string.Join(", ", texel)}]");
 

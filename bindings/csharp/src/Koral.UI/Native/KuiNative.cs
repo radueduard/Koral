@@ -26,12 +26,25 @@ internal static unsafe partial class KuiNative
     private static IntPtr Resolve(string name, Assembly assembly, DllImportSearchPath? searchPath)
     {
         if (name != Library) return IntPtr.Zero;
-        // Koral first: the module links against it, and must find the copy C# already loaded.
-        _ = KoralNative.koral_last_error();
+        // Koral first: the module links against it, and must find the copy C# already loaded — which, on Windows,
+        // takes saying (NativeLibraryResolver.LoadBesideKoral).
+        // A file that is there and does not load is said, with why: "not found" would send one looking for it.
+        string? unloadable = null;
         foreach (var candidate in Candidates())
-            if (File.Exists(candidate) && NativeLibrary.TryLoad(candidate, out var handle)) return handle;
+        {
+            if (!File.Exists(candidate)) continue;
+            try
+            {
+                return NativeLibraryResolver.LoadBesideKoral(candidate);
+            }
+            catch (Exception e) when (e is DllNotFoundException or BadImageFormatException)
+            {
+                unloadable ??= $"{candidate} could not be loaded: {e.Message}";
+            }
+        }
         if (NativeLibrary.TryLoad(name, assembly, searchPath, out var fromSystem)) return fromSystem;
-        throw new DllNotFoundException($"koral-ui's native module ({FileName}) was not found beside Koral's library. Set KORAL_UI_LIBRARY to it.");
+        throw new DllNotFoundException(unloadable ??
+            $"koral-ui's native module ({FileName}) was not found beside Koral's library. Set KORAL_UI_LIBRARY to it.");
     }
 
     private static IEnumerable<string> Candidates()

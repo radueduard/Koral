@@ -10,6 +10,7 @@ import koral.UVec2
 import koral.Vec2
 import koral.compose.ContentScale
 import koral.compose.Modifier
+import koral.compose.Picture
 import koral.compose.fillMaxSize
 import koral.compose.setContent
 import kotlin.test.Test
@@ -23,7 +24,7 @@ class Showing : Scene() {
         val texture = Image.Builder().setFormat(ImageFormat.eRGBA8_UNORM).setExtent(UVec2(2, 2))
             .setData(byteArrayOf(-1, 0, 0, -1, 0, -1, 0, -1, 0, 0, -1, -1, -1, -1, -1, -1))
             .setUsage(ImageUsage.eSampled, ImageUsage.eTransferDst).build()
-        setContent { koral.compose.Image(texture, "test pattern", Modifier.fillMaxSize(), ContentScale.FillBounds) }
+        setContent { Picture(texture, "test pattern", Modifier.fillMaxSize(), ContentScale.FillBounds) }
         graph.add(ReadScreen(readback))
     }
 }

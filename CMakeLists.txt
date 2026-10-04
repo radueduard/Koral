@@ -455,6 +455,21 @@ install(TARGETS ${PROJECT_NAME} Koral_Runtime
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+# Beside Koral.dll, a manifest that says "Koral.dll is the one here". .NET's own Koral.dll — the managed
+# assembly — is loaded first in a C# program, and Windows would bind a module's import of Koral.dll to that:
+# C# loads a module with this manifest in force, and the import goes to the engine
+# (bindings/csharp: NativeLibraryResolver.LoadBesideKoral). A module loaded so has no manifest of its own.
+if(WIN32)
+    file(GENERATE OUTPUT $<TARGET_FILE_DIR:${PROJECT_NAME}>/Koral.native.manifest CONTENT
+"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>
+<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">
+  <assemblyIdentity type=\"win32\" name=\"Koral.Native\" version=\"1.0.0.0\"/>
+  <file name=\"Koral.dll\"/>
+</assembly>
+")
+    install(FILES $<TARGET_FILE_DIR:${PROJECT_NAME}>/Koral.native.manifest DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+
 # The public headers. Without these the installed library is unusable as an SDK.
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
@@ -470,14 +485,76 @@ install(FILES ${CMAKE_BINARY_DIR}/include/api.h
 # scene-library interface it speaks (read from sceneLibrary.h, so the two cannot drift), and what it
 # can do. An SDK without this file is one from before it existed: v1, with OpenGL and CreateScene.
 # Declared here, ahead of its build rules at the end, because it is also a capability.
-option(KORAL_BUILD_DOTNET "Build the C# bindings and koral-dotnet (needs the .NET 10 SDK)" OFF)
+# On by default wherever a .NET 10 SDK is installed, so `stage` ships the bindings without being
+# asked. A bare `dotnet` is not enough: the runtime alone installs one too, and cannot build them.
+find_program(KORAL_DOTNET_EXECUTABLE dotnet
+        HINTS "$ENV{DOTNET_ROOT}" "$ENV{HOME}/.dotnet" "$ENV{ProgramFiles}/dotnet")
+set(KORAL_DOTNET_SDK_FOUND OFF)
+if(KORAL_DOTNET_EXECUTABLE)
+    execute_process(COMMAND "${KORAL_DOTNET_EXECUTABLE}" --list-sdks
+            OUTPUT_VARIABLE KORAL_DOTNET_SDKS ERROR_QUIET RESULT_VARIABLE KORAL_DOTNET_RESULT)
+    if(KORAL_DOTNET_RESULT EQUAL 0)
+        string(REGEX MATCHALL "(^|\n)[0-9]+\\." KORAL_DOTNET_MAJORS "${KORAL_DOTNET_SDKS}")
+        foreach(major IN LISTS KORAL_DOTNET_MAJORS)
+            string(REGEX REPLACE "[^0-9]" "" major "${major}")
+            if(major GREATER_EQUAL 10)
+                set(KORAL_DOTNET_SDK_FOUND ON)
+            endif()
+        endforeach()
+    endif()
+endif()
+option(KORAL_BUILD_DOTNET "Build the C# bindings and koral-dotnet (needs the .NET 10 SDK)" ${KORAL_DOTNET_SDK_FOUND})
+if(KORAL_BUILD_DOTNET AND NOT KORAL_DOTNET_SDK_FOUND)
+    message(FATAL_ERROR "KORAL_BUILD_DOTNET is ON, but no .NET 10 SDK was found. Install it from "
+            "https://dotnet.microsoft.com/download, or configure with -DKORAL_BUILD_DOTNET=OFF.")
+endif()
 set(KORAL_CAPABILITY_EXTRA "")
 if(KORAL_BUILD_DOTNET)
     set(KORAL_CAPABILITY_EXTRA ", \"csharp\"")
 endif()
 # The Kotlin bindings (bindings/kotlin) are a Gradle build of their own: built into a Maven repository the
 # SDK carries (share/Koral/maven), and tested from ctest.
-option(KORAL_BUILD_KOTLIN "Build the Kotlin bindings into the SDK and test them (needs JDK 25: KORAL_JAVA_HOME, or JAVA_HOME)" OFF)
+# On by default wherever a JDK 25 or later is installed, like the C# ones, so `stage` ships them without
+# being asked. The JDK is KORAL_JAVA_HOME when that names one; otherwise JAVA_HOME, then where installers
+# and the JetBrains IDEs put them. Its `release` file says which version it is, so nothing has to be run.
+set(KORAL_JAVA_HOME "" CACHE PATH "The JDK (25 or later) the Kotlin bindings are built with")
+function(koral_jdk_major home out)
+    set(${out} 0 PARENT_SCOPE)
+    if(home AND EXISTS "${home}/release")
+        file(STRINGS "${home}/release" line REGEX "^JAVA_VERSION=")
+        if(line MATCHES "JAVA_VERSION=\"?([0-9]+)")
+            set(${out} ${CMAKE_MATCH_1} PARENT_SCOPE)
+        endif()
+    endif()
+endfunction()
+koral_jdk_major("${KORAL_JAVA_HOME}" KORAL_JDK_MAJOR)
+if(KORAL_JDK_MAJOR LESS 25)
+    file(GLOB KORAL_JDK_CANDIDATES LIST_DIRECTORIES true
+            "$ENV{USERPROFILE}/.jdks/*" "$ENV{HOME}/.jdks/*" "$ENV{HOME}/.local/jdk"
+            "$ENV{ProgramFiles}/Java/*" "$ENV{ProgramFiles}/Eclipse Adoptium/*" "$ENV{ProgramFiles}/Microsoft/jdk-*"
+            "/usr/lib/jvm/*" "/Library/Java/JavaVirtualMachines/*/Contents/Home")
+    foreach(home IN ITEMS "$ENV{JAVA_HOME}" LISTS KORAL_JDK_CANDIDATES)
+        koral_jdk_major("${home}" major)
+        if(major GREATER_EQUAL 25)
+            file(TO_CMAKE_PATH "${home}" home)
+            # Only an empty KORAL_JAVA_HOME is filled in: one that was set is the user's, right or wrong.
+            if(NOT KORAL_JAVA_HOME)
+                set(KORAL_JAVA_HOME "${home}" CACHE PATH "The JDK (25 or later) the Kotlin bindings are built with" FORCE)
+                set(KORAL_JDK_MAJOR ${major})
+            endif()
+            break()
+        endif()
+    endforeach()
+endif()
+set(KORAL_JDK_FOUND OFF)
+if(KORAL_JDK_MAJOR GREATER_EQUAL 25)
+    set(KORAL_JDK_FOUND ON)
+endif()
+option(KORAL_BUILD_KOTLIN "Build the Kotlin bindings into the SDK and test them (needs JDK 25: KORAL_JAVA_HOME, or JAVA_HOME)" ${KORAL_JDK_FOUND})
+if(KORAL_BUILD_KOTLIN AND NOT KORAL_JDK_FOUND)
+    message(FATAL_ERROR "KORAL_BUILD_KOTLIN is ON, but KORAL_JAVA_HOME (\"${KORAL_JAVA_HOME}\") is not a JDK 25 or later "
+            "and none was found. Configure with -DKORAL_JAVA_HOME=<jdk>, or with -DKORAL_BUILD_KOTLIN=OFF.")
+endif()
 if(KORAL_BUILD_KOTLIN)
     set(KORAL_CAPABILITY_EXTRA "${KORAL_CAPABILITY_EXTRA}, \"kotlin\"")
 endif()
@@ -983,7 +1060,8 @@ add_dependencies(stage ${PROJECT_NAME} Koral_Runtime)
 if(KORAL_BUILD_MODULES)
     add_dependencies(stage
             koral-camera koral-gui-extras koral-mesh
-            koral-image-import koral-image-export koral-image-compress koral-model-import)
+            koral-image-import koral-image-export koral-image-compress koral-model-import
+            koral-ui)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -993,9 +1071,6 @@ endif()
 # <prefix>/lib/koral-dotnet, beside lib (Linux, macOS) and bin (Windows).
 # ---------------------------------------------------------------------------
 if(KORAL_BUILD_DOTNET)
-    find_program(KORAL_DOTNET_EXECUTABLE dotnet
-            HINTS "$ENV{DOTNET_ROOT}" "$ENV{HOME}/.dotnet" "$ENV{ProgramFiles}/dotnet"
-            REQUIRED)
     set(KORAL_DOTNET_DIR "${CMAKE_SOURCE_DIR}/bindings/csharp")
     set(KORAL_DOTNET_OUT "${CMAKE_BINARY_DIR}/dotnet")
     add_custom_target(koral_dotnet ALL
@@ -1017,7 +1092,6 @@ endif()
 # build adds as a repository to depend on koral:koral-ui:<version>.
 # ---------------------------------------------------------------------------
 if(KORAL_BUILD_KOTLIN)
-    set(KORAL_JAVA_HOME "$ENV{JAVA_HOME}" CACHE PATH "The JDK (25 or later) the Kotlin bindings are built with")
     set(KORAL_KOTLIN_DIR "${CMAKE_SOURCE_DIR}/bindings/kotlin")
     set(KORAL_KOTLIN_REPO "${CMAKE_BINARY_DIR}/kotlin/maven")
     if(WIN32)

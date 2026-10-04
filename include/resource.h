@@ -562,7 +562,7 @@ namespace kor {
             // An expired ref is a lifetime bug, not a build failure, and there is no valid
             // value to hand back — this keeps throwing, as it always has.
             if (!_unsafe && _life.expired()) {
-                throw std::runtime_error("Attempted to dereference a ResourceRef whose Resource has been destroyed!");
+                detail::ThrowDestroyedResource();
             }
             if (Poisoned()) {
                 log::Error("Dereferenced the unusable resource '{}':\n{}",

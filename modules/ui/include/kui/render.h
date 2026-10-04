@@ -13,7 +13,7 @@
 #include <framebuffer.h>
 #include <resource.h>
 
-#include "api.h"
+#include "kuiApi.h"
 #include "canvas.h"
 
 namespace kui
@@ -50,6 +50,8 @@ namespace kui
             std::size_t instances = 0, vertices = 0, layers = 0, clips = 0, draws = 0;
             std::size_t uploadedBytes = 0;     ///< Last Prepare.
             double composeMs = 0.0;            ///< Last Prepare's CPU time putting the frame together.
+            double uploadMs = 0.0;             ///< Last Prepare's CPU time handing what changed to the GPU.
+            double prepareMs = 0.0;            ///< All of the last Prepare.
             bool recomposed = false;           ///< Whether the last Prepare had to put the frame together again.
         };
         [[nodiscard]] const Statistics& Stats() const;

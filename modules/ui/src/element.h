@@ -124,6 +124,9 @@ namespace kui
         /// While its own children are being made or updated: their render objects are taken once, after,
         /// not once per child as each appears (which made mounting a long list cubic).
         bool _takingChildren = false;
+        /// The render object as what holds others, when it is one: asked once, not at every rebuild.
+        RenderContainer* _container = nullptr;
+        bool _containerKnown = false;
     };
 
     /**
@@ -148,6 +151,17 @@ namespace kui
     };
 
     /** @brief The theme in effect while a view builds, lays out and paints. */
+    namespace detail {
+        /** @brief How many Themed widgets there are, in any view: none, and nobody looks for one. */
+        int& ThemedCount();
+        /**
+         * @brief A widget that is whatever @p build makes when it is built — and so in the theme it is built
+         *        in. What a function returning a widget reads of the theme, it reads where it is called: under
+         *        a Themed, or from another language, that is not where the widget ends up.
+         */
+        Widget Deferred(std::function<Widget()> build);
+    }
+
     struct ThemeScope {
         const Theme* previous;
         explicit ThemeScope(const Theme& theme);

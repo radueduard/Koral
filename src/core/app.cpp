@@ -817,7 +817,13 @@ namespace kor
     bool App::Frame()
     {
         auto& impl = *_impl;
+        // An interface's window has ImGui's own procedure in front of the system's messages, and that
+        // looks for the current context whatever the message: one must be current while they are handed
+        // out, or the first message to a window with an interface finds none.
+        for (const auto& stage : impl.stages)
+            if (!stage->stack.empty() && stage->Top()._interface) { Impl::MakeInterfaceCurrent(stage->Top()); break; }
         glfwPollEvents();
+        Interface::MakeNoneCurrent();
         if (impl.deviceUp) Context::DrainMainThread();
 
         // A window asked to close: its scene decides.

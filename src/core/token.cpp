@@ -36,18 +36,20 @@ namespace kor::detail {
         return gpu && gpu->counter() >= value;
     }
 
-    TimelineState::Waiter TimelineState::suspend(const std::uint64_t value, const std::coroutine_handle<> handle,
-                                                 const bool resumeInline) {
+    bool TimelineState::suspend(const std::uint64_t value, const std::coroutine_handle<> handle, Waiter& slot,
+                                const bool resumeInline) {
         std::lock_guard lock(mutex);
         // Re-checked under the lock: a signal between await_ready and here would otherwise leave
         // this coroutine parked on a value nobody is going to reach again.
-        if (reached.load(std::memory_order_acquire) >= value) return nullptr;
-        if (gpu && gpu->counter() >= value) return nullptr;
+        if (reached.load(std::memory_order_acquire) >= value) return false;
+        if (gpu && gpu->counter() >= value) return false;
         auto waiter = std::make_shared<WaiterSlot>(value, handle, resumeInline ? nullptr : resumeExecutor(), CurrentSceneLife());
-        waiters.push_back(waiter);
+        // Before it can be found: whoever resumes it needs this lock to find it.
+        slot = waiter;
+        waiters.push_back(std::move(waiter));
         // The GPU tells nobody when it gets there; the backend has to be looking.
         if (gpu) gpu->watch();
-        return waiter;
+        return true;
     }
 
     void TimelineState::cancel(const Waiter& waiter) noexcept {
@@ -241,10 +243,10 @@ namespace kor::detail {
 
 namespace kor::detail {
     bool InlineAwaiter::await_suspend(const std::coroutine_handle<> h) {
-        const auto& state = TokenAccess::state(token);
+        // A copy: the token is in the coroutine's frame, which may be gone before suspend returns.
+        const auto state = TokenAccess::state(token);
         if (!state) return false;
-        slot = state->suspend(token.Value(), h, /*resumeInline=*/true);
-        return slot != nullptr;
+        return state->suspend(token.Value(), h, slot, /*resumeInline=*/true);
     }
 
     InlineAwaiter::~InlineAwaiter() {
@@ -295,8 +297,10 @@ void kor::Token::Signal() const {
     if (_state) _state->reach(_value);
 }
 
-std::shared_ptr<kor::detail::WaiterSlot> kor::Token::Suspend(const std::coroutine_handle<> h) const {
-    return _state ? _state->suspend(_value, h) : nullptr;
+bool kor::Token::Suspend(const std::coroutine_handle<> h, std::shared_ptr<detail::WaiterSlot>& slot) const {
+    // A copy: this token is in the coroutine's frame, which may be gone before suspend returns.
+    const auto state = _state;
+    return state && state->suspend(_value, h, slot);
 }
 
 void kor::Token::Cancel(const std::shared_ptr<detail::WaiterSlot>& slot) const noexcept {

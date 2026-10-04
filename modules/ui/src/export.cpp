@@ -9,7 +9,7 @@
 
 #include <module.h>
 
-#include <kui/api.h>
+#include <kui/kuiApi.h>
 
 #include "atlas.h"
 

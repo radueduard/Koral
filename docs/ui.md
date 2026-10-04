@@ -81,6 +81,8 @@ struct Card : kui::StatelessWidget {
 | `ScrollView` | A child larger than the box, scrolled by the wheel |
 | `ListView(children)` | A scrolling list whose items each keep a layer of their own |
 | `ListView(count, extent, builder, onRange)` | Only the items near the view exist: a million rows cost a screenful. `onRange`, if given, is told which items the list keeps |
+| `LazyList(options, builder)` | The same, down or across, with items as long as they like (one not yet built is taken to be `estimatedExtent`), a gap between them and padding at the ends. `onScrolled` says which item is first in view and how far into it; `jumpIndex` puts one there when `jump` changes |
+| `Intrinsic(width, height, child)` | The child as wide, or as tall, as it is with all the room there is: a column as wide as its widest child, so the others can be stretched to it |
 
 | Painting and input | |
 |---|---|
@@ -96,6 +98,23 @@ struct Card : kui::StatelessWidget {
 |---|---|
 | `Button(child, onPressed)` | Any widget, made a button: a container that calls back when clicked. `ButtonStyle::ePrimary`, `eSecondary`, or `ePlain` (just the child, clickable). `Button("label", ...)` is the same holding text |
 | `Checkbox`, `Switch`, `Slider`, `ProgressBar`, `TextField` | Styled by the Ui's `kui::Theme` (`Dark()`, `Light()`, or your own). A `TextField` with `controlled` set always shows its `text`, as a Compose or React field does |
+| `Themed(theme, child)` | `child` in a theme of its own, whatever the Ui's is. `Theme` also says how round a button, a field and a checkbox are (`buttonRadius`, `fieldRadius`, `checkboxRadius`; negative: `radius`, and a circle). `QuerySystemAppearance()` is whether the system is dark, and its accent |
+| `Text(text, style, align, wrap, maxLines, ellipsis)` | `TextStyle` has `weight` (400 as drawn, 700 bold: the font thickened), `italic`, `underline` and `lineThrough`; `maxLines` keeps so many lines, the last ending in an ellipsis when asked. `Slider(..., onFinished)` says when it is let go of; a `TextField`'s `focus`, when it changes, gives it the keyboard, and `Ui::ClearFocus()` takes it away |
+| `RadioButton`, `Selectable` | One of several choices; a line of a list that can be picked |
+| `DragValue`, `Dropdown` | A number changed by dragging across it; a field that opens a list under itself |
+| `ColorPicker`, `ColorEdit` | A square of saturation and brightness over bars of hue and alpha; a swatch that opens one under itself |
+| `ContextMenu(items, child)`, `MenuBar(menus)` | A menu where the right button is pressed; a row of titles that each open one |
+| `CollapsingHeader`, `TreeNode` | A header that folds what is under it; a node of a tree, its children further in. Whoever builds them keeps whether they are open, and is told when that should change |
+| `TabBar(tabs, selected, onSelected)` | A row of titles, the one in front underlined |
+| `Tooltip(text, child)` | The text shows by the pointer while it is over the child |
+| `SizeObserver(onChanged, child)` | Tells how big the child was laid out, in units and in pixels, when that changes: what a viewport resizes its texture by |
+| `Modal(open, child, dialog)` | The dialog on a card over the child, which is dimmed and deaf while it shows |
+| `Plot(values, options)` | A line through the values, or bars: frame times, a histogram |
+| `Table(columns, rows)` | Rows of cells under columns that line up — fixed widths, or shares of what is left |
+| `Separator`, `Disabled(child)` | A line between two things; a subtree faded and deaf to the pointer |
+| `StepSlider(value, steps, onChanged)` | A slider that stops only at its steps: a wide rounded track, and in it a rounded thumb one step wide. `labels` writes a name in each step |
+| `GradientEditor(stops, onChanged)` | A bar showing the gradient over a handle for each stop: press a handle to pick it, drag to move it, press the bar to add one, right-click to remove; a colour picker under it for the picked stop |
+| `StatusBar(message, level)` | A bar along the foot of a window with the last thing said, after a mark of its level (info, warning, error), in the colour of the window behind the docked panels; `trailing` for what goes at its right end |
 
 ### Three ways to write it
 
@@ -192,17 +211,36 @@ kui::DockSpace(layout, {
 })
 ```
 
+The space is arranged as the tool windows of the JetBrains IDEs are. Down each side is a stripe of square
+buttons, one glyph each: a docked panel's. A button opens its panel, in front of whichever of its area
+was open; the button of the panel that is open folds the area away.
+
+| Buttons… | Open their panels… |
+|---|---|
+| from the top of a stripe | down that side of the space. A side can be in several parts, one over the other, each showing one panel; a line between the buttons separates one part's from the next's (`Dock(panel, DockArea::eLeft, part)`) |
+| at the foot of a stripe | along the bottom, which runs from one stripe to the other under both sides: the left stripe's in its left part, the right stripe's in its right (`DockArea::eBottomLeft`, `eBottomRight`) |
+
+The middle is whatever the sides and the bottom leave: empty, it shows the scene and lets the pointer
+through; panels docked there (`DockArea::eCenter`, or `Dock(panel)` as above) are tabs. An open panel has a
+title bar — its title on the left; on the right a button that folds it away and, when it is closable, one
+that closes it.
+
 With the mouse:
 
-| Drag a tab… | It… |
+| Drag a panel's button, or its title… | It… |
 |---|---|
-| onto another group's tab bar | becomes a tab there |
-| near an edge of a panel | splits that panel, taking the half on that edge |
-| to the rim of the whole space | docks beside everything in it, taking a quarter |
-| into the middle of a panel | floats over the space, where its bar moves it and its corner resizes it |
-| out of the window | gets an OS window of its own |
+| onto a stripe, between a part's buttons | joins that part, there among its buttons |
+| onto the line between two parts, or under the last | becomes a part of its own |
+| to the foot of a stripe | goes to that end of the bottom |
+| onto a docked panel | joins that panel's group, in front of it |
+| onto the lower part of a panel docked down a side | docks under it, as a part of its own |
+| into the left or right margin of the space (within 15% of that edge) | docks down that side: the margin is one band a level of the side, and one more — a level's band joins that level, the last makes a level of its own under them |
+| into the bottom margin of the space | docks along the bottom: in its left part from the left half, its right from the right |
+| into the middle (onto its title bar, or the 30% about its centre) | docks there, a tab among whatever else is in the middle |
+| anywhere else in the space | floats there, where its title bar moves it and its corner resizes it |
+| out of the window | floats over the desktop (one see-through, click-through window over every monitor) |
 
-Dragging the line between two groups resizes them, and a tab's × closes its panel.
+Between two areas is a gap (`DockOptions::gap`, 6 by default; `DockSpace(gap = 8.dp)` in Kotlin). Dragging it resizes them, and over it the pointer turns into the arrows that say which way.
 
 **A panel keeps its state wherever it goes.** It is one widget that stays in one place in the tree; only
 where it is shown changes. A stateful widget, a scroll position or a text field moved to another group, a
@@ -221,6 +259,7 @@ it, and its pointer and keys go to the same widgets. Closing that window docks t
   the main window or into another panel's window.
 - **On Wayland** a program cannot place its windows or learn where they are. The window opens where the
   compositor puts it, and its tab bar has a button that docks it back.
+- `DockOptions::style` (a `DockStyle`; `DockSpace(style = DockStyle(...))` in Kotlin) is every size the space is drawn and handled with: title bar height, stripe width, button size and gaps, tab padding, the resize grip, the least a float or an area can be, the islands' corner radius, and how much of an edge or of the middle takes a drop. `gap` and `stripeGap` are beside it in the options.
 - `DockOptions::multiViewport = false` keeps every panel inside the space: a tab dropped outside does nothing.
 - It needs a `Ui` updated with `Update()` in a scene of a running `kor::App`. Offscreen, or with
   `Update(input, viewport, dt)`, `PopOut` floats the panel inside the space instead.
@@ -419,6 +458,17 @@ Text fields read `kor::Input::TypedText()` (the code points typed this frame) an
 - **Drag and drop** does not go to or come from other programs, and the feedback is drawn only in the
   `Ui` the drag began in.
 - **Text:** no clipboard, no selection, no input-method composition, and only the font's kern table
-  (no complex shaping).
+  (no complex shaping). A `TextField` is one line: there is no multi-line field.
+- **Controls:** no vertical slider, no sortable or resizable table columns, and a `MenuBar`'s menus have
+  no sub-menus or shortcuts.
+- **Keyboard:** no moving between controls with Tab or the arrows.
+- **C#:** the controls added after `ContextMenu` have C functions but no C# wrappers yet.
 - **Widgets from C#:** a C# `StatefulWidget` instance placed in two spots at once shares its state
   between them.
+
+## Measuring it
+
+`koral_ui_bench` (built with the UI tests, from `modules/ui/bench/bench.cpp`) draws the same grid of cells
+with koral-ui and with Dear ImGui and prints what a frame costs at each load: the interface's own CPU
+work, and the whole frame with nothing waiting for the display. Run it from a Release build, one of the
+two a process: `koral_ui_bench 200 kui`, `koral_ui_bench 200 imgui`.

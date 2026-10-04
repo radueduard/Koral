@@ -10,12 +10,11 @@ import java.lang.foreign.MemorySegment
 import koral.ui.ButtonStyle
 import koral.ui.CrossAxisAlignment
 import koral.ui.MainAxisSize
-import koral.ui.TextAlign
 import koral.ui.interop.KuiLayouts
 import koral.ui.interop.KuiNative
 
 /** The theme of the interface being composed: what [setContent] was given. */
-val LocalTheme = staticCompositionLocalOf { Theme.Dark }
+val LocalTheme = staticCompositionLocalOf { KoralDarkTheme }
 
 /**
  * Emits one node. Whatever [make] depends on goes in [key]: the node's widget is made again only when that
@@ -44,7 +43,7 @@ private fun cross(bias: Float) = when {
 }.value
 
 private fun flex(kids: List<MemorySegment>, vertical: Boolean, main: Int, spacing: Dp, cross: Int): MemorySegment =
-    Arena.ofConfined().use { a ->
+    scratch { a ->
         val options = Struct(a, KuiLayouts.KuiFlexOptions).int("main_axis_alignment", main).int("cross_axis_alignment", cross)
             .int("main_axis_size", MainAxisSize.eMin.value).float("gap", spacing.value).segment
         if (vertical) KuiNative.kui_column(handles(a, kids), kids.size.toLong(), options)
@@ -82,31 +81,6 @@ fun Spacer(modifier: Modifier) = Node(modifier, Unit, { _, _ -> KuiNative.kui_si
 
 // ---- text -----------------------------------------------------------------------------------------------
 
-/**
- * [text], in [color] — or the content colour around it ([LocalContentColor]: a Button's), or the theme's.
- * [fontSize] is the theme's unless given.
- */
-@Composable
-fun Text(text: String, modifier: Modifier = Modifier, color: Color = Color.Unspecified, fontSize: TextUnit = TextUnit.Unspecified,
-         textAlign: TextAlign = TextAlign.eStart, softWrap: Boolean = true, letterSpacing: TextUnit = TextUnit.Unspecified,
-         lineHeight: Float = 1.25f) {
-    val theme = LocalTheme.current
-    val resolved = when {
-        color.isSpecified -> color
-        LocalContentColor.current.isSpecified -> LocalContentColor.current
-        else -> theme.text
-    }
-    val size = if (fontSize.value.isNaN()) theme.fontSize.value else fontSize.value
-    val spacing = if (letterSpacing.value.isNaN()) 0f else letterSpacing.value
-    Node(modifier, listOf(text, resolved, size, textAlign, softWrap, spacing, lineHeight), { _, _ ->
-        Arena.ofConfined().use { a ->
-            val style = Struct(a, KuiLayouts.KuiTextStyle).float("size", size).color("color", resolved)
-                .float("line_height", lineHeight).float("letter_spacing", spacing).segment
-            KuiNative.kui_text(text, style, textAlign.value, softWrap)
-        }
-    })
-}
-
 // ---- buttons --------------------------------------------------------------------------------------------
 
 @Composable
@@ -117,7 +91,7 @@ private fun ButtonNode(onClick: () -> Unit, modifier: Modifier, enabled: Boolean
     val padding = contentPadding ?: PaddingValues(if (style == ButtonStyle.ePlain) 8.dp else 14.dp,
         maxOf(0f, (theme.controlHeight.value - theme.fontSize.value * 1.25f) / 2f).dp)
     Node(modifier, listOf(enabled, style, padding), { node, kids ->
-        Arena.ofConfined().use { a ->
+        scratch { a ->
             val row = flex(kids, false, 2, 8.dp, CrossAxisAlignment.eCenter.value)
             val options = Struct(a, KuiLayouts.KuiButtonOptions).int("style", style.value).float("width", Float.NaN)
                 .bool("enabled", enabled).bool("has_padding", true)
@@ -136,53 +110,224 @@ data class PaddingValues(val start: Dp, val top: Dp, val end: Dp, val bottom: Dp
     constructor(horizontal: Dp, vertical: Dp) : this(horizontal, vertical, horizontal, vertical)
 }
 
-/** A filled button holding [content] — anything — laid out in a row. */
+/** A button's colours, as Compose's: what it is filled with and what its content is drawn in, enabled and not. */
+class ButtonColors(val containerColor: Color, val contentColor: Color, val disabledContainerColor: Color, val disabledContentColor: Color)
+
+/** What a button is by default, and how to say otherwise: `ButtonDefaults.buttonColors(containerColor = Color.Red)`. */
+object ButtonDefaults {
+    val ContentPadding = PaddingValues(14.dp, 8.dp)
+    val TextButtonContentPadding = PaddingValues(8.dp, 8.dp)
+    val shape: Shape @Composable get() = RoundedCornerShape(LocalTheme.current.radius)
+    val outlinedShape: Shape @Composable get() = shape
+    val textShape: Shape @Composable get() = shape
+    @Composable
+    fun buttonColors(containerColor: Color = Color.Unspecified, contentColor: Color = Color.Unspecified,
+                     disabledContainerColor: Color = Color.Unspecified, disabledContentColor: Color = Color.Unspecified): ButtonColors {
+        val t = LocalTheme.current
+        return ButtonColors(containerColor.takeIf { it.isSpecified } ?: t.primary, contentColor.takeIf { it.isSpecified } ?: t.onPrimary,
+                            disabledContainerColor.takeIf { it.isSpecified } ?: t.surfaceHover, disabledContentColor.takeIf { it.isSpecified } ?: t.textMuted)
+    }
+    @Composable
+    fun outlinedButtonColors(containerColor: Color = Color.Transparent, contentColor: Color = Color.Unspecified,
+                             disabledContainerColor: Color = Color.Transparent, disabledContentColor: Color = Color.Unspecified): ButtonColors {
+        val t = LocalTheme.current
+        return ButtonColors(containerColor, contentColor.takeIf { it.isSpecified } ?: t.text, disabledContainerColor,
+                            disabledContentColor.takeIf { it.isSpecified } ?: t.textMuted)
+    }
+    @Composable
+    fun textButtonColors(containerColor: Color = Color.Transparent, contentColor: Color = Color.Unspecified,
+                         disabledContainerColor: Color = Color.Transparent, disabledContentColor: Color = Color.Unspecified): ButtonColors {
+        val t = LocalTheme.current
+        return ButtonColors(containerColor, contentColor.takeIf { it.isSpecified } ?: t.primary, disabledContainerColor,
+                            disabledContentColor.takeIf { it.isSpecified } ?: t.textMuted)
+    }
+    @Composable
+    fun outlinedButtonBorder(enabled: Boolean = true): BorderStroke = BorderStroke(1.dp, LocalTheme.current.border.copy(alpha = if (enabled) 1f else 0.5f))
+}
+
+/** A button of a shape and colours of the caller's own: made of a surface that is pressed, where koral-ui's own button is the theme's. */
 @Composable
-fun Button(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, contentPadding: PaddingValues? = null,
-           content: @Composable RowScope.() -> Unit) =
-    ButtonNode(onClick, modifier, enabled, ButtonStyle.ePrimary, LocalTheme.current.onPrimary, contentPadding, content)
+private fun ShapedButton(onClick: () -> Unit, modifier: Modifier, enabled: Boolean, shape: Shape, colors: ButtonColors, border: BorderStroke?,
+                         contentPadding: PaddingValues, content: @Composable RowScope.() -> Unit) {
+    var all = modifier.clip(shape).background(if (enabled) colors.containerColor else colors.disabledContainerColor, shape)
+    if (border != null) all = all.border(border.width, border.color, shape)
+    Row(all.clickable(enabled, onClick).padding(contentPadding), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        CompositionLocalProvider(LocalContentColor provides if (enabled) colors.contentColor else colors.disabledContentColor) { content() }
+    }
+}
+
+/**
+ * A filled button holding [content] — anything — laid out in a row. With no [shape], [colors] or [border] it is
+ * koral-ui's own, in the theme's; with any of them, it is what they say.
+ */
+@Composable
+fun Button(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape? = null, colors: ButtonColors? = null,
+           border: BorderStroke? = null, contentPadding: PaddingValues? = null, content: @Composable RowScope.() -> Unit) =
+    if (shape == null && colors == null && border == null)
+        ButtonNode(onClick, modifier, enabled, ButtonStyle.ePrimary, LocalTheme.current.onPrimary, contentPadding, content)
+    else ShapedButton(onClick, modifier, enabled, shape ?: ButtonDefaults.shape, colors ?: ButtonDefaults.buttonColors(), border,
+                      contentPadding ?: ButtonDefaults.ContentPadding, content)
 
 /** A button drawn as an outline. */
 @Composable
-fun OutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, contentPadding: PaddingValues? = null,
-                   content: @Composable RowScope.() -> Unit) =
-    ButtonNode(onClick, modifier, enabled, ButtonStyle.eSecondary, LocalTheme.current.text, contentPadding, content)
+fun OutlinedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape? = null, colors: ButtonColors? = null,
+                   border: BorderStroke? = null, contentPadding: PaddingValues? = null, content: @Composable RowScope.() -> Unit) =
+    if (shape == null && colors == null && border == null)
+        ButtonNode(onClick, modifier, enabled, ButtonStyle.eSecondary, LocalTheme.current.text, contentPadding, content)
+    else ShapedButton(onClick, modifier, enabled, shape ?: ButtonDefaults.outlinedShape, colors ?: ButtonDefaults.outlinedButtonColors(),
+                      border ?: ButtonDefaults.outlinedButtonBorder(enabled), contentPadding ?: ButtonDefaults.ContentPadding, content)
 
 /** A button that is only its content, in the theme's primary colour. */
 @Composable
-fun TextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, contentPadding: PaddingValues? = null,
-               content: @Composable RowScope.() -> Unit) =
-    ButtonNode(onClick, modifier, enabled, ButtonStyle.ePlain, LocalTheme.current.primary, contentPadding, content)
+fun TextButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape? = null, colors: ButtonColors? = null,
+               border: BorderStroke? = null, contentPadding: PaddingValues? = null, content: @Composable RowScope.() -> Unit) =
+    if (shape == null && colors == null && border == null)
+        ButtonNode(onClick, modifier, enabled, ButtonStyle.ePlain, LocalTheme.current.primary, contentPadding, content)
+    else ShapedButton(onClick, modifier, enabled, shape ?: ButtonDefaults.textShape, colors ?: ButtonDefaults.textButtonColors(), border,
+                      contentPadding ?: ButtonDefaults.TextButtonContentPadding, content)
+
+/** A filled button in a quieter colour: Material's tonal one. */
+@Composable
+fun FilledTonalButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape? = null, colors: ButtonColors? = null,
+                      border: BorderStroke? = null, contentPadding: PaddingValues? = null, content: @Composable RowScope.() -> Unit) =
+    ShapedButton(onClick, modifier, enabled, shape ?: ButtonDefaults.shape,
+                 colors ?: ButtonDefaults.buttonColors(LocalTheme.current.surfacePressed, LocalTheme.current.text), border,
+                 contentPadding ?: ButtonDefaults.ContentPadding, content)
+
+@Composable
+fun ElevatedButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, shape: Shape? = null, colors: ButtonColors? = null,
+                   border: BorderStroke? = null, contentPadding: PaddingValues? = null, content: @Composable RowScope.() -> Unit) =
+    ShapedButton(onClick, modifier.shadow(3.dp, shape ?: ButtonDefaults.shape), enabled, shape ?: ButtonDefaults.shape,
+                 colors ?: ButtonDefaults.buttonColors(LocalTheme.current.surfaceHover, LocalTheme.current.primary), border,
+                 contentPadding ?: ButtonDefaults.ContentPadding, content)
 
 // ---- controls -------------------------------------------------------------------------------------------
 
+/** What is made, faded and deaf to the pointer when not [enabled]. */
+internal fun whenEnabled(enabled: Boolean, widget: MemorySegment): MemorySegment =
+    if (enabled) widget else KuiNative.kui_disabled(widget, true).also { KuiNative.kui_widget_release(widget) }
+
 @Composable
-fun Checkbox(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier) =
-    Node(modifier, checked, { node, _ ->
-        Arena.ofConfined().use { a ->
-            KuiNative.kui_checkbox(checked, Callbacks.make(a, KuiLayouts.KuiBoolAction, Callbacks.boolAction,
-                { v: Boolean -> node.onBool?.invoke(v) }), "")
+fun Checkbox(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) =
+    Node(modifier, checked to enabled, { node, _ ->
+        scratch { a ->
+            whenEnabled(enabled, KuiNative.kui_checkbox(checked, Callbacks.make(a, KuiLayouts.KuiBoolAction, Callbacks.boolAction,
+                { v: Boolean -> node.onBool?.invoke(v) }), ""))
         }
     }, update = { onBool = onCheckedChange })
 
 @Composable
-fun Switch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier) =
-    Node(modifier, checked, { node, _ ->
-        Arena.ofConfined().use { a ->
-            KuiNative.kui_switch(checked, Callbacks.make(a, KuiLayouts.KuiBoolAction, Callbacks.boolAction,
-                { v: Boolean -> node.onBool?.invoke(v) }))
+fun Switch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) =
+    Node(modifier, checked to enabled, { node, _ ->
+        scratch { a ->
+            whenEnabled(enabled, KuiNative.kui_switch(checked, Callbacks.make(a, KuiLayouts.KuiBoolAction, Callbacks.boolAction,
+                { v: Boolean -> node.onBool?.invoke(v) })))
         }
     }, update = { onBool = onCheckedChange })
 
+/**
+ * A slider, as Compose's: [steps] is how many places it stops at between the two ends (0: anywhere), and
+ * [onValueChangeFinished] is called when it is let go of.
+ */
 @Composable
-fun Slider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier,
-           valueRange: ClosedFloatingPointRange<Float> = 0f..1f) =
-    Node(modifier, listOf(value, valueRange), { node, _ ->
-        Arena.ofConfined().use { a ->
-            KuiNative.kui_slider(value, Callbacks.make(a, KuiLayouts.KuiFloatAction, Callbacks.floatAction,
-                { v: Float -> node.onFloat?.invoke(v) }), valueRange.start, valueRange.endInclusive)
+fun Slider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+           valueRange: ClosedFloatingPointRange<Float> = 0f..1f, steps: Int = 0, onValueChangeFinished: (() -> Unit)? = null) =
+    Node(modifier, listOf(value, valueRange, enabled), { node, _ ->
+        scratch { a ->
+            whenEnabled(enabled, KuiNative.kui_slider_finished(value, Callbacks.make(a, KuiLayouts.KuiFloatAction, Callbacks.floatAction,
+                { v: Float -> node.onFloat?.invoke(v) }), valueRange.start, valueRange.endInclusive,
+                Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, { node.onClick?.invoke() })))
+        }
+    }, update = {
+        onClick = onValueChangeFinished
+        onFloat = if (steps <= 0) onValueChange else { v ->
+            // The nearest of the places it stops at: the two ends, and [steps] between them.
+            val span = valueRange.endInclusive - valueRange.start
+            val place = Math.round((v - valueRange.start) / span * (steps + 1)).toFloat() / (steps + 1)
+            onValueChange(valueRange.start + place * span)
+        }
+    })
+
+/**
+ * A number in a field, changed by dragging across it sideways — ImGui's DragFloat. Each unit dragged to the
+ * right adds [speed]; the value stops at the ends of [valueRange]. [label] is shown before the value.
+ *
+ * ```
+ * var speed by remember { mutableStateOf(1f) }
+ * DragValue(speed, { speed = it }, label = "Speed", speed = 0.05f, valueRange = 0f..10f)
+ * ```
+ */
+@Composable
+fun DragValue(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier, label: String = "", speed: Float = 0.01f,
+              valueRange: ClosedFloatingPointRange<Float> = Float.NEGATIVE_INFINITY..Float.POSITIVE_INFINITY, decimals: Int = 2,
+              width: Dp = Dp.Unspecified) =
+    Node(modifier, listOf(value, label, speed, valueRange, decimals, width), { node, _ ->
+        scratch { a ->
+            KuiNative.kui_drag_value(value, Callbacks.make(a, KuiLayouts.KuiFloatAction, Callbacks.floatAction,
+                { v: Float -> node.onFloat?.invoke(v) }), speed, valueRange.start, valueRange.endInclusive, decimals, label,
+                if (width.value.isNaN()) -1f else width.value)
         }
     }, update = { onFloat = onValueChange })
+
+/**
+ * A field showing the one of [items] at [selected]; pressed, it opens the list of them under itself, and
+ * [onSelected] hears the index of the one picked. [placeholder] shows while [selected] is none of them (-1).
+ *
+ * ```
+ * var quality by remember { mutableStateOf(1) }
+ * Dropdown(listOf("Low", "Medium", "High"), quality, { quality = it })
+ * ```
+ */
+@Composable
+fun Dropdown(items: List<String>, selected: Int, onSelected: (Int) -> Unit, modifier: Modifier = Modifier, placeholder: String = "",
+             width: Dp = Dp.Unspecified) =
+    Node(modifier, listOf(items, selected, placeholder, width), { node, _ ->
+        scratch { a ->
+            val names = a.allocate(java.lang.foreign.ValueLayout.ADDRESS, maxOf(1, items.size).toLong())
+            items.forEachIndexed { i, item -> names.setAtIndex(java.lang.foreign.ValueLayout.ADDRESS, i.toLong(), a.allocateFrom(item)) }
+            KuiNative.kui_dropdown(names, items.size.toLong(), selected, Callbacks.make(a, KuiLayouts.KuiFloatAction, Callbacks.floatAction,
+                { v: Float -> node.onFloat?.invoke(v) }), if (width.value.isNaN()) -1f else width.value, placeholder)
+        }
+    }, update = { onFloat = { onSelected(it.toInt()) } })
+
+/** One line of a menu: something to pick, which runs [onClick] — or [Divider], the line between two groups of them. */
+class MenuItem(val label: String, val enabled: Boolean = true, val onClick: () -> Unit = {}) {
+    internal var separator = false
+
+    companion object {
+        /** A line between two groups of items. */
+        val Divider: MenuItem get() = MenuItem("").also { it.separator = true }
+    }
+}
+
+/**
+ * [content], with a menu of [items] that opens where the right button is pressed on it. Picking an item runs
+ * it and closes the menu; so does pressing anywhere else, or Escape.
+ *
+ * ```
+ * ContextMenuArea(listOf(MenuItem("Rename") { rename() }, MenuItem.Divider, MenuItem("Delete") { delete() })) {
+ *     Text("Right-click me")
+ * }
+ * ```
+ */
+@Composable
+fun ContextMenuArea(items: List<MenuItem>, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    // What each line runs is looked up when it is picked: the menu need not be made again when only that changed.
+    val current = androidx.compose.runtime.rememberUpdatedState(items)
+    Node(modifier, items.map { Triple(it.label, it.enabled, it.separator) }, { _, kids ->
+        scratch { a ->
+            val size = KuiLayouts.KuiMenuItem.byteSize()
+            val array = a.allocate(KuiLayouts.KuiMenuItem, maxOf(1, items.size).toLong())
+            items.forEachIndexed { i, item ->
+                Struct(array.asSlice(i * size, size), KuiLayouts.KuiMenuItem).address("label", a.allocateFrom(item.label))
+                    .struct("on_selected", Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, { current.value.getOrNull(i)?.onClick?.invoke() }))
+                    .bool("disabled", !item.enabled).bool("separator", item.separator)
+            }
+            val child = stack(kids, Alignment.TopStart)
+            KuiNative.kui_context_menu(array, items.size.toLong(), child).also { KuiNative.kui_widget_release(child) }
+        }
+    }) { content() }
+}
 
 /** A bar filled to [progress], from 0 to 1. */
 @Composable
@@ -192,29 +337,34 @@ fun LinearProgressIndicator(progress: () -> Float, modifier: Modifier = Modifier
 }
 
 /**
- * A one-line text field showing [value], as Compose's does: what is typed reaches [onValueChange], and shows
- * once it comes back as [value] — so `onValueChange = { text = it.uppercase() }` shows capitals.
+ * koral-ui's own field, showing [value]: what is typed reaches [onValueChange], and shows once it comes back as
+ * [value] — so `onValueChange = { text = it.uppercase() }` shows capitals. As Compose's, it takes as many lines as
+ * are typed, from [minLines] up to [maxLines], Enter starting another; with [singleLine] it is one, and Enter calls
+ * [onSubmit]. [placeholder] is plain text; [TextField] is Compose's, with a composable one. A
+ * `Modifier.focusRequester` on it gives it the keyboard when its [FocusRequester] is asked.
  */
 @Composable
-fun TextField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "",
-              width: Dp = Dp.Unspecified, onSubmit: ((String) -> Unit)? = null) =
-    Node(modifier, listOf(value, placeholder, width), { node, _ ->
-        Arena.ofConfined().use { a ->
+fun BasicTextField(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+                   singleLine: Boolean = false, maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE, minLines: Int = 1,
+                   placeholder: String = "", width: Dp = Dp.Unspecified, onSubmit: ((String) -> Unit)? = null) {
+    val focus = modifier.elements().filterIsInstance<FocusRequesterElement>().lastOrNull()?.requester?.token ?: 0
+    val several = !singleLine && maxLines > 1
+    Node(modifier, listOf(value, placeholder, width, enabled, several, maxLines, minLines, focus), { node, _ ->
+        scratch { a ->
             val options = Struct(a, KuiLayouts.KuiTextFieldOptions)
                 .address("text", a.allocateFrom(value)).address("placeholder", a.allocateFrom(placeholder))
                 .float("width", if (width.value.isNaN()) -1f else width.value).bool("controlled", true)
-            options.segment.asSlice(KuiLayouts.KuiTextFieldOptions.byteOffset(
-                java.lang.foreign.MemoryLayout.PathElement.groupElement("on_changed")), KuiLayouts.KuiTextAction)
-                .copyFrom(Callbacks.make(a, KuiLayouts.KuiTextAction, Callbacks.textAction, { s: String ->
-                    node.onText?.invoke(s)
-                    node.invalidate()   // made again from what value is next frame: a refused edit goes back
-                }))
-            options.segment.asSlice(KuiLayouts.KuiTextFieldOptions.byteOffset(
-                java.lang.foreign.MemoryLayout.PathElement.groupElement("on_submitted")), KuiLayouts.KuiTextAction)
-                .copyFrom(Callbacks.make(a, KuiLayouts.KuiTextAction, Callbacks.textAction, { s: String -> node.onSubmit?.invoke(s) }))
-            KuiNative.kui_text_field(options.segment)
+                .bool("multiline", several).int("min_lines", minLines).int("max_lines", minOf(maxOf(maxLines, minLines), 1000))
+                .int("focus", focus)
+            options.struct("on_changed", Callbacks.make(a, KuiLayouts.KuiTextAction, Callbacks.textAction, { s: String ->
+                node.onText?.invoke(s)
+                node.invalidate()   // made again from what value is next frame: a refused edit goes back
+            }))
+            options.struct("on_submitted", Callbacks.make(a, KuiLayouts.KuiTextAction, Callbacks.textAction, { s: String -> node.onSubmit?.invoke(s) }))
+            whenEnabled(enabled, KuiNative.kui_text_field(options.segment))
         }
     }, update = { onText = onValueChange; this.onSubmit = onSubmit })
+}
 
 // ---- drawing --------------------------------------------------------------------------------------------
 
@@ -227,7 +377,7 @@ fun Canvas(modifier: Modifier, onDraw: DrawScope.() -> Unit) {
     val reads = LocalDrawReads.current
     Node(modifier, onDraw, { node, _ ->
         node.onDispose = { reads.clear(node) }
-        Arena.ofConfined().use { a ->
+        scratch { a ->
             KuiNative.kui_custom_paint(Callbacks.make(a, KuiLayouts.KuiPainter, Callbacks.painter, { scope: DrawScope ->
                 reads.observeReads(node, Redraw) { scope.onDraw() }
             }), vec2(a, 0f, 0f), MemorySegment.NULL)
@@ -255,11 +405,12 @@ enum class ContentScale(internal val fit: koral.ui.ImageFit) {
 
 /**
  * A Koral image — a texture, or what a View or a pass draws into — shown in the space [modifier] gives it
- * (its own size otherwise). It shows what the image holds each time the interface is drawn.
+ * (its own size otherwise). It shows what the image holds each time the interface is drawn. It is Compose's
+ * Image under another name: `Image` is Koral's own, the thing this shows.
  */
 @Composable
 @Suppress("UNUSED_PARAMETER")
-fun Image(image: koral.Image, contentDescription: String?, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit) =
+fun Picture(image: koral.Image, contentDescription: String?, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit) =
     Node(modifier, image to contentScale, { _, _ ->
-        Arena.ofConfined().use { a -> KuiNative.kui_image(image.nativeHandle, contentScale.fit.value, vec2(a, -1f, -1f)) }
+        scratch { a -> KuiNative.kui_image(image.nativeHandle, contentScale.fit.value, vec2(a, -1f, -1f)) }
     })

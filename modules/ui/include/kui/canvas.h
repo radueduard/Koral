@@ -21,7 +21,7 @@
 #include <resource.h>
 #include <shader.h>
 
-#include "api.h"
+#include "kuiApi.h"
 
 namespace kui
 {
@@ -60,6 +60,8 @@ namespace kui
     namespace colors {
         inline constexpr Color Transparent { 0.f, 0.f, 0.f, 0.f };
         inline constexpr Color Black { 0.f, 0.f, 0.f, 1.f };
+        /// No colour of its own: text of this colour is drawn in the text colour of the theme it is in.
+        inline constexpr Color Inherit { 0.f, 0.f, 0.f, -1.f };
         inline constexpr Color White { 1.f, 1.f, 1.f, 1.f };
         inline constexpr Color Red = Color::Hex(0xF44336);
         inline constexpr Color Green = Color::Hex(0x4CAF50);
@@ -403,6 +405,20 @@ namespace kui
         Canvas& Concat(const Transform& transform);
         Canvas& SetTransform(const Transform& transform);
         [[nodiscard]] const Transform& CurrentTransform() const;
+
+        /**
+         * @brief Says what part of the canvas — in its own coordinates, before any transform — will be
+         *        looked at. Nothing is cut by it: it is what QuickReject answers against, so that whoever
+         *        draws a great many things can leave out those nobody will see.
+         */
+        Canvas& SetCullRect(const Rect& rect);
+        /**
+         * @brief Makes room for about @p shapes of them before any is drawn — as many as the picture this
+         *        one replaces had, say — so that a big picture is not copied over and over as it grows.
+         */
+        Canvas& Reserve(std::size_t shapes);
+        /** @brief Whether @p rect, in the current coordinates, is wholly outside what will be looked at. */
+        [[nodiscard]] bool QuickReject(const Rect& rect) const;
         /** @brief Nothing outside @p rect is drawn until the matching Restore. */
         Canvas& ClipRect(const Rect& rect);
         Canvas& ClipRRect(const RRect& rrect);

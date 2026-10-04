@@ -576,6 +576,36 @@ TEST_F(WidgetTest, ScrollingMovesALayerAndRepaintsNothing) {
     EXPECT_TRUE(IsGreen(scene->At(10, 4))) << "row 3 (green) is at the top now";
 }
 
+TEST_F(WidgetTest, WhatIsScrolledFarOutOfViewIsNotPainted) {
+    // Two hundred rows of sixteen in a view of sixty-four: fifty views of content.
+    std::vector<int> painted(200, 0);
+    std::vector<kui::Widget> rows;
+    for (int i = 0; i < 200; ++i) {
+        rows.push_back(kui::CustomPaint([&painted, i](kui::Canvas& c, const glm::vec2 s) {
+            ++painted[static_cast<std::size_t>(i)];
+            c.DrawRect(kui::Rect::FromSize(s), kui::Paint::Fill(i % 2 ? Green : Red));
+        }, { 64.f, 16.f }));
+    }
+    Show(kui::ScrollView(kui::Column(std::move(rows))));
+    EXPECT_TRUE(IsRed(scene->At(10, 4)));
+    EXPECT_GT(painted[0], 0);
+    EXPECT_GT(painted[7], 0) << "within a view of what shows";
+    EXPECT_EQ(painted[100], 0) << "far below: not in the picture at all";
+    const std::size_t all = scene->ui.GetRenderer().Stats().instances;
+    EXPECT_LT(all, 40u) << "and not handed to the GPU";
+
+    // A notch at a time, well past what was painted: what comes into view is there when it does.
+    scene->SceneInput().FeedMousePosition({ 10.f, 10.f });
+    settle();
+    for (int i = 0; i < 10; ++i) { scene->SceneInput().FeedScroll({ 0.f, -1.f }); settle(); }
+    settle();
+    // 480 units down: row 30 is at the top, and it is red.
+    EXPECT_TRUE(IsRed(scene->At(10, 4)));
+    EXPECT_TRUE(IsGreen(scene->At(10, 20)));
+    EXPECT_GT(painted[30], 0);
+    EXPECT_EQ(painted[100], 0);
+}
+
 TEST_F(WidgetTest, ATextFieldTakesTypedTextOnceClicked) {
     if (!kui::Font::Default()) GTEST_SKIP() << "no default font";
     std::string text, submitted;
@@ -600,6 +630,174 @@ TEST_F(WidgetTest, ATextFieldTakesTypedTextOnceClicked) {
     EXPECT_EQ(submitted, "héll");
 }
 
+TEST_F(WidgetTest, ATextFieldSelectsReplacesAndTakesSeveralLines) {
+    if (!kui::Font::Default()) GTEST_SKIP() << "no default font";
+    std::string text;
+    auto& input = scene->SceneInput();
+    const auto press = [&](const kor::Key key) { input.FeedKey(key, true); settle(); input.FeedKey(key, false); settle(); };
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::TextField({ .onChanged = [&](const std::string& t) { text = t; }, .width = 60.f })));
+    Click({ 20.f, 10.f });
+    input.FeedText(U"abc");
+    settle();
+    ASSERT_EQ(text, "abc");
+
+    // Shift and Left, twice: the last two letters are selected, and what is typed takes their place.
+    input.FeedKey(kor::Key::eLeftShift, true);
+    press(kor::Key::eLeft);
+    press(kor::Key::eLeft);
+    input.FeedKey(kor::Key::eLeftShift, false);
+    input.FeedText(U"X");
+    settle();
+    EXPECT_EQ(text, "aX");
+
+    // Control and A: all of it.
+    input.FeedKey(kor::Key::eLeftControl, true);
+    press(kor::Key::eA);
+    input.FeedKey(kor::Key::eLeftControl, false);
+    settle();
+    press(kor::Key::eBackspace);
+    EXPECT_EQ(text, "");
+
+    // Several lines: Enter starts another, and the field grows to hold it.
+    glm::vec2 before = {};
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::TextField(kui::TextFieldOptions {}.SetWidth(60.f).SetMultiline(1, 3)
+                                                                  .OnChanged([&](const std::string& t) { text = t; }))));
+    Click({ 20.f, 10.f });
+    input.FeedText(U"a");
+    settle();
+    EXPECT_TRUE(IsBlack(scene->At(30, 50))) << "one line tall";
+    press(kor::Key::eEnter);
+    input.FeedText(U"b");
+    settle();
+    press(kor::Key::eEnter);
+    input.FeedText(U"c");
+    settle(); settle();
+    EXPECT_EQ(text, "a\nb\nc");
+    EXPECT_FALSE(IsBlack(scene->At(30, 50))) << "three lines tall now";
+    (void) before;
+}
+
+TEST_F(WidgetTest, TabGoesFromOneFieldToTheNext) {
+    if (!kui::Font::Default()) GTEST_SKIP() << "no default font";
+    std::string first, second;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Column({
+        kui::TextField({ .onChanged = [&](const std::string& t) { first = t; }, .width = 60.f }),
+        kui::TextField({ .onChanged = [&](const std::string& t) { second = t; }, .width = 60.f }),
+    })));
+    auto& input = scene->SceneInput();
+    Click({ 20.f, 10.f });
+    input.FeedText(U"a");
+    settle();
+    input.FeedKey(kor::Key::eTab, true); settle(); input.FeedKey(kor::Key::eTab, false); settle();
+    input.FeedText(U"b");
+    settle();
+    EXPECT_EQ(first, "a");
+    EXPECT_EQ(second, "b") << "the keyboard went to the field after";
+    input.FeedKey(kor::Key::eTab, true); settle(); input.FeedKey(kor::Key::eTab, false); settle();
+    input.FeedText(U"c");
+    settle();
+    EXPECT_EQ(first, "ac") << "and round to the first again";
+}
+
+TEST_F(WidgetTest, SharesRatiosTransformsAndLayoutsOfTheCallersOwn) {
+    glm::vec2 size {};
+    Show(kui::FractionallySizedBox(0.5f, 0.25f, Probe(size)));
+    EXPECT_FLOAT_EQ(size.x, 32.f);
+    EXPECT_FLOAT_EQ(size.y, 16.f);
+
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::AspectRatio(2.f, Probe(size))));
+    EXPECT_FLOAT_EQ(size.x, 64.f);
+    EXPECT_FLOAT_EQ(size.y, 32.f) << "half as tall as it is wide";
+
+    // A rule of the caller's own: the second child ten square, at (40, 10); the whole as big as it may be.
+    const auto dot = [](const kui::Color color) { return kui::DecoratedBox({ .color = color }, {}); };
+    Show(kui::CustomLayout([](kui::LayoutContext& context, const kui::BoxConstraints& c) {
+        context.measure(0, kui::BoxConstraints::Tight({ 6.f, 6.f }));
+        context.place(0, { 0.f, 0.f });
+        const glm::vec2 second = context.measure(1, kui::BoxConstraints::Loose({ 10.f, 10.f }).Tighten(10.f, 10.f));
+        context.place(1, { 40.f, second.y });
+        return c.Biggest();
+    }, { dot(Red), dot(Green) }));
+    EXPECT_TRUE(IsRed(scene->At(3, 3)));
+    EXPECT_TRUE(IsGreen(scene->At(45, 15)));
+    EXPECT_TRUE(IsBlack(scene->At(45, 5)));
+
+    // Twice the size about its top-left corner: drawn there, and pressed there.
+    int taps = 0;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::TransformBox(kui::Transform::Scaling({ 2.f, 2.f }),
+        kui::GestureDetector(kui::GestureOptions {}.OnTap([&] { ++taps; }), kui::SizedBox(10.f, 10.f, dot(Red))), kui::Alignment::TopLeft())));
+    EXPECT_TRUE(IsRed(scene->At(15, 15)));
+    EXPECT_TRUE(IsBlack(scene->At(25, 15)));
+    Click({ 15.f, 15.f });
+    EXPECT_EQ(taps, 1) << "hit where it is drawn";
+}
+
+TEST_F(WidgetTest, APopupIsShownUnderWhatItIsInAndSaysWhenItGoes) {
+    int dismissed = 0;
+    const auto dot = [](const kui::Color color, const float size) { return kui::SizedBox(size, size, kui::DecoratedBox({ .color = color }, {})); };
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Stack({ dot(Red, 20.f), kui::PopupAnchor(true, dot(Green, 10.f), [&] { ++dismissed; }) })));
+    settle(); settle();
+    EXPECT_TRUE(IsRed(scene->At(5, 5)));
+    EXPECT_TRUE(IsGreen(scene->At(5, 25))) << "under it, at its left";
+    Click({ 50.f, 50.f });
+    settle();
+    EXPECT_EQ(dismissed, 1) << "a press outside it";
+    EXPECT_TRUE(IsBlack(scene->At(5, 25)));
+}
+
+TEST_F(WidgetTest, AScrollViewSaysWhereItIsAndGoesWhereItIsTold) {
+    float at = -1.f, most = -1.f;
+    const auto view = [&](const float jumpTo, const std::uint32_t jump) {
+        return kui::ScrollView(kui::SizedBox(64.f, 200.f, kui::DecoratedBox({ .color = Red }, {})),
+                               kui::ScrollOptions { kui::Axis::eVertical, [&](const float p, const float m) { at = p; most = m; }, jumpTo, jump });
+    };
+    Show(view(0.f, 0));
+    EXPECT_FLOAT_EQ(at, 0.f);
+    EXPECT_FLOAT_EQ(most, 136.f) << "two hundred of content in sixty-four of view";
+    Show(view(50.f, 1));
+    EXPECT_FLOAT_EQ(at, 50.f);
+    Show(view(500.f, 2));
+    EXPECT_FLOAT_EQ(at, 136.f) << "no further than there is";
+}
+
+TEST_F(WidgetTest, AThemeOfItsOwnLinesKeptToAFewAndASliderLetGoOf) {
+    // A theme for part of the tree: what is under it is built and painted with it, not with the view's.
+    kui::Theme blue;
+    blue.primary = blue.primaryHover = blue.primaryPressed = Blue;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Themed(blue, kui::Button("", [] {}, kui::ButtonOptions {}.SetWidth(40.f)))));
+    EXPECT_TRUE(IsBlue(scene->At(20, 18))) << "a button in the theme set over it";
+
+    // A square checkbox, where the theme says how round one is.
+    kui::Theme square;
+    square.checkboxRadius = 0.f;
+    square.primary = square.primaryHover = Red;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Themed(square, kui::Checkbox(true, [](bool) {}))));
+    EXPECT_TRUE(IsRed(scene->At(2, 2))) << "filled to its corner: not a circle";
+
+    if (kui::Font::Default()) {
+        glm::vec2 size {};
+        kui::TextStyle style { .size = 10.f, .color = kui::colors::White };
+        const auto text = [&](const int lines) {
+            return kui::Align(kui::Alignment::TopLeft(), kui::SizeObserver([&](const glm::vec2 s, glm::vec2) { size = s; },
+                              kui::Text("one two three four five six seven eight nine ten", style, kui::TextAlign::eStart, true, lines, true)));
+        };
+        Show(text(0));
+        EXPECT_GT(size.y, 30.f) << "as many lines as it takes";
+        Show(text(1));
+        EXPECT_FLOAT_EQ(size.y, 12.5f) << "one line, ending in an ellipsis";
+        EXPECT_LE(size.x, 64.f);
+        Show(text(2));
+        EXPECT_FLOAT_EQ(size.y, 25.f);
+    }
+
+    int finished = 0;
+    float value = 0.f;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Slider(0.f, [&](const float v) { value = v; }, 0.f, 1.f, [&] { ++finished; })));
+    Click({ 30.f, 14.f });
+    EXPECT_GT(value, 0.f);
+    EXPECT_EQ(finished, 1) << "told once, when it is let go of";
+}
+
 TEST_F(WidgetTest, AVirtualListBuildsOnlyWhatIsNearTheView) {
     std::size_t built = 0;
     Show(kui::ListView(1'000'000, 16.f, [&](const std::size_t i) {
@@ -619,6 +817,91 @@ TEST_F(WidgetTest, AVirtualListBuildsOnlyWhatIsNearTheView) {
     settle();
     EXPECT_TRUE(IsGreen(scene->At(10, 4))) << "row 3 at the top";
     EXPECT_EQ(built, 3u) << "items already built stay built; the three scrolled into range join them";
+}
+
+TEST_F(WidgetTest, ALazyListsItemsAreAsLongAsTheyLikeAndItSaysWhereItIs) {
+    std::size_t first = 99;
+    float into = -1.f;
+    const auto list = [&](const std::uint32_t jump) {
+        kui::LazyListOptions options;
+        options.count = 100'000;
+        options.estimatedExtent = 20.f;
+        options.onScrolled = [&](const std::size_t i, const float o) { first = i; into = o; };
+        options.jumpIndex = 101;
+        options.jump = jump;
+        // The even ones ten tall and red, the odd ones thirty and green.
+        return kui::LazyList(options, [](const std::size_t i) { return kui::Container({ .height = i % 2 ? 30.f : 10.f, .decoration = { .color = i % 2 ? Green : Red } }, {}); });
+    };
+    Show(list(0));
+    settle();
+    EXPECT_TRUE(IsRed(scene->At(10, 5)));
+    EXPECT_TRUE(IsGreen(scene->At(10, 25))) << "the second starts where the first, ten tall, ends";
+    EXPECT_TRUE(IsRed(scene->At(10, 45))) << "and the third where the second, thirty tall, does";
+    EXPECT_EQ(first, 0u);
+
+    scene->SceneInput().FeedMousePosition({ 10.f, 10.f });
+    settle();
+    scene->SceneInput().FeedScroll({ 0.f, -1.f });   // 48 units: past the first two, eight into the third
+    settle();
+    settle();
+    EXPECT_EQ(first, 2u);
+    EXPECT_FLOAT_EQ(into, 8.f);
+    EXPECT_TRUE(IsGreen(scene->At(10, 5))) << "the fourth, two units down";
+
+    Show(list(1));
+    settle();
+    settle();
+    EXPECT_EQ(first, 101u) << "told to go to an item, it is first in view";
+    EXPECT_TRUE(IsGreen(scene->At(10, 5)));
+    EXPECT_TRUE(IsRed(scene->At(10, 35))) << "however long the thousands before it turn out to be";
+}
+
+TEST_F(WidgetTest, ALazyListRunsAcrossToo) {
+    kui::LazyListOptions options;
+    options.count = 1'000'000;
+    options.axis = kui::Axis::eHorizontal;
+    std::size_t built = 0;
+    Show(kui::LazyList(options, [&](const std::size_t i) { ++built; return kui::Container({ .width = 20.f, .decoration = { .color = i % 2 ? Green : Red } }, {}); }));
+    settle();
+    settle();
+    EXPECT_LT(built, 400u);
+    EXPECT_TRUE(IsRed(scene->At(5, 10)));
+    EXPECT_TRUE(IsGreen(scene->At(25, 10)));
+    scene->SceneInput().FeedMousePosition({ 10.f, 10.f });
+    settle();
+    scene->SceneInput().FeedScroll({ 0.f, -1.f });
+    settle();
+    settle();
+    EXPECT_TRUE(IsRed(scene->At(5, 10))) << "48 along: eight into the third";
+    EXPECT_TRUE(IsGreen(scene->At(15, 10)));
+}
+
+TEST_F(WidgetTest, IntrinsicIsAsWideAsItsWidestChildAndTextThatSaysBlackIsBlack) {
+    // A column as wide as the forty of its first child: the second, stretched, is forty wide too.
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Intrinsic(true, false, kui::Column({
+        kui::Container({ .width = 40.f, .height = 10.f, .decoration = { .color = Red } }, {}),
+        kui::Container({ .height = 10.f, .decoration = { .color = Green } }, {}),
+    }, { .crossAxisAlignment = kui::CrossAxisAlignment::eStretch }))));
+    settle();
+    EXPECT_TRUE(IsGreen(scene->At(35, 15)));
+    EXPECT_FALSE(IsGreen(scene->At(45, 15)));
+
+    const auto darkest = [&] {
+        int least = 255;
+        for (int y = 0; y < 30; ++y) for (int x = 0; x < 60; ++x) least = std::min<int>(least, scene->At(x, y).r);
+        return least;
+    };
+    kui::TextStyle black;
+    black.size = 24.f;
+    black.color = kui::colors::Black;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Container({ .width = 60.f, .height = 30.f, .decoration = { .color = kui::colors::White } }, kui::Text("HH", black))));
+    settle();
+    EXPECT_LT(darkest(), 60) << "black on white, in a dark theme whose own text is white";
+    kui::TextStyle unsaid;
+    unsaid.size = 24.f;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Container({ .width = 60.f, .height = 30.f, .decoration = { .color = kui::colors::White } }, kui::Text("HH", unsaid))));
+    settle();
+    EXPECT_GT(darkest(), 200) << "and text that does not say is the theme's";
 }
 
 TEST_F(WidgetTest, AListGivesEachItemALayerOfItsOwn) {
@@ -841,6 +1124,191 @@ TEST(Bench, ListsOfThousandsOfRows) {
 
 // ---- modifiers and drag and drop -------------------------------------------------------------------------
 
+TEST_F(WidgetTest, WhatCanBePickedTellsWhenItIs) {
+    int radio = 0, picked = 0, tab = -1;
+    bool open = false;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::RadioButton(false, [&] { ++radio; })));
+    Click({ 10.f, 10.f });
+    EXPECT_EQ(radio, 1);
+
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Selectable("a", false, [&] { ++picked; })));
+    Click({ 40.f, 10.f });
+    EXPECT_EQ(picked, 1) << "the whole line, not only its text";
+
+    // A header says what it should be now; whoever builds it keeps that, and shows what is under it.
+    glm::vec2 under {};
+    const auto header = [&] { return kui::Align(kui::Alignment::TopLeft(), kui::CollapsingHeader("h", open, [&](const bool now) { open = now; }, Probe(under))); };
+    Show(header());
+    EXPECT_TRUE(IsBlack(scene->At(30, 50))) << "shut: nothing under it";
+    Click({ 30.f, 10.f });
+    EXPECT_TRUE(open);
+    Show(header());
+    Click({ 30.f, 10.f });
+    EXPECT_FALSE(open);
+
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::TabBar({ "A", "B" }, 0, [&](const int index) { tab = index; })));
+    Click({ 50.f, 15.f });
+    EXPECT_EQ(tab, 1);
+}
+
+TEST_F(WidgetTest, AStepSliderStopsOnlyAtItsSteps) {
+    int value = 0;
+    const auto slider = [&] { return kui::Align(kui::Alignment::TopLeft(), kui::StepSlider(value, 4, [&](const int step) { value = step; }, { .width = 62.f })); };
+    Show(slider());
+    // Four places of fourteen, three in from each end; the thumb is the accent's, in the first.
+    const auto accent = [&](const int x) { const auto p = scene->At(x, 16); return p.r > 200 && p.g > 90 && p.g < 170 && p.b < 120; };
+    EXPECT_TRUE(accent(6));
+    EXPECT_FALSE(accent(34));
+    Click({ 40.f, 16.f });
+    EXPECT_EQ(value, 2) << "the third place, wherever in it the press was";
+    Show(slider());
+    EXPECT_TRUE(accent(34));
+    EXPECT_FALSE(accent(6));
+}
+
+TEST_F(WidgetTest, AGradientsStopsArePickedMovedAddedAndTakenAway) {
+    std::vector<kui::GradientStop> stops { { 0.f, Red }, { 1.f, Green } };
+    int told = 0;
+    const auto editor = [&] {
+        return kui::Align(kui::Alignment::TopLeft(), kui::GradientEditor(stops, [&](std::vector<kui::GradientStop> now) { stops = std::move(now); ++told; },
+                                                                         { .width = 64.f, .picker = false }));
+    };
+    Show(editor());
+    // The bar is 48 wide from 8, 26 tall: red at its left end, green at its right.
+    EXPECT_TRUE(IsRed(scene->At(10, 12)));
+    EXPECT_TRUE(IsGreen(scene->At(54, 12)));
+
+    // A press on the bar, where no handle is: a stop there, of the colour that was there.
+    Click({ 32.f, 12.f });
+    ASSERT_EQ(stops.size(), 3u);
+    EXPECT_NEAR(stops[1].offset, 0.5f, 0.02f);
+    EXPECT_NEAR(stops[1].color.r, (Red.r + Green.r) * 0.5f, 0.05f);
+
+    // Its handle, under the bar, dragged to the right.
+    Show(editor());
+    auto& input = scene->SceneInput();
+    input.FeedMousePosition({ 32.f, 38.f }); settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, true); settle();
+    input.FeedMousePosition({ 40.f, 38.f }); settle();
+    input.FeedMousePosition({ 44.f, 38.f }); settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, false); settle();
+    EXPECT_NEAR(stops[1].offset, 0.75f, 0.02f);
+
+    // And taken away with the right button.
+    Show(editor());
+    input.FeedMouseButton(kor::MouseButton::eRight, true); settle();
+    input.FeedMouseButton(kor::MouseButton::eRight, false); settle();
+    EXPECT_EQ(stops.size(), 2u);
+    EXPECT_GE(told, 3);
+}
+
+TEST_F(WidgetTest, AStatusBarShowsTheLastThingSaidInTheWindowsOwnColour) {
+    Show(kui::Column({ kui::Expanded(kui::SizedBox(1.f, 1.f, kui::DecoratedBox({ .color = Blue }, {}))), kui::StatusBar("it broke", kui::StatusLevel::eError) },
+                     { .crossAxisAlignment = kui::CrossAxisAlignment::eStretch }));
+    EXPECT_TRUE(IsBlue(scene->At(60, 36))) << "what is over it comes right down to it: no line between";
+    EXPECT_TRUE(IsBlack(scene->At(60, 39))) << "the bar, in the background's colour — as what is round the docked panels is";
+    EXPECT_TRUE(IsBlack(scene->At(60, 60)));
+    const auto mark = scene->At(15, 51);
+    EXPECT_GT(mark.r, 180) << "an error's mark, in red";
+    EXPECT_LT(mark.b, 120);
+}
+
+TEST_F(WidgetTest, AScrollThumbHasAStripOfItsOwnBesideTheContent) {
+    glm::vec2 size {};
+    const auto content = [&](const float height) {
+        return kui::ScrollView(kui::CustomPaint([&size](kui::Canvas& c, const glm::vec2 s) {
+            size = s;
+            c.DrawRect(kui::Rect::FromSize(s), kui::Paint::Fill(Red));
+        }, { -1.f, height }));
+    };
+    Show(content(40.f));
+    EXPECT_FLOAT_EQ(size.x, 64.f) << "it all fits: nothing to scroll, and the content has the whole width";
+    Show(content(200.f));
+    EXPECT_FLOAT_EQ(size.x, 56.f) << "more than shows: the content stops short of the thumb";
+    EXPECT_TRUE(IsRed(scene->At(54, 30)));
+    EXPECT_FALSE(IsRed(scene->At(58, 30))) << "the strip the thumb moves in";
+}
+
+TEST_F(WidgetTest, ASizeObserverTellsTheSizeWhenItChanges) {
+    std::vector<glm::vec2> told;
+    const auto root = [&](const float height) {
+        return kui::Column({ kui::SizedBox(64.f, height), kui::Expanded(kui::SizeObserver([&](const glm::vec2 size, glm::vec2) { told.push_back(size); })) },
+                           { .crossAxisAlignment = kui::CrossAxisAlignment::eStretch });
+    };
+    Show(root(24.f));
+    ASSERT_EQ(told.size(), 1u) << "once, when it is first laid out";
+    EXPECT_FLOAT_EQ(told.back().x, 64.f);
+    EXPECT_FLOAT_EQ(told.back().y, 40.f) << "what the box over it leaves";
+    settle();
+    EXPECT_EQ(told.size(), 1u) << "and not again while it stays that size";
+    Show(root(40.f));
+    ASSERT_EQ(told.size(), 2u);
+    EXPECT_FLOAT_EQ(told.back().y, 24.f);
+}
+
+TEST_F(WidgetTest, ATipShowsWhileThePointerIsOverWhatHasOne) {
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Tooltip("what it is", kui::SizedBox(20.f, 20.f, kui::DecoratedBox({ .color = Red }, {})))));
+    scene->SceneInput().FeedMousePosition({ 40.f, 40.f });
+    settle();
+    EXPECT_TRUE(scene->ui.TooltipText().empty());
+    scene->SceneInput().FeedMousePosition({ 10.f, 10.f });
+    settle(); settle();
+    EXPECT_EQ(scene->ui.TooltipText(), "what it is");
+    EXPECT_FALSE(IsBlack(scene->At(34, 40))) << "drawn by the pointer, under it";
+    EXPECT_TRUE(IsBlack(scene->At(3, 60))) << "and as big as its text, not as the view";
+    scene->SceneInput().FeedMousePosition({ 50.f, 5.f });
+    settle(); settle();
+    EXPECT_TRUE(scene->ui.TooltipText().empty());
+    EXPECT_TRUE(IsBlack(scene->At(34, 40)));
+}
+
+TEST_F(WidgetTest, ADialogKeepsThePointerFromWhatIsUnderIt) {
+    int under = 0, dismissed = 0;
+    const auto root = [&](const bool open) {
+        return kui::Modal(open, kui::GestureDetector(kui::GestureOptions {}.OnTap([&] { ++under; }), kui::Container({ .decoration = { .color = Red }, .alignment = kui::Alignment::Center() })),
+                          kui::SizedBox(4.f, 4.f), [&] { ++dismissed; });
+    };
+    Show(root(false));
+    Click({ 4.f, 4.f });
+    EXPECT_EQ(under, 1);
+    Show(root(true));
+    EXPECT_FALSE(IsRed(scene->At(4, 4))) << "dimmed";
+    Click({ 4.f, 4.f });
+    EXPECT_EQ(under, 1) << "the shade took it";
+    EXPECT_EQ(dismissed, 1);
+    Click({ 32.f, 32.f });
+    EXPECT_EQ(dismissed, 1) << "a press on the dialog itself dismisses nothing";
+}
+
+TEST_F(WidgetTest, AColourIsPickedFromTheSquare) {
+    kui::Color picked = kui::colors::White;
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::ColorPicker(kui::colors::White, [&](const kui::Color c) { picked = c; }, { .alpha = false, .hex = false, .width = 60.f })));
+    // The square is every saturation across and every brightness down, of red while nothing says another hue: its top-right is red.
+    Click({ 58.f, 1.f });
+    EXPECT_GT(picked.r, 0.9f);
+    EXPECT_LT(picked.g, 0.1f);
+    EXPECT_LT(picked.b, 0.1f);
+    // The bar of hues is under it: a third of the way along is green.
+    Click({ 20.f, 53.f });
+    EXPECT_GT(picked.g, 0.9f);
+    EXPECT_LT(picked.r, 0.15f);
+}
+
+TEST_F(WidgetTest, APlotDrawsItsValuesAndATableLinesItsCellsUp) {
+    Show(kui::Plot({ 0.f, 1.f, 0.f, 1.f }, kui::PlotOptions {}.SetKind(kui::PlotKind::eHistogram).SetRange(0.f, 1.f).SetSize({ 64.f, 64.f }).SetColor(Red)));
+    EXPECT_TRUE(IsRed(scene->At(24, 30))) << "the second bar, as tall as the plot";
+    EXPECT_FALSE(IsRed(scene->At(10, 30))) << "the first has no height";
+
+    const auto dot = [](const kui::Color color) { return kui::SizedBox(6.f, 6.f, kui::DecoratedBox({ .color = color }, {})); };
+    Show(kui::Table({ { "a" }, { "b" } }, { { dot(Red), dot(Green) }, { dot(Green), dot(Red) } },
+                    kui::TableOptions {}.SetHeader(false).SetStriped(false).SetBorders(false).SetRowHeight(20.f)));
+    // Two columns sharing the width, cells ten in from their column's left and in the middle of their row.
+    EXPECT_TRUE(IsRed(scene->At(13, 10)));
+    EXPECT_TRUE(IsGreen(scene->At(45, 10)));
+    EXPECT_TRUE(IsGreen(scene->At(13, 30)));
+    EXPECT_TRUE(IsRed(scene->At(45, 30)));
+}
+
 TEST_F(WidgetTest, ModifiersWrapAWidgetInsideOut) {
     int taps = 0;
     // A red 16x16 box, 8 of blue around it, in the top-left corner; clicking it counts.
@@ -935,7 +1403,7 @@ namespace {
                 { "inspector", "Inspector", kui::Make<Tapped>(nullptr, &inspector) },
                 { "scene", "Scene", kui::Make<Tapped>(nullptr, &view) },
                 { "log", "Log", kui::Make<Tapped>(&taps, &log) },
-            }, kui::DockOptions {}.OnChanged([this] { ++changes; }).OnClosed([this](const std::string& id) { closed = id; })));
+            }, kui::DockOptions {}.SetGap(4.f).SetStripeGap(0.f).OnChanged([this] { ++changes; }).OnClosed([this](const std::string& id) { closed = id; })));
             settle(); settle();
         }
         void TearDown() override {
@@ -957,74 +1425,366 @@ namespace {
     };
 }
 
-TEST_F(DockTest, PanelsGoWhereTheLayoutSaysAndFillTheirShare) {
-    // 240 wide: a quarter (of what the 4-wide line leaves) on the right; 160 tall: 30% at the bottom, bars of 28.
-    EXPECT_FLOAT_EQ(inspector.x, 59.f);
-    EXPECT_FLOAT_EQ(inspector.y, 132.f);
-    EXPECT_FLOAT_EQ(view.x, 177.f);
-    EXPECT_FLOAT_EQ(view.y, 81.f);
-    EXPECT_FLOAT_EQ(log.x, 177.f);
-    EXPECT_FLOAT_EQ(log.y, 19.f);
-    Click({ 20.f, 150.f });
+namespace {
+    // How big the pictures are: KUI_DOCK_SHOWCASE_SIZE, as "800x500", says otherwise — a small one shows what gives when there is no room.
+    int DockShowW = 960, DockShowH = 600;
+
+    /** @brief Clears to a colour that is nothing of the interface's: where the scene shows through, it is plain to see. */
+    class SkyPass final : public kor::RenderPass {
+    public:
+        SkyPass() : RenderPass("Sky") {}
+        void Setup(kor::PassBuilder& b) override { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); }
+        void Initialize(const kor::PassResources& r) override { _screen = r.ImageNamed(kor::FrameGraph::Screen); }
+        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, glm::vec4(0.10f, 0.32f, 0.55f, 1.f)); }
+    private:
+        kor::ResourceRef<const kor::Image> _screen;
+    };
+
+    class DockShowScene final : public kor::Scene {
+    public:
+        void Initialize() override {
+            readback = kor::Buffer::RawBuilder{}.SetRawSize(DockShowW * DockShowH * 4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback).Build();
+            Graph().Add<SkyPass>();
+            Graph().Add<kui::UiPass>(ui);
+            Graph().Add<ReadPass>(kor::ResourceRef<const kor::Buffer>(readback));
+        }
+        void Update() override { ui.Update(); }
+        kui::Ui ui;
+        kor::Resource<kor::Buffer> readback;
+    };
+}
+
+// A dock space with a panel in every area — two parts down each side, the two parts of the bottom, and the
+// middle — drawn to pictures, to be looked at: set KUI_DOCK_SHOWCASE to where they go (a path, less ".png").
+TEST(DockShowcase, Renders) {
+    const char* out = std::getenv("KUI_DOCK_SHOWCASE");
+    if (!s_app || !out) GTEST_SKIP() << "set KUI_DOCK_SHOWCASE to a path prefix to render the dock space";
+    if (const char* size = std::getenv("KUI_DOCK_SHOWCASE_SIZE")) std::sscanf(size, "%dx%d", &DockShowW, &DockShowH);
+    auto* scene = s_app->OpenOffscreen<DockShowScene>({ .title = "dock showcase", .extent = { static_cast<glm::u32>(DockShowW), static_cast<glm::u32>(DockShowH) }, .format = kor::Window::Format::eRGBA8_SRGB });
+    ASSERT_NE(scene, nullptr);
+    auto layout = std::make_shared<kui::DockLayout>();
+    layout->Dock("project", kui::DockArea::eLeft, 0).Dock("structure", kui::DockArea::eLeft, 1)
+           .Dock("inspector", kui::DockArea::eRight, 0).Dock("assets", kui::DockArea::eRight, 1)
+           .Dock("log", kui::DockArea::eBottomLeft).Dock("problems", kui::DockArea::eBottomRight)
+           .Dock("editor", kui::DockArea::eCenter);
+    const auto panel = [](const std::string& name, const std::uint32_t colour) {
+        return kui::Container({ .padding = kui::EdgeInsets::All(10.f), .decoration = { .color = kui::Color::Hex(colour) }, .alignment = kui::Alignment::TopLeft() },
+                              kui::Text(name + " content"));
+    };
+    const bool noMiddle = std::getenv("KUI_DOCK_SHOWCASE_NO_MIDDLE") != nullptr;
+    std::vector<kui::DockPanel> panels {
+        { "project", "Project", panel("Project", 0x3B2F2F) },
+        { "structure", "Structure", panel("Structure", 0x2F3B2F) },
+        { "inspector", "Inspector", panel("Inspector", 0x2F2F3B) },
+        { "assets", "Assets", panel("Assets", 0x3B3B2F) },
+        { "log", "Log", panel("Log", 0x3B2F3B) },
+        { "problems", "Problems", panel("Problems", 0x2F3B3B) },
+    };
+    if (!noMiddle) panels.push_back({ "editor", "Editor", panel("Editor", 0x444444) });
+    scene->ui.SetRoot(kui::DockSpace(layout, panels));
+    const auto shot = [&](const std::string& name) {
+        for (int i = 0; i < 4; ++i) settle();
+        const auto pixels = scene->readback->Read<glm::u8vec4>(DockShowW * DockShowH);
+        stbi_write_png((std::string(out) + "-" + name + ".png").c_str(), DockShowW, DockShowH, 4, pixels.data(), DockShowW * 4);
+    };
+    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
+
+    move({ DockShowW * 0.5f, DockShowH * 0.5f });
+    shot("1-all-open");
+
+    // One part of each side folded away, and one end of the bottom.
+    layout->Hide("structure");
+    layout->Hide("assets");
+    layout->Hide("problems");
+    shot("2-some-folded");
+
+    // Everything folded: only the stripes.
+    layout->Hide("project");
+    layout->Hide("inspector");
+    layout->Hide("log");
+    shot("3-all-folded");
+
+    // All open again, one floated over the space, and a button in hand over the left stripe.
+    for (const char* id : { "project", "structure", "inspector", "assets", "log", "problems" }) layout->Activate(id);
+    layout->Float("assets", kui::Rect::XYWH(DockShowW * 0.34f, DockShowH * 0.2f, 300.f, 200.f));
+    shot("4-one-floating");
+    const float w = static_cast<float>(DockShowW), h = static_cast<float>(DockShowH);
+    move({ w - 19.f, 19.f }); button(true); move({ w * 0.6f, h * 0.3f }); move({ 19.f, 60.f });
+    shot("5-dragging-over-stripe");
+    move({ w * 0.5f, h - 40.f });
+    shot("6-dragging-over-bottom-margin");
+    button(false);
+    shot("7-dropped-in-bottom");
+
+    s_app->Close(*scene);
+    settle();
+}
+
+// The space is 240 by 160. The scene is in the middle; the inspector down the right, a quarter of the
+// space wide (60); the log along the bottom, in its left part, 30% of the space tall (48). So there is a
+// stripe of 38 down each side — the inspector's button at the top of the right one, the log's at the foot
+// of the left one — and between them 164, of which a line of 4 and the inspector's 60 leave the scene 100.
+// Every open panel has a title bar of 28 over it.
+
+TEST_F(DockTest, PanelsGoWhereTheLayoutSaysAndFillTheirAreas) {
+    EXPECT_FLOAT_EQ(view.x, 100.f);
+    EXPECT_FLOAT_EQ(view.y, 80.f) << "108 over the bottom's line, less its title bar";
+    EXPECT_FLOAT_EQ(inspector.x, 60.f);
+    EXPECT_FLOAT_EQ(inspector.y, 80.f) << "the sides stop where the bottom starts";
+    EXPECT_FLOAT_EQ(log.x, 164.f) << "the bottom runs from one stripe to the other";
+    EXPECT_FLOAT_EQ(log.y, 20.f);
+    Click({ 100.f, 150.f });
     EXPECT_EQ(taps, 1) << "a click in a panel reaches the panel";
     EXPECT_TRUE(scene->ui.WantsPointer());
+    EXPECT_TRUE(layout->IsShown("log"));
 }
 
-TEST_F(DockTest, ATabDraggedToAnotherGroupKeepsItsState) {
-    Click({ 20.f, 150.f });
-    ASSERT_EQ(taps, 1);
-    Drag({ 12.f, 127.f }, { 200.f, 14.f });   // the Log tab, onto the Inspector's bar
-    EXPECT_FLOAT_EQ(view.y, 132.f) << "the scene has the whole column";
-    EXPECT_FLOAT_EQ(log.x, 59.f) << "the log is where the inspector was, and in front";
+TEST_F(DockTest, AButtonOpensItsPanelAndFoldsItAway) {
+    Click({ 19.f, 141.f });   // the log's button, at the foot of the left stripe
+    EXPECT_FALSE(layout->IsShown("log")) << "open, its button folds it away";
+    EXPECT_TRUE(layout->IsOpen("log")) << "which is not closing it";
+    EXPECT_FLOAT_EQ(view.y, 132.f) << "the scene has the height the bottom had";
     EXPECT_GT(changes, 0);
-    Click({ 210.f, 100.f });
+    Click({ 19.f, 141.f });
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_FLOAT_EQ(log.y, 20.f) << "as tall as it was";
+    Click({ 100.f, 150.f });
+    EXPECT_EQ(taps, 1) << "the same panel";
+}
+
+TEST_F(DockTest, ATitleBarHidesAndCloses) {
+    // The inspector's title bar is 60 wide, from 142: its last button closes it, the one before folds it away.
+    Click({ 162.f, 14.f });
+    EXPECT_FALSE(layout->IsShown("inspector"));
+    EXPECT_FLOAT_EQ(view.x, 164.f) << "the scene has the width the side had";
+    Click({ 221.f, 19.f });   // its button, at the top of the right stripe
+    EXPECT_TRUE(layout->IsShown("inspector"));
+    Click({ 186.f, 14.f });
+    EXPECT_EQ(closed, "inspector");
+    EXPECT_FALSE(layout->IsOpen("inspector"));
+    EXPECT_FLOAT_EQ(view.x, 202.f) << "closed, its button is gone — and with it the right stripe";
+    layout->Open("inspector");
+    settle(); settle();
+    EXPECT_TRUE(layout->IsShown("inspector"));
+    EXPECT_FLOAT_EQ(view.x, 100.f);
+}
+
+// The sizes a dock space is drawn with are its style's: another title bar height moves what is under it.
+TEST(DockStyle, TheSizesAreTheStylesToSay) {
+    if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
+    auto* scene = s_app->OpenOffscreen<DockScene>({ .title = "dock style", .extent = { 240, 160 } });
+    ASSERT_NE(scene, nullptr);
+    glm::vec2 size {};
+    const auto show = [&](const kui::DockStyle style) {
+        auto layout = std::make_shared<kui::DockLayout>();
+        layout->Dock("a", kui::DockArea::eCenter);
+        scene->ui.SetRoot(kui::DockSpace(layout, { { "a", "Alpha", kui::CustomPaint([&size](kui::Canvas&, const glm::vec2 s) { size = s; }) } },
+                                         kui::DockOptions {}.SetStyle(style)));
+        settle(); settle();
+    };
+    show({});
+    EXPECT_FLOAT_EQ(size.y, 160.f - 28.f) << "under a title bar of 28, as it always was";
+    kui::DockStyle tall;
+    tall.titleBarHeight = 40.f;
+    show(tall);
+    EXPECT_FLOAT_EQ(size.y, 160.f - 40.f);
+    s_app->Close(*scene);
+    settle();
+}
+
+TEST_F(DockTest, OverTheLineBetweenTwoAreasThePointerSaysWhichWayItGoes) {
+    Move({ 100.f, 60.f });
+    EXPECT_EQ(scene->ui.Cursor(), kui::PointerCursor::eArrow);
+    Move({ 140.f, 60.f });    // between the scene and the inspector: dragged sideways
+    EXPECT_EQ(scene->ui.Cursor(), kui::PointerCursor::eResizeHorizontal);
+    Move({ 100.f, 110.f });   // over the bottom: dragged up and down
+    EXPECT_EQ(scene->ui.Cursor(), kui::PointerCursor::eResizeVertical);
+    Move({ 100.f, 60.f });
+    EXPECT_EQ(scene->ui.Cursor(), kui::PointerCursor::eArrow);
+}
+
+TEST_F(DockTest, TheLineBetweenAreasResizesThem) {
+    Drag({ 140.f, 60.f }, { 120.f, 60.f });   // the line between the scene and the inspector, twenty to the left
+    EXPECT_FLOAT_EQ(inspector.x, 80.f);
+    EXPECT_FLOAT_EQ(view.x, 80.f);
+    Drag({ 100.f, 110.f }, { 100.f, 90.f });  // the line over the bottom, twenty up
+    EXPECT_FLOAT_EQ(log.y, 40.f);
+}
+
+TEST_F(DockTest, AButtonDraggedOntoAStripeMovesItsPanelThere) {
+    Click({ 100.f, 150.f });
+    ASSERT_EQ(taps, 1);
+    Drag({ 19.f, 141.f }, { 221.f, 60.f });   // the log's button, to under the inspector's on the right stripe
+    EXPECT_FALSE(layout->IsFloating("log"));
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_TRUE(layout->IsShown("inspector")) << "a part of its own: the inspector is still shown over it";
+    // No left stripe now: 202 between the edge and the right one. The right side's 160 is two parts of 78.
+    EXPECT_FLOAT_EQ(view.x, 138.f);
+    EXPECT_FLOAT_EQ(view.y, 132.f) << "nothing is left along the bottom";
+    EXPECT_FLOAT_EQ(log.x, 60.f);
+    EXPECT_FLOAT_EQ(log.y, 50.f);
+    EXPECT_FLOAT_EQ(inspector.y, 50.f);
+    Click({ 180.f, 140.f });
     EXPECT_EQ(taps, 2) << "the same panel, with what it counted before";
 
-    // And to an edge: the left of the scene, split in two.
-    const std::string before = layout->Save();
-    layout->Dock("log", kui::DockSide::eLeft, "scene", 0.5f);
-    settle(); settle();
-    EXPECT_NE(layout->Save(), before);
+    // Onto the inspector's button itself: into its part, in front of it.
+    Drag({ 221.f, 62.f }, { 221.f, 12.f });
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_FALSE(layout->IsShown("inspector")) << "one part shows one panel";
     EXPECT_FLOAT_EQ(log.y, 132.f);
-    Click({ 20.f, 100.f });
-    EXPECT_EQ(taps, 3);
 }
 
-TEST_F(DockTest, TheLineBetweenGroupsResizesThem) {
-    Drag({ 179.f, 80.f }, { 139.f, 80.f });
-    EXPECT_FLOAT_EQ(view.x, 137.f);
-    EXPECT_FLOAT_EQ(inspector.x, 99.f);
+TEST_F(DockTest, DroppedOnADockedPanelItJoinsItOrGoesUnderIt) {
+    // The inspector is shown from 142 to 202, down the 108 over the bottom's line. Over its lower part: under it.
+    Drag({ 19.f, 141.f }, { 170.f, 95.f });
+    EXPECT_FALSE(layout->IsFloating("log"));
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_TRUE(layout->IsShown("inspector")) << "a part of its own, under the inspector's";
+    EXPECT_FLOAT_EQ(log.y, 50.f);
+    EXPECT_FLOAT_EQ(inspector.y, 50.f);
+
+    // Over its upper part: into its group, in front of it. One part shows one panel; their buttons switch between them.
+    Drag({ 221.f, 62.f }, { 170.f, 40.f });
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_FALSE(layout->IsShown("inspector"));
+    EXPECT_FLOAT_EQ(log.y, 132.f) << "the one part has the whole side";
+    Click({ 221.f, 19.f });   // the inspector's button, the first of the two
+    EXPECT_TRUE(layout->IsShown("inspector"));
+    EXPECT_FALSE(layout->IsShown("log"));
 }
 
-TEST_F(DockTest, DroppedInTheMiddleItFloatsAndTheLayoutSurvivesSaving) {
-    EXPECT_FALSE(layout->IsFloating("inspector"));
-    Drag({ 190.f, 14.f }, { 80.f, 60.f });   // the Inspector's tab, into the middle of the scene
-    EXPECT_TRUE(layout->IsFloating("inspector"));
-    EXPECT_FLOAT_EQ(view.x, 240.f) << "what it left closes up";
+TEST_F(DockTest, DroppedInTheMiddleItIsATabThere) {
+    // The scene is the middle: 100 wide from 38, 108 tall. About its centre: the log joins it, in front of it.
+    Drag({ 19.f, 141.f }, { 88.f, 54.f });
+    EXPECT_FALSE(layout->IsFloating("log"));
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_FALSE(layout->IsShown("scene")) << "a tab behind it now";
+    EXPECT_FLOAT_EQ(log.x, 138.f) << "its button left the left stripe, which is gone: the middle starts at the edge";
+    EXPECT_FLOAT_EQ(log.y, 132.f) << "and nothing is left along the bottom";
+
+    // The scene's title, next to the log's, brings it back to the front.
+    Click({ 20.f, 14.f });
+    EXPECT_TRUE(layout->IsShown("scene"));
+    EXPECT_FALSE(layout->IsShown("log"));
+
+    // And a tab dragged out by its title, to where nothing is a target, floats.
+    Click({ 70.f, 14.f });
+    ASSERT_TRUE(layout->IsShown("log"));
+    Drag({ 70.f, 14.f }, { 40.f, 100.f });
+    EXPECT_TRUE(layout->IsFloating("log"));
+    EXPECT_TRUE(layout->IsShown("scene"));
+}
+
+// A side has levels, and its margin a band for each and one more: where a panel is let go says which level it joins.
+TEST(DockLevels, ASidesMarginHasABandForEachLevelAndOneMore) {
+    if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
+    auto* scene = s_app->OpenOffscreen<DockScene>({ .title = "dock levels", .extent = { 480, 320 } });
+    ASSERT_NE(scene, nullptr);
+    auto layout = std::make_shared<kui::DockLayout>();
+    layout->Dock("a", kui::DockArea::eLeft).Float("b", kui::Rect::XYWH(200.f, 100.f, 200.f, 120.f));
+    scene->ui.SetRoot(kui::DockSpace(layout, { { "a", "Alpha", kui::SizedBox(10.f, 10.f) }, { "b", "Beta", kui::SizedBox(10.f, 10.f) } },
+                                     kui::DockOptions {}.SetStripeGap(0.f)));
+    settle(); settle();
+    layout->Hide("a");   // folded away: the left side's one level shows nothing, and its margin is free to drop on
+    settle(); settle();
+    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
+    const auto drag = [&](const glm::vec2 from, const glm::vec2 to) {
+        move(from); button(true);
+        move((from + to) * 0.5f); move(to); move(to);
+        button(false); settle(); settle();
+    };
+    const auto levels = [&] {
+        const std::string saved = layout->Save();
+        int count = 0;
+        for (std::size_t at = saved.find("group left"); at != std::string::npos; at = saved.find("group left", at + 1)) ++count;
+        return count;
+    };
+    ASSERT_EQ(levels(), 1);
+
+    // The margin is 15% of the 442 between the stripe and the right edge, from 38. One level: two bands, of 160 each.
+    drag({ 215.f, 114.f }, { 60.f, 250.f });   // Beta, by its title, into the lower band: a level of its own
+    EXPECT_FALSE(layout->IsFloating("b"));
+    EXPECT_TRUE(layout->IsShown("b"));
+    EXPECT_EQ(levels(), 2) << layout->Save();
+    EXPECT_FALSE(layout->IsShown("a")) << "the level over it is as it was: folded away";
+
+    // Two levels now, Alpha's and Beta's: three bands. Beta's button — the second, under the line — into the first band: Alpha's level.
+    drag({ 19.f, 62.f }, { 60.f, 40.f });
+    EXPECT_EQ(levels(), 1) << layout->Save();
+    EXPECT_TRUE(layout->IsShown("b")) << "in front, in the level it joined";
+
+    s_app->Close(*scene);
+    settle();
+}
+
+TEST_F(DockTest, DroppedInAMarginItDocksThereAndAnywhereElseItFloats) {
+    EXPECT_FALSE(layout->IsFloating("log"));
+    Drag({ 19.f, 141.f }, { 120.f, 70.f });   // the log's button, into the middle of the space
+    EXPECT_TRUE(layout->IsFloating("log"));
+    EXPECT_FLOAT_EQ(view.x, 138.f) << "its button left the left stripe, which is gone";
 
     const std::string saved = layout->Save();
     auto other = std::make_shared<kui::DockLayout>();
     ASSERT_TRUE(other->Load(saved));
     EXPECT_EQ(other->Save(), saved);
-    EXPECT_TRUE(other->IsFloating("inspector"));
+    EXPECT_TRUE(other->IsFloating("log"));
     EXPECT_FALSE(other->Load("not a layout"));
 
-    layout->Close("inspector");
-    settle();
-    EXPECT_FALSE(layout->IsOpen("inspector"));
-    layout->Open("inspector");
-    layout->Dock("inspector", kui::DockSide::eRight, {}, 0.5f);
+    // By its title, into the bottom margin of the space, in its right half: the bottom's right part.
+    Drag({ 122.f, 70.f }, { 200.f, 152.f });
+    EXPECT_FALSE(layout->IsFloating("log"));
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_FLOAT_EQ(log.x, 202.f) << "the only part of the bottom that is open has all of it";
+
+    // And into the left margin: down the left side.
+    Drag({ 221.f, 141.f }, { 40.f, 30.f });   // its button, at the foot of the right stripe now — to nowhere (off the margins, and off the middle of the middle): it floats
+    EXPECT_TRUE(layout->IsFloating("log"));
+    layout->Dock("log", kui::DockArea::eLeft);
     settle(); settle();
-    EXPECT_FALSE(layout->IsFloating("inspector"));
-    EXPECT_FLOAT_EQ(inspector.x, 118.f);
+    EXPECT_FALSE(layout->IsFloating("log"));
+    EXPECT_FLOAT_EQ(log.y, 132.f) << "the whole height of the left side";
 }
 
-TEST_F(DockTest, TheRimOfTheSpaceDocksBesideEverything) {
-    Drag({ 12.f, 127.f }, { 236.f, 80.f });   // the Log tab, to the right rim of the space
-    EXPECT_FLOAT_EQ(log.y, 132.f) << "the whole height, beside everything else";
-    EXPECT_FLOAT_EQ(log.x, 59.f) << "a quarter of the space";
-    EXPECT_FLOAT_EQ(view.y, 132.f);
-    EXPECT_FALSE(layout->IsFloating("log"));
+TEST_F(DockTest, ASideCanBeInSeveralParts) {
+    layout->Dock("log", kui::DockArea::eRight, 1);   // a second part of the right side, under the inspector's
+    settle(); settle();
+    EXPECT_TRUE(layout->IsShown("log"));
+    EXPECT_TRUE(layout->IsShown("inspector"));
+    EXPECT_FLOAT_EQ(inspector.y, 50.f) << "half of the side's 160, less the line between them and its title bar";
+    EXPECT_FLOAT_EQ(log.y, 50.f);
+    EXPECT_FLOAT_EQ(log.x, 60.f);
+
+    Drag({ 170.f, 80.f }, { 170.f, 100.f });  // the line between the two parts, twenty down
+    EXPECT_FLOAT_EQ(inspector.y, 70.f);
+    EXPECT_FLOAT_EQ(log.y, 30.f);
+
+    auto other = std::make_shared<kui::DockLayout>();
+    ASSERT_TRUE(other->Load(layout->Save()));
+    EXPECT_EQ(other->Save(), layout->Save());
+
+    layout->Hide("inspector");
+    settle(); settle();
+    EXPECT_FALSE(layout->IsShown("inspector"));
+    EXPECT_FLOAT_EQ(log.y, 132.f) << "the part that is open has the whole side";
+}
+
+TEST_F(DockTest, APanelFloatsAgainAtTheSizeItFloatedAtBefore) {
+    layout->Float("inspector", kui::Rect::XYWH(10.f, 10.f, 150.f, 100.f));
+    settle(); settle();
+    ASSERT_TRUE(layout->IsFloating("inspector"));
+    const glm::vec2 floated = inspector;
+
+    layout->Dock("inspector", kui::DockArea::eRight);
+    settle(); settle();
+    ASSERT_FALSE(layout->IsFloating("inspector"));
+    EXPECT_NE(inspector, floated) << "docked, it is as big as its area";
+
+    Drag({ 221.f, 19.f }, { 120.f, 70.f });   // its button, out into the middle of the space
+    ASSERT_TRUE(layout->IsFloating("inspector"));
+    EXPECT_EQ(inspector, floated) << "the size it floated at, not the size it was docked at";
 }
 
 namespace {

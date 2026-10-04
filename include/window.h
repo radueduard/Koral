@@ -137,6 +137,12 @@ namespace kor {
         [[nodiscard]] bool IsVSync() const { return _vsync; }
         /** @brief Whether the framebuffer's alpha composites with the desktop. */
         [[nodiscard]] bool IsFramebufferTransparent() const { return _transparentFramebuffer; }
+        /**
+         * @brief Whether the window really is see-through: it was opened with a transparent framebuffer
+         *        and the display blends what it presents with what is behind it. A display that cannot
+         *        leaves such a window opaque — which an overlay over the desktop has to know.
+         */
+        [[nodiscard]] bool CompositesWithDesktop() const;
         /** @brief The format the window presents in: the first of WindowSettings::formats the display offers. */
         [[nodiscard]] Format PixelFormat() const;
         /** @brief The formats it was asked to present in, most wanted first. */
@@ -194,6 +200,82 @@ namespace kor {
         void SetPosition(glm::ivec2 position);
         /** @brief Brings the window to the front and gives it the keyboard, where the platform allows. */
         void Focus();
+
+        /**
+         * @brief Whether the pointer goes through the window to what is behind it. While it does the
+         *        window hears nothing of the pointer — ask CursorPosition where it is, and take the
+         *        pointer back when it is over something of yours.
+         */
+        void SetMousePassthrough(bool passthrough);
+        [[nodiscard]] bool IsMousePassthrough() const { return _mousePassthrough; }
+        /**
+         * @brief Where the pointer is, relative to the window's drawable area, in pixels — wherever it
+         *        is on the desktop, over this window or not, and whether or not the window lets it
+         *        through. (0, 0) for an offscreen window.
+         */
+        [[nodiscard]] glm::vec2 CursorPosition() const;
+
+        /** @brief What the pointer looks like over a window. */
+        enum class Cursor : std::uint8_t {
+            eArrow,
+            eResizeHorizontal,      ///< ↔ : over something dragged sideways — the line between two side-by-side panes.
+            eResizeVertical,        ///< ↕ : over something dragged up and down.
+            eResizeDiagonal,        ///< ⤡ : over a corner that resizes both ways.
+            eHand,
+            eText,
+        };
+        /**
+         * @brief Sets what the pointer looks like over this window, until it is set again. Nothing happens
+         *        for an offscreen window. (Const: it is how the window looks to the pointer, not what the
+         *        window is — and what draws in a window, and knows what is under the pointer, has it const.)
+         */
+        void SetCursor(Cursor cursor) const;
+
+        /**
+         * @brief Colours the window's own title bar — the system's, with its buttons — so that it goes
+         *        with what is drawn under it: @p background behind @p text, each 0xRRGGBB's parts from 0
+         *        to 1. A dark background also asks for the system's dark buttons and menu. Where the
+         *        system does not colour title bars (before Windows 11, which only goes dark or light;
+         *        other platforms), and for an offscreen window, as much of it happens as can.
+         */
+        void SetTitleBarColors(glm::vec3 background, glm::vec3 text) const;
+
+        /**
+         * @brief Takes the system's title bar away (true) so that the application draws its own: the
+         *        window keeps its frame — resized by its edges, snapped, shadowed, rounded as the system
+         *        does — and all of it, to its top edge, is the application's to draw in. What is drawn
+         *        there moves the window with BeginMove and has buttons that call Minimize,
+         *        ToggleMaximize and RequestClose. (kui::TitleBar is one.) Nothing happens for an
+         *        offscreen window. Where the system has no such thing (not Windows), the window loses
+         *        its decoration altogether.
+         */
+        void SetCustomTitleBar(bool custom) const;
+        [[nodiscard]] bool HasCustomTitleBar() const { return _customTitleBar; }
+        /**
+         * @brief Lets the system move the window with the pointer, as dragging its title bar does —
+         *        snapping to the screen's edges and all. Called when the button goes down on what
+         *        stands for the title bar; the button's release goes to the system, and the window is
+         *        told the button is up. (Windows only: elsewhere it does nothing.)
+         */
+        void BeginMove() const;
+        void Minimize() const;
+        /** @brief Fills the screen's work area, or goes back to the size it had. */
+        void ToggleMaximize() const;
+        [[nodiscard]] bool IsMaximized() const;
+        /** @brief Asks the window to close, as its close button does — from what only has it const. @see Close */
+        void RequestClose() const;
+
+        /** @brief A monitor's place on the desktop, in screen coordinates. */
+        struct MonitorArea { glm::ivec2 position {}; glm::ivec2 size {}; };
+        /** @brief The monitor most of the window is on (the primary one for an offscreen window, or where windows cannot say where they are). */
+        [[nodiscard]] MonitorArea Monitor() const;
+        /** @brief The whole desktop: the smallest area that holds every monitor. */
+        [[nodiscard]] static MonitorArea Desktop();
+
+        /** @brief The text on the system's clipboard, as UTF-8: empty when it holds none, or there is no windowing system. */
+        [[nodiscard]] static std::string ClipboardText();
+        /** @brief Puts @p text on the system's clipboard. */
+        static void SetClipboardText(const std::string& text);
         /**
          * @brief Whether windows here can be asked where they are and put somewhere: true on Windows,
          *        macOS and X11, false on Wayland, where only the compositor places windows.
@@ -233,6 +315,10 @@ namespace kor {
         bool _fullscreen;
         bool _decorated;
         bool _transparentFramebuffer;
+        bool _mousePassthrough = false;
+        mutable Cursor _cursor = Cursor::eArrow;
+        mutable bool _customTitleBar = false;
+        mutable bool _frameChanged = false;     ///< The frame is to be worked out again, after this frame.
         bool _vsync;
         std::vector<Format> _formats;
 
@@ -269,6 +355,10 @@ namespace kor {
         bool fullscreen = false;                    ///< Whether to open fullscreen on the primary monitor.
         bool decorated = true;                      ///< Whether the OS draws a title bar and border.
         bool transparentFramebuffer = false;        ///< Whether the framebuffer's alpha composites with the desktop.
+        bool alwaysOnTop = false;                   ///< Whether it stays above every other window.
+        bool mousePassthrough = false;              ///< Whether the pointer goes through it. @see Window::SetMousePassthrough
+        bool focusOnOpen = true;                    ///< Whether opening it takes the keyboard from whatever had it.
+        bool taskbar = true;                        ///< Whether it has a button in the taskbar (Windows; elsewhere the platform's choice).
         bool vsync = true;                          ///< Whether presentation waits for the display's refresh.
         /// Where on the desktop to open it, in screen coordinates; centred on the primary monitor when
         /// not given. Ignored where the platform places windows itself. @see Window::CanBePositioned

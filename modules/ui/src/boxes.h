@@ -51,6 +51,30 @@ namespace kui
         Decoration _decoration {};
     };
 
+    /**
+     * @brief A Container that is more than one thing at once — a size and a colour, a colour and padding —
+     *        as one box: what a margin round a sized box round a decorated one round padding round an
+     *        alignment would lay out, paint and hit, without being five.
+     */
+    class RenderBox final : public RenderContainer {
+    public:
+        struct Config {
+            EdgeInsets margin {}, padding {};
+            float width = -1.f, height = -1.f;
+            Decoration decoration {};
+            std::optional<Alignment> alignment;
+            bool hasMargin = false, hasPadding = false, hasSize = false, hasDecoration = false;
+        };
+        void Set(const Config& config);
+        void Paint(Canvas& canvas, glm::vec2 offset) override;
+        [[nodiscard]] bool HitTestSelf(glm::vec2 position) const override;
+    protected:
+        void PerformLayout() override;
+    private:
+        Config _config {};
+        Rect _decorated {};     ///< Where the decoration is, in the box: inside the margin.
+    };
+
     /** @brief A child of a flex with a share of its leftover space. */
     class RenderFlexible final : public RenderContainer {
     public:
@@ -100,7 +124,7 @@ namespace kui
 
     class RenderParagraph final : public RenderContainer {
     public:
-        void Set(const std::string& text, const TextStyle& style, TextAlign align, bool wrap);
+        void Set(const std::string& text, const TextStyle& style, TextAlign align, bool wrap, int maxLines = 0, bool ellipsis = false);
         void Paint(Canvas& canvas, glm::vec2 offset) override;
         [[nodiscard]] const Paragraph& GetParagraph() const { return _paragraph; }
     protected:
@@ -109,7 +133,9 @@ namespace kui
         Paragraph _paragraph;
         TextStyle _style;
         TextAlign _align = TextAlign::eStart;
-        bool _wrap = true, _built = false;
+        bool _wrap = true, _built = false, _ellipsis = false;
+        int _maxLines = 0;
+        std::string _text;      ///< All of it: the paragraph holds what is left once it is cut to its lines.
     };
 
     class RenderImage final : public RenderContainer {
@@ -196,6 +222,15 @@ namespace kui
     private:
         [[nodiscard]] glm::vec2 ScrollVector() const;
         void PlaceThumb();
+    public:
+        void Observe(std::function<void(float, float)> onScrolled, float jumpTo, std::uint32_t jump);
+    private:
+        std::function<void(float, float)> _onScrolled;
+        float _toldAt = -1.f, _toldMost = -1.f, _jumpTo = 0.f;
+        std::uint32_t _jump = 0;
+        bool _jumping = false;
+        /** Tells the content what part of it shows, when there is much more of it than that. */
+        void Cull();
         Axis _axis = Axis::eVertical;
         float _scroll = 0.f;
         std::shared_ptr<Layer> _thumb;

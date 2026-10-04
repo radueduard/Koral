@@ -35,22 +35,38 @@ public record struct TextStyle()
     /// <summary>Font.Default() when null.</summary>
     public Font? Font { get; set; }
     public float Size { get; set; } = 14f;
-    public Color Color { get; set; } = Color.Black;
+    /// <summary>The theme's text colour, unless it says another.</summary>
+    public Color Color { get; set; } = Color.Inherit;
     public float LineHeight { get; set; } = 1.25f;
     public float LetterSpacing { get; set; }
+    /// <summary>How heavy its strokes are: 400 is the font as drawn, 700 bold — the font thickened, which a family's own bold font does better.</summary>
+    public float Weight { get; set; } = 400f;
+    public bool Italic { get; set; }
+    public bool Underline { get; set; }
+    public bool LineThrough { get; set; }
 
     public TextStyle SetFont(Font? font) => this with { Font = font };
     public TextStyle SetSize(float size) => this with { Size = size };
     public TextStyle SetColor(Color color) => this with { Color = color };
     public TextStyle SetLineHeight(float lineHeight) => this with { LineHeight = lineHeight };
     public TextStyle SetLetterSpacing(float spacing) => this with { LetterSpacing = spacing };
+    public TextStyle SetWeight(float weight) => this with { Weight = weight };
+    public TextStyle Bold() => this with { Weight = 700f };
+    public TextStyle SetItalic(bool italic = true) => this with { Italic = italic };
+    public TextStyle SetUnderline(bool underline = true) => this with { Underline = underline };
+    public TextStyle SetLineThrough(bool lineThrough = true) => this with { LineThrough = lineThrough };
 
     internal readonly KuiTextStyle Native => new()
     {
         font = Font?.Native ?? IntPtr.Zero, size = Size, color = Color.Native, line_height = LineHeight, letter_spacing = LetterSpacing,
+        weight = Weight, italic = KuiNative.Bool(Italic), underline = KuiNative.Bool(Underline), line_through = KuiNative.Bool(LineThrough),
     };
 
-    internal static TextStyle From(KuiTextStyle s) => new() { Size = s.size, Color = Color.From(s.color), LineHeight = s.line_height, LetterSpacing = s.letter_spacing };
+    internal static TextStyle From(KuiTextStyle s) => new()
+    {
+        Size = s.size, Color = Color.From(s.color), LineHeight = s.line_height, LetterSpacing = s.letter_spacing,
+        Weight = s.weight > 0f ? s.weight : 400f, Italic = s.italic != 0, Underline = s.underline != 0, LineThrough = s.line_through != 0,
+    };
 }
 
 /// <summary>kui::Paragraph: text laid out into lines — measured once, drawn any number of times.</summary>

@@ -133,9 +133,12 @@ namespace kor {
         Token(std::shared_ptr<detail::TimelineState> state, std::uint64_t value) noexcept
             : _state(std::move(state)), _value(value) {}
 
-        // Registers `h` to be resumed once the value is reached, and returns the slot it waits in —
-        // or null when the value has already been reached, and the coroutine carries on at once.
-        std::shared_ptr<detail::WaiterSlot> Suspend(std::coroutine_handle<> h) const;
+        // Registers `h` to be resumed once the value is reached, leaving the slot it waits in in
+        // `slot` — or returns false when the value has already been reached, and the coroutine
+        // carries on at once. `slot` is written before the coroutine can be resumed, and nothing in
+        // its frame (this token and `slot` included) may be touched once this returns true: another
+        // thread may have resumed it, and it may have finished and freed the frame.
+        bool Suspend(std::coroutine_handle<> h, std::shared_ptr<detail::WaiterSlot>& slot) const;
 
         // The coroutine waiting in `slot` is being destroyed while it waits: see that nothing ever
         // resumes it. A no-op once it has been resumed.
@@ -159,7 +162,7 @@ namespace kor {
         ~Awaiter() { if (slot) token.Cancel(slot); }
 
         bool await_ready() const noexcept { return token.Ready(); }
-        bool await_suspend(const std::coroutine_handle<> h) { slot = token.Suspend(h); return slot != nullptr; }
+        bool await_suspend(const std::coroutine_handle<> h) { return token.Suspend(h, slot); }
         void await_resume() const noexcept {}
     };
 

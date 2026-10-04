@@ -82,10 +82,23 @@ public sealed unsafe class Ui : IDisposable
         KuiNative.Check();
     }
 
+    /// <summary>Takes the keyboard from whatever has it: a text field being typed into.</summary>
+    public void ClearFocus() => KuiNative.kui_ui_clear_focus(Native);
+
     /// <summary>Every widget built again, keeping its state.</summary>
     public void Reassemble() => KuiNative.kui_ui_reassemble(Native);
     /// <summary>Every live Ui reassembled: what a hot reload does.</summary>
     public static void ReassembleAll() => KuiNative.kui_ui_reassemble_all();
+
+    /// <summary>
+    /// kui::debug::SetPaintBounds: every render object outlined where it was laid out, in every Ui of the
+    /// process — containers in one colour, what holds nothing in a fainter one, repaint boundaries in a third.
+    /// </summary>
+    public static bool DebugPaintBounds
+    {
+        get => KuiNative.kui_debug_paint_bounds() != 0;
+        set => KuiNative.kui_debug_set_paint_bounds(KuiNative.Bool(value));
+    }
 
     /// <summary>Whether the pointer is over a widget that takes it, or one is being dragged.</summary>
     public bool WantsPointer => KuiNative.kui_ui_wants_pointer(Native).AsBool();

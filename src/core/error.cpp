@@ -5,6 +5,9 @@
 #include <error.h>
 
 #include <format>
+#ifndef NDEBUG
+#include <stacktrace>
+#endif
 
 namespace kor
 {
@@ -155,5 +158,14 @@ namespace kor
     {
         e.cause = std::move(cause);
         return e;
+    }
+
+    void detail::ThrowDestroyedResource()
+    {
+        std::string message = "Attempted to dereference a ResourceRef whose Resource has been destroyed!";
+#ifndef NDEBUG
+        message += '\n' + std::to_string(std::stacktrace::current(1, 24));
+#endif
+        throw std::runtime_error(message);
     }
 }

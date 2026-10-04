@@ -20,7 +20,7 @@
 #include <input.h>
 #include <resource.h>
 
-#include "api.h"
+#include "kuiApi.h"
 #include "canvas.h"
 #include "render.h"
 #include "rendering.h"
@@ -237,23 +237,36 @@ namespace kui
 
     // ---- theme ------------------------------------------------------------------------------------
 
-    /** @brief The colours, shapes and type the built-in controls draw with. */
+    /**
+     * @brief The colours, shapes and type the built-in controls draw with.
+     *
+     * The default is in the manner of Samsung's One UI, dark: neutral greys on black, generous
+     * corners — a control is as round as it is tall, a pill — and one accent, coral. Light() is the
+     * same on a light ground.
+     */
     struct KUI_API Theme {
-        Color background = Color::Hex(0x15161B);
-        Color surface = Color::Hex(0x22242C);
-        Color surfaceHover = Color::Hex(0x2C2F39);
-        Color surfacePressed = Color::Hex(0x353946);
-        Color primary = Color::Hex(0x5B7CFA);
-        Color primaryHover = Color::Hex(0x7090FF);
-        Color primaryPressed = Color::Hex(0x4A68DD);
+        Color background = Color::Hex(0x000000);
+        Color surface = Color::Hex(0x171717);
+        Color surfaceHover = Color::Hex(0x252525);
+        Color surfacePressed = Color::Hex(0x303030);
+        Color primary = Color::Hex(0xFF7F50);           ///< Coral.
+        Color primaryHover = Color::Hex(0xFF946B);
+        Color primaryPressed = Color::Hex(0xE86A3C);
         Color onPrimary = colors::White;
-        Color text = Color::Hex(0xE8E9EE);
-        Color textMuted = Color::Hex(0x9A9DAA);
-        Color border = Color::Hex(0x3A3D49);
-        Color focus = Color::Hex(0x8FA6FF);
-        float radius = 6.f;
-        float controlHeight = 32.f;
-        TextStyle textStyle { .size = 14.f };
+        Color text = Color::Hex(0xFAFAFA);
+        Color textMuted = Color::Hex(0x8E8E8E);
+        Color border = Color::Hex(0x2B2B2B);
+        Color focus = Color::Hex(0xFFB59A);
+        float radius = 18.f;                            ///< Half a control's height: buttons and fields are pills, cards well rounded.
+        float controlHeight = 36.f;
+        TextStyle textStyle { .size = 15.f };
+        /// How round each kind of thing is, where it is not the theme's radius: a button, a field (a text
+        /// field, a dropdown, a drag value), and a checkbox — whose negative means a circle. Negative: radius.
+        float buttonRadius = -1.f, fieldRadius = -1.f;
+        float checkboxRadius = -1.f;
+
+        [[nodiscard]] float ButtonRadius() const { return buttonRadius >= 0.f ? buttonRadius : radius; }
+        [[nodiscard]] float FieldRadius() const { return fieldRadius >= 0.f ? fieldRadius : radius; }
 
         static Theme Dark();
         static Theme Light();
@@ -390,7 +403,21 @@ namespace kui
     enum class ImageFit : std::uint8_t { eFill, eContain, eCover, eNone };
 
     /** @brief Text, wrapped to the width it is given. */
-    KUI_API Widget Text(std::string text, TextStyle style = {}, TextAlign align = TextAlign::eStart, bool wrap = true);
+    /** @brief Text. @p maxLines (0: any number) keeps so many lines, the last ending in an ellipsis when @p ellipsis. */
+    KUI_API Widget Text(std::string text, TextStyle style = {}, TextAlign align = TextAlign::eStart, bool wrap = true, int maxLines = 0, bool ellipsis = false);
+    /**
+     * @brief @p child, built, laid out and painted with @p theme in place of the view's: a panel in another
+     *        family's look, a preview of a theme. Themes nest: the nearest above applies.
+     */
+    KUI_API Widget Themed(Theme theme, Widget child);
+
+    /** @brief How the system itself looks: dark or light, and its accent. What a theme that follows the system is made from. */
+    struct SystemAppearance {
+        bool dark = true;
+        Color accent = Color::Hex(0x0078D4);
+        bool known = false;     ///< Whether the system said: false where it has no such thing to ask.
+    };
+    KUI_API SystemAppearance QuerySystemAppearance();
     /** @brief Children side by side. */
     KUI_API Widget Row(std::vector<Widget> children, FlexOptions options = {});
     /** @brief Children one above the other. */
@@ -433,8 +460,68 @@ namespace kui
      */
     KUI_API Widget ListView(std::size_t count, float itemExtent, std::function<Widget(std::size_t)> builder,
                             std::function<void(std::size_t first, std::size_t last)> onRange = {});
+    /** @brief What a LazyList is: how many items, which way they run, how long they are, and where it is scrolled to. */
+    struct LazyListOptions {
+        std::size_t count = 0;
+        Axis axis = Axis::eVertical;
+        /// How long every item is. 0 or less: each is as long as it turns out to be, and one not yet built is
+        /// taken to be @p estimatedExtent long until it is.
+        float itemExtent = 0.f;
+        float estimatedExtent = 40.f;
+        float gap = 0.f;                                                ///< Between one item and the next.
+        float paddingStart = 0.f, paddingEnd = 0.f;                     ///< Before the first item and after the last, scrolled with them.
+        std::function<void(std::size_t first, std::size_t last)> onRange;   ///< The items [first, last) it keeps, as that changes.
+        /// Where it is: the first item in view, and how far into it the view starts. Told when either changes.
+        std::function<void(std::size_t index, float offset)> onScrolled;
+        std::size_t jumpIndex = 0;                                      ///< The item to put first in view, @p jumpOffset into it,
+        float jumpOffset = 0.f;                                         ///< when @p jump is not what it last was (and not 0).
+        std::uint32_t jump = 0;
+    };
+    /**
+     * @brief A list down or across of which only the items in view (and a screen either side) exist, each as
+     *        long as it likes: what ListView(count, itemExtent, builder) is for items all the same.
+     */
+    KUI_API Widget LazyList(LazyListOptions options, std::function<Widget(std::size_t)> builder);
+    /**
+     * @brief @p child as wide (@p width) and as tall (@p height) as it would be with all the room there is that
+     *        way, and no more: what makes a column as wide as its widest child, or a row as tall as its tallest,
+     *        so that the others can be stretched to it. The child is laid out twice.
+     */
+    KUI_API Widget Intrinsic(bool width, bool height, Widget child);
     /** @brief Pointer events on the child. */
     KUI_API Widget GestureDetector(GestureOptions options, Widget child);
+
+    struct ScrollOptions {
+        Axis axis = Axis::eVertical;
+        std::function<void(float position, float most)> onScrolled;     ///< Where it is scrolled to, and how far it can be: told when either changes.
+        float jumpTo = 0.f;                                             ///< Where to scroll to, when @p jump is not what it last was.
+        std::uint32_t jump = 0;
+    };
+    /** @brief A ScrollView that says where it is, and goes where it is told: what a scroll state is made of. */
+    KUI_API Widget ScrollView(Widget child, ScrollOptions options);
+
+    /** @brief @p child drawn, and hit, through @p transform about the point of its own box @p origin names. Its layout is unchanged. */
+    KUI_API Widget TransformBox(const Transform& transform, Widget child, Alignment origin = Alignment::Center());
+    /** @brief As wide as it may be, and as tall as that makes it at @p ratio (width over height). */
+    KUI_API Widget AspectRatio(float ratio, Widget child);
+    /** @brief @p child made that share of the width, and of the height, it is allowed. A share of 0 leaves that way alone. */
+    KUI_API Widget FractionallySizedBox(float widthShare, float heightShare, Widget child);
+
+    /** @brief What a CustomLayout's rule measures and places its children through. */
+    struct LayoutContext {
+        std::size_t count = 0;
+        std::function<glm::vec2(std::size_t index, const BoxConstraints& constraints)> measure;    ///< Lays child @p index out; its size.
+        std::function<void(std::size_t index, glm::vec2 at)> place;
+    };
+    /** @brief @p children laid out by @p layout: it measures each with the constraints it likes, places it, and returns its own size. */
+    KUI_API Widget CustomLayout(std::function<glm::vec2(LayoutContext&, const BoxConstraints&)> layout, std::vector<Widget> children);
+
+    /**
+     * @brief Takes no room; while @p open, @p popup is shown over everything, at the left of whatever this is
+     *        in — under it, or (@p below false) over its top — moved by @p offset. A press outside the popup, or
+     *        Escape, closes it and calls @p onDismiss. A dropdown menu is one of these beside its button.
+     */
+    KUI_API Widget PopupAnchor(bool open, Widget popup, std::function<void()> onDismiss, glm::vec2 offset = {}, bool below = true);
     /** @brief Draws with a canvas, in a box of @p size (negative: as large as the child, or nothing without one — unless the parent sets its size). */
     KUI_API Widget CustomPaint(std::function<void(Canvas&, glm::vec2 size)> painter, glm::vec2 size = { -1.f, -1.f }, Widget child = {});
     /** @brief An element shader filling the box. @see ElementShader */
@@ -540,8 +627,239 @@ namespace kui
     /** @brief A box with a tick, and a label beside it. */
     KUI_API Widget Checkbox(bool value, std::function<void(bool)> onChanged, std::string label = {});
     KUI_API Widget Switch(bool value, std::function<void(bool)> onChanged);
-    KUI_API Widget Slider(float value, std::function<void(float)> onChanged, float min = 0.f, float max = 1.f);
+    /** @brief A slider. @p onFinished is called when it is let go of. */
+    KUI_API Widget Slider(float value, std::function<void(float)> onChanged, float min = 0.f, float max = 1.f, std::function<void()> onFinished = {});
     KUI_API Widget ProgressBar(float value);
+
+    /** @brief How a DragValue turns a drag into a number, and shows it. */
+    struct DragValueOptions {
+        float speed = 0.01f;                    ///< What dragging one unit to the right adds.
+        float min = -Infinity, max = Infinity;  ///< Where the value stops.
+        int decimals = 2;                       ///< How many it is shown with.
+        std::string label;                      ///< Shown before the value: "X", "Speed".
+        float width = -1.f;                     ///< Negative: 120.
+
+        // Chainable: `kui::DragValueOptions{}.SetSpeed(0.1f).SetRange(0, 10)`.
+        DragValueOptions& SetSpeed(float value) { speed = value; return *this; }
+        DragValueOptions& SetRange(float low, float high) { min = low; max = high; return *this; }
+        DragValueOptions& SetDecimals(int value) { decimals = value; return *this; }
+        DragValueOptions& SetLabel(std::string value) { label = std::move(value); return *this; }
+        DragValueOptions& SetWidth(float value) { width = value; return *this; }
+    };
+    /**
+     * @brief A number in a field, changed by dragging across it sideways: ImGui's DragFloat. Each unit of
+     *        the drag adds DragValueOptions::speed; the value stops at its range.
+     */
+    KUI_API Widget DragValue(float value, std::function<void(float)> onChanged, DragValueOptions options = {});
+
+    /** @brief How a Dropdown looks. */
+    struct DropdownOptions {
+        float width = -1.f;                     ///< Negative: 200.
+        std::string placeholder;                ///< Shown while nothing is selected (an index out of range).
+
+        DropdownOptions& SetWidth(float value) { width = value; return *this; }
+        DropdownOptions& SetPlaceholder(std::string value) { placeholder = std::move(value); return *this; }
+    };
+    /**
+     * @brief A field showing the one of @p items that is @p selected; pressed, it opens the list of them
+     *        under itself, and @p onChanged hears which was picked.
+     */
+    KUI_API Widget Dropdown(std::vector<std::string> items, int selected, std::function<void(int)> onChanged, DropdownOptions options = {});
+
+    /** @brief One line of a menu: something to pick, or (separator) the line between two groups of them. */
+    struct MenuItem {
+        std::string label;
+        std::function<void()> onSelected;
+        bool enabled = true;
+        bool separator = false;
+    };
+    /** @brief @p child, with a menu of @p items that opens where the right button is pressed on it. */
+    KUI_API Widget ContextMenu(std::vector<MenuItem> items, Widget child);
+
+    /** @brief One menu of a MenuBar: its title in the bar, and what opens under it. */
+    struct Menu {
+        std::string title;
+        std::vector<MenuItem> items;
+    };
+    /** @brief A row of titles — File, Edit, View — each opening its menu under itself when pressed. */
+    KUI_API Widget MenuBar(std::vector<Menu> menus);
+
+    // ---- more controls ------------------------------------------------------------------------------------
+
+    /** @brief A line between two things: across (as wide as it is given room for) or, eVertical, down. */
+    KUI_API Widget Separator(Axis axis = Axis::eHorizontal, float thickness = 1.f);
+    /** @brief @p child faded, and deaf to the pointer — while @p disabled. */
+    KUI_API Widget Disabled(Widget child, bool disabled = true);
+    /** @brief One of several choices: a ring, filled when it is the one @p selected. */
+    KUI_API Widget RadioButton(bool selected, std::function<void()> onSelected, std::string label = {});
+    /** @brief A line of a list that can be picked: lit under the pointer, in the accent while @p selected. */
+    KUI_API Widget Selectable(std::string label, bool selected, std::function<void()> onTap);
+
+    /**
+     * @brief A header that folds what is under it: pressed, it tells @p onToggled what it should be now.
+     *        @p child shows under it while @p open. Whoever builds it keeps whether it is open.
+     */
+    KUI_API Widget CollapsingHeader(std::string title, bool open, std::function<void(bool)> onToggled, Widget child = {});
+
+    struct TreeNodeOptions {
+        bool leaf = false;                  ///< Nothing under it: a dot where the arrow would be, and nothing to open.
+        bool selected = false;              ///< Its label in the accent.
+        float indent = 18.f;                ///< How far in what is under it starts.
+        std::function<void()> onTap;        ///< Pressed — as well as being opened or shut.
+
+        TreeNodeOptions& SetLeaf(bool value) { leaf = value; return *this; }
+        TreeNodeOptions& SetSelected(bool value) { selected = value; return *this; }
+        TreeNodeOptions& SetIndent(float value) { indent = value; return *this; }
+        TreeNodeOptions& OnTap(std::function<void()> f) { onTap = std::move(f); return *this; }
+    };
+    /** @brief A node of a tree: its label after an arrow, and @p children under it, further in, while @p open. */
+    KUI_API Widget TreeNode(std::string label, bool open, std::function<void(bool)> onToggled, std::vector<Widget> children = {},
+                            TreeNodeOptions options = {});
+
+    /** @brief A row of titles, the one at @p selected underlined in the accent; pressing another tells @p onSelected. */
+    KUI_API Widget TabBar(std::vector<std::string> tabs, int selected, std::function<void(int)> onSelected);
+
+    /** @brief @p child; while the pointer is over it, @p text shows by the pointer. */
+    KUI_API Widget Tooltip(std::string text, Widget child);
+
+    /**
+     * @brief @p child, and @p onChanged told how big it has been laid out — in the interface's units, and
+     *        in pixels — the first time and whenever that changes. What shows a texture drawn elsewhere
+     *        (a viewport) makes the texture that size there, so that it is drawn at the size it is seen
+     *        at. With no child it is as big as it is allowed to be made.
+     *
+     * Called while the interface is laid out, in Ui::Update: what it does to the interface (a SetState)
+     * shows from the next frame.
+     */
+    KUI_API Widget SizeObserver(std::function<void(glm::vec2 size, glm::vec2 pixels)> onChanged, Widget child = {});
+
+    /**
+     * @brief @p child and, while @p open, @p dialog on a card in the middle of it, over a shade that dims
+     *        the child and keeps the pointer from it. A press on the shade calls @p onDismiss.
+     */
+    KUI_API Widget Modal(bool open, Widget child, Widget dialog, std::function<void()> onDismiss = {});
+
+    struct ColorPickerOptions {
+        bool alpha = true;                  ///< A bar for how see-through it is.
+        bool hex = true;                    ///< A swatch and the colour as #RRGGBB(AA) under the bars.
+        float width = 220.f;
+
+        ColorPickerOptions& SetAlpha(bool value) { alpha = value; return *this; }
+        ColorPickerOptions& SetHex(bool value) { hex = value; return *this; }
+        ColorPickerOptions& SetWidth(float value) { width = value; return *this; }
+    };
+    /** @brief Picks a colour: a square of every saturation and brightness of a hue, a bar of hues, and one of alpha. */
+    KUI_API Widget ColorPicker(Color color, std::function<void(Color)> onChanged, ColorPickerOptions options = {});
+    /** @brief A swatch of @p color (and @p label after it); pressed, it opens a ColorPicker under itself. */
+    KUI_API Widget ColorEdit(Color color, std::function<void(Color)> onChanged, std::string label = {}, ColorPickerOptions options = {});
+
+    enum class PlotKind : std::uint8_t { eLines, eHistogram };
+    struct PlotOptions {
+        PlotKind kind = PlotKind::eLines;
+        float min = std::numeric_limits<float>::quiet_NaN();    ///< What the foot of the plot is: the least value, when not given.
+        float max = std::numeric_limits<float>::quiet_NaN();    ///< What its top is: the greatest value, when not given.
+        glm::vec2 size { -1.f, 60.f };                          ///< Negative: as much as it is given room for.
+        std::string overlay;                                    ///< Written over it, along its top: "16.6 ms".
+        Color color = colors::Transparent;                      ///< The theme's accent, when not given.
+
+        PlotOptions& SetKind(PlotKind value) { kind = value; return *this; }
+        PlotOptions& SetRange(float low, float high) { min = low; max = high; return *this; }
+        PlotOptions& SetSize(glm::vec2 value) { size = value; return *this; }
+        PlotOptions& SetOverlay(std::string value) { overlay = std::move(value); return *this; }
+        PlotOptions& SetColor(Color value) { color = value; return *this; }
+    };
+    /** @brief @p values drawn as a line through them, or as bars: frame times, a histogram. */
+    KUI_API Widget Plot(std::vector<float> values, PlotOptions options = {});
+
+    struct TableColumn {
+        std::string title;
+        float width = -1.f;                 ///< Negative: a share of what the fixed columns leave, by @p flex.
+        float flex = 1.f;
+    };
+    struct TableOptions {
+        bool header = true;                 ///< A first row of the columns' titles.
+        bool striped = true;                ///< Every other row a shade darker.
+        bool borders = true;                ///< Lines between rows and columns, and round the table.
+        float rowHeight = -1.f;             ///< Negative: the theme's.
+
+        TableOptions& SetHeader(bool value) { header = value; return *this; }
+        TableOptions& SetStriped(bool value) { striped = value; return *this; }
+        TableOptions& SetBorders(bool value) { borders = value; return *this; }
+        TableOptions& SetRowHeight(float value) { rowHeight = value; return *this; }
+    };
+    /** @brief Rows of cells under columns that line up: @p rows[r][c] is what row r shows in column c. */
+    KUI_API Widget Table(std::vector<TableColumn> columns, std::vector<std::vector<Widget>> rows, TableOptions options = {});
+
+    struct StepSliderOptions {
+        std::vector<std::string> labels;    ///< Written in the steps, one each; a step with none shows a dot.
+        float width = -1.f;                 ///< Negative: as wide as it is given room for (240 where that has no end).
+
+        StepSliderOptions& SetLabels(std::vector<std::string> value) { labels = std::move(value); return *this; }
+        StepSliderOptions& SetWidth(float value) { width = value; return *this; }
+    };
+    /**
+     * @brief A slider that stops only at its steps: a wide rounded track of @p steps places, and in it a
+     *        rounded thumb as wide as one of them, at @p value (from 0). Pressed or dragged, it tells
+     *        @p onChanged the step under the pointer.
+     */
+    KUI_API Widget StepSlider(int value, int steps, std::function<void(int)> onChanged, StepSliderOptions options = {});
+
+    struct GradientEditorOptions {
+        float width = 260.f;
+        bool picker = true;                 ///< A ColorPicker under the bar, for the stop that is picked.
+
+        GradientEditorOptions& SetWidth(float value) { width = value; return *this; }
+        GradientEditorOptions& SetPicker(bool value) { picker = value; return *this; }
+    };
+    /**
+     * @brief Edits a gradient's stops: a bar showing it, and under the bar a handle for each stop.
+     *
+     * A handle is picked by pressing it and moved by dragging it; a press on the bar where there is none
+     * adds a stop there, of the colour the gradient has there; the right button on a handle (or the
+     * Remove button) takes its stop away, while more than two are left. The picker under the bar changes
+     * the colour of the stop that is picked. @p onChanged hears the stops, in order, after every change.
+     * A gradient has at most eight.
+     */
+    KUI_API Widget GradientEditor(std::vector<GradientStop> stops, std::function<void(std::vector<GradientStop>)> onChanged,
+                                  GradientEditorOptions options = {});
+
+    struct TitleBarOptions {
+        Widget leading;                     ///< At its left end, before the title: an icon, a MenuBar.
+        Widget trailing;                    ///< Before the window's buttons: a search field, an account.
+        float height = 36.f;
+        bool buttons = true;                ///< The window's own three: minimize, maximize or restore, close.
+
+        TitleBarOptions& SetLeading(Widget value) { leading = std::move(value); return *this; }
+        TitleBarOptions& SetTrailing(Widget value) { trailing = std::move(value); return *this; }
+        TitleBarOptions& SetHeight(float value) { height = value; return *this; }
+        TitleBarOptions& SetButtons(bool value) { buttons = value; return *this; }
+    };
+    /**
+     * @brief The window's title bar, drawn by the interface in place of the system's — a row along the
+     *        top of the window, in the theme's background: @p leading, the title, room that moves the
+     *        window when dragged (and maximizes it when pressed twice), @p trailing, and the window's
+     *        buttons.
+     *
+     * Showing one is what takes the system's title bar away (kor::Window::SetCustomTitleBar): put it
+     * first in a Column that fills the window. The window is still resized by its edges and snapped
+     * by the system. In a view with no window of its own it is only a row.
+     */
+    KUI_API Widget TitleBar(std::string title, TitleBarOptions options = {});
+
+    enum class StatusLevel : std::uint8_t { eInfo, eWarning, eError };
+    struct StatusBarOptions {
+        Widget trailing;                    ///< At its right end: a frame rate, a progress bar.
+        float height = 26.f;
+
+        StatusBarOptions& SetTrailing(Widget value) { trailing = std::move(value); return *this; }
+        StatusBarOptions& SetHeight(float value) { height = value; return *this; }
+    };
+    /**
+     * @brief A bar along the foot of a window showing the last thing that was said — a line of text
+     *        after a mark of its @p level, in the level's colour — as an editor's does. It is the colour
+     *        of the window behind the docked panels (the theme's background), and nothing in it is pressed.
+     */
+    KUI_API Widget StatusBar(std::string message, StatusLevel level = StatusLevel::eInfo, StatusBarOptions options = {});
 
     struct TextFieldOptions {
         std::string text;                                   ///< What it starts with.
@@ -552,16 +870,26 @@ namespace kui
         /// True: it always shows `text`, as a controlled field — what is typed reaches onChanged, and shows
         /// once it comes back as `text`. False: `text` is only what it starts with.
         bool controlled = false;
+        /// Several lines: Enter starts another, Up and Down move between them, and the text wraps at the field's
+        /// width. It is as tall as its text, from minLines to maxLines, and scrolls past that.
+        bool multiline = false;
+        int minLines = 1, maxLines = 1;
+        /// Takes the keyboard when this is not what it last was (and is not 0): how something else gives it the focus.
+        std::uint32_t focus = 0;
 
         // Chainable: `kui::TextFieldOptions{}.Set...(...).Set...(...)`.
         TextFieldOptions& SetText(std::string value) { text = std::move(value); return *this; }
         TextFieldOptions& SetPlaceholder(std::string value) { placeholder = std::move(value); return *this; }
         TextFieldOptions& SetWidth(float value) { width = value; return *this; }
         TextFieldOptions& SetControlled(bool value) { controlled = value; return *this; }
+        TextFieldOptions& SetMultiline(int least, int most) { multiline = true; minLines = least; maxLines = most; return *this; }
         TextFieldOptions& OnChanged(std::function<void(const std::string&)> f) { onChanged = std::move(f); return *this; }
         TextFieldOptions& OnSubmitted(std::function<void(const std::string&)> f) { onSubmitted = std::move(f); return *this; }
     };
-    /** @brief One line of editable text. */
+    /**
+     * @brief Editable text: one line, or (multiline) several. Shift with the arrows, or a drag, selects;
+     *        Control+A, C, X and V select all, copy, cut and paste; Tab goes to the next field.
+     */
     KUI_API Widget TextField(TextFieldOptions options);
 
     // ---- the view ---------------------------------------------------------------------------------------
@@ -569,8 +897,12 @@ namespace kui
     struct UiSettings {
         Theme theme {};
         float scale = 1.f;                      ///< Pixels per logical unit.
+        /// Whether the window the interface is shown in has its title bar coloured to go with it: the
+        /// theme's background behind the theme's text (kor::Window::SetTitleBarColors), where the system can.
+        bool titleBar = true;
 
         // Chainable: `kui::UiSettings{}.Set...(...).Set...(...)`.
+        UiSettings& SetTitleBar(bool value) { titleBar = value; return *this; }
         UiSettings& SetTheme(Theme value) { theme = std::move(value); return *this; }
         UiSettings& SetScale(float value) { scale = std::move(value); return *this; }
     };
@@ -621,6 +953,12 @@ namespace kui
         [[nodiscard]] RenderObject* RootRenderObject() const;
         /** @brief Whether the pointer is over a widget that takes it, or one is being dragged. */
         [[nodiscard]] bool WantsPointer() const;
+        /** @brief What the pointer looks like over the interface: what is under it said so. The view shows it so in its window. */
+        [[nodiscard]] PointerCursor Cursor() const;
+        /** @brief Takes the keyboard from whatever has it. */
+        void ClearFocus();
+        /** @brief The tip showing by the pointer — a Tooltip's, while the pointer is over it — or nothing. */
+        [[nodiscard]] const std::string& TooltipText() const;
         /** @brief Whether a widget has the keyboard. */
         [[nodiscard]] bool WantsKeyboard() const;
 

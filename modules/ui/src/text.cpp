@@ -230,6 +230,31 @@ namespace kui
 
     float Paragraph::LineHeight() const { return _style.size * _style.lineHeight; }
 
+    void Paragraph::Truncate(const std::size_t maxLines, const bool ellipsis)
+    {
+        if (maxLines == 0 || _lines.size() <= maxLines) return;
+        const std::uint32_t end = _lines[maxLines - 1].endByte;
+        if (!ellipsis) {
+            _lines.resize(maxLines);
+            std::erase_if(_glyphs, [end](const Glyph& g) { return g.byte >= end; });
+            float widest = 0.f;
+            for (const auto& line : _lines) widest = std::max(widest, line.width);
+            _size = { widest, static_cast<float>(maxLines) * LineHeight() };
+            return;
+        }
+        // As much of the text as leaves room for the mark that says there was more.
+        const char* const mark = _style.font && _style.font->HasGlyph(0x2026) ? "\xE2\x80\xA6" : "...";
+        std::string kept = _text.substr(0, std::min<std::size_t>(end, _text.size()));
+        for (;;) {
+            while (!kept.empty() && (kept.back() == ' ' || kept.back() == '\n' || kept.back() == '\t')) kept.pop_back();
+            Paragraph candidate(kept + mark, _style, _maxWidth, _align);
+            if (candidate.LineCount() <= maxLines || kept.empty()) { *this = std::move(candidate); return; }
+            // A character less: all of its bytes.
+            while (!kept.empty() && (static_cast<unsigned char>(kept.back()) & 0xC0u) == 0x80u) kept.pop_back();
+            if (!kept.empty()) kept.pop_back();
+        }
+    }
+
     float Paragraph::FirstBaseline() const { return _lines.empty() ? 0.f : _lines.front().baseline; }
 
     void Paragraph::Layout(const float maxWidth)

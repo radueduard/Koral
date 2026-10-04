@@ -15,7 +15,7 @@
 
 #include <glm/glm.hpp>
 
-#include "api.h"
+#include "kuiApi.h"
 #include "canvas.h"
 
 namespace kui
@@ -63,9 +63,15 @@ namespace kui
     struct TextStyle {
         std::shared_ptr<Font> font;             ///< Font::Default() when empty.
         float size = 14.f;                      ///< The em size, in logical units.
-        Color color = colors::Black;
+        Color color = colors::Inherit;          ///< The theme's text colour, unless it says another.
         float lineHeight = 1.25f;               ///< Line spacing, as a multiple of the size.
         float letterSpacing = 0.f;              ///< Added after every glyph, in logical units.
+        /// How heavy its strokes are, as fonts count it: 400 is the font as drawn, 700 bold. A font has one
+        /// weight; another is that one thickened or thinned, which a family's own bold font does better.
+        float weight = 400.f;
+        bool italic = false;                    ///< Slanted. A family's own italic font does it better.
+        bool underline = false;
+        bool lineThrough = false;
 
         // Chainable: `kui::TextStyle{}.Set...(...).Set...(...)`.
         TextStyle& SetFont(std::shared_ptr<Font> value) { font = std::move(value); return *this; }
@@ -92,6 +98,11 @@ namespace kui
 
         /** @brief Lays the text out again for @p maxWidth; nothing is done when it would not change. */
         void Layout(float maxWidth);
+        /**
+         * @brief Keeps the first @p maxLines lines, where there are more. With @p ellipsis its last line ends
+         *        in one, as much of the text before it as fits; without, what does not fit is just left out.
+         */
+        void Truncate(std::size_t maxLines, bool ellipsis);
 
         [[nodiscard]] const std::string& Text() const { return _text; }
         [[nodiscard]] const TextStyle& Style() const { return _style; }

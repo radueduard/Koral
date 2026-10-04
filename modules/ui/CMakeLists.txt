@@ -19,6 +19,8 @@ add_library(koral-ui SHARED
         src/boxes.cpp
         src/modifiers.cpp
         src/controls.cpp
+        src/more.cpp
+        src/compose.cpp
         src/ui.cpp
         src/list.cpp
         src/dock.cpp
@@ -45,6 +47,13 @@ target_link_libraries(koral-ui PRIVATE glm::glm spdlog::spdlog)
 set_target_properties(koral-ui PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
+
+if(MSVC)
+    # No manifest of its own. With one, Windows resolves what the module imports by the module's manifest alone;
+    # without, by whoever loads it — which is how C# has it bind to the engine and not to its own Koral.dll, the
+    # managed assembly of the same name that .NET has loaded first (see NativeLibraryResolver.LoadBesideKoral).
+    target_link_options(koral-ui PRIVATE /MANIFEST:NO)
+endif()
 
 if(APPLE)
     set_target_properties(koral-ui PROPERTIES INSTALL_RPATH "@loader_path/..")

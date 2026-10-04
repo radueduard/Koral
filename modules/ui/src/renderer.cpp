@@ -103,7 +103,7 @@ namespace kui
          *        upload, and the per-frame storage buffer the GPU reads.
          */
         template <typename T>
-        struct Table {
+        struct GpuTable {
             std::vector<T> cpu;
             Allocator allocator;
             std::vector<std::pair<std::uint32_t, std::uint32_t>> dirty;   // offset, count
@@ -266,11 +266,11 @@ namespace kui
         float scale = 1.f;
         std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 
-        Table<Instance> instances { .name = "kui instances" };
-        Table<Vertex> vertices { .name = "kui vertices" };
-        Table<GpuLayer> layers { .name = "kui layers" };
-        Table<GpuClip> clips { .name = "kui clips" };
-        Table<GpuGradient> gradients { .name = "kui gradients" };
+        GpuTable<Instance> instances { .name = "kui instances" };
+        GpuTable<Vertex> vertices { .name = "kui vertices" };
+        GpuTable<GpuLayer> layers { .name = "kui layers" };
+        GpuTable<GpuClip> clips { .name = "kui clips" };
+        GpuTable<GpuGradient> gradients { .name = "kui gradients" };
         OrderTable instanceOrder { .name = "kui instance order" };
         OrderTable vertexOrder { .name = "kui vertex order" };
 
@@ -278,7 +278,7 @@ namespace kui
         struct Parameters {
             std::shared_ptr<ElementShader> shader;
             std::uint32_t stride = 0;
-            Table<std::byte> bytes { .name = "kui element parameters" };
+            GpuTable<std::byte> bytes { .name = "kui element parameters" };
             Allocator records;   // in records, not bytes
         };
         std::map<std::uint32_t, Parameters> parameters;   // by shader id
@@ -792,7 +792,9 @@ namespace kui
         const auto begin = std::chrono::steady_clock::now();
         impl.Update();
         impl.stats.composeMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+        const auto uploading = std::chrono::steady_clock::now();
         impl.Upload();
+        impl.stats.uploadMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - uploading).count();
 
         impl.stats.instances = impl.instanceOrder.cpu.size();
         impl.stats.vertices = impl.vertexOrder.cpu.size();
@@ -804,6 +806,7 @@ namespace kui
         const auto extent = target->ColorImage(0)->Extent();
         impl.viewport = { static_cast<float>(extent.x), static_cast<float>(extent.y) };
         impl.PrepareTarget(target);
+        impl.stats.prepareMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
     }
 
     void Renderer::Record(kor::CommandBuffer& commandBuffer, const kor::ResourceRef<const kor::Framebuffer>& target) const

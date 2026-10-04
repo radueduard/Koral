@@ -57,7 +57,8 @@ void main() {
         const vec4 texel = texture(sampler2D(kuiTextures[nonuniformEXT(kuiTexture(it))], kuiSampler), uv);
         if (kind == KUI_GLYPH) {
             // The atlas holds distance from the outline, 0.5 on it; strokeWidth scales it to local units.
-            const float d = (0.50196 - texel.r) * it.strokeWidth;
+            // stroke carries how far the outline is moved out — text heavier than its font — or in.
+            const float d = (0.50196 - texel.r) * it.strokeWidth - uintBitsToFloat(it.stroke);
             color = kuiFillColor(it, p) * cover(d, w);
         } else {
             // Clipped to the rectangle with an anti-aliased edge, like any other shape.

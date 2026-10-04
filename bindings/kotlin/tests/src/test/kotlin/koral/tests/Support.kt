@@ -45,8 +45,15 @@ class ReadScreen(val readback: Buffer) : RenderPass("Read") {
 fun readback(size: Int): Buffer = Buffer.Builder().setSize(size.toLong() * size * 4).setUsage(BufferUsage.eTransferDst)
     .setType(BufferType.eReadback).build()
 
-/** The RGBA bytes of pixel (x, y) of a [size]-wide screen. */
+/**
+ * The RGBA bytes of pixel (x, y) of a [size]-wide screen, as the last frame drew it.
+ *
+ * A frame is submitted, not waited for: with two in flight, the copy into this buffer may not have
+ * happened yet when frame() returns, and a read would see the frame before — on some GPUs, some of the
+ * time. Work submitted after it and waited for is done only once it is, the queue running in order.
+ */
 fun Buffer.pixel(size: Int, x: Int, y: Int): List<Int> {
+    CommandBuffer.singleTimeCommand { }.waitBlocking()
     val bytes = read()
     val i = (y * size + x) * 4
     return (0 until 4).map { bytes[i + it].toInt() and 0xff }

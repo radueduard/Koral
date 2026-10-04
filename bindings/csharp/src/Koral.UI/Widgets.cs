@@ -331,7 +331,7 @@ public sealed record ButtonOptions
     };
 }
 
-/// <summary>kui::TextFieldOptions: one line of editable text.</summary>
+/// <summary>kui::TextFieldOptions: editable text, of one line or several.</summary>
 public sealed record TextFieldOptions
 {
     /// <summary>What it starts with.</summary>
@@ -345,7 +345,15 @@ public sealed record TextFieldOptions
     /// <summary>True: it always shows <see cref="Text"/> — what is typed reaches OnChanged, and shows once it
     /// comes back as Text. False: Text is only what it starts with.</summary>
     public bool Controlled { get; set; }
+    /// <summary>Several lines, from <see cref="MinLines"/> to <see cref="MaxLines"/> tall: Enter starts another.</summary>
+    public bool Multiline { get; set; }
+    public int MinLines { get; set; } = 1;
+    public int MaxLines { get; set; } = 6;
+    /// <summary>Takes the keyboard when this is not what it last was (and not 0).</summary>
+    public uint Focus { get; set; }
 
+    public TextFieldOptions SetMultiline(int minLines = 1, int maxLines = 6) { Multiline = true; MinLines = minLines; MaxLines = maxLines; return this; }
+    public TextFieldOptions SetFocus(uint token) { Focus = token; return this; }
     public TextFieldOptions SetText(string value) { Text = value; return this; }
     public TextFieldOptions SetPlaceholder(string value) { Placeholder = value; return this; }
     public TextFieldOptions SetOnChanged(Action<string> value) { OnChanged = value; return this; }
@@ -408,7 +416,7 @@ public static unsafe partial class Widgets
         finally { if (handle != IntPtr.Zero) KuiNative.kui_widget_release(handle); }
     }
 
-    /// <summary>Text, wrapped to the width it is given. Black text takes the theme's text colour.</summary>
+    /// <summary>Text, wrapped to the width it is given. With no colour of its own (<see cref="Color.Inherit"/>, a style's default) it is the theme's.</summary>
     public static Widget Text(string text, TextStyle? style = null, TextAlign align = TextAlign.eStart, bool wrap = true)
     {
         var s = (style ?? new TextStyle()).Native;
@@ -604,7 +612,8 @@ public static unsafe partial class Widgets
             {
                 text = text, placeholder = placeholder, on_changed = Callbacks.Text(options.OnChanged),
                 on_submitted = Callbacks.Text(options.OnSubmitted), width = options.Width,
-                controlled = KuiNative.Bool(options.Controlled),
+                controlled = KuiNative.Bool(options.Controlled), multiline = KuiNative.Bool(options.Multiline),
+                min_lines = options.MinLines, max_lines = options.MaxLines, focus = options.Focus,
             };
             return Made(KuiNative.kui_text_field(&o));
         }

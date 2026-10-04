@@ -75,6 +75,8 @@ namespace kor::vk
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
         [[nodiscard]] kor::Window::Format getWindowFormat() const { return _windowFormat; }
         [[nodiscard]] glm::u32 currentImageIndex() const { return _imageIndex; }
+        /// Whether what it presents is blended with what is behind the window, by its alpha.
+        [[nodiscard]] bool compositesAlpha() const { return _composites; }
 
     	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinishedSemaphores[_imageIndex]; }
         /// Signalled by the acquire made for frame @p slot; what that frame's submit waits for.
@@ -99,6 +101,7 @@ namespace kor::vk
         glm::uvec2 _extent;
         bool _vsync = true;
         bool _transparent = false;
+        bool _composites = false;       ///< Transparent, and the surface could do it.
         SampleCount _sampleCount = SampleCount::e1;
         /// What was asked for, held separately from _imageCount because _imageCount is replaced
         /// by the driver's actual count — and re-requesting that on a Resize would ratchet it up.

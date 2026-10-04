@@ -4,6 +4,7 @@
 //
 
 #include <algorithm>
+#include <cstring>
 #include <atomic>
 #include <cmath>
 #include <limits>
@@ -11,6 +12,7 @@
 #include <log.h>
 
 #include <kui/text.h>
+#include <kui/widgets.h>
 
 #include "gpu.h"
 #include "tessellate.h"
@@ -141,6 +143,8 @@ namespace kui
         Saved current;
         std::vector<Saved> stack;
         Path pen;   // what BeginPath / MoveTo / DrawLineTo build, until Fill or Stroke draw it
+        bool culls = false;
+        Rect cull {};   // in the canvas's own coordinates: what will be looked at, when culls is set
         std::unique_ptr<Picture::Data> data = std::make_unique<Picture::Data>();
         float tolerance = 0.25f;
 
@@ -305,6 +309,27 @@ namespace kui
         clips.push_back({ _state->current.transform, rrect.rect, rrect.radii, _state->current.clip });
         _state->current.clip = static_cast<std::uint32_t>(clips.size() - 1);
         return *this;
+    }
+
+    Canvas& Canvas::SetCullRect(const Rect& rect)
+    {
+        _state->culls = true;
+        _state->cull = rect;
+        return *this;
+    }
+
+    Canvas& Canvas::Reserve(const std::size_t shapes)
+    {
+        _state->data->instances.reserve(shapes);
+        return *this;
+    }
+
+    bool Canvas::QuickReject(const Rect& rect) const
+    {
+        if (!_state->culls) return false;
+        const Rect r = _state->current.transform.IsIdentity() ? rect : _state->current.transform.MapRect(rect);
+        const Rect& c = _state->cull;
+        return r.right <= c.left || r.left >= c.right || r.bottom <= c.top || r.top >= c.bottom;
     }
 
     Canvas& Canvas::DrawRect(const Rect& rect, const Paint& paint) { DrawRRect({ rect, {} }, paint); return *this; }
@@ -501,19 +526,59 @@ namespace kui
 
     Canvas& Canvas::DrawParagraph(const Paragraph& paragraph, const glm::vec2 position)
     {
-        const Color color = paragraph.Style().color;
+        const TextStyle& style = paragraph.Style();
+        // Of no colour of its own, it is the colour of text in the theme this is drawn in.
+        const Color color = style.color.a < 0.f ? Theme::Current().text : style.color;
         if (!color.Visible()) return *this;
         const std::uint32_t packed = color.Packed();
+        // Heavier or lighter than the font is drawn: its outline moved out or in, by so much of its size.
+        const float thicken = (style.weight - 400.f) / 300.f * 0.032f * style.size;
+        std::uint32_t thickenBits = 0;
+        static_assert(sizeof thickenBits == sizeof thicken);
+        std::memcpy(&thickenBits, &thicken, sizeof thicken);
+        const auto& lines = paragraph.Lines();
+        std::size_t line = 0;
+        bool slanted = false;
+        const auto slant = [&](const std::size_t index) {
+            // Sheared about the line's own baseline, so that the letters lean without leaving it.
+            if (slanted) { Restore(); slanted = false; }
+            if (!style.italic || index >= lines.size()) return;
+            constexpr float Lean = 0.2f;
+            const float baseline = position.y + lines[index].baseline;
+            Save();
+            Concat(Transform { 1.f, 0.f, -Lean, 1.f, Lean * baseline, 0.f });
+            slanted = true;
+        };
+        slant(0);
         for (const auto& glyph : paragraph.Glyphs()) {
+            while (line + 1 < lines.size() && glyph.byte >= lines[line].endByte) slant(++line);
             const Rect r = glyph.rect.Shift(position);
             Instance it = _state->Make(detail::eGlyph, r);
             it.shape0 = { r.left, r.top, r.right, r.bottom };
             it.shape1 = { glyph.uv.left, glyph.uv.top, glyph.uv.right, glyph.uv.bottom };
             it.strokeWidth = glyph.distanceScale;
             it.fill = packed;
+            it.stroke = thickenBits;
             it.kindFlags |= detail::eFill << 8;
             it.SetTexture(0);
             _state->Push(it);
+        }
+        if (slanted) Restore();
+        if (style.underline || style.lineThrough) {
+            // A line under each line of text, or through the middle of its letters.
+            const float thick = std::max(std::round(style.size / 14.f), 1.f);
+            for (const auto& l : lines) {
+                if (l.width <= 0.f) continue;
+                const float left = position.x + l.x, right = left + l.width;
+                if (style.underline) {
+                    const float y = std::round(position.y + l.baseline + style.size * 0.12f);
+                    DrawRect(Rect::LTRB(left, y, right, y + thick), Paint::Fill(color));
+                }
+                if (style.lineThrough) {
+                    const float y = std::round(position.y + l.baseline - style.size * 0.28f);
+                    DrawRect(Rect::LTRB(left, y, right, y + thick), Paint::Fill(color));
+                }
+            }
         }
         return *this;
     }

@@ -49,7 +49,8 @@ chosen framework's SDK was built with its Kotlin bindings.
   and recommends the Kotlin extensions.
 
 The Hub finds JDK 25 and the JetBrains Runtime where installers put them (and in `JAVA_HOME`, `KORAL_JBR`
-and `~/.local/jdk`). It writes them, with where the SDK is, into a `gradle.properties` that git ignores.
+and `~/.local/jdk`). With no JDK 25 on the machine, the first build downloads Eclipse Temurin into the
+Hub's own tools (its Toolchain window lists it, and .NET for C#, beside CMake and Ninja). It writes them, with where the SDK is, into a `gradle.properties` that git ignores.
 `App.launch` reads koral.json as the C++ runtime does, and opens its `scene` (or the first registered).
 
 ## Using the SDK
@@ -92,7 +93,10 @@ Programs that run Koral need `--enable-native-access=ALL-UNNAMED`. The sample's 
 | `:koral-ui` | Compose on koral-ui (`koral.compose`), and koral-ui's C interface (`koral.ui.interop`).        |
 | `:tests`    | End-to-end tests on a real device with no display, each test class in a JVM of its own.        |
 
-From CMake, `-DKORAL_BUILD_KOTLIN=ON -DKORAL_JAVA_HOME=<jdk>` does three things:
+CMake builds the bindings by default wherever it finds a JDK 25 or later: in `KORAL_JAVA_HOME`, `JAVA_HOME`,
+or where installers and the JetBrains IDEs put them (`-DKORAL_JAVA_HOME=<jdk>` names one,
+`-DKORAL_BUILD_KOTLIN=OFF` leaves them out). A build tree configured before this keeps the `OFF` it cached,
+until it is configured with `-DKORAL_BUILD_KOTLIN=ON`. Building them does three things:
 - it publishes the libraries into the SDK's Maven repository (`stage`, `install`);
 - `Kotlin.Bindings`, in ctest, runs the Gradle tests against the build's Koral (on the JetBrains Runtime too,
   when `KORAL_JBR` names one);
@@ -247,8 +251,8 @@ content, not the column around it.
 | `Checkbox`, `Switch`, `Slider`, `LinearProgressIndicator` | the controls of the same names                          |
 | `TextField(value, onValueChange, placeholder)`      | `TextField`, controlled: it shows `value`, and what `onValueChange` made of an edit |
 | `Canvas(modifier) { drawCircle(...) }`              | `CustomPaint`, with a Compose-style `DrawScope`. It draws again when state it read while drawing changes, without composing again |
-| `Image(image, contentDescription, modifier, contentScale)` | `Image`: a Koral image (a texture, or what a View draws), `Fit`, `Crop`, `FillBounds` or `None` |
-| `LazyColumn(modifier, itemHeight) { item { }; items(list, key) { } }` | `ListView(count, extent, builder)`: only the items in view are composed, each a composition of its own |
+| `Picture(image, contentDescription, modifier, contentScale)` | `Image`: a Koral image (a texture, or what a View draws), `Fit`, `Crop`, `FillBounds` or `None`. Compose's `Image` under another name: `Image` is Koral's own type, the thing this shows |
+| `LazyColumn(modifier, state, contentPadding, verticalArrangement) { item { }; items(list, key) { } }`, `LazyRow`, `LazyVerticalGrid` | `LazyList`: only the items in view are composed, each a composition of its own and as long as it is (`itemHeight` / `itemWidth`, koral-ui's own: all one length, which a list of very many lays out faster) |
 
 Modifiers apply outermost first, as in Compose:
 
@@ -259,6 +263,7 @@ Modifiers apply outermost first, as in Compose:
 | `size`, `width`, `height`                                       | a fixed size                         |
 | `fillMaxWidth`, `fillMaxHeight`, `fillMaxSize`                  | all the space allowed                |
 | `clickable`                                                     | clicks, with hover and press shown   |
+| `onSizeChanged { size -> }`                                     | its size in pixels, when it changes: resize a viewport's texture to it |
 | `alpha`                                                         | transparency                         |
 | `clip(shape)`                                                   | cut to a shape                       |
 | `dragSource(type, payload)`, `dropTarget(type) { }`             | drag and drop                        |
@@ -270,8 +275,70 @@ Modifiers apply outermost first, as in Compose:
 - `drawRect`, `drawRoundRect`, `drawCircle`, `drawOval`, `drawArc`, `drawLine`, `drawPath` and `drawText`;
 - `translate`, `rotate`, `scale` and `clipRect` blocks.
 
-Shapes are `RectangleShape`, `RoundedCornerShape(dp)` and `CircleShape`. The theme is `Theme.Dark` or
-`Theme.Light`, read in a composable as `LocalTheme.current`.
+Shapes are `RectangleShape`, `RoundedCornerShape(dp)` and `CircleShape`.
+
+### Themes and fonts
+
+A `Theme` is every choice of a colour and a size the controls are drawn with, as one value, read in a composable
+as `LocalTheme.current`. There are four families, each light and dark, each in its own accent or one given:
+
+| | dark | light | by its parts |
+|---|---|---|---|
+| koral-ui's own (One UI's shapes, coral) | `KoralDarkTheme` | `KoralLightTheme` | `Themes.koral(dark, accent)` |
+| Material 3 | `MaterialDarkTheme` | `MaterialLightTheme` | `Themes.material(dark, accent)` |
+| Cupertino | `CupertinoDarkTheme` | `CupertinoLightTheme` | `Themes.cupertino(dark, accent)` |
+| Windows (Fluent) | `WindowsDarkTheme` | `WindowsLightTheme` | `Themes.windows(dark, accent)` |
+
+```kotlin
+val ui = setContent(theme = Themes.material(dark = false, accent = Color(0xFF00897B))) { App() }
+ui.theme = Themes.windows()                      // changed while it runs: the whole interface, where it stands
+KoralTheme(CupertinoLightTheme) { Preview() }    // or for a part of it
+val mine = KoralDarkTheme.copy(radius = 8.dp, buttonRadius = 4.dp, controlHeight = 30.dp)
+```
+
+`Themes.windows()` with nothing said is dark or light as Windows is set, in Windows' accent, in Segoe UI:
+`SystemAppearance.isDark` and `.accent` are what it reads (`isKnown` is false where the system has no such
+setting). `Themes.of(family, dark, accent)` picks by a `ThemeFamily`; `theme.withAccent(color)` is any theme in
+another accent. Besides the colours a theme has `radius` (cards, menus, panels), `buttonRadius`, `fieldRadius`,
+`checkboxRadius` (unspecified: a circle), `controlHeight`, `fontSize` and `fontFamily`.
+
+Fonts are Compose's `Font` and `FontFamily`:
+
+```kotlin
+val Inter = FontFamily(
+    Font("assets/fonts/Inter-Regular.ttf"),
+    Font("assets/fonts/Inter-Bold.ttf", FontWeight.Bold),
+    Font("assets/fonts/Inter-Italic.ttf", style = FontStyle.Italic))
+Text("Hello", fontFamily = Inter, fontWeight = FontWeight.Bold)
+setContent(theme = KoralDarkTheme.copy(fontFamily = Inter)) { … }      // everywhere, the controls too
+```
+
+A `Font` is a TrueType or OpenType file by its path, a `File`, its bytes (`Font(name, bytes)`) or a resource
+(`Font.resource("fonts/Inter.ttf")`). `FontFamily.SansSerif`, `Serif`, `Monospace` and `Cursive` are the system's
+where it has them. A family gives the font nearest the weight and style asked for; where it has none that heavy or
+that slanted, koral-ui thickens or slants the nearest — a family's own bold and italic look better.
+
+Besides Compose's own names there are the controls a tools interface is made of. None keeps anything of
+its own: the caller's state says whether a header is open or which tab is in front, and hears when it
+should change.
+
+| Composable | |
+|---|---|
+| `RadioButton(selected, onClick, label)`, `Selectable(label, selected, onClick)` | one of several; a line that can be picked |
+| `DragValue`, `Dropdown`, `ColorPicker`, `ColorEdit` | a number dragged; a list under a field; a colour, inline or under a swatch |
+| `Slider` and `DragValue` over an `Int`, a `Double`, a `Dp` or a `TextUnit` | the value comes back as what it was given: `Slider(radius, { radius = it }, valueRange = 0.dp..24.dp)` |
+| `CollapsingHeader(title, expanded, onExpandedChange) { }` | folds its content, which is composed only while open |
+| `TreeNode(label, expanded, onExpandedChange, leaf, selected, onClick) { }` | a node of a tree, its content further in |
+| `TabRow(tabs, selected, onSelected)` | a row of titles |
+| `MenuBar(listOf(Menu("File", items)))`, `ContextMenuArea(items) { }` | menus |
+| `Tooltip(text) { }` | a tip by the pointer |
+| `Dialog(open, onDismiss, dialog = { }) { }` | a card over its content, which is dimmed while it shows |
+| `Plot(values, kind, range, overlay)` | a line or bars |
+| `Table(columns, rowCount) { row, column -> }` | cells under columns that line up |
+| `Divider`, `Enabled(enabled) { }`, `BulletText` | |
+| `StepSlider(value, steps, onValueChange, labels)` | a slider that stops only at its steps |
+| `GradientEditor(stops, onStopsChange)` | a gradient's `ColorStop`s: added, moved, recoloured, removed |
+| `StatusBar(message, level) { trailing }` | the last thing said, along the foot of the window |
 
 ### Docking and drag and drop
 
@@ -297,9 +364,53 @@ A LazyColumn item keeps what it remembers while it stays within the range the li
 screen either side). One that leaves it is disposed, and composed afresh when it comes back, as in Compose.
 Give items a `key` so their state moves with them when the list changes.
 
+### What is Compose's, and what is not
+
+The names, parameter names and parameter order are Jetpack Compose's wherever Compose has the thing: `Text`
+(with `TextStyle`, `TextAlign.Center`, `FontWeight`…), `Button`, `Checkbox`, `Switch`, `RadioButton`,
+`Slider` (with `steps`), `TextField` (composable `label` and `placeholder`), `Surface`, `Card`, `Scaffold`,
+`TabRow` and `Tab`, `Dialog` and `AlertDialog`, `HorizontalDivider`, `CircularProgressIndicator`,
+`MaterialTheme.colorScheme` / `.typography` / `.shapes`, `Modifier.pointerInput { detectTapGestures / detectDragGestures }`,
+`onSizeChanged`, `widthIn` / `sizeIn`, `wrapContentSize`, `shadow`, and the animation names (`animate*AsState`,
+`Animatable`, `tween` / `spring` / `snap`, `AnimatedVisibility`, `Crossfade`, `rememberInfiniteTransition`).
+Menus follow Compose for Desktop: `MenuBar { Menu("File") { Item("Open", onClick = { }) } }`,
+`ContextMenuArea(items = { listOf(ContextMenuItem("Copy") { }) })`. They are in `koral.compose`, not `androidx.compose.*`.
+
+What koral-ui adds keeps Compose's conventions — the value, then `on…Change`, then `modifier`, content last — and
+where one of them takes something Compose's own does not (a `RadioButton`'s `label`, a `TextField`'s `width` and
+`onSubmit`), it is a named parameter after Compose's.
+
+Also Compose's: `Layout(content) { measurables, constraints -> layout(w, h) { placeable.place(x, y) } }`,
+`Modifier.graphicsLayer` / `rotate` / `scale`, `aspectRatio`, `fillMaxWidth(0.5f)`, `DropdownMenu` and
+`DropdownMenuItem`, `Popup`, `Icon(Icons.Default.Add, …)` (some fifty icons, drawn rather than loaded),
+`rememberScrollState()` with `value`, `maxValue`, `scrollTo` and `animateScrollTo`, `awaitPointerEventScope`,
+`ButtonDefaults.buttonColors(…)` with `shape`, `colors` and `border` on the buttons, `MaterialTheme(colorScheme) { }`,
+`LazyRow`, `LazyVerticalGrid`. A `TextField` selects with Shift and the arrows or a drag, copies, cuts and pastes
+with Control and C, X and V; as Compose's it is as many lines as are typed (from `minLines` to `maxLines`), and one
+with `singleLine = true`, where Enter submits; Tab goes from one field to the next.
+
+And: `Text`'s `fontWeight`, `fontStyle`, `fontFamily`, `textDecoration`, `maxLines`, `minLines` and
+`overflow = TextOverflow.Ellipsis`; a `Slider`'s `onValueChangeFinished`; `detectTapGestures(onLongPress = …)`;
+`FocusRequester` with `Modifier.focusRequester` on a field, and `LocalFocusManager.current.clearFocus()`;
+`BoxWithConstraints` (its content is composed from the frame after it is first laid out); `AnimatedVisibility` with
+`fadeIn`, `expandVertically` / `Horizontally` / `In`, `slideInVertically` / `Horizontally`, `scaleIn` and their
+exits, added together with `+`; `MaterialTheme(colorScheme) { }`, which recolours everything inside it, koral-ui's
+own controls too.
+
+And: lazy lists as Compose writes them — `LazyColumn` and `LazyRow` with items as long as they are,
+`contentPadding`, `Arrangement.spacedBy`, and a `LazyListState` (`rememberLazyListState()`,
+`firstVisibleItemIndex`, `firstVisibleItemScrollOffset`, `scrollToItem`); `LazyVerticalGrid` with
+`GridCells.Fixed` or `GridCells.Adaptive`, which counts its columns from the width it is given;
+`Modifier.width(IntrinsicSize.Max)` and `height(IntrinsicSize.Min)`, and a `Measurable`'s intrinsic sizes in a
+`Layout`; `SubcomposeLayout`.
+
+Where it differs from Compose:
+- An intrinsic size is the size something is with all the room there is that way: `Min` and `Max` are the same.
+- `SubcomposeLayout` composes a slot in the frame after its rule first asks for it, so a layout whose parts depend
+  on one another settles over that many frames; and a slot is one measurable, whatever it emits.
+- `animateScrollToItem` goes there at once. A lazy list has no `reverseLayout`, sticky headers or `layoutInfo`.
+
 ### Not yet
 
-- **`LazyColumn`** items are all `itemHeight` tall: koral-ui's virtual list has a fixed extent.
 - **`Modifier.offset`** moves where a click lands, but a click reaches it only inside its parent's box.
-- **`fillMax*`** supports only the whole of the space (a fraction of 1).
-- **`Image`** shows a Koral `Image`; loading files is the image modules' (`kimg`), which have no Kotlin face yet.
+- **`Picture`** shows a Koral `Image`; loading files is the image modules' (`kimg`), which have no Kotlin face yet.

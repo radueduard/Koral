@@ -8,6 +8,14 @@ public static class Check
 {
     public static int Failures { get; private set; }
 
+    /// <summary>
+    /// Waits until the GPU has done what the frames so far submitted. A frame is submitted, not waited for:
+    /// with two in flight, what it copies into a readback buffer may not be there yet when Frame() returns,
+    /// and a read would see the frame before — on some GPUs, some of the time. Work submitted after it and
+    /// waited for is done only once it is, the queue running in order.
+    /// </summary>
+    public static void GpuIsDone() => CommandBuffer.SingleTimeCommand(_ => { }).Wait();
+
     public static void That(bool condition, string what, [CallerFilePath] string file = "", [CallerLineNumber] int line = 0)
     {
         if (condition) return;

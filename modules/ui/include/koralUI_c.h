@@ -67,6 +67,8 @@ typedef struct KuiTextStyle {
     KuiColor color;
     float line_height;
     float letter_spacing;
+    float weight;                       /* 400: the font as it is drawn; 700: bold. 0 is taken as 400 */
+    bool italic, underline, line_through;
 } KuiTextStyle;
 
 /* ==== callbacks ======================================================================================== */
@@ -311,6 +313,9 @@ typedef struct KuiTextFieldOptions {
     KuiTextAction on_submitted;
     float width;
     bool controlled;                /* true: it always shows text (TextFieldOptions::controlled) */
+    bool multiline;                 /* several lines, from min_lines to max_lines tall */
+    int32_t min_lines, max_lines;
+    uint32_t focus;                 /* takes the keyboard when this changes (and is not 0) */
 } KuiTextFieldOptions;
 typedef struct KuiItemBuilder { KuiWidget* (*build)(size_t index, void* user); void* user; void (*destroy)(void* user); } KuiItemBuilder;
 typedef struct KuiRangeAction { void (*invoke)(size_t first, size_t last, void* user); void* user; void (*destroy)(void* user); } KuiRangeAction;
@@ -338,6 +343,49 @@ KUI_API KuiWidget* kui_list_view(KuiWidget* const* children, size_t count, uint3
 KUI_API KuiWidget* kui_list_view_builder(size_t count, float item_extent, KuiItemBuilder builder);
 /** ListView(count, extent, builder, onRange): also told which items [first, last) it keeps, as that changes. */
 KUI_API KuiWidget* kui_list_view_builder_with_range(size_t count, float item_extent, KuiItemBuilder builder, KuiRangeAction on_range);
+/** Told an item and how far into it: where a lazy list is. */
+typedef struct KuiIndexAction { void (*invoke)(size_t index, float offset, void* user); void* user; void (*destroy)(void* user); } KuiIndexAction;
+typedef struct KuiLazyListOptions {
+    size_t count;
+    uint32_t axis;
+    float item_extent;              /* every item's; 0 or less: each its own */
+    float estimated_extent;         /* an item's, until it is built and measured */
+    float gap;
+    float padding_start, padding_end;
+    KuiItemBuilder builder;
+    KuiRangeAction on_range;
+    KuiIndexAction on_scrolled;     /* the first item in view, and how far into it the view starts */
+    size_t jump_index;              /* put first in view, jump_offset into it, when jump changes (and is not 0) */
+    float jump_offset;
+    uint32_t jump;
+} KuiLazyListOptions;
+/** LazyList: only the items in view exist, each as long as it likes; down or across. */
+KUI_API KuiWidget* kui_lazy_list(const KuiLazyListOptions* options);
+/** Intrinsic: @p child as wide, and as tall, as it is with all the room there is. */
+KUI_API KuiWidget* kui_intrinsic(bool width, bool height, KuiWidget* child);
+/** ScrollView(child, ScrollOptions): @p on_scrolled hears where it is and how far it can go; it jumps to @p jump_to when @p jump changes. */
+KUI_API KuiWidget* kui_scroll_view_observed(KuiWidget* child, uint32_t axis, KuiPointAction on_scrolled, float jump_to, uint32_t jump);
+/** TransformBox: @p child drawn and hit through @p transform about @p origin of its own box. */
+KUI_API KuiWidget* kui_transform_box(KuiTransform transform, KuiAlignment origin, KuiWidget* child);
+KUI_API KuiWidget* kui_aspect_ratio(float ratio, KuiWidget* child);
+/** FractionallySizedBox: a share of 0 leaves that way alone. */
+KUI_API KuiWidget* kui_fractionally_sized_box(float width_share, float height_share, KuiWidget* child);
+/** What a custom layout's rule measures and places its children through: good for the call it is given to. */
+typedef struct KuiLayoutContext KuiLayoutContext;
+KUI_API size_t kui_layout_count(KuiLayoutContext* context);
+KUI_API void kui_layout_measure(KuiLayoutContext* context, size_t index, float min_width, float max_width, float min_height, float max_height,
+                                float* out_width, float* out_height);
+KUI_API void kui_layout_place(KuiLayoutContext* context, size_t index, float x, float y);
+typedef struct KuiLayoutRule {
+    /* Measures and places the children through @p context, and says how big the whole is. INFINITY: unbounded. */
+    void (*layout)(KuiLayoutContext* context, float min_width, float max_width, float min_height, float max_height,
+                   float* out_width, float* out_height, void* user);
+    void* user;
+    void (*destroy)(void* user);
+} KuiLayoutRule;
+KUI_API KuiWidget* kui_custom_layout(KuiLayoutRule rule, KuiWidget* const* children, size_t count);
+/** PopupAnchor: @p popup shown over everything while @p open, under (or, below false, over) what this is in. */
+KUI_API KuiWidget* kui_popup_anchor(bool open, KuiWidget* popup, KuiAction on_dismiss, KuiVec2 offset, bool below);
 KUI_API KuiWidget* kui_gesture_detector(const KuiGestureOptions* options, KuiWidget* child);
 KUI_API KuiWidget* kui_custom_paint(KuiPainter painter, KuiVec2 size, KuiWidget* child);
 KUI_API KuiWidget* kui_shader_box(KuiElementShader* shader, const void* parameters, size_t size, KuiRadii radius, KuiWidget* child);
@@ -387,24 +435,111 @@ KUI_API void kui_dock_layout_release(KuiDockLayout* layout);
 /** Dock(panel, side, relativeTo, fraction): side is a kui::DockSide; relative_to may be null (the whole space). */
 KUI_API void kui_dock_layout_dock(KuiDockLayout* layout, const char* panel, uint32_t side, const char* relative_to, float fraction);
 KUI_API void kui_dock_layout_float(KuiDockLayout* layout, const char* panel, KuiRect rect);
+/** Float(panel, at): floating at a place, as big as what it shows. */
+KUI_API void kui_dock_layout_float_at(KuiDockLayout* layout, const char* panel, KuiVec2 at);
 KUI_API void kui_dock_layout_pop_out(KuiDockLayout* layout, const char* panel, KuiVec2 size);
 KUI_API void kui_dock_layout_close(KuiDockLayout* layout, const char* panel);
 KUI_API void kui_dock_layout_open(KuiDockLayout* layout, const char* panel);
+/** Dock(panel, area, part). area: 0 left, 1 right, 2 bottom-left, 3 bottom-right, 4 center; part: which part of a side, from the top. */
+KUI_API void kui_dock_layout_dock_in(KuiDockLayout* layout, const char* panel, uint32_t area, int32_t part);
 KUI_API void kui_dock_layout_activate(KuiDockLayout* layout, const char* panel);
+/** Hide: folds the panel's area away, when it is the one shown there. */
+KUI_API void kui_dock_layout_hide(KuiDockLayout* layout, const char* panel);
+/** IsShown: floating, or the one its area shows — and not closed. */
+KUI_API bool kui_dock_layout_is_shown(KuiDockLayout* layout, const char* panel);
 KUI_API bool kui_dock_layout_is_open(KuiDockLayout* layout, const char* panel);
 KUI_API bool kui_dock_layout_is_floating(KuiDockLayout* layout, const char* panel);
 /** Save(): valid until the next call of it on this thread. */
 KUI_API const char* kui_dock_layout_save(KuiDockLayout* layout);
 KUI_API bool kui_dock_layout_load(KuiDockLayout* layout, const char* text);
 
-typedef struct KuiDockPanel { const char* id; const char* title; KuiWidget* content; bool fixed; /* no close button */ } KuiDockPanel;
+typedef struct KuiDockPanel {
+    const char* id; const char* title; KuiWidget* content;
+    bool fixed;                     /* no close button */
+    bool undockable;                /* it never docks: it floats on its own, and nothing docks into it */
+    bool no_title_bar;              /* floating on its own it is only its content, moved by dragging that */
+    const char* icon;               /* the glyph on its button; null or empty: the first letter of its title */
+} KuiDockPanel;
+/** kui::DockStyle, in its order. A value of 0 (or less) is the default. */
+typedef struct KuiDockStyle {
+    float title_bar_height, stripe_width, button_size, button_gap, separator_gap, tab_padding, resize_grip, min_float_size, min_area_size, radius;
+    float edge_drop_margin, center_drop_size, under_drop_start;
+} KuiDockStyle;
 typedef struct KuiDockOptions {
     bool single_viewport;           /* true: panels never get windows of their own */
+    float gap;                      /* the space between two areas; 0 (or less): the default */
+    float stripe_gap;               /* space added round a stripe's buttons, half each side of them; negative: the default */
+    KuiDockStyle style;             /* every size it is drawn with; a 0 is the default */
     KuiTextAction on_closed;        /* a panel's close button was clicked: its id */
     KuiAction on_changed;
 } KuiDockOptions;
 /** DockSpace(layout, panels, options): options may be null. */
 KUI_API KuiWidget* kui_dock_space(KuiDockLayout* layout, const KuiDockPanel* panels, size_t count, const KuiDockOptions* options);
+
+/** DragValue: a number changed by dragging across it. @p label may be null; a negative @p width is the default. */
+KUI_API KuiWidget* kui_drag_value(float value, KuiFloatAction on_changed, float speed, float min, float max, int32_t decimals,
+                                  const char* label, float width);
+/** Dropdown: @p on_changed hears the index picked (a whole number, as a float). @p placeholder may be null. */
+KUI_API KuiWidget* kui_dropdown(const char* const* items, size_t count, int32_t selected, KuiFloatAction on_changed, float width,
+                                const char* placeholder);
+typedef struct KuiMenuItem {
+    const char* label;
+    KuiAction on_selected;
+    bool disabled;
+    bool separator;                 /* a line between two groups of items, not an item */
+} KuiMenuItem;
+/** ContextMenu: @p child, with a menu of @p items where the right button is pressed on it. */
+KUI_API KuiWidget* kui_context_menu(const KuiMenuItem* items, size_t count, KuiWidget* child);
+typedef struct KuiMenu {
+    const char* title;
+    const KuiMenuItem* items;
+    size_t count;
+} KuiMenu;
+/** MenuBar: a row of titles, each opening its menu under itself. */
+KUI_API KuiWidget* kui_menu_bar(const KuiMenu* menus, size_t count);
+
+/* ---- more controls: Separator, Disabled, RadioButton, Selectable, CollapsingHeader, TreeNode, TabBar, Tooltip, Modal ---- */
+KUI_API KuiWidget* kui_separator(bool vertical, float thickness);
+KUI_API KuiWidget* kui_disabled(KuiWidget* child, bool disabled);
+KUI_API KuiWidget* kui_radio_button(bool selected, KuiAction on_selected, const char* label);
+KUI_API KuiWidget* kui_selectable(const char* label, bool selected, KuiAction on_tap);
+/** CollapsingHeader: @p on_toggled hears what it should be now. @p child (may be null) shows under it while @p open. */
+KUI_API KuiWidget* kui_collapsing_header(const char* title, bool open, KuiBoolAction on_toggled, KuiWidget* child);
+KUI_API KuiWidget* kui_tree_node(const char* label, bool open, KuiBoolAction on_toggled, KuiWidget* const* children, size_t count,
+                                 bool leaf, bool selected, KuiAction on_tap);
+/** TabBar: @p on_selected hears the index picked (a whole number, as a float). */
+KUI_API KuiWidget* kui_tab_bar(const char* const* tabs, size_t count, int32_t selected, KuiFloatAction on_selected);
+KUI_API KuiWidget* kui_tooltip(const char* text, KuiWidget* child);
+/** SizeObserver: @p on_changed hears the child's size in units (the first two) and in pixels (the last two) when it changes. */
+KUI_API KuiWidget* kui_size_observer(KuiPanAction on_changed, KuiWidget* child);
+KUI_API KuiWidget* kui_modal(bool open, KuiWidget* child, KuiWidget* dialog, KuiAction on_dismiss);
+
+/* ---- colour, plots, tables ---- */
+typedef struct KuiColorAction { void (*invoke)(float r, float g, float b, float a, void* user); void* user; void (*destroy)(void* user); } KuiColorAction;
+KUI_API KuiWidget* kui_color_picker(KuiColor color, KuiColorAction on_changed, bool alpha, bool hex, float width);
+/** ColorEdit: a swatch (and @p label, which may be null) that opens a picker under itself. */
+KUI_API KuiWidget* kui_color_edit(KuiColor color, KuiColorAction on_changed, const char* label, bool alpha);
+/** Plot: @p kind 0 a line, 1 bars. @p min and @p max may be NaN (the values' own); a negative size is what there is room for;
+ *  @p overlay may be null; a transparent @p color is the theme's accent. */
+KUI_API KuiWidget* kui_plot(const float* values, size_t count, uint32_t kind, float min, float max, KuiVec2 size, const char* overlay, KuiColor color);
+typedef struct KuiTableColumn {
+    const char* title;
+    float width;                    /* negative: a share of what is left, by flex */
+    float flex;
+} KuiTableColumn;
+/** StepSlider: @p on_changed hears the step picked (a whole number, as a float). @p labels may be null. A negative width fills. */
+KUI_API KuiWidget* kui_step_slider(int32_t value, int32_t steps, KuiFloatAction on_changed, const char* const* labels, size_t label_count, float width);
+/** A gradient's stops, five floats each: offset, r, g, b, a. */
+typedef struct KuiStopsAction { void (*invoke)(const float* stops, size_t count, void* user); void* user; void (*destroy)(void* user); } KuiStopsAction;
+/** GradientEditor: @p stops is @p count stops of five floats each (offset, r, g, b, a); @p on_changed hears them the same way. */
+KUI_API KuiWidget* kui_gradient_editor(const float* stops, size_t count, KuiStopsAction on_changed, float width, bool picker);
+/** TitleBar: the window's title bar, drawn by the interface in place of the system's. @p leading and @p trailing may be null. */
+KUI_API KuiWidget* kui_title_bar(const char* title, KuiWidget* leading, KuiWidget* trailing, float height, bool buttons);
+/** StatusBar: @p level 0 info, 1 warning, 2 error. @p trailing may be null. */
+KUI_API KuiWidget* kui_status_bar(const char* message, uint32_t level, KuiWidget* trailing, float height);
+/** Table: @p cells are its rows one after another, @p column_count to a row (a null cell is empty). */
+KUI_API KuiWidget* kui_table(const KuiTableColumn* columns, size_t column_count, KuiWidget* const* cells, size_t row_count,
+                             bool header, bool striped, bool borders, float row_height);
 
 KUI_API KuiWidget* kui_button(const char* label, KuiAction on_pressed, const KuiButtonOptions* options);
 /** Button(child, ...): any widget, made a button. */
@@ -412,6 +547,10 @@ KUI_API KuiWidget* kui_button_with_child(KuiWidget* child, KuiAction on_pressed,
 KUI_API KuiWidget* kui_checkbox(bool value, KuiBoolAction on_changed, const char* label);
 KUI_API KuiWidget* kui_switch(bool value, KuiBoolAction on_changed);
 KUI_API KuiWidget* kui_slider(float value, KuiFloatAction on_changed, float min, float max);
+/** The same, with @p on_finished called when it is let go of. */
+KUI_API KuiWidget* kui_slider_finished(float value, KuiFloatAction on_changed, float min, float max, KuiAction on_finished);
+/** Text of so many lines at the most (0: any number), the last ending in an ellipsis when asked. */
+KUI_API KuiWidget* kui_text_lines(const char* text, const KuiTextStyle* style, uint32_t align, bool wrap, int32_t max_lines, bool ellipsis);
 KUI_API KuiWidget* kui_progress_bar(float value);
 KUI_API KuiWidget* kui_text_field(const KuiTextFieldOptions* options);
 
@@ -423,7 +562,12 @@ typedef struct KuiTheme {
     float radius;
     float control_height;
     KuiTextStyle text_style;
+    float button_radius, field_radius, checkbox_radius;     /* negative: the theme's radius; a checkbox's negative: a circle */
 } KuiTheme;
+/** Themed: @p child with @p theme in place of the view's. */
+KUI_API KuiWidget* kui_themed(const KuiTheme* theme, KuiWidget* child);
+/** How the system looks: whether dark, and its accent. Returns whether the system said. */
+KUI_API bool kui_system_appearance(bool* dark, KuiColor* accent);
 KUI_API void kui_theme_dark(KuiTheme* theme);
 KUI_API void kui_theme_light(KuiTheme* theme);
 /** Theme::Current: the theme of the Ui being built (the dark one outside a build). */
@@ -440,6 +584,7 @@ KUI_API KuiUi* kui_ui_new(KuiWidget* root, const KuiTheme* theme, float scale);
 KUI_API void kui_ui_destroy(KuiUi* view);
 KUI_API void kui_ui_set_root(KuiUi* view, KuiWidget* root);
 KUI_API void kui_ui_set_theme(KuiUi* view, const KuiTheme* theme);
+KUI_API void kui_ui_clear_focus(KuiUi* view);
 KUI_API void kui_ui_get_theme(KuiUi* view, KuiTheme* theme);
 KUI_API void kui_ui_set_scale(KuiUi* view, float scale);
 /** Ui::Update(): the current scene's input, window and clock. */
@@ -447,6 +592,9 @@ KUI_API void kui_ui_update(KuiUi* view);
 KUI_API void kui_ui_update_with(KuiUi* view, KoralInput* input, float width, float height, float dt);
 KUI_API void kui_ui_reassemble(KuiUi* view);
 KUI_API void kui_ui_reassemble_all(void);
+/** debug::SetPaintBounds: every render object outlined where it was laid out, in every interface of the process. */
+KUI_API void kui_debug_set_paint_bounds(bool enabled);
+KUI_API bool kui_debug_paint_bounds(void);
 KUI_API bool kui_ui_wants_pointer(KuiUi* view);
 KUI_API bool kui_ui_wants_keyboard(KuiUi* view);
 KUI_API void kui_ui_stats(KuiUi* view, KuiUiStats* stats);

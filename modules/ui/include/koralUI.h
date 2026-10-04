@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include "kui/api.h"
+#include "kui/kuiApi.h"
 #include "kui/canvas.h"
 #include "kui/text.h"
 #include "kui/render.h"

@@ -106,6 +106,81 @@ namespace kui
         RenderContainer::Paint(canvas, offset);
     }
 
+    // ---- a container, in one ----------------------------------------------------------------------------
+
+    namespace {
+        bool same(const EdgeInsets& a, const EdgeInsets& b) { return a.left == b.left && a.top == b.top && a.right == b.right && a.bottom == b.bottom; }
+    }
+
+    void RenderBox::Set(const Config& c)
+    {
+        const bool layout = !same(c.margin, _config.margin) || !same(c.padding, _config.padding) || c.width != _config.width || c.height != _config.height
+                         || c.alignment != _config.alignment || c.hasMargin != _config.hasMargin || c.hasPadding != _config.hasPadding
+                         || c.hasSize != _config.hasSize || c.hasDecoration != _config.hasDecoration;
+        const bool paint = !(c.decoration == _config.decoration);
+        _config = c;
+        if (layout) MarkNeedsLayout();
+        if (layout || paint) MarkNeedsPaint();
+    }
+
+    void RenderBox::PerformLayout()
+    {
+        // The constraints each of the boxes this stands for would have been given, outermost first.
+        const BoxConstraints outer = Constraints();
+        const BoxConstraints sized = _config.hasMargin ? outer.Deflate(_config.margin) : outer;
+        const BoxConstraints decorated = _config.hasSize ? BoxConstraints {}.Tighten(_config.width, _config.height).Enforce(sized) : sized;
+        const BoxConstraints aligned = _config.hasPadding ? decorated.Deflate(_config.padding) : decorated;
+
+        // And the size each would have come out, innermost first.
+        auto* child = Child();
+        bool have = false;
+        glm::vec2 size {}, at {};
+        if (_config.alignment) {
+            glm::vec2 childSize {};
+            if (child) { child->Layout(aligned.Loosen()); childSize = child->Size(); }
+            size = aligned.Constrain({ aligned.HasBoundedWidth() ? aligned.maxWidth : childSize.x, aligned.HasBoundedHeight() ? aligned.maxHeight : childSize.y });
+            at = _config.alignment->Place(childSize, size);
+            have = true;
+        } else if (child) {
+            child->Layout(aligned);
+            size = child->Size();
+            have = true;
+        }
+        if (_config.hasPadding) {
+            size = decorated.Constrain((have ? size : glm::vec2 {}) + _config.padding.Total());
+            at += glm::vec2(_config.padding.left, _config.padding.top);
+            have = true;
+        }
+        if (_config.hasDecoration) {
+            size = have ? decorated.Constrain(size) : decorated.Smallest();
+            have = true;
+        }
+        if (_config.hasSize) {
+            size = sized.Constrain(have ? size : decorated.Smallest());
+            have = true;
+        }
+        const glm::vec2 inside = size;
+        glm::vec2 origin {};
+        if (_config.hasMargin) {
+            size = (have ? size : glm::vec2 {}) + _config.margin.Total();
+            origin = { _config.margin.left, _config.margin.top };
+        }
+        SetSize(size);
+        _decorated = Rect::XYWH(origin.x, origin.y, inside.x, inside.y);
+        if (child) child->SetOffset(origin + at);
+    }
+
+    void RenderBox::Paint(Canvas& canvas, const glm::vec2 offset)
+    {
+        if (_config.hasDecoration) PaintDecoration(canvas, _config.decoration, _decorated.Shift(offset));
+        RenderContainer::Paint(canvas, offset);
+    }
+
+    bool RenderBox::HitTestSelf(const glm::vec2 position) const
+    {
+        return _config.hasDecoration && _config.decoration.Visible() && _decorated.Contains(position);
+    }
+
     // ---- flex -------------------------------------------------------------------------------------------
 
     void RenderFlexible::Set(const float flex, const bool tight)
@@ -263,17 +338,21 @@ namespace kui
     namespace {
         bool sameStyle(const TextStyle& a, const TextStyle& b)
         {
-            return a.font == b.font && a.size == b.size && a.color == b.color && a.lineHeight == b.lineHeight && a.letterSpacing == b.letterSpacing;
+            return a.font == b.font && a.size == b.size && a.color == b.color && a.lineHeight == b.lineHeight && a.letterSpacing == b.letterSpacing
+                && a.weight == b.weight && a.italic == b.italic && a.underline == b.underline && a.lineThrough == b.lineThrough;
         }
     }
 
-    void RenderParagraph::Set(const std::string& text, const TextStyle& style, const TextAlign align, const bool wrap)
+    void RenderParagraph::Set(const std::string& text, const TextStyle& style, const TextAlign align, const bool wrap, const int maxLines, const bool ellipsis)
     {
-        const bool same = text == _paragraph.Text() && sameStyle(style, _style) && align == _align;
-        if (same && wrap == _wrap && _built) return;
+        const bool same = _built && text == _text && sameStyle(style, _style) && align == _align;
+        if (same && wrap == _wrap && maxLines == _maxLines && ellipsis == _ellipsis) return;
+        _text = text;
         _style = style;
         _align = align;
         _wrap = wrap;
+        _maxLines = maxLines;
+        _ellipsis = ellipsis;
         _paragraph = Paragraph(text, style, Infinity, align);
         _built = true;
         MarkNeedsLayout();
@@ -283,7 +362,20 @@ namespace kui
     void RenderParagraph::PerformLayout()
     {
         const auto& c = Constraints();
-        _paragraph.Layout(_wrap && c.HasBoundedWidth() ? c.maxWidth : Infinity);
+        const float width = _wrap && c.HasBoundedWidth() ? c.maxWidth : Infinity;
+        if (_maxLines > 0) {
+            // Laid out afresh, from all of the text: what was cut to fit a narrower width is not in the paragraph.
+            _paragraph = Paragraph(_text, _style, c.HasBoundedWidth() ? c.maxWidth : Infinity, _align);
+            if (!_wrap) _paragraph.Layout(Infinity);
+            _paragraph.Truncate(static_cast<std::size_t>(_maxLines), _ellipsis);
+            // One line that is too long is cut at the width, too: an ellipsis where there is room for no more.
+            if (_ellipsis && !_wrap && c.HasBoundedWidth() && _paragraph.Size().x > c.maxWidth) {
+                _paragraph = Paragraph(_text, _style, c.maxWidth, _align);
+                _paragraph.Truncate(1, true);
+            }
+        } else {
+            _paragraph.Layout(width);
+        }
         SetSize(_paragraph.Size());
     }
 
@@ -454,10 +546,21 @@ namespace kui
         const auto& c = Constraints();
         auto* child = Child();
         if (!child) { SetSize(c.Smallest()); return; }
-        if (_axis == Axis::eVertical) child->Layout({ c.minWidth, c.maxWidth, 0.f, Infinity });
+        // The content has all of the box while it fits. Once there is more of it than shows, the thumb has
+        // a strip of its own along the edge, and the content what is left: the one is never over the other.
+        constexpr float Gutter = 8.f;
+        const bool vertical = _axis == Axis::eVertical;
+        if (vertical) child->Layout({ c.minWidth, c.maxWidth, 0.f, Infinity });
         else child->Layout({ 0.f, Infinity, c.minHeight, c.maxHeight });
+        glm::vec2 size = c.Constrain(child->Size());
+        if (vertical ? child->Size().y > size.y : child->Size().x > size.x) {
+            if (vertical) child->Layout({ std::max(c.minWidth - Gutter, 0.f), std::max(c.maxWidth - Gutter, 0.f), 0.f, Infinity });
+            else child->Layout({ 0.f, Infinity, std::max(c.minHeight - Gutter, 0.f), std::max(c.maxHeight - Gutter, 0.f) });
+            size = c.Constrain(child->Size() + (vertical ? glm::vec2(Gutter, 0.f) : glm::vec2(0.f, Gutter)));
+        }
         child->SetOffset({});
-        SetSize(child->Size());
+        SetSize(size);
+        if (_jumping) { _scroll = _jumpTo; _jumping = false; }
         Scroll(0.f);   // kept inside the content, which may have shrunk
     }
 
@@ -476,8 +579,47 @@ namespace kui
         // The content keeps its picture; only its layer — and the thumb's — move.
         if (auto* child = Child(); child && child->IsRepaintBoundary())
             child->OwnLayer()->SetTransform(Transform::Translation(-ScrollVector()));
+        Cull();
         PlaceThumb();
+        if (_onScrolled) {
+            const float most = MaxScroll();
+            if (_scroll != _toldAt || most != _toldMost) {
+                _toldAt = _scroll;
+                _toldMost = most;
+                const auto tell = _onScrolled;
+                tell(_scroll, most);
+            }
+        }
         return moved;
+    }
+
+    void RenderScroll::Observe(std::function<void(float, float)> onScrolled, const float jumpTo, const std::uint32_t jump)
+    {
+        _onScrolled = std::move(onScrolled);
+        if (jump != _jump) {
+            _jump = jump;
+            _jumpTo = jumpTo;
+            _jumping = true;
+            MarkNeedsLayout();
+            MarkNeedsPaint();
+        }
+    }
+
+    void RenderScroll::Cull()
+    {
+        auto* child = Child();
+        if (!child || !child->IsRepaintBoundary()) return;
+        const bool vertical = _axis == Axis::eVertical;
+        const float view = vertical ? Size().y : Size().x, content = vertical ? child->Size().y : child->Size().x;
+        // Content of a few views is painted whole, and scrolling it paints nothing. More than that, and only
+        // what shows and a view either side of it is in the picture: scrolling repaints once the pointer has
+        // gone a view's worth, and what is far off costs nothing to paint or to draw.
+        if (view <= 0.f || content <= 3.f * view) { child->SetPaintCull(std::nullopt); return; }
+        const Rect visible = vertical ? Rect::XYWH(0.f, _scroll, Size().x, view) : Rect::XYWH(_scroll, 0.f, view, Size().y);
+        if (const auto& has = child->PaintCull();
+            has && has->left <= visible.left && has->top <= visible.top && has->right >= visible.right && has->bottom >= visible.bottom) return;
+        child->SetPaintCull(vertical ? Rect::LTRB(-1.e6f, visible.top - view, 1.e6f, visible.bottom + view)
+                                     : Rect::LTRB(visible.left - view, -1.e6f, visible.right + view, 1.e6f));
     }
 
     glm::vec2 RenderScroll::ScrollVector() const { return _axis == Axis::eVertical ? glm::vec2(0.f, _scroll) : glm::vec2(_scroll, 0.f); }
@@ -651,13 +793,12 @@ namespace kui
         std::vector<Widget> one(Widget child) { return child ? std::vector<Widget> { std::move(child) } : std::vector<Widget> {}; }
     }
 
-    Widget Text(std::string text, TextStyle style, const TextAlign align, const bool wrap)
+    Widget Text(std::string text, TextStyle style, const TextAlign align, const bool wrap, const int maxLines, const bool ellipsis)
     {
         if (!style.font) style.font = Theme::Current().textStyle.font;
-        if (style.color == colors::Black && Theme::Current().text != colors::Black) style.color = Theme::Current().text;
-        struct Config { std::string text; TextStyle style; TextAlign align; bool wrap; };
-        return box<RenderParagraph, Config>({ std::move(text), std::move(style), align, wrap }, {},
-            [](RenderParagraph& r, const Config& c) { r.Set(c.text, c.style, c.align, c.wrap); });
+        struct Config { std::string text; TextStyle style; TextAlign align; bool wrap; int maxLines = 0; bool ellipsis = false; };
+        return box<RenderParagraph, Config>({ std::move(text), std::move(style), align, wrap, maxLines, ellipsis }, {},
+            [](RenderParagraph& r, const Config& c) { r.Set(c.text, c.style, c.align, c.wrap, c.maxLines, c.ellipsis); });
     }
 
     Widget Flex(const Axis axis, std::vector<Widget> children, FlexOptions options)
@@ -711,6 +852,15 @@ namespace kui
 
     Widget Container(ContainerOptions o, Widget child)
     {
+        // More than one thing at once: one box that is all of them. (One alone is the widget for it, below.)
+        const bool margin = o.margin.Horizontal() > 0.f || o.margin.Vertical() > 0.f;
+        const bool padding = o.padding.Horizontal() > 0.f || o.padding.Vertical() > 0.f;
+        const bool size = o.width >= 0.f || o.height >= 0.f;
+        const bool decoration = o.decoration.Visible();
+        if (static_cast<int>(margin) + static_cast<int>(padding) + static_cast<int>(size) + static_cast<int>(decoration) + static_cast<int>(o.alignment.has_value()) > 1) {
+            RenderBox::Config config { o.margin, o.padding, o.width, o.height, std::move(o.decoration), o.alignment, margin, padding, size, decoration };
+            return box<RenderBox, RenderBox::Config>(std::move(config), one(std::move(child)), [](RenderBox& r, const RenderBox::Config& c) { r.Set(c); });
+        }
         Widget w = std::move(child);
         if (o.alignment) w = Align(*o.alignment, std::move(w));
         if (o.padding.Horizontal() > 0.f || o.padding.Vertical() > 0.f) w = Padding(o.padding, std::move(w));
@@ -778,6 +928,12 @@ namespace kui
     {
         // The content gets a layer of its own, which is what scrolling moves.
         return box<RenderScroll, Axis>(axis, one(RepaintBoundary(std::move(child))), [](RenderScroll& r, const Axis& c) { r.Set(c); });
+    }
+
+    Widget ScrollView(Widget child, ScrollOptions options)
+    {
+        return box<RenderScroll, ScrollOptions>(std::move(options), one(RepaintBoundary(std::move(child))),
+            [](RenderScroll& r, const ScrollOptions& c) { r.Set(c.axis); r.Observe(c.onScrolled, c.jumpTo, c.jump); });
     }
 
     Widget GestureDetector(GestureOptions options, Widget child)

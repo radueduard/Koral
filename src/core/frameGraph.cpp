@@ -777,6 +777,16 @@ namespace kor {
             _extent = extent;
             _dirty = true;
         }
+        // The window's image can be another one at the same size — a window minimized and brought back,
+        // a swap chain made again for the system's reasons: what the passes made from the old one is stale.
+        if (const auto screen = screenOf(TargetWindow()); screen.Alive()) {
+            const auto which = reinterpret_cast<std::uintptr_t>(screen.Get());
+            if (which != _screenSeen || screen->Generation() != _screenGeneration) {
+                _screenSeen = which;
+                _screenGeneration = screen->Generation();
+                _dirty = true;
+            }
+        }
         if (_dirty) Build();
         if (_broken || _order.empty()) return false;
 

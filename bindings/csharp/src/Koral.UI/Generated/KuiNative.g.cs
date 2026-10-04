@@ -103,6 +103,10 @@ internal unsafe struct KuiTextStyle
     public KuiColor color;
     public float line_height;
     public float letter_spacing;
+    public float weight;
+    public byte italic;
+    public byte underline;
+    public byte line_through;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -283,6 +287,10 @@ internal unsafe struct KuiTextFieldOptions
     public KuiTextAction on_submitted;
     public float width;
     public byte controlled;
+    public byte multiline;
+    public int min_lines;
+    public int max_lines;
+    public uint focus;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -305,6 +313,40 @@ internal unsafe struct KuiRangeAction
 internal unsafe struct KuiPainter
 {
     public delegate* unmanaged[Cdecl]<IntPtr, float, float, void*, void> paint;
+    public void* user;
+    public delegate* unmanaged[Cdecl]<void*, void> destroy;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiIndexAction
+{
+    public delegate* unmanaged[Cdecl]<nuint, float, void*, void> invoke;
+    public void* user;
+    public delegate* unmanaged[Cdecl]<void*, void> destroy;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiLazyListOptions
+{
+    public nuint count;
+    public uint axis;
+    public float item_extent;
+    public float estimated_extent;
+    public float gap;
+    public float padding_start;
+    public float padding_end;
+    public KuiItemBuilder builder;
+    public KuiRangeAction on_range;
+    public KuiIndexAction on_scrolled;
+    public nuint jump_index;
+    public float jump_offset;
+    public uint jump;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiLayoutRule
+{
+    public delegate* unmanaged[Cdecl]<IntPtr, float, float, float, float, float*, float*, void*, void> layout;
     public void* user;
     public delegate* unmanaged[Cdecl]<void*, void> destroy;
 }
@@ -352,14 +394,79 @@ internal unsafe struct KuiDockPanel
     public IntPtr title;
     public IntPtr content;
     public byte @fixed;
+    public byte undockable;
+    public byte no_title_bar;
+    public IntPtr icon;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiDockStyle
+{
+    public float title_bar_height;
+    public float stripe_width;
+    public float button_size;
+    public float button_gap;
+    public float separator_gap;
+    public float tab_padding;
+    public float resize_grip;
+    public float min_float_size;
+    public float min_area_size;
+    public float radius;
+    public float edge_drop_margin;
+    public float center_drop_size;
+    public float under_drop_start;
 }
 
 [StructLayout(LayoutKind.Sequential)]
 internal unsafe struct KuiDockOptions
 {
     public byte single_viewport;
+    public float gap;
+    public float stripe_gap;
+    public KuiDockStyle style;
     public KuiTextAction on_closed;
     public KuiAction on_changed;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiMenuItem
+{
+    public IntPtr label;
+    public KuiAction on_selected;
+    public byte disabled;
+    public byte separator;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiMenu
+{
+    public IntPtr title;
+    public KuiMenuItem* items;
+    public nuint count;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiColorAction
+{
+    public delegate* unmanaged[Cdecl]<float, float, float, float, void*, void> invoke;
+    public void* user;
+    public delegate* unmanaged[Cdecl]<void*, void> destroy;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiTableColumn
+{
+    public IntPtr title;
+    public float width;
+    public float flex;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KuiStopsAction
+{
+    public delegate* unmanaged[Cdecl]<float*, nuint, void*, void> invoke;
+    public void* user;
+    public delegate* unmanaged[Cdecl]<void*, void> destroy;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -380,6 +487,9 @@ internal unsafe struct KuiTheme
     public float radius;
     public float control_height;
     public KuiTextStyle text_style;
+    public float button_radius;
+    public float field_radius;
+    public float checkbox_radius;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -525,6 +635,17 @@ internal static unsafe partial class KuiNative
     [LibraryImport(Library)] internal static partial IntPtr kui_list_view(IntPtr* children, nuint count, uint axis, float gap);
     [LibraryImport(Library)] internal static partial IntPtr kui_list_view_builder(nuint count, float item_extent, KuiItemBuilder builder);
     [LibraryImport(Library)] internal static partial IntPtr kui_list_view_builder_with_range(nuint count, float item_extent, KuiItemBuilder builder, KuiRangeAction on_range);
+    [LibraryImport(Library)] internal static partial IntPtr kui_lazy_list(KuiLazyListOptions* options);
+    [LibraryImport(Library)] internal static partial IntPtr kui_intrinsic(byte width, byte height, IntPtr child);
+    [LibraryImport(Library)] internal static partial IntPtr kui_scroll_view_observed(IntPtr child, uint axis, KuiPointAction on_scrolled, float jump_to, uint jump);
+    [LibraryImport(Library)] internal static partial IntPtr kui_transform_box(KuiTransform transform, KuiAlignment origin, IntPtr child);
+    [LibraryImport(Library)] internal static partial IntPtr kui_aspect_ratio(float ratio, IntPtr child);
+    [LibraryImport(Library)] internal static partial IntPtr kui_fractionally_sized_box(float width_share, float height_share, IntPtr child);
+    [LibraryImport(Library)] internal static partial nuint kui_layout_count(IntPtr context);
+    [LibraryImport(Library)] internal static partial void kui_layout_measure(IntPtr context, nuint index, float min_width, float max_width, float min_height, float max_height, float* out_width, float* out_height);
+    [LibraryImport(Library)] internal static partial void kui_layout_place(IntPtr context, nuint index, float x, float y);
+    [LibraryImport(Library)] internal static partial IntPtr kui_custom_layout(KuiLayoutRule rule, IntPtr* children, nuint count);
+    [LibraryImport(Library)] internal static partial IntPtr kui_popup_anchor(byte open, IntPtr popup, KuiAction on_dismiss, KuiVec2 offset, byte below);
     [LibraryImport(Library)] internal static partial IntPtr kui_gesture_detector(KuiGestureOptions* options, IntPtr child);
     [LibraryImport(Library)] internal static partial IntPtr kui_custom_paint(KuiPainter painter, KuiVec2 size, IntPtr child);
     [LibraryImport(Library)] internal static partial IntPtr kui_shader_box(IntPtr shader, void* parameters, nuint size, KuiRadii radius, IntPtr child);
@@ -540,22 +661,52 @@ internal static unsafe partial class KuiNative
     [LibraryImport(Library)] internal static partial void kui_dock_layout_release(IntPtr layout);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_dock(IntPtr layout, string? panel, uint side, string? relative_to, float fraction);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_float(IntPtr layout, string? panel, KuiRect rect);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_float_at(IntPtr layout, string? panel, KuiVec2 at);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_pop_out(IntPtr layout, string? panel, KuiVec2 size);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_close(IntPtr layout, string? panel);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_open(IntPtr layout, string? panel);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_dock_in(IntPtr layout, string? panel, uint area, int part);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_activate(IntPtr layout, string? panel);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void kui_dock_layout_hide(IntPtr layout, string? panel);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial byte kui_dock_layout_is_shown(IntPtr layout, string? panel);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial byte kui_dock_layout_is_open(IntPtr layout, string? panel);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial byte kui_dock_layout_is_floating(IntPtr layout, string? panel);
     [LibraryImport(Library)] internal static partial byte* kui_dock_layout_save(IntPtr layout);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial byte kui_dock_layout_load(IntPtr layout, string? text);
     [LibraryImport(Library)] internal static partial IntPtr kui_dock_space(IntPtr layout, KuiDockPanel* panels, nuint count, KuiDockOptions* options);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_drag_value(float value, KuiFloatAction on_changed, float speed, float min, float max, int decimals, string? label, float width);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_dropdown(string[]? items, nuint count, int selected, KuiFloatAction on_changed, float width, string? placeholder);
+    [LibraryImport(Library)] internal static partial IntPtr kui_context_menu(KuiMenuItem* items, nuint count, IntPtr child);
+    [LibraryImport(Library)] internal static partial IntPtr kui_menu_bar(KuiMenu* menus, nuint count);
+    [LibraryImport(Library)] internal static partial IntPtr kui_separator(byte vertical, float thickness);
+    [LibraryImport(Library)] internal static partial IntPtr kui_disabled(IntPtr child, byte disabled);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_radio_button(byte selected, KuiAction on_selected, string? label);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_selectable(string? label, byte selected, KuiAction on_tap);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_collapsing_header(string? title, byte open, KuiBoolAction on_toggled, IntPtr child);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_tree_node(string? label, byte open, KuiBoolAction on_toggled, IntPtr* children, nuint count, byte leaf, byte selected, KuiAction on_tap);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_tab_bar(string[]? tabs, nuint count, int selected, KuiFloatAction on_selected);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_tooltip(string? text, IntPtr child);
+    [LibraryImport(Library)] internal static partial IntPtr kui_size_observer(KuiPanAction on_changed, IntPtr child);
+    [LibraryImport(Library)] internal static partial IntPtr kui_modal(byte open, IntPtr child, IntPtr dialog, KuiAction on_dismiss);
+    [LibraryImport(Library)] internal static partial IntPtr kui_color_picker(KuiColor color, KuiColorAction on_changed, byte alpha, byte hex, float width);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_color_edit(KuiColor color, KuiColorAction on_changed, string? label, byte alpha);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_plot(float* values, nuint count, uint kind, float min, float max, KuiVec2 size, string? overlay, KuiColor color);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_step_slider(int value, int steps, KuiFloatAction on_changed, string[]? labels, nuint label_count, float width);
+    [LibraryImport(Library)] internal static partial IntPtr kui_gradient_editor(float* stops, nuint count, KuiStopsAction on_changed, float width, byte picker);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_title_bar(string? title, IntPtr leading, IntPtr trailing, float height, byte buttons);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_status_bar(string? message, uint level, IntPtr trailing, float height);
+    [LibraryImport(Library)] internal static partial IntPtr kui_table(KuiTableColumn* columns, nuint column_count, IntPtr* cells, nuint row_count, byte header, byte striped, byte borders, float row_height);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_button(string? label, KuiAction on_pressed, KuiButtonOptions* options);
     [LibraryImport(Library)] internal static partial IntPtr kui_button_with_child(IntPtr child, KuiAction on_pressed, KuiButtonOptions* options);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_checkbox(byte value, KuiBoolAction on_changed, string? label);
     [LibraryImport(Library)] internal static partial IntPtr kui_switch(byte value, KuiBoolAction on_changed);
     [LibraryImport(Library)] internal static partial IntPtr kui_slider(float value, KuiFloatAction on_changed, float min, float max);
+    [LibraryImport(Library)] internal static partial IntPtr kui_slider_finished(float value, KuiFloatAction on_changed, float min, float max, KuiAction on_finished);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_text_lines(string? text, KuiTextStyle* style, uint align, byte wrap, int max_lines, byte ellipsis);
     [LibraryImport(Library)] internal static partial IntPtr kui_progress_bar(float value);
     [LibraryImport(Library)] internal static partial IntPtr kui_text_field(KuiTextFieldOptions* options);
+    [LibraryImport(Library)] internal static partial IntPtr kui_themed(KuiTheme* theme, IntPtr child);
+    [LibraryImport(Library)] internal static partial byte kui_system_appearance(byte* dark, KuiColor* accent);
     [LibraryImport(Library)] internal static partial void kui_theme_dark(KuiTheme* theme);
     [LibraryImport(Library)] internal static partial void kui_theme_light(KuiTheme* theme);
     [LibraryImport(Library)] internal static partial void kui_theme_current(KuiTheme* theme);
@@ -563,12 +714,15 @@ internal static unsafe partial class KuiNative
     [LibraryImport(Library)] internal static partial void kui_ui_destroy(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_set_root(IntPtr view, IntPtr root);
     [LibraryImport(Library)] internal static partial void kui_ui_set_theme(IntPtr view, KuiTheme* theme);
+    [LibraryImport(Library)] internal static partial void kui_ui_clear_focus(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_get_theme(IntPtr view, KuiTheme* theme);
     [LibraryImport(Library)] internal static partial void kui_ui_set_scale(IntPtr view, float scale);
     [LibraryImport(Library)] internal static partial void kui_ui_update(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_update_with(IntPtr view, IntPtr input, float width, float height, float dt);
     [LibraryImport(Library)] internal static partial void kui_ui_reassemble(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_reassemble_all();
+    [LibraryImport(Library)] internal static partial void kui_debug_set_paint_bounds(byte enabled);
+    [LibraryImport(Library)] internal static partial byte kui_debug_paint_bounds();
     [LibraryImport(Library)] internal static partial byte kui_ui_wants_pointer(IntPtr view);
     [LibraryImport(Library)] internal static partial byte kui_ui_wants_keyboard(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_stats(IntPtr view, KuiUiStats* stats);

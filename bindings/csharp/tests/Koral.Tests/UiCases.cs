@@ -65,7 +65,11 @@ public sealed class UiScene : Scene
         Ui.Update();
     }
 
-    public byte[] Pixel(int x, int y) => Readback.Read<byte>(16 * 16 * 4).Skip((y * 16 + x) * 4).Take(4).ToArray();
+    public byte[] Pixel(int x, int y)
+    {
+        Check.GpuIsDone();
+        return Readback.Read<byte>(16 * 16 * 4).Skip((y * 16 + x) * 4).Take(4).ToArray();
+    }
 }
 
 public static partial class Cases

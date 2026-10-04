@@ -526,6 +526,9 @@ namespace kor {
         std::vector<Resource<Framebuffer>> _historyClears;  // what cleared a depth history, kept until rebuilt
         std::vector<std::string> _history;                  // the physical names, for the interface
         glm::uvec2 _extent {0, 0};
+        /// The window's image the graph was last built for: which one, and how many times rebuilt.
+        std::uintptr_t _screenSeen = 0;
+        glm::u64 _screenGeneration = 0;
         mutable bool _dirty = true;
         bool _broken = false;
     };

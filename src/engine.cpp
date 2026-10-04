@@ -26,6 +26,8 @@
 #include "shader.h"
 #include "core/tokenState.h"
 
+#undef LoadLibrary   // sceneManager.h brings in <windows.h>; this file means App::LoadLibrary
+
 namespace kor
 {
     class Engine

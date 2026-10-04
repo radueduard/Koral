@@ -9,6 +9,8 @@
 #include <kui/rendering.h>
 #include <kui/widgets.h>
 
+#include "element.h"
+
 namespace kui
 {
     // ---- constraints ----------------------------------------------------------------------------------
@@ -147,11 +149,44 @@ namespace kui
         return _layer;
     }
 
+    namespace {
+        bool paintBounds = false;
+        unsigned debugRevision = 0;
+
+        /** The outline debug::SetPaintBounds asks for, of @p object laid out at @p at. */
+        void OutlineBounds(RenderObject& object, Canvas& canvas, const glm::vec2 at)
+        {
+            const glm::vec2 size = object.Size();
+            if (size.x <= 0.f || size.y <= 0.f) return;
+            bool holds = false;
+            object.VisitChildren([&holds](RenderObject&) { holds = true; });
+            const Color color = object.IsRepaintBoundary() ? Color::Hex(0x22d3ee).WithAlpha(0.9f)
+                              : holds ? Color::Hex(0xff3ea5).WithAlpha(0.85f)
+                              : Color::Hex(0xfacc15).WithAlpha(0.45f);
+            // Half a unit in, so the line is inside what it outlines and two neighbours' lines do not share one.
+            canvas.DrawRect(Rect::XYWH(at.x + 0.5f, at.y + 0.5f, std::max(size.x - 1.f, 0.f), std::max(size.y - 1.f, 0.f)),
+                            Paint::Stroked(color, 1.f));
+        }
+    }
+
+    void debug::SetPaintBounds(const bool enabled)
+    {
+        if (enabled == paintBounds) return;
+        paintBounds = enabled;
+        ++debugRevision;
+    }
+    bool debug::PaintBounds() { return paintBounds; }
+    unsigned debug::Revision() { return debugRevision; }
+
     void RenderObject::RepaintIfNeeded()
     {
         if (!_needsPaint && _layer && _layer->GetPicture()) return;
         Canvas canvas;
+        // About as much as last time, as a rule: room for it at once.
+        if (_layer && _layer->GetPicture()) canvas.Reserve(_layer->GetPicture()->InstanceCount() + 16);
+        if (_cull) canvas.SetCullRect(*_cull);
         Paint(canvas, { 0.f, 0.f });
+        if (paintBounds) OutlineBounds(*this, canvas, { 0.f, 0.f });
         OwnLayer()->SetPicture(canvas.Finish());
         _needsPaint = false;
         if (_owner) ++_owner->paints;
@@ -162,8 +197,19 @@ namespace kui
         PaintChildAt(child, canvas, offset + ChildOrigin(child));
     }
 
+    void RenderObject::SetPaintCull(const std::optional<Rect>& cull)
+    {
+        if (cull == _cull) return;
+        _cull = cull;
+        MarkNeedsPaint();
+    }
+
     void RenderObject::PaintChildAt(RenderObject& child, Canvas& canvas, const glm::vec2 at)
     {
+        // Wholly outside what will be looked at — and by enough that a shadow or something hung off it
+        // would be too: left out. It keeps whatever it was owed; it is painted when it comes into view.
+        constexpr float Overhang = 48.f;
+        if (canvas.QuickReject(Rect::XYWH(at.x, at.y, child.Size().x, child.Size().y).Inflate(Overhang))) return;
         if (child.IsRepaintBoundary()) {
             child.RepaintIfNeeded();
             canvas.Save();
@@ -173,6 +219,7 @@ namespace kui
         } else {
             child._needsPaint = false;
             child.Paint(canvas, at);
+            if (paintBounds) OutlineBounds(child, canvas, at);
         }
     }
 
@@ -198,6 +245,19 @@ namespace kui
         glm::vec2 p = local;
         for (const RenderObject* node = this; node->_parent; node = node->_parent) p += node->_parent->ChildOrigin(*node);
         return p;
+    }
+
+    glm::vec2 RenderObject::ToLocal(const glm::vec2 global) const
+    {
+        return _parent ? _parent->MapToChild(*this, _parent->ToLocal(global)) : global;
+    }
+
+    const Theme* RenderObject::InheritedTheme() const
+    {
+        if (detail::ThemedCount() == 0) return nullptr;    // nothing sets one anywhere: the usual case, and free
+        for (const RenderObject* node = this; node; node = node->_parent)
+            if (const Theme* theme = node->ProvidedTheme()) return theme;
+        return nullptr;
     }
 
     // ---- the owner -------------------------------------------------------------------------------------
@@ -230,6 +290,9 @@ namespace kui
             for (RenderObject* object : pending) {
                 if (!object->_needsLayout || object->_owner != this) continue;
                 if (!object->_hasLaidOut) continue;   // its parent lays it out the first time
+                // With the theme set over it, where one is: it is laid out from here, not from under what set it.
+                const Theme* theme = object->InheritedTheme();
+                const std::optional<ThemeScope> scope = theme ? std::optional<ThemeScope>(std::in_place, *theme) : std::nullopt;
                 object->PerformLayout();
                 object->_needsLayout = false;
                 ++layouts;
@@ -244,8 +307,12 @@ namespace kui
         _paint.clear();
         // Deepest first, so a parent repainting after its child shows the child's new picture either way.
         std::ranges::sort(pending, [](const RenderObject* a, const RenderObject* b) { return a->Depth() > b->Depth(); });
-        for (RenderObject* object : pending)
-            if (object->_owner == this && object->_needsPaint) object->RepaintIfNeeded();
+        for (RenderObject* object : pending) {
+            if (object->_owner != this || !object->_needsPaint) continue;
+            const Theme* theme = object->InheritedTheme();
+            const std::optional<ThemeScope> scope = theme ? std::optional<ThemeScope>(std::in_place, *theme) : std::nullopt;
+            object->RepaintIfNeeded();
+        }
     }
 
     void Owner::RequestFocus(RenderObject* object)

@@ -50,6 +50,18 @@ namespace kui
         thread_local const Theme* currentTheme = nullptr;
     }
 
+    int& detail::ThemedCount() { static int count = 0; return count; }
+
+    namespace {
+        struct DeferredWidget final : StatelessWidget {
+            std::function<Widget()> build;
+            explicit DeferredWidget(std::function<Widget()> b) : build(std::move(b)) {}
+            [[nodiscard]] Widget Build() const override { return build(); }
+        };
+    }
+
+    Widget detail::Deferred(std::function<Widget()> build) { return Make<DeferredWidget>(std::move(build)); }
+
     ThemeScope::ThemeScope(const Theme& theme) : previous(currentTheme) { currentTheme = &theme; }
     ThemeScope::~ThemeScope() { currentTheme = previous; }
 
@@ -64,17 +76,18 @@ namespace kui
     Theme Theme::Light()
     {
         Theme t;
-        t.background = Color::Hex(0xF4F5F8);
-        t.surface = Color::Hex(0xFFFFFF);
-        t.surfaceHover = Color::Hex(0xEDEFF4);
-        t.surfacePressed = Color::Hex(0xE1E4EC);
-        t.primary = Color::Hex(0x3D5AFE);
-        t.primaryHover = Color::Hex(0x536DFE);
-        t.primaryPressed = Color::Hex(0x304FFE);
-        t.text = Color::Hex(0x1B1D24);
-        t.textMuted = Color::Hex(0x6B6F7D);
-        t.border = Color::Hex(0xD3D6DF);
-        t.focus = Color::Hex(0x3D5AFE);
+        // One UI's light ground: soft grey behind near-white cards, the same coral.
+        t.background = Color::Hex(0xF2F2F2);
+        t.surface = Color::Hex(0xFCFCFC);
+        t.surfaceHover = Color::Hex(0xEFEFEF);
+        t.surfacePressed = Color::Hex(0xE2E2E2);
+        t.primary = Color::Hex(0xFF7F50);
+        t.primaryHover = Color::Hex(0xFF946B);
+        t.primaryPressed = Color::Hex(0xE86A3C);
+        t.text = Color::Hex(0x252525);
+        t.textMuted = Color::Hex(0x7A7A7A);
+        t.border = Color::Hex(0xE0E0E0);
+        t.focus = Color::Hex(0xE86A3C);
         return t;
     }
 
@@ -152,6 +165,22 @@ namespace kui
 
     std::vector<std::unique_ptr<Element>> Element::UpdateChildren(std::vector<std::unique_ptr<Element>> old, const std::vector<Widget>& widgets)
     {
+        // The common case by far: as many as before, each the kind that was in its place — and under the
+        // key that was there, where they are keyed: every child is updated where it is, and the list is
+        // the one there was.
+        if (old.size() == widgets.size()) {
+            bool aligned = true;
+            for (std::size_t i = 0; i < old.size() && aligned; ++i) {
+                const Widget& widget = widgets[i];
+                aligned = widget && old[i] && (old[i]->_widget.Get() == widget.Get() || CanUpdate(old[i]->_widget, widget));
+            }
+            if (aligned) {
+                for (std::size_t i = 0; i < old.size(); ++i)
+                    if (old[i]->_widget.Get() != widgets[i].Get()) old[i]->Update(widgets[i]);
+                return old;
+            }
+        }
+
         std::vector<std::unique_ptr<Element>> result;
         result.reserve(widgets.size());
 
@@ -207,6 +236,13 @@ namespace kui
     {
         if (!_mounted) return;
         RenderObject* before = RenderObjectOf();
+        // Built with the theme set nearest over it, where any is: the element above that has a render object
+        // is where to look from, since this one's own is not made yet the first time.
+        const Theme* theme = nullptr;
+        if (detail::ThemedCount() > 0)
+            for (const Element* up = _parent; up && !theme; up = up->Parent())
+                if (const RenderObject* object = dynamic_cast<const RenderObjectElement*>(up) ? up->RenderObjectOf() : nullptr) theme = object->ProvidedTheme();
+        const std::optional<ThemeScope> scope = theme ? std::optional<ThemeScope>(std::in_place, *theme) : std::nullopt;
         const Widget built = Build();
         _dirty = false;
         if (_owner) ++_owner->builds;
@@ -277,6 +313,8 @@ namespace kui
         Element::Unmount();
         // The render object goes with the element; its parent forgets it as it does.
         _object.reset();
+        _container = nullptr;
+        _containerKnown = false;
     }
 
     void RenderObjectElement::ChildRenderObjectChanged()
@@ -286,13 +324,27 @@ namespace kui
 
     void RenderObjectElement::TakeChildren()
     {
-        auto* container = dynamic_cast<RenderContainer*>(_object.get());
-        if (!container) return;
+        if (!_containerKnown) {
+            _container = dynamic_cast<RenderContainer*>(_object.get());
+            _containerKnown = true;
+        }
+        if (!_container) return;
+        // Nearly always the ones it has already: looked at before a list of them is made.
+        const auto& have = _container->Children();
+        std::size_t at = 0;
+        bool same = true;
+        for (const auto& child : _children) {
+            auto* object = child->RenderObjectOf();
+            if (!object) continue;
+            if (at >= have.size() || have[at] != object) { same = false; break; }
+            ++at;
+        }
+        if (same && at == have.size()) return;
         std::vector<RenderObject*> objects;
         objects.reserve(_children.size());
         for (const auto& child : _children)
             if (auto* object = child->RenderObjectOf()) objects.push_back(object);
-        container->SetChildren(objects);
+        _container->SetChildren(objects);
     }
 
     // ---- the owner --------------------------------------------------------------------------------------

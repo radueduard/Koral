@@ -19,12 +19,42 @@ value class Dp(val value: Float) : Comparable<Dp> {
     }
 }
 
+val Dp.isSpecified: Boolean get() = !value.isNaN()
+val Dp.isUnspecified: Boolean get() = value.isNaN()
+val TextUnit.isSpecified: Boolean get() = !value.isNaN()
+val TextUnit.isUnspecified: Boolean get() = value.isNaN()
+
+/** A size in whole pixels: what onSizeChanged tells. */
+data class IntSize(val width: Int, val height: Int) {
+    companion object { val Zero = IntSize(0, 0) }
+}
+
+/** A place in whole pixels. */
+data class IntOffset(val x: Int, val y: Int) {
+    companion object { val Zero = IntOffset(0, 0) }
+}
+
+/** A size in the interface's units. */
+data class DpSize(val width: Dp, val height: Dp) {
+    companion object { val Zero = DpSize(Dp(0f), Dp(0f)); val Unspecified = DpSize(Dp.Unspecified, Dp.Unspecified) }
+}
+
+/** A place in the interface's units. */
+data class DpOffset(val x: Dp, val y: Dp) {
+    companion object { val Zero = DpOffset(Dp(0f), Dp(0f)) }
+}
+
 val Int.dp: Dp get() = Dp(toFloat())
 val Float.dp: Dp get() = Dp(this)
 val Double.dp: Dp get() = Dp(toFloat())
 
 @JvmInline
-value class TextUnit(val value: Float) {
+value class TextUnit(val value: Float) : Comparable<TextUnit> {
+    operator fun plus(o: TextUnit) = TextUnit(value + o.value)
+    operator fun minus(o: TextUnit) = TextUnit(value - o.value)
+    operator fun times(s: Float) = TextUnit(value * s)
+    operator fun div(s: Float) = TextUnit(value / s)
+    override fun compareTo(other: TextUnit) = value.compareTo(other.value)
     companion object { val Unspecified = TextUnit(Float.NaN) }
 }
 

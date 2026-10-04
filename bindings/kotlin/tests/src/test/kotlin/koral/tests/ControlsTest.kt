@@ -62,7 +62,7 @@ class Controls(@Suppress("UNUSED_PARAMETER") args: SceneArgs) : Scene() {
                 }
                 Slider(level, { level = it }, Modifier.width(120.dp))
                 LinearProgressIndicator({ level }, Modifier.width(120.dp))
-                TextField("", { typed = it }, placeholder = "name", width = 120.dp)
+                TextField("", { typed = it }, placeholder = { Text("name") }, width = 120.dp)
                 Spacer(Modifier.height(4.dp))
                 Canvas(Modifier.size(40.dp)) {
                     drawPath(Path().apply { moveTo(0f, 40f); lineTo(20f, 0f); lineTo(40f, 40f); close() }, Color.Magenta)
@@ -87,8 +87,9 @@ class ControlsTest {
         val labelOnce = scene.labelCompositions
 
         // The button, at the top-left, in the light theme's primary colour.
-        val button = scene.readback.pixel(WIDE, 4, 4)
-        assertTrue(button[2] > button[0], "the light theme's primary is blue: $button")
+        // Sampled in from its corner, which a pill does not reach: coral.
+        val button = scene.readback.pixel(WIDE, 20, 8)
+        assertTrue(button[0] > 200 && button[0] > button[1] && button[1] > button[2], "the light theme's primary is coral: $button")
         // The canvas's triangle, at the bottom of the column.
         val bytes = scene.readback.read()
         val magenta = (0 until WIDE * WIDE).any { i ->

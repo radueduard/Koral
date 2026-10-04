@@ -155,13 +155,13 @@ namespace kor::vk
 
 		// What this frame has to receive, kept as well as the per-buffer copy regions: the host path
 		// below needs the source frame of each, which a vk::BufferCopy does not carry.
-		struct FrameWrite { glm::u32 srcFrameIndex; glm::u64 offset; glm::u64 byteSize; };
+		struct FrameWrite { glm::u32 srcFrameIndex; glm::u64 offset; glm::u64 byteSize; std::shared_ptr<const std::vector<std::byte>> data; };
 		std::vector<FrameWrite> _pendingWritesForThisFrame;
 
 		std::unordered_set<PendingWrite, PendingWrite::Hash> remaining;
 		for (auto write : _pendingWrites) {
 			if (write.buffersLeftToUpdate.contains(currentFrame)) {
-				_pendingWritesForThisFrame.push_back({ write.srcFrameIndex, write.offset, write.byteSize });
+				_pendingWritesForThisFrame.push_back({ write.srcFrameIndex, write.offset, write.byteSize, write.data });
 				copyRegionsPerBuffer[_buffers[write.srcFrameIndex]].push_back(
 					::vk::BufferCopy()
 						.setSrcOffset(write.offset)
@@ -194,6 +194,12 @@ namespace kor::vk
 			auto* destination = static_cast<std::byte*>(allocator.MapMemory(_allocations[currentFrame]));
 
 			for (const auto& write : _pendingWritesForThisFrame) {
+				// From the bytes themselves where the write kept them: mapped memory is for writing to,
+				// and reading megabytes back out of it takes longer than the rest of the frame.
+				if (write.data && write.data->size() >= write.byteSize) {
+					std::memcpy(destination + write.offset, write.data->data(), write.byteSize);
+					continue;
+				}
 				auto* source = static_cast<std::byte*>(allocator.MapMemory(_allocations[write.srcFrameIndex]));
 				std::memcpy(destination + write.offset, source + write.offset, write.byteSize);
 				allocator.UnmapMemory(_allocations[write.srcFrameIndex]);

@@ -83,7 +83,16 @@ namespace kor::detail {
         /** The highest value known to be reached, looking at the GPU counter if there is one. */
         [[nodiscard]] std::uint64_t current();
         [[nodiscard]] bool isReached(std::uint64_t value);
-        Waiter suspend(std::uint64_t value, std::coroutine_handle<> handle, bool resumeInline = false);
+        /**
+         * Parks @p handle until @p value is reached, leaving the slot it waits in in @p slot; false,
+         * with nothing parked, when the value has been reached already.
+         *
+         * The slot is written here, under the lock, and not returned for the caller to store: once
+         * the lock is let go another thread may resume the coroutine, which may run to its end and
+         * free its frame — the awaiter and its slot with it — before this even returns. Nothing of
+         * the awaiter may be touched after this call.
+         */
+        bool suspend(std::uint64_t value, std::coroutine_handle<> handle, Waiter& slot, bool resumeInline = false);
         void cancel(const Waiter& waiter) noexcept;
         void wait(std::uint64_t value);
 

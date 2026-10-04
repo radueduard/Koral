@@ -12,9 +12,15 @@ public readonly record struct Color(float R, float G, float B, float A = 1f)
     public static Color HexA(uint rgba) => Hex(rgba >> 8).WithAlpha((rgba & 0xff) / 255f);
     public Color WithAlpha(float alpha) => this with { A = alpha };
     public bool Visible => A > 0f;
+    /// <summary>How light it is, from 0 to 1, as the eye weighs red, green and blue.</summary>
+    public float Luminance => 0.2126f * R + 0.7152f * G + 0.0722f * B;
+    /// <summary>This colour, so far of the way to <paramref name="other"/>.</summary>
+    public Color Mix(Color other, float amount) => new(R + (other.R - R) * amount, G + (other.G - G) * amount, B + (other.B - B) * amount, A + (other.A - A) * amount);
 
     public static readonly Color Transparent = new(0, 0, 0, 0);
     public static readonly Color Black = new(0, 0, 0);
+    /// <summary>No colour of its own: text of this colour is drawn in the text colour of the theme it is in.</summary>
+    public static readonly Color Inherit = new(0, 0, 0, -1);
     public static readonly Color White = new(1, 1, 1);
     public static readonly Color Red = Hex(0xF44336);
     public static readonly Color Green = Hex(0x4CAF50);

@@ -99,6 +99,10 @@ namespace
         style.color = C(s->color);
         style.lineHeight = s->line_height;
         style.letterSpacing = s->letter_spacing;
+        style.weight = s->weight > 0.f ? s->weight : 400.f;
+        style.italic = s->italic;
+        style.underline = s->underline;
+        style.lineThrough = s->line_through;
         return style;
     }
 
@@ -111,6 +115,7 @@ namespace
         theme.textMuted = C(t.text_muted); theme.border = C(t.border); theme.focus = C(t.focus);
         theme.radius = t.radius; theme.controlHeight = t.control_height;
         theme.textStyle = StyleOf(&t.text_style);
+        theme.buttonRadius = t.button_radius; theme.fieldRadius = t.field_radius; theme.checkboxRadius = t.checkbox_radius;
         return theme;
     }
 
@@ -119,7 +124,10 @@ namespace
         if (!out) throw std::runtime_error("no theme was given to fill in");
         *out = { C(t.background), C(t.surface), C(t.surfaceHover), C(t.surfacePressed), C(t.primary), C(t.primaryHover),
                  C(t.primaryPressed), C(t.onPrimary), C(t.text), C(t.textMuted), C(t.border), C(t.focus),
-                 t.radius, t.controlHeight, { nullptr, t.textStyle.size, C(t.textStyle.color), t.textStyle.lineHeight, t.textStyle.letterSpacing } };
+                 t.radius, t.controlHeight,
+                 { nullptr, t.textStyle.size, C(t.textStyle.color), t.textStyle.lineHeight, t.textStyle.letterSpacing, t.textStyle.weight,
+                   t.textStyle.italic, t.textStyle.underline, t.textStyle.lineThrough },
+                 t.buttonRadius, t.fieldRadius, t.checkboxRadius };
     }
 
     std::shared_ptr<const Gradient> MakeGradient(Gradient g, const float* offsets, const KuiColor* colors, const size_t count)
@@ -155,6 +163,12 @@ namespace
         auto o = Hold(a);
         if (!o) return {};
         return [o, f = a.invoke] { f(o->user); };
+    }
+    std::function<void(Color)> F(const KuiColorAction& a)
+    {
+        auto o = Hold(a);
+        if (!o) return {};
+        return [o, f = a.invoke](const Color c) { f(c.r, c.g, c.b, c.a, o->user); };
     }
     std::function<void(bool)> F(const KuiBoolAction& a)
     {
@@ -223,6 +237,14 @@ namespace
 
     KuiWidget* Give(Widget widget) { return widget ? new KuiWidget { std::move(widget) } : nullptr; }
     Widget W(KuiWidget* handle) { return handle ? handle->widget : Widget {}; }
+
+    std::vector<MenuItem> MenuItems(const KuiMenuItem* items, const std::size_t count)
+    {
+        std::vector<MenuItem> list;
+        for (std::size_t i = 0; items && i < count; ++i)
+            list.push_back({ items[i].label ? items[i].label : "", F(items[i].on_selected), !items[i].disabled, items[i].separator });
+        return list;
+    }
 
     std::vector<Widget> Children(KuiWidget* const* children, const size_t count)
     {
@@ -610,6 +632,81 @@ KuiWidget* kui_list_view_builder_with_range(const size_t count, const float exte
                              [r, range](const std::size_t f, const std::size_t l) { if (range) range(f, l, r->user); }));
     }, nullptr);
 }
+KuiWidget* kui_lazy_list(const KuiLazyListOptions* o)
+{
+    return Guarded([&]() -> KuiWidget* {
+        const auto& in = Need(o, "lazy list options");
+        auto b = std::make_shared<Owned>(in.builder.user, in.builder.destroy);
+        auto r = std::make_shared<Owned>(in.on_range.user, in.on_range.destroy);
+        auto s = std::make_shared<Owned>(in.on_scrolled.user, in.on_scrolled.destroy);
+        const auto build = in.builder.build;
+        const auto range = in.on_range.invoke;
+        const auto scrolled = in.on_scrolled.invoke;
+        LazyListOptions options;
+        options.count = in.count;
+        options.axis = static_cast<Axis>(in.axis);
+        options.itemExtent = in.item_extent;
+        options.estimatedExtent = in.estimated_extent > 0.f ? in.estimated_extent : 40.f;
+        options.gap = in.gap;
+        options.paddingStart = in.padding_start;
+        options.paddingEnd = in.padding_end;
+        if (range) options.onRange = [r, range](const std::size_t f, const std::size_t l) { range(f, l, r->user); };
+        if (scrolled) options.onScrolled = [s, scrolled](const std::size_t i, const float into) { scrolled(i, into, s->user); };
+        options.jumpIndex = in.jump_index;
+        options.jumpOffset = in.jump_offset;
+        options.jump = in.jump;
+        return Give(LazyList(std::move(options), [b, build](const std::size_t i) { return build ? Take(build(i, b->user)) : Widget {}; }));
+    }, nullptr);
+}
+KuiWidget* kui_intrinsic(const bool width, const bool height, KuiWidget* child) { KUI_WIDGET(Intrinsic(width, height, W(child))); }
+KuiWidget* kui_scroll_view_observed(KuiWidget* child, const uint32_t axis, const KuiPointAction onScrolled, const float jumpTo, const uint32_t jump)
+{
+    return Guarded([&]() -> KuiWidget* {
+        ScrollOptions options;
+        options.axis = static_cast<Axis>(axis);
+        if (const std::function<void(glm::vec2)> told = F(onScrolled)) options.onScrolled = [told](const float at, const float most) { told({ at, most }); };
+        options.jumpTo = jumpTo;
+        options.jump = jump;
+        return Give(ScrollView(W(child), std::move(options)));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_transform_box(const KuiTransform transform, const KuiAlignment origin, KuiWidget* child) { KUI_WIDGET(TransformBox(T(transform), W(child), A(origin))); }
+KuiWidget* kui_aspect_ratio(const float ratio, KuiWidget* child) { KUI_WIDGET(AspectRatio(ratio, W(child))); }
+KuiWidget* kui_fractionally_sized_box(const float w, const float h, KuiWidget* child) { KUI_WIDGET(FractionallySizedBox(w, h, W(child))); }
+
+struct KuiLayoutContext { LayoutContext* context; };
+size_t kui_layout_count(KuiLayoutContext* context) { return context && context->context ? context->context->count : 0; }
+void kui_layout_measure(KuiLayoutContext* context, const size_t index, const float minWidth, const float maxWidth, const float minHeight,
+                        const float maxHeight, float* outWidth, float* outHeight)
+{
+    GuardedVoid([&] {
+        const glm::vec2 size = context && context->context ? context->context->measure(index, { minWidth, maxWidth, minHeight, maxHeight }) : glm::vec2 {};
+        if (outWidth) *outWidth = size.x;
+        if (outHeight) *outHeight = size.y;
+    });
+}
+void kui_layout_place(KuiLayoutContext* context, const size_t index, const float x, const float y)
+{
+    GuardedVoid([&] { if (context && context->context) context->context->place(index, { x, y }); });
+}
+KuiWidget* kui_custom_layout(const KuiLayoutRule rule, KuiWidget* const* children, const size_t count)
+{
+    return Guarded([&]() -> KuiWidget* {
+        auto owned = std::make_shared<Owned>(rule.user, rule.destroy);
+        const auto layout = rule.layout;
+        return Give(CustomLayout([owned, layout](LayoutContext& context, const BoxConstraints& c) -> glm::vec2 {
+            if (!layout) return c.Smallest();
+            KuiLayoutContext handle { &context };
+            float width = 0.f, height = 0.f;
+            layout(&handle, c.minWidth, c.maxWidth, c.minHeight, c.maxHeight, &width, &height, owned->user);
+            return { width, height };
+        }, Children(children, count)));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_popup_anchor(const bool open, KuiWidget* popup, const KuiAction onDismiss, const KuiVec2 offset, const bool below)
+{
+    KUI_WIDGET(PopupAnchor(open, W(popup), F(onDismiss), V(offset), below));
+}
 KuiWidget* kui_gesture_detector(const KuiGestureOptions* o, KuiWidget* child)
 {
     return Guarded([&]() -> KuiWidget* {
@@ -694,9 +791,16 @@ void kui_dock_layout_dock(KuiDockLayout* l, const char* panel, const uint32_t si
     GuardedVoid([&] { Need(l, "dock layout").layout->Dock(panel ? panel : "", static_cast<DockSide>(side), relativeTo ? relativeTo : "", fraction); });
 }
 void kui_dock_layout_float(KuiDockLayout* l, const char* panel, const KuiRect rect) { GuardedVoid([&] { Need(l, "dock layout").layout->Float(panel ? panel : "", R(rect)); }); }
+void kui_dock_layout_float_at(KuiDockLayout* l, const char* panel, const KuiVec2 at) { GuardedVoid([&] { Need(l, "dock layout").layout->Float(panel ? panel : "", V(at)); }); }
 void kui_dock_layout_pop_out(KuiDockLayout* l, const char* panel, const KuiVec2 size) { GuardedVoid([&] { Need(l, "dock layout").layout->PopOut(panel ? panel : "", V(size)); }); }
 void kui_dock_layout_close(KuiDockLayout* l, const char* panel) { GuardedVoid([&] { Need(l, "dock layout").layout->Close(panel ? panel : ""); }); }
 void kui_dock_layout_open(KuiDockLayout* l, const char* panel) { GuardedVoid([&] { Need(l, "dock layout").layout->Open(panel ? panel : ""); }); }
+void kui_dock_layout_dock_in(KuiDockLayout* l, const char* panel, const uint32_t area, const int32_t part)
+{
+    GuardedVoid([&] { Need(l, "dock layout").layout->Dock(panel ? panel : "", static_cast<DockArea>(area), part); });
+}
+void kui_dock_layout_hide(KuiDockLayout* l, const char* panel) { GuardedVoid([&] { Need(l, "dock layout").layout->Hide(panel ? panel : ""); }); }
+bool kui_dock_layout_is_shown(KuiDockLayout* l, const char* panel) { return Guarded([&] { return Need(l, "dock layout").layout->IsShown(panel ? panel : ""); }, false); }
 void kui_dock_layout_activate(KuiDockLayout* l, const char* panel) { GuardedVoid([&] { Need(l, "dock layout").layout->Activate(panel ? panel : ""); }); }
 bool kui_dock_layout_is_open(KuiDockLayout* l, const char* panel) { return Guarded([&] { return Need(l, "dock layout").layout->IsOpen(panel ? panel : ""); }, false); }
 bool kui_dock_layout_is_floating(KuiDockLayout* l, const char* panel) { return Guarded([&] { return Need(l, "dock layout").layout->IsFloating(panel ? panel : ""); }, false); }
@@ -712,10 +816,22 @@ KuiWidget* kui_dock_space(KuiDockLayout* l, const KuiDockPanel* panels, const si
     return Guarded([&]() -> KuiWidget* {
         std::vector<DockPanel> list;
         for (std::size_t i = 0; i < count; ++i)
-            list.push_back({ panels[i].id ? panels[i].id : "", panels[i].title ? panels[i].title : "", W(panels[i].content), !panels[i].fixed });
+            list.push_back({ panels[i].id ? panels[i].id : "", panels[i].title ? panels[i].title : "", W(panels[i].content), !panels[i].fixed,
+                             !panels[i].undockable, !panels[i].no_title_bar, panels[i].icon ? panels[i].icon : "" });
         DockOptions options;
         if (o) {
             options.multiViewport = !o->single_viewport;
+            if (o->gap > 0.f) options.gap = o->gap;
+            if (o->stripe_gap >= 0.f) options.stripeGap = o->stripe_gap;
+            const auto given = [](float& into, const float value) { if (value > 0.f) into = value; };
+            const KuiDockStyle& s = o->style;
+            given(options.style.titleBarHeight, s.title_bar_height); given(options.style.stripeWidth, s.stripe_width);
+            given(options.style.buttonSize, s.button_size); given(options.style.buttonGap, s.button_gap);
+            given(options.style.separatorGap, s.separator_gap); given(options.style.tabPadding, s.tab_padding);
+            given(options.style.resizeGrip, s.resize_grip); given(options.style.minFloatSize, s.min_float_size);
+            given(options.style.minAreaSize, s.min_area_size); given(options.style.radius, s.radius);
+            given(options.style.edgeDropMargin, s.edge_drop_margin); given(options.style.centerDropSize, s.center_drop_size);
+            given(options.style.underDropStart, s.under_drop_start);
             options.onClosed = F(o->on_closed);
             options.onChanged = F(o->on_changed);
         }
@@ -734,7 +850,164 @@ KuiWidget* kui_button_with_child(KuiWidget* child, const KuiAction onPressed, co
 KuiWidget* kui_checkbox(const bool value, const KuiBoolAction onChanged, const char* label) { KUI_WIDGET(Checkbox(value, F(onChanged), label ? label : "")); }
 KuiWidget* kui_switch(const bool value, const KuiBoolAction onChanged) { KUI_WIDGET(Switch(value, F(onChanged))); }
 KuiWidget* kui_slider(const float value, const KuiFloatAction onChanged, const float min, const float max) { KUI_WIDGET(Slider(value, F(onChanged), min, max)); }
+KuiWidget* kui_slider_finished(const float value, const KuiFloatAction onChanged, const float min, const float max, const KuiAction onFinished)
+{
+    KUI_WIDGET(Slider(value, F(onChanged), min, max, F(onFinished)));
+}
+KuiWidget* kui_text_lines(const char* text, const KuiTextStyle* style, const uint32_t align, const bool wrap, const int32_t maxLines, const bool ellipsis)
+{
+    KUI_WIDGET(Text(text ? text : "", StyleOf(style), static_cast<TextAlign>(align), wrap, maxLines, ellipsis));
+}
+KuiWidget* kui_themed(const KuiTheme* theme, KuiWidget* child) { KUI_WIDGET(Themed(ThemeOf(Need(theme, "theme")), W(child))); }
+bool kui_system_appearance(bool* dark, KuiColor* accent)
+{
+    return Guarded([&] {
+        const SystemAppearance a = QuerySystemAppearance();
+        if (dark) *dark = a.dark;
+        if (accent) *accent = C(a.accent);
+        return a.known;
+    }, false);
+}
 KuiWidget* kui_progress_bar(const float value) { KUI_WIDGET(ProgressBar(value)); }
+KuiWidget* kui_drag_value(const float value, const KuiFloatAction onChanged, const float speed, const float min, const float max,
+                          const int32_t decimals, const char* label, const float width)
+{
+    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width }));
+}
+KuiWidget* kui_dropdown(const char* const* items, const size_t count, const int32_t selected, const KuiFloatAction onChanged,
+                        const float width, const char* placeholder)
+{
+    return Guarded([&]() -> KuiWidget* {
+        std::vector<std::string> list;
+        for (std::size_t i = 0; i < count; ++i) list.emplace_back(items && items[i] ? items[i] : "");
+        std::function<void(float)> changed = F(onChanged);
+        return Give(Dropdown(std::move(list), selected, [changed](const int index) { if (changed) changed(static_cast<float>(index)); },
+                             DropdownOptions { width, placeholder ? placeholder : "" }));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_context_menu(const KuiMenuItem* items, const size_t count, KuiWidget* child)
+{
+    return Guarded([&]() -> KuiWidget* {
+        std::vector<MenuItem> list;
+        for (std::size_t i = 0; i < count; ++i)
+            list.push_back({ items[i].label ? items[i].label : "", F(items[i].on_selected), !items[i].disabled, items[i].separator });
+        return Give(ContextMenu(std::move(list), W(child)));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_menu_bar(const KuiMenu* menus, const size_t count)
+{
+    return Guarded([&]() -> KuiWidget* {
+        std::vector<Menu> list;
+        for (std::size_t i = 0; menus && i < count; ++i) list.push_back({ menus[i].title ? menus[i].title : "", MenuItems(menus[i].items, menus[i].count) });
+        return Give(MenuBar(std::move(list)));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_separator(const bool vertical, const float thickness) { KUI_WIDGET(Separator(vertical ? Axis::eVertical : Axis::eHorizontal, thickness)); }
+KuiWidget* kui_disabled(KuiWidget* child, const bool disabled) { KUI_WIDGET(Disabled(W(child), disabled)); }
+KuiWidget* kui_radio_button(const bool selected, const KuiAction onSelected, const char* label)
+{
+    KUI_WIDGET(RadioButton(selected, F(onSelected), label ? label : ""));
+}
+KuiWidget* kui_selectable(const char* label, const bool selected, const KuiAction onTap) { KUI_WIDGET(Selectable(label ? label : "", selected, F(onTap))); }
+KuiWidget* kui_collapsing_header(const char* title, const bool open, const KuiBoolAction onToggled, KuiWidget* child)
+{
+    KUI_WIDGET(CollapsingHeader(title ? title : "", open, F(onToggled), W(child)));
+}
+KuiWidget* kui_tree_node(const char* label, const bool open, const KuiBoolAction onToggled, KuiWidget* const* children, const size_t count,
+                         const bool leaf, const bool selected, const KuiAction onTap)
+{
+    KUI_WIDGET(TreeNode(label ? label : "", open, F(onToggled), Children(children, count), TreeNodeOptions { leaf, selected, 18.f, F(onTap) }));
+}
+KuiWidget* kui_tab_bar(const char* const* tabs, const size_t count, const int32_t selected, const KuiFloatAction onSelected)
+{
+    return Guarded([&]() -> KuiWidget* {
+        std::vector<std::string> list;
+        for (std::size_t i = 0; i < count; ++i) list.emplace_back(tabs && tabs[i] ? tabs[i] : "");
+        std::function<void(float)> picked = F(onSelected);
+        return Give(TabBar(std::move(list), selected, [picked](const int index) { if (picked) picked(static_cast<float>(index)); }));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_tooltip(const char* text, KuiWidget* child) { KUI_WIDGET(Tooltip(text ? text : "", W(child))); }
+KuiWidget* kui_size_observer(const KuiPanAction onChanged, KuiWidget* child) { KUI_WIDGET(SizeObserver(F(onChanged), W(child))); }
+KuiWidget* kui_modal(const bool open, KuiWidget* child, KuiWidget* dialog, const KuiAction onDismiss)
+{
+    KUI_WIDGET(Modal(open, W(child), W(dialog), F(onDismiss)));
+}
+KuiWidget* kui_color_picker(const KuiColor color, const KuiColorAction onChanged, const bool alpha, const bool hex, const float width)
+{
+    KUI_WIDGET(ColorPicker(C(color), F(onChanged), ColorPickerOptions { alpha, hex, width > 0.f ? width : 220.f }));
+}
+KuiWidget* kui_color_edit(const KuiColor color, const KuiColorAction onChanged, const char* label, const bool alpha)
+{
+    KUI_WIDGET(ColorEdit(C(color), F(onChanged), label ? label : "", ColorPickerOptions { alpha, true, 220.f }));
+}
+KuiWidget* kui_plot(const float* values, const size_t count, const uint32_t kind, const float min, const float max, const KuiVec2 size,
+                    const char* overlay, const KuiColor color)
+{
+    return Guarded([&]() -> KuiWidget* {
+        PlotOptions options;
+        options.kind = kind == 1 ? PlotKind::eHistogram : PlotKind::eLines;
+        options.min = min;
+        options.max = max;
+        options.size = V(size);
+        options.overlay = overlay ? overlay : "";
+        options.color = C(color);
+        return Give(Plot(values ? std::vector<float>(values, values + count) : std::vector<float> {}, std::move(options)));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_step_slider(const int32_t value, const int32_t steps, const KuiFloatAction onChanged, const char* const* labels, const size_t labelCount,
+                           const float width)
+{
+    return Guarded([&]() -> KuiWidget* {
+        StepSliderOptions options;
+        for (std::size_t i = 0; labels && i < labelCount; ++i) options.labels.emplace_back(labels[i] ? labels[i] : "");
+        options.width = width;
+        std::function<void(float)> picked = F(onChanged);
+        return Give(StepSlider(value, steps, [picked](const int step) { if (picked) picked(static_cast<float>(step)); }, std::move(options)));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_gradient_editor(const float* stops, const size_t count, const KuiStopsAction onChanged, const float width, const bool picker)
+{
+    return Guarded([&]() -> KuiWidget* {
+        std::vector<GradientStop> list;
+        for (std::size_t i = 0; stops && i < count; ++i) {
+            const float* s = stops + i * 5;
+            list.push_back({ s[0], Color { s[1], s[2], s[3], s[4] } });
+        }
+        std::function<void(std::vector<GradientStop>)> changed;
+        if (auto o = Hold(onChanged)) {
+            changed = [o, f = onChanged.invoke](const std::vector<GradientStop>& now) {
+                std::vector<float> flat;
+                flat.reserve(now.size() * 5);
+                for (const auto& stop : now) flat.insert(flat.end(), { stop.offset, stop.color.r, stop.color.g, stop.color.b, stop.color.a });
+                f(flat.data(), now.size(), o->user);
+            };
+        }
+        return Give(GradientEditor(std::move(list), std::move(changed), GradientEditorOptions { width > 0.f ? width : 260.f, picker }));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+KuiWidget* kui_title_bar(const char* title, KuiWidget* leading, KuiWidget* trailing, const float height, const bool buttons)
+{
+    KUI_WIDGET(TitleBar(title ? title : "", TitleBarOptions { W(leading), W(trailing), height > 0.f ? height : 36.f, buttons }));
+}
+KuiWidget* kui_status_bar(const char* message, const uint32_t level, KuiWidget* trailing, const float height)
+{
+    KUI_WIDGET(StatusBar(message ? message : "", static_cast<StatusLevel>(std::min(level, 2u)),
+                         StatusBarOptions { W(trailing), height > 0.f ? height : 26.f }));
+}
+KuiWidget* kui_table(const KuiTableColumn* columns, const size_t columnCount, KuiWidget* const* cells, const size_t rowCount,
+                     const bool header, const bool striped, const bool borders, const float rowHeight)
+{
+    return Guarded([&]() -> KuiWidget* {
+        std::vector<TableColumn> list;
+        for (std::size_t c = 0; columns && c < columnCount; ++c) list.push_back({ columns[c].title ? columns[c].title : "", columns[c].width, columns[c].flex });
+        std::vector<std::vector<Widget>> rows(rowCount);
+        for (std::size_t r = 0; cells && r < rowCount; ++r)
+            for (std::size_t c = 0; c < columnCount; ++c) rows[r].push_back(W(cells[r * columnCount + c]));
+        return Give(Table(std::move(list), std::move(rows), TableOptions { header, striped, borders, rowHeight }));
+    }, static_cast<KuiWidget*>(nullptr));
+}
+
 KuiWidget* kui_text_field(const KuiTextFieldOptions* o)
 {
     return Guarded([&]() -> KuiWidget* {
@@ -745,6 +1018,10 @@ KuiWidget* kui_text_field(const KuiTextFieldOptions* o)
         options.onChanged = F(t.on_changed);
         options.onSubmitted = F(t.on_submitted);
         options.controlled = t.controlled;
+        options.multiline = t.multiline;
+        options.minLines = t.min_lines;
+        options.maxLines = t.max_lines;
+        options.focus = t.focus;
         options.width = t.width;
         return Give(TextField(std::move(options)));
     }, nullptr);
@@ -770,6 +1047,7 @@ KuiUi* kui_ui_new(KuiWidget* root, const KuiTheme* theme, const float scale)
 void kui_ui_destroy(KuiUi* view) { delete reinterpret_cast<Ui*>(view); }
 void kui_ui_set_root(KuiUi* v, KuiWidget* root) { GuardedVoid([&] { UiOf(v).SetRoot(W(root)); }); }
 void kui_ui_set_theme(KuiUi* v, const KuiTheme* t) { GuardedVoid([&] { UiOf(v).SetTheme(ThemeOf(Need(t, "theme"))); }); }
+void kui_ui_clear_focus(KuiUi* v) { GuardedVoid([&] { UiOf(v).ClearFocus(); }); }
 void kui_ui_get_theme(KuiUi* v, KuiTheme* t) { GuardedVoid([&] { ThemeOf(UiOf(v).GetTheme(), t); }); }
 void kui_ui_set_scale(KuiUi* v, const float s) { GuardedVoid([&] { UiOf(v).SetScale(s); }); }
 void kui_ui_update(KuiUi* v) { GuardedVoid([&] { UiOf(v).Update(); }); }
@@ -779,6 +1057,8 @@ void kui_ui_update_with(KuiUi* v, KoralInput* input, const float w, const float 
 }
 void kui_ui_reassemble(KuiUi* v) { GuardedVoid([&] { UiOf(v).Reassemble(); }); }
 void kui_ui_reassemble_all(void) { GuardedVoid([] { Ui::ReassembleAll(); }); }
+void kui_debug_set_paint_bounds(const bool enabled) { debug::SetPaintBounds(enabled); }
+bool kui_debug_paint_bounds(void) { return debug::PaintBounds(); }
 bool kui_ui_wants_pointer(KuiUi* v) { return Guarded([&] { return UiOf(v).WantsPointer(); }, false); }
 bool kui_ui_wants_keyboard(KuiUi* v) { return Guarded([&] { return UiOf(v).WantsKeyboard(); }, false); }
 void kui_ui_stats(KuiUi* v, KuiUiStats* out)

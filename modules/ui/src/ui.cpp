@@ -73,6 +73,15 @@ namespace kui
         BuildOwner builder;
         // The screen: the widgets, and over them what floats above everything (a drag's feedback).
         RootRender render, content, overlay;
+        unsigned debugRevision = debug::Revision();
+        std::vector<RenderObject*> forgotten;   // what left the tree while this frame's events were being sent
+        struct Popup { Widget widget; glm::vec2 at {}; };
+        std::optional<Popup> popup;
+        bool stale = false;     ///< Everything is to be built again: asked for through the owner.
+        const kor::Window* titled = nullptr;    // the window whose title bar was coloured to go with the theme
+        std::string tip;                        // the tooltip that is showing, and where the pointer was when it came up
+        glm::vec2 tipAt {};
+        glm::vec2 logical {};                   // the view's size, in its own units: where a popup is kept inside
         std::unique_ptr<RootElement> element, overlayElement;
         Statistics stats;
 
@@ -103,6 +112,7 @@ namespace kui
         {
             Live().push_back(this);
             owner.onForget = [this](RenderObject& object) {
+                forgotten.push_back(&object);
                 std::erase(hovered, &object);
                 std::erase(captured, &object);
                 if (claimed == &object) claimed = nullptr;
@@ -115,6 +125,24 @@ namespace kui
                 ShowFeedback();
                 return true;
             };
+            owner.showPopup = [this](const Widget& widget, glm::vec2 at, const glm::vec2 size) {
+                // Another popup takes this one's place: whoever showed the one there hears that it went.
+                if (popup) if (const auto closed = std::exchange(owner.onPopupClosed, nullptr)) closed();
+                // Inside the view, where it fits there.
+                at = glm::max(glm::min(at, logical - size - glm::vec2(4.f)), glm::vec2(4.f));
+                popup = Popup { widget, at };
+                ShowFeedback();
+            };
+            owner.reassemble = [this] { stale = true; };
+            owner.closePopup = [this] {
+                if (!popup) return;
+                popup.reset();
+                ShowFeedback();
+                // Whoever showed it hears that it went — once: the next popup has its own to tell.
+                if (const auto closed = std::exchange(owner.onPopupClosed, nullptr)) closed();
+            };
+            owner.clipboardText = [] { return kor::Window::ClipboardText(); };
+            owner.setClipboardText = [](const std::string& text) { kor::Window::SetClipboardText(text); };
             render.SetChildren({ &content, &overlay });
             render.Attach(&owner);
             element = std::make_unique<RootElement>(content);
@@ -134,12 +162,40 @@ namespace kui
             element.reset();
             owner.onForget = nullptr;
             owner.beginDrag = nullptr;
+            owner.showPopup = nullptr;
+            owner.closePopup = nullptr;
             render.SetChildren({});
         }
 
+        /** What is over the view's own widgets: a popup, behind it what closes it, and what a drag carries. */
         void ShowFeedback()
         {
-            overlayElement->SetRoot(drag ? Translate(pointer - drag->hotspot, IgnorePointer(drag->feedback)) : Widget {});
+            std::vector<Widget> layers;
+            if (popup) {
+                // Everywhere the popup is not: a press there closes it, and goes no further.
+                layers.push_back(GestureDetector(GestureOptions {}.OnTapDown([this](glm::vec2) { owner.closePopup(); }), SizedBox(1.e6f, 1.e6f)));
+                layers.push_back(Translate(popup->at, popup->widget));
+            }
+            if (drag) layers.push_back(Translate(pointer - drag->hotspot, IgnorePointer(drag->feedback)));
+            else if (!tip.empty()) {
+                // By the pointer, under it — over it near the foot of the view — and nothing the pointer can touch.
+                const Theme& t = settings.theme;
+                TextStyle style = t.textStyle;
+                style.size = std::max(style.size - 2.f, 10.f);
+                constexpr float Widest = 320.f;
+                const Paragraph text(tip, style, Widest);
+                const glm::vec2 size = glm::vec2(std::min(text.MaxIntrinsicWidth(), Widest), text.Size().y) + glm::vec2(20.f, 12.f);
+                glm::vec2 at = tipAt + glm::vec2(14.f, 20.f);
+                if (at.y + size.y > logical.y - 4.f) at.y = tipAt.y - size.y - 8.f;
+                at = glm::max(glm::min(at, logical - size - glm::vec2(4.f)), glm::vec2(4.f));
+                layers.push_back(Translate(at, IgnorePointer(Container({
+                    .padding = EdgeInsets::Symmetric(10.f, 6.f),
+                    .decoration = { .color = t.surfacePressed, .borderWidth = 1.f, .borderColor = t.border, .radius = 8.f },
+                }, ConstrainedBox({ 0.f, Widest, 0.f, Infinity }, Text(tip, style))))));
+            }
+            // Always in a stack, even one alone: the overlay is as big as the view, and what a stack holds is
+            // as big as itself — a tip or a drag's picture put there bare would be stretched over all of it.
+            overlayElement->SetRoot(layers.empty() ? Widget {} : Stack(std::move(layers)));
         }
 
         /** The drag, as the pointer moves over @p path and the button is let go. */
@@ -225,16 +281,20 @@ namespace kui
             return nullptr;
         }
 
-        static glm::vec2 LocalOf(const RenderObject& object, const glm::vec2 position) { return position - object.ToGlobal({ 0.f, 0.f }); }
+        static glm::vec2 LocalOf(const RenderObject& object, const glm::vec2 position) { return object.ToLocal(position); }
 
-        static bool Send(RenderObject& target, PointerEvent event)
+        bool Send(RenderObject& target, PointerEvent event)
         {
+            // Gone since this frame's events began: what an earlier one did — a menu closed by what was
+            // picked in it — took it out of the tree, while the list it was sent from still named it.
+            if (std::ranges::find(forgotten, &target) != forgotten.end()) return false;
             event.local = LocalOf(target, event.position);
             return target.HandleEvent(event);
         }
 
         void Pointer(kor::Input& own)
         {
+            forgotten.clear();
             // Positions are in the root's coordinates whichever window they came from, so every render
             // object finds its own from them the same way.
             const PointerViewport* viewport = ViewportFor(own);
@@ -268,7 +328,19 @@ namespace kui
             for (auto* now : path)
                 if (std::ranges::find(hovered, now) == hovered.end()) Send(*now, { .type = PointerEvent::Type::eEnter, .position = position });
             hovered = path;
-            if (moved) for (auto* now : std::vector(path)) Send(*now, { .type = PointerEvent::Type::eHover, .position = position });
+            // What the pointer looks like is said afresh by what it is over, each time it moves.
+            if (moved) {
+                owner.cursor = PointerCursor::eArrow;
+                owner.tooltip.clear();
+                for (auto* now : std::vector(path)) Send(*now, { .type = PointerEvent::Type::eHover, .position = position });
+                // A tip comes up where the pointer was when it got there, and stays there while it is the same.
+                if (owner.tooltip != tip) {
+                    tip = owner.tooltip;
+                    tipAt = position;
+                    ShowFeedback();
+                }
+            }
+            if (const kor::Window* shown = viewport ? viewport->window : owner.window) shown->SetCursor(static_cast<kor::Window::Cursor>(owner.cursor));
 
             // A press: everything under the pointer hears of it, and is what the rest of the gesture goes to.
             for (const auto button : { kor::MouseButton::eLeft, kor::MouseButton::eRight, kor::MouseButton::eMiddle }) {
@@ -279,8 +351,9 @@ namespace kui
                     captured = path;
                     claimed = nullptr;
                 }
+                bool taken = false;
                 for (auto* target : std::vector(path))
-                    Send(*target, { .type = PointerEvent::Type::eDown, .position = position, .button = button });
+                    taken |= Send(*target, { .type = PointerEvent::Type::eDown, .position = position, .button = button, .taken = taken });
             }
 
             // A drag: the first of them to want it takes it, and the rest are told the gesture is off.
@@ -321,21 +394,48 @@ namespace kui
             return own;
         }
 
+/** The keyboard to what has it — and, with Tab, to the next that can have it. */
         void Keyboard(kor::Input& input, const float dt)
         {
+            // Down now, or going down this very frame: a key pressed with its modifier has it.
+            const auto down = [&input](const kor::Key key) { return input.IsKeyHeld(key) || input.IsKeyPressed(key); };
+            owner.shift = down(kor::Key::eLeftShift) || down(kor::Key::eRightShift);
+            owner.control = down(kor::Key::eLeftControl) || down(kor::Key::eRightControl);
+            if (input.IsKeyPressed(kor::Key::eTab) || input.IsKeyRepeated(kor::Key::eTab)) {
+                // In the order they are in the tree, round and round; backwards with Shift.
+                std::vector<RenderObject*> all;
+                const std::function<void(RenderObject&)> collect = [&](RenderObject& object) {
+                    if (object.Focusable()) all.push_back(&object);
+                    object.VisitChildren(collect);
+                };
+                collect(render);
+                if (!all.empty()) {
+                    const auto at = std::ranges::find(all, owner.Focused());
+                    const std::size_t count = all.size();
+                    const std::size_t next = at == all.end() ? (owner.shift ? count - 1 : 0)
+                                           : (static_cast<std::size_t>(at - all.begin()) + (owner.shift ? count - 1 : 1)) % count;
+                    owner.RequestFocus(all[next]);
+                }
+            }
             RenderObject* focused = owner.Focused();
             if (!focused) return;
-            if (const auto text = input.TypedText(); !text.empty()) focused->HandleText(text);
+            if (const auto text = input.TypedText(); !text.empty() && !owner.control) focused->HandleText(text);
             for (const kor::Key key : EditKeys) {
+                if (key == kor::Key::eTab) continue;
                 const bool pressed = input.IsKeyPressed(key), repeated = input.IsKeyRepeated(key);
                 if ((pressed || repeated) && owner.Focused()) owner.Focused()->HandleKey(key, repeated && !pressed);
             }
+            // With Control: select all, copy, cut and paste.
+            if (owner.control)
+                for (const kor::Key key : { kor::Key::eA, kor::Key::eC, kor::Key::eX, kor::Key::eV })
+                    if ((input.IsKeyPressed(key) || (key == kor::Key::eV && input.IsKeyRepeated(key))) && owner.Focused()) owner.Focused()->HandleKey(key, false);
             if (owner.Focused()) owner.Focused()->FocusTick(dt);
         }
 
-        void Frame(kor::Input* input, const glm::vec2 viewport, const float dt)
+                void Frame(kor::Input* input, const glm::vec2 viewport, const float dt)
         {
             const ThemeScope theme(settings.theme);
+            if (std::exchange(stale, false)) { element->MarkTreeDirty(); overlayElement->MarkTreeDirty(); }
             builder.builds = 0;
             owner.ResetCounters();
 
@@ -343,7 +443,12 @@ namespace kui
             const auto ms = [](const Clock::time_point from, const Clock::time_point to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
             const auto t0 = Clock::now();
             owner.scale = settings.scale;
+            logical = viewport / settings.scale;
             if (input) {
+                // A popup is let go of with Escape, or by pressing with another button anywhere.
+                if (popup && (input->IsKeyPressed(kor::Key::eEsc) || input->IsMouseButtonPressed(kor::MouseButton::eRight)
+                              || input->IsMouseButtonPressed(kor::MouseButton::eMiddle)))
+                    owner.closePopup();
                 Pointer(*input);
                 Keyboard(KeyboardOf(*input), dt);
             }
@@ -360,6 +465,15 @@ namespace kui
             render.Layout(BoxConstraints::Tight(logical), false);
             owner.FlushLayout();
             const auto t3 = Clock::now();
+            // A debugging aid changed: everything painted before it is painted again, with it or without.
+            if (debugRevision != debug::Revision()) {
+                debugRevision = debug::Revision();
+                const std::function<void(RenderObject&)> repaint = [&repaint](RenderObject& object) {
+                    object.MarkNeedsPaint();
+                    object.VisitChildren(repaint);
+                };
+                repaint(render);
+            }
             owner.FlushPaint();
             render.RepaintIfNeeded();
             renderer.SetScale(settings.scale);
@@ -424,6 +538,12 @@ namespace kui
         auto& input = kor::Scene::Input::Get();
         const glm::uvec2 extent = kor::Scene::Window::Extent();
         _impl->owner.window = &kor::Scene::Window::Get();
+        // The window's own title bar, in the theme's colours: once for each window the interface is shown in.
+        if (_impl->settings.titleBar && _impl->titled != _impl->owner.window) {
+            _impl->titled = _impl->owner.window;
+            const Theme& t = _impl->settings.theme;
+            _impl->owner.window->SetTitleBarColors({ t.background.r, t.background.g, t.background.b }, { t.text.r, t.text.g, t.text.b });
+        }
         _impl->Frame(&input, glm::vec2(extent), kor::Scene::Time::FrameTime());
     }
 
@@ -431,6 +551,9 @@ namespace kui
 
     Renderer& Ui::GetRenderer() { return _impl->renderer; }
     RenderObject* Ui::RootRenderObject() const { return &_impl->render; }
+    PointerCursor Ui::Cursor() const { return _impl->owner.cursor; }
+    void Ui::ClearFocus() { _impl->owner.RequestFocus(nullptr); }
+    const std::string& Ui::TooltipText() const { return _impl->tip; }
     bool Ui::WantsPointer() const { return _impl->overSomething || !_impl->captured.empty() || _impl->drag.has_value(); }
     bool Ui::WantsKeyboard() const { return _impl->owner.Focused() != nullptr; }
     const Ui::Statistics& Ui::Stats() const { return _impl->stats; }
