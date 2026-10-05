@@ -19,6 +19,8 @@
 #include "image.h"
 #include "imageView.h"
 #include "log.h"
+#include "scene.h"
+#include "window.h"
 #include "shader.h"
 
 namespace kor
@@ -573,8 +575,22 @@ namespace kor
     }
 
     bool DebugDraw::Gizmo(const GizmoMode mode, glm::mat4& transform, const glm::mat4& viewProjection, const GizmoPointer& pointer,
-                          const GizmoOptions& options, const std::uint64_t id)
+                          const GizmoOptions& given, const std::uint64_t id)
     {
+        // Its sizes are on screen, in points: on a scaled display (Retina, two pixels to a point) the image the
+        // camera draws is drawn at the display's density, so a pixel of it is less than a point. As big, and as
+        // easy to take hold of, as anywhere else — and nothing changes where a pixel is a point.
+        float density = 1.f;
+        if (const Scene* scene = Scene::Current(); scene && !scene->SceneWindow().IsOffscreen())
+            density = std::max(scene->SceneWindow().PixelRatio(), 1.f);
+        GizmoOptions options = given;
+        options.size *= density;
+        const float pick = pickDistance * density;
+        const auto handleStyle = [density](const glm::vec4 color, const float fillAlpha = 0.f) {
+            DebugStyle style = kor::handleStyle(color, fillAlpha);
+            style.lineWidth *= density;
+            return style;
+        };
         // Ids given and ids by order kept apart: the top bit is the order's.
         const std::uint64_t key = id != 0 ? (id & ~(std::uint64_t(1) << 63)) : ((std::uint64_t(1) << 63) | _gizmoCalls);
         ++_gizmoCalls;
@@ -625,7 +641,7 @@ namespace kor
         glm::vec3 hotDirection(0.f);   // for a ring: where on it the pointer is
         if (!dragging && pointer.position) {
             const glm::vec2 cursor = *pointer.position;
-            float best = pickDistance;
+            float best = pick;
             const auto consider = [&](const int handle, const float distance) {
                 if (distance < best) {
                     best = distance;
@@ -652,7 +668,7 @@ namespace kor
                     }
                 }
             } else {
-                if (toCenter < (mode == GizmoMode::eScale ? 12.f : 10.f)) consider(centerHandle, 0.f);
+                if (toCenter < (mode == GizmoMode::eScale ? 12.f : 10.f) * density) consider(centerHandle, 0.f);
                 for (int i = 0; i < 3; ++i)
                     if (axisShown[i]) consider(i, segmentDistance(origin + axes[i] * size * 0.15f, origin + axes[i] * size));
                 if (hot < 0 && mode == GizmoMode::eTranslate) {

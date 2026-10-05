@@ -393,6 +393,8 @@ class ComposeUi(theme: Theme = KoralDarkTheme, scale: Float = 1f, content: @Comp
         // Everything that changed is made again in one go, out of one arena.
         if (scratch { _ -> rootChanged() }) KuiNative.kui_ui_set_root(ui, root.widget())
         val made = System.nanoTime()
+        // Its pointer's places, heard during the update, are told in pixels: as many to a unit as it is drawn at.
+        PointerPixels.perUnit = KuiNative.kui_ui_pixel_scale(ui)
         KuiNative.kui_ui_update(ui)
         koral.checkLastError()
         timings = Timings((composed - start) / 1e6, (made - composed) / 1e6, (System.nanoTime() - made) / 1e6)

@@ -24,13 +24,14 @@ namespace
 
     // The untyped PushConstant and PushConstantBlock are protected: the typed templates in front of them
     // are what C++ calls. A binding has only bytes and a shape, so it reaches the untyped ones through
-    // member pointers, which name them without needing to be a command buffer.
+    // member pointers, which name them without needing to be a command buffer. Clang only grants protected
+    // access when the member is named through the derived class, so the accessors must not reuse the names.
     struct Access : CommandBuffer {
         using PushConstantRaw = CommandBuffer& (CommandBuffer::*)(std::string_view, const void*, glm::u32, ValueShape,
                                                                    std::source_location);
         using PushBlockRaw = CommandBuffer& (CommandBuffer::*)(const void*, glm::u32, glm::u32);
-        static PushConstantRaw PushConstant() { return &Access::CommandBuffer::PushConstant; }
-        static PushBlockRaw PushConstantBlock() { return &Access::CommandBuffer::PushConstantBlock; }
+        static PushConstantRaw RawPushConstant() { return &Access::PushConstant; }
+        static PushBlockRaw RawPushConstantBlock() { return &Access::PushConstantBlock; }
     };
 
     template<typename Body>
@@ -228,7 +229,7 @@ void koral_cmd_bind_descriptor_set(KoralCommandBuffer* c, const uint32_t i, Kora
 void koral_cmd_bind_mesh(KoralCommandBuffer* c, KoralMesh* m) { Record(c, [&](auto& x) { x.BindMesh(RefOf<Mesh>(m)); }); }
 void koral_cmd_push_constant_block(KoralCommandBuffer* c, const void* data, const uint32_t bytes, const uint32_t offset)
 {
-    Record(c, [&](CommandBuffer& x) { (x.*Access::PushConstantBlock())(data, bytes, offset); });
+    Record(c, [&](CommandBuffer& x) { (x.*Access::RawPushConstantBlock())(data, bytes, offset); });
 }
 void koral_cmd_push_constant(KoralCommandBuffer* c, const char* name, const void* data, const uint32_t bytes, const KoralValueShape* shape)
 {
@@ -241,7 +242,7 @@ void koral_cmd_push_constant(KoralCommandBuffer* c, const char* name, const void
             s.count = shape->count;
             s.known = shape->known;
         }
-        (x.*Access::PushConstant())(name ? name : "", data, bytes, s, std::source_location::current());
+        (x.*Access::RawPushConstant())(name ? name : "", data, bytes, s, std::source_location::current());
     });
 }
 void koral_cmd_barrier(KoralCommandBuffer* c, const KoralBufferBarrier* buffers, const size_t bufferCount, const KoralImageBarrier* images,

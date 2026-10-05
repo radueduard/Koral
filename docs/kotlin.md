@@ -85,7 +85,13 @@ At run time, `KORAL_SDK` is also where the native libraries are found.
   - the working directory.
 - **koral-ui**, from `modules/` beside Koral's library, or from the file `KORAL_UI_LIBRARY` names.
 
-Programs that run Koral need `--enable-native-access=ALL-UNNAMED`. The sample's `application` block passes it.
+Programs that run Koral need `--enable-native-access=ALL-UNNAMED`. On macOS a window opens only on the process's
+first thread, which a JVM's `main()` is not on: `App.launch` runs the program there by itself, and a program that
+makes its `App` itself does so inside `onFirstThread { }` — or is started with `-XstartOnFirstThread`, as this
+build starts the sample. Otherwise opening the application throws, saying so.
+
+Pointer positions (`pointerInput`) and `onSizeChanged` sizes are in pixels, as Compose's are: on a Retina display
+twice the layout's units, so a place over a viewport is a place in its image.
 
 | Project    | What it is                                                                                     |
 |------------|------------------------------------------------------------------------------------------------|

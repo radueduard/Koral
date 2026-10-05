@@ -727,6 +727,7 @@ internal static unsafe partial class KuiNative
     [LibraryImport(Library)] internal static partial void kui_ui_clear_focus(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_get_theme(IntPtr view, KuiTheme* theme);
     [LibraryImport(Library)] internal static partial void kui_ui_set_scale(IntPtr view, float scale);
+    [LibraryImport(Library)] internal static partial float kui_ui_pixel_scale(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_update(IntPtr view);
     [LibraryImport(Library)] internal static partial void kui_ui_update_with(IntPtr view, IntPtr input, float width, float height, float dt);
     [LibraryImport(Library)] internal static partial void kui_ui_reassemble(IntPtr view);

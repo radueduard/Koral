@@ -25,6 +25,10 @@
 #include <dlfcn.h>
 #endif
 
+#ifdef __APPLE__
+#include <pthread.h>   // pthread_main_np
+#endif
+
 #include "framebuffer.h"
 #include "log.h"
 #include "module.h"
@@ -399,6 +403,15 @@ namespace kor
         }
         // Point GLFW's Vulkan support at the loader Koral ships, before glfwInit snapshots it.
         initGlfwVulkanLoader();
+
+#ifdef __APPLE__
+        // Cocoa runs only on the process's first thread; glfwInit anywhere else is a SIGTRAP inside AppKit,
+        // with nothing to say why. The usual way here is a JVM, whose main() is not on that thread.
+        if (s.platform != WindowPlatform::eNone && !pthread_main_np())
+            throw std::runtime_error("On macOS, windows can only be opened from the process's first thread, and "
+                                     "this is not it. Make the application inside koral_run_on_main_thread (Kotlin: "
+                                     "App.launch, or onFirstThread { }), or start a JVM with -XstartOnFirstThread.");
+#endif
 
         if (glfwInit() != GLFW_TRUE) {
             const char* description = nullptr;

@@ -1080,6 +1080,7 @@ void kui_ui_set_theme(KuiUi* v, const KuiTheme* t) { GuardedVoid([&] { UiOf(v).S
 void kui_ui_clear_focus(KuiUi* v) { GuardedVoid([&] { UiOf(v).ClearFocus(); }); }
 void kui_ui_get_theme(KuiUi* v, KuiTheme* t) { GuardedVoid([&] { ThemeOf(UiOf(v).GetTheme(), t); }); }
 void kui_ui_set_scale(KuiUi* v, const float s) { GuardedVoid([&] { UiOf(v).SetScale(s); }); }
+float kui_ui_pixel_scale(KuiUi* v) { return Guarded([&] { return UiOf(v).PixelScale(); }, 1.f); }
 void kui_ui_update(KuiUi* v) { GuardedVoid([&] { UiOf(v).Update(); }); }
 void kui_ui_update_with(KuiUi* v, KoralInput* input, const float w, const float h, const float dt)
 {

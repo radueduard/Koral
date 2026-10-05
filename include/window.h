@@ -223,6 +223,12 @@ namespace kor {
          *        through. (0, 0) for an offscreen window.
          */
         [[nodiscard]] glm::vec2 CursorPosition() const;
+        /**
+         * @brief Pixels of the drawable area per screen coordinate: 2 on a Retina display (or a Wayland
+         *        output scaled 2x), 1 where screen coordinates are pixels (Windows, X11) or offscreen.
+         *        Extent() is in pixels, Position() and the desktop in screen coordinates.
+         */
+        [[nodiscard]] float PixelRatio() const;
 
         /** @brief What the pointer looks like over a window. */
         enum class Cursor : std::uint8_t {
@@ -255,16 +261,23 @@ namespace kor {
          *        does — and all of it, to its top edge, is the application's to draw in. What is drawn
          *        there moves the window with BeginMove and has buttons that call Minimize,
          *        ToggleMaximize and RequestClose. (kui::TitleBar is one.) Nothing happens for an
-         *        offscreen window. Where the system has no such thing (not Windows), the window loses
-         *        its decoration altogether.
+         *        offscreen window. On macOS the system's own buttons stay, at the bar's left (see
+         *        SystemButtonsWidth), and the window keeps all it does; on Linux the window loses its
+         *        decoration altogether.
          */
         void SetCustomTitleBar(bool custom) const;
         [[nodiscard]] bool HasCustomTitleBar() const { return _customTitleBar; }
         /**
+         * @brief How much of the left of a custom title bar the system's own window buttons take, in
+         *        screen coordinates: on macOS, where they stay, the room to leave them. 0 elsewhere, where
+         *        the application draws its own.
+         */
+        [[nodiscard]] float SystemButtonsWidth() const;
+        /**
          * @brief Lets the system move the window with the pointer, as dragging its title bar does —
          *        snapping to the screen's edges and all. Called when the button goes down on what
          *        stands for the title bar; the button's release goes to the system, and the window is
-         *        told the button is up. (Windows only: elsewhere it does nothing.)
+         *        told the button is up. (Windows, macOS, X11 and Wayland.)
          */
         void BeginMove() const;
         void Minimize() const;

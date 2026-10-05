@@ -915,7 +915,7 @@ namespace kui
         Widget leading;                     ///< At its left end, before the title: an icon, a MenuBar.
         Widget trailing;                    ///< Before the window's buttons: a search field, an account.
         float height = 36.f;
-        bool buttons = true;                ///< The window's own three: minimize, maximize or restore, close.
+        bool buttons = true;                ///< The window's own three: minimize, maximize or restore, close. (On macOS the system's, always, at the left.)
 
         TitleBarOptions& SetLeading(Widget value) { leading = std::move(value); return *this; }
         TitleBarOptions& SetTrailing(Widget value) { trailing = std::move(value); return *this; }
@@ -991,7 +991,7 @@ namespace kui
 
     struct UiSettings {
         Theme theme {};
-        float scale = 1.f;                      ///< Pixels per logical unit.
+        float scale = 1.f;                      ///< How big the interface is drawn: 1 is its natural size, whatever the display's density.
         /// Whether the window the interface is shown in has its title bar coloured to go with it: the
         /// theme's background behind the theme's text (kor::Window::SetTitleBarColors), where the system can.
         bool titleBar = true;
@@ -1037,6 +1037,11 @@ namespace kui
         static void ReassembleAll();
         [[nodiscard]] const Theme& GetTheme() const;
         void SetScale(float scale);
+        /**
+         * @brief Pixels per logical unit, as the view is drawn: its scale times its window's pixels per screen
+         *        coordinate (2 on a Retina display). What turns a place in the view into pixels of an image.
+         */
+        [[nodiscard]] float PixelScale() const;
 
         /** @brief The frame, with the current scene's input and window. */
         void Update();

@@ -85,6 +85,11 @@ namespace kui
         std::unique_ptr<RootElement> element, overlayElement;
         Statistics stats;
 
+        // Pixels per screen coordinate of the window the view is drawn in (Window::PixelRatio): 1 unless
+        // it is on a scaled display. What it is drawn at is the settings' scale times this.
+        float pixelRatio = 1.f;
+        [[nodiscard]] float Scale() const { return settings.scale * pixelRatio; }
+
         // The pointer.
         glm::vec2 pointer {};
         bool hasPointer = false;
@@ -227,9 +232,9 @@ namespace kui
             if (from != owner.window) {
                 // Another window: by where the two are on the desktop, where the platform says.
                 if (!kor::Window::CanBePositioned() || from->IsOffscreen() || owner.window->IsOffscreen()) return std::nullopt;
-                mine = glm::vec2(from->Position()) + pixels - glm::vec2(owner.window->Position());
+                mine = glm::vec2(from->Position() - owner.window->Position()) * pixelRatio + pixels;
             }
-            mine /= settings.scale;
+            mine /= Scale();
             if (mine.x < 0.f || mine.y < 0.f || mine.x >= render.Size().x || mine.y >= render.Size().y) return std::nullopt;
             return mine;
         }
@@ -324,20 +329,20 @@ namespace kui
             // Held in place, it is where it was: only how far the hand moved is new.
             const bool locked = lockedInput == &input && hasPointer;
             if (viewport) {
-                glm::vec2 local = viewport->origin + input.MousePosition() / settings.scale;
+                glm::vec2 local = viewport->origin + input.MousePosition() / Scale();
                 if (viewport->desktopOrigin)
                     if (const auto cursor = kor::Window::DesktopCursor())
-                        local = viewport->origin + glm::vec2(*cursor - *viewport->desktopOrigin) / settings.scale;
+                        local = viewport->origin + glm::vec2(*cursor - *viewport->desktopOrigin) / owner.desktopScale;
                 if (locked) local = viewportLocal;
                 viewportLocal = local;
                 viewport->root->HitTest(hit, local);
                 position = viewport->root->ToGlobal(local);
             } else {
-                position = locked ? pointer : input.MousePosition() / settings.scale;
+                position = locked ? pointer : input.MousePosition() / Scale();
                 render.HitTest(hit, position);
             }
             const bool sameSource = pointerInput == &input;
-            const glm::vec2 delta = locked ? input.MousePositionDelta() / settings.scale
+            const glm::vec2 delta = locked ? input.MousePositionDelta() / Scale()
                                   : hasPointer && sameSource ? position - pointer : glm::vec2(0.f);
             const bool moved = locked ? delta != glm::vec2(0.f) : !hasPointer || !sameSource || position != pointer;
             pointer = position;
@@ -472,8 +477,9 @@ namespace kui
             using Clock = std::chrono::steady_clock;
             const auto ms = [](const Clock::time_point from, const Clock::time_point to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
             const auto t0 = Clock::now();
-            owner.scale = settings.scale;
-            logical = viewport / settings.scale;
+            owner.scale = Scale();
+            owner.desktopScale = settings.scale;
+            logical = viewport / Scale();
             if (input) {
                 // A popup is let go of with Escape, or by pressing with another button anywhere.
                 if (popup && (input->IsKeyPressed(kor::Key::eEsc) || input->IsMouseButtonPressed(kor::MouseButton::eRight)
@@ -491,7 +497,7 @@ namespace kui
             builder.Flush();
             const auto t2 = Clock::now();
 
-            const glm::vec2 logical = viewport / settings.scale;
+            const glm::vec2 logical = viewport / Scale();
             render.Layout(BoxConstraints::Tight(logical), false);
             owner.FlushLayout();
             const auto t3 = Clock::now();
@@ -506,7 +512,7 @@ namespace kui
             }
             owner.FlushPaint();
             render.RepaintIfNeeded();
-            renderer.SetScale(settings.scale);
+            renderer.SetScale(Scale());
             const auto t4 = Clock::now();
             stats.inputMs = ms(t0, t1);
             stats.buildMs = ms(t1, t2);
@@ -572,11 +578,21 @@ namespace kui
         _impl->settings.scale = std::max(scale, 0.1f);
     }
 
+    float Ui::PixelScale() const
+    {
+        // Before its first frame, as the window it is about to be shown in has it.
+        const kor::Window* window = _impl->owner.window;
+        if (!window && kor::Scene::Current()) window = &kor::Scene::Window::Get();
+        return _impl->settings.scale * (window ? window->PixelRatio() : _impl->pixelRatio);
+    }
+
     void Ui::Update()
     {
         auto& input = kor::Scene::Input::Get();
         const glm::uvec2 extent = kor::Scene::Window::Extent();
         _impl->owner.window = &kor::Scene::Window::Get();
+        // Natural size on a scaled display (Retina): the window's pixels per screen coordinate, times the view's own scale.
+        _impl->pixelRatio = _impl->owner.window->PixelRatio();
         // The window's own title bar, in the theme's colours: once for each window the interface is shown in.
         if (_impl->settings.titleBar && _impl->titled != _impl->owner.window) {
             _impl->titled = _impl->owner.window;

@@ -64,7 +64,9 @@ namespace kor::vk
     }
 
     CommandBuffer::~CommandBuffer() {
-        // Back on the free list with its fence and query pool, for the next command buffer to reuse.
+        // Back on the free list with its fence and query pool, for the next command buffer to reuse —
+        // which submits with that fence, so it must be settled first, and outside the pool lock.
+        DoWaitForFence();
         if (Context::Device().freeCommandBuffer(*this)) return;
         Context::Device()->destroyFence(_fence);
         if (_timerPool) Context::Device()->destroyQueryPool(_timerPool);
@@ -88,6 +90,7 @@ namespace kor::vk
         try {
             const auto lock = Context::Device().lockQueues();
             _queue->submit(submitInfo, _fence);
+            _fencePending = true;
         } catch (const std::runtime_error& e) {
             std::cerr << e.what() << std::endl;
         }
@@ -100,9 +103,8 @@ namespace kor::vk
         _inFlight.clear();
         // WaitForFence() resets the fence after waiting, but a caller who waited on a token instead
         // never went through it, and submitting with a still-signalled fence is invalid. Re-recording
-        // means the last submission is done, so a signalled fence here is simply a stale one.
-        if (Context::Device()->getFenceStatus(_fence) == ::vk::Result::eSuccess)
-            Context::Device()->resetFences(_fence);
+        // means the last submission is done, though its fence may not have caught up yet.
+        DoWaitForFence();
         // Before the pool is reset below, which is what destroys the results being collected.
         // Re-recording is proof the GPU is done with the last submission, so this is the earliest
         // moment the previous frame's timestamps can be read — and the reason they are read here.
@@ -1176,6 +1178,7 @@ namespace kor::vk
                         .setWaitDstStageMask(waitStages)
                         .setSignalSemaphores(signalSemaphores)
                         .setPNext(&timelineInfo), _fence);
+                    _fencePending = true;
                 } catch (...) {
                     Context::Device().abandonEpoch(_queue);
                     throw;
@@ -1200,6 +1203,9 @@ namespace kor::vk
 
     void CommandBuffer::DoWaitForFence() const
     {
+        // Nothing submitted with it since the last wait: it would never signal.
+        if (!_fencePending) return;
+        _fencePending = false;
         try {
             auto result = Context::Device()->waitForFences(_fence, true, WholeSize);
             if (result != ::vk::Result::eSuccess) {

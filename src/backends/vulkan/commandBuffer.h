@@ -138,6 +138,11 @@ namespace kor::vk
         // in between is invalid, so re-submitting the same buffer tripped validation for nothing.
         // Ordering against other submissions belongs to the scheduler, which carries its own.
         ::vk::Fence _fence = nullptr;
+        // Whether a submission carrying the fence has not been waited out yet. Its status alone cannot
+        // say: the fence lands after the timeline semaphores do (on MoltenVK noticeably so), so a
+        // buffer whose tokens are all done can still have an unsignalled fence that signals later —
+        // after being reset, recycled and handed to the next submit, which then trips VUID-00063.
+        mutable bool _fencePending = false;
 
         // One pool for the whole command buffer, two queries per timer scope. Sized up front
         // because a Vulkan query pool cannot grow, and reset in its entirety at Begin() — the only

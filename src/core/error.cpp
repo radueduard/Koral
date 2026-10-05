@@ -6,7 +6,7 @@
 
 #include <format>
 #ifndef NDEBUG
-#include <stacktrace>
+#include "stacktrace.h"
 #endif
 
 namespace kor
@@ -164,7 +164,16 @@ namespace kor
     {
         std::string message = "Attempted to dereference a ResourceRef whose Resource has been destroyed!";
 #ifndef NDEBUG
+#if KOR_HAS_STD_STACKTRACE
         message += '\n' + std::to_string(std::stacktrace::current(1, 24));
+#else
+        // Apple's libc++ has no <stacktrace>; the fallback has no max_depth or to_string, so cap and print by hand.
+        std::size_t depth = 0;
+        for (const auto& frame : Stacktrace::current(1)) {
+            if (depth == 24) break;
+            message += std::format("\n{:>4}# {}", depth++, frame.description());
+        }
+#endif
 #endif
         throw std::runtime_error(message);
     }

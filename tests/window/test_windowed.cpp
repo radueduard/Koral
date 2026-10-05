@@ -525,7 +525,9 @@ TEST_F(VkWindowTest, GuiExtrasDrawInARealFrame) {
     auto& scene = VkEnvironment::scene();
     for (int i = 0; i < 4; ++i) drawFrame(scene);
 
-    EXPECT_EQ(scene.viewport->Size(), glm::uvec2(64, 64)) << "laid out at the size it was given";
+    // In pixels: twice the layout's size on a Retina display.
+    const float ratio = scene.SceneWindow().PixelRatio();
+    EXPECT_EQ(scene.viewport->Size(), glm::uvec2(glm::vec2(64, 64) * ratio)) << "laid out at the size it was given";
     EXPECT_GT(scene.directViewport->Size().x, 0u);
     EXPECT_GT(scene.sampledOnlyViewport->Size().x, 0u);
     EXPECT_FALSE(scene.viewport->Dragging()) << "nothing was pressed";
@@ -1585,7 +1587,8 @@ TEST_F(VkWindowTest, ASceneViewShowsAnOffscreenSceneSizedToThePanel) {
     for (int frame = 0; frame < 4; ++frame) settle();
     editor.testInterface = {};
 
-    EXPECT_EQ(state->Size(), glm::uvec2(200, 150)) << "the panel's size";
+    // In pixels: twice the panel's layout size on a Retina display.
+    EXPECT_EQ(state->Size(), glm::uvec2(glm::vec2(200, 150) * editor.SceneWindow().PixelRatio())) << "the panel's size";
     EXPECT_EQ(game->SceneWindow().Extent(), state->Size()) << "sized to the panel";
     EXPECT_EQ(game->resizedTo, state->Size());
     EXPECT_EQ(state->Image().Get(), game->SceneWindow().Image().Get()) << "showing the scene's picture";
@@ -1682,7 +1685,7 @@ TEST_F(VkWindowTest, ASceneViewShowsOneOfTheScenesOwnViews) {
     editor.testInterface = kui::Align(kui::Alignment::TopLeft(), kui::SizedBox(120.f, 90.f, kgui::SceneView(view, state)));
     for (int frame = 0; frame < 4; ++frame) settle();
     editor.testInterface = {};
-    EXPECT_EQ(state->Size(), glm::uvec2(120, 90));
+    EXPECT_EQ(state->Size(), glm::uvec2(glm::vec2(120, 90) * editor.SceneWindow().PixelRatio()));
     EXPECT_EQ(view.Target().Extent(), state->Size());
     EXPECT_EQ(state->Image().Get(), view.Image().Get());
     editor.RemoveView("Preview");

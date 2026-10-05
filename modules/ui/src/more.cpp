@@ -677,7 +677,8 @@ namespace kui
          */
         class RenderWindowControl final : public RenderContainer {
         public:
-            enum class Kind : std::uint8_t { eDrag, eMinimize, eMaximize, eClose };
+            // eSystemButtons: room for the system's own, where they stay (macOS); it moves the window like eDrag.
+            enum class Kind : std::uint8_t { eDrag, eMinimize, eMaximize, eClose, eSystemButtons };
             struct Config {
                 Kind kind = Kind::eDrag;
                 std::string title;          // eDrag: written at its left
@@ -701,7 +702,7 @@ namespace kui
                 case PointerEvent::Type::eExit: _hovered = false; _pressed = false; MarkNeedsPaint(); return false;
                 case PointerEvent::Type::eDown:
                     if (event.button != kor::MouseButton::eLeft) return false;
-                    if (_config.kind != Kind::eDrag) { _pressed = true; MarkNeedsPaint(); return true; }
+                    if (_config.kind != Kind::eDrag && _config.kind != Kind::eSystemButtons) { _pressed = true; MarkNeedsPaint(); return true; }
                     if (window) {
                         // Twice in a moment: bigger, or back. Once: the system moves the window with the pointer.
                         const auto now = std::chrono::steady_clock::now();
@@ -734,7 +735,9 @@ namespace kui
                 const glm::vec2 size = Size();
                 canvas.Save();
                 canvas.Translate(offset);
-                if (_config.kind == Kind::eDrag) {
+                if (_config.kind == Kind::eSystemButtons) {
+                    // The system draws them.
+                } else if (_config.kind == Kind::eDrag) {
                     if (!_config.title.empty()) {
                         TextStyle style = t.textStyle;
                         style.size = std::max(style.size - 2.f, 10.f);
@@ -772,7 +775,10 @@ namespace kui
             void PerformLayout() override
             {
                 const auto& c = Constraints();
-                const float width = _config.kind != Kind::eDrag ? 46.f : c.HasBoundedWidth() ? c.maxWidth : 0.f;
+                const Owner* owner = GetOwner();
+                const float width = _config.kind == Kind::eSystemButtons
+                    ? (owner && owner->window ? owner->window->SystemButtonsWidth() / owner->desktopScale : 0.f)
+                    : _config.kind != Kind::eDrag ? 46.f : c.HasBoundedWidth() ? c.maxWidth : 0.f;
                 SetSize(c.Constrain({ width, _config.height }));
             }
 
@@ -835,10 +841,18 @@ namespace kui
             const Theme t = Theme::Current();
             const float height = options.height;
             std::vector<Widget> row;
+#ifdef __APPLE__
+            // The system's own buttons stay, at the left, and are the window's buttons here: there whether
+            // or not they are asked for.
+            constexpr bool own = false;
+            row.push_back(Make<WindowControlWidget>(RenderWindowControl::Config { Kind::eSystemButtons, {}, height }));
+#else
+            constexpr bool own = true;
+#endif
             if (options.leading) row.push_back(options.leading);
             row.push_back(Expanded(Make<WindowControlWidget>(RenderWindowControl::Config { Kind::eDrag, title, height })));
             if (options.trailing) row.push_back(options.trailing);
-            if (options.buttons)
+            if (own && options.buttons)
                 for (const Kind kind : { Kind::eMinimize, Kind::eMaximize, Kind::eClose })
                     row.push_back(Make<WindowControlWidget>(RenderWindowControl::Config { kind, {}, height }));
             return Container({ .height = height, .decoration = { .color = t.background } }, Row(row));

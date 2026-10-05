@@ -13,7 +13,9 @@
 
 namespace kmdl::detail
 {
-    namespace
+    // Not in the anonymous namespace: reflect-cpp needs these types to have linkage, which Clang enforces
+    // and GCC/MSVC let slide.
+    namespace gltfLightsJson
     {
         // Only the part of a glTF document this reads; everything else is ignored.
         struct PunctualLight {
@@ -30,6 +32,11 @@ namespace kmdl::detail
         struct Document {
             std::optional<Extensions> extensions;
         };
+    }
+
+    namespace
+    {
+        using namespace gltfLightsJson;
 
         /** @brief The JSON text of a .gltf, or the JSON chunk of a .glb. */
         std::optional<std::string> documentOf(const std::filesystem::path& path)

@@ -789,6 +789,15 @@ typedef struct KoralSceneCallbacks {
  */
 typedef KoralSceneCallbacks (*KoralSceneFactory)(const char* arguments_json, void* factory_user);
 
+/**
+ * Runs @p body on the process's first thread, and returns once it has. On macOS windows open only there, and a
+ * program whose main() runs elsewhere — a JVM's, unless started with -XstartOnFirstThread — runs its whole
+ * application through this: the thread it is on waits, while the first thread (parked in its run loop by the
+ * JVM's launcher) runs it. Anywhere else, and on the first thread already, it simply calls @p body.
+ */
+typedef void (*KoralMainThreadBody)(void* user);
+KORAL_API void koral_run_on_main_thread(KoralMainThreadBody body, void* user);
+
 KORAL_API KoralStatus koral_app_create(const KoralAppSettings* settings);
 KORAL_API void koral_app_destroy(void);
 KORAL_API bool koral_app_exists(void);

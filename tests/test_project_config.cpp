@@ -596,6 +596,8 @@ protected:
                  "-" + ::testing::UnitTest::GetInstance()->current_test_info()->name());
         std::filesystem::remove_all(_root);
         std::filesystem::create_directories(_root / "cmake-build-debug");
+        // Find() canonicalises, and on macOS the temp directory is behind a symlink (/var -> /private/var).
+        _root = std::filesystem::canonical(_root);
     }
 
     void TearDown() override

@@ -832,6 +832,8 @@ object KuiNative {
     fun kui_ui_get_theme(view: MemorySegment, theme: MemorySegment): Unit { h_kui_ui_get_theme.invokeExact(view, theme) }
     private val h_kui_ui_set_scale by lazy { handle("kui_ui_set_scale", FunctionDescriptor.ofVoid(ADDRESS, JAVA_FLOAT)) }
     fun kui_ui_set_scale(view: MemorySegment, scale: Float): Unit { h_kui_ui_set_scale.invokeExact(view, scale) }
+    private val h_kui_ui_pixel_scale by lazy { handle("kui_ui_pixel_scale", FunctionDescriptor.of(JAVA_FLOAT, ADDRESS)) }
+    fun kui_ui_pixel_scale(view: MemorySegment): Float = h_kui_ui_pixel_scale.invokeExact(view) as Float
     private val h_kui_ui_update by lazy { handle("kui_ui_update", FunctionDescriptor.ofVoid(ADDRESS)) }
     fun kui_ui_update(view: MemorySegment): Unit { h_kui_ui_update.invokeExact(view) }
     private val h_kui_ui_update_with by lazy { handle("kui_ui_update_with", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }

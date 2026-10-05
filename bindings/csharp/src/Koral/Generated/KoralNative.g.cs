@@ -676,6 +676,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial KoralAppSettings koral_app_settings_default();
     [LibraryImport(Library)] internal static partial KoralWindowSettings koral_window_settings_default();
     [LibraryImport(Library)] internal static partial KoralOffscreenSettings koral_offscreen_settings_default();
+    [LibraryImport(Library)] internal static partial void koral_run_on_main_thread(delegate* unmanaged[Cdecl]<IntPtr, void> body, void* user);
     [LibraryImport(Library)] internal static partial int koral_app_create(KoralAppSettings* settings);
     [LibraryImport(Library)] internal static partial void koral_app_destroy();
     [LibraryImport(Library)] internal static partial byte koral_app_exists();

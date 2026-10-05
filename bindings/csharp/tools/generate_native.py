@@ -24,7 +24,8 @@ SCALARS = {"void": "void", "bool": "byte", "uint32_t": "uint", "int32_t": "int",
            "KoralStatus": "int", "KoralLogLevel": "int", "KoralResourceKind": "int", "KoralPlatform": "int"}
 HAND_WRITTEN = {"KoralClearColor"}   # the union
 # Function-pointer typedefs, by name.
-TYPEDEFS = {"KoralSceneFactory": "delegate* unmanaged[Cdecl]<byte*, IntPtr, KoralSceneCallbacks>"}
+TYPEDEFS = {"KoralSceneFactory": "delegate* unmanaged[Cdecl]<byte*, IntPtr, KoralSceneCallbacks>",
+            "KoralMainThreadBody": "delegate* unmanaged[Cdecl]<IntPtr, void>"}
 
 
 def strip(text):

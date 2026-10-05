@@ -12,9 +12,11 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <locale>
 #include <map>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <unordered_map>
 
 #include <app.h>
@@ -418,8 +420,15 @@ namespace kui
             {
                 const std::string word = Word();
                 float value = 0.f;
+#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
                 const auto [end, error] = std::from_chars(word.data(), word.data() + word.size(), value);
                 if (error != std::errc() || word.empty()) ok = false;
+#else
+                // Apple's libc++ has floating-point from_chars only from macOS 26. As Koral's own parseNumber.h does.
+                std::istringstream in(word);
+                in.imbue(std::locale::classic());
+                if (word.empty() || !(in >> value)) ok = false;
+#endif
                 return value;
             }
             std::optional<std::string> String()
@@ -1162,7 +1171,9 @@ namespace kui
         {
             const Owner* owner = GetOwner();
             if (!_overlay.scene || !owner) return Rect::XYWH(OverlayOrigin.x, OverlayOrigin.y, 0.f, 0.f);
-            const glm::vec2 extent = glm::vec2(_overlay.fitted ? glm::uvec2(_overlay.desktop) : _overlay.scene->SceneWindow().Extent()) / owner->scale;
+            // Fitted, as big as the desktop says, in screen coordinates; otherwise as its window, in pixels.
+            const glm::vec2 extent = _overlay.fitted ? glm::vec2(_overlay.desktop) / owner->desktopScale
+                                                     : glm::vec2(_overlay.scene->SceneWindow().Extent()) / owner->scale;
             return Rect::XYWH(OverlayOrigin.x, OverlayOrigin.y, extent.x, extent.y);
         }
 
@@ -1189,8 +1200,8 @@ namespace kui
             if (_dragging) if (const auto there = OverlayPoint(_dragAt)) add(Rect::LTRB(there->x - 80.f, there->y - 60.f, there->x + 420.f, there->y + 60.f));
             if (!any) return false;
             constexpr int Step = 128;
-            const glm::vec2 low = (glm::vec2(all.left, all.top) - OverlayOrigin) * owner->scale;
-            const glm::vec2 high = (glm::vec2(all.right, all.bottom) - OverlayOrigin) * owner->scale;
+            const glm::vec2 low = (glm::vec2(all.left, all.top) - OverlayOrigin) * owner->desktopScale;
+            const glm::vec2 high = (glm::vec2(all.right, all.bottom) - OverlayOrigin) * owner->desktopScale;
             at = _overlay.origin + glm::ivec2(glm::floor(low));
             const glm::ivec2 need = glm::ivec2(glm::ceil(high - glm::floor(low)));
             size = glm::max((need + Step - 1) / Step * Step, glm::ivec2(2 * Step));
@@ -1301,7 +1312,7 @@ namespace kui
                 if (size != _overlay.wantedSize) { _overlay.wantedSize = size; window.Resize(glm::uvec2(size)); }
             }
             if (_overlay.at != was) { MarkNeedsPaint(); PublishViewports(); }
-            const glm::vec2 shift = glm::vec2(_overlay.at - _overlay.origin) / owner->scale;
+            const glm::vec2 shift = glm::vec2(_overlay.at - _overlay.origin) / owner->desktopScale;
             const glm::vec2 at = OverlayOrigin + shift + window.CursorPosition() / owner->scale;
             const bool held = _pressInOverlay && _pressed.kind != Hit::Kind::eNothing;
             const bool over = std::ranges::any_of(L().floats, [&](const Floating& f) { return f.window && f.root && f.rect.Inflate(2.f).Contains(at); });
@@ -1522,8 +1533,8 @@ namespace kui
         {
             const Owner* owner = GetOwner();
             if (!owner || !owner->window || owner->window->IsOffscreen() || !kor::Window::CanBePositioned()) return std::nullopt;
-            if (_pressInOverlay) return glm::vec2(OverlayAt()) + (position - OverlayOrigin) * owner->scale;
-            return glm::vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->scale;
+            if (_pressInOverlay) return glm::vec2(OverlayAt()) + (position - OverlayOrigin) * owner->desktopScale;
+            return glm::vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->desktopScale;
         }
 
         /** That point in the space's own coordinates: inside it or not. */
@@ -1533,7 +1544,7 @@ namespace kui
             const auto desktop = Desktop(position);
             if (!desktop) return std::nullopt;
             const Owner* owner = GetOwner();
-            return (*desktop - glm::vec2(owner->window->Position())) / owner->scale - ToGlobal({ 0.f, 0.f });
+            return (*desktop - glm::vec2(owner->window->Position())) / owner->desktopScale - ToGlobal({ 0.f, 0.f });
         }
 
         /** That point in the overlay's part of the coordinates: over the desktop. */
@@ -1542,7 +1553,7 @@ namespace kui
             if (_pressInOverlay) return position;
             const auto desktop = Desktop(position);
             if (!desktop) return std::nullopt;
-            return OverlayOrigin + (*desktop - glm::vec2(OverlayAt())) / GetOwner()->scale;
+            return OverlayOrigin + (*desktop - glm::vec2(OverlayAt())) / GetOwner()->desktopScale;
         }
 
         /**
@@ -1563,15 +1574,15 @@ namespace kui
         glm::vec2 RenderDock::SpaceFromOverlay(const glm::vec2 position) const
         {
             const Owner* owner = GetOwner();
-            const glm::vec2 desktop = glm::vec2(OverlayAt()) + (position - OverlayOrigin) * owner->scale;
-            return (desktop - glm::vec2(owner->window->Position())) / owner->scale - ToGlobal({ 0.f, 0.f });
+            const glm::vec2 desktop = glm::vec2(OverlayAt()) + (position - OverlayOrigin) * owner->desktopScale;
+            return (desktop - glm::vec2(owner->window->Position())) / owner->desktopScale - ToGlobal({ 0.f, 0.f });
         }
 
         glm::vec2 RenderDock::OverlayFromSpace(const glm::vec2 position) const
         {
             const Owner* owner = GetOwner();
-            const glm::vec2 desktop = glm::vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->scale;
-            return OverlayOrigin + (desktop - glm::vec2(OverlayAt())) / owner->scale;
+            const glm::vec2 desktop = glm::vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->desktopScale;
+            return OverlayOrigin + (desktop - glm::vec2(OverlayAt())) / owner->desktopScale;
         }
 
         /** Whether @p rect, in the space's coordinates, is wholly inside the space. */
@@ -2340,7 +2351,7 @@ namespace kui
             if (_overlay.scene && _overlay.layer) {
                 Canvas desktop;
                 // From where the overlay's window is: the desktop's corner, unless it is fitted to its panels.
-                const glm::vec2 shift = GetOwner() ? glm::vec2(_overlay.at - _overlay.origin) / GetOwner()->scale : glm::vec2(0.f);
+                const glm::vec2 shift = GetOwner() ? glm::vec2(_overlay.at - _overlay.origin) / GetOwner()->desktopScale : glm::vec2(0.f);
                 PaintSurface(desktop, -OverlayOrigin - shift, true);
                 _overlay.layer->SetPicture(desktop.Finish());
             }

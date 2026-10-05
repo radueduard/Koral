@@ -298,14 +298,43 @@ class App(val settings: AppSettings = AppSettings()) : Owner(), AutoCloseable {
          * fun main(args: Array<String>) = App.launch(args) { register<Orbit>() }
          * ```
          */
-        fun launch(args: Array<String>, setup: App.() -> Unit): Unit = ProjectConfig.load(args.toList()).use { project ->
-            App(project.appSettings).use { app ->
-                app.setup()
-                val name = project.scene.ifEmpty { app.sceneNames.firstOrNull() ?: throw KoralException("no scene is registered") }
-                app.open(name, project.windowSettings)
-                app.run()
+        fun launch(args: Array<String>, setup: App.() -> Unit): Unit = onFirstThread {
+            ProjectConfig.load(args.toList()).use { project ->
+                App(project.appSettings).use { app ->
+                    app.setup()
+                    val name = project.scene.ifEmpty { app.sceneNames.firstOrNull() ?: throw KoralException("no scene is registered") }
+                    app.open(name, project.windowSettings)
+                    app.run()
+                }
             }
         }
+    }
+}
+
+/**
+ * Runs [body] on the process's first thread, and gives back what it returns or throws. On macOS a window opens
+ * there and nowhere else, and a JVM's main() is not on it unless started with -XstartOnFirstThread: a program
+ * that makes its [App] itself runs it in here — `fun main() = onFirstThread { App().use { ... } }`. [App.launch]
+ * does it already. Elsewhere, and on the first thread already, it just runs [body].
+ */
+fun <T> onFirstThread(body: () -> T): T = FirstThread.run(body)
+
+internal object FirstThread {
+    private var pending: (() -> Unit)? = null
+
+    // Upcalled on the first thread: must not throw, so what [body] throws is carried back in its result.
+    @JvmStatic fun call(@Suppress("UNUSED_PARAMETER") user: MemorySegment) { pending?.also { pending = null }?.invoke() }
+
+    private val stub: MemorySegment by lazy {
+        val d = FunctionDescriptor.ofVoid(ADDRESS)
+        Native.linker.upcallStub(MethodHandles.lookup().findStatic(FirstThread::class.java, "call", d.toMethodType()), d, Arena.global())
+    }
+
+    fun <T> run(body: () -> T): T {
+        var result: Result<T>? = null
+        pending = { result = runCatching(body) }
+        KoralNative.koral_run_on_main_thread(stub, MemorySegment.NULL)
+        return result!!.getOrThrow()
     }
 }
 

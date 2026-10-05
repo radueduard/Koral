@@ -23,10 +23,14 @@ target_link_libraries(koral_window_tests PRIVATE
         glm::glm
         spdlog::spdlog
         Vulkan::Vulkan
-        glfw
+        # libKoral already carries GLFW and exports it. ELF folds a second static copy into that one, but
+        # macOS's two-level namespace keeps both, and this binary's glfw* calls would reach a GLFW that
+        # never initialised and owns none of the windows. So there it takes only the headers.
+        $<$<NOT:$<PLATFORM_ID:Darwin>>:glfw>
 )
 
 target_include_directories(koral_window_tests PRIVATE
+        $<$<PLATFORM_ID:Darwin>:$<TARGET_PROPERTY:glfw,INTERFACE_INCLUDE_DIRECTORIES>>
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include
         ${CMAKE_SOURCE_DIR})

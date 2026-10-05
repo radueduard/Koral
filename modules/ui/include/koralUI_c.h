@@ -609,6 +609,8 @@ KUI_API void kui_ui_set_theme(KuiUi* view, const KuiTheme* theme);
 KUI_API void kui_ui_clear_focus(KuiUi* view);
 KUI_API void kui_ui_get_theme(KuiUi* view, KuiTheme* theme);
 KUI_API void kui_ui_set_scale(KuiUi* view, float scale);
+/** Ui::PixelScale(): pixels per logical unit, as the view is drawn — its scale times its window's pixels per point. */
+KUI_API float kui_ui_pixel_scale(KuiUi* view);
 /** Ui::Update(): the current scene's input, window and clock. */
 KUI_API void kui_ui_update(KuiUi* view);
 KUI_API void kui_ui_update_with(KuiUi* view, KoralInput* input, float width, float height, float dt);

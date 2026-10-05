@@ -987,6 +987,8 @@ object KoralNative {
     fun koral_window_settings_default(allocator: SegmentAllocator): MemorySegment = h_koral_window_settings_default.invokeExact(allocator) as MemorySegment
     private val h_koral_offscreen_settings_default by lazy { handle("koral_offscreen_settings_default", FunctionDescriptor.of(KoralLayouts.KoralOffscreenSettings)) }
     fun koral_offscreen_settings_default(allocator: SegmentAllocator): MemorySegment = h_koral_offscreen_settings_default.invokeExact(allocator) as MemorySegment
+    private val h_koral_run_on_main_thread by lazy { handle("koral_run_on_main_thread", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)) }
+    fun koral_run_on_main_thread(body: MemorySegment, user: MemorySegment): Unit { h_koral_run_on_main_thread.invokeExact(body, user) }
     private val h_koral_app_create by lazy { handle("koral_app_create", FunctionDescriptor.of(JAVA_INT, ADDRESS)) }
     fun koral_app_create(settings: MemorySegment): Int = h_koral_app_create.invokeExact(settings) as Int
     private val h_koral_app_destroy by lazy { handle("koral_app_destroy", FunctionDescriptor.ofVoid()) }

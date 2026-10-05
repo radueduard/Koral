@@ -298,6 +298,9 @@ namespace kui
         std::vector<PointerViewport> viewports;
         /** @brief Pixels per logical unit of the view: what a render object sizing a window of its own needs. */
         float scale = 1.f;
+        /** @brief Screen coordinates per logical unit: what the desktop (window positions) is measured in.
+         *  The same as scale except on a scaled display (Retina, Wayland), where a screen coordinate is several pixels. */
+        float desktopScale = 1.f;
         /** @brief The window the view is drawn in, when it is updated with a scene's (Ui::Update()): null otherwise. */
         const kor::Window* window = nullptr;
         /**

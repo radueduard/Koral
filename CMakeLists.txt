@@ -42,7 +42,9 @@ list(APPEND VCPKG_OVERLAY_TRIPLETS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-tr
 # dependency against the build machine's OS, and a binary is only as portable as the newest thing
 # it links.
 if(APPLE)
-    if(NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+    # Empty counts as unset: an IDE that creates the cache entry with no value would otherwise leave a Debug
+    # tree with no floor at all, building against the machine's own OS — and missing what Release then fails on.
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
         set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "Minimum macOS version" FORCE)
     endif()
     if(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
@@ -250,6 +252,13 @@ if(UNIX AND NOT APPLE)
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+if(APPLE)
+    # What GLFW has no call for on macOS (src/core/windowCocoa.mm): a title bar the application draws,
+    # which keeps the window titled so that AppKit still minimizes, zooms and resizes it.
+    enable_language(OBJCXX)
+    target_sources(${PROJECT_NAME} PRIVATE src/core/windowCocoa.mm)
+    target_link_libraries(${PROJECT_NAME} PRIVATE "-framework AppKit")
+endif()
 if(UNIX AND NOT APPLE)
     # What GLFW has no call for (src/core/windowX11.cpp): the window manager is asked to move or resize
     # a window, and a window's input region is set. GLFW loads these at run time; Koral links them.

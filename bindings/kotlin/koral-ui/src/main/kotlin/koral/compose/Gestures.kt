@@ -15,6 +15,16 @@ import koral.ui.interop.KuiLayouts
 // The block is run once a key, as Compose's is — but here it only says what to call: koral-ui's gesture
 // detector hears the pointer and calls it. There is no awaitPointerEventScope: a gesture is one of those
 // detect* names, not a loop over events.
+//
+// Where the pointer is, and how far a drag went, are in pixels, as Compose's are — and as onSizeChanged's sizes
+// are, so the two go together: a place over a viewport is a place in its image. Where a pixel is not a unit of
+// the layout (a Retina display: two to one), koral-ui's places are turned into pixels here.
+
+/** Pixels per unit of the layout, of the interface whose frame is under way: what its pointer's places are turned into pixels by. */
+internal object PointerPixels {
+    var perUnit = 1f
+    fun of(at: Offset) = Offset(at.x * perUnit, at.y * perUnit)
+}
 
 /** One pointer's change: where it is and was, and whether its button is and was down. */
 class PointerInputChange(val position: Offset, val previousPosition: Offset, val pressed: Boolean = true, val previousPressed: Boolean = true) {
@@ -137,13 +147,15 @@ internal object LongPress {
 /** koral-ui's gesture options, calling whichever scope [current] gives when the pointer does something. */
 internal fun pointerOptions(a: SegmentAllocator, current: () -> PointerInputScope?): MemorySegment {
     val options = Struct(a, KuiLayouts.KuiGestureOptions).bool("opaque", true)
-    options.struct("on_tap_down", Callbacks.make(a, KuiLayouts.KuiPointAction, Callbacks.pointAction, { at: Offset ->
+    options.struct("on_tap_down", Callbacks.make(a, KuiLayouts.KuiPointAction, Callbacks.pointAction, { units: Offset ->
+        val at = PointerPixels.of(units)
         current()?.let { it.down = at; it.longPressed = false; LongPress.begin(it); it.onPress?.invoke(at); it.deliver(PointerEventType.Press, at, true) }
     }))
     options.struct("on_tap_up", Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, {
         current()?.let { LongPress.end(it); it.deliver(PointerEventType.Release, it.last, false) }
     }))
-    options.struct("on_hover", Callbacks.make(a, KuiLayouts.KuiPointAction, Callbacks.pointAction, { at: Offset ->
+    options.struct("on_hover", Callbacks.make(a, KuiLayouts.KuiPointAction, Callbacks.pointAction, { units: Offset ->
+        val at = PointerPixels.of(units)
         current()?.let { if (!it.pressed) it.deliver(PointerEventType.Move, at, false) }
     }))
     options.struct("on_enter", Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, { current()?.let { it.deliver(PointerEventType.Enter, it.last, it.pressed) } }))
@@ -158,10 +170,13 @@ internal fun pointerOptions(a: SegmentAllocator, current: () -> PointerInputScop
             else { scope.lastTap = now; scope.onTap?.invoke(scope.down) }
         }
     }))
-    options.struct("on_pan_start", Callbacks.make(a, KuiLayouts.KuiPointAction, Callbacks.pointAction, { at: Offset ->
+    options.struct("on_pan_start", Callbacks.make(a, KuiLayouts.KuiPointAction, Callbacks.pointAction, { units: Offset ->
+        val at = PointerPixels.of(units)
         current()?.let { LongPress.end(it); it.onDragStart?.invoke(at) }
     }))
-    options.struct("on_pan_update", Callbacks.make(a, KuiLayouts.KuiPanAction, Callbacks.panAction, { delta: Offset, at: Offset ->
+    options.struct("on_pan_update", Callbacks.make(a, KuiLayouts.KuiPanAction, Callbacks.panAction, { moved: Offset, units: Offset ->
+        val at = PointerPixels.of(units)
+        val delta = PointerPixels.of(moved)
         current()?.let { scope -> scope.onDrag?.invoke(PointerInputChange(at, scope.last), delta); scope.deliver(PointerEventType.Move, at, true) }
     }))
     options.struct("on_pan_end", Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, {

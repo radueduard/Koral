@@ -116,6 +116,19 @@ namespace kor {
 
 	Input::Input() : _state(new State) {}
 
+	namespace
+	{
+		// GLFW reports the cursor in screen coordinates, which are not pixels where the display is scaled
+		// (macOS, Wayland). Input speaks pixels, as the picture the window shows does.
+		float pixelRatioOf(GLFWwindow* window)
+		{
+			int width = 0, height = 0, pixels = 0, unused = 0;
+			glfwGetWindowSize(window, &width, &height);
+			glfwGetFramebufferSize(window, &pixels, &unused);
+			return width > 0 && pixels > 0 ? static_cast<float>(pixels) / static_cast<float>(width) : 1.f;
+		}
+	}
+
 	Input::~Input()
 	{
 		for (auto* window : _state->windows) routes().erase(window);
@@ -152,9 +165,10 @@ namespace kor {
 			glfwGetCursorPos(window, &cx, &cy);
 			int windowX = 0, windowY = 0;
 			glfwGetWindowPos(window, &windowX, &windowY);
-			_state->mousePosition = { static_cast<float>(cx), static_cast<float>(cy) };
+			const float ratio = pixelRatioOf(window);
+			_state->mousePosition = glm::vec2(cx, cy) * ratio;
 			_state->lastMousePosition = _state->mousePosition;
-			_state->globalMousePosition = { static_cast<float>(windowX + cx), static_cast<float>(windowY + cy) };
+			_state->globalMousePosition = glm::vec2(windowX + cx, windowY + cy) * ratio;
 			_state->hasMousePosition = true;
 		}
 	}
@@ -401,14 +415,15 @@ namespace kor {
         // pointer crosses from the scene's window into one of its undocked panels means the same thing.
         int windowX = 0, windowY = 0;
         glfwGetWindowPos(handle, &windowX, &windowY);
-        const glm::vec2 global = { static_cast<float>(windowX) + static_cast<float>(x),
-                                   static_cast<float>(windowY) + static_cast<float>(y) };
+        const float ratio = pixelRatioOf(handle);
+        const glm::vec2 global = glm::vec2(static_cast<float>(windowX) + static_cast<float>(x),
+                                           static_cast<float>(windowY) + static_cast<float>(y)) * ratio;
         if (state.hasMousePosition) state.mouseDelta += global - state.globalMousePosition;
         state.globalMousePosition = global;
         state.hasMousePosition = true;
         // Window-local, and only from the scene's own window: where the cursor is in the picture it drew.
         if (!state.windows.empty() && handle == state.windows.front())
-            state.mousePosition = { static_cast<float>(x), static_cast<float>(y) };
+            state.mousePosition = glm::vec2(static_cast<float>(x), static_cast<float>(y)) * ratio;
     }
 
     void Input::Callbacks::MouseButtonCallback(GLFWwindow* handle, const int button, const int action, const int mods) {

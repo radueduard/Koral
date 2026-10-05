@@ -5,6 +5,10 @@
 #include <cstring>
 
 #include <yyjson.h>
+#ifdef __APPLE__
+#include <dispatch/dispatch.h>
+#include <pthread.h>
+#endif
 
 #include "capi.h"
 
@@ -30,7 +34,10 @@ struct KoralProject {
 
 namespace
 {
-    std::unique_ptr<App> g_app;
+    // Never destroyed by the process's own exit, only by koral_app_destroy: a program ended with the application
+    // still open (a signal, System.exit) would otherwise have its scenes shut down by a static destructor — calling
+    // back into a host that is gone by then, which a JVM answers with a crash.
+    std::unique_ptr<App>& g_app = *new std::unique_ptr<App>();
 
     App& TheApp()
     {
@@ -250,6 +257,18 @@ KoralOffscreenSettings koral_offscreen_settings_default(void)
 }
 
 // ---- the application -------------------------------------------------------------------------------------
+
+void koral_run_on_main_thread(const KoralMainThreadBody body, void* user)
+{
+    if (!body) return;
+#ifdef __APPLE__
+    if (!pthread_main_np()) {
+        dispatch_sync_f(dispatch_get_main_queue(), user, body);
+        return;
+    }
+#endif
+    body(user);
+}
 
 KoralStatus koral_app_create(const KoralAppSettings* settings)
 {

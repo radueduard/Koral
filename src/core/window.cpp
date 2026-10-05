@@ -28,6 +28,9 @@
 
 #include "context.h"
 #include "windowX11.h"
+#ifdef __APPLE__
+#include "windowCocoa.h"
+#endif
 #include "scheduler.h"
 #include "surface.h"
 #include "../backends/vulkan/surface.h"
@@ -193,6 +196,14 @@ namespace kor {
         return glm::vec2(x, y) * scale;
     }
 
+    float Window::PixelRatio() const
+    {
+        if (_window == nullptr) return 1.f;
+        int width = 0, height = 0;
+        glfwGetWindowSize(_window, &width, &height);
+        return width > 0 && _extent.x > 0 ? static_cast<float>(_extent.x) / static_cast<float>(width) : 1.f;
+    }
+
     Window::MonitorArea Window::Monitor() const
     {
         int count = 0;
@@ -333,6 +344,8 @@ namespace kor {
         // The frame is worked out again — the client area grows over where the title bar was, or gives it
         // back — once the frame being drawn is done with: that resizes what is drawn into.
         _frameChanged = true;
+#elif defined(__APPLE__)
+        cocoa::SetCustomTitleBar(_window, custom);
 #else
         glfwSetWindowAttrib(_window, GLFW_DECORATED, custom ? GLFW_FALSE : GLFW_TRUE);
         // The frame went with the title bar, and what resized the window with it: its edges are
@@ -406,8 +419,19 @@ namespace kor {
         // down on a title bar, which is how the system is asked to move a window.
         PostMessageW(handle, WM_LBUTTONUP, 0, MAKELPARAM(client.x, client.y));
         PostMessageW(handle, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(screen.x, screen.y));
+#elif defined(__APPLE__)
+        cocoa::BeginMove(_window);
 #else
         moveOrResize(_window, x11::Grip::eMove, true);
+#endif
+    }
+
+    float Window::SystemButtonsWidth() const
+    {
+#ifdef __APPLE__
+        return _window ? cocoa::WindowButtonsWidth(_window) : 0.f;
+#else
+        return 0.f;
 #endif
     }
 

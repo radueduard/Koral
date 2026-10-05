@@ -4,7 +4,10 @@ plugins {
 }
 
 // Every module: Kotlin on JDK 25 (java.lang.foreign is final from 22), and the native access FFM asks
-// to be granted for whatever runs.
+// to be granted for whatever runs. On macOS, a program also starts on the process's first thread: Cocoa,
+// and so a window, works nowhere else, and a JVM's main() is not on it otherwise. (Not tests: they have no
+// display.)
+val macOS = System.getProperty("os.name").startsWith("Mac")
 subprojects {
     plugins.withId("org.jetbrains.kotlin.jvm") {
         extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension> {
@@ -15,7 +18,10 @@ subprojects {
             targetCompatibility = JavaVersion.VERSION_25
         }
     }
-    tasks.withType<JavaExec>().configureEach { jvmArgs("--enable-native-access=ALL-UNNAMED") }
+    tasks.withType<JavaExec>().configureEach {
+        jvmArgs("--enable-native-access=ALL-UNNAMED")
+        if (macOS) jvmArgs("-XstartOnFirstThread")
+    }
     tasks.withType<Test>().configureEach { jvmArgs("--enable-native-access=ALL-UNNAMED") }
 }
 

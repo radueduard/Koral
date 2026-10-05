@@ -453,9 +453,8 @@ namespace kor::vk {
         // Still this buffer's alone until it is on the free list, but resetting under the lock
         // costs nothing that matters and keeps the "gone" check above honest.
         _handle.resetCommandPool(pool);
-        // The next owner submits with this fence, which must be unsignalled by then.
+        // The next owner submits with this fence; ~CommandBuffer has already settled it to unsignalled.
         const auto fence = commandBuffer.getFence();
-        if (_handle.getFenceStatus(fence) == ::vk::Result::eSuccess) (void)_handle.resetFences(1, &fence);
         _freeCommandBuffers[commandBuffer.getQueue().getIdentifier()].push_back(
             {pool, *commandBuffer, fence, commandBuffer.getTimerPool()});
         return true;
