@@ -19,8 +19,8 @@ add_executable(koral_ui_docking ../samples/docking.cpp)
 target_link_libraries(koral_ui_docking PRIVATE koral-ui Koral glm::glm spdlog::spdlog)
 target_include_directories(koral_ui_docking PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 
-# koral-ui against Dear ImGui, the same grid in each: what a frame costs. Built with the tests, run by hand —
-# from a Release build, or it measures the debugging.
+# What a frame of koral-ui costs, a grid of cells at a few sizes. Built with the tests, run by hand — from a
+# Release build, or it measures the debugging.
 add_executable(koral_ui_bench ../bench/bench.cpp)
-target_link_libraries(koral_ui_bench PRIVATE koral-ui Koral imgui::imgui glm::glm spdlog::spdlog)
+target_link_libraries(koral_ui_bench PRIVATE koral-ui Koral glm::glm spdlog::spdlog)
 target_include_directories(koral_ui_bench PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)

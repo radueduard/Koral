@@ -1025,8 +1025,8 @@ namespace kor
          * @brief Records commands through the backend's own command buffer.
          * @param command Callback handed this command buffer.
          *
-         * The escape hatch for work the API does not express — it is how the ImGui backend records
-         * its draws. Like every other command it is deferred, so the callback runs at End(), in the
+         * The escape hatch for work the API does not express — how a library with a Vulkan renderer of
+         * its own records its draws. Like every other command it is deferred, so the callback runs at End(), in the
          * position it was written, rather than where it was called.
          */
         CommandBuffer& Run(const std::function<void(CommandBuffer&)>& command);

@@ -268,6 +268,18 @@ namespace kui
         glm::vec2 _start {}, _current {};
     };
 
+    /** @brief How what is behind something is shown through it. @see Canvas::DrawBackdrop */
+    struct Backdrop {
+        float blur = 14.f;                      ///< How far it is blurred: the Gaussian's standard deviation, about.
+        Color tint = colors::Transparent;       ///< Laid over it: its alpha is how much of the tint there is.
+        float refraction = 0.f;                 ///< How far, at the most, what is behind is bent inwards at the edge.
+
+        // Chainable: `kui::Backdrop{}.SetBlur(20.f).SetTint(surface.WithAlpha(0.5f))`.
+        Backdrop& SetBlur(float value) { blur = value; return *this; }
+        Backdrop& SetTint(Color value) { tint = value; return *this; }
+        Backdrop& SetRefraction(float value) { refraction = value; return *this; }
+    };
+
     // ---- element shaders --------------------------------------------------------------------------
 
     /**
@@ -446,6 +458,16 @@ namespace kui
         Canvas& DrawPath(const Path& path, const Paint& paint);
         /** @brief The soft shadow a rounded rectangle casts: @p blur is the Gaussian's standard deviation. */
         Canvas& DrawShadow(const RRect& rrect, Color color, float blur, glm::vec2 offset = {}, float spread = 0.f);
+        /**
+         * @brief What is behind @p rrect — everything drawn into the target before it, the scene and the
+         *        interface under it — shown through it as through frosted glass: blurred, tinted, and bent
+         *        near the edge as a lens bends it. What glass is made of: a panel, a menu, a thumb.
+         *
+         * The renderer takes a picture of the target when it comes to one of these (a few times a frame at
+         * the most: glass on glass sees what was there at the last of them), so it costs a copy of the
+         * target — nothing, where no picture has one.
+         */
+        Canvas& DrawBackdrop(const RRect& rrect, const Backdrop& backdrop = {});
 
         // -- images and text
         /** @brief @p image (the part @p source covers, in pixels; all of it by default) stretched over @p destination. */

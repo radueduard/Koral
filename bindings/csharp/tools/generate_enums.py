@@ -30,6 +30,8 @@ ENUMS = [
     ("window.h", "Window", "Format", "Window", "class"),
     ("input.h", "Input", "CursorMode", "Input", "class"),
     ("input.h", "InputSource", "Kind", "InputSource", "struct"),
+    ("debugDraw.h", None, "GizmoMode", None, None),
+    ("debugDraw.h", None, "GizmoSpace", None, None),
     ("log.h", None, "Level", "Log", "static class"),
 ] + [("structs.h", None, name, None, None) for name in [
     "ChannelType", "ResourceAccess", "ImageShape", "DescriptorType", "Topology", "PolygonMode", "CullMode", "FrontFace",

@@ -46,6 +46,8 @@ namespace kor::vk
             .setExtent(window.Extent())
             .setVSync(window.IsVSync())
             .setTransparent(window.IsFramebufferTransparent())
+            .setAlphaVisual(glfwGetPlatform() == GLFW_PLATFORM_X11
+                            && glfwGetWindowAttrib(*window, GLFW_TRANSPARENT_FRAMEBUFFER) == GLFW_TRUE)
             .setFormats(window.RequestedFormats())
             .setSampleCount(SampleCount::e1)
             .build();

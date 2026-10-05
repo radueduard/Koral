@@ -211,7 +211,6 @@ object KoralLayouts {
         JAVA_INT.withName("frames_in_flight"),
         MemoryLayout.paddingLayout(4),
         ADDRESS.withName("gpu"),
-        ADDRESS.withName("interface_directory"),
     )
     val KoralWindowSettings: StructLayout = MemoryLayout.structLayout(
         ADDRESS.withName("title"),
@@ -233,14 +232,11 @@ object KoralLayouts {
     )
     val KoralSceneCallbacks: StructLayout = MemoryLayout.structLayout(
         ADDRESS.withName("user"),
-        JAVA_BOOLEAN.withName("interface"),
-        MemoryLayout.paddingLayout(7),
         ADDRESS.withName("initialize"),
         ADDRESS.withName("fixed_update"),
         ADDRESS.withName("update"),
         ADDRESS.withName("late_update"),
         ADDRESS.withName("render"),
-        ADDRESS.withName("render_ui"),
         ADDRESS.withName("on_resize"),
         ADDRESS.withName("on_suspend"),
         ADDRESS.withName("on_resume"),
@@ -260,6 +256,24 @@ object KoralLayouts {
         JAVA_FLOAT.withName("duration"),
         JAVA_BOOLEAN.withName("on_top"),
         MemoryLayout.paddingLayout(3),
+        MemoryLayout.sequenceLayout(4, JAVA_FLOAT).withName("fill"),
+        JAVA_BOOLEAN.withName("fill_only"),
+        MemoryLayout.paddingLayout(3),
+        JAVA_FLOAT.withName("line_width"),
+    )
+    val KoralGizmoPointer: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(2, JAVA_FLOAT).withName("position"),
+        JAVA_BOOLEAN.withName("has_position"),
+        MemoryLayout.paddingLayout(3),
+        MemoryLayout.sequenceLayout(2, JAVA_FLOAT).withName("viewport"),
+        JAVA_BOOLEAN.withName("down"),
+        JAVA_BOOLEAN.withName("pressed"),
+        MemoryLayout.paddingLayout(2),
+    )
+    val KoralGizmoOptions: StructLayout = MemoryLayout.structLayout(
+        JAVA_INT.withName("space"),
+        JAVA_FLOAT.withName("size"),
+        JAVA_FLOAT.withName("snap"),
     )
 }
 
@@ -1047,8 +1061,6 @@ object KoralNative {
     fun koral_scene_scene_time(scene: MemorySegment): MemorySegment = h_koral_scene_scene_time.invokeExact(scene) as MemorySegment
     private val h_koral_scene_scene_debug by lazy { handle("koral_scene_scene_debug", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_scene_scene_debug(scene: MemorySegment): MemorySegment = h_koral_scene_scene_debug.invokeExact(scene) as MemorySegment
-    private val h_koral_scene_has_interface by lazy { handle("koral_scene_has_interface", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS)) }
-    fun koral_scene_has_interface(scene: MemorySegment): Boolean = h_koral_scene_has_interface.invokeExact(scene) as Boolean
     private val h_koral_scene_save_state by lazy { handle("koral_scene_save_state", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_scene_save_state(scene: MemorySegment): String = Native.kString(h_koral_scene_save_state.invokeExact(scene) as MemorySegment)
     private val h_koral_scene_load_state by lazy { handle("koral_scene_load_state", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS)) }
@@ -1265,6 +1277,38 @@ object KoralNative {
     fun koral_debug_clear(draw: MemorySegment): Unit { h_koral_debug_clear.invokeExact(draw) }
     private val h_koral_debug_line_count by lazy { handle("koral_debug_line_count", FunctionDescriptor.of(JAVA_LONG, ADDRESS)) }
     fun koral_debug_line_count(draw: MemorySegment): Long = h_koral_debug_line_count.invokeExact(draw) as Long
+    private val h_koral_debug_triangle by lazy { handle("koral_debug_triangle", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_debug_triangle(draw: MemorySegment, a: MemorySegment, b: MemorySegment, c: MemorySegment, style: MemorySegment): Unit { h_koral_debug_triangle.invokeExact(draw, a, b, c, style) }
+    private val h_koral_debug_quad by lazy { handle("koral_debug_quad", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_debug_quad(draw: MemorySegment, a: MemorySegment, b: MemorySegment, c: MemorySegment, d: MemorySegment, style: MemorySegment): Unit { h_koral_debug_quad.invokeExact(draw, a, b, c, d, style) }
+    private val h_koral_debug_plane by lazy { handle("koral_debug_plane", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_debug_plane(draw: MemorySegment, center: MemorySegment, normal: MemorySegment, size: MemorySegment, style: MemorySegment): Unit { h_koral_debug_plane.invokeExact(draw, center, normal, size, style) }
+    private val h_koral_debug_cylinder by lazy { handle("koral_debug_cylinder", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_FLOAT, ADDRESS, JAVA_INT)) }
+    fun koral_debug_cylinder(draw: MemorySegment, from: MemorySegment, to: MemorySegment, radius: Float, style: MemorySegment, segments: Int): Unit { h_koral_debug_cylinder.invokeExact(draw, from, to, radius, style, segments) }
+    private val h_koral_debug_cone by lazy { handle("koral_debug_cone", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_FLOAT, ADDRESS, JAVA_INT)) }
+    fun koral_debug_cone(draw: MemorySegment, base: MemorySegment, tip: MemorySegment, radius: Float, style: MemorySegment, segments: Int): Unit { h_koral_debug_cone.invokeExact(draw, base, tip, radius, style, segments) }
+    private val h_koral_debug_capsule by lazy { handle("koral_debug_capsule", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_FLOAT, ADDRESS, JAVA_INT)) }
+    fun koral_debug_capsule(draw: MemorySegment, from: MemorySegment, to: MemorySegment, radius: Float, style: MemorySegment, segments: Int): Unit { h_koral_debug_capsule.invokeExact(draw, from, to, radius, style, segments) }
+    private val h_koral_debug_camera by lazy { handle("koral_debug_camera", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_FLOAT, ADDRESS)) }
+    fun koral_debug_camera(draw: MemorySegment, view: MemorySegment, projection: MemorySegment, size: Float, style: MemorySegment): Unit { h_koral_debug_camera.invokeExact(draw, view, projection, size, style) }
+    private val h_koral_debug_point_light by lazy { handle("koral_debug_point_light", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_FLOAT, ADDRESS)) }
+    fun koral_debug_point_light(draw: MemorySegment, position: MemorySegment, range: Float, style: MemorySegment): Unit { h_koral_debug_point_light.invokeExact(draw, position, range, style) }
+    private val h_koral_debug_spot_light by lazy { handle("koral_debug_spot_light", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, ADDRESS)) }
+    fun koral_debug_spot_light(draw: MemorySegment, position: MemorySegment, direction: MemorySegment, range: Float, outer_angle: Float, inner_angle: Float, style: MemorySegment): Unit { h_koral_debug_spot_light.invokeExact(draw, position, direction, range, outer_angle, inner_angle, style) }
+    private val h_koral_debug_directional_light by lazy { handle("koral_debug_directional_light", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_FLOAT, ADDRESS)) }
+    fun koral_debug_directional_light(draw: MemorySegment, position: MemorySegment, direction: MemorySegment, size: Float, style: MemorySegment): Unit { h_koral_debug_directional_light.invokeExact(draw, position, direction, size, style) }
+    private val h_koral_debug_triangle_count by lazy { handle("koral_debug_triangle_count", FunctionDescriptor.of(JAVA_LONG, ADDRESS)) }
+    fun koral_debug_triangle_count(draw: MemorySegment): Long = h_koral_debug_triangle_count.invokeExact(draw) as Long
+    private val h_koral_gizmo_options_default by lazy { handle("koral_gizmo_options_default", FunctionDescriptor.of(KoralLayouts.KoralGizmoOptions)) }
+    fun koral_gizmo_options_default(allocator: SegmentAllocator): MemorySegment = h_koral_gizmo_options_default.invokeExact(allocator) as MemorySegment
+    private val h_koral_debug_gizmo by lazy { handle("koral_debug_gizmo", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS, JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG)) }
+    fun koral_debug_gizmo(draw: MemorySegment, mode: Int, transform: MemorySegment, view_projection: MemorySegment, pointer: MemorySegment, options: MemorySegment, id: Long): Boolean = h_koral_debug_gizmo.invokeExact(draw, mode, transform, view_projection, pointer, options, id) as Boolean
+    private val h_koral_debug_gizmo_active by lazy { handle("koral_debug_gizmo_active", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS)) }
+    fun koral_debug_gizmo_active(draw: MemorySegment): Boolean = h_koral_debug_gizmo_active.invokeExact(draw) as Boolean
+    private val h_koral_debug_gizmo_hovered by lazy { handle("koral_debug_gizmo_hovered", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS)) }
+    fun koral_debug_gizmo_hovered(draw: MemorySegment): Boolean = h_koral_debug_gizmo_hovered.invokeExact(draw) as Boolean
+    private val h_koral_current_gizmo by lazy { handle("koral_current_gizmo", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_INT, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG)) }
+    fun koral_current_gizmo(mode: Int, transform: MemorySegment, view_projection: MemorySegment, options: MemorySegment, id: Long): Boolean = h_koral_current_gizmo.invokeExact(mode, transform, view_projection, options, id) as Boolean
     private val h_koral_graph_add_debug_draw_pass by lazy { handle("koral_graph_add_debug_draw_pass", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS, ADDRESS)) }
     fun koral_graph_add_debug_draw_pass(graph: MemorySegment, draw: MemorySegment, view_projection: MemorySegment, user: MemorySegment, destroy: MemorySegment, target: String?, depth: String?): MemorySegment = Arena.ofConfined().use { a -> h_koral_graph_add_debug_draw_pass.invokeExact(graph, draw, view_projection, user, destroy, Native.cString(a, target), Native.cString(a, depth)) as MemorySegment }
     private val h_koral_context_has_device by lazy { handle("koral_context_has_device", FunctionDescriptor.of(JAVA_BOOLEAN)) }

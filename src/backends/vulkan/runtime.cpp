@@ -110,8 +110,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
             .setEngineVersion(VK_MAKE_VERSION(1, 0, 0))
             // 1.3, not 1.4. Nothing here needs 1.4 any more — the only 1.4 features ever requested
             // (indexTypeUint8, maintenance9) were unused and have been dropped from device
-            // creation. 1.3 is also what the allocator and the ImGui backend already declare, so
-            // this is now consistent rather than the one place asking for more.
+            // creation. 1.3 is also what the allocator already declares, so this is consistent
+            // rather than the one place asking for more.
             .setApiVersion(VK_API_VERSION_1_3);
 
         // Add GLFW-required surface extensions (VK_KHR_surface + platform-specific)

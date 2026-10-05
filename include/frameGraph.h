@@ -23,6 +23,7 @@
 #include "buffer.h"
 #include "flags.h"
 #include "image.h"
+#include "reflect.h"
 #include "resource.h"
 
 namespace kor {
@@ -225,8 +226,19 @@ namespace kor {
         virtual void Initialize(const PassResources& resources) {}
         virtual void Prepare() {}
         virtual void Record(CommandBuffer& commandBuffer) const = 0;
-        /** @brief ImGui for the pass's own settings; FrameGraph::DrawGUI calls it. */
-        virtual void DrawGUI() {}
+        /**
+         * @brief What can be changed about the pass while it runs, for an editor to show: an object of a
+         *        reflected type (reflect.h), or nothing. kgui::PassSettings draws one for every pass.
+         *
+         * @code
+         * struct BloomSettings { float threshold = 1.f; float intensity = 0.04f; };
+         * KORAL_REFLECT(BloomSettings, threshold, intensity)
+         * kor::Ref Settings() override { return _settings; }
+         * @endcode
+         */
+        [[nodiscard]] virtual Ref Settings() { return {}; }
+        /** @brief An editor changed Settings(): for what follows from them (a resource remade at another size). */
+        virtual void SettingsChanged() {}
 
         [[nodiscard]] const std::string& Name() const { return _name; }
         [[nodiscard]] bool Enabled() const { return _enabled; }
@@ -351,20 +363,8 @@ namespace kor {
          */
         bool Execute();
 
-        /** @brief Every pass's DrawGUI, plus the schedule and the Performance window — whichever are shown. */
-        void DrawGUI();
-
-        /**
-         * @brief Menu items showing and hiding the graph's windows, for a menu the scene owns.
-         *
-         * @code
-         * if (ImGui::BeginMainMenuBar()) {
-         *     if (ImGui::BeginMenu("View")) { Graph().DrawMenuItems(); ImGui::EndMenu(); }
-         *     ImGui::EndMainMenuBar();
-         * }
-         * @endcode
-         */
-        void DrawMenuItems();
+        /** @brief Every pass added, in the order it was added — enabled or not, scheduled or not. */
+        [[nodiscard]] std::vector<RenderPass*> Passes() const;
 
         /** @brief One pass as scheduled: its name, and how deep in the dependencies it sits. */
         struct Scheduled {
@@ -383,6 +383,10 @@ namespace kor {
         [[nodiscard]] const std::vector<Skipped>& SkippedPasses() const { return _skipped; }
         /** @brief Passes left out because nothing needs what they make. */
         [[nodiscard]] const std::vector<std::string>& CulledPasses() const { return _culled; }
+        /** @brief The resources kept for the next frame (RenderPass::ReadPrevious). */
+        [[nodiscard]] const std::vector<std::string>& KeptForNextFrame() const { return _history; }
+        /** @brief Whether the graph failed to compile, and so draws nothing (the log says why). */
+        [[nodiscard]] bool Broken() const { return _broken; }
 
         /**
          * @brief What one pass costs, averaged over recent frames.
@@ -409,6 +413,12 @@ namespace kor {
             double gpuMs = 0.0;         ///< The passes' GPU times, summed.
         };
         [[nodiscard]] GraphTiming Timing() const;
+        /** @brief The last frames' CPU frame time and the graph's GPU time, in ms, oldest first. */
+        struct TimeHistory {
+            std::vector<float> frameMs;
+            std::vector<float> gpuMs;
+        };
+        [[nodiscard]] TimeHistory Times() const;
 
         /**
          * @brief An image of the graph's by name — for a screenshot, a debug view, another scene.
@@ -457,17 +467,12 @@ namespace kor {
         bool Build();
         /** @brief Whether the graph may be changed now: from its own thread, and not while passes record. */
         [[nodiscard]] bool Mutable(std::string_view what) const;
-        void DrawSchedule();
-        void DrawPerformance();
 
         // Shared with the timer callbacks, which arrive from the scheduler once a frame is done —
         // possibly after the graph is gone, hence held weakly by them.
         struct Stats;
         std::shared_ptr<Stats> _stats;
 
-        bool _showSchedule = true;
-        bool _showPerformance = true;
-        bool _showPassWindows = true;
 
         std::vector<std::unique_ptr<RenderPass>> _passes;
         std::vector<RenderPass*> _order;      // what runs, in order
@@ -524,7 +529,7 @@ namespace kor {
         std::vector<History> _historyCopies;
         std::map<std::string, std::size_t, std::less<>> _historyIndex;     // every name reaching one, aliases included
         std::vector<Resource<Framebuffer>> _historyClears;  // what cleared a depth history, kept until rebuilt
-        std::vector<std::string> _history;                  // the physical names, for the interface
+        std::vector<std::string> _history;                  // the physical names, for KeptForNextFrame
         glm::uvec2 _extent {0, 0};
         /// The window's image the graph was last built for: which one, and how many times rebuilt.
         std::uintptr_t _screenSeen = 0;

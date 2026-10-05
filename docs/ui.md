@@ -448,7 +448,7 @@ chains, on Compose's own runtime. See [Kotlin and Compose](kotlin.md).
 ## Input it needs
 
 Text fields read `kor::Input::TypedText()` (the code points typed this frame) and
-`IsKeyRepeated(key)`. `ClaimInterface(claimer, mouse, keyboard)` is how a non-ImGui interface makes
+`IsKeyRepeated(key)`. `ClaimInterface(claimer, mouse, keyboard)` is how an interface makes
 `InterfaceWantsMouse/Keyboard` true. An offscreen scene is fed the same way with `FeedText` and
 `FeedKeyRepeat`, which C (`koral_input_feed_text`) and C# (`Input.FeedText`) have too.
 
@@ -468,7 +468,10 @@ Text fields read `kor::Input::TypedText()` (the code points typed this frame) an
 
 ## Measuring it
 
-`koral_ui_bench` (built with the UI tests, from `modules/ui/bench/bench.cpp`) draws the same grid of cells
-with koral-ui and with Dear ImGui and prints what a frame costs at each load: the interface's own CPU
-work, and the whole frame with nothing waiting for the display. Run it from a Release build, one of the
-two a process: `koral_ui_bench 200 kui`, `koral_ui_bench 200 imgui`.
+`koral_ui_bench` (built with the UI tests, from `modules/ui/bench/bench.cpp`) draws a grid of cells at one
+load after another, every cell changing and none, and prints what a frame costs: the interface's own CPU
+work, and the whole frame with nothing waiting for the display. Run it from a Release build:
+`koral_ui_bench 200`.
+
+For a test, `kui::debug::Texts(ui)` is every text an interface shows — labels, values, what is typed into
+fields — in the order of the tree: what a test reads an interface by.

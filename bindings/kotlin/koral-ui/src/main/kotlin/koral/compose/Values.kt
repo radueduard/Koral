@@ -39,31 +39,31 @@ fun Slider(value: TextUnit, onValueChange: (TextUnit) -> Unit, modifier: Modifie
 /** A [DragValue] over whole numbers. [speed] is how many a unit of dragging adds. */
 @Composable
 fun DragValue(value: Int, onValueChange: (Int) -> Unit, modifier: Modifier = Modifier, label: String = "", speed: Float = 0.1f,
-              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = Dp.Unspecified) =
+              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = Dp.Unspecified, typeable: Boolean = true) =
     DragValue(value.toFloat(), { onValueChange(it.roundToInt().coerceIn(valueRange.first, valueRange.last)) }, modifier, label, speed,
-              valueRange.first.toFloat()..valueRange.last.toFloat(), decimals = 0, width = width)
+              valueRange.first.toFloat()..valueRange.last.toFloat(), decimals = 0, width = width, typeable = typeable)
 
 /** A [DragValue] over a Double. */
 @Composable
 fun DragValue(value: Double, onValueChange: (Double) -> Unit, modifier: Modifier = Modifier, label: String = "", speed: Float = 0.01f,
               valueRange: ClosedFloatingPointRange<Double> = Double.NEGATIVE_INFINITY..Double.POSITIVE_INFINITY, decimals: Int = 2,
-              width: Dp = Dp.Unspecified) =
+              width: Dp = Dp.Unspecified, typeable: Boolean = true) =
     DragValue(value.toFloat(), { onValueChange(it.toDouble()) }, modifier, label, speed, valueRange.start.toFloat()..valueRange.endInclusive.toFloat(),
-              decimals, width)
+              decimals, width, typeable = typeable)
 
 /** A [DragValue] over a length: `DragValue(gap, { gap = it }, label = "Gap", valueRange = 0.dp..24.dp)`. */
 @Composable
 fun DragValue(value: Dp, onValueChange: (Dp) -> Unit, modifier: Modifier = Modifier, label: String = "", speed: Float = 0.1f,
               valueRange: ClosedRange<Dp> = Dp(Float.NEGATIVE_INFINITY)..Dp(Float.POSITIVE_INFINITY), decimals: Int = 0,
-              width: Dp = Dp.Unspecified) =
-    DragValue(value.value, { onValueChange(it.dp) }, modifier, label, speed, valueRange.start.value..valueRange.endInclusive.value, decimals, width)
+              width: Dp = Dp.Unspecified, typeable: Boolean = true) =
+    DragValue(value.value, { onValueChange(it.dp) }, modifier, label, speed, valueRange.start.value..valueRange.endInclusive.value, decimals, width, typeable = typeable)
 
 /** A [DragValue] over a text size: `DragValue(size, { size = it }, label = "Text", valueRange = 8.sp..32.sp)`. */
 @Composable
 fun DragValue(value: TextUnit, onValueChange: (TextUnit) -> Unit, modifier: Modifier = Modifier, label: String = "", speed: Float = 0.1f,
               valueRange: ClosedRange<TextUnit> = TextUnit(Float.NEGATIVE_INFINITY)..TextUnit(Float.POSITIVE_INFINITY), decimals: Int = 0,
-              width: Dp = Dp.Unspecified) =
-    DragValue(value.value, { onValueChange(it.sp) }, modifier, label, speed, valueRange.start.value..valueRange.endInclusive.value, decimals, width)
+              width: Dp = Dp.Unspecified, typeable: Boolean = true) =
+    DragValue(value.value, { onValueChange(it.sp) }, modifier, label, speed, valueRange.start.value..valueRange.endInclusive.value, decimals, width, typeable = typeable)
 
 // ---- progress -----------------------------------------------------------------------------------------------
 
@@ -86,11 +86,11 @@ private val Axes = listOf("X", "Y", "Z", "W")
 
 @Composable
 private fun DragFloats(values: List<Float>, onChange: (List<Float>) -> Unit, modifier: Modifier, labels: List<String>, speed: Float,
-                       range: ClosedFloatingPointRange<Float>, decimals: Int, width: Dp) =
+                       range: ClosedFloatingPointRange<Float>, decimals: Int, width: Dp, typeable: Boolean) =
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         values.forEachIndexed { i, component ->
             DragValue(component, { v -> onChange(values.toMutableList().also { it[i] = v }) }, label = labels.getOrElse(i) { "" }, speed = speed,
-                      valueRange = range, decimals = decimals, width = width)
+                      valueRange = range, decimals = decimals, width = width, typeable = typeable)
         }
     }
 
@@ -107,68 +107,68 @@ private fun List<Float>.whole(range: IntRange) = map { it.roundToInt().coerceIn(
 /** A [DragValue] a component, side by side. [labels] are written before each; [width] is each one's. */
 @Composable
 fun DragValue(value: koral.Vec2, onValueChange: (koral.Vec2) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.01f,
-              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 2, width: Dp = 96.dp) =
-    DragFloats(listOf(value.x, value.y), { onValueChange(koral.Vec2(it[0], it[1])) }, modifier, labels, speed, valueRange, decimals, width)
+              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 2, width: Dp = 96.dp, typeable: Boolean = true) =
+    DragFloats(listOf(value.x, value.y), { onValueChange(koral.Vec2(it[0], it[1])) }, modifier, labels, speed, valueRange, decimals, width, typeable)
 
 @Composable
 fun DragValue(value: koral.Vec3, onValueChange: (koral.Vec3) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.01f,
-              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 2, width: Dp = 96.dp) =
-    DragFloats(listOf(value.x, value.y, value.z), { onValueChange(koral.Vec3(it[0], it[1], it[2])) }, modifier, labels, speed, valueRange, decimals, width)
+              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 2, width: Dp = 96.dp, typeable: Boolean = true) =
+    DragFloats(listOf(value.x, value.y, value.z), { onValueChange(koral.Vec3(it[0], it[1], it[2])) }, modifier, labels, speed, valueRange, decimals, width, typeable)
 
 @Composable
 fun DragValue(value: koral.Vec4, onValueChange: (koral.Vec4) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.01f,
-              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 2, width: Dp = 96.dp) =
+              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 2, width: Dp = 96.dp, typeable: Boolean = true) =
     DragFloats(listOf(value.x, value.y, value.z, value.w), { onValueChange(koral.Vec4(it[0], it[1], it[2], it[3])) }, modifier, labels, speed, valueRange,
-               decimals, width)
+               decimals, width, typeable)
 
 /** Whole numbers a component. */
 @Composable
 fun DragValue(value: koral.IVec2, onValueChange: (koral.IVec2) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.1f,
-              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = 96.dp) =
+              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = 96.dp, typeable: Boolean = true) =
     DragFloats(listOf(value.x.toFloat(), value.y.toFloat()), { val v = it.whole(valueRange); onValueChange(koral.IVec2(v[0], v[1])) }, modifier, labels, speed,
-               valueRange.floats(), 0, width)
+               valueRange.floats(), 0, width, typeable)
 
 @Composable
 fun DragValue(value: koral.IVec3, onValueChange: (koral.IVec3) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.1f,
-              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = 96.dp) =
+              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = 96.dp, typeable: Boolean = true) =
     DragFloats(listOf(value.x.toFloat(), value.y.toFloat(), value.z.toFloat()), { val v = it.whole(valueRange); onValueChange(koral.IVec3(v[0], v[1], v[2])) },
-               modifier, labels, speed, valueRange.floats(), 0, width)
+               modifier, labels, speed, valueRange.floats(), 0, width, typeable)
 
 @Composable
 fun DragValue(value: koral.IVec4, onValueChange: (koral.IVec4) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.1f,
-              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = 96.dp) =
+              valueRange: IntRange = Int.MIN_VALUE..Int.MAX_VALUE, width: Dp = 96.dp, typeable: Boolean = true) =
     DragFloats(listOf(value.x.toFloat(), value.y.toFloat(), value.z.toFloat(), value.w.toFloat()),
-               { val v = it.whole(valueRange); onValueChange(koral.IVec4(v[0], v[1], v[2], v[3])) }, modifier, labels, speed, valueRange.floats(), 0, width)
+               { val v = it.whole(valueRange); onValueChange(koral.IVec4(v[0], v[1], v[2], v[3])) }, modifier, labels, speed, valueRange.floats(), 0, width, typeable)
 
 /** Whole numbers a component, none below zero. */
 @Composable
 fun DragValue(value: koral.UVec2, onValueChange: (koral.UVec2) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.1f,
-              valueRange: IntRange = 0..Int.MAX_VALUE, width: Dp = 96.dp) =
+              valueRange: IntRange = 0..Int.MAX_VALUE, width: Dp = 96.dp, typeable: Boolean = true) =
     DragFloats(listOf(value.x.toFloat(), value.y.toFloat()), { val v = it.whole(valueRange); onValueChange(koral.UVec2(v[0], v[1])) }, modifier, labels, speed,
-               valueRange.floats(), 0, width)
+               valueRange.floats(), 0, width, typeable)
 
 @Composable
 fun DragValue(value: koral.UVec3, onValueChange: (koral.UVec3) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.1f,
-              valueRange: IntRange = 0..Int.MAX_VALUE, width: Dp = 96.dp) =
+              valueRange: IntRange = 0..Int.MAX_VALUE, width: Dp = 96.dp, typeable: Boolean = true) =
     DragFloats(listOf(value.x.toFloat(), value.y.toFloat(), value.z.toFloat()), { val v = it.whole(valueRange); onValueChange(koral.UVec3(v[0], v[1], v[2])) },
-               modifier, labels, speed, valueRange.floats(), 0, width)
+               modifier, labels, speed, valueRange.floats(), 0, width, typeable)
 
 @Composable
 fun DragValue(value: koral.UVec4, onValueChange: (koral.UVec4) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.1f,
-              valueRange: IntRange = 0..Int.MAX_VALUE, width: Dp = 96.dp) =
+              valueRange: IntRange = 0..Int.MAX_VALUE, width: Dp = 96.dp, typeable: Boolean = true) =
     DragFloats(listOf(value.x.toFloat(), value.y.toFloat(), value.z.toFloat(), value.w.toFloat()),
-               { val v = it.whole(valueRange); onValueChange(koral.UVec4(v[0], v[1], v[2], v[3])) }, modifier, labels, speed, valueRange.floats(), 0, width)
+               { val v = it.whole(valueRange); onValueChange(koral.UVec4(v[0], v[1], v[2], v[3])) }, modifier, labels, speed, valueRange.floats(), 0, width, typeable)
 
 /** A point and a size of the interface's own: two numbers each. */
 @Composable
 fun DragValue(value: Offset, onValueChange: (Offset) -> Unit, modifier: Modifier = Modifier, labels: List<String> = Axes, speed: Float = 0.1f,
-              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 1, width: Dp = 96.dp) =
-    DragFloats(listOf(value.x, value.y), { onValueChange(Offset(it[0], it[1])) }, modifier, labels, speed, valueRange, decimals, width)
+              valueRange: ClosedFloatingPointRange<Float> = Unbounded, decimals: Int = 1, width: Dp = 96.dp, typeable: Boolean = true) =
+    DragFloats(listOf(value.x, value.y), { onValueChange(Offset(it[0], it[1])) }, modifier, labels, speed, valueRange, decimals, width, typeable)
 
 @Composable
 fun DragValue(value: Size, onValueChange: (Size) -> Unit, modifier: Modifier = Modifier, labels: List<String> = listOf("W", "H"), speed: Float = 0.1f,
-              valueRange: ClosedFloatingPointRange<Float> = 0f..Float.POSITIVE_INFINITY, decimals: Int = 1, width: Dp = 96.dp) =
-    DragFloats(listOf(value.width, value.height), { onValueChange(Size(it[0], it[1])) }, modifier, labels, speed, valueRange, decimals, width)
+              valueRange: ClosedFloatingPointRange<Float> = 0f..Float.POSITIVE_INFINITY, decimals: Int = 1, width: Dp = 96.dp, typeable: Boolean = true) =
+    DragFloats(listOf(value.width, value.height), { onValueChange(Size(it[0], it[1])) }, modifier, labels, speed, valueRange, decimals, width, typeable)
 
 /** A [Slider] a component, one over the other, each over [valueRange]. */
 @Composable

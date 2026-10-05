@@ -18,6 +18,8 @@ import koral.DescriptorSet
 import koral.ErrorCode
 import koral.Filter
 import koral.FrameGraph
+import koral.GizmoMode
+import koral.GizmoPointer
 import koral.GpuLayout
 import koral.GraphicsPipeline
 import koral.Image
@@ -229,6 +231,30 @@ class DebugLinesTest {
         app.frames(4)
         assertTrue(scene.cameraCalls >= 3, "the camera was asked each frame (${scene.cameraCalls})")
         assertTrue(scene.debug.lineCount > 0, "the lines are there")
+    }
+
+    /** Filled shapes are triangles, and a gizmo dragged by a pointer of our own moves what it is on. */
+    @Test
+    fun debugFillsAndGizmos() = headlessApp().use { app ->
+        app.register<Lines>()
+        val scene = app.openOffscreen("Lines", OffscreenSettings(width = 32, height = 32)) as Lines
+        val draw = scene.debug
+        draw.clear()
+        draw.box(Vec3(-0.5f, -0.5f, -0.5f), Vec3(0.5f, 0.5f, 0.5f), DebugStyle(fill = Vec4(1f, 0f, 0f, 0.5f), outline = false))
+        assertEquals(12L, draw.triangleCount, "a filled box")
+        assertEquals(0L, draw.lineCount, "without its outline")
+
+        // An orthographic camera two units across, onto a 200 by 200 image: a unit is 100 pixels, X is right.
+        val viewProjection = Mat4.scale(Vec3(1f, 1f, -0.5f)) * Mat4.translation(Vec3(0f, 0f, -1f))
+        val viewport = Vec2(200f, 200f)
+        draw.gizmo(GizmoMode.eTranslate, Mat4.Identity, viewProjection, GizmoPointer(Vec2(160f, 100f), viewport, down = true, pressed = true), id = 1)
+        assertTrue(draw.gizmoActive, "the X arrow is grabbed")
+        val moved = draw.gizmo(GizmoMode.eTranslate, Mat4.Identity, viewProjection, GizmoPointer(Vec2(180f, 120f), viewport, down = true), id = 1)
+        assertNotNull(moved, "and dragged")
+        assertEquals(0.2f, moved[3, 0], 1e-4f, "along X by the pointer's 20 pixels")
+        assertEquals(0f, moved[3, 1], 1e-4f, "and not along Y")
+        draw.gizmo(GizmoMode.eTranslate, moved, viewProjection, GizmoPointer(null, viewport, down = false), id = 1)
+        assertFalse(draw.gizmoActive, "let go of")
     }
 }
 

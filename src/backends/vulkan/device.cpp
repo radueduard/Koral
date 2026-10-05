@@ -182,6 +182,20 @@ namespace kor::vk {
         }
 #endif
 
+        // A present mode that shows the newest finished frame at each refresh and never makes the
+        // application wait for one: what "vsync" is asked of where there is no mailbox (NVIDIA on X11),
+        // and waiting for the display (FIFO) costs frames it should not. Enabled where the device has it.
+        const char* fifoLatestReady =
+            physicalDevice.supportsExtension(VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME) ? VK_KHR_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME
+            : physicalDevice.supportsExtension(VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME) ? VK_EXT_PRESENT_MODE_FIFO_LATEST_READY_EXTENSION_NAME
+            : nullptr;
+        auto fifoLatestReadyFeatures = ::vk::PhysicalDevicePresentModeFifoLatestReadyFeaturesKHR().setPresentModeFifoLatestReady(true);
+        if (fifoLatestReady) {
+            fifoLatestReadyFeatures.setPNext(const_cast<void*>(static_cast<const void*>(vk13Features.pNext)));
+            vk13Features.setPNext(&fifoLatestReadyFeatures);
+        }
+        _supportsFifoLatestReady = fifoLatestReady != nullptr;
+
     	auto vk12Features = ::vk::PhysicalDeviceVulkan12Features()
     		.setRuntimeDescriptorArray(require(supported12.runtimeDescriptorArray, "runtimeDescriptorArray"))
     		.setTimelineSemaphore(require(supported12.timelineSemaphore, "timelineSemaphore"))
@@ -225,6 +239,7 @@ namespace kor::vk {
                 deviceExtensions.push_back(optional);
             }
         }
+        if (fifoLatestReady) deviceExtensions.push_back(fifoLatestReady);
 
         _supportsRayTracing = physicalDevice.supportsExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
             && physicalDevice.supportsExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)

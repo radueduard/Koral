@@ -7,8 +7,8 @@
  * @brief Umbrella header for the Koral framework: including this pulls in the whole public API.
  *
  * What a scene normally includes. Individual headers can still be included directly to keep a
- * translation unit lean, but note that scene.h pulls in the Dear ImGui binding a scene needs, so a
- * project that reaches for individual headers should include scene.h among them.
+ * translation unit lean. An interface is a module's business, not the framework's: koral-ui (kui/)
+ * draws one, and a scene links it as it would any other module.
  *
  * The API divides into: resources built by builders and held as a kor::Resource (buffers, images,
  * shaders, pipelines, descriptor sets); the kor::CommandBuffer that records a frame's GPU work;
@@ -118,7 +118,7 @@
 #include "commandBuffer.h"
 #include "scheduler.h"
 
-// Context, scene, window, input & GUI
+// Context, scene, window & input
 #include "context.h"
 #include "module.h"
 #include "scene.h"
@@ -126,4 +126,3 @@
 #include "window.h"
 #include "input.h"
 #include "surface.h"
-#include "gui.h"

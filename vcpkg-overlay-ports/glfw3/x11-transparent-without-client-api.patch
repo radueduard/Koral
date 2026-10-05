@@ -1,0 +1,34 @@
+--- a/src/x11_window.c	2026-10-04 18:50:14.649050803 +0300
++++ b/src/x11_window.c	2026-10-04 18:58:38.483533369 +0300
+@@ -1987,6 +1987,31 @@
+         }
+     }
+ 
++    if (!visual && fbconfig->transparent)
++    {
++        // Koral: with no client API (Vulkan) nothing above chose a visual, and the default one has no
++        // alpha. A 32-bit TrueColor visual with an alpha mask is what a compositor sees through.
++        // (Through XGetVisualInfo, which GLFW has loaded: it links nothing of Xlib's.)
++        XVisualInfo wanted = { 0 };
++        wanted.screen = _glfw.x11.screen;
++        wanted.depth = 32;
++        wanted.class = TrueColor;
++        int count = 0;
++        XVisualInfo* found = XGetVisualInfo(_glfw.x11.display,
++                                            VisualScreenMask | VisualDepthMask | VisualClassMask,
++                                            &wanted, &count);
++        for (int i = 0; found && i < count; i++)
++        {
++            if (!_glfwIsVisualTransparentX11(found[i].visual))
++                continue;
++            visual = found[i].visual;
++            depth = found[i].depth;
++            break;
++        }
++        if (found)
++            XFree(found);
++    }
++
+     if (!visual)
+     {
+         visual = DefaultVisual(_glfw.x11.display, _glfw.x11.screen);

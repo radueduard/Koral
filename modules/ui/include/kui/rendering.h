@@ -9,6 +9,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -134,6 +135,9 @@ namespace kui
         const kor::Window* window = nullptr;
         RenderObject* root = nullptr;
         glm::vec2 origin {};
+        /// Where on the desktop @p origin is, in pixels, for a window that moves under the pointer: the
+        /// pointer is then asked of the desktop (kor::Window::DesktopCursor), not of the window.
+        std::optional<glm::ivec2> desktopOrigin;
     };
 
     /** @brief What a pointer is over, deepest first, with where it is in each. */
@@ -167,6 +171,8 @@ namespace kui
         [[nodiscard]] RenderObject* Parent() const { return _parent; }
         /** @brief Every child, in paint order. */
         virtual void VisitChildren(const std::function<void(RenderObject&)>& visit) {}
+        /** @brief The text it shows, if it shows any: a paragraph's, a field's. What debug::Texts reads. */
+        [[nodiscard]] virtual std::string DebugText() const { return {}; }
         /** @brief For a parent: adopts @p child (the parent keeps its own list). */
         void AdoptChild(RenderObject& child);
         void DropChild(RenderObject& child);
@@ -320,6 +326,13 @@ namespace kui
          *        the pointer so, in whichever window it is in.
          */
         PointerCursor cursor = PointerCursor::eArrow;
+        /**
+         * @brief Holds the pointer where it is, unseen, for a drag that has no use for where the pointer
+         *        goes — a number dragged up or down — and (false) lets it go again, where it was. While it
+         *        is held, moves still arrive (eMove), with how far the hand went in their delta and no
+         *        end to how far that can be. The view lets go by itself when the button is. Set by the view.
+         */
+        std::function<void(bool)> lockPointer;
         /**
          * @brief What the view shows by the pointer: a tip about what is under it. Emptied and said
          *        afresh as the cursor is — whatever has a tip sets it when told the pointer moved over it

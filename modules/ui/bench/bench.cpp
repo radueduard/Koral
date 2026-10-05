@@ -1,10 +1,10 @@
 //
-// koral-ui against Dear ImGui: the same grid of cells — a rounded box of a colour with a number in it,
-// twenty to a row, scrolling — drawn by each in a window of its own, at one load after another. What is
-// measured is what a frame costs: the interface's own work on the CPU, and the whole frame from one to
-// the next with nothing waiting for the display.
+// What a frame of koral-ui costs: a grid of cells — a rounded box of a colour with a number in it, twenty
+// to a row, scrolling — at one load after another, every cell changing and none. What is measured is the
+// interface's own work on the CPU, and the whole frame from one to the next with nothing waiting for the
+// display.
 //
-//   koral_ui_bench [frames] [kui|imgui]     (a Release build: a Debug one measures the debugging)
+//   koral_ui_bench [frames]     (a Release build: a Debug one measures the debugging)
 //
 
 #include <algorithm>
@@ -17,7 +17,6 @@
 #include <app.h>
 #include <commandBuffer.h>
 #include <frameGraph.h>
-#include <gui.h>
 #include <scene.h>
 
 #include <koralUI.h>
@@ -48,7 +47,7 @@ namespace {
         kor::ResourceRef<const kor::Image> _screen;
     };
 
-    /** What both scenes are told, and say back. */
+    /** What the scene is told, and says back. */
     struct Load {
         int cells = 0;
         bool animate = true;
@@ -102,39 +101,6 @@ namespace {
         int shown = -1;
     };
 
-    // ---- Dear ImGui -------------------------------------------------------------------------------------
-
-    struct ImGuiScene final : kor::Scene {
-        ImGuiScene() { EnableInterface({ .viewports = false, .docking = false }); }
-        void Initialize() override { Graph().Add<ClearPass>(); }
-        void RenderUI() override
-        {
-            const auto begin = Clock::now();
-            const ImGuiViewport* view = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(view->Pos);
-            ImGui::SetNextWindowSize(view->Size);
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 5.f);
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(3.f, 3.f));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
-            ImGui::Begin("grid", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.f, 0.f, 0.f, 1.f));
-            char label[16];
-            for (int i = 0; i < load.cells; ++i) {
-                const glm::vec3 c = hue(static_cast<float>(i) * 0.011f + load.phase);
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(c.r, c.g, c.b, 1.f));
-                std::snprintf(label, sizeof label, "%d", i);
-                ImGui::Button(label, ImVec2(34.f, 20.f));
-                ImGui::PopStyleColor();
-                if ((i + 1) % PerRow != 0 && i + 1 < load.cells) ImGui::SameLine();
-            }
-            ImGui::PopStyleColor();
-            ImGui::End();
-            ImGui::PopStyleVar(3);
-            load.interfaceMs = since(begin);
-        }
-        Load load;
-    };
-
     struct Result { double interfaceMs = 0.0, frameMs = 0.0, detail[8] {}; };
 
     /** @p frames frames of @p load, after a few to settle: what each cost on average. */
@@ -165,35 +131,20 @@ int main(const int argc, char** argv)
     kor::App app;
     const kor::WindowSettings window { .title = "koral-ui bench", .extent = { 1280, 720 }, .vsync = false };
 
-    std::vector<Result> kuiMoving, kuiStill, imguiMoving;
-
-    // One of the two a run, when asked: a window each, and a process each, so that neither is measured after the other.
-    const std::string only = argc > 2 ? argv[2] : "";
-    if (only != "imgui") {
-        auto* kui = app.Open<KuiScene>(window);
-        if (!kui) { std::fprintf(stderr, "no window\n"); return 1; }
-        for (const int cells : loads) {
-            kuiMoving.push_back(measure(app, kui->load, cells, true, frames));
-            kuiStill.push_back(measure(app, kui->load, cells, false, frames));
-        }
-        if (only.empty()) { app.Close(*kui); for (int i = 0; i < 3; ++i) app.Frame(); }
+    std::vector<Result> moving, still;
+    auto* scene = app.Open<KuiScene>(window);
+    if (!scene) { std::fprintf(stderr, "no window\n"); return 1; }
+    for (const int cells : loads) {
+        moving.push_back(measure(app, scene->load, cells, true, frames));
+        still.push_back(measure(app, scene->load, cells, false, frames));
     }
-    if (only != "kui") {
-        auto* imgui = app.Open<ImGuiScene>(window);
-        if (!imgui) { std::fprintf(stderr, "no window\n"); return 1; }
-        for (const int cells : loads) imguiMoving.push_back(measure(app, imgui->load, cells, true, frames));
-    }
-    kuiMoving.resize(loads.size());
-    kuiStill.resize(loads.size());
-    imguiMoving.resize(loads.size());
 
-    std::printf("\n%d frames a load, 1280x720, no vsync. Milliseconds a frame: the interface's own CPU work | the whole frame.\n", frames);
-    std::printf("ImGui's interface time is its widgets being submitted; putting its draw lists together and drawing them is in its frame time.\n\n");
-    std::printf("%6s | %-21s | %-21s | %-21s | koral-ui changing: build layout paint compose upload prepare | kB up, shapes\n", "cells", "koral-ui, all changing", "koral-ui, unchanged", "Dear ImGui");
+    std::printf("\n%d frames a load, 1280x720, no vsync. Milliseconds a frame: the interface's own CPU work | the whole frame.\n\n", frames);
+    std::printf("%6s | %-21s | %-21s | all changing: build layout paint compose upload prepare | kB up, shapes\n", "cells", "all changing", "unchanged");
     for (std::size_t i = 0; i < loads.size(); ++i) {
-        const Result &a = kuiMoving[i], &b = kuiStill[i], &c = imguiMoving[i];
-        std::printf("%6d | %9.3f | %9.3f | %9.3f | %9.3f | %9.3f | %9.3f | %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f | %7.0f %7.0f\n", loads[i],
-                    a.interfaceMs, a.frameMs, b.interfaceMs, b.frameMs, c.interfaceMs, c.frameMs, a.detail[0], a.detail[1], a.detail[2], a.detail[3], a.detail[4], a.detail[5], a.detail[6], a.detail[7]);
+        const Result &a = moving[i], &b = still[i];
+        std::printf("%6d | %9.3f | %9.3f | %9.3f | %9.3f | %6.3f %6.3f %6.3f %6.3f %6.3f %6.3f | %7.0f %7.0f\n", loads[i],
+                    a.interfaceMs, a.frameMs, b.interfaceMs, b.frameMs, a.detail[0], a.detail[1], a.detail[2], a.detail[3], a.detail[4], a.detail[5], a.detail[6], a.detail[7]);
     }
     return 0;
 }

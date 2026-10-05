@@ -14,6 +14,7 @@
 #include <window.h>
 
 #include "boxes.h"
+#include "glass.h"
 #include "element.h"
 
 namespace kui
@@ -48,13 +49,15 @@ namespace kui
         /** A box that paints itself: as wide as it is given room for (or @p width), @p height tall. */
         class RenderPaintBox final : public RenderContainer {
         public:
-            void Set(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size)
+            void Set(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size, std::string text)
             {
                 _painter = std::move(painter);
+                _text = std::move(text);
                 if (size != _preferred) { _preferred = size; MarkNeedsLayout(); }
                 MarkNeedsPaint();
             }
             [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] std::string DebugText() const override { return _text; }
             void Paint(Canvas& canvas, const glm::vec2 offset) override
             {
                 if (!_painter) return;
@@ -75,19 +78,33 @@ namespace kui
         private:
             std::function<void(Canvas&, glm::vec2)> _painter;
             glm::vec2 _preferred { -1.f, -1.f };
+            std::string _text;      ///< What it says, for debug::Texts: it paints its words itself.
         };
 
         struct PaintBoxWidget final : RenderObjectWidget {
             std::function<void(Canvas&, glm::vec2)> painter;
             glm::vec2 size;
-            PaintBoxWidget(std::function<void(Canvas&, glm::vec2)> p, const glm::vec2 s) : painter(std::move(p)), size(s) {}
+            std::string text;
+            PaintBoxWidget(std::function<void(Canvas&, glm::vec2)> p, const glm::vec2 s, std::string t)
+                : painter(std::move(p)), size(s), text(std::move(t)) {}
             [[nodiscard]] std::unique_ptr<RenderObject> CreateRenderObject() const override { return std::make_unique<RenderPaintBox>(); }
-            void UpdateRenderObject(RenderObject& object) const override { static_cast<RenderPaintBox&>(object).Set(painter, size); }
+            void UpdateRenderObject(RenderObject& object) const override { static_cast<RenderPaintBox&>(object).Set(painter, size, text); }
         };
 
-        Widget paintBox(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size) { return Make<PaintBoxWidget>(std::move(painter), size); }
+        /** @p text: what it says, when it paints words of its own — what debug::Texts reads. */
+        Widget paintBox(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size, std::string text = {})
+        {
+            return Make<PaintBoxWidget>(std::move(painter), size, std::move(text));
+        }
 
         /** The arrow before a header or a tree's node: pointing right when shut, down when open. */
+        /** @p a, a little of the way to @p b: an outline that can be seen on its surface. */
+        Color mix3(const Color a, const Color b)
+        {
+            constexpr float f = 0.10f;
+            return { a.r + (b.r - a.r) * f, a.g + (b.g - a.g) * f, a.b + (b.b - a.b) * f, a.a };
+        }
+
         Widget arrow(const bool open, const Color color)
         {
             return CustomPaint([open, color](Canvas& canvas, const glm::vec2 size) {
@@ -374,14 +391,11 @@ namespace kui
                 style.size = std::max(style.size - 2.f, 10.f);
                 for (int i = 0; i < _config.steps; ++i) {
                     const glm::vec2 c { Inset + step * (static_cast<float>(i) + 0.5f), size.y * 0.5f };
-                    const Color ink = i == at ? t.onPrimary : t.textMuted;
                     if (static_cast<std::size_t>(i) < _config.options.labels.size() && !_config.options.labels[static_cast<std::size_t>(i)].empty()) {
                         const std::string& label = _config.options.labels[static_cast<std::size_t>(i)];
                         style.color = i == at ? t.onPrimary : t.text;
                         const Paragraph text(label, style);
                         canvas.DrawText(label, { std::round(c.x - text.Size().x * 0.5f), std::round(c.y - text.Size().y * 0.5f) }, style);
-                    } else {
-                        canvas.DrawCircle(c, 2.f, Paint::Fill(ink));
                     }
                 }
                 canvas.Restore();
@@ -865,6 +879,134 @@ namespace kui
                         across ? glm::vec2(-1.f, thickness) : glm::vec2(thickness, -1.f));
     }
 
+    Widget BackdropFilter(const Backdrop backdrop, const Radii radius, Widget child)
+    {
+        return CustomPaint([backdrop, radius](Canvas& canvas, const glm::vec2 size) {
+            canvas.DrawBackdrop({ Rect::FromSize(size), radius }, backdrop);
+        }, { -1.f, -1.f }, std::move(child));
+    }
+
+    // ---- animation --------------------------------------------------------------------------------------
+
+    float Ease(const Curve curve, const float time)
+    {
+        const float t = std::clamp(time, 0.f, 1.f);
+        switch (curve) {
+        case Curve::eEaseIn: return t * t * t;
+        case Curve::eEaseOut: { const float u = 1.f - t; return 1.f - u * u * u; }
+        case Curve::eEaseInOut: return t < 0.5f ? 4.f * t * t * t : 1.f - std::pow(-2.f * t + 2.f, 3.f) * 0.5f;
+        case Curve::eEaseOutBack: { constexpr float c = 1.70158f; const float u = t - 1.f; return 1.f + (c + 1.f) * u * u * u + c * u * u; }
+        default: return t;
+        }
+    }
+
+    namespace {
+        /** A value on its way to where it was last told to go, and whatever is built of it. */
+        struct AnimatedWidget final : StatefulWidget {
+            float target;
+            std::function<Widget(float)> builder;
+            AnimationOptions options;
+            float from = 0.f, value = 0.f, time = 1.f;
+            bool running = false;
+
+            AnimatedWidget(const float t, std::function<Widget(float)> b, const AnimationOptions o) : target(t), builder(std::move(b)), options(o) {}
+
+            void InitState() override
+            {
+                running = false;
+                time = 1.f;
+                value = from = target;
+                // Told where to start: it sets off from there as soon as it is in the tree.
+                if (options.initial && *options.initial != target) { value = from = *options.initial; Go(); }
+            }
+
+            void DidUpdateWidget(const StatefulWidget& newer) override
+            {
+                const auto& a = static_cast<const AnimatedWidget&>(newer);
+                builder = a.builder;
+                options = a.options;
+                if (a.target == target) return;
+                target = a.target;
+                from = value;
+                Go();
+            }
+
+            void Go()
+            {
+                time = 0.f;
+                if (options.duration <= 0.f) { value = target; time = 1.f; return; }
+                if (running) return;
+                running = Animate([this](const float dt) {
+                    SetState([&] {
+                        time = std::min(time + dt / std::max(options.duration, 1.e-4f), 1.f);
+                        value = time >= 1.f ? target : from + (target - from) * Ease(options.curve, time);
+                    });
+                    running = time < 1.f;
+                    return running;
+                });
+                // Nothing to run it on: there at once, rather than never.
+                if (!running) { value = target; time = 1.f; }
+            }
+
+            Widget Build() override { return builder ? builder(value) : Widget {}; }
+        };
+
+        /** Unfolds its child while open, folds it away when not — and keeps the child it had while it folds. */
+        struct RevealWidget final : StatefulWidget {
+            bool open;
+            Widget child, kept;
+            AnimationOptions options;
+
+            RevealWidget(const bool o, Widget c, const AnimationOptions a) : open(o), child(std::move(c)), options(a) {}
+
+            void InitState() override { kept = child; }
+
+            void DidUpdateWidget(const StatefulWidget& newer) override
+            {
+                const auto& r = static_cast<const RevealWidget&>(newer);
+                open = r.open;
+                child = r.child;
+                options = r.options;
+                if (child) kept = child;
+            }
+
+            Widget Build() override
+            {
+                AnimationOptions o = options;
+                o.initial.reset();      // as it is when first shown: nothing unfolds at the start
+                return Animated(open ? 1.f : 0.f, [this](const float share) -> Widget {
+                    // Folded away: nothing of it is built, laid out or drawn.
+                    if (share <= 0.f && !open) { if (!child) kept = {}; return SizedBox(0.f, 0.f); }
+                    return detail::RevealBox(share, child ? child : kept);
+                }, o);
+            }
+        };
+    }
+
+    Widget Animated(const float target, std::function<Widget(float)> builder, const AnimationOptions options)
+    {
+        return Make<AnimatedWidget>(target, std::move(builder), options);
+    }
+
+    Widget AnimatedOpacity(const float opacity, Widget child, const AnimationOptions options)
+    {
+        return Animated(opacity, [child = std::move(child)](const float value) { return Opacity(value, child); }, options);
+    }
+
+    Widget Appear(Widget child, AnimationOptions options, const float rise)
+    {
+        if (!options.initial) options.initial = 0.f;
+        return Animated(1.f, [child = std::move(child), rise](const float value) {
+            const Widget faded = Opacity(std::clamp(value, 0.f, 1.f), child);
+            return rise != 0.f ? Translate({ 0.f, std::round((1.f - value) * rise) }, faded) : faded;
+        }, options);
+    }
+
+    Widget Reveal(const bool open, Widget child, const AnimationOptions options)
+    {
+        return Make<RevealWidget>(open, std::move(child), options);
+    }
+
     Widget Disabled(Widget child, const bool disabled)
     {
         if (!disabled) return child;
@@ -879,8 +1021,36 @@ namespace kui
             return Make<Hover>([t, selected, label = label](const bool hovered) {
                 Widget ring = CustomPaint([t, selected, hovered](Canvas& canvas, const glm::vec2 size) {
                     const glm::vec2 c = size * 0.5f;
-                    canvas.DrawCircle(c, 9.f, Paint::Fill(hovered ? t.surfaceHover : t.surface).SetStroke(1.5f, selected ? t.primary : t.textMuted));
-                    if (selected) canvas.DrawCircle(c, 5.f, Paint::Fill(t.primary));
+                    switch (t.design) {
+                    case ThemeDesign::eMaterial:
+                        // A thick ring with nothing in it but the dot, and the pointer's wash round it.
+                        if (hovered) canvas.DrawCircle(c, 11.f, Paint::Fill((selected ? t.primary : t.text).WithAlpha(0.10f)));
+                        canvas.DrawCircle(c, 8.f, Paint::Stroked(selected ? t.primary : hovered ? t.text : t.textMuted, 2.f));
+                        if (selected) canvas.DrawCircle(c, 4.5f, Paint::Fill(t.primary));
+                        break;
+                    case ThemeDesign::eCupertino:
+                        // Filled with the accent, a white dot in it, when chosen; the surface in a hairline when not.
+                        if (selected) {
+                            canvas.DrawCircle(c, 9.f, Paint::Fill(hovered ? t.primaryHover : t.primary));
+                            canvas.DrawCircle(c, 3.5f, Paint::Fill(colors::White));
+                        } else {
+                            canvas.DrawCircle(c, 8.5f, Paint::Fill(hovered ? t.surfaceHover : t.surface).SetStroke(1.f, t.border));
+                        }
+                        break;
+                    case ThemeDesign::eFluent:
+                        // Filled with the accent when chosen, the dot in it bigger under the pointer; a thin ring when not.
+                        if (selected) {
+                            canvas.DrawCircle(c, 9.f, Paint::Fill(t.primary));
+                            canvas.DrawCircle(c, hovered ? 5.f : 4.f, Paint::Fill(t.onPrimary));
+                        } else {
+                            canvas.DrawCircle(c, 8.5f, Paint::Fill(hovered ? t.surfaceHover : t.surface).SetStroke(1.f, t.textMuted));
+                        }
+                        break;
+                    default:
+                        canvas.DrawCircle(c, 9.f, Paint::Fill(hovered ? t.surfaceHover : t.surface).SetStroke(1.5f, selected ? t.primary : t.textMuted));
+                        if (selected) canvas.DrawCircle(c, 5.f, Paint::Fill(t.primary));
+                        break;
+                    }
                 }, { 22.f, 22.f });
                 if (label.empty()) return ring;
                 return Row({ ring, Text(label, t.textStyle, TextAlign::eStart, false) }, { .gap = 8.f });
@@ -895,14 +1065,40 @@ namespace kui
             const Theme t = Theme::Current();
             return Make<Hover>([t, selected, label = label](const bool hovered) {
                 TextStyle style = t.textStyle;
-                if (selected) style.color = t.onPrimary;
+                const float height = std::max(t.controlHeight - 6.f, 20.f);
+                Color fill = selected ? t.primary.WithAlpha(hovered ? 0.95f : 0.8f) : hovered ? t.surfaceHover : colors::Transparent;
+                Radii round = std::min(t.radius, 10.f);
+                Widget content;
+                switch (t.design) {
+                case ThemeDesign::eMaterial:
+                    // A pill washed with the accent where chosen, with the text's colour under the pointer.
+                    fill = selected ? t.primary.WithAlpha(hovered ? 0.30f : 0.22f) : hovered ? t.text.WithAlpha(0.08f) : colors::Transparent;
+                    round = height * 0.5f;
+                    break;
+                case ThemeDesign::eCupertino:
+                    // Apple's: the accent itself where chosen, its text in the accent's ink.
+                    fill = selected ? t.primary : hovered ? t.text.WithAlpha(0.08f) : colors::Transparent;
+                    round = 8.f;
+                    if (selected) style.color = t.onPrimary;
+                    break;
+                case ThemeDesign::eFluent:
+                    // Windows': a quiet patch, and a mark of the accent before what is chosen.
+                    fill = selected ? (hovered ? t.surfacePressed : t.surfaceHover) : hovered ? t.surfaceHover : colors::Transparent;
+                    round = 4.f;
+                    if (selected) content = Row({ Container({ .width = 3.f, .height = 16.f, .decoration = { .color = t.primary, .radius = 1.5f } }),
+                                                  Text(label, style, TextAlign::eStart, false) }, { .gap = 8.f });
+                    break;
+                default:
+                    if (selected) style.color = t.onPrimary;
+                    break;
+                }
+                if (!content) content = Text(label, style, TextAlign::eStart, false);
                 return Container({
-                    .height = std::max(t.controlHeight - 6.f, 20.f),
+                    .height = height,
                     .padding = EdgeInsets::Symmetric(12.f, 0.f),
-                    .decoration = { .color = selected ? t.primary.WithAlpha(hovered ? 0.95f : 0.8f) : hovered ? t.surfaceHover : colors::Transparent,
-                                    .radius = std::min(t.radius, 10.f) },
+                    .decoration = { .color = fill, .radius = round },
                     .alignment = Alignment::CenterLeft(),
-                }, Text(label, style, TextAlign::eStart, false));
+                }, std::move(content));
             }, onTap);
         });
     }
@@ -915,15 +1111,45 @@ namespace kui
         return detail::Deferred([=]() -> Widget {
             const Theme t = Theme::Current();
             Widget header = Make<Hover>([t, open, title = title](const bool hovered) {
-                return Container({
-                    .height = t.controlHeight,
-                    .padding = EdgeInsets::Symmetric(10.f, 0.f),
-                    .decoration = { .color = hovered ? t.surfacePressed : t.surfaceHover, .radius = std::min(t.radius, 10.f) },
-                    .alignment = Alignment::CenterLeft(),
-                }, Row({ arrow(open, t.text), Text(title, t.textStyle, TextAlign::eStart, false) }, { .gap = 6.f }));
+                Widget line = Row({ arrow(open, t.text), Text(title, t.textStyle, TextAlign::eStart, false) }, { .gap = 6.f });
+                switch (t.design) {
+                case ThemeDesign::eMaterial: {
+                    // Nothing behind it but the pointer's wash, and its title a little heavier.
+                    TextStyle heavy = t.textStyle;
+                    heavy.weight = 600;
+                    return Container({
+                        .height = t.controlHeight,
+                        .padding = EdgeInsets::Symmetric(10.f, 0.f),
+                        .decoration = { .color = t.text.WithAlpha(hovered ? 0.10f : 0.04f), .radius = 4.f },
+                        .alignment = Alignment::CenterLeft(),
+                    }, Row({ arrow(open, t.text), Text(title, heavy, TextAlign::eStart, false) }, { .gap = 6.f }));
+                }
+                case ThemeDesign::eCupertino:
+                    // A bar of clear glass.
+                    return CustomPaint([t, hovered](Canvas& canvas, const glm::vec2 size) {
+                        detail::PaintGlass(canvas, t, { Rect::FromSize(size), std::min(size.y * 0.5f, 12.f) }, colors::Transparent,
+                                           (t.IsDark() ? -0.06f : -0.3f) + (hovered ? 0.05f : 0.f), false);
+                    }, { -1.f, -1.f }, Container({ .height = t.controlHeight, .padding = EdgeInsets::Symmetric(10.f, 0.f), .alignment = Alignment::CenterLeft() },
+                                                 std::move(line)));
+                case ThemeDesign::eFluent:
+                    // A card: the surface, in a thin outline.
+                    return Container({
+                        .height = t.controlHeight,
+                        .padding = EdgeInsets::Symmetric(10.f, 0.f),
+                        .decoration = { .color = hovered ? t.surfaceHover : t.surface, .borderWidth = 1.f, .borderColor = mix3(t.border, t.text), .radius = 4.f },
+                        .alignment = Alignment::CenterLeft(),
+                    }, std::move(line));
+                default:
+                    return Container({
+                        .height = t.controlHeight,
+                        .padding = EdgeInsets::Symmetric(10.f, 0.f),
+                        .decoration = { .color = hovered ? t.surfacePressed : t.surfaceHover, .radius = std::min(t.radius, 10.f) },
+                        .alignment = Alignment::CenterLeft(),
+                    }, std::move(line));
+                }
             }, [open, onToggled = onToggled] { if (onToggled) onToggled(!open); });
-            if (!open || !child) return header;
-            return Column({ header, Padding(EdgeInsets::Only(8.f, 8.f, 0.f, 4.f), child) },
+            // What it holds unfolds under it, and folds away: gone, it is not built.
+            return Column({ header, Reveal(open && child, child ? Padding(EdgeInsets::Only(8.f, 8.f, 0.f, 4.f), child) : Widget {}) },
                           { .crossAxisAlignment = CrossAxisAlignment::eStretch });
         });
     }
@@ -937,13 +1163,36 @@ namespace kui
             const bool selected = options.selected;
             Widget row = Make<Hover>([t, open, leaf, selected, label = label](const bool hovered) {
                 TextStyle style = t.textStyle;
-                if (selected) style.color = t.primary;
-                Widget mark = leaf ? CustomPaint([t](Canvas& canvas, const glm::vec2 size) { canvas.DrawCircle(size * 0.5f, 2.f, Paint::Fill(t.textMuted)); }, { 16.f, 16.f })
-                                   : arrow(open, t.textMuted);
+                const float height = std::max(t.controlHeight - 10.f, 20.f);
+                Color fill = hovered ? t.surfaceHover : colors::Transparent, ink = t.textMuted;
+                Radii round = 8.f;
+                switch (t.design) {
+                case ThemeDesign::eMaterial:
+                    // A pill: the accent's wash where chosen, the text's under the pointer.
+                    fill = selected ? t.primary.WithAlpha(hovered ? 0.30f : 0.22f) : hovered ? t.text.WithAlpha(0.08f) : colors::Transparent;
+                    round = height * 0.5f;
+                    break;
+                case ThemeDesign::eCupertino:
+                    // Apple's: the line chosen is the accent's, its text and its arrow in the accent's ink.
+                    fill = selected ? t.primary : hovered ? t.text.WithAlpha(0.07f) : colors::Transparent;
+                    round = 6.f;
+                    if (selected) { style.color = t.onPrimary; ink = t.onPrimary; }
+                    break;
+                case ThemeDesign::eFluent:
+                    fill = selected ? (hovered ? t.surfacePressed : t.surfaceHover) : hovered ? t.surfaceHover : colors::Transparent;
+                    round = 4.f;
+                    if (selected) style.color = t.primary;
+                    break;
+                default:
+                    if (selected) style.color = t.primary;
+                    break;
+                }
+                Widget mark = leaf ? CustomPaint([ink](Canvas& canvas, const glm::vec2 size) { canvas.DrawCircle(size * 0.5f, 2.f, Paint::Fill(ink)); }, { 16.f, 16.f })
+                                   : arrow(open, ink);
                 return Container({
-                    .height = std::max(t.controlHeight - 10.f, 20.f),
+                    .height = height,
                     .padding = EdgeInsets::Symmetric(4.f, 0.f),
-                    .decoration = { .color = hovered ? t.surfaceHover : colors::Transparent, .radius = 8.f },
+                    .decoration = { .color = fill, .radius = round },
                     .alignment = Alignment::CenterLeft(),
                 }, Row({ mark, Text(label, style, TextAlign::eStart, false) }, { .gap = 4.f }));
             }, [open, leaf, onToggled = onToggled, onTap = options.onTap] {
@@ -963,15 +1212,41 @@ namespace kui
         return detail::Deferred([=]() -> Widget {
             const Theme t = Theme::Current();
             std::vector<Widget> row;
+            if (t.design == ThemeDesign::eCupertino) {
+                // Apple's: segments in a grey pill, the one in front lifted off it.
+                for (std::size_t i = 0; i < tabs.size(); ++i) {
+                    const int index = static_cast<int>(i);
+                    const bool on = index == selected;
+                    row.push_back(Make<Hover>([t, on, title = tabs[i]](const bool hovered) {
+                        TextStyle style = t.textStyle;
+                        style.color = on || hovered ? t.text : t.textMuted;
+                        Widget segment = Container({
+                            .height = std::max(t.controlHeight - 6.f, 20.f),
+                            .padding = EdgeInsets::Symmetric(14.f, 0.f),
+                        }, Center(Text(title, style, TextAlign::eStart, false)));
+                        // The one in front is a piece of glass lying on the bar; the others are the bar's.
+                        if (!on) return segment;
+                        return CustomPaint([t](Canvas& canvas, const glm::vec2 size) {
+                            detail::PaintGlass(canvas, t, { Rect::FromSize(size), size.y * 0.5f }, colors::Transparent, t.IsDark() ? 0.10f : 0.18f);
+                        }, { -1.f, -1.f }, segment);
+                    }, [index, onSelected] { if (onSelected) onSelected(index); }));
+                }
+                return Row({ CustomPaint([t](Canvas& canvas, const glm::vec2 size) {
+                    detail::PaintGlass(canvas, t, { Rect::FromSize(size), size.y * 0.5f }, colors::Transparent, t.IsDark() ? -0.05f : -0.3f, false);
+                }, { -1.f, -1.f }, Padding(EdgeInsets::All(3.f), Row(row, { .mainAxisSize = MainAxisSize::eMin }))) });
+            }
             for (std::size_t i = 0; i < tabs.size(); ++i) {
                 const int index = static_cast<int>(i);
                 const bool on = index == selected;
                 row.push_back(Make<Hover>([t, on, title = tabs[i]](const bool hovered) {
                     TextStyle style = t.textStyle;
-                    style.color = on ? t.text : hovered ? t.text : t.textMuted;
-                    // The one in front is underlined in the accent.
-                    return CustomPaint([t, on](Canvas& canvas, const glm::vec2 size) {
-                        if (on) canvas.DrawRRect({ Rect::LTRB(10.f, size.y - 3.f, size.x - 10.f, size.y - 1.f), 1.f }, Paint::Fill(t.primary));
+                    const bool material = t.design == ThemeDesign::eMaterial;
+                    style.color = on ? (material ? t.primary : t.text) : hovered ? t.text : t.textMuted;
+                    // The one in front is underlined in the accent: Material's line stands on the foot, round at the top only.
+                    return CustomPaint([t, on, material](Canvas& canvas, const glm::vec2 size) {
+                        if (!on) return;
+                        if (material) canvas.DrawRRect({ Rect::LTRB(12.f, size.y - 3.f, size.x - 12.f, size.y), Radii(3.f, 3.f, 0.f, 0.f) }, Paint::Fill(t.primary));
+                        else canvas.DrawRRect({ Rect::LTRB(10.f, size.y - 3.f, size.x - 10.f, size.y - 1.f), 1.f }, Paint::Fill(t.primary));
                     }, { -1.f, -1.f }, Container({
                         .height = t.controlHeight,
                         .padding = EdgeInsets::Symmetric(12.f, 0.f),
@@ -1073,7 +1348,7 @@ namespace kui
                     const Paragraph text(options.overlay, style);
                     canvas.DrawText(options.overlay, { std::round((size.x - text.Size().x) * 0.5f), 4.f }, style);
                 }
-            }, options.size);
+            }, options.size, options.overlay);
         });
     }
 

@@ -443,7 +443,6 @@ namespace kor
     void ModuleHost::FixedUpdate() { forEach([](Module& m) { m.FixedUpdate(); }); }
     void ModuleHost::Update()     { forEach([](Module& m) { m.Update(); }); }
     void ModuleHost::LateUpdate() { forEach([](Module& m) { m.LateUpdate(); }); }
-    void ModuleHost::RenderUI()   { forEach([](Module& m) { m.RenderUI(); }); }
 
     void ModuleHost::Render(CommandBuffer& commandBuffer)
     {

@@ -50,10 +50,6 @@ inline std::uint64_t logMark() {
 inline void expectNoValidationErrorsSince(const std::uint64_t since) {
     for (const auto& record : kor::log::HistorySince(since)) {
         if (record.level != kor::log::Level::eError) continue;
-        // Dear ImGui's Vulkan backend reuses each platform window's semaphores, so once an earlier
-        // test in the same process has floated a panel, every frame can report this against *its*
-        // swap chain, not ours. APerFrameImageThatIsOnlySampledIsShownCleanly exempts it the same way.
-        if (record.message.find("may still be in use by VkSwapchainKHR") != std::string::npos) continue;
         EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
         // Only reported with synchronization validation on (see tests/README.md), which is the
         // run that shows the barriers between executed command buffers are really there.

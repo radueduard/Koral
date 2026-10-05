@@ -1,6 +1,6 @@
 # A scene library the windowed tests load, open by name, unload and reload (sceneLibrary.h).
 add_library(koral_test_scenes SHARED test_scene_library.cpp)
-target_link_libraries(koral_test_scenes PRIVATE Koral glm::glm imgui::imgui spdlog::spdlog fmt::fmt)
+target_link_libraries(koral_test_scenes PRIVATE Koral glm::glm spdlog::spdlog fmt::fmt)
 target_include_directories(koral_test_scenes PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 set_target_properties(koral_test_scenes PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
@@ -15,15 +15,13 @@ target_link_libraries(koral_window_tests PRIVATE
         Koral
         # Vertex formats come from the mesh module, linked here the way a project links it.
         koral-mesh
-        # And the GUI extras, whose viewport and panels are drawn from the test scene's RenderUI —
-        # the only place a real ImGui backend is behind them.
+        # And the GUI extras, whose viewport and panels are drawn in a test scene's interface.
         koral-gui-extras
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum
         glm::glm
         spdlog::spdlog
-        imgui::imgui
         Vulkan::Vulkan
         glfw
 )
@@ -50,7 +48,7 @@ gtest_discover_tests(koral_window_tests
 # An application with no windowing system, running offscreen scenes only. Its own executable: an
 # application is one per process. Needs a Vulkan device but no display.
 add_executable(koral_headless_app_tests test_headless_app.cpp)
-target_link_libraries(koral_headless_app_tests PRIVATE Koral GTest::gtest GTest::gtest_main glm::glm spdlog::spdlog imgui::imgui)
+target_link_libraries(koral_headless_app_tests PRIVATE Koral GTest::gtest GTest::gtest_main glm::glm spdlog::spdlog)
 target_include_directories(koral_headless_app_tests PRIVATE
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_BINARY_DIR}/include

@@ -392,6 +392,17 @@ KUI_API KuiWidget* kui_shader_box(KuiElementShader* shader, const void* paramete
 KUI_API KuiWidget* kui_image(KoralImage* image, uint32_t fit, KuiVec2 size);
 KUI_API KuiWidget* kui_repaint_boundary(KuiWidget* child);
 KUI_API KuiWidget* kui_opacity(float opacity, KuiWidget* child);
+/** The child on glass: what is behind its box shows through, blurred, tinted and bent inwards at the edge. */
+KUI_API KuiWidget* kui_backdrop_filter(KuiWidget* child, float blur, KuiColor tint, float refraction, float radius);
+/* Animation. A curve is a kui::Curve: 0 linear, 1 ease in, 2 ease out, 3 ease in and out, 4 ease out and back. */
+/** Where along its way (0 to 1) something on a curve is, t of the way through its time. */
+KUI_API float kui_ease(uint32_t curve, float t);
+/** The child, fading to an opacity whenever that is another, over so many seconds. */
+KUI_API KuiWidget* kui_animated_opacity(float opacity, KuiWidget* child, float duration, uint32_t curve);
+/** The child, fading in when first shown and rising into place by so much. */
+KUI_API KuiWidget* kui_appear(KuiWidget* child, float duration, uint32_t curve, float rise);
+/** The child (which may be null while it folds away), unfolding downwards while open and folding away when not. */
+KUI_API KuiWidget* kui_reveal(bool open, KuiWidget* child, float duration, uint32_t curve);
 KUI_API KuiWidget* kui_clip_rrect(KuiRadii radius, KuiWidget* child);
 KUI_API KuiWidget* kui_translate(KuiVec2 offset, KuiWidget* child);
 KUI_API KuiWidget* kui_ignore_pointer(KuiWidget* child);
@@ -410,10 +421,12 @@ typedef struct KuiDropAction {
     void (*destroy)(void* user);
 } KuiDropAction;
 typedef struct KuiDraggableOptions {
-    KuiWidget* feedback;            /* what follows the pointer; null: a ghost of the child's size */
+    KuiWidget* feedback;            /* what follows the pointer; null: the child itself, a little seen through */
     KuiAction on_drag_start;
     KuiBoolAction on_drag_end;      /* whether a target took it */
     bool disabled;
+    bool feedback_in_place;         /* the feedback is the thing itself: held where it was taken hold of, not by its corner */
+    float feedback_radius;          /* how round the outline round the thing in hand is; negative: the theme's radius */
 } KuiDraggableOptions;
 typedef struct KuiDropTargetOptions {
     const char* accepts_type;       /* null: any drag */
@@ -476,9 +489,15 @@ typedef struct KuiDockOptions {
 /** DockSpace(layout, panels, options): options may be null. */
 KUI_API KuiWidget* kui_dock_space(KuiDockLayout* layout, const KuiDockPanel* panels, size_t count, const KuiDockOptions* options);
 
-/** DragValue: a number changed by dragging across it. @p label may be null; a negative @p width is the default. */
+/**
+ * DragValue: a number changed by dragging across it. @p label may be null; a negative @p width is the default.
+ * @p typeable: clicked without being dragged, it turns into a text box for typing the value exactly.
+ */
 KUI_API KuiWidget* kui_drag_value(float value, KuiFloatAction on_changed, float speed, float min, float max, int32_t decimals,
-                                  const char* label, float width);
+                                  const char* label, float width, bool typeable);
+/** The same, upright: its label over its value, dragged up for more. */
+KUI_API KuiWidget* kui_drag_value_vertical(float value, KuiFloatAction on_changed, float speed, float min, float max, int32_t decimals,
+                                           const char* label, float width, bool typeable);
 /** Dropdown: @p on_changed hears the index picked (a whole number, as a float). @p placeholder may be null. */
 KUI_API KuiWidget* kui_dropdown(const char* const* items, size_t count, int32_t selected, KuiFloatAction on_changed, float width,
                                 const char* placeholder);
@@ -549,6 +568,8 @@ KUI_API KuiWidget* kui_switch(bool value, KuiBoolAction on_changed);
 KUI_API KuiWidget* kui_slider(float value, KuiFloatAction on_changed, float min, float max);
 /** The same, with @p on_finished called when it is let go of. */
 KUI_API KuiWidget* kui_slider_finished(float value, KuiFloatAction on_changed, float min, float max, KuiAction on_finished);
+/** The same, upright: the value grows upwards. */
+KUI_API KuiWidget* kui_slider_vertical(float value, KuiFloatAction on_changed, float min, float max, KuiAction on_finished);
 /** Text of so many lines at the most (0: any number), the last ending in an ellipsis when asked. */
 KUI_API KuiWidget* kui_text_lines(const char* text, const KuiTextStyle* style, uint32_t align, bool wrap, int32_t max_lines, bool ellipsis);
 KUI_API KuiWidget* kui_progress_bar(float value);
@@ -563,6 +584,7 @@ typedef struct KuiTheme {
     float control_height;
     KuiTextStyle text_style;
     float button_radius, field_radius, checkbox_radius;     /* negative: the theme's radius; a checkbox's negative: a circle */
+    uint32_t design;                                        /* kui::ThemeDesign: 0 koral-ui's own, 1 Material, 2 Cupertino, 3 Fluent */
 } KuiTheme;
 /** Themed: @p child with @p theme in place of the view's. */
 KUI_API KuiWidget* kui_themed(const KuiTheme* theme, KuiWidget* child);

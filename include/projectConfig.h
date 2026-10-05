@@ -33,8 +33,7 @@
  *     "window": {
  *       "width": 1280, "height": 720,
  *       "resizable": true, "fullscreen": false, "borderless": false,
- *       "transparent": false, "vsync": true,
- *       "imguiIni": "imgui.ini"
+ *       "transparent": false, "vsync": true
  *     }
  *   },
  *   "paths": {
@@ -45,7 +44,8 @@
  * @endcode
  *
  * The Hub's own keys (`color`, `frameworkVersion`, `kind`, `libraries`) mean nothing to the engine
- * and are ignored, as is any key from a newer Hub than this build knows about.
+ * and are ignored, as is any key from a newer Hub than this build knows about — or from an older
+ * engine's config (`rendering.window.imguiIni`, from when the engine drew its interfaces with ImGui).
  *
  * Every key is optional: an absent key leaves the layer beneath it alone. `name` is the window
  * title unless `window.title` overrides it. Directories may be relative, and are resolved against
@@ -176,16 +176,6 @@ namespace kor
         bool hotReload = false;
 
         /**
-         * @brief Where Dear ImGui persists its layout (window positions, docking). Empty until a
-         * config file is loaded, at which point it defaults to `imgui.ini` beside the config so the
-         * layout travels with the project rather than landing in whatever directory the runtime was
-         * launched from. `rendering.window.imguiIni` (or `--imgui-ini`) overrides it; a relative
-         * override resolves against the config's directory (against the working directory for the
-         * flag). When still empty — no config file at all — ImGui keeps its own default.
-         */
-        std::filesystem::path imguiIni;
-
-        /**
          * @brief Overlay a config document onto this config.
          *
          * Keys present in @p json replace the current value; absent keys leave it untouched, which
@@ -205,7 +195,7 @@ namespace kor
          * @p args are the arguments alone — no program name, no scene library. Recognised flags:
          * `--width N`, `--height N`, `--title S`, `--api Vulkan`,
          * `--platform auto|x11|wayland` (Linux only), `--gpu INDEX|NAME` (Vulkan only),
-         * `--imgui-ini FILE`, `--assets DIR`,
+         * `--assets DIR`,
          * `--shaders DIR` (both repeatable, both prepended so the last one given is searched first),
          * and the booleans `--fullscreen`, `--resizable`, `--borderless`, `--transparent`, `--vsync`
          * with their counterparts (`--no-fullscreen`, `--no-resizable`, `--decorated`,

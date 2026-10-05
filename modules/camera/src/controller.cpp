@@ -197,9 +197,9 @@ namespace kcam
         case Controller::Input::eEnabled:
             return true;
         default: {
-            // The automatic answer, and the latch that keeps a look going: ImGui reports that it wants
-            // the mouse as soon as the pointer is over any window, so without this a look that began on
-            // the scene would end the moment the pointer crossed a panel.
+            // The automatic answer, and the latch that keeps a look going: an interface says it wants the
+            // mouse as soon as the pointer is over any panel, so without this a look that began on the
+            // scene would end the moment the pointer crossed one.
             if (_looking) return true;
             return !(sceneInput() && sceneInput()->InterfaceWantsMouse());
         }
@@ -226,7 +226,7 @@ namespace kcam
 
         if (looking) look(camera);
 
-        // The keyboard is only ever ImGui's while something is being typed into, which is a question
+        // The keyboard is only ever the interface's while something is being typed into, which is a question
         // the scene has no better answer to — so this one stays automatic even when input does not.
         if ((sceneInput() && sceneInput()->InterfaceWantsKeyboard()) && _controller.input != Controller::Input::eEnabled) return;
         if (_controller.input == Controller::Input::eDisabled) return;

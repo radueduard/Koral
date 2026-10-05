@@ -194,8 +194,9 @@ namespace kui
         /**
          * @brief Calls @p tick each frame with the seconds since the last one, for as long as it returns
          *        true and the widget is in the tree — what an animation runs on.
+         * @return Whether it will be called: false for a widget that is in no tree.
          */
-        void Animate(std::function<bool(float)> tick);
+        bool Animate(std::function<bool(float)> tick);
         [[nodiscard]] bool Mounted() const { return _element != nullptr; }
 
     private:
@@ -244,6 +245,17 @@ namespace kui
      * corners — a control is as round as it is tall, a pill — and one accent, coral. Light() is the
      * same on a light ground.
      */
+    /**
+     * @brief Whose manner the built-in controls are drawn in: not only how round and how big, which a
+     *        Theme's numbers say, but what a switch, a slider, a field is made of.
+     */
+    enum class ThemeDesign : std::uint8_t {
+        eKoral,         ///< koral-ui's own, after One UI: pills, a round check, a thumb that fills its switch.
+        eMaterial,      ///< Material 3: outlined and text buttons, filled fields with a line under them, a bar for a slider's handle.
+        eCupertino,     ///< Apple's, after Liquid Glass: buttons, fields and segments of glass — clear or the accent's, with a bright rim — and thumbs wider than tall.
+        eFluent,        ///< Windows 11's: thin outlines, a small thumb in an outlined switch, a dot in the slider's, an accent line under a field.
+    };
+
     struct KUI_API Theme {
         Color background = Color::Hex(0x000000);
         Color surface = Color::Hex(0x171717);
@@ -264,7 +276,10 @@ namespace kui
         /// field, a dropdown, a drag value), and a checkbox — whose negative means a circle. Negative: radius.
         float buttonRadius = -1.f, fieldRadius = -1.f;
         float checkboxRadius = -1.f;
+        ThemeDesign design = ThemeDesign::eKoral;       ///< What the controls are made of. @see ThemeDesign
 
+        /** @brief Whether it is a dark theme: by how light its background is. */
+        [[nodiscard]] bool IsDark() const { return 0.2126f * background.r + 0.7152f * background.g + 0.0722f * background.b < 0.5f; }
         [[nodiscard]] float ButtonRadius() const { return buttonRadius >= 0.f ? buttonRadius : radius; }
         [[nodiscard]] float FieldRadius() const { return fieldRadius >= 0.f ? fieldRadius : radius; }
 
@@ -544,15 +559,78 @@ namespace kui
     /** @brief The child, which the pointer goes through as if it were not there. */
     KUI_API Widget IgnorePointer(Widget child);
 
+    /**
+     * @brief The child on glass: what is behind its box shows through, blurred, tinted and bent at the
+     *        edge, with corners as round as @p radius. @see Canvas::DrawBackdrop
+     *
+     * @code
+     * kui::BackdropFilter(kui::Backdrop{}.SetBlur(18.f).SetTint(theme.surface.WithAlpha(0.5f)), 16.f, Panel())
+     * @endcode
+     */
+    KUI_API Widget BackdropFilter(Backdrop backdrop, Radii radius, Widget child);
+
+    // ---- animation --------------------------------------------------------------------------------------
+
+    /** @brief How something that goes from one value to another gets there: evenly, or easing away and in. */
+    enum class Curve : std::uint8_t {
+        eLinear,        ///< At one speed all the way.
+        eEaseIn,        ///< Slowly at first.
+        eEaseOut,       ///< Slowing as it arrives.
+        eEaseInOut,     ///< Slowly at both ends. The default.
+        eEaseOutBack,   ///< Past where it is going, a little, and back: what pops into place.
+    };
+    /** @brief Where along its way (0 to 1) something on @p curve is, @p t of the way through its time (0 to 1). */
+    KUI_API float Ease(Curve curve, float t);
+
+    struct AnimationOptions {
+        float duration = 0.18f;                 ///< Seconds from one value to the next.
+        Curve curve = Curve::eEaseInOut;
+        std::optional<float> initial;           ///< Where it starts when first shown; there already, when not given.
+
+        // Chainable: `kui::AnimationOptions{}.SetDuration(0.3f).SetCurve(kui::Curve::eEaseOut)`.
+        AnimationOptions& SetDuration(float value) { duration = value; return *this; }
+        AnimationOptions& SetCurve(Curve value) { curve = value; return *this; }
+        AnimationOptions& SetInitial(float value) { initial = value; return *this; }
+    };
+    /**
+     * @brief A number that goes where it is told to over time, and whatever is made of it: each time it is
+     *        built with another @p target, the value starts for there from wherever it is, and @p builder
+     *        is built with it every frame until it arrives.
+     *
+     * @code
+     * kui::Animated(open ? 240.f : 48.f, [](const float width) { return kui::SizedBox(width, -1.f, Sidebar()); })
+     * @endcode
+     */
+    KUI_API Widget Animated(float target, std::function<Widget(float value)> builder, AnimationOptions options = {});
+    /** @brief The child, fading to @p opacity whenever that is another. */
+    KUI_API Widget AnimatedOpacity(float opacity, Widget child, AnimationOptions options = {});
+    /** @brief The child, fading in when it is first shown — and rising into place by @p rise as it does. */
+    KUI_API Widget Appear(Widget child, AnimationOptions options = {}, float rise = 6.f);
+    /**
+     * @brief The child, unfolding downwards while @p open and folding away when it is not: as tall as
+     *        the share of its height shown so far, and cut off there. Folded away it is not built at all;
+     *        while it folds, the child it had is what is shown, so one that is gone already may be left out.
+     */
+    KUI_API Widget Reveal(bool open, Widget child, AnimationOptions options = {});
+
     // ---- drag and drop ----------------------------------------------------------------------------------
 
     struct DraggableOptions {
-        Widget feedback;                            ///< What follows the pointer; a ghost of the child's size when empty.
+        Widget feedback;                            ///< What follows the pointer; the child itself, a little seen through, when empty.
         std::function<void()> onDragStart;
         std::function<void(bool accepted)> onDragEnd;   ///< Whether a target took it.
         bool enabled = true;
+        /// The feedback is a picture of the thing itself, as big as it: held where it was taken hold of,
+        /// not by its corner. (For whoever knows better than the child what the thing looks like.)
+        bool feedbackInPlace = false;
+        /// How round the outline drawn round what follows the pointer is — as round as the thing, for it
+        /// to look right. Negative: the theme's radius. (Only the thing itself is outlined: a feedback
+        /// widget of the caller's own, held by its corner, is shown as it is.)
+        float feedbackRadius = -1.f;
 
+        DraggableOptions& SetFeedbackRadius(float value) { feedbackRadius = value; return *this; }
         // Chainable: `kui::DraggableOptions{}.Set...(...).On...(...)`.
+        DraggableOptions& SetFeedbackInPlace(bool value) { feedbackInPlace = value; return *this; }
         DraggableOptions& SetFeedback(Widget value) { feedback = std::move(value); return *this; }
         DraggableOptions& SetEnabled(bool value) { enabled = value; return *this; }
         DraggableOptions& OnDragStart(std::function<void()> f) { onDragStart = std::move(f); return *this; }
@@ -628,7 +706,8 @@ namespace kui
     KUI_API Widget Checkbox(bool value, std::function<void(bool)> onChanged, std::string label = {});
     KUI_API Widget Switch(bool value, std::function<void(bool)> onChanged);
     /** @brief A slider. @p onFinished is called when it is let go of. */
-    KUI_API Widget Slider(float value, std::function<void(float)> onChanged, float min = 0.f, float max = 1.f, std::function<void()> onFinished = {});
+    KUI_API Widget Slider(float value, std::function<void(float)> onChanged, float min = 0.f, float max = 1.f, std::function<void()> onFinished = {},
+                          Axis axis = Axis::eHorizontal);     ///< eVertical: upright, the value growing upwards.
     KUI_API Widget ProgressBar(float value);
 
     /** @brief How a DragValue turns a drag into a number, and shows it. */
@@ -637,7 +716,14 @@ namespace kui
         float min = -Infinity, max = Infinity;  ///< Where the value stops.
         int decimals = 2;                       ///< How many it is shown with.
         std::string label;                      ///< Shown before the value: "X", "Speed".
-        float width = -1.f;                     ///< Negative: 120.
+        float width = -1.f;                     ///< The least it is (negative: 120): it is wider where its label and its longest value need more.
+        /// Which way it is dragged, and how it is laid out: across, its label before its value — or
+        /// (eVertical) up and down, its label over its value, dragged up for more.
+        Axis axis = Axis::eHorizontal;
+        /// Double-clicked, or tabbed to, it turns into a text box for typing the value exactly: Enter, Tab
+        /// or clicking elsewhere sets it (kept to its range); Escape leaves it as it was. It is in the order
+        /// Tab goes through the fields.
+        bool typeable = true;
 
         // Chainable: `kui::DragValueOptions{}.SetSpeed(0.1f).SetRange(0, 10)`.
         DragValueOptions& SetSpeed(float value) { speed = value; return *this; }
@@ -645,9 +731,11 @@ namespace kui
         DragValueOptions& SetDecimals(int value) { decimals = value; return *this; }
         DragValueOptions& SetLabel(std::string value) { label = std::move(value); return *this; }
         DragValueOptions& SetWidth(float value) { width = value; return *this; }
+        DragValueOptions& SetAxis(Axis value) { axis = value; return *this; }
+        DragValueOptions& SetTypeable(bool value) { typeable = value; return *this; }
     };
     /**
-     * @brief A number in a field, changed by dragging across it sideways: ImGui's DragFloat. Each unit of
+     * @brief A number in a field, changed by dragging across it sideways. Each unit of
      *        the drag adds DragValueOptions::speed; the value stops at its range.
      */
     KUI_API Widget DragValue(float value, std::function<void(float)> onChanged, DragValueOptions options = {});
@@ -791,7 +879,7 @@ namespace kui
     KUI_API Widget Table(std::vector<TableColumn> columns, std::vector<std::vector<Widget>> rows, TableOptions options = {});
 
     struct StepSliderOptions {
-        std::vector<std::string> labels;    ///< Written in the steps, one each; a step with none shows a dot.
+        std::vector<std::string> labels;    ///< Written in the steps, one each; a step with none shows nothing.
         float width = -1.f;                 ///< Negative: as wide as it is given room for (240 where that has no end).
 
         StepSliderOptions& SetLabels(std::vector<std::string> value) { labels = std::move(value); return *this; }
@@ -876,6 +964,13 @@ namespace kui
         int minLines = 1, maxLines = 1;
         /// Takes the keyboard when this is not what it last was (and is not 0): how something else gives it the focus.
         std::uint32_t focus = 0;
+        /// When it lets go of the keyboard — clicked away from, tabbed out of — with the text it has. Not
+        /// after Escape: that is onEscape's.
+        std::function<void(const std::string&)> onFocusLost;
+        /// Escape, before it lets go of the keyboard: what an edit that can be called off is called off by.
+        std::function<void()> onEscape;
+        /// Everything in it is selected when it takes the keyboard, so what is typed replaces it.
+        bool selectAllOnFocus = false;
 
         // Chainable: `kui::TextFieldOptions{}.Set...(...).Set...(...)`.
         TextFieldOptions& SetText(std::string value) { text = std::move(value); return *this; }
@@ -975,4 +1070,11 @@ namespace kui
         std::unique_ptr<Impl> _impl;
     };
 
+    namespace debug {
+        /**
+         * @brief Every text @p ui shows now — labels, values, what is typed into fields — in the order of
+         *        the tree: what a test reads an interface by.
+         */
+        [[nodiscard]] KUI_API std::vector<std::string> Texts(const Ui& ui);
+    }
 }

@@ -345,7 +345,7 @@ namespace kcam
          * @brief Pressed over the scene to take the cursor back afterwards. Left mouse by default.
          *
          * Only counts where the controller is allowed to read the mouse — over the viewport for a
-         * scene that says so, or anywhere ImGui is not using the pointer for one that does not. That
+         * scene that says so, or anywhere an interface is not using the pointer for one that does not. That
          * is what makes clicking a panel while released stay a click on that panel: the camera takes
          * the pointer back when you click *it*, and not before. @see Controller::Input
          */
@@ -434,18 +434,18 @@ namespace kcam
          * @brief Where a controller's input is allowed to come from.
          *
          * A controller reading the mouse has to know when the mouse is someone else's — a slider being
-         * dragged, a menu open. Left alone it works that out from ImGui, which is right for a scene
-         * drawn straight to the screen.
+         * dragged, a menu open. Left alone it works that out from kor::Input::InterfaceWantsMouse, which
+         * is right for a scene drawn straight to the screen.
          *
-         * It is *wrong* for a scene shown inside an ImGui window, a viewport above all: the pointer is
-         * over a window there by definition, so the automatic answer is always "someone else's" and the
+         * It is *wrong* for a scene shown inside an interface's panel, a viewport above all: the pointer
+         * is over a panel there by definition, so the automatic answer is always "someone else's" and the
          * camera never moves. Such a scene decides for itself — `eEnabled` while the viewport is
-         * hovered, `eDisabled` otherwise. @see kgui::Viewport::IsHovered
+         * hovered, `eDisabled` otherwise. @see kgui::ViewportState::Hovered
          */
         enum class Input : std::uint8_t
         {
-            eAutomatic, ///< Take input unless ImGui wants it. The default.
-            eEnabled,   ///< Take input regardless of what ImGui is doing.
+            eAutomatic, ///< Take input unless an interface wants it. The default.
+            eEnabled,   ///< Take input regardless of what an interface is doing.
             eDisabled,  ///< Take none at all.
         };
 

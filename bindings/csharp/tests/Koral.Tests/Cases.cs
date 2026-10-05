@@ -312,6 +312,42 @@ public static partial class Cases
         Check.That(!Lines.Camera!.IsAlive, "and let go of when the scene closed");
     }
 
+    /// <summary>Filled shapes are triangles, and a gizmo dragged by a pointer of our own moves what it is on.</summary>
+    public static void DebugFillsAndGizmos()
+    {
+        using var app = Check.HeadlessApp();
+        app.Register<Lines>();
+        var scene = app.OpenOffscreen("Lines", Offscreen(32));
+        var draw = scene.SceneDebug;
+        draw.Clear();
+        draw.Box(Matrix4x4.Identity, new DebugStyle { Fill = new Vector4(1, 0, 0, 0.5f), Outline = false });
+        Check.That(draw.TriangleCount == 12 && draw.LineCount == 0, $"a filled box without its outline ({draw.TriangleCount}, {draw.LineCount})");
+        draw.SpotLight(Vector3.Zero, -Vector3.UnitY, 5f, 0.5f);
+        Check.That(draw.LineCount == 29, $"a spot light's cone ({draw.LineCount})");
+
+        // A camera at (0, 0, 5) looking at the origin: System.Numerics' row vectors are glm's columns.
+        var viewport = new Vector2(800, 600);
+        var viewProjection = Matrix4x4.CreateLookAt(new Vector3(0, 0, 5), Vector3.Zero, Vector3.UnitY)
+                           * Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 3f, 800f / 600f, 0.1f, 100f);
+        Vector2 ToScreen(Vector3 p)
+        {
+            var clip = Vector4.Transform(new Vector4(p, 1f), viewProjection);
+            return new Vector2((clip.X / clip.W * 0.5f + 0.5f) * viewport.X, (clip.Y / clip.W * 0.5f + 0.5f) * viewport.Y);
+        }
+        var center = ToScreen(Vector3.Zero);
+        var x = Vector2.Normalize(ToScreen(new Vector3(0.01f, 0, 0)) - center);
+        var transform = Matrix4x4.Identity;
+        draw.Gizmo(GizmoMode.eTranslate, ref transform, viewProjection, new GizmoPointer(center + x * 60f, viewport, true, true), id: 1);
+        Check.That(draw.GizmoActive, "the X arrow is grabbed");
+        var moved = draw.Gizmo(GizmoMode.eTranslate, ref transform, viewProjection, new GizmoPointer(center + x * 160f, viewport, true, false), id: 1);
+        Check.That(moved && transform.Translation.X > 0.5f && MathF.Abs(transform.Translation.Y) < 1e-4f,
+                   $"and dragged along X ({transform.Translation})");
+        draw.Gizmo(GizmoMode.eTranslate, ref transform, viewProjection, new GizmoPointer(null, viewport, false, false), id: 1);
+        Check.That(!draw.GizmoActive, "and let go of");
+        app.Close(scene);
+        app.Frame();
+    }
+
     /// <summary>Failures that are not builds come back as exceptions, with Koral's reason.</summary>
     public static void FailuresAreExceptions()
     {

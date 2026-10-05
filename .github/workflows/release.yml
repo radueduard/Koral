@@ -148,11 +148,11 @@ jobs:
             # is only about vcpkg's own libraries. slang and the Vulkan loader stay DLLs regardless —
             # bundled next to the exe by GET_RUNTIME_DEPENDENCIES.
             #
-            # imgui (and its GLFW backend dependency glfw3) are the deliberate exceptions: the
-            # overlay triplet vcpkg-overlay-triplets/x64-windows-static-md.cmake forces those two
-            # dynamic, because ImGui's process-global state can't be shared across the DLL boundary
-            # when statically linked on Windows. See that file for the full reasoning. They ship as
-            # DLLs beside the exe via GET_RUNTIME_DEPENDENCIES, same as slang.
+            # glfw3 is the deliberate exception: the overlay triplet
+            # vcpkg-overlay-triplets/x64-windows-static-md.cmake forces it dynamic, because its
+            # process-global state can't be shared across the DLL boundary when statically linked on
+            # Windows. See that file for the full reasoning. It ships as a DLL beside the exe via
+            # GET_RUNTIME_DEPENDENCIES, same as slang.
             triplet: x64-windows-static-md
             # Deliberately NOT Ninja. Ninja on Windows needs cl.exe on PATH, which means running
             # vcvars first (an extra action); the Visual Studio generator finds the toolchain by
@@ -460,7 +460,7 @@ jobs:
           fi
 
           # SDK: what you build against. Everything, including the headers, the CMake package and
-          # the vendored public dependencies (glm/spdlog/imgui) so a project needs no package
+          # the vendored public dependencies (glm/spdlog/fmt) so a project needs no package
           # manager of its own.
           sdk="koral-sdk-${version}-${{ matrix.name }}"
           cp -r stage "$sdk"

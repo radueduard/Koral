@@ -15,11 +15,8 @@
 #include <unordered_map>
 #include <GLFW/glfw3.h>
 #include <glm/vec2.hpp>
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
 #include <magic_enum/magic_enum.hpp>
 
-#include <imgui_internal.h>
 
 #include "window.h"
 #include "log.h"
@@ -50,7 +47,7 @@ namespace kor {
 		glm::vec2 scrollDelta {};
 		std::u32string typed;                ///< This frame's text. @see TypedText
 		std::vector<Key> repeated;           ///< Keys that repeated this frame.
-		/// Interfaces other than ImGui that say they are using the pointer or the keyboard.
+		/// Interfaces that say they are using the pointer or the keyboard, by who said so. @see ClaimInterface
 		std::unordered_map<const void*, std::pair<bool, bool>> claims;
 
 		/// The cursor in virtual-desktop coordinates, the only space every window shares and so the
@@ -60,7 +57,6 @@ namespace kor {
 
 		std::vector<GLFWwindow*> windows;   ///< the scene's own first
 		CursorMode cursorMode = CursorMode::eNormal;
-		ImGuiContext* interface = nullptr;
 
 		/// Fed from elsewhere, applied with the next Update so the scene sees it next frame. @see FeedKey
 		std::vector<std::function<void(State&)>> fed;
@@ -116,20 +112,6 @@ namespace kor {
 				break;
 			}
 		}
-
-		// Events over a scene's windows go to *its* interface. ImGui's GLFW backend keeps its state per
-		// context, so the scene's context has to be the current one while the event is forwarded.
-		struct InterfaceScope {
-			ImGuiContext* previous = nullptr;
-			bool active = false;
-			explicit InterfaceScope(const Input* input, ImGuiContext* context) {
-				if (!input || !context) return;
-				previous = ImGui::GetCurrentContext();
-				ImGui::SetCurrentContext(context);
-				active = true;
-			}
-			~InterfaceScope() { if (active) ImGui::SetCurrentContext(previous); }
-		};
 	}
 
 	Input::Input() : _state(new State) {}
@@ -140,10 +122,7 @@ namespace kor {
 		delete _state;
 	}
 
-	void Input::SetInterfaceContext(ImGuiContext* context) { _state->interface = context; }
-
-	// Installed on every window input is read from. The engine's callbacks forward each event to ImGui
-	// themselves (see below), which is why they *replace* rather than chain.
+	// Installed on every window input is read from.
 	void Input::InstallCallbacks(GLFWwindow* window)
 	{
 		glfwSetKeyCallback(window, Callbacks::KeyCallback);
@@ -152,7 +131,6 @@ namespace kor {
 		glfwSetScrollCallback(window, Callbacks::ScrollCallback);
 		glfwSetWindowFocusCallback(window, Callbacks::FocusCallback);
 		glfwSetCharCallback(window, Callbacks::CharCallback);
-		glfwSetCursorEnterCallback(window, Callbacks::CursorEnterCallback);
 	}
 
 	void Input::AttachTo(GLFWwindow* window)
@@ -185,8 +163,8 @@ namespace kor {
 	{
 		std::erase(_state->windows, window);
 		if (routeOf(window) == this) routes().erase(window);
-		// The callbacks are not cleared: this is called for a window ImGui is about to destroy, and
-		// touching a window mid-destruction is worse than leaving pointers on something about to go.
+		// The callbacks are not cleared: this is called for a window about to be destroyed, and touching
+		// a window mid-destruction is worse than leaving pointers on something about to go.
 	}
 
 	const std::vector<GLFWwindow*>& Input::AttachedWindows() const { return _state->windows; }
@@ -374,14 +352,13 @@ namespace kor {
     bool Input::InterfaceWantsMouse() const {
         for (const auto& [mouse, keyboard] : _state->claims | std::views::values)
             if (mouse) return true;
-        // Read straight off the scene's own context: another scene's may be the current one.
-        return _state->interface != nullptr && _state->interface->IO.WantCaptureMouse;
+        return false;
     }
 
     bool Input::InterfaceWantsKeyboard() const {
         for (const auto& [mouse, keyboard] : _state->claims | std::views::values)
             if (keyboard) return true;
-        return _state->interface != nullptr && _state->interface->IO.WantCaptureKeyboard;
+        return false;
     }
 
     void Input::ClaimInterface(const void* claimer, const bool mouse, const bool keyboard) {
@@ -401,16 +378,11 @@ namespace kor {
     const glm::vec2& Input::LastMousePosition() const { return _state->lastMousePosition; }
 
     // ---- callbacks ----------------------------------------------------------------------------------
-    // Each finds the scene the window feeds, forwards the event to that scene's interface (if it has
-    // one), and records it in that scene's input.
+    // Each finds the scene the window feeds, and records the event in that scene's input.
 
     void Input::Callbacks::KeyCallback(GLFWwindow* handle, const int key, const int scancode, const int action, const int mods) {
         Input* input = routeOf(handle);
         if (!input) return;
-        {
-            const InterfaceScope scope(input, input->_state->interface);
-            if (scope.active) ImGui_ImplGlfw_KeyCallback(handle, key, scancode, action, mods);
-        }
         auto& state = input->_state->keys[static_cast<Key>(key)];
         switch (action) {
         case GLFW_PRESS:   state = KeyState::ePressed; break;
@@ -423,10 +395,7 @@ namespace kor {
     void Input::Callbacks::MouseMoveCallback(GLFWwindow* handle, const double x, const double y) {
         Input* input = routeOf(handle);
         if (!input) return;
-        {
-            const InterfaceScope scope(input, input->_state->interface);
-            if (scope.active) ImGui_ImplGlfw_CursorPosCallback(handle, x, y);
-        }
+        Window::FramePointerMoved(handle, x, y);
         auto& state = *input->_state;
         // Converted to virtual-desktop coordinates, which every window shares, so a delta taken as the
         // pointer crosses from the scene's window into one of its undocked panels means the same thing.
@@ -445,10 +414,8 @@ namespace kor {
     void Input::Callbacks::MouseButtonCallback(GLFWwindow* handle, const int button, const int action, const int mods) {
         Input* input = routeOf(handle);
         if (!input) return;
-        {
-            const InterfaceScope scope(input, input->_state->interface);
-            if (scope.active) ImGui_ImplGlfw_MouseButtonCallback(handle, button, action, mods);
-        }
+        // On an edge that resizes the window: the window manager's from here, and nobody else's.
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && Window::FramePressed(handle)) return;
         auto& state = input->_state->buttons[static_cast<MouseButton>(button)];
         if (action == GLFW_PRESS) state = KeyState::ePressed;
         else if (action == GLFW_RELEASE) state = KeyState::eReleased;
@@ -457,40 +424,21 @@ namespace kor {
     void Input::Callbacks::ScrollCallback(GLFWwindow* handle, const double x, const double y) {
         Input* input = routeOf(handle);
         if (!input) return;
-        {
-            const InterfaceScope scope(input, input->_state->interface);
-            if (scope.active) ImGui_ImplGlfw_ScrollCallback(handle, x, y);
-        }
         input->_state->scrollDelta += glm::vec2 { x, y };
     }
 
     void Input::Callbacks::FocusCallback(GLFWwindow* handle, const int focus) {
         Input* input = routeOf(handle);
         if (!input) return;
-        {
-            const InterfaceScope scope(input, input->_state->interface);
-            if (scope.active) ImGui_ImplGlfw_WindowFocusCallback(handle, focus);
-        }
-        // Only a scene's own window carries a kor::Window in its user pointer; an undocked panel's
-        // holds ImGui's data, and reading a kor::Window out of that was a segfault once.
+        // Only a scene's own window carries a kor::Window in its user pointer; an undocked panel's holds
+        // its interface's own data, and reading a kor::Window out of that was a segfault once.
         if (!input->_state->windows.empty() && handle == input->_state->windows.front()) {
             if (auto* window = static_cast<Window*>(glfwGetWindowUserPointer(handle))) window->_focused = focus;
         }
     }
 
     void Input::Callbacks::CharCallback(GLFWwindow* handle, const unsigned int codepoint) {
-        Input* input = routeOf(handle);
-        {
-            const InterfaceScope scope(input, input ? input->_state->interface : nullptr);
-            if (scope.active) ImGui_ImplGlfw_CharCallback(handle, codepoint);
-        }
-        if (input) input->_state->typed.push_back(static_cast<char32_t>(codepoint));
-    }
-
-    void Input::Callbacks::CursorEnterCallback(GLFWwindow* handle, const int entered) {
-        Input* input = routeOf(handle);
-        const InterfaceScope scope(input, input ? input->_state->interface : nullptr);
-        if (scope.active) ImGui_ImplGlfw_CursorEnterCallback(handle, entered);
+        if (Input* input = routeOf(handle)) input->_state->typed.push_back(static_cast<char32_t>(codepoint));
     }
 
     // ---- gamepads -----------------------------------------------------------------------------------

@@ -4,6 +4,21 @@
 
 namespace Koral;
 
+/// <summary>kor::GizmoMode.</summary>
+public enum GizmoMode : byte
+{
+    eTranslate = 0,
+    eRotate = 1,
+    eScale = 2,
+}
+
+/// <summary>kor::GizmoSpace.</summary>
+public enum GizmoSpace : byte
+{
+    eWorld = 0,
+    eLocal = 1,
+}
+
 /// <summary>kor::ChannelType.</summary>
 public enum ChannelType : byte
 {

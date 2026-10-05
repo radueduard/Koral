@@ -3,7 +3,6 @@
 
 #include <scene.h>
 #include <sceneLibrary.h>
-#include <gui.h>   // one of its scenes has an interface, so the library registers its ImGui
 
 #include <atomic>
 #include <string>
@@ -47,16 +46,6 @@ namespace
         int framesAtInitialize = -1;
     };
 
-    class InterfaceScene final : public kor::Scene {
-    public:
-        InterfaceScene() { ++g_alive; EnableInterface(); }
-        ~InterfaceScene() override { --g_alive; }
-        void RenderUI() override {
-            ImGui::Begin("From a library");
-            ImGui::Text("drawn by a scene an unloadable library made");
-            ImGui::End();
-        }
-    };
 }
 
 extern "C" KORAL_SCENE_EXPORT_FN int KoralTestScenesAlive() { return g_alive; }
@@ -64,6 +53,5 @@ extern "C" KORAL_SCENE_EXPORT_FN int KoralTestScenesAlive() { return g_alive; }
 KORAL_SCENES(
     KORAL_SCENE("Library.Plain", PlainScene),
     KORAL_SCENE("Library.Arguments", ArgumentScene),
-    KORAL_SCENE("Library.Interface", InterfaceScene),
     KORAL_SCENE("Library.Stateful", StatefulScene),
 )

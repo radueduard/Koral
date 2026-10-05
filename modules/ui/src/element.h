@@ -148,6 +148,7 @@ namespace kui
         std::vector<Element*> _pending;   ///< Being rebuilt now; an element unmounted meanwhile is nulled out.
         struct Ticker { Element* element; std::function<bool(float)> tick; };
         std::vector<Ticker> _tickers;
+        std::vector<Ticker> _ticking;      ///< Those being called now. @see Tick
     };
 
     /** @brief The theme in effect while a view builds, lays out and paints. */

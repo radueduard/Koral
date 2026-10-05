@@ -568,6 +568,26 @@ public static unsafe partial class Widgets
     public static Widget RepaintBoundary(Widget child) => WithChild(child, KuiNative.kui_repaint_boundary);
     /// <summary>The child, faded. Changing it re-records nothing.</summary>
     public static Widget Opacity(float opacity, Widget child) => WithChild(child, c => KuiNative.kui_opacity(opacity, c));
+    /// <summary>
+    /// The child on glass: what is behind its box shows through, blurred by <paramref name="blur"/>, washed with
+    /// <paramref name="tint"/> (its alpha says how much) and bent inwards by up to <paramref name="refraction"/> at the edge.
+    /// </summary>
+    public static Widget BackdropFilter(Widget child, float blur = 14f, Color? tint = null, float refraction = 0f, float radius = 0f) =>
+        WithChild(child, c => KuiNative.kui_backdrop_filter(c, blur, (tint ?? Color.Transparent).Native, refraction, radius));
+    /// <summary>The child, fading to <paramref name="opacity"/> whenever that is another, over <paramref name="duration"/> seconds.</summary>
+    public static Widget AnimatedOpacity(float opacity, Widget child, float duration = 0.18f, Curve curve = Curve.EaseInOut) =>
+        WithChild(child, c => KuiNative.kui_animated_opacity(opacity, c, duration, (uint)curve));
+    /// <summary>The child, fading in when it is first shown and rising into place by <paramref name="rise"/>.</summary>
+    public static Widget Appear(Widget child, float duration = 0.18f, Curve curve = Curve.EaseInOut, float rise = 6f) =>
+        WithChild(child, c => KuiNative.kui_appear(c, duration, (uint)curve, rise));
+    /// <summary>
+    /// The child, unfolding downwards while <paramref name="open"/> and folding away when not. Folded away it is not
+    /// built; while it folds the child it had is shown, so one that is gone already may be null.
+    /// </summary>
+    public static Widget Reveal(bool open, Widget? child, float duration = 0.18f, Curve curve = Curve.EaseInOut) =>
+        WithChild(child, c => KuiNative.kui_reveal(KuiNative.Bool(open), c, duration, (uint)curve));
+    /// <summary>Where along its way (0 to 1) something on <paramref name="curve"/> is, <paramref name="t"/> of the way through its time.</summary>
+    public static float Ease(Curve curve, float t) => KuiNative.kui_ease((uint)curve, t);
     /// <summary>The child, cut to its box with rounded corners.</summary>
     public static Widget ClipRRect(Radii radius, Widget child) => WithChild(child, c => KuiNative.kui_clip_rrect(radius.Native, c));
     /// <summary>The child, moved by <paramref name="offset"/> where it paints and is hit; layout unchanged.</summary>

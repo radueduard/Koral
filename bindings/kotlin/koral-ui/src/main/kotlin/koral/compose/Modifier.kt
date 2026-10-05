@@ -55,6 +55,7 @@ internal class DropTargetElement(val type: String?, val onEnter: ((DragData) -> 
 }
 internal data class AlphaElement(val alpha: Float) : Modifier.Element
 internal data class ClipElement(val shape: Shape) : Modifier.Element
+internal data class BackdropElement(val blur: Dp, val shape: Shape, val tint: Color, val refraction: Dp) : Modifier.Element
 internal data class OffsetElement(val x: Dp, val y: Dp) : Modifier.Element
 internal data class ScrollElement(val vertical: Boolean, val state: ScrollState) : Modifier.Element
 internal data class TransformElement(val scaleX: Float, val scaleY: Float, val rotation: Float, val translationX: Float, val translationY: Float,
@@ -166,6 +167,14 @@ fun Modifier.dropTarget(type: String? = null, onEnter: ((DragData) -> Unit)? = n
 
 /** Cuts what follows to [shape]: `Modifier.clip(RoundedCornerShape(8.dp)).background(...)`. */
 fun Modifier.clip(shape: Shape): Modifier = then(ClipElement(shape))
+
+/**
+ * Glass under what follows: whatever is behind its box — the scene, the interface under it — shows through,
+ * blurred by [radius], washed with [tint] (its alpha says how much) and bent inwards by up to [refraction]
+ * near the edge, in [shape]. `Modifier.backdropBlur(18.dp, RoundedCornerShape(16.dp), surface.copy(alpha = 0.5f))`
+ */
+fun Modifier.backdropBlur(radius: Dp = 14.dp, shape: Shape = RectangleShape, tint: Color = Color.Transparent, refraction: Dp = 0.dp): Modifier =
+    then(BackdropElement(radius, shape, tint, refraction))
 
 /**
  * Moves what follows by ([x], [y]) where it is drawn and clicked; the layout around it does not move. As

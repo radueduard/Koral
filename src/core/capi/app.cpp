@@ -24,7 +24,7 @@ using namespace kor::capi;
 
 struct KoralProject {
     ProjectConfig config;
-    std::string gpu, interfaceDirectory, scene, title;
+    std::string gpu, scene, title;
     std::vector<uint32_t> formats;
 };
 
@@ -130,7 +130,15 @@ namespace
     DebugStyle StyleOf(const KoralDebugStyle* s)
     {
         if (!s) return {};
-        return {.color = {s->color[0], s->color[1], s->color[2], s->color[3]}, .duration = s->duration, .onTop = s->on_top};
+        return {.color = {s->color[0], s->color[1], s->color[2], s->color[3]}, .duration = s->duration, .onTop = s->on_top,
+                .fill = {s->fill[0], s->fill[1], s->fill[2], s->fill[3]}, .outline = !s->fill_only,
+                .lineWidth = s->line_width > 0.f ? s->line_width : 1.f};
+    }
+
+    GizmoOptions GizmoOptionsOf(const KoralGizmoOptions* o)
+    {
+        if (!o) return {};
+        return {.space = static_cast<GizmoSpace>(o->space), .size = o->size, .snap = o->snap};
     }
 
     glm::vec3 Vec3Of(const float* v) { return {v[0], v[1], v[2]}; }
@@ -164,9 +172,7 @@ namespace
 
     class CScene final : public Scene {
     public:
-        explicit CScene(const KoralSceneCallbacks& callbacks) : _c(callbacks) {
-            if (_c.interface) EnableInterface();
-        }
+        explicit CScene(const KoralSceneCallbacks& callbacks) : _c(callbacks) {}
         ~CScene() override { if (_c.destroy) _c.destroy(_c.user); }
 
         void Initialize() override { if (_c.initialize) _c.initialize(Handle(), _c.user); }
@@ -176,7 +182,6 @@ namespace
         void Render(CommandBuffer& commands) override {
             if (_c.render) _c.render(Handle(), reinterpret_cast<KoralCommandBuffer*>(&commands), _c.user);
         }
-        void RenderUI() override { if (_c.render_ui) _c.render_ui(Handle(), _c.user); }
         void OnResize(const glm::uvec2 extent) override { if (_c.on_resize) _c.on_resize(Handle(), extent.x, extent.y, _c.user); }
         void OnSuspend() override { if (_c.on_suspend) _c.on_suspend(Handle(), _c.user); }
         void OnResume() override { if (_c.on_resume) _c.on_resume(Handle(), _c.user); }
@@ -200,8 +205,8 @@ namespace
 
     bool Empty(const KoralSceneCallbacks& c)
     {
-        return !c.user && !c.interface && !c.initialize && !c.fixed_update && !c.update && !c.late_update && !c.render
-            && !c.render_ui && !c.on_resize && !c.on_suspend && !c.on_resume && !c.on_close_requested && !c.shutdown
+        return !c.user && !c.initialize && !c.fixed_update && !c.update && !c.late_update && !c.render
+            && !c.on_resize && !c.on_suspend && !c.on_resume && !c.on_close_requested && !c.shutdown
             && !c.save_state && !c.load_state && !c.destroy;
     }
 
@@ -222,7 +227,7 @@ KoralAppSettings koral_app_settings_default(void)
 {
     const AppSettings d;
     return {.api = static_cast<uint32_t>(d.api), .platform = static_cast<KoralPlatform>(d.platform), .frames_in_flight = d.framesInFlight,
-            .gpu = nullptr, .interface_directory = nullptr};
+            .gpu = nullptr};
 }
 
 KoralWindowSettings koral_window_settings_default(void)
@@ -256,7 +261,6 @@ KoralStatus koral_app_create(const KoralAppSettings* settings)
             s.platform = static_cast<WindowPlatform>(settings->platform);
             if (settings->frames_in_flight) s.framesInFlight = settings->frames_in_flight;
             if (settings->gpu) s.gpu = settings->gpu;
-            if (settings->interface_directory) s.interfaceDirectory = settings->interface_directory;
         }
         g_app = std::make_unique<App>(std::move(s));
         return KORAL_OK;
@@ -410,7 +414,6 @@ KoralDebugDraw* koral_scene_scene_debug(KoralScene* s)
 {
     return Guarded([&] { return reinterpret_cast<KoralDebugDraw*>(&OpenScene(s).SceneDebug()); }, static_cast<KoralDebugDraw*>(nullptr));
 }
-bool koral_scene_has_interface(KoralScene* s) { return Guarded([&] { return OpenScene(s).HasInterface(); }, false); }
 const char* koral_scene_save_state(KoralScene* s) { return Guarded([&] { return Keep(OpenScene(s).SaveState()); }, Keep("null")); }
 KoralStatus koral_scene_load_state(KoralScene* s, const char* json)
 {
@@ -662,7 +665,8 @@ void koral_time_set_time_scale(KoralTime* t, const float s) { GuardedVoid([&] { 
 KoralDebugStyle koral_debug_style_default(void)
 {
     const DebugStyle d;
-    return {.color = {d.color.r, d.color.g, d.color.b, d.color.a}, .duration = d.duration, .on_top = d.onTop};
+    return {.color = {d.color.r, d.color.g, d.color.b, d.color.a}, .duration = d.duration, .on_top = d.onTop,
+            .fill = {d.fill.r, d.fill.g, d.fill.b, d.fill.a}, .fill_only = !d.outline, .line_width = d.lineWidth};
 }
 void koral_debug_line(KoralDebugDraw* d, const float from[3], const float to[3], const KoralDebugStyle* s)
 {
@@ -706,6 +710,84 @@ void koral_debug_frustum(KoralDebugDraw* d, const float viewProjection[16], cons
 }
 void koral_debug_clear(KoralDebugDraw* d) { GuardedVoid([&] { DebugOf(d).Clear(); }); }
 uint64_t koral_debug_line_count(KoralDebugDraw* d) { return Guarded([&] { return static_cast<uint64_t>(DebugOf(d).LineCount()); }, uint64_t{0}); }
+void koral_debug_triangle(KoralDebugDraw* d, const float a[3], const float b[3], const float c[3], const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).Triangle(Vec3Of(a), Vec3Of(b), Vec3Of(c), StyleOf(s)); });
+}
+void koral_debug_quad(KoralDebugDraw* d, const float a[3], const float b[3], const float c[3], const float e[3], const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).Quad(Vec3Of(a), Vec3Of(b), Vec3Of(c), Vec3Of(e), StyleOf(s)); });
+}
+void koral_debug_plane(KoralDebugDraw* d, const float center[3], const float normal[3], const float size[2], const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).Plane(Vec3Of(center), Vec3Of(normal), {size[0], size[1]}, StyleOf(s)); });
+}
+void koral_debug_cylinder(KoralDebugDraw* d, const float from[3], const float to[3], const float radius, const KoralDebugStyle* s, const int segments)
+{
+    GuardedVoid([&] { DebugOf(d).Cylinder(Vec3Of(from), Vec3Of(to), radius, StyleOf(s), segments > 0 ? segments : 24); });
+}
+void koral_debug_cone(KoralDebugDraw* d, const float base[3], const float tip[3], const float radius, const KoralDebugStyle* s, const int segments)
+{
+    GuardedVoid([&] { DebugOf(d).Cone(Vec3Of(base), Vec3Of(tip), radius, StyleOf(s), segments > 0 ? segments : 24); });
+}
+void koral_debug_capsule(KoralDebugDraw* d, const float from[3], const float to[3], const float radius, const KoralDebugStyle* s, const int segments)
+{
+    GuardedVoid([&] { DebugOf(d).Capsule(Vec3Of(from), Vec3Of(to), radius, StyleOf(s), segments > 0 ? segments : 24); });
+}
+void koral_debug_camera(KoralDebugDraw* d, const float view[16], const float projection[16], const float size, const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).Camera(Mat4Of(view), Mat4Of(projection), size, StyleOf(s)); });
+}
+void koral_debug_point_light(KoralDebugDraw* d, const float position[3], const float range, const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).PointLight(Vec3Of(position), range, StyleOf(s)); });
+}
+void koral_debug_spot_light(KoralDebugDraw* d, const float position[3], const float direction[3], const float range, const float outerAngle,
+                            const float innerAngle, const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).SpotLight(Vec3Of(position), Vec3Of(direction), range, outerAngle, innerAngle, StyleOf(s)); });
+}
+void koral_debug_directional_light(KoralDebugDraw* d, const float position[3], const float direction[3], const float size, const KoralDebugStyle* s)
+{
+    GuardedVoid([&] { DebugOf(d).DirectionalLight(Vec3Of(position), Vec3Of(direction), size, StyleOf(s)); });
+}
+uint64_t koral_debug_triangle_count(KoralDebugDraw* d) { return Guarded([&] { return static_cast<uint64_t>(DebugOf(d).TriangleCount()); }, uint64_t{0}); }
+
+KoralGizmoOptions koral_gizmo_options_default(void)
+{
+    const GizmoOptions o;
+    return {.space = static_cast<uint32_t>(o.space), .size = o.size, .snap = o.snap};
+}
+bool koral_debug_gizmo(KoralDebugDraw* d, const uint32_t mode, float transform[16], const float viewProjection[16],
+                       const KoralGizmoPointer* p, const KoralGizmoOptions* o, const uint64_t id)
+{
+    return Guarded([&] {
+        if (!transform) return false;
+        GizmoPointer pointer;
+        if (p) {
+            if (p->has_position) pointer.position = glm::vec2(p->position[0], p->position[1]);
+            pointer.viewport = {p->viewport[0], p->viewport[1]};
+            pointer.down = p->down;
+            pointer.pressed = p->pressed;
+        }
+        glm::mat4 m = Mat4Of(transform);
+        const bool changed = DebugOf(d).Gizmo(static_cast<GizmoMode>(mode), m, Mat4Of(viewProjection), pointer, GizmoOptionsOf(o), id);
+        std::memcpy(transform, &m[0][0], sizeof(float) * 16);
+        return changed;
+    }, false);
+}
+bool koral_debug_gizmo_active(KoralDebugDraw* d) { return Guarded([&] { return DebugOf(d).GizmoActive(); }, false); }
+bool koral_debug_gizmo_hovered(KoralDebugDraw* d) { return Guarded([&] { return DebugOf(d).GizmoHovered(); }, false); }
+bool koral_current_gizmo(const uint32_t mode, float transform[16], const float viewProjection[16], const KoralGizmoOptions* o, const uint64_t id)
+{
+    return Guarded([&] {
+        if (!transform) return false;
+        glm::mat4 m = Mat4Of(transform);
+        const bool changed = Scene::Debug::Gizmo(static_cast<GizmoMode>(mode), m, Mat4Of(viewProjection), GizmoOptionsOf(o), id);
+        std::memcpy(transform, &m[0][0], sizeof(float) * 16);
+        return changed;
+    }, false);
+}
 
 // ---- Context, paths ----------------------------------------------------------------------------------------------
 
@@ -735,7 +817,6 @@ KoralProject* koral_project_load(const char* searchFrom, const int argc, const c
             log::Info("[project] configuration: {}", (*file)->string());
         }
         if (const auto overridden = config.ApplyOverrides(args); !overridden) { Fail(overridden.error().message); return nullptr; }
-        if (config.imguiIni.empty() && *file) config.imguiIni = (*file)->parent_path() / "imgui.ini";
 
         // What applies before there is an application, as the runtime applies it.
         config.RegisterSearchPaths();
@@ -747,7 +828,6 @@ KoralProject* koral_project_load(const char* searchFrom, const int argc, const c
             return nullptr;
         }
         project->gpu = config.gpu;
-        project->interfaceDirectory = config.imguiIni.empty() ? std::string() : config.imguiIni.parent_path().string();
         project->scene = config.scene;
         project->title = config.title;
         for (const auto f : WindowSettings{}.formats) project->formats.push_back(static_cast<uint32_t>(f));
@@ -767,7 +847,6 @@ void koral_project_app_settings(KoralProject* project, KoralAppSettings* setting
     settings->api = static_cast<uint32_t>(c.api);
     settings->platform = static_cast<KoralPlatform>(c.platform);
     settings->gpu = project->gpu.empty() ? nullptr : project->gpu.c_str();
-    settings->interface_directory = project->interfaceDirectory.empty() ? nullptr : project->interfaceDirectory.c_str();
 }
 
 void koral_project_window_settings(KoralProject* project, KoralWindowSettings* settings)

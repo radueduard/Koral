@@ -13,7 +13,6 @@
 #include <ranges>
 #include <set>
 
-#include <imgui.h>
 
 #include "commandBuffer.h"
 #include "context.h"
@@ -912,104 +911,23 @@ namespace kor {
         return touchedScreen;
     }
 
-    void FrameGraph::DrawMenuItems() {
-        ImGui::MenuItem("Frame graph", nullptr, &_showSchedule);
-        ImGui::MenuItem("Performance", nullptr, &_showPerformance);
-        ImGui::MenuItem("Pass settings", nullptr, &_showPassWindows);
+    std::vector<RenderPass*> FrameGraph::Passes() const {
+        std::vector<RenderPass*> passes;
+        passes.reserve(_passes.size());
+        for (const auto& pass : _passes) passes.push_back(pass.get());
+        return passes;
     }
 
-    void FrameGraph::DrawGUI() {
-        // Begin/End pair up whatever Begin returns, and Begin may clear the flag (its close button) —
-        // so the flag is read once, before either.
-        if (_showSchedule) DrawSchedule();
-        if (_showPerformance) DrawPerformance();
-        if (_showPassWindows) for (RenderPass* pass : _order) pass->DrawGUI();
-    }
-
-    void FrameGraph::DrawSchedule() {
-        if (ImGui::Begin("Frame Graph", &_showSchedule)) {
-            ImGui::TextDisabled("Passes on one level do not depend on each other.");
-            for (const auto& [name, level, async] : _schedule)
-                ImGui::Text("%*s%u  %s%s", static_cast<int>(level * 2), "", level, name.c_str(), async ? "  (async compute)" : "");
-            if (std::ranges::any_of(_schedule, &Scheduled::async) && !Context::SupportsAsyncCompute())
-                ImGui::TextDisabled("This device has no async compute queue: async passes run in order.");
-            if (!_skipped.empty()) {
-                ImGui::Separator();
-                ImGui::TextDisabled("Skipped (an input comes from a disabled pass):");
-                for (const auto& [name, resource, source] : _skipped)
-                    ImGui::BulletText("%s: needs '%s' from %s", name.c_str(), resource.c_str(), source.c_str());
-            }
-            if (!_culled.empty()) {
-                ImGui::Separator();
-                ImGui::TextDisabled("Culled (nothing reads what they make):");
-                for (const auto& name : _culled) ImGui::BulletText("%s", name.c_str());
-            }
-            if (!_history.empty()) {
-                ImGui::Separator();
-                ImGui::TextDisabled("Kept for the next frame:");
-                for (const auto& name : _history) ImGui::BulletText("%s", name.c_str());
-            }
-            ImGui::Separator();
-            const auto megabytes = [](const glm::u64 bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0); };
-            ImGui::Text("Memory  %.1f MB: %u resources in %u allocations", megabytes(_memory.bytes),
-                        _memory.resources, _memory.allocations);
-            if (_memory.unsharedBytes > _memory.bytes)
-                ImGui::TextDisabled("%.1f MB saved by sharing", megabytes(_memory.unsharedBytes - _memory.bytes));
-            if (bool aliasing = _aliasing; ImGui::Checkbox("Share memory between resources", &aliasing)) SetAliasing(aliasing);
-            ImGui::Separator();
-            for (const auto& pass : _passes) {
-                bool on = pass->Enabled();
-                if (ImGui::Checkbox(pass->Name().c_str(), &on)) pass->SetEnabled(on);
-            }
-            if (_broken) ImGui::TextColored({1.f, 0.4f, 0.4f, 1.f}, "The graph does not compile; see the log.");
+    FrameGraph::TimeHistory FrameGraph::Times() const {
+        // The rings, from the oldest sample (the one about to be overwritten) round to the newest.
+        TimeHistory history;
+        history.frameMs.reserve(Stats::History);
+        history.gpuMs.reserve(Stats::History);
+        for (std::size_t i = 0; i < Stats::History; ++i) {
+            const std::size_t at = (_stats->next + i) % Stats::History;
+            history.frameMs.push_back(_stats->frameMs[at]);
+            history.gpuMs.push_back(_stats->gpuMs[at]);
         }
-        ImGui::End();
-    }
-
-    void FrameGraph::DrawPerformance() {
-        if (ImGui::Begin("Performance", &_showPerformance)) {
-            const auto& stats = *_stats;
-
-            // The frame as a whole: CPU wall time between frames, and the graph's GPU time.
-            float frameAverage = 0.f, frameWorst = 0.f;
-            for (const float ms : stats.frameMs) { frameAverage += ms; frameWorst = std::max(frameWorst, ms); }
-            frameAverage /= static_cast<float>(Stats::History);
-            ImGui::Text("Frame  %.2f ms  (%.0f fps)   worst %.2f ms", frameAverage,
-                        frameAverage > 0.f ? 1000.f / frameAverage : 0.f, frameWorst);
-            const float ceiling = std::max(frameWorst * 1.2f, 16.7f);
-            ImGui::PlotLines("##frame", stats.frameMs.data(), static_cast<int>(Stats::History),
-                             static_cast<int>(stats.next), "CPU frame time", 0.f, ceiling, ImVec2(-FLT_MIN, 50.f));
-            ImGui::PlotLines("##gpu", stats.gpuMs.data(), static_cast<int>(Stats::History),
-                             static_cast<int>(stats.next), "GPU, frame graph", 0.f, ceiling, ImVec2(-FLT_MIN, 50.f));
-
-            const auto& graph = stats.graph;
-            ImGui::Text("Graph GPU %.2f ms   prepare %.2f ms   record %.2f ms (%.2f ms of work across threads)",
-                        graph.gpuMs, graph.prepareMs, graph.recordWallMs, graph.recordWorkMs);
-            ImGui::Separator();
-
-            // Pass by pass, in the order they run, with a bar for each one's share of the GPU time.
-            if (ImGui::BeginTable("passes", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp)) {
-                ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 1.4f);
-                ImGui::TableSetupColumn("GPU ms", ImGuiTableColumnFlags_WidthFixed, 60.f);
-                ImGui::TableSetupColumn("share", ImGuiTableColumnFlags_WidthStretch, 1.f);
-                ImGui::TableSetupColumn("Record ms", ImGuiTableColumnFlags_WidthFixed, 70.f);
-                ImGui::TableSetupColumn("Prepare ms", ImGuiTableColumnFlags_WidthFixed, 72.f);
-                ImGui::TableHeadersRow();
-                for (const auto& timing : PassTimings()) {
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn(); ImGui::TextUnformatted(timing.name.c_str());
-                    ImGui::TableNextColumn();
-                    if (timing.gpuMeasured) ImGui::Text("%.3f", timing.gpuMs); else ImGui::TextDisabled("n/a");
-                    ImGui::TableNextColumn();
-                    ImGui::ProgressBar(graph.gpuMs > 0.0 ? static_cast<float>(timing.gpuMs / graph.gpuMs) : 0.f,
-                                       ImVec2(-FLT_MIN, 0.f), "");
-                    ImGui::TableNextColumn(); ImGui::Text("%.3f", timing.recordMs);
-                    ImGui::TableNextColumn(); ImGui::Text("%.3f", timing.prepareMs);
-                }
-                ImGui::EndTable();
-            }
-            ImGui::TextDisabled("Averaged over recent frames. GPU times arrive once the GPU has run the frame.");
-        }
-        ImGui::End();
+        return history;
     }
 }

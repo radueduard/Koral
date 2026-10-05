@@ -19,7 +19,7 @@ namespace kui::detail
 {
     enum Kind : std::uint32_t {
         eRect = 0, eEllipse = 1, eArc = 2, eSegment = 3, eTriangle = 4, eBezier = 5,
-        eGlyph = 6, eImage = 7, eShadow = 8, eMesh = 9, eCustom = 10,
+        eGlyph = 6, eImage = 7, eShadow = 8, eMesh = 9, eCustom = 10, eBackdrop = 11,
     };
     enum Flag : std::uint32_t { eFill = 1, eStroke = 2, eGradient = 4 };
 
@@ -100,7 +100,7 @@ namespace kui
         };
         /** @brief A stretch of the picture drawn one way, in order. */
         struct Run {
-            enum class Kind : std::uint8_t { ePrimitives, eMesh, eElement, eLayer };
+            enum class Kind : std::uint8_t { ePrimitives, eMesh, eElement, eLayer, eBackdrop };   // eBackdrop: primitives that show what is behind them
             Kind kind = Kind::ePrimitives;
             std::uint32_t first = 0, count = 0;   ///< Instances (primitives, elements), vertices (mesh), or the LayerRef.
             std::shared_ptr<ElementShader> shader;

@@ -98,7 +98,7 @@ namespace kor::vk {
         // One token per queue for the last epoch submitted on it.
         [[nodiscard]] std::vector<kor::Token> submittedSoFar() const;
         // Submits nothing but an epoch signal, which — coming after them in submission order — also
-        // covers work other code submitted to the queue directly (Dear ImGui's platform windows).
+        // covers work other code submitted to the queue directly (a library with a renderer of its own).
         void markEpoch(const Queue& queue) const;
 
         Device(const Device &) = delete;
@@ -139,6 +139,8 @@ namespace kor::vk {
         // functions that would otherwise be null (the loader never resolves them for a device the
         // extension was not enabled on).
         [[nodiscard]] bool supportsRayTracing() const { return _supportsRayTracing; }
+        /** Whether a swap chain may ask for ::vk::PresentModeKHR::eFifoLatestReady: its extension is enabled. */
+        [[nodiscard]] bool supportsFifoLatestReady() const { return _supportsFifoLatestReady; }
 
     private:
         mutable std::vector<Queue::Family> _queueFamilies {};
@@ -165,5 +167,6 @@ namespace kor::vk {
         mutable std::map<glm::u32, std::vector<PooledCommandBuffer>> _freeCommandBuffers {}; // by queue identifier
         mutable std::vector<::vk::CommandPool> _commandPools {};                             // every pool ever made
         bool _supportsRayTracing = false;
+        bool _supportsFifoLatestReady = false;
     };
 }

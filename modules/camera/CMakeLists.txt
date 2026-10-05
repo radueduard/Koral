@@ -41,9 +41,9 @@ target_link_libraries(koral-camera PUBLIC Koral)
 # them PUBLIC here would put `glm::glm` in the exported link interface, where a
 # consumer's CMake has no such target and find_package(Koral) fails outright.
 #
-# ImGui is deliberately absent. The controller does ask whether the interface is using the pointer,
-# but through kor::GUI::WantsMouse — so a camera never becomes an ImGui client, and this module has
-# no interface of its own to draw. @see koralCameraPanel.h in koral-gui-extras
+# No interface library is linked. The controller does ask whether an interface is using the pointer,
+# but through kor::Input::InterfaceWantsMouse — so a camera is no interface's client, and this module
+# has no interface of its own to draw. @see koralCameraPanel.h in koral-gui-extras
 target_link_libraries(koral-camera PRIVATE
         glm::glm
         spdlog::spdlog

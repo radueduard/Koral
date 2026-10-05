@@ -30,6 +30,8 @@ public sealed record Theme
     public float? FieldRadius { get; init; }
     /// <summary>How round a checkbox's corners are. Not given: it is a circle.</summary>
     public float? CheckboxRadius { get; init; }
+    /// <summary>Whose manner the controls are drawn in — what a switch, a slider, a field is made of: kui::ThemeDesign.</summary>
+    public ThemeFamily Design { get; init; } = ThemeFamily.Koral;
 
     public static unsafe Theme Dark() { KuiTheme t; KuiNative.kui_theme_dark(&t); return From(t); }
     public static unsafe Theme Light() { KuiTheme t; KuiNative.kui_theme_light(&t); return From(t); }
@@ -59,6 +61,7 @@ public sealed record Theme
         Radius = t.radius, ControlHeight = t.control_height, TextStyle = TextStyle.From(t.text_style),
         ButtonRadius = t.button_radius >= 0f ? t.button_radius : null, FieldRadius = t.field_radius >= 0f ? t.field_radius : null,
         CheckboxRadius = t.checkbox_radius >= 0f ? t.checkbox_radius : null,
+        Design = t.design <= (uint)ThemeFamily.Windows ? (ThemeFamily)t.design : ThemeFamily.Koral,
     };
 
     internal KuiTheme Native => new()
@@ -68,10 +71,14 @@ public sealed record Theme
         text = Text.Native, text_muted = TextMuted.Native, border = Border.Native, focus = Focus.Native,
         radius = Radius, control_height = ControlHeight, text_style = TextStyle.Native,
         button_radius = ButtonRadius ?? -1f, field_radius = FieldRadius ?? -1f, checkbox_radius = CheckboxRadius ?? -1f,
+        design = (uint)Design,
     };
 }
 
-/// <summary>The families of look an interface can have.</summary>
+/// <summary>How something that goes from one value to another gets there. In kui::Curve's order.</summary>
+public enum Curve { Linear, EaseIn, EaseOut, EaseInOut, EaseOutBack }
+
+/// <summary>The families of look an interface can have: each has its colours and sizes, and its own design of every control. In kui::ThemeDesign's order.</summary>
 public enum ThemeFamily { Koral, Material, Cupertino, Windows }
 
 /// <summary>
@@ -105,12 +112,12 @@ public static class Themes
     /// <summary>Material 3's baseline scheme: pill buttons, fields with small corners, square checkboxes; violet unless <paramref name="accent"/> says.</summary>
     public static Theme Material(bool dark = true, Color? accent = null) => Accented(dark
         ? Make(0x141218, 0x211F26, 0x2B2930, 0x36343B, 0xD0BCFF, 0xDCCBFF, 0xB69DF8, 0x381E72, 0xE6E0E9, 0xCAC4D0, 0x49454F, 0xD0BCFF, 12, 40, 14, 20, 4, 2)
-        : Make(0xFEF7FF, 0xF3EDF7, 0xECE6F0, 0xE6E0E9, 0x6750A4, 0x7965AF, 0x5B4597, 0xFFFFFF, 0x1D1B20, 0x49454F, 0xCAC4D0, 0x6750A4, 12, 40, 14, 20, 4, 2), accent);
+        : Make(0xFEF7FF, 0xF3EDF7, 0xECE6F0, 0xE6E0E9, 0x6750A4, 0x7965AF, 0x5B4597, 0xFFFFFF, 0x1D1B20, 0x49454F, 0xCAC4D0, 0x6750A4, 12, 40, 14, 20, 4, 2), accent) with { Design = ThemeFamily.Material };
 
     /// <summary>Cupertino: Apple's system colours — gently rounded buttons and fields, round checks, the system blue unless <paramref name="accent"/> says.</summary>
     public static Theme Cupertino(bool dark = true, Color? accent = null) => Accented(dark
-        ? Make(0x000000, 0x1C1C1E, 0x2C2C2E, 0x3A3A3C, 0x0A84FF, 0x3B9BFF, 0x0871DB, 0xFFFFFF, 0xFFFFFF, 0x98989F, 0x38383A, 0x64B1FF, 10, 34, 15, 8, 8, null)
-        : Make(0xF2F2F7, 0xFFFFFF, 0xE5E5EA, 0xD1D1D6, 0x007AFF, 0x3395FF, 0x0068D9, 0xFFFFFF, 0x000000, 0x8A8A8E, 0xC6C6C8, 0x007AFF, 10, 34, 15, 8, 8, null), accent);
+        ? Make(0x000000, 0x1C1C1E, 0x2C2C2E, 0x3A3A3C, 0x0A84FF, 0x3B9BFF, 0x0871DB, 0xFFFFFF, 0xFFFFFF, 0x98989F, 0x38383A, 0x64B1FF, 16, 34, 15, 17, 17, null)
+        : Make(0xF2F2F7, 0xFFFFFF, 0xE5E5EA, 0xD1D1D6, 0x007AFF, 0x3395FF, 0x0068D9, 0xFFFFFF, 0x000000, 0x8A8A8E, 0xC6C6C8, 0x007AFF, 16, 34, 15, 17, 17, null), accent) with { Design = ThemeFamily.Cupertino };
 
     /// <summary>
     /// Windows' own (Fluent): small corners all round, in Segoe UI where Windows has it. Unless told, dark or light
@@ -126,7 +133,7 @@ public static class Themes
         if (Fonts.FromSystem("segoeui.ttf") is { } segoe) theme = theme.WithFont(segoe);
         // Windows' own accent where it has one, lightened on dark as Windows itself lightens it.
         Color? own = system.Known ? (isDark ? system.Accent.Mix(Color.White, 0.45f) : system.Accent) : null;
-        return Accented(theme, accent ?? own);
+        return Accented(theme, accent ?? own) with { Design = ThemeFamily.Windows };
     }
 
     public static Theme Of(ThemeFamily family, bool dark = true, Color? accent = null) => family switch

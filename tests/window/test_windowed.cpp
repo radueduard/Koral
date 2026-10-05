@@ -1,5 +1,5 @@
 // Windowed Vulkan integration tests: boot a real window + surface + swap chain +
-// scheduler + ImGui, render frames (with an ImGui overlay and a GuiImage),
+// scheduler, render frames (with a koral-ui interface over them, showing images),
 // resize, and — the parity part — verify that a rasterized triangle and the same
 // pattern written by a compute imageStore both present the same way.
 //
@@ -7,8 +7,8 @@
 // shared by every test through the VkWindowTest fixture (mirroring the headless
 // GpuTest). A real display (X11/Wayland) and a
 // WSI-capable Vulkan loader must be available; tests skip gracefully otherwise.
-// One windowed Vulkan context per process — a second corrupts the heap (GLFW +
-// the Vulkan/ImGui statics don't survive re-initialization) — so everything runs
+// One windowed Vulkan context per process — a second corrupts the heap (GLFW and
+// the Vulkan statics don't survive re-initialization) — so everything runs
 // against the single shared window.
 
 #include <gtest/gtest.h>
@@ -30,7 +30,6 @@
 #include <string_view>
 
 #include <GLFW/glfw3.h>
-#include <imgui.h>
 
 #include "commandBuffer.h"
 #include "computePipeline.h"
@@ -47,7 +46,6 @@
 #include "log.h"
 #include "app.h"
 #include "context.h"
-#include "gui.h"
 #include "image.h"
 #include "resource.h"
 #include "scene.h"
@@ -57,19 +55,17 @@
 #include "orientation_shared.h"
 #include "scheduler_seam_shared.h"
 
-// The GUI extras module, drawn from a real scene's RenderUI. imgui.h is already included above, which
-// ImGuizmo.h requires of whoever includes it.
+// The GUI extras module, in a real scene's koral-ui interface.
 #include <koralGuiExtras.h>
+#include <kui/render.h>
 
 namespace {
 
-// A scene that draws a cleared default framebuffer plus an ImGui overlay and a
-// GuiImage, so a single frame drives the scheduler, the swap chain and the whole
-// ImGui-on-Vulkan path (GuiImage blit helper, textured widget, font access).
+// A scene that draws a cleared default framebuffer with a koral-ui interface over it — a panel of text,
+// the GUI extras' panels and viewports showing images — so a single frame drives the scheduler, the swap
+// chain and an interface sampling images the scene renders.
 class OverlayScene : public kor::Scene {
 public:
-    OverlayScene() { EnableInterface(); }
-
     void Initialize() override {
         _image = kor::Image::Builder{}
                      .SetType(kor::Image::Type::e2D)
@@ -80,7 +76,7 @@ public:
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
             cb.ClearColorImage(_image, glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
         }, kor::CommandBuffer::Usage::eGraphics).Wait();
-        _guiImage = kor::GuiImage::Create(_image);
+        viewport->SetImage(_image);
 
         viewportTarget = kor::Image::Builder{}
             .SetType(kor::Image::Type::e2D)
@@ -100,15 +96,17 @@ public:
             .SetUsage(kor::Image::Usage::eSampled)
             .Build();
 
-        // Once, here — deliberately not every frame in RenderUI like the two below. Resizing a target
-        // replaces the image, and the viewport is supposed to notice that by itself; a scene that
-        // handed it back every frame would hide a viewport that could not. @see kgui::Viewport::SetImage
-        directViewport.SetImage(viewportTarget);
+        // Once, here. Resizing a target replaces the image under the same handle, and the interface is
+        // supposed to notice that by itself; a scene that handed it back every frame would hide one that
+        // could not.
+        directViewport->SetImage(viewportTarget);
+        sampledOnlyViewport->SetImage(sampledOnlyTarget);
 
         viewportTargetView = kor::ImageView::Builder(viewportTarget).Build();
         viewportFramebuffer = kor::Framebuffer::Builder{}
             .AddColor({ .view = viewportTargetView, .clear = glm::vec4{0.2f, 0.f, 0.4f, 1.f} })
             .Build();
+        ui.SetRoot(Interface());
     }
 
     void Update() override {
@@ -122,6 +120,14 @@ public:
             const glm::uvec2 next{ 64 + (updates % 17), 48 + (updates % 13) };
             viewportFramebuffer->Resize(next);
         }
+
+        // What the interface shows: the scene's own panels, or a test's, built again when that changes.
+        const auto shape = std::tuple{ drawLogPanel, drawStatsPanel, drawViewports, testInterface.Get() };
+        if (shape != _shape) {
+            _shape = shape;
+            ui.SetRoot(testInterface ? testInterface : Interface());
+        }
+        ui.Update();
     }
 
     void Render(kor::CommandBuffer& cb) override {
@@ -133,48 +139,34 @@ public:
 
             cb.BeginRendering();   // default framebuffer: clears the swap-chain image
             cb.EndRendering();
+
+            // And the interface over it, as the last thing in the frame.
+            const auto screen = SceneWindow().DefaultFramebuffer();
+            ui.GetRenderer().Prepare(screen);
+            ui.GetRenderer().Record(cb, screen);
         }
         // A test's own graph, run as a scene's own is: in the frame, with the scene current.
         if (extraGraph) extraGraph->Execute();
         if (onRender) onRender(cb);
     }
 
-    void RenderUI() override {
-        ImGui::Begin("Koral test overlay");
-        ImGui::Text("frame %d", updates);
-        ImGui::SliderFloat("slider", &_slider, 0.f, 1.f);
-        if (_guiImage) {
-            ImGui::Image(**_guiImage, ImVec2(64, 64));
-        }
-        ImGui::End();
-
-        // The GUI extras, drawn in a real ImGui frame with a real backend behind it — which is the one
-        // thing the headless tests cannot cover, since a texture handle is a backend object.
-        ImGuizmo::BeginFrame();
-        if (drawViewports) {
-            if (floatViewportOutsideMainWindow) {
-                // Far to the left of the main window, so ImGui has to give it its own OS window.
-                ImGui::SetNextWindowPos(ImVec2(-600.f, 100.f), ImGuiCond_Always);
-                ImGui::SetNextWindowSize(ImVec2(320.f, 240.f), ImGuiCond_Always);
-            }
-            directViewport.Draw("Direct");   // image set once, at Initialize
-
-            sampledOnlyViewport.SetImage(sampledOnlyTarget);
-            sampledOnlyViewport.Draw("SampledOnly");
-        }
-
-        viewport.SetImage(_image);
-        if (viewport.Draw("Scene")) {
-            ImGui::Begin("Scene");
-            gizmo.Manipulate(viewport, glm::mat4(1.f), glm::mat4(1.f), transform);
-            ImGui::End();
-        }
-        if (drawLogPanel) log.Draw();
-        if (drawStatsPanel) stats.Draw();
-        if (onRenderUI) onRenderUI();
-    }
-
     void OnResize(glm::uvec2 extent) override { lastResize = extent; }
+
+    /** The scene's own interface: text and a slider, the image, the viewports, the log and the statistics. */
+    kui::Widget Interface() {
+        std::vector<kui::Widget> panels {
+            kui::Text("Koral test overlay"),
+            kui::Slider(_slider, [this](const float v) { _slider = v; }),
+            kui::SizedBox(64.f, 64.f, kgui::Viewport(viewport)),
+        };
+        if (drawViewports) {
+            panels.push_back(kui::SizedBox(80.f, 60.f, kgui::Viewport(directViewport)));
+            panels.push_back(kui::SizedBox(40.f, 30.f, kgui::Viewport(sampledOnlyViewport)));
+        }
+        if (drawLogPanel) panels.push_back(kui::SizedBox(300.f, 120.f, kgui::LogPanel()));
+        if (drawStatsPanel) panels.push_back(kui::SizedBox(300.f, 160.f, kgui::StatsPanel()));
+        return kui::ScrollView(kui::Column(std::move(panels), kui::FlexOptions {}.SetGap(4.f)));
+    }
 
     int updates = 0;
     glm::uvec2 lastResize{0, 0};
@@ -182,25 +174,21 @@ public:
     std::function<void()> onUpdate;
     /// Records a test's own work into the frame, after (or, with drawDefault off, instead of) the scene's.
     std::function<void(kor::CommandBuffer&)> onRender;
-    /// Draws a test's own interface, inside the scene's ImGui frame.
-    std::function<void()> onRenderUI;
+    /// A test's own interface, shown instead of the scene's while it is set.
+    kui::Widget testInterface;
     /// A graph of a test's own, executed in the frame as the scene's own graph is.
     kor::FrameGraph* extraGraph = nullptr;
-    /// Whether Render draws the viewport target and the screen.
+    /// Whether Render draws the viewport target, the screen and the interface.
     bool drawDefault = true;
 
-    kgui::Viewport viewport;
+    kui::Ui ui;
+    std::shared_ptr<kgui::ViewportState> viewport = std::make_shared<kgui::ViewportState>();
     // A colour target as a scene would actually make one: sampled and rendered into, with no transfer
-    // usage at all. It is the case that used to fail — the GUI's handle copied from every image, so an
-    // image without eTransferSrc could not be shown, and a per-frame one was only ever valid for the
-    // swap-chain image that happened to be current when the handle was made.
+    // usage needed to show it.
     kor::Resource<kor::Image> viewportTarget;
-    kgui::Viewport directViewport;
+    std::shared_ptr<kgui::ViewportState> directViewport = std::make_shared<kgui::ViewportState>();
     /// When set, the target is resized every frame, as it is while a window edge is being dragged.
     bool resizeTargetEveryFrame = false;
-    /// When set, the viewport panel is placed outside the main window, which is what makes ImGui give
-    /// it a platform window of its own — the same state as undocking it by hand.
-    bool floatViewportOutsideMainWindow = false;
     /// Which of the GUI extras to draw, so their cost can be measured against a bare frame.
     bool drawLogPanel = true;
     bool drawStatsPanel = true;
@@ -211,18 +199,14 @@ public:
     /// resolver sees "already shader-read" and skips the barrier, while this frame's copy has never
     /// been transitioned at all.
     kor::Resource<kor::Image> sampledOnlyTarget;
-    kgui::Viewport sampledOnlyViewport;
+    std::shared_ptr<kgui::ViewportState> sampledOnlyViewport = std::make_shared<kgui::ViewportState>();
     kor::Resource<kor::Framebuffer> viewportFramebuffer;
     kor::Resource<kor::ImageView> viewportTargetView;
-    kgui::Gizmo gizmo;
-    kgui::LogPanel log;
-    kgui::StatsPanel stats;
-    glm::mat4 transform{1.f};
 
 private:
     float _slider = 0.5f;
     kor::Resource<kor::Image> _image;
-    kor::Resource<kor::GuiImage> _guiImage;
+    std::tuple<bool, bool, bool, const kui::WidgetBase*> _shape { true, true, true, nullptr };
 };
 
 // Drives one frame of the application: every scene, exactly as the runtime runs it.
@@ -249,9 +233,8 @@ class VkEnvironment : public ::testing::Environment {
 public:
     void SetUp() override {
         try {
-            // X11 deliberately: ImGui's multi-viewport needs to place a window at an absolute screen
-            // position, which Wayland denies, so viewports — and with them everything about *undocked*
-            // panels — are off there. Testing them at all means asking for the platform that has them.
+            // X11 deliberately: a window placed at an absolute screen position — what an undocked panel
+            // is — is something Wayland denies, and some of these tests attach windows of their own.
             s_app = std::make_unique<kor::App>(kor::AppSettings{.api = kor::API::eVulkan, .platform = kor::WindowPlatform::eX11});
             s_scene = static_cast<OverlayScene*>(s_app->Open("Overlay", std::make_unique<OverlayScene>(), {
                 .title = "Koral windowed test", .extent = {320, 240}, .resizable = true, .vsync = false}));
@@ -304,16 +287,13 @@ private:
     std::unique_ptr<kor::detail::SceneScope> _scope;
 };
 
-// Render frames with an ImGui overlay (acquire/record/submit/present + the whole
-// ImGui-on-Vulkan path), then resize and keep drawing so the next Acquire/Present
+// Render frames with an interface over them (acquire/record/submit/present, with
+// images sampled by the interface), then resize and keep drawing so the next Acquire/Present
 // sees an out-of-date swap chain and recreates it (SwapChain::Resize + the
 // default-framebuffer Resize path).
 TEST_F(VkWindowTest, RenderResizeAndPresent) {
     auto& window = VkEnvironment::window();
     auto& scene = VkEnvironment::scene();
-
-    // Touch the font accessor (pure gui.cpp coverage, harmless if null).
-    (void)kor::GUI::GetFont(kor::Font::eRegular);
 
     // Phase 1: render enough frames to cycle every in-flight frame slot twice.
     for (int i = 0; i < 8 && !window.ShouldClose(); ++i) {
@@ -539,28 +519,19 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
 // rasterizer and the same pattern written by a compute imageStore must land in
 // the same place, and both are blit to the screen.
 // -----------------------------------------------------------------------------
-// The GUI extras with a real backend behind them: the viewport must actually get a texture handle for
-// its image (the one thing a headless test cannot check), be laid out to a real size, and survive a
-// gizmo drawn over it — all inside the frame the scene's RenderUI runs in.
+// The GUI extras with a real device behind them: each viewport laid out to a real size, its image sampled
+// by the interface — the per-frame, sampled-only one included — all in a frame the scene draws.
 TEST_F(VkWindowTest, GuiExtrasDrawInARealFrame) {
     auto& scene = VkEnvironment::scene();
-
     for (int i = 0; i < 4; ++i) drawFrame(scene);
 
-    EXPECT_TRUE(scene.viewport.Showing())
-        << "the backend produced no texture handle for the viewport's image";
-    // The case a scene actually hits: a per-frame, sampled-only colour target, shown with no copy and
-    // no transfer usage. Several frames have gone by, so every swap-chain image has been used —
-    // which is what the layout error was about.
-    EXPECT_TRUE(scene.directViewport.Showing())
-        << "a sampled-only per-frame target could not be shown";
-    EXPECT_GT(scene.viewport.size().x, 0u);
-    EXPECT_GT(scene.viewport.size().y, 0u);
-    EXPECT_FALSE(scene.gizmo.IsUsing()) << "nothing was dragged";
-
-    // The window has been drawn at some size, so the image's rectangle is inside it.
-    EXPECT_GT(scene.viewport.ScreenRect().size.x, 0.f);
-    EXPECT_GT(scene.viewport.ScreenRect().size.y, 0.f);
+    EXPECT_EQ(scene.viewport->Size(), glm::uvec2(64, 64)) << "laid out at the size it was given";
+    EXPECT_GT(scene.directViewport->Size().x, 0u);
+    EXPECT_GT(scene.sampledOnlyViewport->Size().x, 0u);
+    EXPECT_FALSE(scene.viewport->Dragging()) << "nothing was pressed";
+    const auto texts = kui::debug::Texts(scene.ui);
+    EXPECT_TRUE(std::ranges::any_of(texts, [](const std::string& t) { return t.find("resources tracked") != std::string::npos; }))
+        << "the statistics panel is there";
 }
 
 // Resizing a viewport's target every frame — what dragging a floating window's edge does — must not
@@ -568,17 +539,15 @@ TEST_F(VkWindowTest, GuiExtrasDrawInARealFrame) {
 //
 // It did: a resize *replaces* the image, and the backend reset only its own layout map while the barrier
 // resolver reads the one in kor::Image. The resolver therefore compared a brand-new image against the
-// old one's state, decided no barrier was needed, and ImGui sampled it in VK_IMAGE_LAYOUT_UNDEFINED —
-// once per frame, with a different VkImage each time, and a grey window while the drag lasted.
+// old one's state, decided no barrier was needed, and the interface sampled it in VK_IMAGE_LAYOUT_UNDEFINED
+// — once per frame, with a different VkImage each time, and a grey window while the drag lasted.
 //
 // Asserted through the log, which is where the validation layer's complaints land.
 //
-// It also covers the viewport keeping up *without being told*: `directViewport` is given its image
-// once, at Initialize, so the only thing that can rebuild its handle across these twelve resizes is
-// the viewport noticing for itself. The obvious assertion for that does not work — `Showing()` stays
-// true with a *stale* handle, since the handle object still exists and merely names a destroyed
-// VkImage — so the layer is the only witness. Disabling Viewport::RefreshHandle turns this check into
-// 40 errors of "Invalid VkDescriptorSet Object".
+// It also covers the interface keeping up *without being told*: `directViewport` is given its image once,
+// at Initialize, so the only thing that can bind the new image across these twelve resizes is the
+// interface's renderer noticing its generation change. The layer is the only witness: a descriptor still
+// naming the replaced image is an "Invalid VkDescriptorSet Object".
 TEST_F(VkWindowTest, ResizingAViewportTargetEveryFrameIsClean) {
     auto& scene = VkEnvironment::scene();
 
@@ -595,17 +564,9 @@ TEST_F(VkWindowTest, ResizingAViewportTargetEveryFrameIsClean) {
     kor::Context::Scheduler().WaitIdle();
     for (int i = 0; i < 3; ++i) drawFrame(scene);
 
-    // Dear ImGui's Vulkan backend reuses each platform window's semaphores and names *its* swap chain
-    // when it trips over that — see APerFrameImageThatIsOnlySampledIsShownCleanly. Resizing used to
-    // stall the whole device, which happened to hide it; with deferred destruction nothing stalls.
-    constexpr std::string_view imguiViewportSemaphoreReuse = "may still be in use by VkSwapchainKHR";
-
     std::vector<std::string> complaints;
-    for (const auto& record : kor::log::History()) {
-        if (record.level != kor::log::Level::eError) continue;
-        if (record.message.find(imguiViewportSemaphoreReuse) != std::string::npos) continue;
-        complaints.push_back(record.message);
-    }
+    for (const auto& record : kor::log::History())
+        if (record.level == kor::log::Level::eError) complaints.push_back(record.message);
     EXPECT_TRUE(complaints.empty())
         << complaints.size() << " error(s) while resizing, first: " << (complaints.empty() ? "" : complaints.front());
 }
@@ -1611,25 +1572,6 @@ TEST_F(VkWindowTest, ActionsAndAxesFollowTheKeysAndGamepadsTheyAreBoundTo) {
     settle();
 }
 
-// An interface needs an OS window to be drawn over: an offscreen scene that asks for one is told so
-// and runs without it — whoever shows it draws the interface.
-TEST_F(VkWindowTest, AnOffscreenSceneRunsWithoutTheInterfaceItAskedFor) {
-    class WantsAnInterface final : public kor::Scene {
-    public:
-        WantsAnInterface() { EnableInterface(); }
-        void RenderUI() override { ++drawn; }
-        int drawn = 0;
-    };
-    auto& app = VkEnvironment::app();
-    auto* scene = app.OpenOffscreen<WantsAnInterface>({.extent = {32, 32}});
-    ASSERT_NE(scene, nullptr);
-    settle();
-    EXPECT_FALSE(scene->HasInterface());
-    EXPECT_EQ(scene->drawn, 0);
-    app.Close(*scene);
-    settle();
-}
-
 // An editor's game view: a panel in one scene's interface showing another, offscreen, sized to the
 // panel and — while the pointer is over it — given the editor's input.
 TEST_F(VkWindowTest, ASceneViewShowsAnOffscreenSceneSizedToThePanel) {
@@ -1638,20 +1580,15 @@ TEST_F(VkWindowTest, ASceneViewShowsAnOffscreenSceneSizedToThePanel) {
     auto* game = app.OpenOffscreen<ListeningScene>({.extent = {16, 16}});
     ASSERT_NE(game, nullptr);
 
-    kgui::SceneView view;
-    bool drawn = false;
-    editor.onRenderUI = [&] {
-        ImGui::SetNextWindowSize(ImVec2(200.f, 150.f), ImGuiCond_Always);
-        ImGui::SetNextWindowPos(ImVec2(10.f, 10.f), ImGuiCond_Always);
-        drawn = view.Draw("Game", *game);
-    };
+    auto state = std::make_shared<kgui::ViewportState>();
+    editor.testInterface = kui::Align(kui::Alignment::TopLeft(), kui::SizedBox(200.f, 150.f, kgui::SceneView(*game, state)));
     for (int frame = 0; frame < 4; ++frame) settle();
-    editor.onRenderUI = nullptr;
+    editor.testInterface = {};
 
-    ASSERT_TRUE(drawn);
-    EXPECT_EQ(game->SceneWindow().Extent(), view.View().size()) << "sized to the panel's content";
-    EXPECT_EQ(game->resizedTo, view.View().size());
-    EXPECT_TRUE(view.View().Showing()) << "its image, with a handle the interface can draw";
+    EXPECT_EQ(state->Size(), glm::uvec2(200, 150)) << "the panel's size";
+    EXPECT_EQ(game->SceneWindow().Extent(), state->Size()) << "sized to the panel";
+    EXPECT_EQ(game->resizedTo, state->Size());
+    EXPECT_EQ(state->Image().Get(), game->SceneWindow().Image().Get()) << "showing the scene's picture";
 
     app.Close(*game);
     settle();
@@ -1741,15 +1678,13 @@ TEST_F(VkWindowTest, ASceneDrawsEachOfItsViewsIntoItsOwnImage) {
 TEST_F(VkWindowTest, ASceneViewShowsOneOfTheScenesOwnViews) {
     auto& editor = VkEnvironment::scene();
     auto& view = editor.AddView("Preview", {.extent = {8, 8}});
-    kgui::SceneView panel;
-    editor.onRenderUI = [&] {
-        ImGui::SetNextWindowSize(ImVec2(120.f, 90.f), ImGuiCond_Always);
-        panel.Draw("Preview", view);
-    };
-    for (int frame = 0; frame < 3; ++frame) settle();
-    editor.onRenderUI = nullptr;
-    EXPECT_EQ(view.Target().Extent(), panel.View().size());
-    EXPECT_TRUE(panel.View().Showing());
+    auto state = std::make_shared<kgui::ViewportState>();
+    editor.testInterface = kui::Align(kui::Alignment::TopLeft(), kui::SizedBox(120.f, 90.f, kgui::SceneView(view, state)));
+    for (int frame = 0; frame < 4; ++frame) settle();
+    editor.testInterface = {};
+    EXPECT_EQ(state->Size(), glm::uvec2(120, 90));
+    EXPECT_EQ(view.Target().Extent(), state->Size());
+    EXPECT_EQ(state->Image().Get(), view.Image().Get());
     editor.RemoveView("Preview");
     settle();
 }
@@ -1813,6 +1748,67 @@ TEST_F(VkWindowTest, DebugLinesAreDrawnForTheirFrameOrTheirDuration) {
     settle();
 }
 
+// Filled shapes are triangles over what the scene drew: a solid fill paints its colour, one you can see
+// through blends with what is under it, and the outline is drawn over the fill.
+TEST_F(VkWindowTest, DebugFillsAreSolidOrSeeThrough) {
+    class Fills final : public kor::Scene {
+    public:
+        void Initialize() override {
+            readback = kor::Buffer::RawBuilder{}.SetRawSize(32 * 32 * 4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback).Build();
+            auto screen = std::make_shared<kor::ResourceRef<const kor::Image>>();
+            auto& clear = Graph().Add<LambdaPass>("Clear");
+            clear.setup = [](kor::PassBuilder& b) { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); };
+            clear.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
+            clear.record = [screen](kor::CommandBuffer& cb) { cb.ClearColorImage(*screen, glm::vec4(0.f, 0.f, 0.f, 1.f)); };
+            Graph().Add<kor::DebugDrawPass>(SceneDebug(), [] { return glm::mat4(1.f); });
+            auto& read = Graph().Add<LambdaPass>("Read");
+            read.setup = [](kor::PassBuilder& b) { b.Read(kor::FrameGraph::Screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
+            read.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
+            read.record = [screen, out = kor::ResourceRef<const kor::Buffer>(readback)](kor::CommandBuffer& cb) {
+                cb.CopyImageToBuffer(*screen, out);
+            };
+        }
+        void Update() override {
+            // Clip space is world space: the left half solid red, the right half half-see-through green.
+            Debug::Quad({-1.f, -1.f, 0.5f}, {0.f, -1.f, 0.5f}, {0.f, 1.f, 0.5f}, {-1.f, 1.f, 0.5f},
+                        {.fill = {1.f, 0.f, 0.f, 1.f}, .outline = false});
+            Debug::Quad({0.f, -1.f, 0.5f}, {1.f, -1.f, 0.5f}, {1.f, 1.f, 0.5f}, {0.f, 1.f, 0.5f},
+                        {.fill = {0.f, 1.f, 0.f, 0.5f}, .outline = false});
+            // And a blue outline across the middle, over both.
+            Debug::Line({-1.f, 0.f, 0.5f}, {1.f, 0.f, 0.5f}, {.color = {0.f, 0.f, 1.f, 1.f}});
+            // A white line 5 pixels wide, a quarter of the way down: rows 6 to 10.
+            Debug::Line({-1.f, -0.5f, 0.5f}, {1.f, -0.5f, 0.5f}, {.color = {1.f, 1.f, 1.f, 1.f}, .lineWidth = 5.f});
+        }
+        [[nodiscard]] glm::u8vec4 At(const int x, const int y) const {
+            const auto pixels = readback->Read<glm::u8>(32 * 32 * 4);
+            const int i = (y * 32 + x) * 4;
+            return {pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]};
+        }
+        kor::Resource<kor::Buffer> readback;
+    };
+    auto& app = VkEnvironment::app();
+    auto* scene = app.OpenOffscreen<Fills>({.extent = {32, 32}});
+    ASSERT_NE(scene, nullptr);
+    settle();
+    settle();
+
+    const auto solid = scene->At(8, 4), seeThrough = scene->At(24, 4);
+    EXPECT_EQ(solid.r, 255) << "a solid fill is its colour";
+    EXPECT_EQ(solid.g, 0);
+    EXPECT_NEAR(seeThrough.g, 128, 2) << "half see-through over black is half its colour";
+    EXPECT_EQ(seeThrough.r, 0);
+    const auto line = std::max(scene->At(8, 15).b, scene->At(8, 16).b);
+    EXPECT_EQ(line, 255) << "the line is drawn over the solid fill";
+    for (const int row : {7, 8, 9})
+        EXPECT_EQ(scene->At(8, row), glm::u8vec4(255, 255, 255, 255)) << "a wide line covers row " << row;
+    EXPECT_EQ(scene->At(8, 4).r, 255) << "and not what is beyond its width";
+    EXPECT_EQ(scene->At(8, 4).g, 0);
+
+    app.Close(*scene);
+    settle();
+}
+
 // ---- state scenes share ---------------------------------------------------------------------------
 
 namespace {
@@ -1859,24 +1855,21 @@ TEST_F(VkWindowTest, ASceneLibraryIsLoadedOpenedReloadedAndUnloaded) {
 
     const auto names = app.LoadLibrary(library);
     ASSERT_TRUE(names) << names.error().message;
-    EXPECT_EQ(*names, (std::vector<std::string>{"Library.Plain", "Library.Arguments", "Library.Interface", "Library.Stateful"}));
+    EXPECT_EQ(*names, (std::vector<std::string>{"Library.Plain", "Library.Arguments", "Library.Stateful"}));
     EXPECT_FALSE(app.LoadLibrary(library)) << "loading it twice is refused; ReloadLibrary is for that";
 
     ASSERT_NE(app.Open("Library.Plain", kSmall), nullptr);
     auto* withArguments = app.Open("Library.Arguments", kSmall, {{"level", "3"}});
     ASSERT_NE(withArguments, nullptr);
     EXPECT_EQ(withArguments->SceneWindow().Title(), "level 3") << "the arguments reached the scene";
-    auto* withInterface = app.Open("Library.Interface", kSmall);
-    ASSERT_NE(withInterface, nullptr);
-    EXPECT_TRUE(withInterface->HasInterface());
     for (int frame = 0; frame < 2; ++frame) settle();
-    EXPECT_EQ(alive(), 3);
-    EXPECT_EQ(app.Scenes().size(), 4u);
+    EXPECT_EQ(alive(), 2);
+    EXPECT_EQ(app.Scenes().size(), 3u);
 
     // Reloaded: every window showing one of its scenes closes, and opens again with the same scene.
     ASSERT_TRUE(app.ReloadLibrary(library));
-    EXPECT_EQ(app.Scenes().size(), 4u);
-    EXPECT_EQ(alive(), 3);
+    EXPECT_EQ(app.Scenes().size(), 3u);
+    EXPECT_EQ(alive(), 2);
     const auto scenes = app.Scenes();
     const auto reopened = std::ranges::find_if(scenes, [](const kor::Scene* s) { return s->Name() == "Library.Arguments"; });
     ASSERT_NE(reopened, scenes.end());
@@ -2140,29 +2133,6 @@ TEST_F(VkWindowTest, MeasurePerFrameBufferWriteCost) {
     SUCCEED();
 }
 
-// Undocking a viewport — giving it an OS window of its own — must not crash, and the panel must keep
-// showing its image there.
-//
-// Forced rather than dragged: a window placed outside the main viewport's rectangle is exactly what
-// makes ImGui promote it to a platform window, which is the same state undocking produces.
-TEST_F(VkWindowTest, AViewportSurvivesBeingGivenItsOwnWindow) {
-    if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {   // where the interface turns viewports off
-        GTEST_SKIP() << "multi-viewport is off on this platform (Wayland); nothing can undock";
-    }
-
-    auto& scene = VkEnvironment::scene();
-    for (int i = 0; i < 3; ++i) drawFrame(scene);
-
-    scene.floatViewportOutsideMainWindow = true;
-    for (int i = 0; i < 8; ++i) drawFrame(scene);      // create the platform window and live with it
-
-    EXPECT_TRUE(scene.directViewport.Showing()) << "the floating panel lost its image";
-
-    scene.floatViewportOutsideMainWindow = false;
-    for (int i = 0; i < 8; ++i) drawFrame(scene);      // and back again, destroying it
-    EXPECT_TRUE(scene.directViewport.Showing());
-}
-
 // The cursor mode is a mode of *every* window input is read from, and a change to it must not arrive
 // as movement.
 //
@@ -2220,14 +2190,10 @@ TEST_F(VkWindowTest, AWindowAttachedWhileCapturedArrivesCaptured) {
 // window of its own and GLFW delivers events to the window they happen over.
 //
 // A real undocked panel cannot be produced from a test — it takes dragging — so this attaches a second
-// window directly, which is the same path the GUI puts ImGui's windows through.
+// window directly, which is the same path an interface puts the windows of its floating panels through.
 TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
-    // Counted per window rather than compared against a total, because the total is not this test's
-    // to predict: drawing a frame lets GUI::RenderPlatformWindows attach ImGui's own platform
-    // windows, and a panel that does not fit the main viewport (the Log panel, against this
-    // fixture's small window) is promoted to one. That is the mechanism working, not a leak, so
-    // asserting on the list's *size* made this test fail for a reason that has nothing to do with
-    // what it covers.
+    // Counted per window rather than compared against a total: an interface may attach windows of its
+    // own, which is the mechanism working, not a leak.
     const auto timesAttached = [](GLFWwindow* window) {
         const auto attached = VkEnvironment::scene().SceneInput().AttachedWindows();
         return std::ranges::count(attached, window);
@@ -2244,7 +2210,7 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
 
     VkEnvironment::scene().SceneInput().AttachTo(second);
     EXPECT_EQ(timesAttached(second), 1);
-    // Attaching twice is not an error and does not double up — the GUI calls it every frame.
+    // Attaching twice is not an error and does not double up — an interface may call it every frame.
     VkEnvironment::scene().SceneInput().AttachTo(second);
     EXPECT_EQ(timesAttached(second), 1);
 
@@ -2264,12 +2230,8 @@ TEST_F(VkWindowTest, InputCanBeReadFromMoreThanTheMainWindow) {
 // A per-frame image that is only ever *sampled* — never written — shown through a viewport across
 // enough frames to come round to every copy in flight.
 //
-// It passes both with and without the frame-index fix to Image::TrackingKey, and the reason is worth
-// recording: a viewport's refresh uses an explicit ImageBarrier, and an explicit barrier is emitted
-// unconditionally (Record::transitions), so every copy is transitioned whatever the tracker believes.
-// The tracker's frame-blindness can therefore only bite an *implicit* barrier — one inferred from a
-// declared use — which nothing here exercises. Kept as coverage of the sampled-only per-frame case,
-// not as proof of that fix.
+// The image is sampled by the interface's draws, so the barrier that makes each copy readable is inferred
+// from that use: a frame-blind layout tracker would skip it for a copy that has never been transitioned.
 TEST_F(VkWindowTest, APerFrameImageThatIsOnlySampledIsShownCleanly) {
     auto& scene = VkEnvironment::scene();
 
@@ -2282,28 +2244,16 @@ TEST_F(VkWindowTest, APerFrameImageThatIsOnlySampledIsShownCleanly) {
     kor::Context::Scheduler().WaitIdle();
     for (int i = 0; i < 2; ++i) drawFrame(scene);
 
-    // One validation error is expected here and is not ours: Dear ImGui's Vulkan backend reuses the
-    // per-frame semaphore of each *platform window's* swapchain, and this test floats a panel, so
-    // ImGui creates one. Confirmed by handle: the VkSwapchainKHR the message names is neither of the
-    // ones kor::vk::SwapChain created. The engine's own instance of this VUID is fixed —
-    // SwapChain::ClaimAcquiredImage waits out the frame that still owns the acquired image — and a
-    // regression there would name our swapchain and still fail this, because only this exact
-    // message is dropped.
-    constexpr std::string_view imguiViewportSemaphoreReuse = "may still be in use by VkSwapchainKHR";
-
     std::vector<std::string> complaints;
-    for (const auto& record : kor::log::History()) {
-        if (record.level != kor::log::Level::eError) continue;
-        if (record.message.find(imguiViewportSemaphoreReuse) != std::string::npos) continue;
-        complaints.push_back(record.message);
-    }
+    for (const auto& record : kor::log::History())
+        if (record.level == kor::log::Level::eError) complaints.push_back(record.message);
     EXPECT_TRUE(complaints.empty())
         << complaints.size() << " error(s), first: " << (complaints.empty() ? "" : complaints.front());
-    EXPECT_TRUE(scene.sampledOnlyViewport.Showing());
+    EXPECT_GT(scene.sampledOnlyViewport->Size().x, 0u);
 }
 
 // ...and the picture is actually *there* after a resize settles: the target is rendered into at its new
-// size, and the handle showing it was rebuilt for that size.
+// size, and the interface shows the new image.
 //
 // This is the "grey while resizing" half. Grey during a continuous drag is the documented frame of lag
 // (see koralViewport.h), but a resize that *stops* must leave a real picture rather than an empty image
@@ -2320,7 +2270,7 @@ TEST_F(VkWindowTest, AResizedViewportTargetIsShownAtItsNewSize) {
     for (int i = 0; i < 3; ++i) drawFrame(scene);
 
     EXPECT_EQ(scene.viewportTarget->Extent(), glm::uvec3(96, 72, 1));
-    EXPECT_TRUE(scene.directViewport.Showing()) << "the handle did not survive the resize";
+    EXPECT_EQ(scene.directViewport->Image().Get(), scene.viewportTarget.Get()) << "the viewport still shows the target";
 
     // The target holds what the pass cleared it to, at the new size — so it was rendered into after
     // being replaced, not left undefined.
@@ -2461,58 +2411,6 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
     ASSERT_TRUE(found) << "no frame reported its timer within " << budget << " frames";
     EXPECT_GT(milliseconds, 0.0);
     EXPECT_LT(milliseconds, 1000.0);
-}
-
-// A mip level or an array layer of an ordinary 2D image is a *view*, not a copy — so showing one asks
-// nothing of the image beyond eSampled. This is the case a viewport hits, and it used to demand
-// eTransferSrc and blit the whole image every frame.
-TEST_F(VkWindowTest, GuiImageShowsAMipOrLayerWithoutCopying) {
-    auto mipped = kor::Image::Builder{}
-        .SetType(kor::Image::Type::e2D)
-        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{32, 32})
-        .SetMipLevels(3)
-        .SetUsage(kor::Image::Usage::eSampled)   // sampled only: no transfer usage at all
-        .Build();
-    ASSERT_TRUE(static_cast<bool>(mipped));
-
-    auto level0 = kor::GuiImage::Create(mipped);
-    EXPECT_TRUE(static_cast<bool>(level0));
-    auto level2 = kor::GuiImage::Create(mipped, 0, 2);
-    EXPECT_TRUE(static_cast<bool>(level2));
-
-    auto layered = kor::Image::Builder{}
-        .SetType(kor::Image::Type::e2D)
-        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{32, 32})
-        .SetArrayLayers(6)
-        .SetUsage(kor::Image::Usage::eSampled)
-        .Build();
-    auto face = kor::GuiImage::Create(layered, 4, 0);
-    EXPECT_TRUE(static_cast<bool>(face));
-}
-
-// What genuinely *does* need a copy — a 3D image's slice — and so needs eTransferSrc. The requirement
-// was undocumented and its only symptom was a wall of validation messages naming a usage flag; now it
-// is one error that says which flag and why.
-TEST_F(VkWindowTest, GuiImageSaysWhyItCannotCopyFromAnImage) {
-    auto volume = kor::Image::Builder{}
-        .SetType(kor::Image::Type::e3D)
-        .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec3{16, 16, 4})
-        // Naming the roles at all is what does it: the transfer usages are on by default, and
-        // setUsage replaces that default rather than adding to it, so an image that says
-        // "exactly these roles" ends up without them. Which is the case being tested.
-        .SetUsage(kor::Image::Usage::eSampled)   // sampled, but not readable by a copy
-        .Build();
-    ASSERT_TRUE(static_cast<bool>(volume));
-
-    try {
-        auto handle = kor::GuiImage::Create(volume, 1, 0);
-        FAIL() << "a slice of a 3D image without eTransferSrc cannot be shown, and should say so";
-    } catch (const kor::BackendException& e) {
-        EXPECT_NE(e.error.message.find("eTransferSrc"), std::string::npos) << e.error.message;
-    }
 }
 
 TEST_F(VkWindowTest, RasterTriangleOrientationToScreen) {

@@ -44,7 +44,6 @@ public sealed unsafe class App : IDisposable, IResourceOwner
         if (Current is not null) throw new InvalidOperationException("There is already an application: one per process.");
         Settings = settings ?? new AppSettings();
         var gpu = KoralNative.Utf8(Settings.Gpu);
-        var interfaceDirectory = KoralNative.Utf8(Settings.InterfaceDirectory);
         try
         {
             var native = new KoralAppSettings
@@ -53,14 +52,12 @@ public sealed unsafe class App : IDisposable, IResourceOwner
                 platform = (int)Settings.Platform,
                 frames_in_flight = Settings.FramesInFlight,
                 gpu = gpu,
-                interface_directory = interfaceDirectory,
             };
             KoralNative.Check(KoralNative.koral_app_create(&native));
         }
         finally
         {
             KoralNative.Free(gpu);
-            KoralNative.Free(interfaceDirectory);
         }
         Current = this;
         // Awaits outside any scene come back here too, at the start of a frame.
@@ -424,7 +421,6 @@ public sealed unsafe class ProjectConfig : IDisposable
                 Platform = (WindowPlatform)s.platform,
                 FramesInFlight = s.frames_in_flight,
                 Gpu = s.gpu == IntPtr.Zero ? "" : KoralNative.Text((byte*)s.gpu),
-                InterfaceDirectory = s.interface_directory == IntPtr.Zero ? "" : KoralNative.Text((byte*)s.interface_directory),
             };
         }
     }

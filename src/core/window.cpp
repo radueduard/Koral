@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 
 #include <stb_image.h>
 #include <GLFW/glfw3.h>
@@ -26,6 +27,7 @@
 #endif
 
 #include "context.h"
+#include "windowX11.h"
 #include "scheduler.h"
 #include "surface.h"
 #include "../backends/vulkan/surface.h"
@@ -50,6 +52,10 @@ namespace kor {
         glfwWindowHint(GLFW_MOUSE_PASSTHROUGH, settings.mousePassthrough);
         glfwWindowHint(GLFW_FOCUSED, settings.focusOnOpen);
         glfwWindowHint(GLFW_FOCUS_ON_SHOW, settings.focusOnOpen);
+        // On X11 a window is given the keyboard by the window manager as it is shown, whatever GLFW was
+        // told: one that must not take it is made unseen, says so itself, and is shown once it has.
+        const bool quiet = !settings.focusOnOpen && !_fullscreen && x11::Active();
+        if (quiet) glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         _mousePassthrough = settings.mousePassthrough;
         // The framebuffer is in physical pixels on a scaled display (GLFW 3.4's default, stated).
         glfwWindowHint(GLFW_SCALE_FRAMEBUFFER, GLFW_TRUE);
@@ -81,6 +87,8 @@ namespace kor {
             SetWindowLongPtrW(handle, GWL_EXSTYLE, style);
             ShowWindow(handle, settings.focusOnOpen ? SW_SHOW : SW_SHOWNA);
         }
+#else
+        if (!settings.taskbar) x11::SkipTaskbar(_window);
 #endif
         // Said again once the window is what it will be: the styles above are set after the hint was applied.
         if (settings.mousePassthrough) glfwSetWindowAttrib(_window, GLFW_MOUSE_PASSTHROUGH, GLFW_TRUE);
@@ -88,6 +96,7 @@ namespace kor {
         glfwSetWindowUserPointer(_window, this);
         glfwSetFramebufferSizeCallback(_window, FramebufferResize);
         glfwSetWindowCloseCallback(_window, CloseRequested);
+        glfwSetWindowIconifyCallback(_window, Iconified);
 
         // On Wayland the framebuffer size is not valid until the compositor has configured the
         // surface. Pumped briefly rather than waited out: a window opened from inside a running
@@ -119,6 +128,11 @@ namespace kor {
                 }
             }
         }
+        if (quiet) {
+            x11::ShowWithoutFocus(_window);
+            glfwShowWindow(_window);
+            _focused = false;
+        }
     }
 
     bool Window::CanBePositioned() { return glfwGetPlatform() != GLFW_PLATFORM_WAYLAND && glfwGetPlatform() != GLFW_PLATFORM_NULL; }
@@ -147,7 +161,24 @@ namespace kor {
     {
         if (_window == nullptr || passthrough == _mousePassthrough) return;
         _mousePassthrough = passthrough;
+        _inputRegion.reset();
         glfwSetWindowAttrib(_window, GLFW_MOUSE_PASSTHROUGH, passthrough);
+    }
+
+    std::optional<glm::ivec2> Window::DesktopCursor()
+    {
+        if (!x11::Active()) return std::nullopt;
+        return x11::CursorPosition();
+    }
+
+    bool Window::SetInputRegion(const std::span<const glm::ivec4> rects)
+    {
+        if (_window == nullptr || !x11::Active()) return false;
+        // Asked every frame by what follows something that moves: the server is told only of a change.
+        if (_inputRegion && std::ranges::equal(*_inputRegion, rects)) return true;
+        _inputRegion.emplace(rects.begin(), rects.end());
+        x11::SetInputRegion(_window, rects);
+        return true;
     }
 
     glm::vec2 Window::CursorPosition() const
@@ -188,6 +219,50 @@ namespace kor {
             if (const GLFWvidmode* mode = glfwGetVideoMode(best)) area.size = { mode->width, mode->height };
         }
         return area;
+    }
+
+#if defined(__linux__) && !defined(__ANDROID__)
+}
+// GLFW's own, as Koral's port of it has it (vcpkg-overlay-ports/glfw3): the Wayland compositor is asked
+// to move the window (edges < 0) or to resize it by an XDG_TOPLEVEL_RESIZE_EDGE_*.
+extern "C" void glfwKoralWaylandMoveResize(GLFWwindow* window, int edges);
+namespace kor {
+#endif
+    namespace {
+        /**
+         * Hands the press that is still down to whatever moves windows here — the window manager on X11,
+         * the compositor on Wayland — to move the window, or to resize it by an edge. With @p releaseHere
+         * the window is told the button is up on X11 too (on Wayland it always is).
+         */
+        void moveOrResize(GLFWwindow* window, const x11::Grip grip, const bool releaseHere)
+        {
+            if (x11::Active()) { x11::BeginMoveResize(window, grip, releaseHere); return; }
+#if defined(__linux__) && !defined(__ANDROID__)
+            if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+                // XDG_TOPLEVEL_RESIZE_EDGE_*, in x11::Grip's order: clockwise from the top left.
+                static constexpr int edges[8] = { 5, 1, 9, 8, 10, 2, 6, 4 };
+                glfwKoralWaylandMoveResize(window, grip == x11::Grip::eMove ? -1 : edges[static_cast<int>(grip)]);
+            }
+#endif
+        }
+
+        /** Whether a window with no frame of the system's can still be moved and resized here: by asking. */
+        bool movesByAsking()
+        {
+#if defined(__linux__) && !defined(__ANDROID__)
+            return x11::Active() || glfwGetPlatform() == GLFW_PLATFORM_WAYLAND;
+#else
+            return false;
+#endif
+        }
+
+        // The windows whose edges are their own to watch (FramePointerMoved): GLFW's callbacks are
+        // handed a window and nothing else, and not every window's user pointer is a kor::Window.
+        std::unordered_map<GLFWwindow*, const Window*>& framed()
+        {
+            static std::unordered_map<GLFWwindow*, const Window*> table;
+            return table;
+        }
     }
 
 #ifdef _WIN32
@@ -260,7 +335,60 @@ namespace kor {
         _frameChanged = true;
 #else
         glfwSetWindowAttrib(_window, GLFW_DECORATED, custom ? GLFW_FALSE : GLFW_TRUE);
+        // The frame went with the title bar, and what resized the window with it: its edges are
+        // the window's own to watch from here (FramePointerMoved). On X11 the window manager is
+        // asked to do the resizing, and on Wayland the compositor.
+        if (movesByAsking()) {
+            if (custom) framed()[_window] = this;
+            else {
+                framed().erase(_window);
+                _frameGrip = -1;
+                ShowCursor();
+            }
+        }
 #endif
+    }
+
+    bool Window::FramePointerMoved(GLFWwindow* handle, const double x, const double y)
+    {
+        const auto it = framed().find(handle);
+        if (it == framed().end()) return false;
+        const Window& window = *it->second;
+        int grip = -1;
+        // Not with the button down: that is something being dragged to the edge, not the edge taken hold of.
+        if (window._resizable && !window._fullscreen && !glfwGetWindowAttrib(handle, GLFW_MAXIMIZED)
+            && glfwGetMouseButton(handle, GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS
+            && glfwGetInputMode(handle, GLFW_CURSOR) == GLFW_CURSOR_NORMAL) {
+            int width = 0, height = 0;
+            glfwGetWindowSize(handle, &width, &height);
+            // As wide as an edge of the system's, and twice that along the edge for a corner.
+            constexpr double band = 6., corner = 2. * band;
+            const bool left = x < band, right = x >= width - band, top = y < band, bottom = y >= height - band;
+            const bool nearLeft = x < corner, nearRight = x >= width - corner, nearTop = y < corner, nearBottom = y >= height - corner;
+            using enum x11::Grip;
+            if ((top && nearLeft) || (left && nearTop)) grip = static_cast<int>(eTopLeft);
+            else if ((top && nearRight) || (right && nearTop)) grip = static_cast<int>(eTopRight);
+            else if ((bottom && nearLeft) || (left && nearBottom)) grip = static_cast<int>(eBottomLeft);
+            else if ((bottom && nearRight) || (right && nearBottom)) grip = static_cast<int>(eBottomRight);
+            else if (top) grip = static_cast<int>(eTop);
+            else if (bottom) grip = static_cast<int>(eBottom);
+            else if (left) grip = static_cast<int>(eLeft);
+            else if (right) grip = static_cast<int>(eRight);
+        }
+        if (grip != window._frameGrip) {
+            window._frameGrip = grip;
+            window.ShowCursor();
+        }
+        return grip >= 0;
+    }
+
+    bool Window::FramePressed(GLFWwindow* handle)
+    {
+        const auto it = framed().find(handle);
+        if (it == framed().end() || it->second->_frameGrip < 0) return false;
+        // The press is not told to anything else, so there is no release for anything to wait on.
+        moveOrResize(handle, static_cast<x11::Grip>(it->second->_frameGrip), false);
+        return true;
     }
 
     void Window::BeginMove() const
@@ -278,6 +406,8 @@ namespace kor {
         // down on a title bar, which is how the system is asked to move a window.
         PostMessageW(handle, WM_LBUTTONUP, 0, MAKELPARAM(client.x, client.y));
         PostMessageW(handle, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(screen.x, screen.y));
+#else
+        moveOrResize(_window, x11::Grip::eMove, true);
 #endif
     }
 
@@ -328,11 +458,23 @@ namespace kor {
     {
         if (_window == nullptr || cursor == _cursor) return;
         _cursor = cursor;
+        // Over an edge that resizes the window the pointer shows that, whatever is drawn under it.
+        if (_frameGrip < 0) ShowCursor();
+    }
+
+    void Window::ShowCursor() const
+    {
+        if (_window == nullptr) return;
         // The system's own shapes, made once each and kept: GLFW frees them when it is shut down.
-        static GLFWcursor* shapes[6] = {};
-        static constexpr int standard[6] = { GLFW_ARROW_CURSOR, GLFW_RESIZE_EW_CURSOR, GLFW_RESIZE_NS_CURSOR, GLFW_RESIZE_NWSE_CURSOR,
-                                             GLFW_POINTING_HAND_CURSOR, GLFW_IBEAM_CURSOR };
-        const auto index = static_cast<std::size_t>(cursor);
+        static GLFWcursor* shapes[7] = {};
+        static constexpr int standard[7] = { GLFW_ARROW_CURSOR, GLFW_RESIZE_EW_CURSOR, GLFW_RESIZE_NS_CURSOR, GLFW_RESIZE_NWSE_CURSOR,
+                                             GLFW_POINTING_HAND_CURSOR, GLFW_IBEAM_CURSOR, GLFW_RESIZE_NESW_CURSOR };
+        auto index = static_cast<std::size_t>(_cursor);
+        if (_frameGrip >= 0) {
+            // In x11::Grip's order: the corners and edges, clockwise from the top left.
+            static constexpr std::size_t edges[8] = { 3, 2, 6, 1, 3, 2, 6, 1 };
+            index = edges[_frameGrip];
+        }
         if (!shapes[index]) shapes[index] = glfwCreateStandardCursor(standard[index]);
         // A shape the platform does not have leaves the pointer an arrow, which null is.
         glfwSetCursor(_window, shapes[index]);
@@ -450,6 +592,7 @@ namespace kor {
     }
 
     Window::~Window() {
+        framed().erase(_window);
         _framebuffer.Reset();
         _surface.reset();
         if (_window) glfwDestroyWindow(_window);
@@ -462,6 +605,7 @@ namespace kor {
     void Window::Retire(std::shared_ptr<kor::Surface>& surface, GLFWwindow*& window) {
         _framebuffer.Reset();
         surface = std::move(_surface);
+        framed().erase(_window);
         window = _window;
         _window = nullptr;
     }
@@ -522,6 +666,15 @@ namespace kor {
     	window->_extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
     	if (width == 0 || height == 0) window->Pause();
     	else window->Unpause();
+    }
+
+    // A minimized window is not drawn into. Where minimizing leaves a window its size (X11) nothing else
+    // says so — and presenting to a window that is not shown waits for a display that never asks for it.
+    void Window::Iconified(GLFWwindow* handle, const int iconified) {
+        const auto window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
+        if (!window) return;
+        // Its own flag: a minimized window is still told its size, which would say it can be drawn into.
+        window->_iconified = iconified == GLFW_TRUE;
     }
 
     void Window::CloseRequested(GLFWwindow* handle) {

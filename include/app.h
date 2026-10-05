@@ -38,11 +38,6 @@ namespace kor
         glm::u32 framesInFlight = 2;
         /** A GPU to prefer by name (Vulkan only); empty lets the runtime pick. */
         std::string gpu {};
-        /**
-         * Where scenes with an interface keep their layout, as `imgui.<scene>.ini`. Empty keeps every
-         * layout in memory. A scene that names its own file (InterfaceSettings::iniFile) keeps that.
-         */
-        std::filesystem::path interfaceDirectory {};
     };
 
     /** @brief What makes a scene: given the arguments it is opened with. */

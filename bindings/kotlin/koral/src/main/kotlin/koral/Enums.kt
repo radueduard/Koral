@@ -295,6 +295,23 @@ enum class InputSourceKind(val value: Int) {
     companion object { fun of(value: Int): InputSourceKind = entries.first { it.value == value } }
 }
 
+/** kor::GizmoMode: the same names and values, so a value crosses the C interface as itself. */
+enum class GizmoMode(val value: Int) {
+    eTranslate(0),
+    eRotate(1),
+    eScale(2),
+    ;
+    companion object { fun of(value: Int): GizmoMode = entries.first { it.value == value } }
+}
+
+/** kor::GizmoSpace: the same names and values, so a value crosses the C interface as itself. */
+enum class GizmoSpace(val value: Int) {
+    eWorld(0),
+    eLocal(1),
+    ;
+    companion object { fun of(value: Int): GizmoSpace = entries.first { it.value == value } }
+}
+
 /** kor::Level: the same names and values, so a value crosses the C interface as itself. */
 enum class Level(val value: Int) {
     eInfo(0),

@@ -88,6 +88,11 @@ namespace kui
         // The pointer.
         glm::vec2 pointer {};
         bool hasPointer = false;
+        // The pointer held in place for a drag (Owner::lockPointer): whose it is, what its cursor did
+        // before, and where it is in its viewport's root.
+        kor::Input* lockedInput = nullptr;
+        kor::Input::CursorMode lockedFrom = kor::Input::CursorMode::eNormal;
+        glm::vec2 viewportLocal {};
         kor::Input* pointerInput = nullptr;     // whose pointer it was last frame: the view's own window's, or a viewport's
 
         /** A drag in progress: what it carries, what shows under the pointer, and the receiver it is over. */
@@ -118,6 +123,21 @@ namespace kui
                 if (claimed == &object) claimed = nullptr;
                 // A drag from any view may be over it.
                 for (auto* view : Live()) if (view->drag && view->drag->over == &object) { view->drag->over = nullptr; view->drag->overUi = nullptr; }
+            };
+            owner.lockPointer = [this](const bool hold) {
+                if (hold && !lockedInput && pointerInput) {
+                    // Only a pointer there is: a scene with no window of the system's is told where its
+                    // pointer is by whoever shows it, and has none to hold.
+                    const kor::Window* window = owner.window;
+                    for (const auto& v : owner.viewports) if (v.input == pointerInput) window = v.window;
+                    if (!window || window->IsOffscreen()) return;
+                    lockedInput = pointerInput;
+                    lockedFrom = lockedInput->CurrentCursorMode();
+                    lockedInput->SetCursorMode(kor::Input::CursorMode::eCaptured);
+                } else if (!hold && lockedInput) {
+                    lockedInput->SetCursorMode(lockedFrom);
+                    lockedInput = nullptr;
+                }
             };
             owner.beginDrag = [this](RenderObject&, DragData data, const Widget& feedback, const glm::vec2 hotspot, std::function<void(bool)> onEnd) {
                 if (drag) return false;
@@ -301,17 +321,25 @@ namespace kui
             kor::Input& input = viewport ? *viewport->input : own;
             HitTestResult hit;
             glm::vec2 position;
+            // Held in place, it is where it was: only how far the hand moved is new.
+            const bool locked = lockedInput == &input && hasPointer;
             if (viewport) {
-                const glm::vec2 local = viewport->origin + input.MousePosition() / settings.scale;
+                glm::vec2 local = viewport->origin + input.MousePosition() / settings.scale;
+                if (viewport->desktopOrigin)
+                    if (const auto cursor = kor::Window::DesktopCursor())
+                        local = viewport->origin + glm::vec2(*cursor - *viewport->desktopOrigin) / settings.scale;
+                if (locked) local = viewportLocal;
+                viewportLocal = local;
                 viewport->root->HitTest(hit, local);
                 position = viewport->root->ToGlobal(local);
             } else {
-                position = input.MousePosition() / settings.scale;
+                position = locked ? pointer : input.MousePosition() / settings.scale;
                 render.HitTest(hit, position);
             }
             const bool sameSource = pointerInput == &input;
-            const bool moved = !hasPointer || !sameSource || position != pointer;
-            const glm::vec2 delta = hasPointer && sameSource ? position - pointer : glm::vec2(0.f);
+            const glm::vec2 delta = locked ? input.MousePositionDelta() / settings.scale
+                                  : hasPointer && sameSource ? position - pointer : glm::vec2(0.f);
+            const bool moved = locked ? delta != glm::vec2(0.f) : !hasPointer || !sameSource || position != pointer;
             pointer = position;
             hasPointer = true;
             pointerInput = &input;
@@ -377,6 +405,8 @@ namespace kui
                 captured.clear();
                 claimed = nullptr;
             }
+            // Nothing holds the pointer past its button: whatever held it may be gone, and never have let go.
+            if (lockedInput == &input && input.MouseButtonState(kor::MouseButton::eLeft) == kor::KeyState::eNotPressed) owner.lockPointer(false);
 
             // The wheel: the deepest thing under the pointer that uses it.
             if (const glm::vec2 wheel = input.MouseScrollDelta(); wheel != glm::vec2(0.f)) {
@@ -513,6 +543,15 @@ namespace kui
     {
         _impl->settings.theme = theme;
         Reassemble();   // everything built read the old one
+        // And everything laid out and painted did: what is as big as the theme's controls are, or drawn
+        // in its colours, is not told so by being built again — a widget the same as it was changes
+        // nothing of its render object. Each is laid out and painted again.
+        const std::function<void(RenderObject&)> again = [&again](RenderObject& object) {
+            object.MarkNeedsLayout();
+            object.MarkNeedsPaint();
+            object.VisitChildren(again);
+        };
+        again(_impl->render);
     }
 
     void Ui::Reassemble()
@@ -558,4 +597,15 @@ namespace kui
     bool Ui::WantsKeyboard() const { return _impl->owner.Focused() != nullptr; }
     const Ui::Statistics& Ui::Stats() const { return _impl->stats; }
 
+
+    std::vector<std::string> debug::Texts(const Ui& ui)
+    {
+        std::vector<std::string> texts;
+        const std::function<void(RenderObject&)> visit = [&](RenderObject& object) {
+            if (auto text = object.DebugText(); !text.empty()) texts.push_back(std::move(text));
+            object.VisitChildren(visit);
+        };
+        if (RenderObject* root = ui.RootRenderObject()) visit(*root);
+        return texts;
+    }
 }

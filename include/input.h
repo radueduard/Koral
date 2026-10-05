@@ -18,7 +18,6 @@ struct GLFWwindow;
 #include "api.h"
 #include "reflect.h"
 
-struct ImGuiContext;
 
 namespace kor {
     class Window;
@@ -319,21 +318,21 @@ namespace kor {
         [[nodiscard]] std::optional<MouseButton> FirstMouseButtonPressed() const;
 
         /**
-         * @brief Whether the scene's interface is using the pointer this frame — a panel hovered, a
-         *        slider dragged, a menu open. False for a scene without one.
+         * @brief Whether an interface over the scene's window is using the pointer this frame — a panel
+         *        hovered, a slider dragged, a menu open: whatever one has claimed (ClaimInterface).
          *
          * What to ask before acting on the mouse yourself, so a camera does not fly off while a panel
          * is being dragged.
          */
         [[nodiscard]] bool InterfaceWantsMouse() const;
 
-        /** @brief Whether the scene's interface is using the keyboard — text is being typed into it. */
+        /** @brief Whether an interface over the scene's window is using the keyboard — text is being typed into it. */
         [[nodiscard]] bool InterfaceWantsKeyboard() const;
 
         /**
-         * @brief Says that an interface other than the scene's ImGui one — a koral-ui document, say —
-         *        is using the pointer or the keyboard. InterfaceWantsMouse/Keyboard answer true while
-         *        it does, so a camera stays put under a panel whichever library drew it.
+         * @brief Says that an interface — a koral-ui one, say — is using the pointer or the keyboard.
+         *        InterfaceWantsMouse/Keyboard answer true while it does, so a camera stays put under a
+         *        panel whichever library drew it.
          *
          * Sticky: it holds until the claimer says otherwise. Each @p claimer is counted on its own, so
          * two interfaces over one window do not release each other's claim.
@@ -403,9 +402,6 @@ namespace kor {
 
         /** @brief Every window this reads from, the scene's own first. */
         [[nodiscard]] const std::vector<GLFWwindow*>& AttachedWindows() const;
-
-        /** @brief The ImGui context events over these windows are forwarded to, if the scene has an interface. Internal. */
-        void SetInterfaceContext(ImGuiContext* context);
 
         // ---- gamepads -----------------------------------------------------------------------------
         // Every connected gamepad, numbered from 0 in the order they were found. Only the scene whose
@@ -512,7 +508,6 @@ namespace kor {
             static void ScrollCallback(GLFWwindow*, double, double);
             static void FocusCallback(GLFWwindow*, int);
             static void CharCallback(GLFWwindow*, unsigned int);
-            static void CursorEnterCallback(GLFWwindow*, int);
         };
 
     private:

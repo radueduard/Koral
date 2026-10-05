@@ -114,7 +114,6 @@ public abstract unsafe partial class Scene : IResourceOwner
     public Koral.Input SceneInput => new(KoralNative.koral_scene_scene_input(Open));
     public Koral.Time SceneTime => new(KoralNative.koral_scene_scene_time(Open));
     public DebugDraw SceneDebug => new(KoralNative.koral_scene_scene_debug(Open));
-    public bool HasInterface => KoralNative.koral_scene_has_interface(Open).AsBool();
 
     /// <summary>AddView(name, target): the scene drawn again, into an image of its own, by a graph of its own.</summary>
     public View AddView(string name, OffscreenSettings? target = null)
@@ -270,6 +269,29 @@ public abstract unsafe partial class Scene : IResourceOwner
         public static void Axes(Matrix4x4 transform, float size = 1f, float duration = 0f) => Get().Axes(transform, size, duration);
         public static void Grid(Vector3 center, float size, int cells, DebugStyle? style = null) => Get().Grid(center, size, cells, style);
         public static void Frustum(Matrix4x4 viewProjection, DebugStyle? style = null) => Get().Frustum(viewProjection, style);
+        public static void Triangle(Vector3 a, Vector3 b, Vector3 c, DebugStyle? style = null) => Get().Triangle(a, b, c, style);
+        public static void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, DebugStyle? style = null) => Get().Quad(a, b, c, d, style);
+        public static void Plane(Vector3 center, Vector3 normal, Vector2 size, DebugStyle? style = null) => Get().Plane(center, normal, size, style);
+        public static void Cylinder(Vector3 from, Vector3 to, float radius, DebugStyle? style = null) => Get().Cylinder(from, to, radius, style);
+        public static void Cone(Vector3 baseCenter, Vector3 tip, float radius, DebugStyle? style = null) => Get().Cone(baseCenter, tip, radius, style);
+        public static void Capsule(Vector3 from, Vector3 to, float radius, DebugStyle? style = null) => Get().Capsule(from, to, radius, style);
+        public static void Camera(Matrix4x4 view, Matrix4x4 projection, float size = 1f, DebugStyle? style = null) => Get().Camera(view, projection, size, style);
+        public static void PointLight(Vector3 position, float range, DebugStyle? style = null) => Get().PointLight(position, range, style);
+        public static void SpotLight(Vector3 position, Vector3 direction, float range, float outerAngle, float innerAngle = 0f, DebugStyle? style = null)
+            => Get().SpotLight(position, direction, range, outerAngle, innerAngle, style);
+        public static void DirectionalLight(Vector3 position, Vector3 direction, float size = 1f, DebugStyle? style = null)
+            => Get().DirectionalLight(position, direction, size, style);
+
+        /// <summary>kor::Scene::Debug::Gizmo: a gizmo used with the scene's own mouse (its left button) over its window.</summary>
+        public static unsafe bool Gizmo(GizmoMode mode, ref Matrix4x4 transform, Matrix4x4 viewProjection, GizmoOptions? options = null, ulong id = 0)
+        {
+            Get();   // the scene's, or the reason there is none
+            var o = (options ?? new GizmoOptions()).Native;
+            fixed (Matrix4x4* m = &transform)
+                return KoralNative.koral_current_gizmo((uint)mode, (float*)m, (float*)&viewProjection, &o, id).AsBool();
+        }
+        public static bool GizmoActive => Get().GizmoActive;
+        public static bool GizmoHovered => Get().GizmoHovered;
     }
 
     /// <summary>kor::Scene::Time: the current scene's clock.</summary>

@@ -39,9 +39,11 @@ namespace kui
         if (_element) _element->MarkDirty();
     }
 
-    void StatefulWidget::Animate(std::function<bool(float)> tick)
+    bool StatefulWidget::Animate(std::function<bool(float)> tick)
     {
-        if (_element && _element->GetOwner()) _element->GetOwner()->AddTicker(*_element, std::move(tick));
+        if (!_element || !_element->GetOwner()) return false;
+        _element->GetOwner()->AddTicker(*_element, std::move(tick));
+        return true;
     }
 
     // ---- theme ------------------------------------------------------------------------------------------
@@ -275,7 +277,10 @@ namespace kui
     {
         ComponentElement::Unmount();
         _state->Dispose();
-        _state->_element = nullptr;
+        // Only if it is still this one's: a widget kept by its maker and placed again — where a parent
+        // was built anew — is the state of the new element by the time the old one goes, and taking
+        // the element from it then would leave it deaf: no rebuild when its state is set, no animation.
+        if (_state->_element == this) _state->_element = nullptr;
     }
 
     Widget StatefulElement::Build() { return _state->Build(); }
@@ -359,6 +364,8 @@ namespace kui
         std::erase(_dirty, &element);
         std::ranges::replace(_pending, &element, static_cast<Element*>(nullptr));
         std::erase_if(_tickers, [&](const Ticker& t) { return t.element == &element; });
+        // And of those being called this very moment: one of them may be what unmounted it.
+        for (Ticker& t : _ticking) if (t.element == &element) t.element = nullptr;
     }
 
     void BuildOwner::Flush()
@@ -384,11 +391,13 @@ namespace kui
 
     void BuildOwner::Tick(const float dt)
     {
-        auto tickers = std::move(_tickers);
+        // Kept where Forget can reach them while they are called: a tick may unmount another's element.
+        _ticking = std::move(_tickers);
         _tickers.clear();
-        for (auto& t : tickers) {
-            if (!t.element->Mounted()) continue;
-            if (t.tick(dt)) _tickers.push_back(std::move(t));
+        for (std::size_t i = 0; i < _ticking.size(); ++i) {
+            if (!_ticking[i].element || !_ticking[i].element->Mounted()) continue;
+            if (_ticking[i].tick(dt) && _ticking[i].element) _tickers.push_back(std::move(_ticking[i]));
         }
+        _ticking.clear();
     }
 }

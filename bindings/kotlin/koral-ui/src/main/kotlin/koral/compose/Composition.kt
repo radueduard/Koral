@@ -144,11 +144,16 @@ class UiNode internal constructor() {
 private fun applyModifiers(node: UiNode, content: MemorySegment, elements: List<Modifier.Element>): MemorySegment {
     if (elements.isEmpty()) return content
     var h = content
+    val temporaries = ArrayList<MemorySegment>()
     var click = elements.count { it is ClickableElement }
     var source = elements.count { it is DragSourceElement }
     var target = elements.count { it is DropTargetElement }
     var sized = elements.count { it is SizeChangedElement }
     var pointed = elements.count { it is PointerInputElement }
+    // What a drag shows under the pointer is the whole of the thing — every modifier's part in how it looks,
+    // not only what is inside the drag source's place in the chain — so the content is kept to build it from.
+    val dragged = if (source > 0) KuiNative.kui_widget_retain(content) else MemorySegment.NULL
+    try {
     scratch { a ->
     var index = elements.size - 1
     while (index >= 0) {
@@ -213,6 +218,9 @@ private fun applyModifiers(node: UiNode, content: MemorySegment, elements: List<
                 }
                 is AlphaElement -> KuiNative.kui_opacity(element.alpha, inner)
                 is ClipElement -> KuiNative.kui_clip_rrect(radii(a, element.shape), inner)
+                is BackdropElement -> KuiNative.kui_backdrop_filter(inner, element.blur.value,
+                    Struct(a, KuiLayouts.KuiColor).color("r", element.tint).segment, element.refraction.value,
+                    (element.shape as? RoundedCornerShape)?.topStart?.value ?: 0f)
                 is OffsetElement -> KuiNative.kui_translate(vec2(a, element.x.value, element.y.value), inner)
                 is ScrollElement -> {
                     // It says where it is, and goes where its state was told to: made again when the state is told.
@@ -237,7 +245,19 @@ private fun applyModifiers(node: UiNode, content: MemorySegment, elements: List<
                     val data = Struct(a, KuiLayouts.KuiDragData).address("type", a.allocateFrom(element.data.type))
                         .address("text", a.allocateFrom(element.data.payload as? String ?: ""))
                         .address("payload", koral.Handles.put(element.data)).address("destroy", Callbacks.free)
+                    // The thing as it looks, with nothing that listens: built a second time, a little seen through.
+                    val look = elements.filter { it !is DragSourceElement && it !is DropTargetElement && it !is ClickableElement &&
+                                                 it !is SizeChangedElement && it !is PointerInputElement && it !is WeightElement &&
+                                                 it !is AlignElement && it !is FocusRequesterElement }
+                    val whole = applyModifiers(node, KuiNative.kui_widget_retain(dragged), look)
+                    val feedback = KuiNative.kui_opacity(0.8f, whole)
+                    KuiNative.kui_widget_release(whole)
+                    temporaries += feedback
                     val options = Struct(a, KuiLayouts.KuiDraggableOptions).bool("disabled", !element.enabled)
+                        .address("feedback", feedback).bool("feedback_in_place", true)
+                        // As round as what it is drawn on, where a background says: the outline round it goes with it.
+                        .float("feedback_radius", (elements.lastOrNull { it is BackgroundElement } as BackgroundElement?)
+                            ?.let { (it.shape as? RoundedCornerShape)?.topStart?.value } ?: -1f)
                         .struct("on_drag_start", Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, { node.dragSources.getOrNull(i)?.onDragStart?.invoke() }))
                         .struct("on_drag_end", Callbacks.make(a, KuiLayouts.KuiBoolAction, Callbacks.boolAction,
                             { ok: Boolean -> node.dragSources.getOrNull(i)?.onDragEnd?.invoke(ok) }))
@@ -260,6 +280,10 @@ private fun applyModifiers(node: UiNode, content: MemorySegment, elements: List<
         }
         KuiNative.kui_widget_release(inner)
     }
+    }
+    } finally {
+        temporaries.forEach { KuiNative.kui_widget_release(it) }
+        if (dragged !== MemorySegment.NULL) KuiNative.kui_widget_release(dragged)
     }
     return h
 }

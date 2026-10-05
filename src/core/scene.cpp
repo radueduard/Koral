@@ -14,7 +14,6 @@
 #include "app.h"
 #include "current.h"
 #include "framebuffer.h"
-#include "interface.h"
 #include "parseNumber.h"
 
 namespace kor
@@ -93,32 +92,12 @@ namespace kor
     {
         // From here on the scene is gone for anyone holding its life — a coroutine, a camera.
         _life->scene = nullptr;
-        // Before the input it forwards to, which is destroyed after it anyway; explicit, so the order
-        // does not depend on where the members happen to be declared.
-        _interface.reset();
     }
 
     kor::Window& Scene::SceneWindow() const
     {
         if (!_window) throw std::logic_error("Scene::SceneWindow before the scene was opened: its window arrives before Initialize");
         return *_window;
-    }
-
-    void Scene::EnableInterface(InterfaceSettings settings)
-    {
-        if (_interface) return;
-        // From the constructor there is no window yet: the application makes the interface when it
-        // opens the scene. From Initialize on, it is made here and now.
-        if (!_window) {
-            _interfaceRequest = std::move(settings);
-            return;
-        }
-        if (settings.iniFile.empty() && App::Exists() && !App::Current().Settings().interfaceDirectory.empty()) {
-            std::string file = "imgui." + _name + ".ini";
-            for (auto& c : file) if (c == '/' || c == '\\' || c == ':') c = '_';
-            settings.iniFile = App::Current().Settings().interfaceDirectory / file;
-        }
-        _interface = std::make_unique<Interface>(*this, settings);
     }
 
     // ---- arguments --------------------------------------------------------------------------------
@@ -238,6 +217,37 @@ namespace kor
     void Scene::Debug::Point(const glm::vec3 position, const float size, const Style& style) { Get().Point(position, size, style); }
     void Scene::Debug::Axes(const glm::mat4& transform, const float size, const float duration) { Get().Axes(transform, size, duration); }
     void Scene::Debug::Grid(const glm::vec3 center, const float size, const int cells, const Style& style) { Get().Grid(center, size, cells, style); }
+    void Scene::Debug::Triangle(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const Style& style) { Get().Triangle(a, b, c, style); }
+    void Scene::Debug::Quad(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const glm::vec3 d, const Style& style) { Get().Quad(a, b, c, d, style); }
+    void Scene::Debug::Plane(const glm::vec3 center, const glm::vec3 normal, const glm::vec2 size, const Style& style) { Get().Plane(center, normal, size, style); }
+    void Scene::Debug::Cylinder(const glm::vec3 from, const glm::vec3 to, const float radius, const Style& style) { Get().Cylinder(from, to, radius, style); }
+    void Scene::Debug::Cone(const glm::vec3 base, const glm::vec3 tip, const float radius, const Style& style) { Get().Cone(base, tip, radius, style); }
+    void Scene::Debug::Capsule(const glm::vec3 from, const glm::vec3 to, const float radius, const Style& style) { Get().Capsule(from, to, radius, style); }
+    void Scene::Debug::Camera(const glm::mat4& view, const glm::mat4& projection, const float size, const Style& style) { Get().Camera(view, projection, size, style); }
+    void Scene::Debug::PointLight(const glm::vec3 position, const float range, const Style& style) { Get().PointLight(position, range, style); }
+    void Scene::Debug::SpotLight(const glm::vec3 position, const glm::vec3 direction, const float range, const float outerAngle,
+                                 const float innerAngle, const Style& style)
+    {
+        Get().SpotLight(position, direction, range, outerAngle, innerAngle, style);
+    }
+    void Scene::Debug::DirectionalLight(const glm::vec3 position, const glm::vec3 direction, const float size, const Style& style)
+    {
+        Get().DirectionalLight(position, direction, size, style);
+    }
+    bool Scene::Debug::Gizmo(const GizmoMode mode, glm::mat4& transform, const glm::mat4& viewProjection, const GizmoOptions& options,
+                             const std::uint64_t id)
+    {
+        kor::DebugDraw& draw = Get();
+        const kor::Input& input = Input::Get();
+        GizmoPointer pointer {.viewport = glm::vec2(Window::Extent()),
+                              .down = input.IsMouseButtonHeld(MouseButton::eLeft),
+                              .pressed = input.IsMouseButtonPressed(MouseButton::eLeft)};
+        if (!input.InterfaceWantsMouse() || draw.GizmoActive()) pointer.position = input.MousePosition();
+        else pointer.down = pointer.pressed = false;
+        return draw.Gizmo(mode, transform, viewProjection, pointer, options, id);
+    }
+    bool Scene::Debug::GizmoActive() { return Get().GizmoActive(); }
+    bool Scene::Debug::GizmoHovered() { return Get().GizmoHovered(); }
     void Scene::Debug::Frustum(const glm::mat4& viewProjection, const Style& style) { Get().Frustum(viewProjection, style); }
 
     // ---- state ---------------------------------------------------------------------------------------

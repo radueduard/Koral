@@ -16,7 +16,6 @@
 
 #include "app.h"
 #include "framebuffer.h"
-#include "gui.h"
 #include "imageView.h"
 #include "log.h"
 #include "module.h"
@@ -64,13 +63,6 @@ namespace kor
             log::Error("[engine] {}\n\nOptions:\n{}", overridden.error().message, ProjectConfig::Usage());
             return EXIT_FAILURE;
         }
-
-        // If nothing set an ImGui layout path (neither the config file nor a flag), default it to
-        // sit beside the config file, so each project keeps its own layout and it is found again no
-        // matter which directory the runtime was launched from. With no config file at all there is
-        // no project directory to anchor to, so ImGui keeps its own default (imgui.ini in the CWD).
-        if (config.imguiIni.empty() && *configFile)
-            config.imguiIni = (*configFile)->parent_path() / "imgui.ini";
 
         // Before anything is loaded: every relative texture, model and shader path from here on is
         // resolved against these roots.
@@ -137,14 +129,10 @@ namespace kor
         // The windowed path: the application, the project's library of scenes, and the one it names.
         std::unique_ptr<App> app;
         try {
-            // Each scene with an interface keeps its layout beside the project's (imgui.<scene>.ini).
-            std::filesystem::path interfaceDirectory;
-            if (!config.imguiIni.empty()) interfaceDirectory = config.imguiIni.parent_path();
             app = std::make_unique<App>(AppSettings{
                 .api = config.api,
                 .platform = config.platform,
                 .gpu = config.gpu,
-                .interfaceDirectory = interfaceDirectory,
             });
         } catch (const std::exception& e) {
             log::Error("[engine] {}", e.what());

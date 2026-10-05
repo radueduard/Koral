@@ -69,7 +69,6 @@ TEST(ProjectConfig, ReadsEveryKey)
     EXPECT_TRUE(config.transparentFramebuffer);
     EXPECT_FALSE(config.vsync);
     EXPECT_EQ(config.platform, kor::WindowPlatform::eWayland);
-    EXPECT_EQ(config.imguiIni, std::filesystem::path("/projects/game/state/imgui.ini"));
 
     ASSERT_EQ(config.assetDirectories.size(), 2u);
     EXPECT_EQ(config.assetDirectories[0], "/projects/game/assets");
@@ -354,53 +353,24 @@ TEST(ProjectConfig, MissingGpuFlagValueIsAnError)
     EXPECT_NE(result.error().message.find("--gpu"), std::string::npos);
 }
 
-TEST(ProjectConfig, ImguiIniResolvesAgainstTheConfigDirectory)
+// The engine drew its interfaces with ImGui once, and a config from then names where ImGui kept its
+// layout. It means nothing now: read past like any key this build does not know, not refused.
+TEST(ProjectConfig, AnOlderConfigsImguiIniIsIgnored)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.Merge(R"({ "rendering": { "window": { "imguiIni": "layout/imgui.ini" } } })", kBase));
-    EXPECT_EQ(config.imguiIni, std::filesystem::path("/projects/game/layout/imgui.ini"));
+    const auto result = config.Merge(R"({ "rendering": { "window": { "width": 800, "imguiIni": "layout/imgui.ini" } } })", kBase);
+    ASSERT_TRUE(result) << result.error().message;
+    EXPECT_EQ(config.extent.x, 800u) << "the rest of the window is taken as it was";
 }
 
-TEST(ProjectConfig, AbsoluteImguiIniIsLeftAlone)
+// ...but a flag is typed by someone, and one that does nothing should say so.
+TEST(ProjectConfig, TheImguiIniFlagIsNoLongerAnOption)
 {
     ProjectConfig config;
-    ASSERT_TRUE(config.Merge(R"({ "rendering": { "window": { "imguiIni": "/var/state/imgui.ini" } } })", kBase));
-    EXPECT_EQ(config.imguiIni, std::filesystem::path("/var/state/imgui.ini"));
-}
-
-TEST(ProjectConfig, ImguiIniIsEmptyByDefault)
-{
-    // The "beside koral.json" default is applied by the runtime once it knows the config file's
-    // location; the config object itself leaves it empty until something sets it.
-    ProjectConfig config;
-    EXPECT_TRUE(config.imguiIni.empty());
-    ASSERT_TRUE(config.Merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
-    EXPECT_TRUE(config.imguiIni.empty()) << "an absent key must not invent a path";
-}
-
-TEST(ProjectConfig, ImguiIniFlagResolvesAgainstTheWorkingDirectory)
-{
-    ProjectConfig config;
-    ASSERT_TRUE(override_(config, { "--imgui-ini", "state/ui.ini" }));
-    EXPECT_TRUE(config.imguiIni.is_absolute()) << "a command-line path is made absolute against the cwd";
-    EXPECT_EQ(config.imguiIni.filename(), "ui.ini");
-}
-
-TEST(ProjectConfig, ImguiIniFlagOverridesTheFile)
-{
-    ProjectConfig config;
-    ASSERT_TRUE(config.Merge(R"({ "rendering": { "window": { "imguiIni": "from-file.ini" } } })", kBase));
-    ASSERT_TRUE(override_(config, { "--imgui-ini", "from-flag.ini" }));
-    EXPECT_EQ(config.imguiIni.filename(), "from-flag.ini");
-}
-
-TEST(ProjectConfig, MissingImguiIniFlagValueIsAnError)
-{
-    ProjectConfig config;
-    const auto result = override_(config, { "--imgui-ini" });
-
+    const auto result = override_(config, { "--imgui-ini", "state/ui.ini" });
     ASSERT_FALSE(result);
     EXPECT_EQ(result.error().code, ErrorCode::eInvalidArgument);
+    EXPECT_NE(result.error().message.find("--imgui-ini"), std::string::npos);
 }
 
 // A project that writes its own CMakeLists says so in a section only the Hub reads. The runtime must

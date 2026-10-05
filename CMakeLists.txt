@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.28)
 
 # vcpkg-overlay-ports/kubazip renames the mz_* symbol namespace of kubazip's vendored copy of
 # miniz.h, so it no longer collides with minizip-ng (pulled in transitively via OpenColorIO) at
-# link time. vcpkg-overlay-ports/imgui is the baseline's 1.91.9 port plus one patch to the Vulkan
-# backend: a platform window's swap-chain transition did not wait for the image to be acquired
-# (see the portfile). Both must be set before project() -- that is when the vcpkg toolchain reads it.
+# link time. vcpkg-overlay-ports/glfw3 is the baseline's 3.4 port plus one patch to the X11
+# backend, which gave a Vulkan window no visual with alpha, so none could be transparent. All must be
+# set before project() -- that is when the vcpkg toolchain reads it.
 list(APPEND VCPKG_OVERLAY_PORTS "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg-overlay-ports")
 
 # vcpkg-overlay-triplets/arm64-osx.cmake adds VCPKG_OSX_DEPLOYMENT_TARGET to the stock arm64-osx
@@ -224,7 +224,6 @@ find_package(Ktx CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 
 find_package(asio CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 
@@ -251,6 +250,12 @@ if(UNIX AND NOT APPLE)
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw)
+if(UNIX AND NOT APPLE)
+    # What GLFW has no call for (src/core/windowX11.cpp): the window manager is asked to move or resize
+    # a window, and a window's input region is set. GLFW loads these at run time; Koral links them.
+    find_package(X11 REQUIRED COMPONENTS Xext)
+    target_link_libraries(${PROJECT_NAME} PRIVATE X11::X11 X11::Xext)
+endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE magic_enum::magic_enum)
 target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 # assimp is deliberately absent: model importing lives in modules/model-import, which links it.
@@ -310,7 +315,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE reflectcpp::reflectcpp)
 # ZLIB only: the rest of the codec stack (TIFF/JPEG/PNG/Jasper) came in with OpenImageIO, which
 # moved to the image module along with the code that used it.
 target_link_libraries(${PROJECT_NAME} PRIVATE ${ZLIB_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE imgui::imgui)
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
 target_link_libraries(${PROJECT_NAME} PRIVATE asio::asio)
 
@@ -342,7 +346,7 @@ endif()
 #
 # Caught by the "Verify the SDK links standalone" step, which builds exactly that project. Worth
 # keeping in mind that anything leaking out of the public headers becomes a consumer's problem —
-# the same reason the SDK vendors glm/spdlog/fmt/imgui in the first place.
+# the same reason the SDK vendors glm/spdlog/fmt in the first place.
 #
 # /Zc:preprocessor for the same reason: KORAL_REFLECT (reflect.h) walks its __VA_ARGS__, which MSVC's
 # traditional preprocessor passes on as one argument, and consumers expand it in their own code.
@@ -416,7 +420,6 @@ target_link_libraries(Koral_Runtime PRIVATE ${PROJECT_NAME})
 
 # Koral_Runtime includes public headers from GFX that expose these deps directly
 target_link_libraries(Koral_Runtime PRIVATE
-        imgui::imgui
         glm::glm
         spdlog::spdlog
         Vulkan::Vulkan
@@ -672,11 +675,11 @@ install(CODE [[
 # ---------------------------------------------------------------------------
 # Vendored public dependencies
 #
-# Koral's public headers expose three third-party libraries: glm (in ~20 headers — vectors and
-# matrices are part of the API's vocabulary), spdlog (log.h, whose inline templates take
-# spdlog::format_string_t) and imgui (gui.h). A consumer therefore cannot compile against Koral
-# without their headers, nor link against it without their objects — spdlog and imgui are static
-# libs whose symbols do not escape libKoral.
+# Koral's public headers expose two third-party libraries: glm (in ~20 headers — vectors and
+# matrices are part of the API's vocabulary) and spdlog (log.h, whose inline templates take
+# spdlog::format_string_t). A consumer therefore cannot compile against Koral without their
+# headers, nor link against it without their objects — spdlog is a static lib whose symbols do not
+# escape libKoral.
 #
 # Rather than making that the consumer's problem (they would need vcpkg with matching versions,
 # which for a launcher-generated project is an absurd amount of setup), the SDK *ships* them. A
@@ -687,7 +690,7 @@ install(CODE [[
 # block and the vendored copies simply stop shipping — no consumer CMake changes.
 # ---------------------------------------------------------------------------
 option(KORAL_VENDOR_PUBLIC_DEPS
-       "Ship glm/spdlog/fmt/imgui inside the SDK so consumers need no package manager" ON)
+       "Ship glm/spdlog/fmt inside the SDK so consumers need no package manager" ON)
 
 if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
     set(KORAL_VENDOR_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/koral-vendor)
@@ -701,17 +704,6 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
             "${KORAL_VCPKG_PREFIX}/include/fmt"
             DESTINATION ${KORAL_VENDOR_INCLUDEDIR})
 
-    # imgui's headers are loose files at the top of include/, not a directory. ImGuizmo's header comes
-    # along because the GUI extras module's koralGizmo.h includes it: its *objects* reach a consumer
-    # through that module's shared library, which re-exports them, but the declarations have to be
-    # compiled and so have to be here.
-    file(GLOB KORAL_VENDOR_IMGUI_HEADERS
-            "${KORAL_VCPKG_PREFIX}/include/imgui*.h"
-            "${KORAL_VCPKG_PREFIX}/include/imconfig.h"
-            "${KORAL_VCPKG_PREFIX}/include/imstb_*.h"
-            "${KORAL_VCPKG_PREFIX}/include/ImGuizmo.h")
-    install(FILES ${KORAL_VENDOR_IMGUI_HEADERS} DESTINATION ${KORAL_VENDOR_INCLUDEDIR})
-
     # The static archives the consumer must actually link. Order matters for GNU ld: a static lib
     # only resolves symbols demanded by something *earlier* on the command line, and spdlog's
     # headers call into fmt — so spdlog precedes fmt. The Config.cmake below preserves this order.
@@ -724,12 +716,12 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
     # open shared object file" the first time anyone ran it.
     #
     # The `d`-suffix fallback is there because the debug name is not the same everywhere: vcpkg's
-    # MSVC builds carry CMake's DEBUG_POSTFIX (fmtd.lib, spdlogd.lib, imguid.lib) while the same
+    # MSVC builds carry CMake's DEBUG_POSTFIX (fmtd.lib, spdlogd.lib) while the same
     # ports on Linux and macOS keep the release name inside debug/lib (libfmt.a). Trying the plain
     # name first and the suffixed one second covers both without hard-coding a platform rule.
     set(KORAL_VENDOR_LIBS "")
     set(KORAL_VENDOR_LIBS_DEBUG "")
-    foreach(dep spdlog fmt imgui)
+    foreach(dep spdlog fmt)
         file(GLOB found "${KORAL_VCPKG_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}${dep}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         if(found)
             list(APPEND KORAL_VENDOR_LIBS ${found})
@@ -812,7 +804,7 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
 
     file(APPEND "${KORAL_INSTALL_CONFIG}"
 "
-# Koral's public headers expose glm, spdlog and imgui, so the SDK ships them; see KORAL_VENDOR_PUBLIC_DEPS
+# Koral's public headers expose glm and spdlog, so the SDK ships them; see KORAL_VENDOR_PUBLIC_DEPS
 # in the top-level CMakeLists. Consumers do not name these — they are pulled in by linking Koral.
 #
 # Which set to link is decided here rather than baked in, because the same config file is installed
@@ -883,8 +875,8 @@ endif()
 #
 # Windows has no RPATH: an executable resolves its DLLs from its own directory or PATH, nowhere
 # else. Koral is a DLL and pulls in more that must sit beside the consumer's binary at load time —
-# the Vulkan loader, slang, and (because they carry process-global state that cannot be shared
-# across a static link on Windows, see the overlay triplet) imgui and glfw3. All are installed into
+# the Vulkan loader, slang, and (because it carries process-global state that cannot be shared
+# across a static link on Windows, see the overlay triplet) glfw3. All are installed into
 # <prefix>/bin by the GET_RUNTIME_DEPENDENCIES step above. A consumer's freshly built .exe sits in
 # its own build tree with none of them beside it, so it links against the import libs and then
 # fails to start. In our own build vcpkg's applocal deploy copies these automatically; a consumer

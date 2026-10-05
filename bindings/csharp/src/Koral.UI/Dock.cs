@@ -17,7 +17,7 @@ public sealed record DragData(string Type, object? Payload = null)
 /// <summary>kui::DraggableOptions.</summary>
 public sealed record DraggableOptions
 {
-    /// <summary>What follows the pointer; a ghost of the child's size when null.</summary>
+    /// <summary>What follows the pointer; the child itself, a little seen through, when null.</summary>
     public Widget? Feedback { get; set; }
     public Action? OnDragStart { get; set; }
     /// <summary>Whether a target took it.</summary>
@@ -186,6 +186,7 @@ public static unsafe partial class Widgets
                 on_drag_start = Callbacks.Action(options?.OnDragStart),
                 on_drag_end = Callbacks.Bool(options?.OnDragEnd),
                 disabled = KuiNative.Bool(!(options?.Enabled ?? true)),
+                feedback_radius = -1f,      // the outline round the thing in hand: as round as the theme says
             };
             return Made(KuiNative.kui_draggable(&d, c, &o));
         }

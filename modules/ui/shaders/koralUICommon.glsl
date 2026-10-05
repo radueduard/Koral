@@ -22,6 +22,7 @@
 #define KUI_SHADOW    8u   // shape0 = rect; shape1.x = corner radius; strokeWidth = sigma
 #define KUI_MESH      9u   // tessellated: vertices point back at it for transform, clip and paint
 #define KUI_CUSTOM   10u   // shape0 = rect; paint = index into the element shader's parameters
+#define KUI_BACKDROP 11u   // shape0 = rect; shape1 = radii; strokeWidth = blur; fill = tint; stroke = how far it bends (a float's bits)
 
 // ---- flags (Instance.kindFlags >> 8 & 0xff) ---------------------------------------------------------
 #define KUI_FLAG_FILL      1u

@@ -116,6 +116,7 @@ namespace
         theme.radius = t.radius; theme.controlHeight = t.control_height;
         theme.textStyle = StyleOf(&t.text_style);
         theme.buttonRadius = t.button_radius; theme.fieldRadius = t.field_radius; theme.checkboxRadius = t.checkbox_radius;
+        theme.design = t.design <= static_cast<uint32_t>(ThemeDesign::eFluent) ? static_cast<ThemeDesign>(t.design) : ThemeDesign::eKoral;
         return theme;
     }
 
@@ -127,7 +128,7 @@ namespace
                  t.radius, t.controlHeight,
                  { nullptr, t.textStyle.size, C(t.textStyle.color), t.textStyle.lineHeight, t.textStyle.letterSpacing, t.textStyle.weight,
                    t.textStyle.italic, t.textStyle.underline, t.textStyle.lineThrough },
-                 t.buttonRadius, t.fieldRadius, t.checkboxRadius };
+                 t.buttonRadius, t.fieldRadius, t.checkboxRadius, static_cast<uint32_t>(t.design) };
     }
 
     std::shared_ptr<const Gradient> MakeGradient(Gradient g, const float* offsets, const KuiColor* colors, const size_t count)
@@ -747,6 +748,24 @@ KuiWidget* kui_shader_box(KuiElementShader* shader, const void* parameters, cons
 KuiWidget* kui_image(KoralImage* image, const uint32_t fit, const KuiVec2 size) { KUI_WIDGET(Image(kor::capi::ImageOf(image), static_cast<ImageFit>(fit), V(size))); }
 KuiWidget* kui_repaint_boundary(KuiWidget* child) { KUI_WIDGET(RepaintBoundary(W(child))); }
 KuiWidget* kui_opacity(const float opacity, KuiWidget* child) { KUI_WIDGET(Opacity(opacity, W(child))); }
+namespace {
+    Curve CurveOf(const uint32_t curve) { return curve <= static_cast<uint32_t>(Curve::eEaseOutBack) ? static_cast<Curve>(curve) : Curve::eEaseInOut; }
+    AnimationOptions AnimationOf(const float duration, const uint32_t curve) { return AnimationOptions {}.SetDuration(duration).SetCurve(CurveOf(curve)); }
+}
+KuiWidget* kui_backdrop_filter(KuiWidget* child, const float blur, const KuiColor tint, const float refraction, const float radius)
+{
+    KUI_WIDGET(BackdropFilter(Backdrop {}.SetBlur(blur).SetTint(C(tint)).SetRefraction(refraction), radius, W(child)));
+}
+float kui_ease(const uint32_t curve, const float t) { return Guarded([&] { return Ease(CurveOf(curve), t); }, t); }
+KuiWidget* kui_animated_opacity(const float opacity, KuiWidget* child, const float duration, const uint32_t curve)
+{
+    KUI_WIDGET(AnimatedOpacity(opacity, W(child), AnimationOf(duration, curve)));
+}
+KuiWidget* kui_appear(KuiWidget* child, const float duration, const uint32_t curve, const float rise) { KUI_WIDGET(Appear(W(child), AnimationOf(duration, curve), rise)); }
+KuiWidget* kui_reveal(const bool open, KuiWidget* child, const float duration, const uint32_t curve)
+{
+    KUI_WIDGET(Reveal(open, child ? W(child) : Widget {}, AnimationOf(duration, curve)));
+}
 KuiWidget* kui_clip_rrect(const KuiRadii radius, KuiWidget* child) { KUI_WIDGET(ClipRRect(Rd(radius), W(child))); }
 KuiWidget* kui_translate(const KuiVec2 offset, KuiWidget* child) { KUI_WIDGET(Translate(V(offset), W(child))); }
 KuiWidget* kui_ignore_pointer(KuiWidget* child) { KUI_WIDGET(IgnorePointer(W(child))); }
@@ -762,6 +781,8 @@ KuiWidget* kui_draggable(const KuiDragData* data, KuiWidget* child, const KuiDra
             options.onDragStart = F(o->on_drag_start);
             options.onDragEnd = F(o->on_drag_end);
             options.enabled = !o->disabled;
+            options.feedbackInPlace = o->feedback_in_place;
+            options.feedbackRadius = o->feedback_radius;
         }
         return Give(Draggable({ d.type ? d.type : "", std::move(payload) }, W(child), std::move(options)));
     }, nullptr);
@@ -870,9 +891,18 @@ bool kui_system_appearance(bool* dark, KuiColor* accent)
 }
 KuiWidget* kui_progress_bar(const float value) { KUI_WIDGET(ProgressBar(value)); }
 KuiWidget* kui_drag_value(const float value, const KuiFloatAction onChanged, const float speed, const float min, const float max,
-                          const int32_t decimals, const char* label, const float width)
+                          const int32_t decimals, const char* label, const float width, const bool typeable)
 {
-    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width }));
+    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eHorizontal, typeable }));
+}
+KuiWidget* kui_drag_value_vertical(const float value, const KuiFloatAction onChanged, const float speed, const float min, const float max,
+                                   const int32_t decimals, const char* label, const float width, const bool typeable)
+{
+    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eVertical, typeable }));
+}
+KuiWidget* kui_slider_vertical(const float value, const KuiFloatAction onChanged, const float min, const float max, const KuiAction onFinished)
+{
+    KUI_WIDGET(Slider(value, F(onChanged), min, max, F(onFinished), Axis::eVertical));
 }
 KuiWidget* kui_dropdown(const char* const* items, const size_t count, const int32_t selected, const KuiFloatAction onChanged,
                         const float width, const char* placeholder)

@@ -237,16 +237,54 @@ public record struct DebugStyle()
     public float Duration { get; init; }
     /// <summary>Drawn over everything, rather than hidden by what is in front of it.</summary>
     public bool OnTop { get; init; }
+    /// <summary>The colour to fill the shape with; alpha below 1 is see-through, and 0 (the default) no fill.</summary>
+    public Vector4 Fill { get; init; }
+    /// <summary>Draws the outline; false for a shape that is only its fill.</summary>
+    public bool Outline { get; init; } = true;
+    /// <summary>How wide its lines are, in pixels, however near or far.</summary>
+    public float LineWidth { get; init; } = 1f;
 
     internal unsafe KoralDebugStyle Native
     {
         get
         {
-            var s = new KoralDebugStyle { duration = Duration, on_top = KoralNative.Bool(OnTop) };
+            var s = new KoralDebugStyle { duration = Duration, on_top = KoralNative.Bool(OnTop), fill_only = KoralNative.Bool(!Outline), line_width = LineWidth };
             s.color[0] = Color.X; s.color[1] = Color.Y; s.color[2] = Color.Z; s.color[3] = Color.W;
+            s.fill[0] = Fill.X; s.fill[1] = Fill.Y; s.fill[2] = Fill.Z; s.fill[3] = Fill.W;
             return s;
         }
     }
+}
+
+/// <summary>kor::GizmoPointer: the pointer a gizmo is used with, in the pixels of the image its camera draws.</summary>
+/// <param name="Position">Where it is, from the image's top-left; null when it is not over the image (or is something else's).</param>
+/// <param name="Viewport">The image's size, in pixels.</param>
+/// <param name="Down">The button that drags a handle is down.</param>
+/// <param name="Pressed">...and went down this frame: what grabs a handle.</param>
+public record struct GizmoPointer(Vector2? Position, Vector2 Viewport, bool Down, bool Pressed)
+{
+    internal unsafe KoralGizmoPointer Native
+    {
+        get
+        {
+            var p = new KoralGizmoPointer { has_position = KoralNative.Bool(Position.HasValue), down = KoralNative.Bool(Down), pressed = KoralNative.Bool(Pressed) };
+            if (Position is { } at) { p.position[0] = at.X; p.position[1] = at.Y; }
+            p.viewport[0] = Viewport.X; p.viewport[1] = Viewport.Y;
+            return p;
+        }
+    }
+}
+
+/// <summary>kor::GizmoOptions: how a gizmo looks and snaps.</summary>
+public record struct GizmoOptions()
+{
+    public GizmoSpace Space { get; init; } = GizmoSpace.eWorld;
+    /// <summary>Its length on screen, in pixels.</summary>
+    public float Size { get; init; } = 100f;
+    /// <summary>Steps it moves in: world units translating, degrees rotating, a factor's step scaling. 0 is none.</summary>
+    public float Snap { get; init; }
+
+    internal KoralGizmoOptions Native => new() { space = (uint)Space, size = Size, snap = Snap };
 }
 
 /// <summary>kor::DebugDraw: lines a scene draws to see what it is doing.</summary>
@@ -278,9 +316,77 @@ public sealed unsafe class DebugDraw
     public void Grid(Vector3 center, float size, int cells, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_grid(Native, (float*)&center, size, cells, &s); }
     /// <summary>What a camera with <paramref name="viewProjection"/> sees: its frustum's twelve edges.</summary>
     public void Frustum(Matrix4x4 viewProjection, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_frustum(Native, (float*)&viewProjection, &s); }
+    public void Triangle(Vector3 a, Vector3 b, Vector3 c, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_triangle(Native, (float*)&a, (float*)&b, (float*)&c, &s); }
+    /// <summary>Four corners, in order around the edge.</summary>
+    public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, DebugStyle? style = null)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_quad(Native, (float*)&a, (float*)&b, (float*)&c, (float*)&d, &s);
+    }
+    /// <summary>A rectangle of <paramref name="size"/> facing along <paramref name="normal"/>.</summary>
+    public void Plane(Vector3 center, Vector3 normal, Vector2 size, DebugStyle? style = null)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_plane(Native, (float*)&center, (float*)&normal, (float*)&size, &s);
+    }
+    public void Cylinder(Vector3 from, Vector3 to, float radius, DebugStyle? style = null, int segments = 24)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_cylinder(Native, (float*)&from, (float*)&to, radius, &s, segments);
+    }
+    /// <summary>A cone with its base's centre at <paramref name="baseCenter"/> and its point at <paramref name="tip"/>.</summary>
+    public void Cone(Vector3 baseCenter, Vector3 tip, float radius, DebugStyle? style = null, int segments = 24)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_cone(Native, (float*)&baseCenter, (float*)&tip, radius, &s, segments);
+    }
+    public void Capsule(Vector3 from, Vector3 to, float radius, DebugStyle? style = null, int segments = 24)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_capsule(Native, (float*)&from, (float*)&to, radius, &s, segments);
+    }
+    /// <summary>A camera: the pyramid it sees through, <paramref name="size"/> deep, with a triangle on top for up.</summary>
+    public void Camera(Matrix4x4 view, Matrix4x4 projection, float size = 1f, DebugStyle? style = null)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_camera(Native, (float*)&view, (float*)&projection, size, &s);
+    }
+    /// <summary>A star where it is, and the sphere it reaches to (none when <paramref name="range"/> is 0: no limit).</summary>
+    public void PointLight(Vector3 position, float range, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_point_light(Native, (float*)&position, range, &s); }
+    /// <summary>The cone it lights; angles from the centre to the edge, in radians.</summary>
+    public void SpotLight(Vector3 position, Vector3 direction, float range, float outerAngle, float innerAngle = 0f, DebugStyle? style = null)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_spot_light(Native, (float*)&position, (float*)&direction, range, outerAngle, innerAngle, &s);
+    }
+    /// <summary>The sun: a disc at <paramref name="position"/> with its rays.</summary>
+    public void DirectionalLight(Vector3 position, Vector3 direction, float size = 1f, DebugStyle? style = null)
+    {
+        var s = S(style);
+        KoralNative.koral_debug_directional_light(Native, (float*)&position, (float*)&direction, size, &s);
+    }
+
+    /// <summary>
+    /// kor::DebugDraw::Gizmo: handles on <paramref name="transform"/>, the one under <paramref name="pointer"/> dragged while
+    /// its button is down. Call it every frame the thing is selected. Returns whether <paramref name="transform"/> changed.
+    /// </summary>
+    public bool Gizmo(GizmoMode mode, ref Matrix4x4 transform, Matrix4x4 viewProjection, GizmoPointer pointer,
+                      GizmoOptions? options = null, ulong id = 0)
+    {
+        var p = pointer.Native;
+        var o = (options ?? new GizmoOptions()).Native;
+        fixed (Matrix4x4* m = &transform)
+            return KoralNative.koral_debug_gizmo(Native, (uint)mode, (float*)m, (float*)&viewProjection, &p, &o, id).AsBool();
+    }
+    /// <summary>A handle is being dragged.</summary>
+    public bool GizmoActive => KoralNative.koral_debug_gizmo_active(Native).AsBool();
+    /// <summary>The pointer is over a handle, this frame or the last.</summary>
+    public bool GizmoHovered => KoralNative.koral_debug_gizmo_hovered(Native).AsBool();
+
     /// <summary>Everything being drawn, now.</summary>
     public void Clear() => KoralNative.koral_debug_clear(Native);
     public ulong LineCount => KoralNative.koral_debug_line_count(Native);
+    public ulong TriangleCount => KoralNative.koral_debug_triangle_count(Native);
 }
 
 /// <summary>kor::View: a scene drawn a second time, into an image of its own, by a graph of its own.</summary>
@@ -306,8 +412,6 @@ public sealed record AppSettings
     public uint FramesInFlight { get; init; } = 2;
     /// <summary>A GPU to prefer by name; empty lets Koral choose.</summary>
     public string Gpu { get; init; } = "";
-    /// <summary>Where scenes with an interface keep their layout.</summary>
-    public string InterfaceDirectory { get; init; } = "";
 }
 
 /// <summary>kor::WindowSettings.</summary>

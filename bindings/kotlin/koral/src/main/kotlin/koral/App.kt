@@ -21,8 +21,6 @@ data class AppSettings(
     val platform: WindowPlatform = WindowPlatform.eAuto,
     val framesInFlight: Int? = null,
     val gpu: String? = null,
-    /** Where ImGui keeps its window layout (imgui.ini); empty: beside the program. */
-    val interfaceDirectory: String? = null,
 )
 
 /** kor::WindowSettings. */
@@ -154,7 +152,6 @@ class App(val settings: AppSettings = AppSettings()) : Owner(), AutoCloseable {
                 int("platform", settings.platform.value)
                 settings.framesInFlight?.let { int("frames_in_flight", it) }
                 settings.gpu?.let { string(a, "gpu", it) }
-                settings.interfaceDirectory?.let { string(a, "interface_directory", it) }
             }
             checked(KoralNative.koral_app_create(s), "creating the application")
         }
@@ -342,7 +339,7 @@ class ProjectConfig private constructor(private var handle: MemorySegment) : Aut
                 s.get(ADDRESS, KoralLayouts.KoralAppSettings.byteOffset(java.lang.foreign.MemoryLayout.PathElement.groupElement(field)))
                     .takeIf { it != MemorySegment.NULL }?.let(Native::kString)?.takeIf { it.isNotEmpty() }
             AppSettings(API.of(f.readInt("api")), WindowPlatform.of(f.readInt("platform")), f.readInt("frames_in_flight"),
-                        text("gpu"), text("interface_directory"))
+                        text("gpu"))
         }
 
     val windowSettings: WindowSettings
@@ -421,8 +418,6 @@ abstract class Scene : Owner() {
     val input: Input get() = Input(KoralNative.koral_scene_scene_input(open))
     val time: Time get() = Time(KoralNative.koral_scene_scene_time(open))
     val debug: DebugDraw get() = DebugDraw(KoralNative.koral_scene_scene_debug(open))
-    /** Whether it draws an ImGui interface. */
-    val hasInterface: Boolean get() = KoralNative.koral_scene_has_interface(open)
 
     /** AddView: a frame graph of its own, drawing into an image ([target]'s size and format). */
     fun addView(name: String, target: OffscreenSettings = OffscreenSettings(title = name)): View =

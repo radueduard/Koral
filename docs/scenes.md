@@ -46,7 +46,6 @@ The hooks, in the order a frame calls them:
 | `Update` | Once a frame. |
 | `LateUpdate` | After every module's late update. |
 | `Render(commandBuffer)` | Records the frame's own work; the scene's graph runs ahead of it. |
-| `RenderUI` | Builds the interface, for a scene that has one. |
 | `OnSuspend` / `OnResume` | Another scene was pushed over this one / popped off it. |
 | `OnCloseRequested` | The window was asked to close; return false to keep it open. |
 | `Shutdown` | Once, before the scene is destroyed, with everything still alive. |
@@ -67,14 +66,20 @@ fixed steps stop) without touching any other. `FixedUpdate` runs in steps of `Fi
 
 ### An interface
 
-A scene has an ImGui interface only when it asks, in its constructor or `Initialize`:
+An interface is a module's business, not the framework's: a scene that wants one links koral-ui and
+keeps a `kui::Ui`, drawn by a pass in its graph and fed the scene's input each frame:
 
 ```cpp
-Editor() { EnableInterface(); }
-void RenderUI() override { ImGui::Begin("Tools"); /* ... */ ImGui::End(); }
+class Editor final : public kor::Scene {
+    kui::Ui _ui { kui::DockSpace(_layout, {{"tools", "Tools", Tools()}}) };
+    void Initialize() override { Graph().Add<kui::UiPass>(_ui); }
+    void Update() override { _ui.Update(); }
+};
 ```
 
-Each scene's interface is a context of its own, with its own layout file (`imgui.<scene>.ini`).
+While the pointer is over a panel, or text is being typed, `Input::InterfaceWantsMouse()` and
+`InterfaceWantsKeyboard()` say so, and a camera stays put. See [ui.md](ui.md), and koral-gui-extras for
+ready-made panels: a log, statistics, an inspector, viewports, a frame graph's own.
 
 ## Windows
 
@@ -90,13 +95,12 @@ each frame, so a scene showing one shows this frame's picture.
 
 ```cpp
 _game = kor::Navigator::OpenOffscreen("Level", {.extent = {1280, 720}});
-// in RenderUI:
-_gameView.Draw("Game", *_game);   // kgui::SceneView: shows it, sizes it to the panel, feeds it input
+// in the interface: shows it, sizes it to the panel, feeds it input
+kgui::SceneView(*_game)
 ```
 
 An offscreen scene has no input of its own; whoever shows it feeds it (`Input::FeedKey` and the
-rest, or `kgui::SceneView`, which does it while the panel is hovered or focused). It cannot have an
-interface of its own — the scene showing it draws the interface.
+rest, or `kgui::SceneView`, which does it while the panel is hovered or was last clicked).
 
 An application that opens only offscreen scenes can run with `AppSettings::platform =
 WindowPlatform::eNone`: no windowing system, no display needed — a server, a test, a batch render.
@@ -112,7 +116,7 @@ void Editor::Initialize() {
     auto& game = AddView("Game", {.extent = {1280, 720}});
     game.Graph().Add<ForwardPass>(_world, _gameCamera);
 }
-void Editor::RenderUI() { _gameView.Draw("Game", *FindView("Game")); }
+// and in the interface: kgui::SceneView(*FindView("Game"))
 ```
 
 Inside a view's passes, `Window::` is the view's target. Views are drawn after `LateUpdate` and before

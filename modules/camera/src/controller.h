@@ -56,8 +56,8 @@ namespace kcam
         /**
          * @brief Whether the mouse belongs to this controller this frame.
          *
-         * Controller::Input::eAutomatic asks ImGui, which is right until the scene is *inside* an ImGui
-         * window — then the scene has to say. And once a look has started it keeps the mouse until the
+         * Controller::Input::eAutomatic asks the interface (kor::Input::InterfaceWantsMouse), which is right
+         * until the scene is *inside* one of its panels — then the scene has to say. And once a look has started it keeps the mouse until the
          * button is released, however the answer changes in between: dragging the pointer off the
          * viewport mid-look must not cut the look in half.
          */

@@ -1,18 +1,22 @@
 # ---------------------------------------------------------------------------
 # The GUI extras module: koral.gui.extras
 #
-# ImGui widgets built on the engine's GUI — a gradient editor, a file browser —
-# that are useful without being the engine's business. Header-only, so the
-# library holds only the module declaration; what a consumer links it for is the
-# headers and the identity.
+# Panels built on koral-ui — a log, statistics, an inspector for reflected objects, a viewport, another
+# scene in a panel, a frame graph's own panels, a file browser — that are useful without being the
+# engine's business. The camera panel is a header-only seam (koralCameraPanel.h), so this library does
+# not link the camera module.
 #
-# A consumer links koral-gui-extras exactly as it links Koral. Nothing has to be
-# named in koral.json.
+# A consumer links koral-gui-extras exactly as it links Koral. Nothing has to be named in koral.json.
 # ---------------------------------------------------------------------------
 
 add_library(koral-gui-extras SHARED
         src/export.cpp
-        src/imguizmoBinding.cpp
+        src/logPanel.cpp
+        src/statsPanel.cpp
+        src/inspector.cpp
+        src/viewport.cpp
+        src/graphPanels.cpp
+        src/fileBrowser.cpp
 )
 
 target_include_directories(koral-gui-extras PUBLIC
@@ -22,51 +26,30 @@ target_include_directories(koral-gui-extras PUBLIC
         # link it. Linking is what puts this directory on their include path.
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/modules/koral-gui-extras>)
 
-# Koral is PUBLIC: the widgets are drawn inside a Koral GUI frame and read Koral's log, timing and
-# images, so anything that links this module links Koral too and inherits its include directories.
-target_link_libraries(koral-gui-extras PUBLIC Koral)
+target_compile_definitions(koral-gui-extras PRIVATE KORAL_GUI_EXTRAS_EXPORTS)
 
-# ImGuizmo, linked PRIVATE on purpose even though koralGizmo.h calls straight into it from a header.
-# Its objects come in here and their symbols carry default visibility, so this shared library
-# re-exports them and a consumer resolves ImGuizmo::Manipulate through it — no archive of its own to
-# link. Naming it PUBLIC would instead put `imguizmo::imguizmo` in the exported link interface, where
-# a consumer's CMake has no such target and find_package(Koral) fails outright: the same trap as glm.
-# The *header* still has to reach the consumer, which is what the SDK vendoring does. @see the root
-# CMakeLists' KORAL_VENDOR_PUBLIC_DEPS block, and src/imguizmoBinding.cpp for the ImGui context.
-find_package(imguizmo CONFIG REQUIRED)
-
-# On ELF and Mach-O the paragraph above is the whole story. On Windows it is not: a DLL exports only
-# what is marked dllexport, ImGuizmo marks nothing, and so koral-gui-extras.dll re-exported none of
-# it — leaving every consumer that calls ImGuizmo::Manipulate from koralGizmo.h with five unresolved
-# externals. This repository's own gizmo tests were the first to hit it, which is why the
-# integration and window test executables did not link at all.
-#
-# WINDOWS_EXPORT_ALL_SYMBOLS does not fix it: the .def CMake generates covers a target's own object
-# files, not the static libraries linked into it, so ImGuizmo's symbols never appear in it.
-#
-# So an in-tree consumer links the archive itself. BUILD_INTERFACE is what keeps that out of the
-# exported link interface, where `imguizmo::imguizmo` would be a target the consumer's CMake has
-# never heard of and find_package(Koral) would fail outright — the trap the paragraph above is about.
-# An installed SDK gets the archive through the root CMakeLists' vendoring instead, alongside imgui.
-target_link_libraries(koral-gui-extras PUBLIC $<BUILD_INTERFACE:imguizmo::imguizmo>)
+# koral-ui is PUBLIC: every panel here is a kui::Widget, so anything that links this module links
+# koral-ui too — and Koral through it — and inherits their include directories.
+target_link_libraries(koral-gui-extras PUBLIC koral-ui Koral)
 
 # PRIVATE, exactly as for Koral itself: glm appears in this module's public headers, but a
 # consumer gets it from Koral::Koral — in an installed SDK through the vendored copies
 # KoralConfig.cmake attaches to it. Naming it PUBLIC here would put `glm::glm` in the exported
 # link interface, where a consumer's CMake has no such target and find_package(Koral) fails.
-#
-# imgui is the same story: these headers *are* ImGui code, so a consumer has to compile against
-# imgui.h — and gets it from Koral::Koral, which vendors it in an installed SDK.
 target_link_libraries(koral-gui-extras PRIVATE
         glm::glm
         spdlog::spdlog
-        imgui::imgui
 )
 
 # Into <libKoral's dir>/modules, where the loader looks without configuration.
 set_target_properties(koral-gui-extras PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
+
+if(MSVC)
+    # No manifest of its own, for the same reason as koral-ui's: see modules/ui/CMakeLists.txt.
+    target_link_options(koral-gui-extras PRIVATE /MANIFEST:NO)
+endif()
 
 # An installed module sits in <libdir>/modules and needs libKoral from <libdir>, one level up.
 # Without this the installed .so carries no RPATH at all. Windows has no RPATH; there the DLL sits

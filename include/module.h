@@ -136,9 +136,6 @@ namespace kor
         /** @brief Called once per frame, after Scene::Render, with the frame's command buffer. */
         virtual void RenderOverlay(CommandBuffer& commandBuffer) {}
 
-        /** @brief Called once per frame, after Scene::RenderUI. Call ImGui functions directly. */
-        virtual void RenderUI() {}
-
         /** @brief Called when the window's drawable area changed size, before Scene::OnResize. */
         virtual void OnResize(glm::uvec2 extent) {}
 
@@ -263,7 +260,6 @@ namespace kor
         static KORAL_API void LateUpdate();
         static KORAL_API void Render(CommandBuffer& commandBuffer);
         static KORAL_API void RenderOverlay(CommandBuffer& commandBuffer);
-        static KORAL_API void RenderUI();
         static KORAL_API void OnResize(glm::uvec2 extent);
     };
 

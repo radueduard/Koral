@@ -510,6 +510,22 @@ namespace kui
         return *this;
     }
 
+    Canvas& Canvas::DrawBackdrop(const RRect& rrect, const Backdrop& backdrop)
+    {
+        if (rrect.rect.Empty()) return *this;
+        Instance it = _state->Make(detail::eBackdrop, rrect.rect);
+        it.shape0 = { rrect.rect.left, rrect.rect.top, rrect.rect.right, rrect.rect.bottom };
+        it.shape1 = { rrect.radii.topLeft, rrect.radii.topRight, rrect.radii.bottomRight, rrect.radii.bottomLeft };
+        it.strokeWidth = std::max(backdrop.blur, 0.f);
+        it.fill = backdrop.tint.Packed();
+        // How far it bends: a float, in the place a stroke's colour has (as a glyph's weight is).
+        const float bend = std::max(backdrop.refraction, 0.f);
+        std::memcpy(&it.stroke, &bend, sizeof bend);
+        // A run of its own: the renderer takes its picture of the target before it draws one.
+        _state->Push(it, Picture::Data::Run::Kind::eBackdrop);
+        return *this;
+    }
+
     Canvas& Canvas::DrawImage(const kor::ResourceRef<const kor::Image>& image, const Rect& destination, const Rect& source, const Color tint)
     {
         if (!image.Valid() || destination.Empty()) return *this;

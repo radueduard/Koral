@@ -43,6 +43,7 @@ namespace kor::vk
             glm::uvec2 extent {1, 1};
             bool vsync = true;
             bool transparent = false;
+            bool alphaVisual = false;       ///< The window's own pixels have alpha, whatever the surface says. @see setAlphaVisual
             std::vector<kor::Window::Format> formats { kor::Window::Format::eBGRA8_UNORM };   ///< Most wanted first.
             SampleCount sampleCount = SampleCount::e1;
 
@@ -51,6 +52,12 @@ namespace kor::vk
             Builder& setExtent(const glm::uvec2 extent) { this->extent = extent; return *this; }
             Builder& setVSync(const bool vsync) { this->vsync = vsync; return *this; }
             Builder& setTransparent(const bool transparent) { this->transparent = transparent; return *this; }
+            /**
+             * On X11 a window is seen through because of its visual, not because of anything the swap
+             * chain asks for: what is presented into a 32-bit visual is blended by the compositor as
+             * premultiplied, also by drivers whose surfaces only say they are opaque (NVIDIA's).
+             */
+            Builder& setAlphaVisual(const bool alphaVisual) { this->alphaVisual = alphaVisual; return *this; }
             Builder& setFormats(std::vector<kor::Window::Format> formats) { this->formats = std::move(formats); return *this; }
             Builder& setSampleCount(const kor::SampleCount sampleCount) { this->sampleCount = sampleCount; return *this; }
             std::unique_ptr<SwapChain> build() { return std::make_unique<SwapChain>(*this); }
@@ -101,6 +108,7 @@ namespace kor::vk
         glm::uvec2 _extent;
         bool _vsync = true;
         bool _transparent = false;
+        bool _alphaVisual = false;
         bool _composites = false;       ///< Transparent, and the surface could do it.
         SampleCount _sampleCount = SampleCount::e1;
         /// What was asked for, held separately from _imageCount because _imageCount is replaced

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -125,7 +126,7 @@ namespace kor {
          *
          * The scene shown in it is not updated or drawn while this holds.
          */
-        [[nodiscard]] bool IsPaused() const { return _paused; }
+        [[nodiscard]] bool IsPaused() const { return _paused || _iconified; }
 
         /** @brief Whether the user may resize the window. */
         [[nodiscard]] bool IsResizable() const { return _resizable; }
@@ -209,6 +210,14 @@ namespace kor {
         void SetMousePassthrough(bool passthrough);
         [[nodiscard]] bool IsMousePassthrough() const { return _mousePassthrough; }
         /**
+         * @brief Says which parts of the window the pointer lands on — @p rects, each x, y, width and
+         *        height in pixels — and lets it through everywhere else. Unlike SetMousePassthrough the
+         *        window then hears of the pointer by itself, over those parts, with nothing to ask.
+         * @return Whether the platform has such a thing (X11). Where it has none nothing changes, and
+         *         SetMousePassthrough is what there is.
+         */
+        bool SetInputRegion(std::span<const glm::ivec4> rects);
+        /**
          * @brief Where the pointer is, relative to the window's drawable area, in pixels — wherever it
          *        is on the desktop, over this window or not, and whether or not the window lets it
          *        through. (0, 0) for an offscreen window.
@@ -272,6 +281,14 @@ namespace kor {
         /** @brief The whole desktop: the smallest area that holds every monitor. */
         [[nodiscard]] static MonitorArea Desktop();
 
+        /**
+         * @brief Where the pointer is on the desktop, in screen coordinates, asked of the system itself:
+         *        right whichever window the pointer is over, and while a window is being moved under
+         *        it — which what a window was last told of the pointer is not. Nothing where the
+         *        platform has no such thing to ask (anything but X11, for now).
+         */
+        [[nodiscard]] static std::optional<glm::ivec2> DesktopCursor();
+
         /** @brief The text on the system's clipboard, as UTF-8: empty when it holds none, or there is no windowing system. */
         [[nodiscard]] static std::string ClipboardText();
         /** @brief Puts @p text on the system's clipboard. */
@@ -302,6 +319,15 @@ namespace kor {
 
     	static void FramebufferResize(GLFWwindow* handle, int width, int height);
         static void CloseRequested(GLFWwindow* handle);
+        static void Iconified(GLFWwindow* handle, int iconified);
+        /**
+         * The edges of a window with a title bar of its own, where the system gives it none to resize
+         * it by (X11): the pointer over one shows it, and a press there resizes the window. Input's to
+         * call, with what the window heard; true when the edge has it, and nothing else should.
+         */
+        static bool FramePointerMoved(GLFWwindow* handle, double x, double y);
+        static bool FramePressed(GLFWwindow* handle);
+        void ShowCursor() const;
 
         GLFWwindow* _window = nullptr;
         GLFWmonitor* _monitor = nullptr;
@@ -319,12 +345,15 @@ namespace kor {
         mutable Cursor _cursor = Cursor::eArrow;
         mutable bool _customTitleBar = false;
         mutable bool _frameChanged = false;     ///< The frame is to be worked out again, after this frame.
+        mutable int _frameGrip = -1;            ///< The edge the pointer is over, as kor::x11::Grip; -1 for none.
+        std::optional<std::vector<glm::ivec4>> _inputRegion;
         bool _vsync;
         std::vector<Format> _formats;
 
         kor::Resource<kor::Framebuffer> _framebuffer;
 
         bool _paused = false;
+        bool _iconified = false;        ///< Minimized: not drawn into, whatever size it is said to have.
         bool _closeRequested = false;
         bool _focused = true;
         bool _hasResized = false;

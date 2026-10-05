@@ -42,7 +42,7 @@ namespace kor
  */
 extern "C" {
     /** @brief Bumped whenever the table below — or kor::Scene, which a library derives from — changes shape. A library built against another is refused. */
-    #define KORAL_SCENE_ABI_VERSION 2u
+    #define KORAL_SCENE_ABI_VERSION 3u
 
     /** @brief One scene a library offers. */
     struct KoralSceneEntry {

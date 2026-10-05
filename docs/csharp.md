@@ -245,8 +245,6 @@ from `koral_c.h`. A ctest fails when either is stale.
 
 ## Not yet
 
-- **An interface.** ImGui has no C# binding here, so a C# scene has no `RenderUI`; a C++ module's panels
-  still work alongside it.
 - **Modules, jobs, reflection and semantics.** `kor::Module`, `kor::Job` (use an `App` with
   `WindowPlatform.eNone`), `KORAL_REFLECT` (C# has reflection of its own: `[Keep]`, `State()`), and
   `SemanticSerializer` writes to descriptor sets are C++ only.

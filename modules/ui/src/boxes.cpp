@@ -383,8 +383,11 @@ namespace kui
 
     void RenderImage::Set(const kor::ResourceRef<const kor::Image>& image, const ImageFit fit, const glm::vec2 size)
     {
-        if (image.Get() == _image.Get() && fit == _fit && size == _preferred) return;
+        // An image resized in place is the same handle with another extent: laid out and painted again.
+        const glm::u64 generation = image.Valid() ? image->Generation() : 0;
+        if (image.Get() == _image.Get() && generation == _generation && fit == _fit && size == _preferred) return;
         _image = image;
+        _generation = generation;
         _fit = fit;
         _preferred = size;
         MarkNeedsLayout();
@@ -501,6 +504,36 @@ namespace kui
     }
 
     void RenderOpacity::Set(const float opacity) { OwnLayer()->SetOpacity(std::clamp(opacity, 0.f, 1.f)); }
+
+    void RenderReveal::Set(const float share)
+    {
+        const float s = std::clamp(share, 0.f, 1.f);
+        if (s == _share) return;
+        _share = s;
+        MarkNeedsLayout();
+        MarkNeedsPaint();
+    }
+
+    void RenderReveal::PerformLayout()
+    {
+        if (auto* child = Child()) {
+            child->Layout(Constraints(), true);
+            child->SetOffset({});
+            SetSize(Constraints().Constrain({ child->Size().x, std::round(child->Size().y * _share) }));
+        } else {
+            SetSize(Constraints().Smallest());
+        }
+    }
+
+    void RenderReveal::Paint(Canvas& canvas, const glm::vec2 offset)
+    {
+        if (_share >= 1.f) { RenderContainer::Paint(canvas, offset); return; }
+        if (Size().y <= 0.f) return;
+        canvas.Save();
+        canvas.ClipRect(Rect::XYWH(offset.x, offset.y, Size().x, Size().y));
+        RenderContainer::Paint(canvas, offset);
+        canvas.Restore();
+    }
 
     void RenderClip::Set(const Radii& radius)
     {
@@ -749,11 +782,22 @@ namespace kui
             Widget feedback = _config.options.feedback;
             glm::vec2 hotspot = _down;
             if (!feedback) {
-                // A ghost of it: where it will land, without drawing it twice.
+                // The thing itself, as big as it is here, a little seen through: held where it was taken hold of.
+                // (Built again for the purpose: what is still in its place stays there.) With no child, a ghost of its size.
                 const Theme& t = Theme::Current();
-                feedback = SizedBox(Size().x, Size().y).Background(t.primary.WithAlpha(0.35f), t.radius).Border(1.f, t.primary, t.radius);
-            } else {
+                feedback = _config.child ? Opacity(0.8f, SizedBox(Size().x, Size().y, _config.child))
+                                         : SizedBox(Size().x, Size().y).Background(t.primary.WithAlpha(0.35f), t.radius).Border(1.f, t.primary, t.radius);
+            } else if (!_config.options.feedbackInPlace) {
                 hotspot = { 8.f, 8.f };   // a feedback of another size is held by its corner, clear of the pointer
+            }
+            if (!_config.options.feedback || _config.options.feedbackInPlace) {
+                // The thing itself: outlined in the accent, so that it is seen to be in hand — round it, not over it.
+                const Theme& t = Theme::Current();
+                constexpr float Line = 1.5f;
+                const float radius = _config.options.feedbackRadius >= 0.f ? _config.options.feedbackRadius : t.radius;
+                feedback = Container({ .padding = EdgeInsets::All(Line),
+                                       .decoration = { .borderWidth = Line, .borderColor = t.primary, .radius = radius + Line } }, std::move(feedback));
+                hotspot += glm::vec2(Line);
             }
             if (!owner->beginDrag(*this, _config.data, feedback, hotspot, _config.options.onDragEnd)) return false;
             if (_config.options.onDragStart) _config.options.onDragStart();
@@ -896,6 +940,11 @@ namespace kui
         return box<RenderOpacity, float>(opacity, one(std::move(child)), [](RenderOpacity& r, const float& c) { r.Set(c); });
     }
 
+    Widget detail::RevealBox(const float share, Widget child)
+    {
+        return box<RenderReveal, float>(share, one(std::move(child)), [](RenderReveal& r, const float& c) { r.Set(c); });
+    }
+
     Widget ClipRRect(const Radii radius, Widget child)
     {
         return box<RenderClip, Radii>(radius, one(std::move(child)), [](RenderClip& r, const Radii& c) { r.Set(c); });
@@ -914,7 +963,8 @@ namespace kui
 
     Widget Draggable(DragData data, Widget child, DraggableOptions options)
     {
-        return box<RenderDraggable, RenderDraggable::Config>({ std::move(data), std::move(options) }, one(std::move(child)),
+        Widget shown = child;
+        return box<RenderDraggable, RenderDraggable::Config>({ std::move(data), std::move(options), std::move(shown) }, one(std::move(child)),
             [](RenderDraggable& r, const RenderDraggable::Config& c) { r.Set(c); });
     }
 

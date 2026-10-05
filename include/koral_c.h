@@ -744,7 +744,6 @@ typedef struct KoralAppSettings {
     KoralPlatform platform;
     uint32_t frames_in_flight;
     const char* gpu;
-    const char* interface_directory;
 } KoralAppSettings;
 typedef struct KoralWindowSettings {
     const char* title;
@@ -769,13 +768,11 @@ KORAL_API KoralOffscreenSettings koral_offscreen_settings_default(void);
  */
 typedef struct KoralSceneCallbacks {
     void* user;
-    bool interface;   /* EnableInterface(): render_ui is called */
     void (*initialize)(KoralScene* scene, void* user);
     void (*fixed_update)(KoralScene* scene, void* user);
     void (*update)(KoralScene* scene, void* user);
     void (*late_update)(KoralScene* scene, void* user);
     void (*render)(KoralScene* scene, KoralCommandBuffer* commands, void* user);
-    void (*render_ui)(KoralScene* scene, void* user);
     void (*on_resize)(KoralScene* scene, uint32_t width, uint32_t height, void* user);
     void (*on_suspend)(KoralScene* scene, void* user);
     void (*on_resume)(KoralScene* scene, void* user);
@@ -838,7 +835,6 @@ KORAL_API KoralWindow* koral_scene_scene_window(KoralScene* scene);
 KORAL_API KoralInput* koral_scene_scene_input(KoralScene* scene);
 KORAL_API KoralTime* koral_scene_scene_time(KoralScene* scene);
 KORAL_API KoralDebugDraw* koral_scene_scene_debug(KoralScene* scene);
-KORAL_API bool koral_scene_has_interface(KoralScene* scene);
 KORAL_API const char* koral_scene_save_state(KoralScene* scene);
 KORAL_API KoralStatus koral_scene_load_state(KoralScene* scene, const char* json);
 KORAL_API KoralView* koral_scene_add_view(KoralScene* scene, const char* name, const KoralOffscreenSettings* target);
@@ -969,8 +965,11 @@ KORAL_API void koral_time_set_time_scale(KoralTime* time, float scale);
 
 /* ==== kor::DebugDraw ===================================================================================== */
 
-/** kor::DebugStyle. */
-typedef struct KoralDebugStyle { float color[4]; float duration; bool on_top; } KoralDebugStyle;
+/**
+ * kor::DebugStyle. A fill with an alpha of 0 is none; @p fill_only leaves the outline out (kor::DebugStyle::outline =
+ * false); @p line_width is in pixels, and 0 is 1.
+ */
+typedef struct KoralDebugStyle { float color[4]; float duration; bool on_top; float fill[4]; bool fill_only; float line_width; } KoralDebugStyle;
 KORAL_API KoralDebugStyle koral_debug_style_default(void);
 
 /* Vectors are 3 floats; matrices 16, column-major. A null style is the default one. */
@@ -988,6 +987,42 @@ KORAL_API void koral_debug_grid(KoralDebugDraw* draw, const float center[3], flo
 KORAL_API void koral_debug_frustum(KoralDebugDraw* draw, const float view_projection[16], const KoralDebugStyle* style);
 KORAL_API void koral_debug_clear(KoralDebugDraw* draw);
 KORAL_API uint64_t koral_debug_line_count(KoralDebugDraw* draw);
+KORAL_API void koral_debug_triangle(KoralDebugDraw* draw, const float a[3], const float b[3], const float c[3], const KoralDebugStyle* style);
+KORAL_API void koral_debug_quad(KoralDebugDraw* draw, const float a[3], const float b[3], const float c[3], const float d[3],
+                                const KoralDebugStyle* style);
+KORAL_API void koral_debug_plane(KoralDebugDraw* draw, const float center[3], const float normal[3], const float size[2],
+                                 const KoralDebugStyle* style);
+KORAL_API void koral_debug_cylinder(KoralDebugDraw* draw, const float from[3], const float to[3], float radius,
+                                    const KoralDebugStyle* style, int segments);
+KORAL_API void koral_debug_cone(KoralDebugDraw* draw, const float base[3], const float tip[3], float radius, const KoralDebugStyle* style,
+                                int segments);
+KORAL_API void koral_debug_capsule(KoralDebugDraw* draw, const float from[3], const float to[3], float radius,
+                                   const KoralDebugStyle* style, int segments);
+KORAL_API void koral_debug_camera(KoralDebugDraw* draw, const float view[16], const float projection[16], float size,
+                                  const KoralDebugStyle* style);
+KORAL_API void koral_debug_point_light(KoralDebugDraw* draw, const float position[3], float range, const KoralDebugStyle* style);
+KORAL_API void koral_debug_spot_light(KoralDebugDraw* draw, const float position[3], const float direction[3], float range,
+                                      float outer_angle, float inner_angle, const KoralDebugStyle* style);
+KORAL_API void koral_debug_directional_light(KoralDebugDraw* draw, const float position[3], const float direction[3], float size,
+                                             const KoralDebugStyle* style);
+KORAL_API uint64_t koral_debug_triangle_count(KoralDebugDraw* draw);
+
+/** kor::GizmoPointer: @p has_position false when the pointer is not over the image (or is something else's). */
+typedef struct KoralGizmoPointer { float position[2]; bool has_position; float viewport[2]; bool down, pressed; } KoralGizmoPointer;
+/** kor::GizmoOptions; space is a kor::GizmoSpace. */
+typedef struct KoralGizmoOptions { uint32_t space; float size; float snap; } KoralGizmoOptions;
+KORAL_API KoralGizmoOptions koral_gizmo_options_default(void);
+/**
+ * kor::DebugDraw::Gizmo: @p mode is a kor::GizmoMode; @p transform (16 floats) is read and, while a handle is
+ * dragged, written. A null options is the default ones. Returns whether @p transform changed.
+ */
+KORAL_API bool koral_debug_gizmo(KoralDebugDraw* draw, uint32_t mode, float transform[16], const float view_projection[16],
+                                 const KoralGizmoPointer* pointer, const KoralGizmoOptions* options, uint64_t id);
+KORAL_API bool koral_debug_gizmo_active(KoralDebugDraw* draw);
+KORAL_API bool koral_debug_gizmo_hovered(KoralDebugDraw* draw);
+/** kor::Scene::Debug::Gizmo: the current scene's gizmo, with its own mouse over its window. */
+KORAL_API bool koral_current_gizmo(uint32_t mode, float transform[16], const float view_projection[16], const KoralGizmoOptions* options,
+                                   uint64_t id);
 /**
  * Adds a kor::DebugDrawPass to @p graph: @p draw's lines into @p target (null: the screen), tested against
  * the depth image @p depth (null: on top), with the camera @p view_projection writes each frame (16 floats,

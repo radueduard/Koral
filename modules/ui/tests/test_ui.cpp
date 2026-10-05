@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <numbers>
+#include <thread>
 
 #include <app.h>
 #include <buffer.h>
@@ -675,6 +676,136 @@ TEST_F(WidgetTest, ATextFieldSelectsReplacesAndTakesSeveralLines) {
     EXPECT_EQ(text, "a\nb\nc");
     EXPECT_FALSE(IsBlack(scene->At(30, 50))) << "three lines tall now";
     (void) before;
+}
+
+// A DragValue double-clicked is a text box for typing the value — a single click is not — and Enter or
+// clicking away sets it, kept to the range; Escape, or what is no number, leaves it as it was.
+TEST_F(WidgetTest, ADragValueClickedIsTypedIn) {
+    if (!kui::Font::Default()) GTEST_SKIP() << "no default font";
+    float value = 1.f;
+    auto& input = scene->SceneInput();
+    const auto press = [&](const kor::Key key) { input.FeedKey(key, true); settle(); input.FeedKey(key, false); settle(); };
+    const auto show = [&] {
+        Show(kui::Align(kui::Alignment::TopLeft(),
+                        kui::DragValue(value, [&](const float v) { value = v; }, kui::DragValueOptions {}.SetRange(0.f, 10.f).SetWidth(60.f))));
+    };
+    const auto typeIn = [&](const std::u32string& text) {
+        Click({ 30.f, 15.f });
+        Click({ 30.f, 15.f });
+        settle();
+        ASSERT_TRUE(input.InterfaceWantsKeyboard()) << "a double click turns it into a text box that has the keyboard";
+        input.FeedText(text);
+        settle();
+    };
+
+    show();
+    Click({ 30.f, 15.f });
+    settle();
+    EXPECT_FALSE(input.InterfaceWantsKeyboard()) << "one click is not enough";
+    // Clicked again long after: two single clicks, not a double one.
+    std::this_thread::sleep_for(std::chrono::milliseconds(450));
+    Click({ 30.f, 15.f });
+    settle();
+    EXPECT_FALSE(input.InterfaceWantsKeyboard()) << "nor are two far apart";
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(450));
+    typeIn(U"7.25");
+    press(kor::Key::eEnter);
+    EXPECT_FLOAT_EQ(value, 7.25f) << "what was typed replaces what it held, all of it selected";
+    EXPECT_FALSE(input.InterfaceWantsKeyboard()) << "and it is a drag again";
+
+    show();
+    typeIn(U"50");
+    press(kor::Key::eEnter);
+    EXPECT_FLOAT_EQ(value, 10.f) << "kept to its range";
+
+    show();
+    typeIn(U"3");
+    press(kor::Key::eEsc);
+    EXPECT_FLOAT_EQ(value, 10.f) << "Escape leaves it as it was";
+
+    show();
+    typeIn(U"not a number");
+    press(kor::Key::eEnter);
+    EXPECT_FLOAT_EQ(value, 10.f) << "and so does what is no number";
+
+    show();
+    typeIn(U" 4,5 ");
+    Click({ 30.f, 55.f });
+    EXPECT_FLOAT_EQ(value, 4.5f) << "clicked away from, it is set: spaces round it and a decimal comma are fine";
+    EXPECT_FALSE(input.InterfaceWantsKeyboard());
+}
+
+// Dragged, it is a drag and no text box; and one that is not typeable never is one.
+TEST_F(WidgetTest, ADragValueDraggedOrNotTypeableIsNoTextBox) {
+    if (!kui::Font::Default()) GTEST_SKIP() << "no default font";
+    float value = 1.f;
+    auto& input = scene->SceneInput();
+    Show(kui::Align(kui::Alignment::TopLeft(),
+                    kui::DragValue(value, [&](const float v) { value = v; }, kui::DragValueOptions {}.SetSpeed(0.1f).SetWidth(60.f))));
+    input.FeedMousePosition({ 30.f, 15.f });
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, true);
+    settle();
+    input.FeedMousePosition({ 50.f, 15.f });
+    input.FeedMouseDelta({ 20.f, 0.f });
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, false);
+    settle(); settle();
+    EXPECT_GT(value, 1.f) << "dragged";
+    EXPECT_FALSE(input.InterfaceWantsKeyboard()) << "a drag is no click";
+
+    Show(kui::Align(kui::Alignment::TopLeft(),
+                    kui::DragValue(value, [&](const float v) { value = v; }, kui::DragValueOptions {}.SetWidth(60.f).SetTypeable(false))));
+    Click({ 30.f, 15.f });
+    Click({ 30.f, 15.f });
+    settle();
+    EXPECT_FALSE(input.InterfaceWantsKeyboard()) << "not typeable: a double click does nothing";
+}
+
+// Tab goes through drag values as it does text fields: each tabbed to is typed in, and tabbed out of, set.
+TEST_F(WidgetTest, TabGoesThroughDragValuesTypingInEach) {
+    if (!kui::Font::Default()) GTEST_SKIP() << "no default font";
+    std::string name;
+    float first = 1.f, second = 2.f;
+    auto& input = scene->SceneInput();
+    const auto press = [&](const kor::Key key) { input.FeedKey(key, true); settle(); input.FeedKey(key, false); settle(); };
+    const auto show = [&] {
+        Show(kui::Align(kui::Alignment::TopLeft(), kui::Column({
+            kui::TextField({ .onChanged = [&](const std::string& t) { name = t; }, .width = 60.f }),
+            kui::DragValue(first, [&](const float v) { first = v; }, kui::DragValueOptions {}.SetWidth(60.f)),
+            kui::DragValue(second, [&](const float v) { second = v; }, kui::DragValueOptions {}.SetWidth(60.f)),
+            kui::DragValue(0.f, {}, kui::DragValueOptions {}.SetWidth(60.f).SetTypeable(false)),
+        })));
+    };
+    show();
+    Click({ 20.f, 10.f });
+    input.FeedText(U"a");
+    settle();
+    ASSERT_EQ(name, "a");
+
+    press(kor::Key::eTab);
+    settle();
+    input.FeedText(U"5");
+    settle();
+    press(kor::Key::eTab);
+    settle();
+    EXPECT_FLOAT_EQ(first, 5.f) << "tabbed to, the first drag was typed in; tabbed out of, set";
+    input.FeedText(U"6");
+    settle();
+    press(kor::Key::eEnter);
+    EXPECT_FLOAT_EQ(second, 6.f) << "and the keyboard went on to the second";
+
+    // From the second, past the one that is not typeable, round to the text field.
+    show();
+    Click({ 20.f, 10.f });
+    press(kor::Key::eTab);
+    press(kor::Key::eTab);
+    press(kor::Key::eTab);
+    settle();
+    input.FeedText(U"b");
+    settle();
+    EXPECT_EQ(name, "ab") << "a drag that is not typeable is not in the order";
 }
 
 TEST_F(WidgetTest, TabGoesFromOneFieldToTheNext) {
@@ -1526,13 +1657,14 @@ TEST(DockShowcase, Renders) {
 // space wide (60); the log along the bottom, in its left part, 30% of the space tall (48). So there is a
 // stripe of 38 down each side — the inspector's button at the top of the right one, the log's at the foot
 // of the left one — and between them 164, of which a line of 4 and the inspector's 60 leave the scene 100.
-// Every open panel has a title bar of 28 over it.
+// Every open panel has a title bar of 28 over it. Half the line's 4 is kept from the top and the foot of
+// the space, and from a side whose stripe is gone.
 
 TEST_F(DockTest, PanelsGoWhereTheLayoutSaysAndFillTheirAreas) {
     EXPECT_FLOAT_EQ(view.x, 100.f);
-    EXPECT_FLOAT_EQ(view.y, 80.f) << "108 over the bottom's line, less its title bar";
+    EXPECT_FLOAT_EQ(view.y, 76.f) << "104 over the bottom's line, less its title bar";
     EXPECT_FLOAT_EQ(inspector.x, 60.f);
-    EXPECT_FLOAT_EQ(inspector.y, 80.f) << "the sides stop where the bottom starts";
+    EXPECT_FLOAT_EQ(inspector.y, 76.f) << "the sides stop where the bottom starts";
     EXPECT_FLOAT_EQ(log.x, 164.f) << "the bottom runs from one stripe to the other";
     EXPECT_FLOAT_EQ(log.y, 20.f);
     Click({ 100.f, 150.f });
@@ -1545,7 +1677,7 @@ TEST_F(DockTest, AButtonOpensItsPanelAndFoldsItAway) {
     Click({ 19.f, 141.f });   // the log's button, at the foot of the left stripe
     EXPECT_FALSE(layout->IsShown("log")) << "open, its button folds it away";
     EXPECT_TRUE(layout->IsOpen("log")) << "which is not closing it";
-    EXPECT_FLOAT_EQ(view.y, 132.f) << "the scene has the height the bottom had";
+    EXPECT_FLOAT_EQ(view.y, 128.f) << "the scene has the height the bottom had";
     EXPECT_GT(changes, 0);
     Click({ 19.f, 141.f });
     EXPECT_TRUE(layout->IsShown("log"));
@@ -1564,7 +1696,7 @@ TEST_F(DockTest, ATitleBarHidesAndCloses) {
     Click({ 186.f, 14.f });
     EXPECT_EQ(closed, "inspector");
     EXPECT_FALSE(layout->IsOpen("inspector"));
-    EXPECT_FLOAT_EQ(view.x, 202.f) << "closed, its button is gone — and with it the right stripe";
+    EXPECT_FLOAT_EQ(view.x, 200.f) << "closed, its button is gone — and with it the right stripe";
     layout->Open("inspector");
     settle(); settle();
     EXPECT_TRUE(layout->IsShown("inspector"));
@@ -1585,11 +1717,11 @@ TEST(DockStyle, TheSizesAreTheStylesToSay) {
         settle(); settle();
     };
     show({});
-    EXPECT_FLOAT_EQ(size.y, 160.f - 28.f) << "under a title bar of 28, as it always was";
+    EXPECT_FLOAT_EQ(size.y, 160.f - 28.f - 6.f) << "under a title bar of 28, as it always was";
     kui::DockStyle tall;
     tall.titleBarHeight = 40.f;
     show(tall);
-    EXPECT_FLOAT_EQ(size.y, 160.f - 40.f);
+    EXPECT_FLOAT_EQ(size.y, 160.f - 40.f - 6.f);
     s_app->Close(*scene);
     settle();
 }
@@ -1610,7 +1742,7 @@ TEST_F(DockTest, TheLineBetweenAreasResizesThem) {
     EXPECT_FLOAT_EQ(inspector.x, 80.f);
     EXPECT_FLOAT_EQ(view.x, 80.f);
     Drag({ 100.f, 110.f }, { 100.f, 90.f });  // the line over the bottom, twenty up
-    EXPECT_FLOAT_EQ(log.y, 40.f);
+    EXPECT_FLOAT_EQ(log.y, 38.f);
 }
 
 TEST_F(DockTest, AButtonDraggedOntoAStripeMovesItsPanelThere) {
@@ -1621,11 +1753,11 @@ TEST_F(DockTest, AButtonDraggedOntoAStripeMovesItsPanelThere) {
     EXPECT_TRUE(layout->IsShown("log"));
     EXPECT_TRUE(layout->IsShown("inspector")) << "a part of its own: the inspector is still shown over it";
     // No left stripe now: 202 between the edge and the right one. The right side's 160 is two parts of 78.
-    EXPECT_FLOAT_EQ(view.x, 138.f);
-    EXPECT_FLOAT_EQ(view.y, 132.f) << "nothing is left along the bottom";
+    EXPECT_FLOAT_EQ(view.x, 136.f);
+    EXPECT_FLOAT_EQ(view.y, 128.f) << "nothing is left along the bottom";
     EXPECT_FLOAT_EQ(log.x, 60.f);
-    EXPECT_FLOAT_EQ(log.y, 50.f);
-    EXPECT_FLOAT_EQ(inspector.y, 50.f);
+    EXPECT_FLOAT_EQ(log.y, 48.f);
+    EXPECT_FLOAT_EQ(inspector.y, 48.f);
     Click({ 180.f, 140.f });
     EXPECT_EQ(taps, 2) << "the same panel, with what it counted before";
 
@@ -1633,7 +1765,7 @@ TEST_F(DockTest, AButtonDraggedOntoAStripeMovesItsPanelThere) {
     Drag({ 221.f, 62.f }, { 221.f, 12.f });
     EXPECT_TRUE(layout->IsShown("log"));
     EXPECT_FALSE(layout->IsShown("inspector")) << "one part shows one panel";
-    EXPECT_FLOAT_EQ(log.y, 132.f);
+    EXPECT_FLOAT_EQ(log.y, 128.f);
 }
 
 TEST_F(DockTest, DroppedOnADockedPanelItJoinsItOrGoesUnderIt) {
@@ -1642,14 +1774,14 @@ TEST_F(DockTest, DroppedOnADockedPanelItJoinsItOrGoesUnderIt) {
     EXPECT_FALSE(layout->IsFloating("log"));
     EXPECT_TRUE(layout->IsShown("log"));
     EXPECT_TRUE(layout->IsShown("inspector")) << "a part of its own, under the inspector's";
-    EXPECT_FLOAT_EQ(log.y, 50.f);
-    EXPECT_FLOAT_EQ(inspector.y, 50.f);
+    EXPECT_FLOAT_EQ(log.y, 48.f);
+    EXPECT_FLOAT_EQ(inspector.y, 48.f);
 
     // Over its upper part: into its group, in front of it. One part shows one panel; their buttons switch between them.
     Drag({ 221.f, 62.f }, { 170.f, 40.f });
     EXPECT_TRUE(layout->IsShown("log"));
     EXPECT_FALSE(layout->IsShown("inspector"));
-    EXPECT_FLOAT_EQ(log.y, 132.f) << "the one part has the whole side";
+    EXPECT_FLOAT_EQ(log.y, 128.f) << "the one part has the whole side";
     Click({ 221.f, 19.f });   // the inspector's button, the first of the two
     EXPECT_TRUE(layout->IsShown("inspector"));
     EXPECT_FALSE(layout->IsShown("log"));
@@ -1661,8 +1793,8 @@ TEST_F(DockTest, DroppedInTheMiddleItIsATabThere) {
     EXPECT_FALSE(layout->IsFloating("log"));
     EXPECT_TRUE(layout->IsShown("log"));
     EXPECT_FALSE(layout->IsShown("scene")) << "a tab behind it now";
-    EXPECT_FLOAT_EQ(log.x, 138.f) << "its button left the left stripe, which is gone: the middle starts at the edge";
-    EXPECT_FLOAT_EQ(log.y, 132.f) << "and nothing is left along the bottom";
+    EXPECT_FLOAT_EQ(log.x, 136.f) << "its button left the left stripe, which is gone: the middle starts at the edge";
+    EXPECT_FLOAT_EQ(log.y, 128.f) << "and nothing is left along the bottom";
 
     // The scene's title, next to the log's, brings it back to the front.
     Click({ 20.f, 14.f });
@@ -1724,7 +1856,7 @@ TEST_F(DockTest, DroppedInAMarginItDocksThereAndAnywhereElseItFloats) {
     EXPECT_FALSE(layout->IsFloating("log"));
     Drag({ 19.f, 141.f }, { 120.f, 70.f });   // the log's button, into the middle of the space
     EXPECT_TRUE(layout->IsFloating("log"));
-    EXPECT_FLOAT_EQ(view.x, 138.f) << "its button left the left stripe, which is gone";
+    EXPECT_FLOAT_EQ(view.x, 136.f) << "its button left the left stripe, which is gone";
 
     const std::string saved = layout->Save();
     auto other = std::make_shared<kui::DockLayout>();
@@ -1737,7 +1869,7 @@ TEST_F(DockTest, DroppedInAMarginItDocksThereAndAnywhereElseItFloats) {
     Drag({ 122.f, 70.f }, { 200.f, 152.f });
     EXPECT_FALSE(layout->IsFloating("log"));
     EXPECT_TRUE(layout->IsShown("log"));
-    EXPECT_FLOAT_EQ(log.x, 202.f) << "the only part of the bottom that is open has all of it";
+    EXPECT_FLOAT_EQ(log.x, 200.f) << "the only part of the bottom that is open has all of it";
 
     // And into the left margin: down the left side.
     Drag({ 221.f, 141.f }, { 40.f, 30.f });   // its button, at the foot of the right stripe now — to nowhere (off the margins, and off the middle of the middle): it floats
@@ -1745,7 +1877,7 @@ TEST_F(DockTest, DroppedInAMarginItDocksThereAndAnywhereElseItFloats) {
     layout->Dock("log", kui::DockArea::eLeft);
     settle(); settle();
     EXPECT_FALSE(layout->IsFloating("log"));
-    EXPECT_FLOAT_EQ(log.y, 132.f) << "the whole height of the left side";
+    EXPECT_FLOAT_EQ(log.y, 128.f) << "the whole height of the left side";
 }
 
 TEST_F(DockTest, ASideCanBeInSeveralParts) {
@@ -1753,13 +1885,13 @@ TEST_F(DockTest, ASideCanBeInSeveralParts) {
     settle(); settle();
     EXPECT_TRUE(layout->IsShown("log"));
     EXPECT_TRUE(layout->IsShown("inspector"));
-    EXPECT_FLOAT_EQ(inspector.y, 50.f) << "half of the side's 160, less the line between them and its title bar";
-    EXPECT_FLOAT_EQ(log.y, 50.f);
+    EXPECT_FLOAT_EQ(inspector.y, 48.f) << "half of the side's 160, less the line between them and its title bar";
+    EXPECT_FLOAT_EQ(log.y, 48.f);
     EXPECT_FLOAT_EQ(log.x, 60.f);
 
     Drag({ 170.f, 80.f }, { 170.f, 100.f });  // the line between the two parts, twenty down
-    EXPECT_FLOAT_EQ(inspector.y, 70.f);
-    EXPECT_FLOAT_EQ(log.y, 30.f);
+    EXPECT_FLOAT_EQ(inspector.y, 68.f);
+    EXPECT_FLOAT_EQ(log.y, 28.f);
 
     auto other = std::make_shared<kui::DockLayout>();
     ASSERT_TRUE(other->Load(layout->Save()));
@@ -1768,7 +1900,7 @@ TEST_F(DockTest, ASideCanBeInSeveralParts) {
     layout->Hide("inspector");
     settle(); settle();
     EXPECT_FALSE(layout->IsShown("inspector"));
-    EXPECT_FLOAT_EQ(log.y, 132.f) << "the part that is open has the whole side";
+    EXPECT_FLOAT_EQ(log.y, 128.f) << "the part that is open has the whole side";
 }
 
 TEST_F(DockTest, APanelFloatsAgainAtTheSizeItFloatedAtBefore) {

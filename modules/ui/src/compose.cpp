@@ -285,7 +285,7 @@ namespace kui
                         && a.primaryPressed == b.primaryPressed && a.onPrimary == b.onPrimary && a.text == b.text
                         && a.textMuted == b.textMuted && a.border == b.border && a.focus == b.focus && a.radius == b.radius
                         && a.controlHeight == b.controlHeight && a.buttonRadius == b.buttonRadius && a.fieldRadius == b.fieldRadius
-                        && a.checkboxRadius == b.checkboxRadius && s.font == o.font && s.size == o.size && s.color == o.color
+                        && a.checkboxRadius == b.checkboxRadius && a.design == b.design && s.font == o.font && s.size == o.size && s.color == o.color
                         && s.lineHeight == o.lineHeight && s.letterSpacing == o.letterSpacing && s.weight == o.weight
                         && s.italic == o.italic && s.underline == o.underline && s.lineThrough == o.lineThrough;
                 };

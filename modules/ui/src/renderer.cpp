@@ -284,9 +284,31 @@ namespace kui
         std::map<std::uint32_t, Parameters> parameters;   // by shader id
 
         /** @brief The textures every layer draws from: slot 0 is the glyph atlas. Slots stay put while used. */
-        struct Texture { kor::ResourceRef<const kor::Image> image; std::uint32_t uses = 0; };
+        // The generation is the image's as it was bound: an image resized in place (kor::Image::Generation)
+        // is another GPU image under the same handle, and the set has to be written again for it.
+        struct Texture { kor::ResourceRef<const kor::Image> image; std::uint32_t uses = 0; glm::u64 generation = 0; };
         std::vector<Texture> textures { 1 };
         bool texturesChanged = true;
+
+        /**
+         * @brief What is behind the interface, as glass shows it (Canvas::DrawBackdrop): a picture of the
+         *        target at half its size, with its smaller copies — the blur — taken while the frame is
+         *        recorded, each time a backdrop is come to with something drawn since the last. It has a
+         *        slot among the textures from the first backdrop drawn, and an image once there is a target.
+         */
+        std::uint32_t backdropSlot = 0;
+        kor::Resource<kor::Image> backdrop;
+        static constexpr int BackdropCaptures = 4;      ///< In a frame, at the most.
+
+        std::uint32_t BackdropSlot()
+        {
+            if (backdropSlot == 0) {
+                textures.push_back({ {}, 1 });      // held for good: never another's
+                backdropSlot = static_cast<std::uint32_t>(textures.size() - 1);
+                texturesChanged = true;
+            }
+            return backdropSlot;
+        }
 
         /** @brief What a layer has in the tables. */
         struct LayerState {
@@ -445,6 +467,7 @@ namespace kui
                 it.SetLayerClip(s.index, clipOf(it.Clip()));
                 if (it.Flags() & eGradient) it.paint += s.gradientSlot.offset;
                 it.SetTexture(textureMap[std::min<std::size_t>(it.Texture(), textureMap.size() - 1)]);
+                if (it.Kind() == eBackdrop) it.SetTexture(BackdropSlot());
                 if (it.Kind() == eCustom) {
                     const auto [id, record] = elementRecord[it.paint];
                     it.paint = s.parameterSlots[id].offset + record;
@@ -466,6 +489,7 @@ namespace kui
             for (const auto& run : d.runs) {
                 switch (run.kind) {
                 case RunKind::ePrimitives:
+                case RunKind::eBackdrop:
                 case RunKind::eElement:
                     if (run.kind == RunKind::eElement && (!run.shader || !run.shader->Valid())) break;
                     s.runs.push_back({ run.kind, run.kind == RunKind::eElement ? run.shader : nullptr, s.instanceSlot.offset + run.first, run.count, nullptr });
@@ -551,6 +575,7 @@ namespace kui
             for (const auto& run : s.runs) {
                 switch (run.kind) {
                 case RunKind::ePrimitives:
+                case RunKind::eBackdrop:
                 case RunKind::eElement: {
                     const auto first = static_cast<std::uint32_t>(instanceOrder.cpu.size());
                     for (std::uint32_t i = 0; i < run.count; ++i) instanceOrder.cpu.push_back(run.first + i);
@@ -661,6 +686,11 @@ namespace kui
 
             const auto atlas = AtlasImage();
             if (textures[0].image.Get() != atlas.Get()) { textures[0].image = atlas; texturesChanged = true; }
+            for (auto& texture : textures)
+                if (texture.image.Valid() && texture.image->Generation() != texture.generation) {
+                    texture.generation = texture.image->Generation();
+                    texturesChanged = true;
+                }
             if (texturesChanged) { texturesChanged = false; replaced = true; }
             if (replaced) ++tablesVersion;
             return replaced;
@@ -717,6 +747,25 @@ namespace kui
             auto& t = targets[formatsOf(*target)];
             current = &t;
             if (t.failed) return;
+            // Glass in the frame: the picture of the target it shows through, as big as half the target.
+            if (backdropSlot != 0 && std::ranges::any_of(draws, [](const Draw& d) { return d.kind == RunKind::eBackdrop; })) {
+                const auto full = target->ColorImage(0)->Extent();
+                const glm::uvec2 extent = glm::max(glm::uvec2(full.x, full.y) / 2u, glm::uvec2(1u));
+                const auto format = target->ColorImage(0)->PixelFormat();
+                if (!backdrop.Valid() || glm::uvec2(backdrop->Extent().x, backdrop->Extent().y) != extent || backdrop->PixelFormat() != format) {
+                    glm::u32 levels = 1;
+                    for (glm::u32 side = std::max(extent.x, extent.y); side > 8u && levels < 7u; side /= 2u) ++levels;
+                    backdrop = kor::Image::Builder{}
+                        .SetFormat(format).SetExtent(extent).SetMipLevels(levels)
+                        .SetUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst)
+                        .Build();
+                    if (!backdrop.Valid())
+                        kor::log::Error("[kui] the picture glass shows through could not be made: {}",
+                                        backdrop.Failure() ? backdrop.Failure()->message : "no reason given");
+                    textures[backdropSlot].image = backdrop.Valid() ? kor::ResourceRef<const kor::Image>(backdrop) : kor::ResourceRef<const kor::Image>{};
+                    ++tablesVersion;
+                }
+            }
             if (!t.primitives.Valid()) {
                 t.srgb = target->ColorAttachmentCount() > 0 && isSrgb(target->ColorImage(0)->PixelFormat());
                 const auto vertex = kor::Shader::Builder{}.SetPath("koralUI.vert.glsl").GetOrBuild();
@@ -821,8 +870,30 @@ namespace kui
         };
         commandBuffer.BeginRendering(kor::RenderInfo(target).SetColorLoadOperation(kor::LoadOperation::eLoad));
         const void* bound = nullptr;
+        // Glass: a picture of the target is taken when a backdrop is come to with something drawn since
+        // the last was — the first of the frame always is: the scene is behind the interface.
+        bool drawnSince = true;
+        int captures = 0;
+        const auto source = target->ColorImage(0);
+        const bool canCapture = impl.backdrop.Valid() && source.Valid() && (source->UsageFlags() & kor::Image::Usage::eTransferSrc);
         for (const auto& draw : impl.draws) {
+            if (draw.kind == RunKind::eBackdrop) {
+                if (canCapture && drawnSince && captures < Impl::BackdropCaptures) {
+                    commandBuffer.EndRendering();
+                    kor::Blit whole;
+                    whole.filtering = kor::Filter::eLinear;
+                    commandBuffer.Blit(source, impl.backdrop, whole);
+                    commandBuffer.GenerateMipmaps(impl.backdrop);
+                    commandBuffer.BeginRendering(kor::RenderInfo(target).SetColorLoadOperation(kor::LoadOperation::eLoad));
+                    bound = nullptr;
+                    ++captures;
+                    drawnSince = false;
+                }
+            } else {
+                drawnSince = true;
+            }
             switch (draw.kind) {
+            case RunKind::eBackdrop:
             case RunKind::ePrimitives:
                 if (bound != t->primitives.Get()) {
                     commandBuffer.BindGraphicsPipeline(t->primitives).BindDescriptorSet(0, t->primitiveSet).PushConstantBlock(push);

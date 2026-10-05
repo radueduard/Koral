@@ -16,9 +16,7 @@ add_executable(koral_integration_tests
         test_image_module.cpp
         test_image_export.cpp
         test_image_compress.cpp
-        test_gui_viewport.cpp
         test_camera_aspect.cpp
-        test_camera_panel.cpp
         test_slang_shader.cpp
         test_poison.cpp
 )
@@ -32,9 +30,6 @@ target_link_libraries(koral_integration_tests PRIVATE
         koral-image-export
         koral-image-compress
         koral-model-import
-        # The viewport and gizmo need a real image, so they are covered here rather than in the unit
-        # suite: same headless ImGui context, but with a device behind it.
-        koral-gui-extras
         # A camera's aspect source is a real image or framebuffer, so it is covered with a device.
         koral-camera
         GTest::gtest
@@ -42,7 +37,6 @@ target_link_libraries(koral_integration_tests PRIVATE
         magic_enum::magic_enum
         glm::glm
         spdlog::spdlog
-        imgui::imgui
         Vulkan::Vulkan
         glfw
 )

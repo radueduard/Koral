@@ -243,7 +243,6 @@ internal unsafe struct KoralAppSettings
     public int platform;
     public uint frames_in_flight;
     public IntPtr gpu;
-    public IntPtr interface_directory;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -272,13 +271,11 @@ internal unsafe struct KoralOffscreenSettings
 internal unsafe struct KoralSceneCallbacks
 {
     public void* user;
-    public byte @interface;
     public delegate* unmanaged[Cdecl]<IntPtr, void*, void> initialize;
     public delegate* unmanaged[Cdecl]<IntPtr, void*, void> fixed_update;
     public delegate* unmanaged[Cdecl]<IntPtr, void*, void> update;
     public delegate* unmanaged[Cdecl]<IntPtr, void*, void> late_update;
     public delegate* unmanaged[Cdecl]<IntPtr, IntPtr, void*, void> render;
-    public delegate* unmanaged[Cdecl]<IntPtr, void*, void> render_ui;
     public delegate* unmanaged[Cdecl]<IntPtr, uint, uint, void*, void> on_resize;
     public delegate* unmanaged[Cdecl]<IntPtr, void*, void> on_suspend;
     public delegate* unmanaged[Cdecl]<IntPtr, void*, void> on_resume;
@@ -303,6 +300,27 @@ internal unsafe struct KoralDebugStyle
     public fixed float color[4];
     public float duration;
     public byte on_top;
+    public fixed float fill[4];
+    public byte fill_only;
+    public float line_width;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KoralGizmoPointer
+{
+    public fixed float position[2];
+    public byte has_position;
+    public fixed float viewport[2];
+    public byte down;
+    public byte pressed;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KoralGizmoOptions
+{
+    public uint space;
+    public float size;
+    public float snap;
 }
 
 internal static unsafe partial class KoralNative
@@ -695,7 +713,6 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial IntPtr koral_scene_scene_input(IntPtr scene);
     [LibraryImport(Library)] internal static partial IntPtr koral_scene_scene_time(IntPtr scene);
     [LibraryImport(Library)] internal static partial IntPtr koral_scene_scene_debug(IntPtr scene);
-    [LibraryImport(Library)] internal static partial byte koral_scene_has_interface(IntPtr scene);
     [LibraryImport(Library)] internal static partial byte* koral_scene_save_state(IntPtr scene);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial int koral_scene_load_state(IntPtr scene, string? json);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr koral_scene_add_view(IntPtr scene, string? name, KoralOffscreenSettings* target);
@@ -804,6 +821,22 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_debug_frustum(IntPtr draw, float* view_projection, KoralDebugStyle* style);
     [LibraryImport(Library)] internal static partial void koral_debug_clear(IntPtr draw);
     [LibraryImport(Library)] internal static partial ulong koral_debug_line_count(IntPtr draw);
+    [LibraryImport(Library)] internal static partial void koral_debug_triangle(IntPtr draw, float* a, float* b, float* c, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_quad(IntPtr draw, float* a, float* b, float* c, float* d, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_plane(IntPtr draw, float* center, float* normal, float* size, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_cylinder(IntPtr draw, float* from, float* to, float radius, KoralDebugStyle* style, int segments);
+    [LibraryImport(Library)] internal static partial void koral_debug_cone(IntPtr draw, float* @base, float* tip, float radius, KoralDebugStyle* style, int segments);
+    [LibraryImport(Library)] internal static partial void koral_debug_capsule(IntPtr draw, float* from, float* to, float radius, KoralDebugStyle* style, int segments);
+    [LibraryImport(Library)] internal static partial void koral_debug_camera(IntPtr draw, float* view, float* projection, float size, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_point_light(IntPtr draw, float* position, float range, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_spot_light(IntPtr draw, float* position, float* direction, float range, float outer_angle, float inner_angle, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial void koral_debug_directional_light(IntPtr draw, float* position, float* direction, float size, KoralDebugStyle* style);
+    [LibraryImport(Library)] internal static partial ulong koral_debug_triangle_count(IntPtr draw);
+    [LibraryImport(Library)] internal static partial KoralGizmoOptions koral_gizmo_options_default();
+    [LibraryImport(Library)] internal static partial byte koral_debug_gizmo(IntPtr draw, uint mode, float* transform, float* view_projection, KoralGizmoPointer* pointer, KoralGizmoOptions* options, ulong id);
+    [LibraryImport(Library)] internal static partial byte koral_debug_gizmo_active(IntPtr draw);
+    [LibraryImport(Library)] internal static partial byte koral_debug_gizmo_hovered(IntPtr draw);
+    [LibraryImport(Library)] internal static partial byte koral_current_gizmo(uint mode, float* transform, float* view_projection, KoralGizmoOptions* options, ulong id);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr koral_graph_add_debug_draw_pass(IntPtr graph, IntPtr draw, delegate* unmanaged[Cdecl]<float*, void*, void> view_projection, void* user, delegate* unmanaged[Cdecl]<void*, void> destroy, string? target, string? depth);
     [LibraryImport(Library)] internal static partial byte koral_context_has_device();
     [LibraryImport(Library)] internal static partial byte koral_context_supports_ray_tracing();

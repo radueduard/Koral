@@ -14,7 +14,6 @@ find_package(GTest CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
 
 add_executable(koral_tests
         test_mesh_tlsf_allocator.cpp
@@ -22,7 +21,6 @@ add_executable(koral_tests
         test_error.cpp
         test_log_repeat.cpp
         test_log_history.cpp
-        test_gui_extras.cpp
         test_structs.cpp
         test_image_format.cpp
         test_mesh_layout.cpp
@@ -44,9 +42,6 @@ target_link_libraries(koral_tests PRIVATE
         # The vertex-format layer lives in the mesh module now, so testing it means linking the
         # module exactly as a project would.
         koral-mesh
-        # The GUI extras' widgets are header-only, so the only way to exercise them is to compile and
-        # draw them — which test_gui_extras.cpp does against a headless ImGui context.
-        koral-gui-extras
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum
@@ -55,7 +50,6 @@ target_link_libraries(koral_tests PRIVATE
         # dependencies' headers directly, so consumers — including this test target —
         # need their include directories, exactly like Koral_Runtime does.
         spdlog::spdlog
-        imgui::imgui
         Vulkan::Vulkan
         glfw
 )
@@ -132,3 +126,4 @@ endif()
 
 # The UI module's tests live beside it, and need GTest from here.
 add_subdirectory(${CMAKE_SOURCE_DIR}/modules/ui/tests ${CMAKE_BINARY_DIR}/modules/ui/tests)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/gui-extras/tests ${CMAKE_BINARY_DIR}/modules/gui-extras/tests)

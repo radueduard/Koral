@@ -101,9 +101,10 @@ public static unsafe partial class Widgets
         return Made(KuiNative.kui_text_lines(text, &s, (uint)align, KuiNative.Bool(wrap), maxLines, KuiNative.Bool(ellipsis)));
     }
 
-    /// <summary>A slider that also says when it is let go of.</summary>
-    public static Widget Slider(float value, Action<float>? onChanged, float min, float max, Action? onFinished) =>
-        Made(KuiNative.kui_slider_finished(value, Callbacks.Float(onChanged), min, max, Callbacks.Action(onFinished)));
+    /// <summary>A slider that also says when it is let go of. <paramref name="vertical"/>: upright, the value growing upwards.</summary>
+    public static Widget Slider(float value, Action<float>? onChanged, float min, float max, Action? onFinished, bool vertical = false) =>
+        Made(vertical ? KuiNative.kui_slider_vertical(value, Callbacks.Float(onChanged), min, max, Callbacks.Action(onFinished))
+                      : KuiNative.kui_slider_finished(value, Callbacks.Float(onChanged), min, max, Callbacks.Action(onFinished)));
 
     /// <summary>A line across (or down) between two things, in the theme's border colour.</summary>
     public static Widget Separator(Axis axis = Axis.eHorizontal, float thickness = 1f) =>
@@ -147,10 +148,16 @@ public static unsafe partial class Widgets
     }
 
     // -- numbers, choices and colours
-    /// <summary>A number changed by dragging across it sideways.</summary>
+    /// <summary>
+    /// A number changed by dragging across it sideways; the pointer is held where it is, unseen, while it is.
+    /// <paramref name="vertical"/>: upright, its label over its value, dragged up for more. <paramref name="typeable"/>:
+    /// clicked without being dragged, it turns into a text box for typing the value exactly.
+    /// </summary>
     public static Widget DragValue(float value, Action<float>? onChanged, float speed = 1f, float min = float.NegativeInfinity,
-                                   float max = float.PositiveInfinity, int decimals = 2, string? label = null, float width = -1f) =>
-        Made(KuiNative.kui_drag_value(value, Callbacks.Float(onChanged), speed, min, max, decimals, label, width));
+                                   float max = float.PositiveInfinity, int decimals = 2, string? label = null, float width = -1f,
+                                   bool vertical = false, bool typeable = true) =>
+        Made(vertical ? KuiNative.kui_drag_value_vertical(value, Callbacks.Float(onChanged), speed, min, max, decimals, label, width, KuiNative.Bool(typeable))
+                      : KuiNative.kui_drag_value(value, Callbacks.Float(onChanged), speed, min, max, decimals, label, width, KuiNative.Bool(typeable)));
     /// <summary>A field that opens a list of <paramref name="items"/> under itself.</summary>
     public static Widget Dropdown(IReadOnlyList<string> items, int selected, Action<int>? onChanged, float width = -1f, string? placeholder = null) =>
         Made(KuiNative.kui_dropdown([.. items], (nuint)items.Count, selected, Whole(onChanged), width, placeholder));

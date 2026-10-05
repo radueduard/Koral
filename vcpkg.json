@@ -40,13 +40,6 @@
     "name" : "spirv-reflect",
     "version>=" : "1.4.341.0"
   }, {
-    "name" : "imgui",
-    "version>=" : "1.91.9",
-    "features" : [ "glfw-binding", "vulkan-binding", "docking-experimental" ]
-  }, {
-    "name" : "imguizmo",
-    "version>=" : "2024-05-29"
-  }, {
     "name" : "jasper",
     "version>=" : "4.2.9"
   }, {

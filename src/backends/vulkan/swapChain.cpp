@@ -56,12 +56,13 @@ namespace kor::vk
             return ::vk::PresentModeKHR::eFifo;
         }
 
-        // VSync on (no tearing): prefer mailbox for lower latency, else Fifo (always available).
-        for (const auto &availablePresentMode : availablePresentModes) {
-            if (availablePresentMode == ::vk::PresentModeKHR::eMailbox) {
-                return availablePresentMode;
-            }
-        }
+        // VSync on (no tearing): prefer mailbox for lower latency; then the mode that is mailbox in all
+        // but name where there is none (NVIDIA on X11 — where Fifo, under XWayland, shows fewer frames
+        // than the display has refreshes even of a picture that costs nothing to draw); else Fifo
+        // (always available).
+        const auto has = [&](const ::vk::PresentModeKHR mode) { return std::ranges::find(availablePresentModes, mode) != availablePresentModes.end(); };
+        if (has(::vk::PresentModeKHR::eMailbox)) return ::vk::PresentModeKHR::eMailbox;
+        if (has(::vk::PresentModeKHR::eFifoLatestReady) && Context::Device().supportsFifoLatestReady()) return ::vk::PresentModeKHR::eFifoLatestReady;
         return ::vk::PresentModeKHR::eFifo;
     }
 
@@ -79,6 +80,7 @@ namespace kor::vk
         _extent(createInfo.extent),
         _vsync(createInfo.vsync),
         _transparent(createInfo.transparent),
+        _alphaVisual(createInfo.alphaVisual),
         _sampleCount(createInfo.sampleCount),
         _requestedImageCount(createInfo.imageCount),
         _surface(createInfo.surface),
@@ -123,6 +125,13 @@ namespace kor::vk
                 compositeAlpha = wanted;
                 _composites = true;
                 break;
+            }
+            if (!_composites && _alphaVisual) {
+                // The window's visual is what composites it (X11): the surface's own word for that is
+                // "inherit" where it has one, and drivers that only say "opaque" leave the alpha alone.
+                if (surfaceCapabilities.supportedCompositeAlpha & ::vk::CompositeAlphaFlagBitsKHR::eInherit)
+                    compositeAlpha = ::vk::CompositeAlphaFlagBitsKHR::eInherit;
+                _composites = true;
             }
             if (!_composites)
                 kor::log::Warn("[window] a transparent window was asked for, but the display composites none ({}); it is opaque",

@@ -26,6 +26,8 @@
 
 #include <kui/render.h>
 
+#include "glass.h"
+
 namespace kui
 {
     namespace {
@@ -762,7 +764,13 @@ namespace kui
             struct Overlay {
                 DockWindow* scene = nullptr;
                 std::shared_ptr<Layer> layer;
-                glm::ivec2 at {};               ///< Where on the desktop it starts.
+                glm::ivec2 at {};               ///< Where on the desktop its window is.
+                /// Where on the desktop its coordinates start: the desktop's corner. The window is there
+                /// too unless it is fitted — then it is only as big as the panels in it, and goes where they do.
+                glm::ivec2 origin {};
+                glm::ivec2 desktop {};          ///< How big the desktop is.
+                bool fitted = false;
+                glm::ivec2 wantedAt {}, wantedSize {};
             };
 
             /** One of a stripe's buttons: a docked panel's, where it is drawn, and which group it is of. */
@@ -892,6 +900,7 @@ namespace kui
             [[nodiscard]] glm::vec2 OverlayFromSpace(glm::vec2 position) const;
             [[nodiscard]] Rect OverlayArea() const;
             [[nodiscard]] glm::ivec2 OverlayAt() const;
+            bool OverlayFit(glm::ivec2& at, glm::ivec2& size) const;
             [[nodiscard]] std::optional<glm::vec2> Desktop(glm::vec2 position) const;
             [[nodiscard]] std::optional<glm::vec2> SpacePoint(glm::vec2 position) const;
             [[nodiscard]] std::optional<glm::vec2> OverlayPoint(glm::vec2 position) const;
@@ -917,6 +926,7 @@ namespace kui
             std::unordered_map<std::string, Paragraph> _titles;
             std::unordered_map<std::string, Paragraph> _icons;
             Stripe _stripes[2];                         ///< Left, right.
+            Rect _ground {};                            ///< The space between them, to its edges: what is filled behind the islands.
             Rect _docked {};                            ///< The space between them: where what is docked is laid out.
             Overlay _overlay;
             bool _overlayFailed = false;                ///< The display cannot show a see-through window: panels stay in the space.
@@ -1103,7 +1113,13 @@ namespace kui
                 stripe.shown = !stripe.buttons.empty();
             }
             const float left = _stripes[0].shown ? strip : 0.f;
-            _docked = Rect::LTRB(left, 0.f, std::max(size.x - (_stripes[1].shown ? strip : 0.f), left), size.y);
+            _ground = Rect::LTRB(left, 0.f, std::max(size.x - (_stripes[1].shown ? strip : 0.f), left), size.y);
+            // Half the gap between two islands is kept from the top and the foot of the space as well,
+            // and from a side that has no stripe: a stripe keeps the islands from the edge by itself.
+            const float edge = Gap() * 0.5f;
+            const float l = _ground.left + (_stripes[0].shown ? 0.f : edge);
+            const float top = std::min(edge, size.y * 0.5f);
+            _docked = Rect::LTRB(l, top, std::max(_ground.right - (_stripes[1].shown ? 0.f : edge), l), std::max(size.y - edge, top));
         }
 
         void RenderDock::PlaceChildren(const Node& node, std::vector<bool>& placed)
@@ -1146,14 +1162,39 @@ namespace kui
         {
             const Owner* owner = GetOwner();
             if (!_overlay.scene || !owner) return Rect::XYWH(OverlayOrigin.x, OverlayOrigin.y, 0.f, 0.f);
-            const glm::vec2 extent = glm::vec2(_overlay.scene->SceneWindow().Extent()) / owner->scale;
+            const glm::vec2 extent = glm::vec2(_overlay.fitted ? glm::uvec2(_overlay.desktop) : _overlay.scene->SceneWindow().Extent()) / owner->scale;
             return Rect::XYWH(OverlayOrigin.x, OverlayOrigin.y, extent.x, extent.y);
         }
 
         /** Where on the desktop the overlay starts — or would, before there is one: the desktop's own corner. */
         glm::ivec2 RenderDock::OverlayAt() const
         {
-            return _overlay.scene ? _overlay.at : kor::Window::Desktop().position;
+            return _overlay.scene ? _overlay.origin : kor::Window::Desktop().position;
+        }
+
+        /**
+         * Where a fitted overlay's window should be, and how big, in pixels: round the panels out over
+         * the desktop with room for their shadows — and for a panel's title, while one is in hand out
+         * there. In steps, so that a panel resized does not make a new window of it every frame.
+         */
+        bool RenderDock::OverlayFit(glm::ivec2& at, glm::ivec2& size) const
+        {
+            const Owner* owner = GetOwner();
+            if (!owner || !_config.layout) return false;
+            constexpr float Room = 48.f;
+            bool any = false;
+            Rect all {};
+            const auto add = [&](const Rect& r) { all = any ? Rect::LTRB(std::min(all.left, r.left), std::min(all.top, r.top), std::max(all.right, r.right), std::max(all.bottom, r.bottom)) : r; any = true; };
+            for (const Floating& f : L().floats) if (f.window && f.root) add(f.rect.Inflate(Room));
+            if (_dragging) if (const auto there = OverlayPoint(_dragAt)) add(Rect::LTRB(there->x - 80.f, there->y - 60.f, there->x + 420.f, there->y + 60.f));
+            if (!any) return false;
+            constexpr int Step = 128;
+            const glm::vec2 low = (glm::vec2(all.left, all.top) - OverlayOrigin) * owner->scale;
+            const glm::vec2 high = (glm::vec2(all.right, all.bottom) - OverlayOrigin) * owner->scale;
+            at = _overlay.origin + glm::ivec2(glm::floor(low));
+            const glm::ivec2 need = glm::ivec2(glm::ceil(high - glm::floor(low)));
+            size = glm::max((need + Step - 1) / Step * Step, glm::ivec2(2 * Step));
+            return true;
         }
 
         /** How long the overlay stays once nothing is in it: a float picked up again soon finds it there. */
@@ -1185,6 +1226,18 @@ namespace kui
                 // One row short of the desktop: a window that covers a monitor exactly is taken for a
                 // fullscreen one, and shown without being blended with what is behind it.
                 settings.extent = glm::uvec2(glm::max(desktop.size - glm::ivec2(0, 1), glm::ivec2(64)));
+                // Where a window is the dearer to show the bigger it is (X11 — under XWayland every frame
+                // of one is copied), and where the pointer can be asked of the desktop while a window moves
+                // under it, the overlay is fitted: as big as the panels in it, and where they are.
+                _overlay.origin = desktop.position;
+                _overlay.desktop = desktop.size;
+                _overlay.fitted = kor::Window::DesktopCursor().has_value();
+                if (glm::ivec2 at, size; _overlay.fitted && OverlayFit(at, size)) {
+                    settings.position = at;
+                    settings.extent = glm::uvec2(size);
+                    _overlay.wantedAt = at;
+                    _overlay.wantedSize = size;
+                }
                 settings.resizable = false;
                 settings.decorated = false;
                 settings.transparentFramebuffer = true;
@@ -1192,6 +1245,9 @@ namespace kui
                 settings.mousePassthrough = true;
                 settings.focusOnOpen = false;
                 settings.taskbar = false;
+                // Never the one that waits for the display: the space's own window does, and a second
+                // wait in the same frame is a second refresh gone — half the frames, while it is open.
+                settings.vsync = false;
                 auto made = std::make_unique<DockWindow>();
                 DockWindow* scene = made.get();
                 const bool opened = kor::App::Current().Open(settings.title, std::move(made), settings) != nullptr;
@@ -1221,6 +1277,7 @@ namespace kui
             }
             _overlay.scene->renderer.SetScale(owner->scale);
             _overlay.at = _overlay.scene->SceneWindow().Position();
+            if (!_overlay.fitted) _overlay.origin = _overlay.at;
             PublishViewports();
         }
 
@@ -1234,11 +1291,32 @@ namespace kui
             const Owner* owner = GetOwner();
             if (!_overlay.scene || !owner || !_config.layout) return;
             kor::Window& window = _overlay.scene->SceneWindow();
+            const glm::ivec2 was = _overlay.at;
             _overlay.at = window.Position();
-            const glm::vec2 at = OverlayOrigin + window.CursorPosition() / owner->scale;
+            if (!_overlay.fitted) _overlay.origin = _overlay.at;
+            // Fitted, the window goes where the panels have gone, and is as big as they have become;
+            // what is drawn in it is drawn from where the window really is.
+            if (glm::ivec2 to, size; _overlay.fitted && OverlayFit(to, size)) {
+                if (to != _overlay.wantedAt) { _overlay.wantedAt = to; window.SetPosition(to); }
+                if (size != _overlay.wantedSize) { _overlay.wantedSize = size; window.Resize(glm::uvec2(size)); }
+            }
+            if (_overlay.at != was) { MarkNeedsPaint(); PublishViewports(); }
+            const glm::vec2 shift = glm::vec2(_overlay.at - _overlay.origin) / owner->scale;
+            const glm::vec2 at = OverlayOrigin + shift + window.CursorPosition() / owner->scale;
             const bool held = _pressInOverlay && _pressed.kind != Hit::Kind::eNothing;
             const bool over = std::ranges::any_of(L().floats, [&](const Floating& f) { return f.window && f.root && f.rect.Inflate(2.f).Contains(at); });
-            window.SetMousePassthrough(!(over || held));
+            // Where a window can say which parts of it take the pointer, the panels are those parts and
+            // the pointer finds them by itself. (Asking where it is has no answer there while it is
+            // over another program's window: under XWayland, X11 hears nothing of it then.)
+            std::vector<glm::ivec4> panels;
+            for (const Floating& f : L().floats) {
+                if (!f.window || !f.root) continue;
+                const Rect r = f.rect.Inflate(2.f);
+                const glm::vec2 low = glm::floor((glm::vec2(r.left, r.top) - OverlayOrigin - shift) * owner->scale);
+                const glm::vec2 high = glm::ceil((glm::vec2(r.right, r.bottom) - OverlayOrigin - shift) * owner->scale);
+                panels.emplace_back(glm::ivec4(low, high - low));
+            }
+            if (!window.SetInputRegion(panels)) window.SetMousePassthrough(!(over || held));
 
             // With nothing in it for a while, it goes — at the next layout, not from inside its own frame.
             const bool empty = std::ranges::none_of(L().floats, [](const Floating& f) { return f.window && f.root; });
@@ -1252,7 +1330,8 @@ namespace kui
             if (!_registered) return;
             std::erase_if(_registered->viewports, [this](const PointerViewport& v) { return v.root == this; });
             if (_overlay.scene)
-                _registered->viewports.push_back({ &_overlay.scene->SceneInput(), &_overlay.scene->SceneWindow(), this, OverlayOrigin });
+                _registered->viewports.push_back({ &_overlay.scene->SceneInput(), &_overlay.scene->SceneWindow(), this, OverlayOrigin,
+                                                   _overlay.fitted ? std::optional(_overlay.origin) : std::nullopt });
         }
 
         void RenderDock::PerformLayout()
@@ -1544,12 +1623,13 @@ namespace kui
             const auto extent = [](const float value, const float of) { return value >= 0.f ? value : -value * of; };
             const float bottom = std::min(extent(layout.bottomHeight, size.y), size.y * 0.9f);
             const bool low = !layout.bottomLeft.shown.empty() || !layout.bottomRight.shown.empty();
-            const float sides = low ? size.y - bottom : size.y;
+            const float foot = std::max(_docked.bottom - bottom, _docked.top);
+            const float sides = low ? foot : _docked.bottom;
             switch (area) {
-            case DockArea::eLeft: return Rect::LTRB(_docked.left, 0.f, _docked.left + std::min(extent(layout.leftWidth, size.x), _docked.Width() * 0.9f), sides);
-            case DockArea::eRight: return Rect::LTRB(_docked.right - std::min(extent(layout.rightWidth, size.x), _docked.Width() * 0.9f), 0.f, _docked.right, sides);
-            case DockArea::eBottomLeft: return Rect::LTRB(_docked.left, size.y - bottom, _docked.left + _docked.Width() * 0.5f, size.y);
-            case DockArea::eBottomRight: return Rect::LTRB(_docked.left + _docked.Width() * 0.5f, size.y - bottom, _docked.right, size.y);
+            case DockArea::eLeft: return Rect::LTRB(_docked.left, _docked.top, _docked.left + std::min(extent(layout.leftWidth, size.x), _docked.Width() * 0.9f), sides);
+            case DockArea::eRight: return Rect::LTRB(_docked.right - std::min(extent(layout.rightWidth, size.x), _docked.Width() * 0.9f), _docked.top, _docked.right, sides);
+            case DockArea::eBottomLeft: return Rect::LTRB(_docked.left, foot, _docked.left + _docked.Width() * 0.5f, _docked.bottom);
+            case DockArea::eBottomRight: return Rect::LTRB(_docked.left + _docked.Width() * 0.5f, foot, _docked.right, _docked.bottom);
             default: return _docked;
             }
         }
@@ -2070,11 +2150,31 @@ namespace kui
                     const Paragraph& title = Title(node.tabs[index]);
                     TextStyle style = title.Style();
                     style.color = active || hot ? t.text : t.textMuted;
+                    // The one shown, of several, as the design marks it: in the accent (Material), on a
+                    // piece of glass (Apple's) — or underlined, below.
+                    if (several && active && t.design == ThemeDesign::eMaterial) style.color = t.primary;
+                    if (several && active && t.design == ThemeDesign::eCupertino) {
+                        const Rect pill = Rect::LTRB(tab.left + 2.f, tab.top + 4.f, std::max(tab.left + 2.f, tab.right - 2.f), tab.bottom - 4.f);
+                        detail::PaintGlass(canvas, t, { pill, pill.Height() * 0.5f }, colors::Transparent, t.IsDark() ? 0.04f : -0.1f, false);
+                    }
                     canvas.Save();
                     canvas.ClipRect(tab);
                     canvas.DrawText(title.Text(), { tab.left + S().tabPadding, std::round(tab.top + (tab.Height() - title.Size().y) * 0.5f) }, style);
                     canvas.Restore();
-                    if (several && active) canvas.DrawRect(Rect::LTRB(tab.left + S().tabPadding, tab.bottom - 2.f, std::max(tab.left + S().tabPadding, tab.right - S().tabPadding), tab.bottom), Paint::Fill(t.primary));
+                    if (several && active) {
+                        const float from = tab.left + S().tabPadding, to = std::max(from, tab.right - S().tabPadding);
+                        switch (t.design) {
+                        case ThemeDesign::eMaterial: canvas.DrawRRect({ Rect::LTRB(from, tab.bottom - 3.f, to, tab.bottom), Radii(3.f, 3.f, 0.f, 0.f) }, Paint::Fill(t.primary)); break;
+                        case ThemeDesign::eCupertino: break;    // the glass under it says so
+                        case ThemeDesign::eFluent: {
+                            // A short mark of the accent, in the middle.
+                            const float mid = (from + to) * 0.5f, half = std::min(10.f, (to - from) * 0.5f);
+                            canvas.DrawRRect({ Rect::LTRB(mid - half, tab.bottom - 4.f, mid + half, tab.bottom - 1.f), 1.5f }, Paint::Fill(t.primary));
+                            break;
+                        }
+                        default: canvas.DrawRect(Rect::LTRB(from, tab.bottom - 2.f, to, tab.bottom), Paint::Fill(t.primary)); break;
+                        }
+                    }
                 }
                 // The buttons on the right. Last, the cross that closes the panel shown.
                 const bool closable = Closable(node);
@@ -2130,11 +2230,35 @@ namespace kui
                 const Group* group = layout.GroupOf(button.panel);
                 const bool open = group && group->shown == button.panel;
                 const bool hot = _hover.kind == Hit::Kind::eButton && _hover.stripe == s && _hover.button == static_cast<int>(i);
-                if (open) canvas.DrawRRect({ box, 8.f }, Paint::Fill(t.primary));
-                else if (hot) canvas.DrawRRect({ box, 8.f }, Paint::Fill(t.surfaceHover));
                 const Paragraph& icon = Icon(button.panel);
                 TextStyle style = icon.Style();
                 style.color = open ? t.onPrimary : hot ? t.text : t.textMuted;
+                // The button of a panel that is open, as the design marks it.
+                switch (t.design) {
+                case ThemeDesign::eMaterial:
+                    // A pill washed with the accent, its letter in the accent.
+                    if (open) { canvas.DrawRRect({ box, box.Height() * 0.5f }, Paint::Fill(t.primary.WithAlpha(0.26f))); style.color = t.primary; }
+                    else if (hot) canvas.DrawRRect({ box, box.Height() * 0.5f }, Paint::Fill(t.text.WithAlpha(0.08f)));
+                    break;
+                case ThemeDesign::eCupertino:
+                    // A piece of glass, the accent's.
+                    if (open) detail::PaintGlass(canvas, t, { box, 9.f }, t.primary, 0.f, false);
+                    else if (hot) detail::PaintGlass(canvas, t, { box, 9.f }, colors::Transparent, 0.f, false);
+                    break;
+                case ThemeDesign::eFluent:
+                    // A quiet patch, and a mark of the accent at its side.
+                    if (open || hot) canvas.DrawRRect({ box, 4.f }, Paint::Fill(open ? t.surfaceHover : t.surfaceHover.WithAlpha(0.6f)));
+                    if (open) {
+                        const float x = s == 0 ? box.left + 1.f : box.right - 4.f, y = box.Center().y;
+                        canvas.DrawRRect({ Rect::LTRB(x, y - 8.f, x + 3.f, y + 8.f), 1.5f }, Paint::Fill(t.primary));
+                        style.color = t.text;
+                    }
+                    break;
+                default:
+                    if (open) canvas.DrawRRect({ box, 8.f }, Paint::Fill(t.primary));
+                    else if (hot) canvas.DrawRRect({ box, 8.f }, Paint::Fill(t.surfaceHover));
+                    break;
+                }
                 canvas.DrawText(icon.Text(), { std::round(box.Center().x - icon.Size().x * 0.5f), std::round(box.Center().y - icon.Size().y * 0.5f) }, style);
             }
         }
@@ -2146,7 +2270,8 @@ namespace kui
             // No title bar: whatever its content draws is all there is of it.
             if (f.root->bare) { PaintNode(canvas, offset, *f.root); return; }
             const Rect r = f.rect.Shift(offset);
-            const RRect card { r, t.radius };
+            // As round as the islands docked in the space are: the space's style says how round, for both.
+            const RRect card { r, S().radius };
             canvas.DrawShadow(card, colors::Black.WithAlpha(0.45f), 16.f, { 0.f, 5.f });
             // Its bar, body and content cut to its rounded corners.
             canvas.Save();
@@ -2154,12 +2279,15 @@ namespace kui
             canvas.DrawRect(r, Paint::Fill(t.border));
             PaintNode(canvas, offset, *f.root);
             if (!f.fit) {
-                const glm::vec2 corner = r.TopLeft() + r.Size();
+                // In from the corner by as much as its rounding takes off it: where the arc crosses the diagonal.
+                const glm::vec2 corner = r.TopLeft() + r.Size() - glm::vec2(S().radius * (1.f - 0.7071f));
                 const kui::Paint grip = Paint::Stroked(t.textMuted, 1.f);
                 canvas.DrawLine(corner + glm::vec2(-10.f, -3.f), corner + glm::vec2(-3.f, -10.f), grip);
                 canvas.DrawLine(corner + glm::vec2(-6.f, -3.f), corner + glm::vec2(-3.f, -6.f), grip);
             }
             canvas.Restore();
+            // Its border, round the corners too: what is under its content there is cut away with them.
+            canvas.DrawRRect({ r.Inflate(-0.5f), std::max(S().radius - 0.5f, 0.f) }, Paint::Stroked(t.border, 1.f));
         }
 
         /** One of the two things it shows on: the space in its window, or (@p overlay) the desktop around it. */
@@ -2176,7 +2304,7 @@ namespace kui
                     const std::function<bool(const Node&)> open = [&open](const Node& node) {
                         return node.split ? open(*node.a) || open(*node.b) : node.hole;
                     };
-                    if (!open(*layout.root)) canvas.DrawRect(_docked.Shift(offset), Paint::Fill(t.background));
+                    if (!open(*layout.root)) canvas.DrawRect(_ground.Shift(offset), Paint::Fill(t.background));
                     PaintNode(canvas, offset, *layout.root);
                 }
                 PaintStripe(canvas, offset, 0);
@@ -2211,7 +2339,9 @@ namespace kui
             PaintSurface(canvas, offset, false);
             if (_overlay.scene && _overlay.layer) {
                 Canvas desktop;
-                PaintSurface(desktop, -OverlayOrigin, true);
+                // From where the overlay's window is: the desktop's corner, unless it is fitted to its panels.
+                const glm::vec2 shift = GetOwner() ? glm::vec2(_overlay.at - _overlay.origin) / GetOwner()->scale : glm::vec2(0.f);
+                PaintSurface(desktop, -OverlayOrigin - shift, true);
                 _overlay.layer->SetPicture(desktop.Finish());
             }
         }

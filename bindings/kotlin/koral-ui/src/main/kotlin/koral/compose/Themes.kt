@@ -32,6 +32,8 @@ data class Theme(
     val checkboxRadius: Dp = Dp.Unspecified,
     /** The fonts text is drawn in, where it does not say: null is koral-ui's own. */
     val fontFamily: FontFamily? = null,
+    /** Whose manner the controls are drawn in — what a switch, a slider, a field is made of: kui::ThemeDesign. */
+    val design: ThemeFamily = ThemeFamily.Koral,
 ) {
     /** Whether it is a dark theme: by how light its background is. */
     val isDark: Boolean get() = background.luminance < 0.5f
@@ -53,6 +55,7 @@ data class Theme(
         .float("button_radius", if (buttonRadius.isSpecified) buttonRadius.value else -1f)
         .float("field_radius", if (fieldRadius.isSpecified) fieldRadius.value else -1f)
         .float("checkbox_radius", if (checkboxRadius.isSpecified) checkboxRadius.value else -1f)
+        .int("design", design.ordinal)
         .segment
 
     companion object {
@@ -101,7 +104,7 @@ object SystemAppearance {
     val accent: Color get() = read().accent
 }
 
-/** The families of look an interface can have. */
+/** The families of look an interface can have: each has its colours and sizes, and its own design of every control. In kui::ThemeDesign's order. */
 enum class ThemeFamily { Koral, Material, Cupertino, Windows }
 
 /** The themes, by family: each dark or light, each in its own accent or the caller's. */
@@ -112,29 +115,29 @@ object Themes {
     /** koral-ui's own: One UI's shapes — round buttons and fields, a circle for a checkbox — on black, or on a soft grey. */
     fun koral(dark: Boolean = true, accent: Color = Color.Unspecified): Theme = (if (dark) Theme.Dark else Theme.Light).withAccent(accent)
 
-    /** Material 3: pill buttons, fields with small corners, square checkboxes; violet unless [accent] says. */
+    /** Material 3: filled, outlined and text buttons, filled fields with a line under them, square checkboxes, a bar for a slider's handle; violet unless [accent] says. */
     fun material(dark: Boolean = true, accent: Color = Color.Unspecified): Theme = (if (dark) Theme(
         background = Color(0xFF141218), surface = Color(0xFF211F26), surfaceHover = Color(0xFF2B2930), surfacePressed = Color(0xFF36343B),
         primary = Color(0xFFD0BCFF), primaryHover = Color(0xFFDCCBFF), primaryPressed = Color(0xFFB69DF8), onPrimary = Color(0xFF381E72),
         text = Color(0xFFE6E0E9), textMuted = Color(0xFFCAC4D0), border = Color(0xFF49454F), focus = Color(0xFFD0BCFF),
-        radius = 12.dp, controlHeight = 40.dp, fontSize = 14.sp, buttonRadius = 20.dp, fieldRadius = 4.dp, checkboxRadius = 2.dp)
+        radius = 12.dp, controlHeight = 40.dp, fontSize = 14.sp, buttonRadius = 20.dp, fieldRadius = 4.dp, checkboxRadius = 2.dp, design = ThemeFamily.Material)
     else Theme(
         background = Color(0xFFFEF7FF), surface = Color(0xFFF3EDF7), surfaceHover = Color(0xFFECE6F0), surfacePressed = Color(0xFFE6E0E9),
         primary = Color(0xFF6750A4), primaryHover = Color(0xFF7965AF), primaryPressed = Color(0xFF5B4597), onPrimary = Color.White,
         text = Color(0xFF1D1B20), textMuted = Color(0xFF49454F), border = Color(0xFFCAC4D0), focus = Color(0xFF6750A4),
-        radius = 12.dp, controlHeight = 40.dp, fontSize = 14.sp, buttonRadius = 20.dp, fieldRadius = 4.dp, checkboxRadius = 2.dp)).withAccent(accent)
+        radius = 12.dp, controlHeight = 40.dp, fontSize = 14.sp, buttonRadius = 20.dp, fieldRadius = 4.dp, checkboxRadius = 2.dp, design = ThemeFamily.Material)).withAccent(accent)
 
-    /** Cupertino: Apple's — gently rounded buttons and fields, round checks, the system blue unless [accent] says. */
+    /** Cupertino: Apple's, after Liquid Glass — capsule buttons, fields and segments of glass, clear or the accent's, with a bright rim; the system blue unless [accent] says. */
     fun cupertino(dark: Boolean = true, accent: Color = Color.Unspecified): Theme = (if (dark) Theme(
         background = Color(0xFF000000), surface = Color(0xFF1C1C1E), surfaceHover = Color(0xFF2C2C2E), surfacePressed = Color(0xFF3A3A3C),
         primary = Color(0xFF0A84FF), primaryHover = Color(0xFF3B9BFF), primaryPressed = Color(0xFF0871DB), onPrimary = Color.White,
         text = Color.White, textMuted = Color(0xFF98989F), border = Color(0xFF38383A), focus = Color(0xFF64B1FF),
-        radius = 10.dp, controlHeight = 34.dp, fontSize = 15.sp, buttonRadius = 8.dp, fieldRadius = 8.dp)
+        radius = 16.dp, controlHeight = 34.dp, fontSize = 15.sp, buttonRadius = 17.dp, fieldRadius = 17.dp, design = ThemeFamily.Cupertino)
     else Theme(
         background = Color(0xFFF2F2F7), surface = Color(0xFFFFFFFF), surfaceHover = Color(0xFFE5E5EA), surfacePressed = Color(0xFFD1D1D6),
         primary = Color(0xFF007AFF), primaryHover = Color(0xFF3395FF), primaryPressed = Color(0xFF0068D9), onPrimary = Color.White,
         text = Color(0xFF000000), textMuted = Color(0xFF8A8A8E), border = Color(0xFFC6C6C8), focus = Color(0xFF007AFF),
-        radius = 10.dp, controlHeight = 34.dp, fontSize = 15.sp, buttonRadius = 8.dp, fieldRadius = 8.dp)).withAccent(accent)
+        radius = 16.dp, controlHeight = 34.dp, fontSize = 15.sp, buttonRadius = 17.dp, fieldRadius = 17.dp, design = ThemeFamily.Cupertino)).withAccent(accent)
 
     /**
      * Windows' own (Fluent): small corners all round, in Segoe UI where Windows has it. Unless told, it is dark
@@ -146,12 +149,12 @@ object Themes {
             background = Color(0xFF202020), surface = Color(0xFF2B2B2B), surfaceHover = Color(0xFF323232), surfacePressed = Color(0xFF272727),
             primary = Color(0xFF60CDFF), primaryHover = Color(0xFF5BC0EE), primaryPressed = Color(0xFF56B3DD), onPrimary = Color(0xFF000000),
             text = Color(0xFFFFFFFF), textMuted = Color(0xFFC5C5C5), border = Color(0xFF3D3D3D), focus = Color(0xFFFFFFFF),
-            radius = 8.dp, controlHeight = 32.dp, fontSize = 14.sp, buttonRadius = 4.dp, fieldRadius = 4.dp, checkboxRadius = 4.dp, fontFamily = segoe)
+            radius = 8.dp, controlHeight = 32.dp, fontSize = 14.sp, buttonRadius = 4.dp, fieldRadius = 4.dp, checkboxRadius = 4.dp, fontFamily = segoe, design = ThemeFamily.Windows)
         else Theme(
             background = Color(0xFFF3F3F3), surface = Color(0xFFFBFBFB), surfaceHover = Color(0xFFF0F0F0), surfacePressed = Color(0xFFE9E9E9),
             primary = Color(0xFF005FB8), primaryHover = Color(0xFF1A6FC0), primaryPressed = Color(0xFF337FC7), onPrimary = Color.White,
             text = Color(0xFF1A1A1A), textMuted = Color(0xFF5F5F5F), border = Color(0xFFE0E0E0), focus = Color(0xFF1A1A1A),
-            radius = 8.dp, controlHeight = 32.dp, fontSize = 14.sp, buttonRadius = 4.dp, fieldRadius = 4.dp, checkboxRadius = 4.dp, fontFamily = segoe)
+            radius = 8.dp, controlHeight = 32.dp, fontSize = 14.sp, buttonRadius = 4.dp, fieldRadius = 4.dp, checkboxRadius = 4.dp, fontFamily = segoe, design = ThemeFamily.Windows)
         // Windows' own accent where it has one, lightened on dark as Windows itself lightens it.
         val system = if (SystemAppearance.isKnown) SystemAppearance.accent.let { if (dark) it.mix(Color.White, 0.45f) else it } else Color.Unspecified
         return base.withAccent(if (accent.isSpecified) accent else system)

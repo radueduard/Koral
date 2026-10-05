@@ -33,6 +33,9 @@ SCALARS = {
 ENUMS = {"KoralStatus", "KoralLogLevel", "KoralResourceKind", "KoralPlatform"}
 POINTER = ("ADDRESS", "MemorySegment", 8)
 KEYWORDS = {"in", "is", "as", "object", "fun", "val", "var", "when", "typealias", "interface", "class", "package", "type"}
+# Functions that also get a `<name>_at` overload taking their strings as C strings already made, for whoever
+# calls them a great many times and keeps the strings in an arena of their own.
+AT_OVERLOADS = {"kui_widget_set_key"}
 
 
 def strip(text):
@@ -241,6 +244,12 @@ def generate(target, known):
                 lines.append(f"{sig} {{ Arena.ofConfined().use {{ a -> {invoke}; Unit }} }}")
             else:
                 lines.append(f"{sig} = Arena.ofConfined().use {{ a -> {inner} }}")
+            if name in AT_OVERLOADS:
+                raw = [f"{ident(p)}: MemorySegment" if kind == "string" else kp for (p, kind, _), kp in zip(args, kparams)]
+                raw_invoke = f"{h}.invokeExact({', '.join(ident(p) for p, _, _ in args)})"
+                lines.append("    /** The same, with the strings already C strings: for whoever calls it a great many times. */")
+                lines.append(f"    fun {name}_at({', '.join(raw)}): {rtype} " +
+                             (f"{{ {raw_invoke} }}" if rt is None else f"= {raw_invoke} as {rtype}"))
         else:
             if rt is None:
                 lines.append(f"{sig} {{ {invoke} }}")

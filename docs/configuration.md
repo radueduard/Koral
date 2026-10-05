@@ -23,8 +23,7 @@ share no code: this schema is the whole contract between them.
       "fullscreen": false,
       "borderless": false,
       "transparent": false,
-      "vsync": true,
-      "imguiIni": "imgui.ini"
+      "vsync": true
     }
   },
   "paths": {
@@ -106,7 +105,7 @@ Modules are optional engine features — shared libraries built against Koral's 
 | `koral-image-export` | Writing images: one subimage to any container, or a whole texture as KTX2 |
 | `koral-image-compress` | Turning an image into a GPU-compressed KTX2 (a build-time step) |
 | `koral-camera` | Camera objects and their controllers |
-| `koral-gui-extras` | ImGui widgets on top of the engine's GUI: log and statistics panels, a viewport, a gizmo, a camera panel, a gradient editor, a file browser |
+| `koral-gui-extras` | Panels on koral-ui: a log, statistics, an inspector for reflected objects, a viewport and a scene view, a frame graph's own panels, a camera panel, a file browser |
 
 Asset loading in particular is *all* modules now: the engine itself reads no files but shaders and its
 own config, so a project that generates its geometry and textures procedurally links none of the five
@@ -115,8 +114,7 @@ above and carries neither Assimp nor OpenImageIO.
 **No module draws an interface.** A module has no opinion about what your application looks like, so
 none of them opens a window or adds a panel — what a widget for one of them looks like is
 `koral-gui-extras`' business, and drawing it is yours. `<koralCameraPanel.h>` is the case that used to
-be otherwise: the camera module drew a "Cameras" panel from its own `RenderUI` hook, and it is now an
-opt-in widget built entirely on the public camera API, so a project that wants a different one has
+be otherwise: the camera module once drew a "Cameras" panel of its own, and it is now an opt-in widget built entirely on the public camera API, so a project that wants a different one has
 everything it needs to write it.
 
 A module depends on another only when it actually calls into it: `koral-image-compress` reads its
@@ -211,7 +209,6 @@ For compatibility, the original singular form is still read:
 | `--width <n>`, `--height <n>`        | Window size.                                                                         |
 | `--api <name>`                       | `Vulkan` (OpenGL is only in Koral v1).                                              |
 | `--platform <name>`                  | Windowing system: `auto`, `x11` or `wayland` (Linux only), or `none` (anywhere).     |
-| `--imgui-ini <file>`                 | Where ImGui saves its layout (default: beside `koral.json`).                         |
 | `--fullscreen` / `--no-fullscreen`   | Open fullscreen.                                                                     |
 | `--resizable` / `--no-resizable`     | Allow the window to be resized.                                                      |
 | `--borderless` / `--decorated`       | Drop or keep the window decorations.                                                 |
@@ -237,11 +234,11 @@ build or session cannot provide falls back to automatic selection with a warning
 is no windowing system at all (`WindowPlatform::eNone`): only offscreen scenes, on a machine with no
 display — a server, a test, a batch render.
 
-The platform also decides **ImGui multi-viewport** (dragging panels out into their own OS windows). It
-is enabled everywhere *except* Wayland: viewports need the app to place a window at an absolute screen
-position, and Wayland deliberately withholds global coordinates (GLFW reports the operation as
-unavailable), so detached panels could not be placed. This is a positioning limit, not something a
-borderless or transparent window works around — run on `x11` if you want viewports under Linux.
+The platform also decides whether an interface's panels can be dragged out into OS windows of their
+own: that needs the app to place a window at an absolute screen position, and Wayland deliberately
+withholds global coordinates (GLFW reports the operation as unavailable), so detached panels could not be
+placed. This is a positioning limit, not something a borderless or transparent window works around — run
+on `x11` if you want them under Linux.
 
 ## A project with its own build
 
@@ -264,14 +261,10 @@ The project's CMake has to keep the scaffold's contract:
   `<build dir>/lib<target>.so` (`<target>.dll`, `lib<target>.dylib`);
 - optionally, run it from a `run` target through the preset's `KORAL_RUNTIME`.
 
-## ImGui layout file
+## Keys from older configs
 
-`rendering.window.imguiIni` (or `--imgui-ini`) is where Dear ImGui persists its layout — window
-positions and docking. Left unset, it defaults to `imgui.ini` **beside `koral.json`**, so each project
-keeps its own layout and it is found again whatever directory you launch from — rather than ImGui's
-default of dropping `imgui.ini` into the working directory. A relative path in the file resolves
-against the config's directory (against the working directory for the flag), and any missing parent
-directories are created. With no config file at all, ImGui keeps its own default.
+`rendering.window.imguiIni` named where Dear ImGui kept its layout, when the engine drew its interfaces
+with it. It is read past now, like any key this build does not know; the `--imgui-ini` flag is gone.
 
 ## Compatibility
 

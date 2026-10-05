@@ -26,14 +26,12 @@
 #endif
 
 #include "framebuffer.h"
-#include "interface.h"
 #include "log.h"
 #include "module.h"
 #include "sceneLibrary.h"
 #include "scheduler.h"
 #include "surface.h"
 #include "tokenState.h"
-#include "../backends/vulkan/gui.h"
 #include "../backends/vulkan/surface.h"
 #include "../backends/vulkan/vulkanContext.h"
 #include "../executor/BackgroundExecutor.h"
@@ -205,40 +203,15 @@ namespace kor
 
         // ---- scenes -------------------------------------------------------------------------------------
 
-        static void MakeInterfaceCurrent(const Scene& scene)
-        {
-            if (scene._interface) scene._interface->MakeCurrent();
-            else Interface::MakeNoneCurrent();
-        }
-
-        /** @brief Gives the scene its window, input and interface, then initialises it. */
+        /** @brief Gives the scene its window and input, then initialises it. */
         void Host(Stage& stage, Hosted& hosted)
         {
             Scene& scene = *hosted.scene;
             scene._window = stage.window.get();
             scene._name = hosted.name;
             scene._input->AttachTo(**stage.window);
-            if (scene._interfaceRequest && stage.window->IsOffscreen()) {
-                // An interface is drawn with ImGui's platform backend, which needs an OS window.
-                log::Warn("[app] '{}' asked for an interface, but it is offscreen: whoever shows it draws the interface",
-                          hosted.name);
-                scene._interfaceRequest.reset();
-            }
-            if (scene._interfaceRequest) {
-                auto interfaceSettings = *scene._interfaceRequest;
-                scene._interfaceRequest.reset();
-                if (interfaceSettings.iniFile.empty()) interfaceSettings.iniFile = DefaultInterfaceFile(hosted.name);
-                scene._interface = std::make_unique<Interface>(scene, interfaceSettings);
-            }
             detail::SceneScope scope(&scene);
-            MakeInterfaceCurrent(scene);
             scene.Initialize();
-        }
-
-        [[nodiscard]] std::filesystem::path DefaultInterfaceFile(const std::string_view name) const
-        {
-            if (settings.interfaceDirectory.empty()) return {};
-            return settings.interfaceDirectory / std::format("imgui.{}.ini", fileSafe(name));
         }
 
         void Destroy(Hosted& hosted)
@@ -246,11 +219,9 @@ namespace kor
             if (!hosted.scene) return;
             {
                 detail::SceneScope scope(hosted.scene);
-                MakeInterfaceCurrent(*hosted.scene);
                 hosted.scene->Shutdown();
                 hosted.destroy(hosted.scene);
             }
-            Interface::MakeNoneCurrent();
             hosted.scene = nullptr;
         }
 
@@ -349,7 +320,6 @@ namespace kor
                     Scene& shown = stage->Top();
                     shown._input->AttachTo(**stage->window);
                     detail::SceneScope scope(&shown);
-                    MakeInterfaceCurrent(shown);
                     shown.OnResume();
                     break;
                 }
@@ -368,7 +338,6 @@ namespace kor
                     } else {
                         Scene& covered = stage->Top();
                         detail::SceneScope scope(&covered);
-                        MakeInterfaceCurrent(covered);
                         covered.OnSuspend();
                     }
                     stage->stack.push_back(std::move(made));
@@ -379,7 +348,6 @@ namespace kor
                     break;
                 }
             }
-            Interface::MakeNoneCurrent();
         }
 
         void Request_(Request request)
@@ -468,7 +436,6 @@ namespace kor
 
         if (impl.modulesUp) ModuleHost::Shutdown();
         windows.clear();
-        if (impl.deviceUp) vk::GUI::ReleaseShared();
         Context::_scheduler.Reset();
         if (impl.deviceUp) vk::Context::StopTokens();
         delete Context::_repository;
@@ -688,7 +655,6 @@ namespace kor
                 }
             }
         }
-        Interface::MakeNoneCurrent();
     }
 
     VoidResult App::ReloadLibrary(const std::filesystem::path& path)
@@ -817,13 +783,7 @@ namespace kor
     bool App::Frame()
     {
         auto& impl = *_impl;
-        // An interface's window has ImGui's own procedure in front of the system's messages, and that
-        // looks for the current context whatever the message: one must be current while they are handed
-        // out, or the first message to a window with an interface finds none.
-        for (const auto& stage : impl.stages)
-            if (!stage->stack.empty() && stage->Top()._interface) { Impl::MakeInterfaceCurrent(stage->Top()); break; }
         glfwPollEvents();
-        Interface::MakeNoneCurrent();
         if (impl.deviceUp) Context::DrainMainThread();
 
         // A window asked to close: its scene decides.
@@ -833,7 +793,6 @@ namespace kor
             bool close = true;
             {
                 detail::SceneScope scope(&shown);
-                Impl::MakeInterfaceCurrent(shown);
                 close = shown.OnCloseRequested();
             }
             if (close) {
@@ -897,8 +856,7 @@ namespace kor
         }
 
         // A window nothing drew into is cleared to its framebuffer's colour, rather than showing
-        // whatever its image held — before the interface, which would otherwise be wiped: for a
-        // scene that shows everything through its interface, it is all there is.
+        // whatever its image held.
         const auto clearIfUntouched = [](CommandBuffer& commandBuffer, const Window& window, const bool graphTouchedScreen) {
             if (const auto framebuffer = window.DefaultFramebuffer();
                 framebuffer.Valid() && !framebuffer->ColorAttachments().empty()) {
@@ -919,7 +877,6 @@ namespace kor
                 if (!window.IsShownThisFrame()) continue;   // nothing to draw into this frame
                 Scene& scene = stage->Top();
                 detail::SceneScope scope(&scene);
-                Impl::MakeInterfaceCurrent(scene);
 
                 if (window.HasResized()) {
                     // Modules first, so anything the scene reads from one in its own OnResize — a
@@ -942,7 +899,7 @@ namespace kor
                 ModuleHost::LateUpdate();
                 scene.LateUpdate();
 
-                // Its views, before its own drawing: what it draws, and its interface, can show them.
+                // Its views, before its own drawing: what it draws can show them.
                 for (const auto& view : scene._views) {
                     if (!view->Enabled()) continue;
                     detail::WindowScope target(view->_window.get());
@@ -956,21 +913,9 @@ namespace kor
                 ModuleHost::RenderOverlay(commandBuffer);
 
                 clearIfUntouched(commandBuffer, window, graphTouchedScreen);
-
-                if (scene._interface) scene._interface->Render(commandBuffer);
             }
         });
         impl.inFrame = false;
-
-        // After the frame's submission: the panels floating in windows of their own submit command
-        // buffers of their own, and those must follow the frame's.
-        for (Impl::Stage* stage : active) {
-            Scene& scene = stage->Top();
-            if (!scene._interface || !stage->window->IsShownThisFrame()) continue;
-            detail::SceneScope scope(&scene);
-            scene._interface->RenderPlatformWindows();
-        }
-        Interface::MakeNoneCurrent();
 
         for (const auto& stage : impl.stages) {
             stage->Top()._input->Update();

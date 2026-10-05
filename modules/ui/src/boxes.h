@@ -127,6 +127,7 @@ namespace kui
         void Set(const std::string& text, const TextStyle& style, TextAlign align, bool wrap, int maxLines = 0, bool ellipsis = false);
         void Paint(Canvas& canvas, glm::vec2 offset) override;
         [[nodiscard]] const Paragraph& GetParagraph() const { return _paragraph; }
+        [[nodiscard]] std::string DebugText() const override { return _text; }
     protected:
         void PerformLayout() override;
     private:
@@ -147,6 +148,7 @@ namespace kui
         void PerformLayout() override;
     private:
         kor::ResourceRef<const kor::Image> _image;
+        glm::u64 _generation = 0;
         ImageFit _fit = ImageFit::eContain;
         glm::vec2 _preferred { -1.f, -1.f };
     };
@@ -187,6 +189,22 @@ namespace kui
         void Set(float opacity);
         [[nodiscard]] bool IsRepaintBoundary() const override { return true; }
     };
+
+    /** Its child, shown down to a share of its height and cut off there: what unfolds, and folds away. */
+    class RenderReveal final : public RenderContainer {
+    public:
+        void Set(float share);
+        void Paint(Canvas& canvas, glm::vec2 offset) override;
+    protected:
+        void PerformLayout() override;
+    private:
+        float _share = 1.f;
+    };
+
+    namespace detail {
+        /** @p child, as much of its height as @p share says (0 to 1), from its top. */
+        Widget RevealBox(float share, Widget child);
+    }
 
     class RenderClip final : public RenderContainer {
     public:
@@ -243,7 +261,7 @@ namespace kui
 
     class RenderDraggable final : public RenderContainer {
     public:
-        struct Config { DragData data; DraggableOptions options; };
+        struct Config { DragData data; DraggableOptions options; Widget child; };   // the child: what follows the pointer, unless told
         void Set(const Config& config) { _config = config; }
         bool HandleEvent(const PointerEvent& event) override;
         [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }

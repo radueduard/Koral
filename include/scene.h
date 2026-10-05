@@ -28,7 +28,6 @@
 namespace kor
 {
     class App;
-    class Interface;
     class Scene;
 
     namespace detail
@@ -133,11 +132,11 @@ namespace kor
      *     auto& game = AddView("Game", {.extent = {1280, 720}});
      *     game.Graph().Add<ForwardPass>(_world, _gameCamera);
      * }
-     * void Editor::RenderUI() { _gameView.Draw("Game", *FindView("Game")); }   // kgui::SceneView
+     * // and in the interface: kgui::SceneView(*FindView("Game")) shows it in a panel
      * @endcode
      *
      * Views are drawn after the scene's Update and LateUpdate and before its own Render and graph,
-     * so what the scene draws — and its interface — can show this frame's view images.
+     * so what the scene draws — its interface included — can show this frame's view images.
      */
     class KORAL_API View {
     public:
@@ -170,21 +169,10 @@ namespace kor
         bool _enabled = true;
     };
 
-    /** @brief How a scene's interface is set up. @see Scene::EnableInterface */
-    struct InterfaceSettings {
-        /** Where the layout is saved; empty keeps it in memory only. */
-        std::filesystem::path iniFile {};
-        /** Panels may be dragged out into windows of their own (not under Wayland, which cannot place them). */
-        bool viewports = true;
-        /** Panels may be docked into one another and into the window. */
-        bool docking = true;
-    };
-
     /**
      * @brief One screen of an application: what a window shows, and everything that belongs to it.
      *
-     * A scene owns its window, its input, its clock, its frame graph and — if it asks for one — its
-     * interface. An application runs any number of them, each in its own window (App::Open,
+     * A scene owns its window, its input, its clock and its frame graph. An application runs any number of them, each in its own window (App::Open,
      * Navigator::Open), and switches the one a window shows (Navigator::Replace, Push, Pop).
      *
      * Inside a scene, `Window::`, `Input::` and `Time::` are the scene's own — nested classes of this
@@ -257,12 +245,6 @@ namespace kor
          * empty: the passes run ahead of it.
          */
         virtual void Render(kor::CommandBuffer& commandBuffer) {}
-
-        /**
-         * @brief Called once per frame to build the scene's interface — only when it has one
-         *        (EnableInterface). Include <gui.h> to call Dear ImGui.
-         */
-        virtual void RenderUI() {}
 
         /** @brief Called the frame after the window's drawable area changed size. */
         virtual void OnResize(glm::uvec2 extent) {}
@@ -346,9 +328,6 @@ namespace kor
         /** @brief Loads JSON saved by SaveState: into State(), by default. @see FromJson */
         virtual VoidResult LoadState(std::string_view json);
 
-        /** @brief Whether the scene has an interface. @see EnableInterface */
-        [[nodiscard]] bool HasInterface() const { return _interface != nullptr; }
-
         /** @brief The scene whose code is running on this thread, or null outside any. */
         [[nodiscard]] static Scene* Current();
 
@@ -425,6 +404,27 @@ namespace kor
             static void Axes(const glm::mat4& transform, float size = 1.f, float duration = 0.f);
             static void Grid(glm::vec3 center, float size, int cells, const Style& style = {});
             static void Frustum(const glm::mat4& viewProjection, const Style& style = {});
+            static void Triangle(glm::vec3 a, glm::vec3 b, glm::vec3 c, const Style& style = {});
+            static void Quad(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, const Style& style = {});
+            static void Plane(glm::vec3 center, glm::vec3 normal, glm::vec2 size, const Style& style = {});
+            static void Cylinder(glm::vec3 from, glm::vec3 to, float radius, const Style& style = {});
+            static void Cone(glm::vec3 base, glm::vec3 tip, float radius, const Style& style = {});
+            static void Capsule(glm::vec3 from, glm::vec3 to, float radius, const Style& style = {});
+            static void Camera(const glm::mat4& view, const glm::mat4& projection, float size = 1.f, const Style& style = {});
+            static void PointLight(glm::vec3 position, float range, const Style& style = {});
+            static void SpotLight(glm::vec3 position, glm::vec3 direction, float range, float outerAngle, float innerAngle = 0.f,
+                                  const Style& style = {});
+            static void DirectionalLight(glm::vec3 position, glm::vec3 direction, float size = 1.f, const Style& style = {});
+            /**
+             * @brief kor::DebugDraw::Gizmo, used with the scene's own mouse — its left button — over its
+             *        window. The pointer is the interface's while it wants the mouse and no handle is held.
+             *        For a camera drawing into something else (an editor's viewport), call DebugDraw::Gizmo
+             *        with a pointer of your own.
+             */
+            static bool Gizmo(GizmoMode mode, glm::mat4& transform, const glm::mat4& viewProjection,
+                              const GizmoOptions& options = {}, std::uint64_t id = 0);
+            [[nodiscard]] static bool GizmoActive();
+            [[nodiscard]] static bool GizmoHovered();
         };
 
         /** @brief The current scene's clock. @see kor::Time */
@@ -441,20 +441,8 @@ namespace kor
             static void SetTimeScale(float scale);
         };
 
-    protected:
-        /**
-         * @brief Gives the scene an interface: a Dear ImGui context of its own, drawn over its window,
-         *        with RenderUI() called every frame.
-         *
-         * Opt-in: a scene that never calls this has no ImGui at all, and needs none to build. Call it
-         * from the constructor or from Initialize. A scene library calling ImGui includes <gui.h>,
-         * which is what hands it the engine's ImGui.
-         */
-        void EnableInterface(InterfaceSettings settings = {});
-
     private:
         friend class App;
-        friend class Interface;
         friend kor::Window* detail::CurrentWindowOrNull();
 
         std::string _name;
@@ -462,8 +450,6 @@ namespace kor
         std::unique_ptr<kor::Input> _input;
         kor::Time _time;
         kor::DebugDraw _debug;
-        std::unique_ptr<Interface> _interface;
-        std::optional<InterfaceSettings> _interfaceRequest;
         std::shared_ptr<detail::SceneLife> _life;
         kor::FrameGraph _graph;
         std::vector<std::unique_ptr<View>> _views;   // after the graph: destroyed first

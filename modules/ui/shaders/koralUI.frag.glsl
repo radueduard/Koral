@@ -68,6 +68,39 @@ void main() {
             // Sampled as the image's format says (an sRGB image arrives linear), then premultiplied.
             color = vec4(texel.rgb * texel.a, texel.a) * kuiPremultiplied(tint) * cover(d, w);
         }
+    } else if (kind == KUI_BACKDROP) {
+        // Glass: what is behind — a picture of the target, half its size, with its smaller copies —
+        // blurred by reading a smaller copy at a ring of places, bent towards the middle near the edge
+        // as a lens bends it, and tinted.
+        const vec2 c = (it.shape0.xy + it.shape0.zw) * 0.5;
+        const vec2 halfSize = (it.shape0.zw - it.shape0.xy) * 0.5;
+        const float d = kuiRoundRect(p - c, halfSize, it.shape1);
+        const float sigma = max(it.strokeWidth * kuiPush.scale, 0.0);     // in pixels
+        const float bend = uintBitsToFloat(it.stroke) * kuiPush.scale;
+        vec2 at = gl_FragCoord.xy;
+        if (bend > 0.0) {
+            // Which way out is, on screen: the way the distance grows.
+            const vec2 g = vec2(dFdx(d), dFdy(d));
+            const float rim = clamp(1.0 + d / max(min(halfSize.x, halfSize.y) * 0.6, 1e-3), 0.0, 1.0);
+            at -= normalize(g + vec2(1e-6)) * bend * rim * rim * rim;
+        }
+        const vec2 uv = at / kuiPush.viewport;
+        const vec2 texel = 1.0 / kuiPush.viewport;
+        // The copy whose texels are about as big as the blur's step; level 0 is half the target already.
+        const float lod = max(log2(max(sigma, 1.0)) - 1.5, 0.0);
+        const float ring = sigma * 1.2;
+        vec3 sum = textureLod(sampler2D(kuiTextures[nonuniformEXT(kuiTexture(it))], kuiSampler), uv, lod).rgb * 2.0;
+        float weight = 2.0;
+        for (int i = 0; i < 8; ++i) {
+            const float a = 0.7853982 * float(i) + 0.3926991;
+            const vec2 o = vec2(cos(a), sin(a)) * ring * ((i & 1) == 0 ? 1.0 : 0.55);
+            sum += textureLod(sampler2D(kuiTextures[nonuniformEXT(kuiTexture(it))], kuiSampler), uv + o * texel, lod).rgb;
+            weight += 1.0;
+        }
+        vec3 behind = sum / weight;
+        const vec4 tint = kuiColor(it.fill);        // premultiplied, in the target's space
+        behind = behind * (1.0 - tint.a) + tint.rgb;
+        color = vec4(behind, 1.0) * cover(d, w);
     } else if (kind == KUI_SHADOW) {
         const float sigma = max(it.strokeWidth, 1e-3);
         color = kuiColor(it.fill) * shadow(it.shape0.xy, it.shape0.zw, p, sigma, it.shape1.x);

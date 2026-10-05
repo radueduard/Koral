@@ -59,10 +59,9 @@ path (`lights[2].color`). `CopyFields(from, to)` copies one object into another 
 ## An editor
 
 ```cpp
-ImGui::Begin("Properties");
-if (kgui::Inspect("Light", myLight)) lightsChanged = true;
-ImGui::End();
+kui::Ui _ui { kgui::Inspector(myLight, [this] { lightsChanged = true; }, "Light") };
 ```
 
-Every field gets the editor its kind calls for — a checkbox, a drag or a slider (with a range), a text
-box, a colour picker, a combo for an enum, a tree for a struct, a tree with + and − for an array.
+Every field gets the editor its kind calls for — a checkbox, a drag (kept to the field's range where it has
+one), a text box, a colour picker, a dropdown for an enum, a tree for a struct, a tree with + and − for an
+array. The object is read again as it changes, so a value the program sets shows straight away.

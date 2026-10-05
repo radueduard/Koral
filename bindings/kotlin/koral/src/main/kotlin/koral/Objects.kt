@@ -123,7 +123,7 @@ class Input internal constructor(internal val native: MemorySegment) {
         if (KoralNative.koral_input_first_mouse_button_pressed(native, out)) MouseButton.of(out.get(ValueLayout.JAVA_INT, 0)) else null
     }
 
-    /** Whether the scene's interface (ImGui or koral-ui) is using the pointer: a camera should stay put. */
+    /** Whether an interface over the scene (koral-ui, say) is using the pointer: a camera should stay put. */
     val interfaceWantsMouse: Boolean get() = KoralNative.koral_input_interface_wants_mouse(native)
     val interfaceWantsKeyboard: Boolean get() = KoralNative.koral_input_interface_wants_keyboard(native)
     val mousePosition: Vec2 get() = twoFloats({ x, y -> KoralNative.koral_input_mouse_position(native, x, y) }, ::Vec2)
@@ -226,10 +226,32 @@ class Time internal constructor(internal val native: MemorySegment) {
     }
 }
 
-/** kor::DebugStyle: a debug line's colour, how long it stays (0: this frame), and whether it shows through. */
-data class DebugStyle(val color: Vec4 = Vec4.One, val duration: Float = 0f, val onTop: Boolean = false) {
+/**
+ * kor::DebugStyle: a debug shape's outline colour, how long it stays (0: this frame), whether it shows through, the
+ * colour it is filled with (alpha below 1 is see-through, 0 no fill), whether it has its outline, and how wide its
+ * lines are, in pixels.
+ */
+data class DebugStyle(val color: Vec4 = Vec4.One, val duration: Float = 0f, val onTop: Boolean = false,
+                      val fill: Vec4 = Vec4.Zero, val outline: Boolean = true, val lineWidth: Float = 1f) {
     internal fun native(a: SegmentAllocator) = Fields(a, KoralLayouts.KoralDebugStyle)
-        .floats("color", *color.toArray()).float("duration", duration).bool("on_top", onTop).segment
+        .floats("color", *color.toArray()).float("duration", duration).bool("on_top", onTop)
+        .floats("fill", *fill.toArray()).bool("fill_only", !outline).float("line_width", lineWidth).segment
+}
+
+/**
+ * kor::GizmoPointer: the pointer a gizmo is used with, in the pixels of the image its camera draws — [position] null
+ * when it is not over the image (or is something else's).
+ */
+data class GizmoPointer(val position: Vec2?, val viewport: Vec2, val down: Boolean, val pressed: Boolean = false) {
+    internal fun native(a: SegmentAllocator) = Fields(a, KoralLayouts.KoralGizmoPointer)
+        .floats("position", position?.x ?: 0f, position?.y ?: 0f).bool("has_position", position != null)
+        .floats("viewport", viewport.x, viewport.y).bool("down", down).bool("pressed", pressed).segment
+}
+
+/** kor::GizmoOptions: world or local axes, its size on screen in pixels, and the steps it snaps to (0: none). */
+data class GizmoOptions(val space: GizmoSpace = GizmoSpace.eWorld, val size: Float = 100f, val snap: Float = 0f) {
+    internal fun native(a: SegmentAllocator) = Fields(a, KoralLayouts.KoralGizmoOptions)
+        .int("space", space.value).float("size", size).float("snap", snap).segment
 }
 
 /** kor::DebugDraw: lines for seeing what code does — drawn by a DebugDrawPass, gone after their duration. */
@@ -251,13 +273,66 @@ class DebugDraw internal constructor(internal val native: MemorySegment) {
     fun axes(transform: Mat4, size: Float = 1f, duration: Float = 0f) = Arena.ofConfined().use { a -> KoralNative.koral_debug_axes(native, a.m4(transform), size, duration) }
     fun grid(center: Vec3, size: Float, cells: Int, style: DebugStyle? = null) = draw(style) { a, s -> KoralNative.koral_debug_grid(native, a.v3(center), size, cells, s) }
     fun frustum(viewProjection: Mat4, style: DebugStyle? = null) = draw(style) { a, s -> KoralNative.koral_debug_frustum(native, a.m4(viewProjection), s) }
+    fun triangle(a: Vec3, b: Vec3, c: Vec3, style: DebugStyle? = null) = draw(style) { m, s -> KoralNative.koral_debug_triangle(native, m.v3(a), m.v3(b), m.v3(c), s) }
+    /** Four corners, in order around the edge. */
+    fun quad(a: Vec3, b: Vec3, c: Vec3, d: Vec3, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_quad(native, m.v3(a), m.v3(b), m.v3(c), m.v3(d), s) }
+    fun plane(center: Vec3, normal: Vec3, size: Vec2, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_plane(native, m.v3(center), m.v3(normal), m.allocateFrom(ValueLayout.JAVA_FLOAT, size.x, size.y), s) }
+    fun cylinder(from: Vec3, to: Vec3, radius: Float, style: DebugStyle? = null, segments: Int = 24) =
+        draw(style) { m, s -> KoralNative.koral_debug_cylinder(native, m.v3(from), m.v3(to), radius, s, segments) }
+    /** A cone with its base's centre at [base] and its point at [tip]. */
+    fun cone(base: Vec3, tip: Vec3, radius: Float, style: DebugStyle? = null, segments: Int = 24) =
+        draw(style) { m, s -> KoralNative.koral_debug_cone(native, m.v3(base), m.v3(tip), radius, s, segments) }
+    fun capsule(from: Vec3, to: Vec3, radius: Float, style: DebugStyle? = null, segments: Int = 24) =
+        draw(style) { m, s -> KoralNative.koral_debug_capsule(native, m.v3(from), m.v3(to), radius, s, segments) }
+    /** A camera: the pyramid it sees through, [size] deep, with a triangle on top for up. */
+    fun camera(view: Mat4, projection: Mat4, size: Float = 1f, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_camera(native, m.m4(view), m.m4(projection), size, s) }
+    /** A star where it is, and the sphere it reaches to (none when [range] is 0: no limit). */
+    fun pointLight(position: Vec3, range: Float, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_point_light(native, m.v3(position), range, s) }
+    /** The cone it lights; angles from the centre to the edge, in radians. */
+    fun spotLight(position: Vec3, direction: Vec3, range: Float, outerAngle: Float, innerAngle: Float = 0f, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_spot_light(native, m.v3(position), m.v3(direction), range, outerAngle, innerAngle, s) }
+    /** The sun: a disc at [position] with its rays. */
+    fun directionalLight(position: Vec3, direction: Vec3, size: Float = 1f, style: DebugStyle? = null) =
+        draw(style) { m, s -> KoralNative.koral_debug_directional_light(native, m.v3(position), m.v3(direction), size, s) }
+
+    /**
+     * kor::DebugDraw::Gizmo: handles on [transform], the one under [pointer] dragged while its button is down. Call it
+     * every frame the thing is selected. Returns the moved transform, or null when it did not move.
+     */
+    fun gizmo(mode: GizmoMode, transform: Mat4, viewProjection: Mat4, pointer: GizmoPointer,
+              options: GizmoOptions = GizmoOptions(), id: Long = 0): Mat4? = Arena.ofConfined().use { a ->
+        val m = a.m4(transform)
+        val changed = KoralNative.koral_debug_gizmo(native, mode.value, m, a.m4(viewProjection), pointer.native(a), options.native(a), id)
+        if (changed) Mat4(m.toArray(ValueLayout.JAVA_FLOAT)) else null
+    }
+    /** A handle is being dragged. */
+    val gizmoActive: Boolean get() = KoralNative.koral_debug_gizmo_active(native)
+    /** The pointer is over a handle, this frame or the last. */
+    val gizmoHovered: Boolean get() = KoralNative.koral_debug_gizmo_hovered(native)
+
     fun clear() = KoralNative.koral_debug_clear(native)
     val lineCount: Long get() = KoralNative.koral_debug_line_count(native)
+    val triangleCount: Long get() = KoralNative.koral_debug_triangle_count(native)
 }
 
 /** The debug lines of the scene running on this thread: kor::Debug::. */
 object Debug {
     val current: DebugDraw get() = DebugDraw(current(KoralNative.koral_current_debug(), "Debug.current"))
+
+    /** kor::Scene::Debug::Gizmo: a gizmo used with the scene's own mouse (its left button) over its window. */
+    fun gizmo(mode: GizmoMode, transform: Mat4, viewProjection: Mat4, options: GizmoOptions = GizmoOptions(), id: Long = 0): Mat4? {
+        current   // the scene's, or the reason there is none
+        return Arena.ofConfined().use { a ->
+            val m = a.allocateFrom(ValueLayout.JAVA_FLOAT, *transform.toArray())
+            val changed = KoralNative.koral_current_gizmo(mode.value, m, a.allocateFrom(ValueLayout.JAVA_FLOAT, *viewProjection.toArray()),
+                                                          options.native(a), id)
+            if (changed) Mat4(m.toArray(ValueLayout.JAVA_FLOAT)) else null
+        }
+    }
 }
 
 /**

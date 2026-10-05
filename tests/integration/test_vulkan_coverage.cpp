@@ -42,8 +42,8 @@ namespace {
 // sampler builder and its enum-conversion helpers are all exercised.
 // Run() must park its lambda in the recorded stream, not execute it on the spot.
 //
-// It is the one way into the raw backend command buffer — the ImGui backend records its own
-// draws through it — and commands are emitted at End(), not as they are called. A Run that
+// It is the one way into the raw backend command buffer — a library with a renderer of its own
+// records its draws through it — and commands are emitted at End(), not as they are called. A Run that
 // fired immediately would put those raw calls ahead of the entire recorded frame instead of
 // where they were written, which is exactly what stopped the GUI from appearing in 0.0.8: it
 // drew first and the scene painted over it. The Vulkan backend ran the lambda inline while the
