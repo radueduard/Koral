@@ -17,6 +17,7 @@ import koral.compose.DropdownMenu
 import koral.compose.DropdownMenuItem
 import koral.compose.Icon
 import koral.compose.Icons
+import koral.compose.ImageVector
 import koral.compose.Layout
 import koral.compose.Modifier
 import koral.compose.PointerEventType
@@ -41,6 +42,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 private const val SIDE = 260
@@ -109,7 +112,13 @@ class ComposeMoreTest {
         assertNotEquals(blue, pixel(30, 73))
         assertEquals(red, pixel(100, 75), "fillMaxWidth(0.5f)")
         assertEquals(black, pixel(150, 75))
-        assertNotEquals(black, pixel(12, 92), "an Icon draws")
+        assertEquals(listOf(255, 255, 255, 255), pixel(12, 92), "an Icon draws")
+        assertEquals(black, pixel(7, 87), "Material's plus: the corners between its arms are empty")
+        assertSame(Icons.AutoMirrored.Filled.ArrowBack, Icons.Filled.ArrowBack, "each icon is read once")
+        assertNotSame(Icons.Outlined.Lock, Icons.TwoTone.Lock)
+        assertEquals("pause", Icons.Filled.Pause.name, "the extended set")
+        assertEquals("3d_rotation", Icons.Rounded._3dRotation.name, "and a name Compose gives a leading underscore")
+        assertEquals("svg", ImageVector.fromSvg("<svg viewBox=\"0 0 4 4\"><rect width=\"4\" height=\"4\"/></svg>").name)
 
         click(10f, 114f)
         assertEquals(1, scene.presses, "awaitPointerEvent: a press")

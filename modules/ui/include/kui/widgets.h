@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cmath>
 #include <concepts>
 #include <cstdint>
 #include <functional>
@@ -229,6 +231,8 @@ namespace kui
         [[nodiscard]] RenderObject* Child() const { return _children.empty() ? nullptr : _children.front(); }
         void Paint(Canvas& canvas, glm::vec2 offset) override;
         void ChildDestroyed(RenderObject& child) override;
+        /** @brief Its widest child's: what holds one child, or lays its children over one another, is that wide at least. */
+        [[nodiscard]] float MinIntrinsicWidth() const override;
 
     protected:
         /** @brief Lays the one child out under the same constraints and takes its size; the smallest size without one. */
@@ -724,6 +728,10 @@ namespace kui
         /// or clicking elsewhere sets it (kept to its range); Escape leaves it as it was. It is in the order
         /// Tab goes through the fields.
         bool typeable = true;
+        /// Past one end of its range it comes back in at the other — an angle dragged past 360 is at 0 again —
+        /// rather than stopping there; a typed value is brought into the range the same way. The two ends are
+        /// one place: the value is never the max, which is the min. Only where both ends are finite.
+        bool wrap = false;
 
         // Chainable: `kui::DragValueOptions{}.SetSpeed(0.1f).SetRange(0, 10)`.
         DragValueOptions& SetSpeed(float value) { speed = value; return *this; }
@@ -733,6 +741,16 @@ namespace kui
         DragValueOptions& SetWidth(float value) { width = value; return *this; }
         DragValueOptions& SetAxis(Axis value) { axis = value; return *this; }
         DragValueOptions& SetTypeable(bool value) { typeable = value; return *this; }
+        DragValueOptions& SetWrap(bool value) { wrap = value; return *this; }
+
+        /** @brief @p value brought into the range: wrapped round it, where it wraps; kept at its ends, where not. */
+        [[nodiscard]] float Keep(const float value) const
+        {
+            const float span = max - min;
+            if (!wrap || !std::isfinite(min) || !std::isfinite(max) || !(span > 0.f)) return std::clamp(value, min, std::max(min, max));
+            const float into = std::fmod(value - min, span);
+            return min + (into < 0.f ? into + span : into);
+        }
     };
     /**
      * @brief A number in a field, changed by dragging across it sideways. Each unit of

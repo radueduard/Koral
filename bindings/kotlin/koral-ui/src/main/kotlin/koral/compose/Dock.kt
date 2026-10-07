@@ -124,20 +124,33 @@ data class DockStyle(
 interface DockScope {
     /**
      * A panel, known to the layout by [id], showing [content]. Docked, it is a square button in the strip down its
-     * group's left side, showing [icon] — one glyph — or, with none, the first letter of [title]. Floating, it has
+     * group's left side, showing [icon] (`Icons.Filled.Tune`, or any [ImageVector]) in the colour the button's state
+     * gives it — or, with none, the first letter of [title]. Floating, it has
      * a title bar instead: a sliver along its top with [title] on the left and its buttons on the right.
      *
      * [dockable] false: it never docks — it floats on its own, and nothing can be docked into it.
-     * [titleBar] false: floating on its own it is only its content, with no bar, frame or surface, at the
+     * [showTitleBar] false: floating on its own it is only its content, with no bar, frame or surface, at the
      * size the layout floats it at; it is moved by dragging the content — its padding, and whatever else of
      * it takes no press (a Button in it is still a button).
+     *
+     * [titleBar]: what its title bar shows between its title, at the start, and its buttons, at the end — a
+     * toolbar, say. It is given that room's width, and the bar is as tall as it wants. Where it takes no press,
+     * pressing it picks the panel up, as the rest of the bar does. None: nothing there.
+     *
+     * ```
+     * panel("viewport", "Viewport", titleBar = {
+     *     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+     *         IconButton(onClick = play) { Icon(Icons.Filled.PlayArrow, "Play") }
+     *     }
+     * }) { Viewport() }
+     * ```
      */
-    fun panel(id: String, title: String, closable: Boolean = true, dockable: Boolean = true, titleBar: Boolean = true,
-              icon: String = "", content: @Composable () -> Unit)
+    fun panel(id: String, title: String, closable: Boolean = true, dockable: Boolean = true, showTitleBar: Boolean = true,
+              icon: ImageVector? = null, titleBar: (@Composable () -> Unit)? = null, content: @Composable () -> Unit)
 }
 
-private data class PanelMeta(val id: String, val title: String, val closable: Boolean, val dockable: Boolean, val titleBar: Boolean,
-                             val icon: String)
+private data class PanelMeta(val id: String, val title: String, val closable: Boolean, val dockable: Boolean, val showTitleBar: Boolean,
+                             val icon: ImageVector?, val hasTitleBar: Boolean)
 
 /**
  * A space of docked panels, filling what it is given, arranged as the tool windows of the JetBrains IDEs are.
@@ -182,11 +195,11 @@ private data class PanelMeta(val id: String, val title: String, val closable: Bo
 @Composable
 fun DockSpace(layout: DockLayout, modifier: Modifier = Modifier, multiViewport: Boolean = true, gap: Dp = 6.dp, stripeGap: Dp = 3.dp, style: DockStyle = DockStyle.Default,
               onPanelClosed: ((id: String) -> Unit)? = null, onLayoutChanged: (() -> Unit)? = null, panels: DockScope.() -> Unit) {
-    val list = ArrayList<Pair<PanelMeta, @Composable () -> Unit>>()
+    val list = ArrayList<Triple<PanelMeta, @Composable () -> Unit, (@Composable () -> Unit)?>>()
     object : DockScope {
-        override fun panel(id: String, title: String, closable: Boolean, dockable: Boolean, titleBar: Boolean, icon: String,
-                           content: @Composable () -> Unit) {
-            list += PanelMeta(id, title, closable, dockable, titleBar, icon) to content
+        override fun panel(id: String, title: String, closable: Boolean, dockable: Boolean, showTitleBar: Boolean, icon: ImageVector?,
+                           titleBar: (@Composable () -> Unit)?, content: @Composable () -> Unit) {
+            list += Triple(PanelMeta(id, title, closable, dockable, showTitleBar, icon, titleBar != null), content, titleBar)
         }
     }.panels()
     val metas = list.map { it.first }
@@ -194,11 +207,14 @@ fun DockSpace(layout: DockLayout, modifier: Modifier = Modifier, multiViewport: 
         Arena.ofConfined().use { a ->
             val size = KuiLayouts.KuiDockPanel.byteSize()
             val array = a.allocate(KuiLayouts.KuiDockPanel, maxOf(1, metas.size).toLong())
+            // The contents first, one a panel; then the title bars', for the panels that have one.
+            var bars = metas.size
             metas.forEachIndexed { i, meta ->
                 Struct(array.asSlice(i * size, size), KuiLayouts.KuiDockPanel).address("id", a.allocateFrom(meta.id))
                     .address("title", a.allocateFrom(meta.title)).address("content", kids.getOrElse(i) { MemorySegment.NULL })
-                    .bool("fixed", !meta.closable).bool("undockable", !meta.dockable).bool("no_title_bar", !meta.titleBar)
-                    .address("icon", if (meta.icon.isEmpty()) MemorySegment.NULL else a.allocateFrom(meta.icon))
+                    .bool("fixed", !meta.closable).bool("undockable", !meta.dockable).bool("no_title_bar", !meta.showTitleBar)
+                    .address("icon", meta.icon?.handle ?: MemorySegment.NULL)
+                    .address("title_bar", if (meta.hasTitleBar) kids.getOrElse(bars++) { MemorySegment.NULL } else MemorySegment.NULL)
             }
             val options = Struct(a, KuiLayouts.KuiDockOptions).bool("single_viewport", !multiViewport).float("gap", gap.value).float("stripe_gap", stripeGap.value)
                 .floats("style", style.titleBarHeight.value, style.stripeWidth.value, style.buttonSize.value, style.buttonGap.value,
@@ -209,9 +225,12 @@ fun DockSpace(layout: DockLayout, modifier: Modifier = Modifier, multiViewport: 
             KuiNative.kui_dock_space(layout.native, array, metas.size.toLong(), options.segment)
         }
     }, update = { onText = onPanelClosed; onClick = onLayoutChanged }) {
-        // One node per panel, in order: the panel's content, whatever it is, as one widget.
+        // One node per panel, in order: the panel's content, whatever it is, as one widget. Then one per title bar.
         for ((meta, content) in list) key(meta.id) {
             Node(Modifier, Unit, { _, kids -> stack(kids, Alignment.TopStart) }) { content() }
+        }
+        for ((meta, _, titleBar) in list) if (titleBar != null) key(meta.id to "titleBar") {
+            Node(Modifier, Unit, { _, kids -> stack(kids, Alignment.TopStart) }) { titleBar() }
         }
     }
 }

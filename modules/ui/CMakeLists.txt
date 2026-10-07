@@ -24,8 +24,21 @@ add_library(koral-ui SHARED
         src/ui.cpp
         src/list.cpp
         src/dock.cpp
+        src/icons.cpp
         src/capi.cpp
+        ${CMAKE_CURRENT_BINARY_DIR}/materialIcons.cpp
 )
+
+# The Material icons (icons/material/<style>/<name>.svg, as Google publishes them) are compiled in as text:
+# regenerated whenever one is added, changed or removed.
+file(GLOB KORAL_UI_ICONS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/icons/material/*/*.svg)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/materialIcons.cpp
+        COMMAND ${CMAKE_COMMAND} -DICONS_DIR=${CMAKE_CURRENT_SOURCE_DIR}/icons/material
+                -DICONS_OUTPUT=${CMAKE_CURRENT_BINARY_DIR}/materialIcons.cpp
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedIcons.cmake
+        DEPENDS ${KORAL_UI_ICONS} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbedIcons.cmake
+        COMMENT "Embedding the Material icons")
+target_include_directories(koral-ui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 target_include_directories(koral-ui PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

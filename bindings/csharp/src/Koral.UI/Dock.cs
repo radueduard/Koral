@@ -54,10 +54,14 @@ public sealed record DropTargetOptions
 /// <summary>kui::DockPanel: what one tab of a dock space shows.</summary>
 /// <remarks>Id is what the layout knows it by: the same from build to build.</remarks>
 /// <remarks>
-/// Dockable false: it never docks — it floats on its own, and nothing can be docked into it. TitleBar false:
-/// floating on its own it is only its content, moved by dragging what of it takes no press.
+/// Dockable false: it never docks — it floats on its own, and nothing can be docked into it. ShowTitleBar false:
+/// floating on its own it is only its content, moved by dragging what of it takes no press. TitleBar: shown in its
+/// title bar between its title and its buttons (a toolbar, say), the bar as tall as it wants; where it takes no
+/// press, pressing it picks the panel up as the rest of the bar does. Icon: what its button in the stripe shows
+/// (<c>VectorImage.Material("tune")</c>), in the colour the button's state gives it; none: the first letter of its title.
 /// </remarks>
-public sealed record DockPanel(string Id, string Title, Widget Content, bool Closable = true, bool Dockable = true, bool TitleBar = true);
+public sealed record DockPanel(string Id, string Title, Widget Content, bool Closable = true, bool Dockable = true, bool ShowTitleBar = true,
+                               Widget? TitleBar = null, VectorImage? Icon = null);
 
 /// <summary>kui::DockStyle: every size a dock space is drawn with. A size not given is koral-ui's own.</summary>
 public sealed record DockStyle
@@ -241,7 +245,9 @@ public static unsafe partial class Widgets
                     content = Lend(panels[i].Content),
                     @fixed = KuiNative.Bool(!panels[i].Closable),
                     undockable = KuiNative.Bool(!panels[i].Dockable),
-                    no_title_bar = KuiNative.Bool(!panels[i].TitleBar),
+                    no_title_bar = KuiNative.Bool(!panels[i].ShowTitleBar),
+                    title_bar = Lend(panels[i].TitleBar),
+                    icon = panels[i].Icon?.Native ?? IntPtr.Zero,
                 };
             var o = new KuiDockOptions
             {
@@ -259,8 +265,10 @@ public static unsafe partial class Widgets
                 Marshal.FreeCoTaskMem(p.id);
                 Marshal.FreeCoTaskMem(p.title);
                 Return(p.content);
+                Return(p.title_bar);
             }
             GC.KeepAlive(layout);
+            GC.KeepAlive(panels);
         }
     }
 }

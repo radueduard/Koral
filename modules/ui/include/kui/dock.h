@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+#include "icons.h"
 #include "widgets.h"
 
 namespace kui
@@ -40,9 +41,14 @@ namespace kui
         /// buttons on the right. False: while it floats it has no title bar, frame or surface — only
         /// its content, at the size the layout gave it. It is moved by dragging its content: the
         /// padding, and whatever else of it takes no press (a button or a slider in it still works as one).
-        bool titleBar = true;
-        /// What its button in the stripe shows: one glyph (a letter, a symbol the font has). Empty: the first letter of its title.
-        std::string icon;
+        bool showTitleBar = true;
+        /// What its button in the stripe shows, in the colour the button's state gives it: `kui::MaterialIcon("tune")`,
+        /// or any SVG's. None: the first letter of its title.
+        std::shared_ptr<const VectorImage> icon;
+        /// What its title bar shows between its title and its buttons — a toolbar, say: given that room's width,
+        /// and as tall as it likes (the bar grows to fit it). Where it takes no press, pressing it picks the panel
+        /// up as the rest of the bar does. Empty: nothing there.
+        Widget titleBar;
     };
 
     /**
@@ -190,7 +196,8 @@ namespace kui
      *    brought to the front by its title, and taken out by dragging its title away.
      *
      * An open panel has a title bar along its top: its title on the left; on the right a button that
-     * folds it away and, when it is closable, one that closes it. Between two areas is a gap
+     * folds it away and, when it is closable, one that closes it; between them, whatever the panel's
+     * DockPanel::titleBar is. Between two areas is a gap
      * (DockOptions::gap): drag it to resize them — over it the pointer turns into the arrows that say
      * which way.
      *

@@ -62,6 +62,7 @@ UI_ENUMS = [
     ("widgets.h", None, "ImageFit", None, None),
     ("widgets.h", None, "ButtonStyle", None, None),
     ("dock.h", None, "DockSide", None, None),
+    ("icons.h", None, "IconStyle", None, None),
 ]
 
 TARGETS = [

@@ -95,3 +95,13 @@ public enum DockSide : byte
     eBottom = 3,
     eCenter = 4,
 }
+
+/// <summary>kui::IconStyle.</summary>
+public enum IconStyle : byte
+{
+    eFilled = 0,
+    eOutlined = 1,
+    eRounded = 2,
+    eSharp = 3,
+    eTwoTone = 4,
+}

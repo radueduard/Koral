@@ -49,6 +49,8 @@ namespace kui
         if (auto* child = Child()) child->SetOffset(_alignment.Place(childSize, Size()));
     }
 
+    float RenderPadding::MinIntrinsicWidth() const { return RenderContainer::MinIntrinsicWidth() + _padding.left + _padding.right; }
+
     void RenderConstrained::Set(const BoxConstraints& extra)
     {
         if (extra == _extra) return;
@@ -110,6 +112,12 @@ namespace kui
 
     namespace {
         bool same(const EdgeInsets& a, const EdgeInsets& b) { return a.left == b.left && a.top == b.top && a.right == b.right && a.bottom == b.bottom; }
+    }
+
+    float RenderConstrained::MinIntrinsicWidth() const
+    {
+        // Its child's, kept to what it allows: a fixed width is that width, whatever the child.
+        return std::clamp(RenderContainer::MinIntrinsicWidth(), _extra.minWidth, std::max(_extra.minWidth, _extra.maxWidth));
     }
 
     void RenderBox::Set(const Config& c)
@@ -191,6 +199,16 @@ namespace kui
         if (Parent()) Parent()->MarkNeedsLayout();
     }
 
+    float RenderBox::MinIntrinsicWidth() const
+    {
+        // From the inside out, as it is laid out: the child, its padding, a size that overrides both, its margin.
+        float width = RenderContainer::MinIntrinsicWidth();
+        if (_config.hasPadding) width += _config.padding.left + _config.padding.right;
+        if (_config.hasSize && _config.width >= 0.f) width = _config.width;
+        if (_config.hasMargin) width += _config.margin.left + _config.margin.right;
+        return width;
+    }
+
     void RenderFlex::Set(const Axis axis, const FlexOptions& options)
     {
         if (axis == _axis && options.mainAxisAlignment == _options.mainAxisAlignment && options.crossAxisAlignment == _options.crossAxisAlignment
@@ -198,6 +216,14 @@ namespace kui
         _axis = axis;
         _options = options;
         MarkNeedsLayout();
+    }
+
+    float RenderFlex::MinIntrinsicWidth() const
+    {
+        if (_axis == Axis::eVertical) return RenderContainer::MinIntrinsicWidth();
+        float width = 0.f;
+        for (const RenderObject* child : _children) width += child->MinIntrinsicWidth();
+        return width + _options.gap * static_cast<float>(std::max<std::size_t>(_children.size(), 1) - 1);
     }
 
     void RenderFlex::PerformLayout()
@@ -377,6 +403,14 @@ namespace kui
             _paragraph.Layout(width);
         }
         SetSize(_paragraph.Size());
+    }
+
+    float RenderParagraph::MinIntrinsicWidth() const
+    {
+        if (_ellipsis) return 0.f;
+        // From all of its text: the paragraph may hold only what was left once it was cut to its lines.
+        const Paragraph whole(_text, _style, Infinity, _align);
+        return std::ceil(_wrap ? whole.MinIntrinsicWidth() : whole.MaxIntrinsicWidth());
     }
 
     void RenderParagraph::Paint(Canvas& canvas, const glm::vec2 offset) { canvas.DrawParagraph(_paragraph, offset); }
@@ -565,6 +599,8 @@ namespace kui
     }
 
     // ---- scrolling --------------------------------------------------------------------------------------
+
+    float RenderScroll::MinIntrinsicWidth() const { return _axis == Axis::eHorizontal ? 0.f : RenderContainer::MinIntrinsicWidth(); }
 
     void RenderScroll::Set(const Axis axis)
     {

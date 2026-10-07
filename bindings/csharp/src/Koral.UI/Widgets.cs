@@ -564,6 +564,19 @@ public static unsafe partial class Widgets
     public static Widget Image(Koral.Image image, ImageFit fit = ImageFit.eContain, Vector2? size = null) =>
         Made(KuiNative.kui_image(Resource.HandleOf(image), (uint)fit, (size ?? new Vector2(-1, -1)).Native()));
 
+    /// <summary>
+    /// <paramref name="icon"/>, in <paramref name="tint"/> — the theme's text colour unless given another — 24 units
+    /// square unless its parent sizes it, as Compose's Icon is.
+    /// </summary>
+    public static Widget Icon(VectorImage? icon, Color? tint = null)
+    {
+        var made = Made(KuiNative.kui_icon(icon?.Native ?? IntPtr.Zero, (tint ?? Color.Inherit).Native));
+        GC.KeepAlive(icon);
+        return made;
+    }
+    /// <summary>The Material icon named <paramref name="name"/> (<c>"arrow_back"</c> or <c>"ArrowBack"</c>), in <paramref name="style"/>.</summary>
+    public static Widget Icon(string name, IconStyle style = IconStyle.eFilled, Color? tint = null) => Icon(VectorImage.Material(name, style), tint);
+
     /// <summary>Keeps the child in a layer of its own: repainting it repaints nothing around it.</summary>
     public static Widget RepaintBoundary(Widget child) => WithChild(child, KuiNative.kui_repaint_boundary);
     /// <summary>The child, faded. Changing it re-records nothing.</summary>

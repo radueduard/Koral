@@ -105,3 +105,14 @@ enum class DockSide(val value: Int) {
     ;
     companion object { fun of(value: Int): DockSide = entries.first { it.value == value } }
 }
+
+/** kui::IconStyle: the same names and values, so a value crosses the C interface as itself. */
+enum class IconStyle(val value: Int) {
+    eFilled(0),
+    eOutlined(1),
+    eRounded(2),
+    eSharp(3),
+    eTwoTone(4),
+    ;
+    companion object { fun of(value: Int): IconStyle = entries.first { it.value == value } }
+}

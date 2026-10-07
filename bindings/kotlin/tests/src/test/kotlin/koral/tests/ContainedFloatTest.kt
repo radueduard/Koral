@@ -36,7 +36,7 @@ class Contained : Scene() {
         graph.add(Clear(0f, 0f, 1f))
         setContent {
             DockSpace(layout, Modifier.fillMaxSize(), multiViewport = false) {
-                panel("card", "Card", dockable = false, titleBar = false) { Box(Modifier.size(width.dp, 30.dp).background(Color.Red)) }
+                panel("card", "Card", dockable = false, showTitleBar = false) { Box(Modifier.size(width.dp, 30.dp).background(Color.Red)) }
                 panel("framed", "F", closable = false) { Box(Modifier.size(60.dp, 40.dp).background(Color.Green)) }
             }
         }

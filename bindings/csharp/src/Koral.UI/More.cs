@@ -155,9 +155,9 @@ public static unsafe partial class Widgets
     /// </summary>
     public static Widget DragValue(float value, Action<float>? onChanged, float speed = 1f, float min = float.NegativeInfinity,
                                    float max = float.PositiveInfinity, int decimals = 2, string? label = null, float width = -1f,
-                                   bool vertical = false, bool typeable = true) =>
-        Made(vertical ? KuiNative.kui_drag_value_vertical(value, Callbacks.Float(onChanged), speed, min, max, decimals, label, width, KuiNative.Bool(typeable))
-                      : KuiNative.kui_drag_value(value, Callbacks.Float(onChanged), speed, min, max, decimals, label, width, KuiNative.Bool(typeable)));
+                                   bool vertical = false, bool typeable = true, bool wrap = false) =>
+        Made(vertical ? KuiNative.kui_drag_value_vertical(value, Callbacks.Float(onChanged), speed, min, max, decimals, label, width, KuiNative.Bool(typeable), KuiNative.Bool(wrap))
+                      : KuiNative.kui_drag_value(value, Callbacks.Float(onChanged), speed, min, max, decimals, label, width, KuiNative.Bool(typeable), KuiNative.Bool(wrap)));
     /// <summary>A field that opens a list of <paramref name="items"/> under itself.</summary>
     public static Widget Dropdown(IReadOnlyList<string> items, int selected, Action<int>? onChanged, float width = -1f, string? placeholder = null) =>
         Made(KuiNative.kui_dropdown([.. items], (nuint)items.Count, selected, Whole(onChanged), width, placeholder));

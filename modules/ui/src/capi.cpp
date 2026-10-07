@@ -29,6 +29,7 @@ struct KuiLayer { std::shared_ptr<Layer> layer; };
 struct KuiElementShader { std::shared_ptr<ElementShader> shader; };
 struct KuiWidget { Widget widget; };
 struct KuiDockLayout { std::shared_ptr<DockLayout> layout; };
+struct KuiVectorImage { std::shared_ptr<const VectorImage> image; };
 
 namespace
 {
@@ -838,7 +839,8 @@ KuiWidget* kui_dock_space(KuiDockLayout* l, const KuiDockPanel* panels, const si
         std::vector<DockPanel> list;
         for (std::size_t i = 0; i < count; ++i)
             list.push_back({ panels[i].id ? panels[i].id : "", panels[i].title ? panels[i].title : "", W(panels[i].content), !panels[i].fixed,
-                             !panels[i].undockable, !panels[i].no_title_bar, panels[i].icon ? panels[i].icon : "" });
+                             !panels[i].undockable, !panels[i].no_title_bar, panels[i].icon ? panels[i].icon->image : nullptr,
+                             panels[i].title_bar ? W(panels[i].title_bar) : Widget {} });
         DockOptions options;
         if (o) {
             options.multiViewport = !o->single_viewport;
@@ -891,14 +893,14 @@ bool kui_system_appearance(bool* dark, KuiColor* accent)
 }
 KuiWidget* kui_progress_bar(const float value) { KUI_WIDGET(ProgressBar(value)); }
 KuiWidget* kui_drag_value(const float value, const KuiFloatAction onChanged, const float speed, const float min, const float max,
-                          const int32_t decimals, const char* label, const float width, const bool typeable)
+                          const int32_t decimals, const char* label, const float width, const bool typeable, const bool wrap)
 {
-    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eHorizontal, typeable }));
+    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eHorizontal, typeable, wrap }));
 }
 KuiWidget* kui_drag_value_vertical(const float value, const KuiFloatAction onChanged, const float speed, const float min, const float max,
-                                   const int32_t decimals, const char* label, const float width, const bool typeable)
+                                   const int32_t decimals, const char* label, const float width, const bool typeable, const bool wrap)
 {
-    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eVertical, typeable }));
+    KUI_WIDGET(DragValue(value, F(onChanged), DragValueOptions { speed, min, max, decimals, label ? label : "", width, Axis::eVertical, typeable, wrap }));
 }
 KuiWidget* kui_slider_vertical(const float value, const KuiFloatAction onChanged, const float min, const float max, const KuiAction onFinished)
 {
@@ -1058,6 +1060,45 @@ KuiWidget* kui_text_field(const KuiTextFieldOptions* o)
 }
 
 #undef KUI_WIDGET
+
+// ---- icons ----
+
+KuiVectorImage* kui_material_icon(const char* name, const uint32_t style)
+{
+    return Guarded([&]() -> KuiVectorImage* {
+        auto image = MaterialIcon(&Need(name, "name"), static_cast<IconStyle>(style));
+        return image ? new KuiVectorImage { std::move(image) } : nullptr;
+    }, static_cast<KuiVectorImage*>(nullptr));
+}
+size_t kui_material_icon_count(void) { return Guarded([] { return MaterialIconNames().size(); }, std::size_t { 0 }); }
+const char* kui_material_icon_name(const size_t index)
+{
+    // The names are views of the compiled-in text, each followed by the SVG's: copied once to end in a nul.
+    return Guarded([&]() -> const char* {
+        static const std::vector<std::string> names(MaterialIconNames().begin(), MaterialIconNames().end());
+        return index < names.size() ? names[index].c_str() : nullptr;
+    }, static_cast<const char*>(nullptr));
+}
+KuiVectorImage* kui_vector_image_from_svg(const char* svg, const size_t length)
+{
+    return Guarded([&]() -> KuiVectorImage* {
+        auto image = VectorImage::FromSvg({ &Need(svg, "svg"), length });
+        return image.Empty() ? nullptr : new KuiVectorImage { std::make_shared<const VectorImage>(std::move(image)) };
+    }, static_cast<KuiVectorImage*>(nullptr));
+}
+void kui_vector_image_release(KuiVectorImage* image) { delete image; }
+KuiRect kui_vector_image_view_box(KuiVectorImage* image)
+{
+    return Guarded([&] { const Rect r = Need(image, "image").image->ViewBox(); return KuiRect { r.left, r.top, r.right, r.bottom }; }, KuiRect {});
+}
+void kui_canvas_draw_vector_image(KuiCanvas* c, KuiVectorImage* image, const KuiRect rect, const KuiColor tint)
+{
+    GuardedVoid([&] { Need(image, "image").image->Draw(CanvasOf(c), R(rect), C(tint)); });
+}
+KuiWidget* kui_icon(KuiVectorImage* image, const KuiColor tint)
+{
+    return Guarded([&]() -> KuiWidget* { return Give(Icon(image ? image->image : nullptr, C(tint))); }, static_cast<KuiWidget*>(nullptr));
+}
 
 // ==== the theme and the view ============================================================================
 

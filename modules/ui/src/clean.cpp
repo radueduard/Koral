@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 
 #include <clipper2/clipper.h>
 #include <clipper2/clipper.triangulation.h>
@@ -59,17 +60,31 @@ namespace kui::detail
          * @brief Triangles for clean contours, and the fringe around them. Clean means what Clipper
          *        returns: no crossings, outers and holes wound opposite ways — so the filled side is
          *        the same side of every edge, found once from the largest contour.
+         *
+         * The fringe is centred on the outline, half of it in and half out, so a pixel the edge cuts in
+         * two is half covered: the inside is pulled in by half a fringe, and the fringe runs from there to
+         * half a fringe outside. (All of it outside made every path half a pixel bolder all round — enough
+         * to close a small icon's gaps.)
          */
         bool emit(const c2::PathsD& clean, const float fringe, Mesh& out)
         {
             if (clean.empty()) return true;
             c2::PathsD triangles;
             if (c2::Triangulate(clean, Precision, triangles, false) != c2::TriangulateResult::success) return false;
-            for (const auto& t : triangles) {
-                if (t.size() != 3) continue;
-                for (const auto& p : t) out.Add({ static_cast<float>(p.x), static_cast<float>(p.y) }, 1.f);
+            // Clipper's triangulation can say it succeeded and still be wrong — a hole whose sides line up with
+            // where its outline's curves begin is filled over (Material's grid_on). Right, its triangles cover
+            // exactly what the outline less its holes does; otherwise the sweep does it.
+            double covered = 0.0, area = 0.0;
+            for (const auto& t : triangles) if (t.size() == 3) covered += std::abs(signedArea(t));
+            for (const auto& path : clean) area += signedArea(path);
+            if (std::abs(covered - std::abs(area)) > 1e-3 * std::max(1.0, std::abs(area))) return false;
+            if (fringe <= 0.f) {
+                for (const auto& t : triangles) {
+                    if (t.size() != 3) continue;
+                    for (const auto& p : t) out.Add({ static_cast<float>(p.x), static_cast<float>(p.y) }, 1.f);
+                }
+                return true;
             }
-            if (fringe <= 0.f) return true;
 
             // Which side is filled: off the largest contour (an outer one), its left or its right.
             const auto largest = std::ranges::max_element(clean, {}, [](const c2::PathD& p) { return std::abs(signedArea(p)); });
@@ -87,12 +102,21 @@ namespace kui::detail
                 }
             }
 
-            for (const auto& path : clean) {
+            // Each vertex's outward normal — per edge, then per vertex the two joined: a miter, kept from
+            // growing a spike — and where the inside's corner moves to, by vertex, for the triangles to find.
+            const float half = fringe * 0.5f;
+            const auto key = [](const double x, const double y) {
+                return std::pair { std::llround(x * 1000.0), std::llround(y * 1000.0) };   // Precision's grid
+            };
+            std::map<std::pair<long long, long long>, glm::vec2> inset;
+            std::vector<std::vector<glm::vec2>> points(clean.size()), normals(clean.size());
+            for (std::size_t c = 0; c < clean.size(); ++c) {
+                const auto& path = clean[c];
                 const std::size_t n = path.size();
                 if (n < 3) continue;
-                std::vector<glm::vec2> pts(n);
+                auto& pts = points[c];
+                pts.resize(n);
                 for (std::size_t i = 0; i < n; ++i) pts[i] = { static_cast<float>(path[i].x), static_cast<float>(path[i].y) };
-                // Outward per edge, then per vertex the two joined — a miter, kept from growing a spike.
                 std::vector<glm::vec2> edgeNormal(n);
                 for (std::size_t i = 0; i < n; ++i) {
                     const glm::vec2 d = pts[(i + 1) % n] - pts[i];
@@ -100,7 +124,8 @@ namespace kui::detail
                     const glm::vec2 left = len > 0.f ? glm::vec2(-d.y, d.x) / len : glm::vec2(0.f);
                     edgeNormal[i] = -left * fillLeft;
                 }
-                std::vector<glm::vec2> vertexNormal(n);
+                auto& vertexNormal = normals[c];
+                vertexNormal.resize(n);
                 for (std::size_t i = 0; i < n; ++i) {
                     const glm::vec2 a = edgeNormal[(i + n - 1) % n], b = edgeNormal[i];
                     glm::vec2 m = a + b;
@@ -110,14 +135,47 @@ namespace kui::detail
                     const float cosHalf = std::max(glm::dot(m, b), 0.25f);   // at most 4x out, at a hairpin
                     vertexNormal[i] = m / cosHalf;
                 }
+                for (std::size_t i = 0; i < n; ++i) inset.try_emplace(key(path[i].x, path[i].y), pts[i] - vertexNormal[i] * half);
+            }
+
+            for (const auto& t : triangles) {
+                if (t.size() != 3) continue;
+                for (const auto& p : t) {
+                    const auto it = inset.find(key(p.x, p.y));
+                    out.Add(it != inset.end() ? it->second : glm::vec2(static_cast<float>(p.x), static_cast<float>(p.y)), 1.f);
+                }
+            }
+            for (std::size_t c = 0; c < clean.size(); ++c) {
+                const auto& pts = points[c];
+                const auto& vertexNormal = normals[c];
+                const std::size_t n = pts.size();
                 for (std::size_t i = 0; i < n; ++i) {
                     const std::size_t j = (i + 1) % n;
-                    const glm::vec2 a = pts[i], b = pts[j];
-                    const glm::vec2 a2 = a + vertexNormal[i] * fringe, b2 = b + vertexNormal[j] * fringe;
+                    const glm::vec2 a = pts[i] - vertexNormal[i] * half, b = pts[j] - vertexNormal[j] * half;
+                    const glm::vec2 a2 = pts[i] + vertexNormal[i] * half, b2 = pts[j] + vertexNormal[j] * half;
                     out.Add(a, 1.f); out.Add(b, 1.f); out.Add(b2, 0.f);
                     out.Add(a, 1.f); out.Add(b2, 0.f); out.Add(a2, 0.f);
                 }
             }
+            return true;
+        }
+
+        /**
+         * @brief Clean contours filled by the sweep, for when Clipper cannot triangulate them. The sweep's fringe
+         *        is all outside what it is given, so it is given the outline pulled in by half of one: the fringe
+         *        then straddles the edge, as emit's does. False when that leaves nothing — thinner than a pixel.
+         */
+        bool sweep(const c2::PathsD& clean, const float fringe, Mesh& out)
+        {
+            const c2::PathsD inset = fringe > 0.f ? c2::InflatePaths(clean, -fringe * 0.5, c2::JoinType::Miter, c2::EndType::Polygon, 2.0, Precision) : clean;
+            if (inset.empty()) return false;
+            std::vector<Path::Contour> contours;
+            for (const auto& path : inset) {
+                Path::Contour c { {}, true };
+                for (const auto& p : path) c.points.emplace_back(static_cast<float>(p.x), static_cast<float>(p.y));
+                contours.push_back(std::move(c));
+            }
+            TessellateFill(contours, FillRule::eNonZero, fringe, out);
             return true;
         }
     }
@@ -131,7 +189,9 @@ namespace kui::detail
             out.coverage.insert(out.coverage.end(), mesh.coverage.begin(), mesh.coverage.end());
             return;
         }
-        TessellateFill(contours, rule, fringe, out);   // Clipper could not triangulate it: the sweep can
+        // Clipper could not triangulate it: the sweep can.
+        if (sweep(clean, fringe, out)) return;
+        TessellateFill(contours, rule, fringe, out);
     }
 
     void StrokePath(const std::vector<Path::Contour>& contours, const Stroke& stroke, const float tolerance, const float fringe, Mesh& out)
@@ -167,6 +227,7 @@ namespace kui::detail
             out.coverage.insert(out.coverage.end(), mesh.coverage.begin(), mesh.coverage.end());
             return;
         }
+        if (sweep(outline, fringe, out)) return;
         TessellateFill(StrokeOutline(contours, stroke, tolerance), FillRule::eNonZero, fringe, out);
     }
 }

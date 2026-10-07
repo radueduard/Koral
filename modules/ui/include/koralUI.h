@@ -13,6 +13,8 @@
  *   kui::Layer trees.
  * - **Widgets** (kui/widgets.h): declarative building blocks laid out by constraints, rebuilt only
  *   where their state changed.
+ * - **Icons** (kui/icons.h): Compose's Material icons, the drawings Google publishes, compiled in; and any
+ *   other SVG of filled shapes as a kui::VectorImage.
  *
  * @code
  * // CMakeLists.txt:  target_link_libraries(MyScene PRIVATE Koral koral-ui)
@@ -28,3 +30,4 @@
 #include "kui/rendering.h"
 #include "kui/widgets.h"
 #include "kui/dock.h"
+#include "kui/icons.h"

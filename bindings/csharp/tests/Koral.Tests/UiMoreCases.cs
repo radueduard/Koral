@@ -62,6 +62,7 @@ public sealed class MoreScene : Scene
             SizeObserver((_, _) => { }, PopupAnchor(false, Text("popup"))),
             TextField(new TextFieldOptions().SetMultiline(2, 4).SetPlaceholder("notes")),
             StatusBar("Ready", StatusLevel.Warning),
+            Row([Icon("Add"), Icon(VectorImage.Material("lock", IconStyle.eTwoTone), Color.Red), Icon("no_such_icon")]),
         ], new FlexOptions().SetCrossAxisAlignment(CrossAxisAlignment.eStart)), Axis.eVertical, (_, _) => { }),
     ], new FlexOptions().SetCrossAxisAlignment(CrossAxisAlignment.eStart));
 
@@ -96,6 +97,15 @@ public static partial class Cases
         }
         Check.That(Themes.Koral().CheckboxRadius is null && Themes.Material().CheckboxRadius is 2f, "a checkbox: a circle, or square");
         if (OperatingSystem.IsWindows()) Check.That(SystemAppearance.Query().Known, "Windows says how it is set");
+
+        // The Material icons, by either spelling, each read once; and an SVG of one's own.
+        Check.That(VectorImage.MaterialNames.Count >= 49 && VectorImage.MaterialNames.Contains("arrow_back"), "the Material icons are listed");
+        Check.That(VectorImage.Material("ArrowBack") is not null && VectorImage.Material("arrow_back") is not null, "by Compose's name or Material's");
+        Check.That(ReferenceEquals(VectorImage.Material("Lock"), VectorImage.Material("Lock")), "each read once");
+        Check.Equal(Rect.LTRB(0, 0, 24, 24), VectorImage.Material("lock", IconStyle.eOutlined)!.ViewBox, "on a box of 24");
+        Check.That(VectorImage.Material("no_such_icon") is null, "none of a name it does not have");
+        Check.Equal(Rect.LTRB(0, 0, 10, 10), VectorImage.FromSvg("<svg viewBox=\"0 0 10 10\"><circle cx=\"5\" cy=\"5\" r=\"4\"/></svg>")!.ViewBox, "an SVG");
+        Check.That(VectorImage.FromSvg("not an svg") is null, "and not one");
 
         app.Register<MoreScene>();
         var scene = app.OpenOffscreen("MoreScene", Offscreen(MoreScene.Side));

@@ -58,7 +58,7 @@ class BareCards : Scene() {
         setContent {
             DockSpace(layout, Modifier.fillMaxSize(), multiViewport = false) {
                 // Only its content: red, with twenty of padding around a green square that takes taps.
-                panel("card", "Card", dockable = false, titleBar = false) {
+                panel("card", "Card", dockable = false, showTitleBar = false) {
                     Box(Modifier.fillMaxSize().background(Color.Red).padding(20.dp)) {
                         Box(Modifier.size(40.dp).background(Color.Green).clickable { taps++ })
                     }

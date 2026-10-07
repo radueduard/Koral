@@ -255,7 +255,8 @@ fun Slider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Mo
  * right adds [speed]; the value stops at the ends of [valueRange]. [label] is shown before the value.
  * While it is dragged the pointer is held where it is, unseen. [vertical]: upright, its label over its value,
  * dragged up for more. [typeable]: clicked without being dragged, it turns into a text box for typing the value
- * exactly — Enter or clicking away sets it, Escape leaves it as it was.
+ * exactly — Enter or clicking away sets it, Escape leaves it as it was. [wrap]: past one end of a finite [valueRange]
+ * it comes back in at the other, typed values too — an angle past 360 is at 0 again — rather than stopping there.
  *
  * ```
  * var speed by remember { mutableStateOf(1f) }
@@ -265,13 +266,13 @@ fun Slider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Mo
 @Composable
 fun DragValue(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = Modifier, label: String = "", speed: Float = 0.01f,
               valueRange: ClosedFloatingPointRange<Float> = Float.NEGATIVE_INFINITY..Float.POSITIVE_INFINITY, decimals: Int = 2,
-              width: Dp = Dp.Unspecified, vertical: Boolean = false, typeable: Boolean = true) =
-    Node(modifier, listOf(value, label, speed, valueRange, decimals, width, vertical, typeable), { node, _ ->
+              width: Dp = Dp.Unspecified, vertical: Boolean = false, typeable: Boolean = true, wrap: Boolean = false) =
+    Node(modifier, listOf(value, label, speed, valueRange, decimals, width, vertical, typeable, wrap), { node, _ ->
         scratch { a ->
             val changed = Callbacks.make(a, KuiLayouts.KuiFloatAction, Callbacks.floatAction, { v: Float -> node.onFloat?.invoke(v) })
             val wide = if (width.value.isNaN()) -1f else width.value
-            if (vertical) KuiNative.kui_drag_value_vertical(value, changed, speed, valueRange.start, valueRange.endInclusive, decimals, label, wide, typeable)
-            else KuiNative.kui_drag_value(value, changed, speed, valueRange.start, valueRange.endInclusive, decimals, label, wide, typeable)
+            if (vertical) KuiNative.kui_drag_value_vertical(value, changed, speed, valueRange.start, valueRange.endInclusive, decimals, label, wide, typeable, wrap)
+            else KuiNative.kui_drag_value(value, changed, speed, valueRange.start, valueRange.endInclusive, decimals, label, wide, typeable, wrap)
         }
     }, update = { onFloat = onValueChange })
 

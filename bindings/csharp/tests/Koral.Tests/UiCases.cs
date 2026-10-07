@@ -207,6 +207,7 @@ public sealed class DockingScene : Scene
     public string? Dropped;
     public bool? Accepted;
     public int Changes;
+    public int BarTaps;
 
     public DockingScene() => Last = this;
 
@@ -216,7 +217,9 @@ public sealed class DockingScene : Scene
             new DockPanel("src", "Source", SizedBox(40, 40).Background(Color.Hex(0xFF0000), 6)
                 .Draggable(new DragData("word", "hello"), new DraggableOptions().SetOnDragEnd(ok => Accepted = ok))
                 .Padding(4).Align(Alignment.TopLeft)),
-            new DockPanel("dst", "Target", SizedBox(0, 0).OnDrop("word", d => Dropped = d.As<string>()), Closable: false),
+            // Its own strip in its title bar, between its title and its button: short enough to leave the bar 28.
+            new DockPanel("dst", "Target", SizedBox(0, 0).OnDrop("word", d => Dropped = d.As<string>()), Closable: false,
+                TitleBar: Row([Expanded(SizedBox(0, 16).OnTap(() => ++BarTaps))]), Icon: VectorImage.Material("tune")),
         ], new DockOptions().SetOnChanged(() => ++Changes)));
         Graph.Add(new UiPass(Ui));
     }
@@ -238,6 +241,14 @@ public static partial class Cases
 
         // Two panels side by side, a bar of 28 over each: the red box is in the left one, the target is the right one.
         void At(float x, float y) { input.FeedMousePosition(new Vector2(x, y)); Frames(app, 1); }
+        // The right one's title bar, 79 to 199: "Target", then its own strip up to its one button (it folds it away) at 173.
+        At(166, 14);
+        input.FeedMouseButton(MouseButton.eLeft, true);
+        Frames(app, 1);
+        input.FeedMouseButton(MouseButton.eLeft, false);
+        Frames(app, 2);
+        Check.Equal(1, dock.BarTaps, "a panel's own title bar widget takes its presses");
+        Check.That(!dock.Layout.IsFloating("dst") && dock.Layout.IsShown("dst"), "and the panel stays where it is");
         At(20, 48);
         input.FeedMouseButton(MouseButton.eLeft, true);
         Frames(app, 1);

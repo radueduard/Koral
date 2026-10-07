@@ -466,12 +466,14 @@ KUI_API bool kui_dock_layout_is_floating(KuiDockLayout* layout, const char* pane
 KUI_API const char* kui_dock_layout_save(KuiDockLayout* layout);
 KUI_API bool kui_dock_layout_load(KuiDockLayout* layout, const char* text);
 
+typedef struct KuiVectorImage KuiVectorImage;   /* a kui::VectorImage: an SVG's filled shapes, drawn in one colour (see icons, below) */
 typedef struct KuiDockPanel {
     const char* id; const char* title; KuiWidget* content;
     bool fixed;                     /* no close button */
     bool undockable;                /* it never docks: it floats on its own, and nothing docks into it */
     bool no_title_bar;              /* floating on its own it is only its content, moved by dragging that */
-    const char* icon;               /* the glyph on its button; null or empty: the first letter of its title */
+    KuiVectorImage* icon;           /* what its button shows (not given away); null: the first letter of its title */
+    KuiWidget* title_bar;           /* shown in its title bar between its title and its buttons (not given away); null: nothing */
 } KuiDockPanel;
 /** kui::DockStyle, in its order. A value of 0 (or less) is the default. */
 typedef struct KuiDockStyle {
@@ -492,12 +494,13 @@ KUI_API KuiWidget* kui_dock_space(KuiDockLayout* layout, const KuiDockPanel* pan
 /**
  * DragValue: a number changed by dragging across it. @p label may be null; a negative @p width is the default.
  * @p typeable: clicked without being dragged, it turns into a text box for typing the value exactly.
+ * @p wrap: past one end of a finite range it comes back in at the other (an angle past 360 is at 0), rather than stopping.
  */
 KUI_API KuiWidget* kui_drag_value(float value, KuiFloatAction on_changed, float speed, float min, float max, int32_t decimals,
-                                  const char* label, float width, bool typeable);
+                                  const char* label, float width, bool typeable, bool wrap);
 /** The same, upright: its label over its value, dragged up for more. */
 KUI_API KuiWidget* kui_drag_value_vertical(float value, KuiFloatAction on_changed, float speed, float min, float max, int32_t decimals,
-                                           const char* label, float width, bool typeable);
+                                           const char* label, float width, bool typeable, bool wrap);
 /** Dropdown: @p on_changed hears the index picked (a whole number, as a float). @p placeholder may be null. */
 KUI_API KuiWidget* kui_dropdown(const char* const* items, size_t count, int32_t selected, KuiFloatAction on_changed, float width,
                                 const char* placeholder);
@@ -574,6 +577,23 @@ KUI_API KuiWidget* kui_slider_vertical(float value, KuiFloatAction on_changed, f
 KUI_API KuiWidget* kui_text_lines(const char* text, const KuiTextStyle* style, uint32_t align, bool wrap, int32_t max_lines, bool ellipsis);
 KUI_API KuiWidget* kui_progress_bar(float value);
 KUI_API KuiWidget* kui_text_field(const KuiTextFieldOptions* options);
+
+/* ---- icons ---- */
+/** One of the Material icons kui carries — all of Compose's, core and extended — by Material's name ("arrow_back") or Compose's
+ *  ("ArrowBack"), in a kui::IconStyle: 0 filled, 1 outlined, 2 rounded, 3 sharp, 4 two-tone. Null when there is none of that name. */
+KUI_API KuiVectorImage* kui_material_icon(const char* name, uint32_t style);
+/** How many Material icons kui carries, and the name of each, as Material spells it (the text lives as long as the library). */
+KUI_API size_t kui_material_icon_count(void);
+KUI_API const char* kui_material_icon_name(size_t index);
+/** An SVG document's text, read: its paths, circles, rects and polygons. Null when nothing in it is drawn. */
+KUI_API KuiVectorImage* kui_vector_image_from_svg(const char* svg, size_t length);
+KUI_API void kui_vector_image_release(KuiVectorImage* image);
+/** The box it is drawn on, in its own units: an icon's is 0, 0 to 24, 24. */
+KUI_API KuiRect kui_vector_image_view_box(KuiVectorImage* image);
+/** Drawn over @p rect in @p tint. */
+KUI_API void kui_canvas_draw_vector_image(KuiCanvas* canvas, KuiVectorImage* image, KuiRect rect, KuiColor tint);
+/** Icon: @p image, 24 units square unless its parent sizes it, in @p tint — the theme's text colour when tint.a is negative. */
+KUI_API KuiWidget* kui_icon(KuiVectorImage* image, KuiColor tint);
 
 /* ==== the theme and the Ui =============================================================================== */
 

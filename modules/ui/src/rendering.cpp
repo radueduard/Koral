@@ -362,6 +362,13 @@ namespace kui
         }
     }
 
+    float RenderContainer::MinIntrinsicWidth() const
+    {
+        float width = 0.f;
+        for (const RenderObject* child : _children) width = std::max(width, child->MinIntrinsicWidth());
+        return width;
+    }
+
     void RenderContainer::Paint(Canvas& canvas, const glm::vec2 offset)
     {
         for (auto* child : _children) PaintChild(*child, canvas, offset);

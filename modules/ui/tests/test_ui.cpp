@@ -181,6 +181,16 @@ TEST_F(Gpu, APathWithAHoleFillsByItsRule) {
     EXPECT_TRUE(IsBlack(scene->At(4, 4)));
 }
 
+TEST_F(Gpu, HolesStayHolesWhereTheTriangulatorWouldFillThem) {
+    // Clipper's triangulation says it succeeded on this one and fills its nine holes over: their sides line
+    // up with where the outline's rounded corners begin. Caught by its area, and drawn by the sweep instead.
+    Draw([](kui::Canvas& c) { kui::MaterialIcon("grid_on")->Draw(c, kui::Rect::XYWH(0, 0, 48, 48), Red); });
+    EXPECT_TRUE(IsBlack(scene->At(12, 12))) << "a hole";
+    EXPECT_TRUE(IsBlack(scene->At(36, 36))) << "another";
+    EXPECT_TRUE(IsRed(scene->At(6, 18))) << "the frame";
+    EXPECT_TRUE(IsRed(scene->At(18, 12))) << "a bar between holes";
+}
+
 TEST_F(Gpu, AStrokedPathIsOneShapeEvenWhereItsPiecesOverlap) {
     Draw([](kui::Canvas& c) {
         kui::Path path;
@@ -761,6 +771,35 @@ TEST_F(WidgetTest, ADragValueDraggedOrNotTypeableIsNoTextBox) {
     Click({ 30.f, 15.f });
     settle();
     EXPECT_FALSE(input.InterfaceWantsKeyboard()) << "not typeable: a double click does nothing";
+}
+
+TEST(DragValueOptions, WrappingBringsAValueRoundIntoItsRangeAndClampingKeepsItAtTheEnds) {
+    const auto angle = kui::DragValueOptions {}.SetRange(0.f, 360.f).SetWrap(true);
+    EXPECT_FLOAT_EQ(angle.Keep(370.f), 10.f);
+    EXPECT_FLOAT_EQ(angle.Keep(-10.f), 350.f);
+    EXPECT_FLOAT_EQ(angle.Keep(360.f), 0.f) << "the two ends are one place";
+    EXPECT_FLOAT_EQ(angle.Keep(725.f), 5.f) << "as many times round as it takes";
+    EXPECT_FLOAT_EQ(angle.Keep(90.f), 90.f);
+    EXPECT_FLOAT_EQ(kui::DragValueOptions {}.SetRange(-1.f, 1.f).SetWrap(true).Keep(1.5f), -0.5f);
+    EXPECT_FLOAT_EQ(kui::DragValueOptions {}.SetRange(0.f, 360.f).Keep(370.f), 360.f) << "not wrapping, it stops at the end";
+    EXPECT_FLOAT_EQ(kui::DragValueOptions {}.SetRange(0.f, kui::Infinity).SetWrap(true).Keep(-5.f), 0.f) << "an open range does not wrap";
+}
+
+TEST_F(WidgetTest, ADragValueThatWrapsComesBackInAtTheOtherEnd) {
+    float value = 350.f;
+    auto& input = scene->SceneInput();
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::DragValue(value, [&](const float v) { value = v; },
+                    kui::DragValueOptions {}.SetSpeed(1.f).SetRange(0.f, 360.f).SetWrap(true).SetWidth(60.f))));
+    input.FeedMousePosition({ 30.f, 15.f });
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, true);
+    settle();
+    input.FeedMousePosition({ 50.f, 15.f });
+    input.FeedMouseDelta({ 20.f, 0.f });
+    settle();
+    input.FeedMouseButton(kor::MouseButton::eLeft, false);
+    settle(); settle();
+    EXPECT_NEAR(value, 10.f, 0.01f) << "350 dragged on by 20 is 10, not 360";
 }
 
 // Tab goes through drag values as it does text fields: each tabbed to is typed in, and tabbed out of, set.
@@ -1604,15 +1643,26 @@ TEST(DockShowcase, Renders) {
                               kui::Text(name + " content"));
     };
     const bool noMiddle = std::getenv("KUI_DOCK_SHOWCASE_NO_MIDDLE") != nullptr;
+    // Each button an icon of Material's — but the assets', which shows its title's first letter.
     std::vector<kui::DockPanel> panels {
-        { "project", "Project", panel("Project", 0x3B2F2F) },
-        { "structure", "Structure", panel("Structure", 0x2F3B2F) },
-        { "inspector", "Inspector", panel("Inspector", 0x2F2F3B) },
-        { "assets", "Assets", panel("Assets", 0x3B3B2F) },
-        { "log", "Log", panel("Log", 0x3B2F3B) },
-        { "problems", "Problems", panel("Problems", 0x2F3B3B) },
+        { .id = "project", .title = "Project", .content = panel("Project", 0x3B2F2F), .icon = kui::MaterialIcon("folder") },
+        { .id = "structure", .title = "Structure", .content = panel("Structure", 0x2F3B2F), .icon = kui::MaterialIcon("account_tree") },
+        { .id = "inspector", .title = "Inspector", .content = panel("Inspector", 0x2F2F3B), .icon = kui::MaterialIcon("tune") },
+        { .id = "assets", .title = "Assets", .content = panel("Assets", 0x3B3B2F) },
+        { .id = "log", .title = "Log", .content = panel("Log", 0x3B2F3B), .icon = kui::MaterialIcon("terminal") },
+        { .id = "problems", .title = "Problems", .content = panel("Problems", 0x2F3B3B), .icon = kui::MaterialIcon("warning", kui::IconStyle::eOutlined) },
     };
-    if (!noMiddle) panels.push_back({ "editor", "Editor", panel("Editor", 0x444444) });
+    if (!noMiddle) {
+        // The middle's panel with a toolbar of its own in its title bar, between its title and its buttons.
+        kui::DockPanel editor { "editor", "Editor", panel("Editor", 0x444444) };
+        const auto tool = [](const char* icon) {
+            return kui::Button(kui::Icon(icon), [] {}, { .style = kui::ButtonStyle::eSecondary, .padding = kui::EdgeInsets::All(2.f) });
+        };
+        editor.titleBar = kui::Row({ tool("PlayArrow"), tool("Pause"), tool("Stop") },
+                                   { .mainAxisAlignment = kui::MainAxisAlignment::eCenter, .crossAxisAlignment = kui::CrossAxisAlignment::eCenter, .gap = 4.f })
+                              .Background(kui::Color::Hex(0x1E1E24)).Height(32.f);
+        panels.push_back(std::move(editor));
+    }
     scene->ui.SetRoot(kui::DockSpace(layout, panels));
     const auto shot = [&](const std::string& name) {
         for (int i = 0; i < 4; ++i) settle();
@@ -1701,6 +1751,88 @@ TEST_F(DockTest, ATitleBarHidesAndCloses) {
     settle(); settle();
     EXPECT_TRUE(layout->IsShown("inspector"));
     EXPECT_FLOAT_EQ(view.x, 100.f);
+}
+
+// A panel's own widget in its title bar: between its title and its buttons, the bar as tall as it wants. The space is
+// 240 by 160 with the one panel in the middle: an island from 2 to 238 across and 2 to 158 down, its one button
+// (it closes it) ending at 214 — so the widget ends at 208.
+TEST(DockTitleBar, APanelsOwnTitleBarSitsBetweenItsTitleAndItsButtons) {
+    if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
+    auto* scene = s_app->OpenOffscreen<DockScene>({ .title = "dock title bar", .extent = { 240, 160 } });
+    ASSERT_NE(scene, nullptr);
+    auto layout = std::make_shared<kui::DockLayout>();
+    layout->Dock("scene");
+    glm::vec2 view {}, tool {};
+    int toolTaps = 0;
+    kui::DockPanel panel { "scene", "Scene", kui::Make<Tapped>(nullptr, &view) };
+    // A tool button 20 by 36 at its end; the rest of it takes no press.
+    panel.titleBar = kui::Row({ kui::SizedBox(20.f, 36.f, kui::Make<Tapped>(&toolTaps, &tool)) }, { .mainAxisAlignment = kui::MainAxisAlignment::eEnd });
+    scene->ui.SetRoot(kui::DockSpace(layout, { panel }, kui::DockOptions {}.SetGap(4.f).SetStripeGap(0.f)));
+    settle(); settle();
+    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
+    const auto drag = [&](const glm::vec2 from, const glm::vec2 to) { move(from); button(true); move((from + to) * 0.5f); move(to); move(to); button(false); settle(); };
+
+    EXPECT_EQ(tool, glm::vec2(20.f, 36.f));
+    EXPECT_FLOAT_EQ(view.y, 120.f) << "the bar grew from 28 to 36 for it";
+    EXPECT_FLOAT_EQ(view.x, 236.f);
+
+    move({ 198.f, 20.f }); button(true); button(false);
+    EXPECT_EQ(toolTaps, 1) << "a press on what takes one in it is its own";
+    drag({ 198.f, 20.f }, { 120.f, 110.f });
+    EXPECT_FALSE(layout->IsFloating("scene")) << "and does not pick the panel up";
+    drag({ 150.f, 20.f }, { 120.f, 110.f });
+    EXPECT_TRUE(layout->IsFloating("scene")) << "the rest of it picks the panel up, as the bar does";
+
+    s_app->Close(*scene);
+    settle();
+}
+
+// A dock keeps a panel no narrower than its content's least width — here three DragValues sharing a row, each needing
+// its label and its widest value — and the DragValues share whatever width more there is. The space is 800 by 160.
+TEST(DockMinWidth, APanelIsNoNarrowerThanItsContentNeedsAndItsDragsShareTheRest) {
+    if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
+    auto* scene = s_app->OpenOffscreen<DockScene>({ .title = "dock min width", .extent = { 800, 160 } });
+    ASSERT_NE(scene, nullptr);
+    auto layout = std::make_shared<kui::DockLayout>();
+    layout->Dock("scene").Dock("transform", kui::DockSide::eRight, "scene", 0.05f);   // asked for 40 wide: far too little
+    glm::vec2 view {}, x {}, y {}, z {};
+    const auto drag = [](glm::vec2& size, std::string label) {
+        return kui::Expanded(kui::SizeObserver([&size](const glm::vec2 s, glm::vec2) { size = s; },
+                                               kui::DragValue(0.f, [](float) {}, kui::DragValueOptions {}.SetLabel(std::move(label)))));
+    };
+    scene->ui.SetRoot(kui::DockSpace(layout, {
+        { "scene", "Scene", kui::Make<Tapped>(nullptr, &view) },
+        { "transform", "Transform", kui::Padding(kui::EdgeInsets::All(12.f), kui::Row({ drag(x, "X"), drag(y, "Y"), drag(z, "Z") }, { .gap = 6.f })) },
+    }, kui::DockOptions {}.SetGap(4.f).SetStripeGap(0.f)));
+    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
+    settle(); settle();
+
+    // What each needs: its label, a gap, and its widest value — open-ended, a sign and four whole digits — and the room round them.
+    const kui::TextStyle style = kui::Theme::Current().textStyle;
+    const float number = kui::Paragraph("-8888.00", style).Size().x;
+    const float label = kui::Paragraph("X", style).Size().x;
+    for (const glm::vec2 size : { x, y, z }) EXPECT_GE(size.x, number + label) << "every drag shows its widest value whole";
+    const float least = x.x + y.x + z.x + 2.f * 6.f + 2.f * 12.f;
+    // The space is 800: a stripe of 38 for the transform's button, half a gap at the left, the gap between the two.
+    const float panel = 800.f - 38.f - 2.f - 4.f - view.x;
+    EXPECT_NEAR(panel, least, 1.f) << "held at its content's least width, not the 12 it was asked for";
+    EXPECT_NEAR(x.x, y.x, 1.f);
+
+    // The line between the two dragged right, to make it narrower still: it stays.
+    const float line = 2.f + view.x + 2.f;
+    move({ line, 80.f }); button(true); move({ line + 30.f, 80.f }); move({ 790.f, 80.f }); button(false);
+    EXPECT_NEAR(800.f - 38.f - 2.f - 4.f - view.x, least, 1.f) << "dragged, it is no narrower";
+
+    // Made wider, the drags share the width: each a third of the row.
+    move({ 2.f + view.x + 2.f, 80.f }); button(true); move({ 200.f, 80.f }); move({ 150.f, 80.f }); button(false);
+    const float wider = 800.f - 38.f - 2.f - 4.f - view.x;
+    EXPECT_GT(wider, least + 20.f);
+    EXPECT_NEAR(x.x, (wider - 24.f - 12.f) / 3.f, 1.f) << "a third of the row each";
+
+    s_app->Close(*scene);
+    settle();
 }
 
 // The sizes a dock space is drawn with are its style's: another title bar height moves what is under it.
@@ -1958,4 +2090,141 @@ TEST(DragAcrossUis, ADragFromOneUiLandsInAnother) {
     EXPECT_TRUE(accepted);
     s_app->Close(*scene);
     settle();
+}
+
+// ---- icons -----------------------------------------------------------------------------------------------
+
+namespace {
+    /** @brief Where @p image's shapes really reach, curves flattened: control points may stray outside. */
+    kui::Rect DrawnBounds(const kui::VectorImage& image) {
+        kui::Rect r { 1e9f, 1e9f, -1e9f, -1e9f };
+        for (const auto& shape : image.Shapes())
+            for (const auto& contour : shape.path.Flatten(0.01f))
+                for (const glm::vec2 p : contour.points) {
+                    r.left = std::min(r.left, p.x); r.top = std::min(r.top, p.y);
+                    r.right = std::max(r.right, p.x); r.bottom = std::max(r.bottom, p.y);
+                }
+        return r;
+    }
+}
+
+TEST(Icons, EveryMaterialIconInEveryStyleIsReadAndStaysInItsBox) {
+    const auto names = kui::MaterialIconNames();
+    EXPECT_EQ(names.size(), 2132u) << "Compose's material-icons-core and -extended";
+    for (const auto style : { kui::IconStyle::eFilled, kui::IconStyle::eOutlined, kui::IconStyle::eRounded, kui::IconStyle::eSharp, kui::IconStyle::eTwoTone })
+        for (const std::string_view name : names) {
+            const auto icon = kui::MaterialIcon(name, style);
+            ASSERT_NE(icon, nullptr) << name;
+            EXPECT_FALSE(icon->Empty()) << name;
+            EXPECT_EQ(icon->ViewBox(), kui::Rect::XYWH(0, 0, 24, 24)) << name;
+            const kui::Rect r = DrawnBounds(*icon);
+            // A few of Google's paths overshoot the box by a few hundredths: as drawn, not as read.
+            EXPECT_GE(r.left, -0.05f) << name; EXPECT_GE(r.top, -0.05f) << name;
+            EXPECT_LE(r.right, 24.05f) << name; EXPECT_LE(r.bottom, 24.05f) << name;
+            EXPECT_GT(std::max(r.Width(), r.Height()), 3.f) << name << ": a box of fill=\"none\" is not drawn, the icon is";
+        }
+}
+
+TEST(Icons, NamesAreMaterialsOrComposesAndUnknownOnesAreNull) {
+    EXPECT_EQ(kui::MaterialIcon("ArrowBack"), kui::MaterialIcon("arrow_back")) << "the same icon, read once";
+    EXPECT_NE(kui::MaterialIcon("ArrowBack"), kui::MaterialIcon("ArrowBack", kui::IconStyle::eOutlined));
+    EXPECT_EQ(kui::MaterialIcon("NoSuchIcon"), nullptr);
+    // Two-tone icons have their light part at 30 %.
+    const auto twoTone = kui::MaterialIcon("Lock", kui::IconStyle::eTwoTone);
+    EXPECT_TRUE(std::ranges::any_of(twoTone->Shapes(), [](const auto& s) { return std::abs(s.opacity - 0.3f) < 1e-4f; }));
+    EXPECT_TRUE(std::ranges::any_of(twoTone->Shapes(), [](const auto& s) { return s.opacity == 1.f; }));
+}
+
+TEST(Icons, SvgArcsShorthandsTransformsAndShapes) {
+    // A half circle from (0, 5) to (10, 5) over the top, as the sweep flag says, and its flags run together.
+    auto arc = kui::VectorImage::FromSvg(R"svg(<svg viewBox="0 0 10 10"><path d="M0 5a5 5 0 0110 0z"/></svg>)svg");
+    ASSERT_EQ(arc.Shapes().size(), 1u);
+    EXPECT_EQ(arc.ViewBox(), kui::Rect::XYWH(0, 0, 10, 10));
+    kui::Rect r = DrawnBounds(arc);
+    EXPECT_NEAR(r.top, 0.f, 0.01f); EXPECT_NEAR(r.bottom, 5.f, 0.01f);
+    EXPECT_NEAR(r.left, 0.f, 0.01f); EXPECT_NEAR(r.right, 10.f, 0.01f);
+
+    // Groups move, scale and hide what is in them; a <defs> is not drawn; comments are skipped.
+    auto groups = kui::VectorImage::FromSvg(R"svg(<?xml version="1.0"?><!-- a comment --><svg width="20" height="20">
+        <defs><rect width="20" height="20"/></defs>
+        <g transform="translate(10 2) scale(2)" opacity=".5"><rect x="0" y="0" width="2" height="1" fill-opacity="0.5"/></g>
+        <g fill="none"><circle cx="5" cy="5" r="4"/></g>
+        <circle cx="5" cy="15" r="2" style="fill:#000;opacity:.25"/></svg>)svg");
+    EXPECT_EQ(groups.ViewBox(), kui::Rect::XYWH(0, 0, 20, 20));
+    ASSERT_EQ(groups.Shapes().size(), 2u);
+    EXPECT_FLOAT_EQ(groups.Shapes()[0].opacity, 0.25f);
+    EXPECT_EQ(groups.Shapes()[0].path.Bounds(), kui::Rect::LTRB(10, 2, 14, 4));
+    EXPECT_FLOAT_EQ(groups.Shapes()[1].opacity, 0.25f);
+
+    // S reflects the last control point; H, V and an L's repeated coordinates are lines.
+    auto smooth = kui::VectorImage::FromSvg(R"svg(<svg viewBox="0 0 24 24"><path d="M2 12C2 2 12 2 12 12S22 22 22 12M2 20H8V14L10 20 2 20" fill-rule="evenodd"/></svg>)svg");
+    ASSERT_EQ(smooth.Shapes().size(), 1u);
+    EXPECT_EQ(smooth.Shapes()[0].path.GetFillRule(), kui::FillRule::eEvenOdd);
+    r = DrawnBounds(smooth);
+    EXPECT_NEAR(r.top, 4.5f, 0.05f); EXPECT_NEAR(r.bottom, 20.f, 0.05f);
+
+    EXPECT_TRUE(kui::VectorImage::FromSvg("not an svg").Empty());
+}
+
+TEST_F(WidgetTest, AnIconIs24UnitsInTheThemesTextColourUnlessSizedOrTinted) {
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::Icon("Add", kui::IconStyle::eFilled, Red)));
+    // Material's plus: bars from 5 to 19, 11 to 13 across.
+    EXPECT_TRUE(IsRed(scene->At(12, 6)));
+    EXPECT_TRUE(IsRed(scene->At(6, 12)));
+    EXPECT_TRUE(IsBlack(scene->At(7, 7)));
+    EXPECT_TRUE(IsBlack(scene->At(12, 21)));
+
+    Show(kui::Align(kui::Alignment::TopLeft(), kui::SizedBox(48.f, 48.f, kui::Icon("add"))));
+    const auto text = kui::Theme::Current().text;
+    const auto p = scene->At(24, 12);
+    EXPECT_NEAR(p.r, text.r * 255.f, 3.f); EXPECT_NEAR(p.g, text.g * 255.f, 3.f) << "the theme's text colour";
+    EXPECT_TRUE(IsBlack(scene->At(14, 14))) << "twice the size";
+    EXPECT_FALSE(IsBlack(scene->At(24, 36)));
+}
+
+namespace {
+    // Every Material icon in one style: 48 a row, each 32 units in a 40-unit cell.
+    constexpr int IconCell = 40, IconColumns = 48;
+    const int SheetW = IconColumns * IconCell;
+    const int SheetH = (static_cast<int>(kui::MaterialIconNames().size()) + IconColumns - 1) / IconColumns * IconCell;
+    kui::IconStyle s_sheetStyle = kui::IconStyle::eFilled;
+
+    class IconSheetScene final : public kor::Scene {
+    public:
+        void Initialize() override {
+            readback = kor::Buffer::RawBuilder{}.SetRawSize(SheetW * SheetH * 4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback).Build();
+            std::vector<kui::Widget> rows, row;
+            for (const std::string_view name : kui::MaterialIconNames()) {
+                row.push_back(kui::SizedBox(IconCell, IconCell, kui::Center(kui::SizedBox(32.f, 32.f, kui::Icon(name, s_sheetStyle, kui::colors::White)))));
+                if (row.size() == IconColumns) rows.push_back(kui::Row(std::exchange(row, {})));
+            }
+            if (!row.empty()) rows.push_back(kui::Row(std::move(row)));
+            ui.SetRoot(kui::Align(kui::Alignment::TopLeft(), kui::Column(std::move(rows), { .crossAxisAlignment = kui::CrossAxisAlignment::eStart })));
+            Graph().Add<ClearPass>();
+            Graph().Add<kui::UiPass>(ui);
+            Graph().Add<ReadPass>(kor::ResourceRef<const kor::Buffer>(readback));
+        }
+        void Update() override { ui.Update(); }
+        kui::Ui ui;
+        kor::Resource<kor::Buffer> readback;
+    };
+}
+
+TEST(IconSheet, Renders) {
+    const char* out = std::getenv("KUI_ICON_SHEET");
+    if (!s_app || !out) GTEST_SKIP() << "set KUI_ICON_SHEET to a path prefix to render every icon, a .png a style";
+    const std::pair<kui::IconStyle, const char*> styles[] = { { kui::IconStyle::eFilled, "filled" }, { kui::IconStyle::eOutlined, "outlined" },
+        { kui::IconStyle::eRounded, "rounded" }, { kui::IconStyle::eSharp, "sharp" }, { kui::IconStyle::eTwoTone, "twotone" } };
+    for (const auto& [style, name] : styles) {
+        s_sheetStyle = style;
+        auto* scene = s_app->OpenOffscreen<IconSheetScene>({ .title = "icons", .extent = { static_cast<std::uint32_t>(SheetW), static_cast<std::uint32_t>(SheetH) },
+                                                             .format = kor::Window::Format::eRGBA8_SRGB });
+        ASSERT_NE(scene, nullptr);
+        for (int i = 0; i < 4; ++i) settle();
+        const auto pixels = scene->readback->Read<glm::u8vec4>(static_cast<std::size_t>(SheetW) * SheetH);
+        stbi_write_png((std::string(out) + "-" + name + ".png").c_str(), SheetW, SheetH, 4, pixels.data(), SheetW * 4);
+        s_app->Close(*scene);
+        settle();
+    }
 }

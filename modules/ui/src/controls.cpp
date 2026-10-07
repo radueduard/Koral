@@ -872,6 +872,7 @@ class RenderTextField final : public RenderContainer {
                 const glm::vec2 wanted = Wanted();
                 const bool size = wanted != _wanted;
                 _wanted = wanted;
+                _minWidth = Content().x;
                 if (size) MarkNeedsLayout();
                 if (look) MarkNeedsPaint();
             }
@@ -913,7 +914,7 @@ class RenderTextField final : public RenderContainer {
                     if (!_held) { _held = true; if (const Owner* owner = GetOwner(); owner && owner->lockPointer) owner->lockPointer(true); }
                     // From where it was pressed, not step by step: the value does not drift when it is held at a limit.
                     _travelled += Upright() ? -event.delta.y : event.delta.x;
-                    const float value = std::clamp(_from + _travelled * _config.options.speed, _config.options.min, _config.options.max);
+                    const float value = _config.options.Keep(_from + _travelled * _config.options.speed);
                     if (value != _config.value && _config.onChanged) _config.onChanged(value);
                     return true;   // a drag on it is its own
                 }
@@ -1016,7 +1017,8 @@ class RenderTextField final : public RenderContainer {
                 // Worked out here too: the theme's type and its controls' height are part of it, and a
                 // theme changed lays it out again without setting it again.
                 _wanted = Wanted();
-                SetSize(_wanted);
+                _minWidth = Content().x;
+                SetSize(_wanted);   // kept to its constraints: given a share of a row, it is that share
             }
 
         private:
@@ -1030,32 +1032,49 @@ class RenderTextField final : public RenderContainer {
             [[nodiscard]] bool Upright() const { return _config.options.axis == Axis::eVertical; }
 
             /**
-             * How wide it is: its label, a gap, its value and the room at either end — and no narrower
-             * than the width it was given (120, given none). The value's room is that of the longest it
-             * can show: the ends of its range, where it has them, so that it does not change width as it
-             * is dragged. (A range as wide as a whole kind of number is no range to size for: an Int's
-             * own limits would make every field of whole numbers ten digits wide.)
+             * The least it can be with nothing cut off, each way: its label, a gap, and the widest value it can
+             * show, with the room at either end. That value is the widest of the one it shows and its range's
+             * ends — so that it does not change width as it is dragged — and, where the range is open that way,
+             * a number of four whole digits and a sign. (A range as wide as a whole kind of number is no range to
+             * size for: an Int's own limits would make every field of whole numbers ten digits wide.)
              */
-            [[nodiscard]] glm::vec2 Wanted() const
+            [[nodiscard]] glm::vec2 Content() const
             {
                 const auto& o = _config.options;
                 const TextStyle style = Theme::Current().textStyle;
                 const Paragraph shown(formatted(_config.value, o.decimals), style);
                 float number = shown.Size().x;
-                for (const float end : { o.min, o.max })
-                    if (std::isfinite(end) && std::abs(end) < 1.e9f) number = std::max(number, Paragraph(formatted(end, o.decimals), style).Size().x);
+                for (const float end : { o.min, o.max }) {
+                    const float widest = std::isfinite(end) && std::abs(end) < 1.e9f ? end : (end < 0.f ? -8888.f : 8888.f);
+                    number = std::max(number, Paragraph(formatted(widest, o.decimals), style).Size().x);
+                }
                 if (Upright()) {
-                    // Upright: as wide as the wider of its label and its value, and as tall as the two and its arrows.
                     const glm::vec2 label = o.label.empty() ? glm::vec2(0.f) : Paragraph(o.label, style).Size();
-                    return { std::max(o.width >= 0.f ? o.width : Theme::Current().controlHeight, std::ceil(std::max(label.x, number) + 2.f * UprightPad)),
-                             std::ceil(2.f * UprightArrow + label.y + shown.Size().y) };
+                    return { std::ceil(std::max(label.x, number) + 2.f * UprightPad), std::ceil(2.f * UprightArrow + label.y + shown.Size().y) };
                 }
                 const float label = o.label.empty() ? 0.f : Paragraph(o.label, style).Size().x + Gap;
-                return { std::max(o.width >= 0.f ? o.width : 120.f, std::ceil(2.f * Arrow + label + number)), Theme::Current().controlHeight };
+                return { std::ceil(2.f * Arrow + label + number), Theme::Current().controlHeight };
             }
 
+            /** How big it is of itself: its content, and no narrower than the width it was given (120 where none was). */
+            [[nodiscard]] glm::vec2 Wanted() const
+            {
+                const glm::vec2 content = Content();
+                const float least = _config.options.width >= 0.f ? _config.options.width : Upright() ? Theme::Current().controlHeight : 120.f;
+                return { std::max(least, content.x), content.y };
+            }
+
+        public:
+            /** @brief Its content's width, or the width it was given where that is more: wider, it is as wide as it is let be. */
+            [[nodiscard]] float MinIntrinsicWidth() const override
+            {
+                return std::max(_minWidth, _config.options.width >= 0.f ? _config.options.width : 0.f);
+            }
+
+        private:
             Config _config;
             glm::vec2 _wanted { 120.f, 36.f };
+            float _minWidth = 0.f;      ///< Content's width, worked out with _wanted.
             float _from = 0.f, _travelled = 0.f;
             bool _dragging = false, _hovered = false;
             bool _held = false;     ///< Whether it has the pointer held in place: from the first move of a drag to its end.
@@ -1119,7 +1138,7 @@ class RenderTextField final : public RenderContainer {
             {
                 if (!editing || !Mounted()) return;
                 if (const auto typed = parsedNumber(text)) {
-                    const float value = std::clamp(*typed, config.options.min, config.options.max);
+                    const float value = config.options.Keep(*typed);
                     if (value != config.value && config.onChanged) config.onChanged(value);
                 }
                 SetState([&] { editing = false; });

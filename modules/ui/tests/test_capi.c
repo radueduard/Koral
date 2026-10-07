@@ -172,6 +172,28 @@ int main(void) {
     kui_canvas_draw_rect(NULL, (KuiRect){0, 0, 1, 1}, &red);
     CHECK(strstr(koral_last_error(), "no canvas") != NULL, "a missing handle is reported, not crashed on");
 
+    /* Icons: Material's by either spelling, any SVG, and the widget. */
+    CHECK(kui_material_icon_count() >= 49 && kui_material_icon_name(0) != NULL, "the Material icons are listed");
+    KuiVectorImage* icon = kui_material_icon("ArrowBack", 1);
+    CHECK(icon != NULL, "a Material icon by Compose's name");
+    KuiRect box = kui_vector_image_view_box(icon);
+    CHECK(box.right == 24.f && box.bottom == 24.f, "on a box of 24");
+    CHECK(kui_material_icon("no_such_icon", 0) == NULL, "none of a name it does not have");
+    const char* svg = "<svg viewBox=\"0 0 10 10\"><circle cx=\"5\" cy=\"5\" r=\"4\"/></svg>";
+    KuiVectorImage* circle = kui_vector_image_from_svg(svg, strlen(svg));
+    CHECK(circle != NULL, "an SVG of its own");
+    canvas = kui_canvas_new();
+    kui_canvas_draw_vector_image(canvas, circle, (KuiRect){0, 0, 20, 20}, (KuiColor){1, 1, 1, 1});
+    picture = kui_canvas_finish(canvas);
+    CHECK(picture && kui_picture_instance_count(picture) >= 1, "an SVG drawn");
+    kui_picture_release(picture);
+    kui_canvas_destroy(canvas);
+    KuiWidget* iconWidget = kui_icon(icon, (KuiColor){0, 0, 0, -1});
+    CHECK(iconWidget != NULL, "an Icon");
+    kui_widget_release(iconWidget);
+    kui_vector_image_release(circle);
+    kui_vector_image_release(icon);
+
     Ui* ui = (Ui*)calloc(1, sizeof(Ui));
     g_ui = ui;
     CHECK(koral_app_register("Ui", make_ui, ui) == KORAL_OK, "register");

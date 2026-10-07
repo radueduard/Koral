@@ -18,6 +18,7 @@ namespace kui
     class RenderPadding final : public RenderContainer {
     public:
         void Set(const EdgeInsets& padding);
+        [[nodiscard]] float MinIntrinsicWidth() const override;
     protected:
         void PerformLayout() override;
     private:
@@ -36,6 +37,7 @@ namespace kui
     class RenderConstrained final : public RenderContainer {
     public:
         void Set(const BoxConstraints& extra);
+        [[nodiscard]] float MinIntrinsicWidth() const override;
     protected:
         void PerformLayout() override;
     private:
@@ -68,6 +70,7 @@ namespace kui
         void Set(const Config& config);
         void Paint(Canvas& canvas, glm::vec2 offset) override;
         [[nodiscard]] bool HitTestSelf(glm::vec2 position) const override;
+        [[nodiscard]] float MinIntrinsicWidth() const override;
     protected:
         void PerformLayout() override;
     private:
@@ -89,6 +92,8 @@ namespace kui
     class RenderFlex final : public RenderContainer {
     public:
         void Set(Axis axis, const FlexOptions& options);
+        /** @brief A row's children side by side, and the gaps between them; a column's widest. */
+        [[nodiscard]] float MinIntrinsicWidth() const override;
     protected:
         void PerformLayout() override;
     private:
@@ -128,6 +133,8 @@ namespace kui
         void Paint(Canvas& canvas, glm::vec2 offset) override;
         [[nodiscard]] const Paragraph& GetParagraph() const { return _paragraph; }
         [[nodiscard]] std::string DebugText() const override { return _text; }
+        /** @brief Its longest word, where it wraps; all of it on one line, where it does not; nothing, where it ends in an ellipsis. */
+        [[nodiscard]] float MinIntrinsicWidth() const override;
     protected:
         void PerformLayout() override;
     private:
@@ -233,6 +240,8 @@ namespace kui
         [[nodiscard]] glm::vec2 ChildOrigin(const RenderObject& child) const override;
         /** @brief Scrolls by @p by units; returns whether it moved. */
         bool Scroll(float by);
+        /** @brief Scrolled across, any width: what does not fit is scrolled to. Up and down, its content's. */
+        [[nodiscard]] float MinIntrinsicWidth() const override;
         [[nodiscard]] float Position() const { return _scroll; }
         [[nodiscard]] float MaxScroll() const;
     protected:

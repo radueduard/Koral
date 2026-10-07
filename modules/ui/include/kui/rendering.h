@@ -192,6 +192,13 @@ namespace kui
         void SetOffset(glm::vec2 offset);
         void MarkNeedsLayout();
         [[nodiscard]] bool NeedsLayout() const { return _needsLayout; }
+        /**
+         * @brief The least width it can be laid out at with nothing it shows cut off — the longest word of a
+         *        text, a row's children side by side, a column's widest — asked of it before it is laid out, by
+         *        a parent that decides how wide it is (a dock keeps an area no narrower than its panel's).
+         *        What can be any width says 0, as does anything that does not know: a leaf by default.
+         */
+        [[nodiscard]] virtual float MinIntrinsicWidth() const { return 0.f; }
 
         // -- painting
         /** @brief Paints itself and its children at @p offset. */

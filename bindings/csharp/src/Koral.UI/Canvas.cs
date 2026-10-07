@@ -172,6 +172,13 @@ public sealed unsafe class Canvas : IDisposable
         KuiNative.kui_canvas_draw_image(Native, Resource.HandleOf(image), destination.Native, source.Native, (tint ?? Color.White).Native);
         return Done();
     }
+    /// <summary><paramref name="image"/> — an icon, an SVG — stretched over <paramref name="rect"/> in <paramref name="tint"/>.</summary>
+    public Canvas DrawVectorImage(VectorImage image, Rect rect, Color tint)
+    {
+        KuiNative.kui_canvas_draw_vector_image(Native, image.Native, rect.Native, tint.Native);
+        GC.KeepAlive(image);
+        return Done();
+    }
     public Canvas DrawParagraph(Paragraph paragraph, Vector2 position) { KuiNative.kui_canvas_draw_paragraph(Native, paragraph.Native, position.Native()); return Done(); }
     /// <summary>One line of text. Lays it out every call: keep a <see cref="Paragraph"/> for text drawn often.</summary>
     public Canvas DrawText(string text, Vector2 position, TextStyle style)

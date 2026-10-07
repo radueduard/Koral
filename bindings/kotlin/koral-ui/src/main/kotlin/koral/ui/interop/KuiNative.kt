@@ -302,6 +302,7 @@ object KuiLayouts {
         JAVA_BOOLEAN.withName("no_title_bar"),
         MemoryLayout.paddingLayout(5),
         ADDRESS.withName("icon"),
+        ADDRESS.withName("title_bar"),
     )
     val KuiDockStyle: StructLayout = MemoryLayout.structLayout(
         JAVA_FLOAT.withName("title_bar_height"),
@@ -742,10 +743,10 @@ object KuiNative {
     fun kui_dock_layout_load(layout: MemorySegment, text: String?): Boolean = Arena.ofConfined().use { a -> h_kui_dock_layout_load.invokeExact(layout, Native.cString(a, text)) as Boolean }
     private val h_kui_dock_space by lazy { handle("kui_dock_space", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, JAVA_LONG, ADDRESS)) }
     fun kui_dock_space(layout: MemorySegment, panels: MemorySegment, count: Long, options: MemorySegment): MemorySegment = h_kui_dock_space.invokeExact(layout, panels, count, options) as MemorySegment
-    private val h_kui_drag_value by lazy { handle("kui_drag_value", FunctionDescriptor.of(ADDRESS, JAVA_FLOAT, KuiLayouts.KuiFloatAction, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT, ADDRESS, JAVA_FLOAT, JAVA_BOOLEAN)) }
-    fun kui_drag_value(value: Float, on_changed: MemorySegment, speed: Float, min: Float, max: Float, decimals: Int, label: String?, width: Float, typeable: Boolean): MemorySegment = Arena.ofConfined().use { a -> h_kui_drag_value.invokeExact(value, on_changed, speed, min, max, decimals, Native.cString(a, label), width, typeable) as MemorySegment }
-    private val h_kui_drag_value_vertical by lazy { handle("kui_drag_value_vertical", FunctionDescriptor.of(ADDRESS, JAVA_FLOAT, KuiLayouts.KuiFloatAction, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT, ADDRESS, JAVA_FLOAT, JAVA_BOOLEAN)) }
-    fun kui_drag_value_vertical(value: Float, on_changed: MemorySegment, speed: Float, min: Float, max: Float, decimals: Int, label: String?, width: Float, typeable: Boolean): MemorySegment = Arena.ofConfined().use { a -> h_kui_drag_value_vertical.invokeExact(value, on_changed, speed, min, max, decimals, Native.cString(a, label), width, typeable) as MemorySegment }
+    private val h_kui_drag_value by lazy { handle("kui_drag_value", FunctionDescriptor.of(ADDRESS, JAVA_FLOAT, KuiLayouts.KuiFloatAction, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT, ADDRESS, JAVA_FLOAT, JAVA_BOOLEAN, JAVA_BOOLEAN)) }
+    fun kui_drag_value(value: Float, on_changed: MemorySegment, speed: Float, min: Float, max: Float, decimals: Int, label: String?, width: Float, typeable: Boolean, wrap: Boolean): MemorySegment = Arena.ofConfined().use { a -> h_kui_drag_value.invokeExact(value, on_changed, speed, min, max, decimals, Native.cString(a, label), width, typeable, wrap) as MemorySegment }
+    private val h_kui_drag_value_vertical by lazy { handle("kui_drag_value_vertical", FunctionDescriptor.of(ADDRESS, JAVA_FLOAT, KuiLayouts.KuiFloatAction, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT, ADDRESS, JAVA_FLOAT, JAVA_BOOLEAN, JAVA_BOOLEAN)) }
+    fun kui_drag_value_vertical(value: Float, on_changed: MemorySegment, speed: Float, min: Float, max: Float, decimals: Int, label: String?, width: Float, typeable: Boolean, wrap: Boolean): MemorySegment = Arena.ofConfined().use { a -> h_kui_drag_value_vertical.invokeExact(value, on_changed, speed, min, max, decimals, Native.cString(a, label), width, typeable, wrap) as MemorySegment }
     private val h_kui_dropdown by lazy { handle("kui_dropdown", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, KuiLayouts.KuiFloatAction, JAVA_FLOAT, ADDRESS)) }
     fun kui_dropdown(items: MemorySegment, count: Long, selected: Int, on_changed: MemorySegment, width: Float, placeholder: String?): MemorySegment = Arena.ofConfined().use { a -> h_kui_dropdown.invokeExact(items, count, selected, on_changed, width, Native.cString(a, placeholder)) as MemorySegment }
     private val h_kui_context_menu by lazy { handle("kui_context_menu", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS)) }
@@ -808,6 +809,22 @@ object KuiNative {
     fun kui_progress_bar(value: Float): MemorySegment = h_kui_progress_bar.invokeExact(value) as MemorySegment
     private val h_kui_text_field by lazy { handle("kui_text_field", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun kui_text_field(options: MemorySegment): MemorySegment = h_kui_text_field.invokeExact(options) as MemorySegment
+    private val h_kui_material_icon by lazy { handle("kui_material_icon", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT)) }
+    fun kui_material_icon(name: String?, style: Int): MemorySegment = Arena.ofConfined().use { a -> h_kui_material_icon.invokeExact(Native.cString(a, name), style) as MemorySegment }
+    private val h_kui_material_icon_count by lazy { handle("kui_material_icon_count", FunctionDescriptor.of(JAVA_LONG)) }
+    fun kui_material_icon_count(): Long = h_kui_material_icon_count.invokeExact() as Long
+    private val h_kui_material_icon_name by lazy { handle("kui_material_icon_name", FunctionDescriptor.of(ADDRESS, JAVA_LONG)) }
+    fun kui_material_icon_name(index: Long): String = Native.kString(h_kui_material_icon_name.invokeExact(index) as MemorySegment)
+    private val h_kui_vector_image_from_svg by lazy { handle("kui_vector_image_from_svg", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG)) }
+    fun kui_vector_image_from_svg(svg: String?, length: Long): MemorySegment = Arena.ofConfined().use { a -> h_kui_vector_image_from_svg.invokeExact(Native.cString(a, svg), length) as MemorySegment }
+    private val h_kui_vector_image_release by lazy { handle("kui_vector_image_release", FunctionDescriptor.ofVoid(ADDRESS)) }
+    fun kui_vector_image_release(image: MemorySegment): Unit { h_kui_vector_image_release.invokeExact(image) }
+    private val h_kui_vector_image_view_box by lazy { handle("kui_vector_image_view_box", FunctionDescriptor.of(KuiLayouts.KuiRect, ADDRESS)) }
+    fun kui_vector_image_view_box(allocator: SegmentAllocator, image: MemorySegment): MemorySegment = h_kui_vector_image_view_box.invokeExact(allocator, image) as MemorySegment
+    private val h_kui_canvas_draw_vector_image by lazy { handle("kui_canvas_draw_vector_image", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, KuiLayouts.KuiRect, KuiLayouts.KuiColor)) }
+    fun kui_canvas_draw_vector_image(canvas: MemorySegment, image: MemorySegment, rect: MemorySegment, tint: MemorySegment): Unit { h_kui_canvas_draw_vector_image.invokeExact(canvas, image, rect, tint) }
+    private val h_kui_icon by lazy { handle("kui_icon", FunctionDescriptor.of(ADDRESS, ADDRESS, KuiLayouts.KuiColor)) }
+    fun kui_icon(image: MemorySegment, tint: MemorySegment): MemorySegment = h_kui_icon.invokeExact(image, tint) as MemorySegment
     private val h_kui_themed by lazy { handle("kui_themed", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS)) }
     fun kui_themed(theme: MemorySegment, child: MemorySegment): MemorySegment = h_kui_themed.invokeExact(theme, child) as MemorySegment
     private val h_kui_system_appearance by lazy { handle("kui_system_appearance", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS, ADDRESS)) }

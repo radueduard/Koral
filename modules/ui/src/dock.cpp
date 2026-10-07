@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <limits>
 #include <locale>
 #include <map>
 #include <optional>
@@ -70,6 +71,7 @@ namespace kui
             bool bare = false;                  ///< A float of one panel with no title bar: only its content.
             bool fit = false;                   ///< A float as big as what it shows: its panel was laid out to say how big.
             Rect rect {}, bar {}, body {}, line {};
+            Rect custom {};                     ///< In the bar, between the titles and the buttons: the panel's own title bar widget.
             std::vector<std::size_t> shown;     ///< The tabs whose panels are there, by index into tabs.
             std::vector<Rect> tabRects;         ///< One per shown.
         };
@@ -714,7 +716,8 @@ namespace kui
 
         class RenderDock final : public RenderContainer {
         public:
-            struct Meta { std::string id, title; bool closable = true, dockable = true, titleBar = true; std::string icon; };
+            /// titleBar: whether it has a widget of its own in its title bar — the children after the panels' contents.
+            struct Meta { std::string id, title; bool closable = true, dockable = true, showTitleBar = true; std::shared_ptr<const VectorImage> icon; bool titleBar = false; };
             struct Config { std::shared_ptr<DockLayout> layout; std::vector<Meta> panels; DockOptions options; };
 
             ~RenderDock() override
@@ -729,7 +732,11 @@ namespace kui
                 if (_config.layout && _config.layout != config.layout) _config.layout->Internal().changed = nullptr;
                 _config = std::move(config);
                 _index.clear();
+                _barIndex.clear();
                 for (std::size_t i = 0; i < _config.panels.size(); ++i) _index[_config.panels[i].id] = i;
+                // The title bars' widgets follow the contents, in the panels' order.
+                std::size_t next = _config.panels.size();
+                for (const auto& meta : _config.panels) if (meta.titleBar) _barIndex[meta.id] = next++;
                 _titles.clear();
                 _icons.clear();
                 if (_config.layout) _config.layout->Internal().changed = [this] { MarkNeedsLayout(); MarkNeedsPaint(); };
@@ -749,9 +756,14 @@ namespace kui
                 // is neither it shows what is behind, and lets the pointer through to it. A tab in
                 // hand is the exception — it can be dropped anywhere.
                 if (!surface && !_dragging && Probe(position) == Hit{}) return false;
-                if (const Node* node = PanelNodeAt(position))
-                    if (RenderObject* child = ChildOf(node->tabs[node->active]))
-                        child->HitTest(result, position - child->Offset());
+                // Under that, the panel the point is in — or the panel's own widget in its title bar.
+                const Hit hit = Probe(position);
+                if (hit.node && !hit.node->split && !hit.node->tabs.empty()) {
+                    const std::string& panel = hit.node->tabs[hit.node->active];
+                    RenderObject* child = hit.kind == Hit::Kind::eContent ? ChildOf(panel)
+                                        : hit.kind == Hit::Kind::eBar && hit.node->custom.Contains(position) ? BarChildOf(panel) : nullptr;
+                    if (child) child->HitTest(result, position - child->Offset());
+                }
                 result.Add(this, position);
                 return true;
             }
@@ -832,6 +844,12 @@ namespace kui
                 const auto it = _index.find(panel);
                 return it != _index.end() && it->second < Children().size() ? Children()[it->second] : nullptr;
             }
+            /** @p panel 's own widget for its title bar, when it has one. */
+            [[nodiscard]] RenderObject* BarChildOf(const std::string& panel) const
+            {
+                const auto it = _barIndex.find(panel);
+                return it != _barIndex.end() && it->second < Children().size() ? Children()[it->second] : nullptr;
+            }
             [[nodiscard]] const Meta* MetaOf(const std::string& panel) const
             {
                 const auto it = _index.find(panel);
@@ -859,7 +877,7 @@ namespace kui
             {
                 if (!f.root || f.root->tabs.empty()) return false;
                 const Meta* meta = MetaOf(f.root->tabs.front());
-                return meta && !meta->titleBar;
+                return meta && !meta->showTitleBar;
             }
 
             const Paragraph& Title(const std::string& panel);
@@ -868,7 +886,7 @@ namespace kui
             /** The buttons at the right of a title bar, counted from its end. */
             [[nodiscard]] static Rect BarButton(const Node& node, const int slot)
             {
-                return Rect::XYWH(node.bar.right - 26.f - 24.f * static_cast<float>(slot), node.bar.top + 4.f, 20.f, 20.f);
+                return Rect::XYWH(node.bar.right - 26.f - 24.f * static_cast<float>(slot), std::round(node.bar.Center().y - 10.f), 20.f, 20.f);
             }
             [[nodiscard]] bool Closable(const Node& node) const
             {
@@ -896,6 +914,15 @@ namespace kui
             /** The sizes it is drawn and handled with. */
             [[nodiscard]] const DockStyle& S() const { return _config.options.style; }
             void LayoutStripes(glm::vec2 size);
+            /**
+             * How narrow @p node can be with nothing its panels show cut off: the widest least width of its
+             * panels' contents (it keeps it whichever is shown); two side by side and the gap between them;
+             * the wider of two one over the other. @p shown says whether anything of it is shown at all.
+             */
+            [[nodiscard]] float MinWidth(const Node& node, bool& shown) const;
+            [[nodiscard]] float MinWidth(const Node& node) const { bool shown = false; return MinWidth(node, shown); }
+            /** Where the line between @p node 's two sides goes, @p first along its @p length: no closer to either edge than that side's MinWidth allows. */
+            [[nodiscard]] float KeepWidths(const Node& node, float length, float first) const;
             void PlaceChildren(const Node& node, std::vector<bool>& placed);
             void SyncOverlay();
             void OverlayFrame();
@@ -915,7 +942,6 @@ namespace kui
             [[nodiscard]] std::optional<glm::vec2> OverlayPoint(glm::vec2 position) const;
             [[nodiscard]] bool CanOpenWindows() const;
             bool OnSurface(glm::vec2 position, const Floating*& surface) const;
-            [[nodiscard]] const Node* PanelNodeAt(glm::vec2 position) const;
             [[nodiscard]] Hit Probe(glm::vec2 position) const;
             static bool ProbeNode(Node& node, glm::vec2 position, Hit& hit);
             [[nodiscard]] std::optional<glm::vec2> Elsewhere(glm::vec2 position) const;
@@ -932,6 +958,7 @@ namespace kui
 
             Config _config;
             std::unordered_map<std::string, std::size_t> _index;
+            std::unordered_map<std::string, std::size_t> _barIndex;    ///< A panel's title bar widget, by index into the children.
             std::unordered_map<std::string, Paragraph> _titles;
             std::unordered_map<std::string, Paragraph> _icons;
             Stripe _stripes[2];                         ///< Left, right.
@@ -968,21 +995,18 @@ namespace kui
             return it->second;
         }
 
-        /** What a panel's button shows: its icon, or without one the first letter of its title. */
+        /** What the button of a panel with no icon shows: the first letter of its title. */
         const Paragraph& RenderDock::Icon(const std::string& panel)
         {
             auto it = _icons.find(panel);
             if (it == _icons.end()) {
                 const Meta* meta = MetaOf(panel);
-                std::string glyph = meta ? meta->icon : std::string();
-                if (glyph.empty()) {
-                    // One character of the title: all the bytes of its first, as UTF-8 has them.
-                    const std::string& title = meta && !meta->title.empty() ? meta->title : panel;
-                    std::size_t length = title.empty() ? 0 : 1;
-                    while (length < title.size() && (static_cast<unsigned char>(title[length]) & 0xC0) == 0x80) ++length;
-                    glyph = title.substr(0, length);
-                    if (glyph.size() == 1 && glyph[0] >= 'a' && glyph[0] <= 'z') glyph[0] = static_cast<char>(glyph[0] - 'a' + 'A');
-                }
+                // One character of the title: all the bytes of its first, as UTF-8 has them.
+                const std::string& title = meta && !meta->title.empty() ? meta->title : panel;
+                std::size_t length = title.empty() ? 0 : 1;
+                while (length < title.size() && (static_cast<unsigned char>(title[length]) & 0xC0) == 0x80) ++length;
+                std::string glyph = title.substr(0, length);
+                if (glyph.size() == 1 && glyph[0] >= 'a' && glyph[0] <= 'z') glyph[0] = static_cast<char>(glyph[0] - 'a' + 'A');
                 TextStyle style = Theme::Current().textStyle;
                 style.size = 14.f;
                 it = _icons.emplace(panel, Paragraph(glyph, style)).first;
@@ -998,6 +1022,35 @@ namespace kui
         }
 
         // ---- layout ------------------------------------------------------------------------------------
+
+        float RenderDock::MinWidth(const Node& node, bool& shown) const
+        {
+            shown = false;
+            if (node.split) {
+                bool a = false, b = false;
+                const float wa = MinWidth(*node.a, a), wb = MinWidth(*node.b, b);
+                shown = a || b;
+                if (!(a && b)) return a ? wa : wb;
+                return node.axis == Axis::eHorizontal ? wa + Gap() + wb : std::max(wa, wb);
+            }
+            if (node.hole) return 0.f;
+            float width = 0.f;
+            for (const auto& panel : node.tabs) {
+                if (!Present(panel)) continue;
+                shown = true;
+                if (const RenderObject* child = ChildOf(panel)) width = std::max(width, child->MinIntrinsicWidth());
+            }
+            return std::ceil(width);
+        }
+
+        float RenderDock::KeepWidths(const Node& node, const float length, const float first) const
+        {
+            if (!node.split || node.axis != Axis::eHorizontal) return first;
+            const float a = MinWidth(*node.a), b = MinWidth(*node.b);
+            // Room for both: each side keeps its least. Not: they share what there is in proportion to their leasts.
+            if (a + b <= length) return std::clamp(first, a, length - b);
+            return a + b > 0.f ? std::round(length * a / (a + b)) : first;
+        }
 
         void RenderDock::Arrange(Node& node, const Rect rect, const bool bare)
         {
@@ -1021,6 +1074,8 @@ namespace kui
                     first = node.extentSecond ? length - extent : extent;
                 }
                 first = std::round(first);
+                // And neither side narrower than what is in it needs.
+                if (h) first = KeepWidths(node, length, first);
                 if (h) {
                     Arrange(*node.a, Rect::LTRB(rect.left, rect.top, rect.left + first, rect.bottom));
                     node.line = Rect::LTRB(rect.left + first, rect.top, rect.left + first + gap, rect.bottom);
@@ -1034,6 +1089,7 @@ namespace kui
             }
             node.shown.clear();
             node.tabRects.clear();
+            node.custom = {};
             // Where nothing is docked: there, as big as it is, with nothing in it.
             if (node.hole) {
                 node.visible = true;
@@ -1051,16 +1107,26 @@ namespace kui
                 return;
             }
             // A title bar along its top: each panel's title from the left, as far as its buttons at the
-            // right — which a title too long for the room left is cut short of, not drawn under.
-            node.bar = Rect::LTRB(rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + S().titleBarHeight));
-            node.body = Rect::LTRB(rect.left, node.bar.bottom, rect.right, rect.bottom);
-            const float end = std::max(rect.left + 2.f, node.bar.right - 6.f - 24.f * static_cast<float>(BarButtons(node)));
+            // right — which a title too long for the room left is cut short of, not drawn under — and
+            // between the two, the shown panel's own widget, when it has one: the bar is as tall as that is.
+            const float end = std::max(rect.left + 2.f, rect.right - 6.f - 24.f * static_cast<float>(BarButtons(node)));
             float x = rect.left + 2.f;
+            std::vector<std::pair<float, float>> spans;
             for (const std::size_t i : node.shown) {
                 const float width = Title(node.tabs[i]).MaxIntrinsicWidth() + 2.f * S().tabPadding;
-                node.tabRects.push_back(Rect::LTRB(std::min(x, end), node.bar.top, std::min(x + width, end), node.bar.bottom));
+                spans.emplace_back(std::min(x, end), std::min(x + width, end));
                 x += width;
             }
+            const float from = std::min(std::ceil(x), end);     // on a whole pixel, for what is drawn there to be crisp
+            float height = S().titleBarHeight;
+            if (RenderObject* custom = BarChildOf(node.tabs[node.active]); custom && end > from) {
+                custom->Layout(BoxConstraints { end - from, end - from, 0.f, std::numeric_limits<float>::infinity() }, true);
+                height = std::max(height, std::ceil(custom->Size().y));
+            }
+            node.bar = Rect::LTRB(rect.left, rect.top, rect.right, std::min(rect.bottom, rect.top + height));
+            node.body = Rect::LTRB(rect.left, node.bar.bottom, rect.right, rect.bottom);
+            node.custom = Rect::LTRB(from, node.bar.top, end, node.bar.bottom);
+            for (const auto& [l, r] : spans) node.tabRects.push_back(Rect::LTRB(l, node.bar.top, r, node.bar.bottom));
         }
 
         /** Where the two stripes are, and each of their buttons. */
@@ -1147,6 +1213,12 @@ namespace kui
             if (!node.fit) child->Layout(BoxConstraints::Tight(glm::max(node.body.Size(), glm::vec2(0.f))));
             child->SetOffset(node.body.TopLeft());
             placed[it->second] = true;
+            // Its title bar's widget, laid out by Arrange: in the middle of the bar, top to bottom.
+            if (const auto bar = _barIndex.find(node.tabs[node.active]); bar != _barIndex.end() && bar->second < Children().size() && !node.custom.Empty()) {
+                RenderObject* custom = Children()[bar->second];
+                custom->SetOffset({ node.custom.left, std::round(node.custom.top + (node.custom.Height() - custom->Size().y) * 0.5f) });
+                placed[bar->second] = true;
+            }
         }
 
         void RenderDock::CloseOverlay()
@@ -1407,7 +1479,13 @@ namespace kui
                 bool fit = false;
                 if (f.fit && !f.root->tabs.empty() && Present(f.root->tabs.front())) {
                     if (RenderObject* child = ChildOf(f.root->tabs.front())) {
-                        const glm::vec2 frame = bare ? glm::vec2(0.f) : glm::vec2(2.f, S().titleBarHeight + 2.f);
+                        // Its bar as tall as its own widget there wants, with the room there is.
+                        float barHeight = S().titleBarHeight;
+                        if (RenderObject* custom = BarChildOf(f.root->tabs.front()); custom && !bare) {
+                            custom->Layout(BoxConstraints { 0.f, std::max(area.Width() - 2.f, 0.f), 0.f, std::numeric_limits<float>::infinity() }, true);
+                            barHeight = std::max(barHeight, std::ceil(custom->Size().y));
+                        }
+                        const glm::vec2 frame = bare ? glm::vec2(0.f) : glm::vec2(2.f, barHeight + 2.f);
                         const glm::vec2 room = glm::max(area.Size() - frame, glm::vec2(0.f));
                         child->Layout(BoxConstraints { 0.f, room.x, 0.f, room.y }, true);
                         glm::vec2 wanted = child->Size() + frame;
@@ -1418,7 +1496,9 @@ namespace kui
                     }
                 }
                 const float least = fit ? 1.f : S().minFloatSize;
-                const float w = std::clamp(f.rect.Width(), least, std::max(least, area.Width()));
+                // No narrower than what it shows needs, and its frame — unless the space itself is narrower.
+                const float leastWidth = fit ? least : std::max(least, MinWidth(*f.root) + (bare ? 0.f : 2.f));
+                const float w = std::clamp(f.rect.Width(), leastWidth, std::max(leastWidth, area.Width()));
                 const float h = std::clamp(f.rect.Height(), least, std::max(least, area.Height()));
                 const float x = std::clamp(f.rect.left, area.left + std::min(0.f, 40.f - w), area.left + std::max(0.f, area.Width() - 40.f));
                 const float y = std::clamp(f.rect.top, area.top, area.top + std::max(0.f, area.Height() - S().titleBarHeight));
@@ -1516,12 +1596,6 @@ namespace kui
                 }
             }
             return hit;
-        }
-
-        const Node* RenderDock::PanelNodeAt(const glm::vec2 position) const
-        {
-            const Hit hit = Probe(position);
-            return hit.kind == Hit::Kind::eContent ? hit.node : nullptr;
         }
 
         /**
@@ -1991,6 +2065,9 @@ namespace kui
                 // A float with no title bar is moved by its content: its padding, and whatever else
                 // of it takes no press. A button in it, or a slider, took this one first.
                 if (hit.kind == Kind::eContent && hit.node->bare && !event.taken) _pressed.kind = Kind::eCard;
+                // The panel's own widget in its title bar: what in it takes a press has it — the rest of it
+                // picks the panel up, as the bar does.
+                if (hit.kind == Kind::eBar && hit.node->custom.Contains(p) && event.taken) { _pressed = {}; _pressedPanel.clear(); return false; }
                 return _pressed.kind != Kind::eContent && _pressed.kind != Kind::eNothing;
             }
 
@@ -2004,7 +2081,9 @@ namespace kui
                     const bool h = node.axis == Axis::eHorizontal;
                     const float length = (h ? node.rect.Width() : node.rect.Height()) - Gap();
                     if (length > 1.f) {
-                        const float at = (h ? p.x - node.rect.left : p.y - node.rect.top) - Gap() * 0.5f;
+                        float at = (h ? p.x - node.rect.left : p.y - node.rect.top) - Gap() * 0.5f;
+                        // Held where a side would be narrower than what is in it needs: the line goes no further.
+                        if (h) at = KeepWidths(node, length, at);
                         if (node.extent >= 0.f) {
                             const float extent = std::clamp(node.extentSecond ? length - at : at, std::min(S().minAreaSize, length * 0.5f), length * 0.9f);
                             if (extent != node.extent) { node.extent = extent; if (node.onResize) node.onResize(extent); Changed(); }
@@ -2017,7 +2096,8 @@ namespace kui
                 }
                 case Kind::eResize:
                     if (Floating* f = FloatById(_pressed.floatId)) {
-                        f->rect = Rect::LTRB(_floatAtPress.left, _floatAtPress.top, std::max(_floatAtPress.left + S().minFloatSize, _floatAtPress.right + by.x),
+                        const float least = f->root ? std::max(S().minFloatSize, MinWidth(*f->root) + 2.f) : S().minFloatSize;
+                        f->rect = Rect::LTRB(_floatAtPress.left, _floatAtPress.top, std::max(_floatAtPress.left + least, _floatAtPress.right + by.x),
                                              std::max(_floatAtPress.top + S().minFloatSize, _floatAtPress.bottom + by.y));
                         Changed();
                     }
@@ -2187,6 +2267,14 @@ namespace kui
                         }
                     }
                 }
+                // Between the titles and the buttons, the panel's own widget.
+                if (const auto bar = _barIndex.find(node.tabs[node.active]); bar != _barIndex.end() && bar->second < _placed.size() && _placed[bar->second] && !node.custom.Empty()) {
+                    RenderObject* custom = Children()[bar->second];
+                    canvas.Save();
+                    canvas.ClipRect(node.custom.Shift(offset));
+                    PaintChildAt(*custom, canvas, offset + custom->Offset());
+                    canvas.Restore();
+                }
                 // The buttons on the right. Last, the cross that closes the panel shown.
                 const bool closable = Closable(node);
                 if (closable) {
@@ -2270,7 +2358,14 @@ namespace kui
                     else if (hot) canvas.DrawRRect({ box, 8.f }, Paint::Fill(t.surfaceHover));
                     break;
                 }
-                canvas.DrawText(icon.Text(), { std::round(box.Center().x - icon.Size().x * 0.5f), std::round(box.Center().y - icon.Size().y * 0.5f) }, style);
+                // Its icon, in the colour its state gives the button — or, with none, its title's first letter.
+                const Meta* meta = MetaOf(button.panel);
+                if (meta && meta->icon) {
+                    const float side = std::round(box.Width() * 0.6f);
+                    meta->icon->Draw(canvas, Rect::FromCenter(glm::round(box.Center()), side, side), style.color);
+                } else {
+                    canvas.DrawText(icon.Text(), { std::round(box.Center().x - icon.Size().x * 0.5f), std::round(box.Center().y - icon.Size().y * 0.5f) }, style);
+                }
             }
         }
 
@@ -2372,10 +2467,14 @@ namespace kui
         widget->config.layout = layout ? std::move(layout) : std::make_shared<DockLayout>();
         widget->config.options = std::move(options);
         for (auto& panel : panels) {
-            widget->config.panels.push_back({ panel.id, panel.title, panel.closable, panel.dockable, panel.titleBar, panel.icon });
+            widget->config.panels.push_back({ panel.id, panel.title, panel.closable, panel.dockable, panel.showTitleBar, panel.icon,
+                                              static_cast<bool>(panel.titleBar) });
             // Each panel a layer of its own, kept by its id: where it is shown changes, what it is does not.
             widget->children.push_back(RepaintBoundary(panel.content ? std::move(panel.content) : SizedBox(0.f, 0.f)).Key(panel.id));
         }
+        // Then the widgets of the title bars that have one, in the same order: see RenderDock::Set.
+        for (auto& panel : panels)
+            if (panel.titleBar) widget->children.push_back(RepaintBoundary(std::move(panel.titleBar)).Key(panel.id + "\x1ftitle bar"));
         return Widget(widget);
     }
 }
