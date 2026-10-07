@@ -7,6 +7,10 @@
 #include <coroutine>
 #include <exception>
 #include <functional>
+#include <memory>
+#include <mutex>
+#include <atomic>
+#include <type_traits>
 #include <expected>
 #include <optional>
 #include <utility>
@@ -100,10 +104,125 @@ namespace kor {
     template <typename T>
     class Task;
 
+    /**
+     * @brief What a cancelled task throws at its next suspension point: every `co_await` in it after
+     *        Task::Cancel(), and the one it is waiting at when that is a token's, or another task's.
+     *
+     * An ordinary exception, so a task stops by unwinding — its destructors run, a `catch` may tidy up and
+     * rethrow. Task::IsCancelled() tells it from a failure; Take() reports it as "cancelled".
+     */
+    struct Cancelled : std::exception {
+        [[nodiscard]] const char* what() const noexcept override { return "cancelled"; }
+    };
+
+    /**
+     * @brief A point in a long stretch of a task's own work, with nothing to wait for, where it may be stopped:
+     *        `co_await kor::CancellationPoint{};` throws kor::Cancelled when the task has been cancelled, and does
+     *        nothing otherwise — it never suspends.
+     */
+    struct CancellationPoint {
+        bool await_ready() const noexcept { return true; }
+        void await_suspend(std::coroutine_handle<>) const noexcept {}
+        void await_resume() const noexcept {}
+    };
+
     namespace detail {
+        /**
+         * Whether a task was asked to stop, and how to wake it where it waits: interrupting the token it waits
+         * on, or asking the task it awaits to stop too (whose stopping then wakes this one).
+         */
+        struct CancelState {
+            std::atomic<bool> requested{false};
+            std::mutex mutex;
+            std::function<void()> wake;     // set while it waits somewhere it can be woken from
+
+            void Cancel() {
+                requested.store(true, std::memory_order_release);
+                std::function<void()> now;
+                {
+                    std::lock_guard lock(mutex);
+                    now = std::move(wake);
+                    wake = nullptr;
+                }
+                // Outside the lock: waking may resume the task inline, which then takes the lock to resume.
+                if (now) now();
+            }
+            [[nodiscard]] bool IsRequested() const noexcept { return requested.load(std::memory_order_acquire); }
+        };
+
+        template <typename A>
+        concept HasMemberCoAwait = requires(A&& a) { std::forward<A>(a).operator co_await(); };
+
+        // What a task's `co_await x` waits through: x's awaiter, with the cancellation check around it.
+        template <typename Inner>
+        struct CancellableAwaiter {
+            CancelState* state;
+            Inner inner;
+
+            template <typename Make>
+            CancellableAwaiter(CancelState* s, Make&& make) : state(s), inner(std::forward<Make>(make)()) {}
+
+            bool await_ready() {
+                // Cancelled already: no waiting, straight to the throw.
+                if (state->IsRequested()) return true;
+                return inner.await_ready();
+            }
+
+            template <typename Handle>
+            auto await_suspend(Handle h) {
+                // Under the lock, so Cancel() cannot run between the awaiter parking and its waking being known
+                // — and a resume that races it waits at await_resume for the lock, keeping this frame alive.
+                std::unique_lock lock(state->mutex);
+                using Result = decltype(inner.await_suspend(h));
+                if constexpr (std::is_void_v<Result>) {
+                    inner.await_suspend(h);
+                    remember();
+                } else {
+                    auto parked = inner.await_suspend(h);
+                    if constexpr (std::is_same_v<Result, bool>) { if (parked) remember(); }
+                    return parked;
+                }
+            }
+
+            decltype(auto) await_resume() {
+                {
+                    std::lock_guard lock(state->mutex);
+                    state->wake = nullptr;
+                }
+                if (state->IsRequested()) throw Cancelled{};
+                return inner.await_resume();
+            }
+
+        private:
+            void remember() {
+                using Plain = std::remove_cvref_t<Inner>;
+                if constexpr (std::is_same_v<Plain, Token::Awaiter>) {
+                    state->wake = inner.Interrupter();
+                } else if constexpr (requires { inner.Cancellation(); }) {
+                    // Another task: asked to stop too, and its stopping wakes this one.
+                    state->wake = [child = inner.Cancellation()] { if (child) child->Cancel(); };
+                }
+            }
+        };
+
         struct TaskPromiseBase {
             std::exception_ptr exception;
             Token completion = Token::Create();
+            std::shared_ptr<CancelState> cancel = std::make_shared<CancelState>();
+
+            /** Every `co_await` in a task goes through here: checked for cancellation, and wakeable by it. */
+            template <typename A>
+            auto await_transform(A&& awaitable) {
+                if constexpr (HasMemberCoAwait<A>) {
+                    using Inner = decltype(std::forward<A>(awaitable).operator co_await());
+                    return CancellableAwaiter<Inner>(cancel.get(), [&]() -> Inner { return std::forward<A>(awaitable).operator co_await(); });
+                } else {
+                    // An awaiter itself: held by reference — a temporary one lives to the end of the co_await's full
+                    // expression, past the suspension, and some cannot be moved.
+                    using Inner = A&&;
+                    return CancellableAwaiter<Inner>(cancel.get(), [&]() -> Inner { return std::forward<A>(awaitable); });
+                }
+            }
 
             std::suspend_never initial_suspend() noexcept { return {}; }
 
@@ -179,6 +298,30 @@ namespace kor {
                 return _handle && _handle.done() ? _handle.promise().exception : nullptr;
             }
 
+            /**
+             * @brief Asks the task to stop: it throws kor::Cancelled at its next suspension point — at once, when it
+             *        is waiting on a token or on another task (which is asked to stop too). Cooperative: work between
+             *        suspensions runs on to the next one, or to a `co_await kor::CancellationPoint{}`. Wait() for
+             *        it to have stopped before letting the task go. A no-op once it has finished.
+             */
+            void Cancel() const {
+                if (_handle && !_handle.done()) _handle.promise().cancel->Cancel();
+            }
+
+            /** @brief Whether it has finished by being cancelled: by kor::Cancelled escaping it. */
+            [[nodiscard]] bool IsCancelled() const noexcept {
+                const auto exception = Exception();
+                if (!exception) return false;
+                try { std::rethrow_exception(exception); }
+                catch (const Cancelled&) { return true; }
+                catch (...) { return false; }
+            }
+
+            /** @brief The task's cancellation, for a task awaiting it to pass its own on. */
+            [[nodiscard]] std::shared_ptr<CancelState> CancelStateOf() const noexcept {
+                return _handle ? _handle.promise().cancel : nullptr;
+            }
+
         protected:
             std::coroutine_handle<Promise> _handle{};
         };
@@ -243,6 +386,8 @@ namespace kor {
             void await_resume() const {
                 if (handle && handle.promise().exception) std::rethrow_exception(handle.promise().exception);
             }
+            /** For a cancelled task awaiting this one: this one is asked to stop too. */
+            [[nodiscard]] std::shared_ptr<detail::CancelState> Cancellation() const { return handle ? handle.promise().cancel : nullptr; }
         };
 
         Awaiter operator co_await() noexcept { return Awaiter{_handle, Token::Awaiter(Completion())}; }
@@ -293,6 +438,8 @@ namespace kor {
                 if (promise->exception) std::rethrow_exception(promise->exception);
                 return std::move(*promise->value);
             }
+            /** For a cancelled task awaiting this one: this one is asked to stop too. */
+            [[nodiscard]] std::shared_ptr<detail::CancelState> Cancellation() const { return promise ? promise->cancel : nullptr; }
         };
 
         /** @brief Makes the task awaitable, so `co_await task` yields its value. */

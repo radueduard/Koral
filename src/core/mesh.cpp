@@ -85,7 +85,7 @@ namespace kor {
         glm::u64 vertexCount = 0;
         bool counted = false;
 
-        for (const auto& [binding, stride] : _vertexLayout.bindings)
+        for (const auto& [binding, stride, inputRate] : _vertexLayout.bindings)
         {
             if (binding >= _vertexBuffers.size() || !_vertexBuffers[binding].Alive()) {
                 AddError(ErrorCode::eInvalidArgument,
@@ -111,6 +111,8 @@ namespace kor {
                 continue;
             }
 
+            // A binding read an instance at a time holds as many elements as there are instances, not vertices.
+            if (inputRate == VertexInputRate::eInstance) continue;
             const auto count = buffer->size() / stride;
             if (!counted) {
                 vertexCount = count;

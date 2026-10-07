@@ -83,6 +83,7 @@ object KoralLayouts {
     val KoralVertexBinding: StructLayout = MemoryLayout.structLayout(
         JAVA_INT.withName("binding"),
         JAVA_INT.withName("stride"),
+        JAVA_INT.withName("input_rate"),
     )
     val KoralVertexAttribute: StructLayout = MemoryLayout.structLayout(
         ADDRESS.withName("semantic"),
@@ -92,6 +93,8 @@ object KoralLayouts {
         JAVA_INT.withName("channel_type"),
         JAVA_INT.withName("channel_count"),
         JAVA_LONG.withName("location"),
+        JAVA_INT.withName("locations"),
+        JAVA_INT.withName("location_stride"),
     )
     val KoralVertexLayout: StructLayout = MemoryLayout.structLayout(
         ADDRESS.withName("bindings"),
@@ -211,6 +214,8 @@ object KoralLayouts {
         JAVA_INT.withName("frames_in_flight"),
         MemoryLayout.paddingLayout(4),
         ADDRESS.withName("gpu"),
+        JAVA_LONG.withName("required_features"),
+        JAVA_LONG.withName("optional_features"),
     )
     val KoralWindowSettings: StructLayout = MemoryLayout.structLayout(
         ADDRESS.withName("title"),
@@ -849,6 +854,8 @@ object KoralNative {
     fun koral_cmd_bind_descriptor_set(commands: MemorySegment, index: Int, set: MemorySegment): Unit { h_koral_cmd_bind_descriptor_set.invokeExact(commands, index, set) }
     private val h_koral_cmd_bind_mesh by lazy { handle("koral_cmd_bind_mesh", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)) }
     fun koral_cmd_bind_mesh(commands: MemorySegment, mesh: MemorySegment): Unit { h_koral_cmd_bind_mesh.invokeExact(commands, mesh) }
+    private val h_koral_cmd_bind_vertex_buffer by lazy { handle("koral_cmd_bind_vertex_buffer", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, ADDRESS, JAVA_LONG)) }
+    fun koral_cmd_bind_vertex_buffer(commands: MemorySegment, binding: Int, buffer: MemorySegment, offset: Long): Unit { h_koral_cmd_bind_vertex_buffer.invokeExact(commands, binding, buffer, offset) }
     private val h_koral_cmd_push_constant_block by lazy { handle("koral_cmd_push_constant_block", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)) }
     fun koral_cmd_push_constant_block(commands: MemorySegment, data: MemorySegment, bytes: Int, offset: Int): Unit { h_koral_cmd_push_constant_block.invokeExact(commands, data, bytes, offset) }
     private val h_koral_cmd_push_constant by lazy { handle("koral_cmd_push_constant", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_INT, ADDRESS)) }
@@ -1319,6 +1326,12 @@ object KoralNative {
     fun koral_context_supports_ray_tracing(): Boolean = h_koral_context_supports_ray_tracing.invokeExact() as Boolean
     private val h_koral_context_supports_async_compute by lazy { handle("koral_context_supports_async_compute", FunctionDescriptor.of(JAVA_BOOLEAN)) }
     fun koral_context_supports_async_compute(): Boolean = h_koral_context_supports_async_compute.invokeExact() as Boolean
+    private val h_koral_context_supports_feature by lazy { handle("koral_context_supports_feature", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_LONG)) }
+    fun koral_context_supports_feature(feature: Long): Boolean = h_koral_context_supports_feature.invokeExact(feature) as Boolean
+    private val h_koral_context_gpu_has_feature by lazy { handle("koral_context_gpu_has_feature", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_LONG)) }
+    fun koral_context_gpu_has_feature(feature: Long): Boolean = h_koral_context_gpu_has_feature.invokeExact(feature) as Boolean
+    private val h_koral_feature_name by lazy { handle("koral_feature_name", FunctionDescriptor.of(ADDRESS, JAVA_LONG)) }
+    fun koral_feature_name(feature: Long): String = Native.kString(h_koral_feature_name.invokeExact(feature) as MemorySegment)
     private val h_koral_context_async_compute_is_separate_family by lazy { handle("koral_context_async_compute_is_separate_family", FunctionDescriptor.of(JAVA_BOOLEAN)) }
     fun koral_context_async_compute_is_separate_family(): Boolean = h_koral_context_async_compute_is_separate_family.invokeExact() as Boolean
     private val h_koral_asset_path by lazy { handle("koral_asset_path", FunctionDescriptor.of(ADDRESS, ADDRESS)) }

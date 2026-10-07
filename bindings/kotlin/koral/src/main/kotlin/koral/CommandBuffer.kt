@@ -136,6 +136,8 @@ class CommandBuffer internal constructor(native: MemorySegment, private val owne
     fun bindRayTracingPipeline(pipeline: RayTracingPipeline) = apply { KoralNative.koral_cmd_bind_ray_tracing_pipeline(n, pipeline.native) }
     fun bindDescriptorSet(index: Int, set: DescriptorSet) = apply { KoralNative.koral_cmd_bind_descriptor_set(n, index, set.native) }
     fun bindMesh(mesh: Mesh) = apply { KoralNative.koral_cmd_bind_mesh(n, mesh.native) }
+    /** Binds [buffer] to vertex [binding]: per-instance data beside a mesh's own bindings. */
+    fun bindVertexBuffer(binding: Int, buffer: Buffer, offset: Long = 0) = apply { KoralNative.koral_cmd_bind_vertex_buffer(n, binding, buffer.native, offset) }
 
     /** PushConstantBlock: [data] (a primitive array or a MemorySegment) at byte [offset] of the push-constant block. */
     fun pushConstantBlock(data: Any, offset: Int = 0) = apply {

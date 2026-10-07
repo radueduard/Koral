@@ -120,7 +120,7 @@ namespace kor::capi
     {
         VertexLayout out;
         for (std::size_t i = 0; i < layout.binding_count; ++i)
-            out.bindings.push_back({layout.bindings[i].binding, layout.bindings[i].stride});
+            out.bindings.push_back({layout.bindings[i].binding, layout.bindings[i].stride, static_cast<VertexInputRate>(layout.bindings[i].input_rate)});
         for (std::size_t i = 0; i < layout.attribute_count; ++i) {
             const auto& a = layout.attributes[i];
             VertexLayout::Attribute attribute{
@@ -132,6 +132,8 @@ namespace kor::capi
                 .channelCount = a.channel_count,
             };
             if (a.location >= 0) attribute.location = static_cast<glm::u32>(a.location);
+            attribute.locations = std::max(a.locations, 1u);
+            attribute.locationStride = a.location_stride;
             out.attributes.push_back(std::move(attribute));
         }
         if (layout.position_attribute >= 0) out.positionAttribute = static_cast<std::size_t>(layout.position_attribute);

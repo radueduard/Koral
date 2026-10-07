@@ -218,6 +218,8 @@ public sealed unsafe partial class CommandBuffer : IDisposable
     public CommandBuffer BindRayTracingPipeline(RayTracingPipeline pipeline) { KoralNative.koral_cmd_bind_ray_tracing_pipeline(N, pipeline.Handle); return this; }
     public CommandBuffer BindDescriptorSet(uint index, DescriptorSet descriptorSet) { KoralNative.koral_cmd_bind_descriptor_set(N, index, descriptorSet.Handle); return this; }
     public CommandBuffer BindMesh(Mesh mesh) { KoralNative.koral_cmd_bind_mesh(N, mesh.Handle); return this; }
+    /// <summary>Binds <paramref name="buffer"/> to vertex <paramref name="binding"/>: per-instance data beside a mesh's own bindings.</summary>
+    public CommandBuffer BindVertexBuffer(uint binding, Buffer buffer, ulong offset = 0) { KoralNative.koral_cmd_bind_vertex_buffer(N, binding, buffer.Handle, offset); return this; }
 
     /// <summary>PushConstantBlock(data, offset): the bytes of <paramref name="data"/>, at <paramref name="offset"/>.</summary>
     public CommandBuffer PushConstantBlock<T>(in T data, uint offset = 0) where T : unmanaged

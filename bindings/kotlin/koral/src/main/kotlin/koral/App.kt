@@ -21,7 +21,14 @@ data class AppSettings(
     val platform: WindowPlatform = WindowPlatform.eAuto,
     val framesInFlight: Int? = null,
     val gpu: String? = null,
+    /** Features of the GPU it cannot run without: the device is made with them, or refused naming them. */
+    val requiredFeatures: Set<Feature> = emptySet(),
+    /** Features it uses where the GPU has them: [Context.supports] says which. */
+    val optionalFeatures: Set<Feature> = emptySet(),
 )
+
+internal fun Set<Feature>.bits(): Long = fold(0L) { bits, feature -> bits or feature.value.toLong() }
+internal fun featuresOf(bits: Long): Set<Feature> = Feature.entries.filter { it.value != 0 && bits and it.value.toLong() != 0L }.toSet()
 
 /** kor::WindowSettings. */
 data class WindowSettings(
@@ -152,6 +159,8 @@ class App(val settings: AppSettings = AppSettings()) : Owner(), AutoCloseable {
                 int("platform", settings.platform.value)
                 settings.framesInFlight?.let { int("frames_in_flight", it) }
                 settings.gpu?.let { string(a, "gpu", it) }
+                long("required_features", settings.requiredFeatures.bits())
+                long("optional_features", settings.optionalFeatures.bits())
             }
             checked(KoralNative.koral_app_create(s), "creating the application")
         }
@@ -368,7 +377,7 @@ class ProjectConfig private constructor(private var handle: MemorySegment) : Aut
                 s.get(ADDRESS, KoralLayouts.KoralAppSettings.byteOffset(java.lang.foreign.MemoryLayout.PathElement.groupElement(field)))
                     .takeIf { it != MemorySegment.NULL }?.let(Native::kString)?.takeIf { it.isNotEmpty() }
             AppSettings(API.of(f.readInt("api")), WindowPlatform.of(f.readInt("platform")), f.readInt("frames_in_flight"),
-                        text("gpu"))
+                        text("gpu"), featuresOf(f.readLong("required_features")), featuresOf(f.readLong("optional_features")))
         }
 
     val windowSettings: WindowSettings

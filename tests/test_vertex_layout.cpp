@@ -271,3 +271,52 @@ TEST(VertexLayoutDefault, FirstOneWins) {
 }
 
 } // namespace
+
+// -----------------------------------------------------------------------------
+// Inputs that take several locations: a mat4 a column each, read by an attribute
+// that fills as many — four descriptions, a column's bytes apart.
+// -----------------------------------------------------------------------------
+TEST(VertexLayoutResolve, AMatrixInputIsFedByAnAttributeThatFillsItsColumns) {
+    VertexLayout layout;
+    layout.bindings.push_back({ .binding = 1, .stride = 64, .inputRate = kor::VertexInputRate::eInstance });
+    layout.attributes.push_back(VertexLayout::Attribute::Matrix("TRANSFORM", 1, 0));
+
+    const auto resolved = layout.Resolve(std::vector<VertexLayout::ShaderInput>{
+        { .location = 3, .locationSpan = 4, .name = "model", .semantic = "TRANSFORM" },
+    });
+    ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
+    ASSERT_EQ(resolved->size(), 4u);
+    for (glm::u32 i = 0; i < 4; ++i) {
+        EXPECT_EQ((*resolved)[i].location, 3u + i);
+        EXPECT_EQ((*resolved)[i].offset, 16u * i) << "a column of four floats apart";
+        EXPECT_EQ((*resolved)[i].channelCount, 4u);
+        EXPECT_EQ((*resolved)[i].binding, 1u);
+    }
+}
+
+TEST(VertexLayoutResolve, AMatrixInputAnsweredByASingleLocationIsAnError) {
+    VertexLayout layout;
+    layout.bindings.push_back({ .binding = 0, .stride = 64 });
+    layout.attributes.push_back({ .semantic = "TRANSFORM", .binding = 0, .offset = 0, .channelType = ChannelType::eFloat, .channelCount = 4 });
+
+    const auto resolved = layout.Resolve(std::vector<VertexLayout::ShaderInput>{
+        { .location = 0, .locationSpan = 4, .name = "model", .semantic = "TRANSFORM" },
+    });
+    ASSERT_FALSE(resolved.has_value());
+    EXPECT_EQ(resolved.error().code, kor::ErrorCode::eVertexLayoutMismatch);
+    EXPECT_NE(resolved.error().message.find("4 location"), std::string::npos) << resolved.error().message;
+}
+
+TEST(VertexLayoutResolve, AnAttributeAfterAMatrixTakesTheLocationAfterItsColumns) {
+    VertexLayout layout;
+    layout.bindings.push_back({ .binding = 0, .stride = 80 });
+    layout.attributes.push_back(VertexLayout::Attribute::Matrix("", 0, 0));
+    layout.attributes.push_back({ .binding = 0, .offset = 64, .channelType = ChannelType::eFloat, .channelCount = 4 });
+
+    const auto resolved = layout.Resolve(std::vector<VertexLayout::ShaderInput>{ { .location = 0, .locationSpan = 4, .name = "model" },
+                                                                                { .location = 4, .name = "color" } });
+    ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
+    ASSERT_EQ(resolved->size(), 5u);
+    EXPECT_EQ((*resolved)[4].location, 4u);
+    EXPECT_EQ((*resolved)[4].offset, 64u);
+}

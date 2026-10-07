@@ -23,7 +23,8 @@ share no code: this schema is the whole contract between them.
       "fullscreen": false,
       "borderless": false,
       "transparent": false,
-      "vsync": true
+      "vsync": true,
+      "formats": ["BGRA8_SRGB", "BGRA8_UNORM"]
     }
   },
   "paths": {
@@ -31,12 +32,23 @@ share no code: this schema is the whole contract between them.
     "shaderDirectories": ["shaders"],
     "moduleDirectories": []
   },
-  "modules": ["some-observer-module"]
+  "modules": ["some-observer-module"],
+  "features": { "required": ["AtomicFloat32"], "optional": ["CooperativeMatrix"] }
 }
 ```
 
 Every key is optional. Drop the ones you do not care about; they keep whatever value the layer
 beneath them set. `name` is the window title unless `rendering.window.title` overrides it.
+
+`rendering.window.formats` lists the formats the window may present in, most wanted first
+(`BGRA8_UNORM`, `BGRA8_SRGB`, `RGBA8_UNORM`, `RGBA8_SRGB`): the first the display offers is used. Without
+it, the window's own preference applies. An `_SRGB` format encodes to sRGB on every write.
+
+`features` asks the GPU for more than Koral needs itself, by `kor::Feature` name: a GPU without a
+`required` one is refused at startup, naming it; an `optional` one is enabled where the GPU has it. It
+does what `KORAL_REQUIRE_FEATURES` in the project's code does, without recompiling — see
+[GPU features](pipelines.md#gpu-features-beyond-korals-own). An unknown name is a config error that lists the
+known ones.
 
 `scene` names which of the library's scenes the runtime opens (a library can offer several — see
 [Scenes and the application](scenes.md)); without it, the first the library lists opens.

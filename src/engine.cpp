@@ -94,6 +94,9 @@ namespace kor
         // Before the device exists — the Vulkan backend reads it while picking the physical
         // device, which happens inside InitHeadless / the window build below.
         if (!config.gpu.empty()) SetPreferredGpu(config.gpu);
+        // What koral.json asks of the GPU, alongside what the project's library asked for when it was loaded.
+        if (config.requiredFeatures || config.optionalFeatures)
+            detail::RegisterFeatures("koral.json", config.requiredFeatures, config.optionalFeatures);
 
         // Headless path: a library exporting CreateJob runs on a device-only context
         // and terminates — no window, surface, swap chain or GUI. Run() returns a
@@ -152,7 +155,7 @@ namespace kor
             return EXIT_FAILURE;
         }
 
-        const WindowSettings window {
+        WindowSettings window {
             .title = config.title.empty() ? scenePath.stem().string() : config.title,
             .extent = config.extent,
             .resizable = config.resizable,
@@ -161,6 +164,7 @@ namespace kor
             .transparentFramebuffer = config.transparentFramebuffer,
             .vsync = config.vsync,
         };
+        if (!config.formats.empty()) window.formats = config.formats;
         if (!app->Open(start, window)) return EXIT_FAILURE;   // already reported, with the reason
         if (!config.hotReload) return app->Run();
 

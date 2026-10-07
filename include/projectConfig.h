@@ -33,7 +33,7 @@
  *     "window": {
  *       "width": 1280, "height": 720,
  *       "resizable": true, "fullscreen": false, "borderless": false,
- *       "transparent": false, "vsync": true
+ *       "transparent": false, "vsync": true, "formats": ["BGRA8_SRGB", "BGRA8_UNORM"]
  *     }
  *   },
  *   "paths": {
@@ -76,6 +76,7 @@
 #include "api.h"
 #include "context.h" // kor::API
 #include "error.h"
+#include "window.h"  // kor::Window::Format
 
 namespace kor
 {
@@ -129,6 +130,14 @@ namespace kor
         std::vector<std::string> modules;
 
         /**
+         * @brief What of the GPU the project cannot run without, and what it uses where it is there: koral.json's
+         *        `"features": { "required": ["AtomicFloat32"], "optional": ["CooperativeMatrix"] }`, by kor::Feature
+         *        name. The same as KORAL_REQUIRE_FEATURES in its code, without recompiling. @see Feature
+         */
+        Flags<Feature> requiredFeatures {};
+        Flags<Feature> optionalFeatures {};
+
+        /**
          * @brief Which of the scene library's scenes the runtime opens: `"scene"` in koral.json, or
          *        `--scene`. Empty opens the first the library lists.
          */
@@ -169,6 +178,13 @@ namespace kor
 
         /** @brief Whether presentation waits for the display's refresh. */
         bool vsync = true;
+
+        /**
+         * @brief The formats to present in, most wanted first: the first the display offers is used. Empty (the
+         *        default) keeps WindowSettings' own list. In koral.json, `rendering.window.formats`: names such as
+         *        "BGRA8_SRGB" (the enumerator, with or without its `e`, in any case).
+         */
+        std::vector<Window::Format> formats;
         /**
          * @brief Reload the scene library when it is rebuilt, keeping each scene's Scene::State():
          *        `--hot-reload`. For development; off by default.

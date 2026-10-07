@@ -2,6 +2,7 @@
 // Created by radue on 2/27/2026.
 //
 
+#include "../../core/featureState.h"
 #include "vulkanContext.h"
 
 #include "allocator.h"
@@ -103,6 +104,7 @@ void kor::vk::Context::DestroyWhenUnused(std::function<void()> destroy)
 
 void kor::vk::Context::Destroy()
 {
+    kor::detail::ClearDeviceFeatures();
     _device->waitIdle();
     kor::detail::collectRetired(/*all=*/true); // in case StopTokens() was never reached
     delete _tokenReactor;

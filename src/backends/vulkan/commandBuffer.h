@@ -54,6 +54,7 @@ namespace kor::vk
         kor::CommandBuffer& DoBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline) override;
         kor::CommandBuffer& DoBindDescriptorSet(glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set) override;
         kor::CommandBuffer& DoBindMesh(kor::ResourceRef<const Mesh> mesh) override;
+        kor::CommandBuffer& DoBindVertexBuffer(glm::u32 binding, kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset) override;
         kor::CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) override;
         kor::CommandBuffer& DoBeginDebugLabel(const std::string& label, glm::vec4 color) override;
         kor::CommandBuffer& DoEndDebugLabel() override;

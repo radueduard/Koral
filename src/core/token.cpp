@@ -60,6 +60,23 @@ namespace kor::detail {
         std::erase(waiters, waiter);
     }
 
+    void TimelineState::interrupt(const Waiter& waiter) noexcept {
+        if (waiter->state.load(std::memory_order_acquire) != WaiterSlot::eWaiting) return;
+        {
+            std::lock_guard lock(mutex);
+            std::erase(waiters, waiter);
+        }
+        // Claimed when the resume runs, as a signal's is: until then the coroutine may still be destroyed, and
+        // its awaiter's Cancel() must be able to win — or a signal that got there first.
+        const auto resume = [waiter] {
+            if (!waiter->claim(WaiterSlot::eResumed)) return;
+            SceneScope scope(waiter->scene);
+            waiter->handle.resume();
+        };
+        if (waiter->executor) waiter->executor->Post(resume);
+        else resume();
+    }
+
     void TimelineState::wait(const std::uint64_t value) {
         std::unique_lock lock(mutex);
         for (;;) {
@@ -305,4 +322,8 @@ bool kor::Token::Suspend(const std::coroutine_handle<> h, std::shared_ptr<detail
 
 void kor::Token::Cancel(const std::shared_ptr<detail::WaiterSlot>& slot) const noexcept {
     if (_state) _state->cancel(slot);
+}
+
+void kor::Token::Interrupt(const std::shared_ptr<detail::WaiterSlot>& slot) const noexcept {
+    if (_state) _state->interrupt(slot);
 }

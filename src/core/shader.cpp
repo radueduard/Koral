@@ -466,15 +466,18 @@ namespace kor {
     	_spirvCode = spirV;
     }
 
-	std::pair<ChannelType, glm::u32> SPIRTypeConverter(const spirv_cross::SPIRType& type)
+	/**
+	 * What one location of a stage variable holds: a matrix's is one column (as many channels as it has rows),
+	 * an array's one element. A struct's members are each their own: it says what its first does.
+	 */
+	std::pair<ChannelType, glm::u32> SPIRTypeConverter(const spirv_cross::Compiler& module, const spirv_cross::SPIRType& type)
     {
-    	auto rows = type.vecsize;
-    	const auto columns = type.columns;
-    	const auto base = type.basetype;
-
-    	if (columns > 1) {
-    		throw std::runtime_error("Matrices are not supported as shader inputs/outputs!");
+    	if (type.basetype == spirv_cross::SPIRType::BaseType::Struct) {
+    		if (type.member_types.empty()) return { ChannelType::eFloat, 0 };
+    		return SPIRTypeConverter(module, module.get_type(type.member_types.front()));
     	}
+    	auto rows = type.vecsize;
+    	const auto base = type.basetype;
 
     	switch (base) {
 			case spirv_cross::SPIRType::BaseType::Float: return {ChannelType::eFloat, rows};
@@ -488,6 +491,24 @@ namespace kor {
 			default: throw std::runtime_error("Unknown base type for shader input/output!");
 		}
     }
+
+	/**
+	 * How many consecutive locations a stage variable of @p type takes: a location a matrix column, an array
+	 * element and a struct member — and two for a 64-bit vector of three or four, which is wider than one.
+	 */
+	glm::u32 LocationSpan(const spirv_cross::Compiler& module, const spirv_cross::SPIRType& type)
+	{
+		glm::u32 span = 0;
+		if (type.basetype == spirv_cross::SPIRType::BaseType::Struct) {
+			for (const auto member : type.member_types) span += LocationSpan(module, module.get_type(member));
+		} else {
+			const bool wide = (type.basetype == spirv_cross::SPIRType::BaseType::Double || type.basetype == spirv_cross::SPIRType::BaseType::Int64
+			                   || type.basetype == spirv_cross::SPIRType::BaseType::UInt64) && type.vecsize > 2;
+			span = std::max(type.columns, 1u) * (wide ? 2u : 1u);
+		}
+		for (const auto size : type.array) span *= std::max(size, 1u);
+		return std::max(span, 1u);
+	}
 
 	glm::u32 GetCount(const spirv_cross::SPIRType& type) {
     	uint32_t count = 1;
@@ -823,10 +844,10 @@ namespace kor {
 
         for (const auto& input : resources.stage_inputs) {
 			auto location = module.get_decoration(input.id, spv::DecorationLocation);
-        	auto locationSpan = 1; // TODO: handle location spans for arrays and structs
 			const auto& name = module.get_name(input.id);
 			const auto& type = module.get_type(input.type_id);
-        	const auto[channelType, channelCount] = SPIRTypeConverter(type);
+        	const auto locationSpan = LocationSpan(module, type);
+        	const auto[channelType, channelCount] = SPIRTypeConverter(module, type);
 
         	// What the input was annotated with, from whichever half of the language knows: GLSL's
         	// `#pragma mesh(POSITION)` is read out of the source and keyed by name, Slang's
@@ -847,10 +868,10 @@ namespace kor {
 		} // inputs
 		for (const auto& output : resources.stage_outputs) {
 			auto location = module.get_decoration(output.id, spv::DecorationLocation);
-			auto locationSpan = 1; // TODO: handle location spans for arrays and structs
 			auto name = module.get_name(output.id);
 			const auto& type = module.get_type(output.type_id);
-			const auto[channelType, channelCount] = SPIRTypeConverter(type);
+			const auto locationSpan = LocationSpan(module, type);
+			const auto[channelType, channelCount] = SPIRTypeConverter(module, type);
 
 			memoryLayout.outputs.emplace(location, locationSpan, name, channelType, channelCount);
 		} // outputs

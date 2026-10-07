@@ -2,6 +2,14 @@
 
 - [Scenes and the application](scenes.md) — `kor::App`, scenes and their hooks, windows, offscreen
   scenes, views, navigation, shared state, scene libraries, hot reload with state.
+- [Buffers, images and meshes](resources.md) — resources, memory types, uploads and readbacks, vertex layouts,
+  matrices and instancing.
+- [Shaders, pipelines and GPU features](pipelines.md) — shaders and reflection, pipelines, descriptor sets, push
+  constants, and asking the device for features (`kor::Feature`).
+- [Command buffers](commands.md) — recording, automatic barriers, End/Submit and threads, one-off work, work in
+  the frame, timers.
+- [Tokens and tasks](tokens.md) — events, timelines, coroutines, cancelling a task.
+- [Modules, the camera, and debug drawing](modules.md) — writing and using modules, `kcam`, `Scene::Debug`.
 - [The frame graph](frame-graph.md) — passes, resources, memory sharing, async compute, debug lines.
 - [Interfaces with koral-ui](ui.md) — the retained UI module: element shaders, the canvas, widgets.
 - [Input](input.md) — keys, mouse, gamepads, actions and axes, rebinding, feeding offscreen scenes.

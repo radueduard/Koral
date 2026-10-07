@@ -94,6 +94,8 @@ namespace kor::detail {
          */
         bool suspend(std::uint64_t value, std::coroutine_handle<> handle, Waiter& slot, bool resumeInline = false);
         void cancel(const Waiter& waiter) noexcept;
+        // Resumes `waiter` now, its value reached or not: a task cancelled while it waits. @see Token::Interrupt
+        void interrupt(const Waiter& waiter) noexcept;
         void wait(std::uint64_t value);
 
         /** A CPU signal: the producer says it got to `value`. Warns if it already had. */

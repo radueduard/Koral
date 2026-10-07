@@ -183,11 +183,12 @@ namespace kor::vk
         std::vector<::vk::VertexInputAttributeDescription> vkVertexInputAttributeDescriptions = {};
 
         if (_vertexBindingDescriptions && _vertexAttributeDescriptions) {
-            for (const auto& [binding, stride] : *_vertexBindingDescriptions) {
+            for (const auto& [binding, stride, inputRate] : *_vertexBindingDescriptions) {
                 vkVertexInputBindingDescriptions.push_back(::vk::VertexInputBindingDescription()
                                                               .setBinding(binding)
                                                               .setStride(stride)
-                                                              .setInputRate(::vk::VertexInputRate::eVertex));
+                                                              .setInputRate(inputRate == VertexInputRate::eInstance
+                                                                  ? ::vk::VertexInputRate::eInstance : ::vk::VertexInputRate::eVertex));
             }
             vertexInputStateCreateInfo.setVertexBindingDescriptions(vkVertexInputBindingDescriptions);
 

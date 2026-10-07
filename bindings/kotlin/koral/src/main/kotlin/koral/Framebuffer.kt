@@ -12,6 +12,10 @@ object Context {
     val supportsRayTracing: Boolean get() = KoralNative.koral_context_supports_ray_tracing()
     val supportsAsyncCompute: Boolean get() = KoralNative.koral_context_supports_async_compute()
     val asyncComputeIsSeparateFamily: Boolean get() = KoralNative.koral_context_async_compute_is_separate_family()
+    /** Whether the device was made with [feature] enabled: asked for, and the GPU has it. */
+    fun supports(feature: Feature): Boolean = KoralNative.koral_context_supports_feature(feature.value.toLong())
+    /** Whether the GPU has [feature], enabled or not. */
+    fun gpuHas(feature: Feature): Boolean = KoralNative.koral_context_gpu_has_feature(feature.value.toLong())
 }
 
 /** Where assets are looked for: kor::AssetPath and its search paths. */

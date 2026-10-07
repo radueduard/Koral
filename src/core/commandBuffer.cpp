@@ -5,9 +5,11 @@
 #include <commandBuffer.h>
 #include "current.h"
 #include <window.h>
+#include "resourceState.h"
 #include "tokenState.h"
 #include <cstring>
 #include <mutex>
+#include <ranges>
 #include <algorithm>
 #include <format>
 #include <framebuffer.h>
@@ -432,6 +434,11 @@ namespace kor
                 }
             }
         }
+        if (includeMesh) {
+            for (const auto& [binding, buffer] : _state.boundVertexBuffers)
+                if (buffer.Alive() && !buffer.Poisoned())
+                    uses.push_back(ResourceUse{ .buffer = buffer, .access = ResourceAccess::eVertexBuffer });
+        }
 
         return uses;
     }
@@ -656,6 +663,25 @@ namespace kor
             }
 
             if (record.pass == PassEdge::eCloses) openPassAt.reset();
+        }
+
+        // Its place among resolutions, and what it took to be ahead of it for each resource: the one resolved
+        // against each before it. Submit checks those are what reached the queue before it. Once a recording: the
+        // backend's End resolves again, over the barriers this pass inserted, and must not take a second place.
+        if (_resolution == 0) {
+            static std::uint64_t resolutions = 0;   // with the resource-state lock held
+            _resolution = ++resolutions;
+            _assumed.clear();
+            for (const auto& image : trackedImages | std::views::values) {
+                auto& order = image->SubmitOrdering();
+                _assumed.push_back({ .image = image, .ahead = order.resolvedBy });
+                order.resolvedBy = _resolution;
+            }
+            for (const auto& buffer : trackedBuffers | std::views::values) {
+                auto& order = buffer->SubmitOrdering();
+                _assumed.push_back({ .buffer = buffer, .ahead = order.resolvedBy });
+                order.resolvedBy = _resolution;
+            }
         }
 
         // Hand the simulated end state back to the resources, so the next command buffer
@@ -1301,6 +1327,26 @@ namespace kor
     void CommandBuffer::StateBindMesh(const kor::ResourceRef<const Mesh>& mesh)
     {
         _state.boundMesh = mesh;
+        // The bindings the mesh has are its own again; one beyond them keeps what was bound to it.
+        const auto count = mesh.Alive() && !mesh.Poisoned() ? mesh->VertexBuffers().size() : 0;
+        std::erase_if(_state.boundVertexBuffers, [count](const auto& bound) { return bound.first < count; });
+    }
+
+    void CommandBuffer::StateBindVertexBuffer(const glm::u32 binding, const kor::ResourceRef<const Buffer>& buffer)
+    {
+        _state.boundVertexBuffers.insert_or_assign(binding, buffer);
+    }
+
+    CommandBuffer& CommandBuffer::BindVertexBuffer(const glm::u32 binding, kor::ResourceRef<const Buffer> buffer, const glm::u64 offset,
+                                                   const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(buffer, "vertex buffer")) return *this;
+        if (!(buffer->UsageFlags() & Buffer::Usage::eVertex))
+            return RecordError(ErrorCode::eInvalidArgument, std::format("The buffer bound to vertex binding {} was not created with Buffer::Usage::eVertex.", binding));
+        StateBindVertexBuffer(binding, buffer);
+        return Enqueue("BindVertexBuffer", where, {}, PassEdge::eNone,
+            [this, binding, buffer, offset] { DoBindVertexBuffer(binding, buffer, offset); });
     }
 
     CommandBuffer& CommandBuffer::BindMesh(kor::ResourceRef<const Mesh> mesh, const std::source_location where) {
@@ -1412,33 +1458,65 @@ namespace kor
         // done with the last submission, so this is the earliest the timestamps can be read.
         RetireTimers();
         _recording = true;
+        _finalized = false;
+        _resolution = 0;
         return DoBegin();
     }
 
-    namespace {
-        // Every resource carries the state the last End() left it in, which the next End() resolves
-        // against — and Vulkan images carry their layouts, which emitting moves along. Two threads
-        // ending command buffers at once would race on both. Recursive because emitting can run
-        // user code (Run's lambda) that ends a command buffer of its own.
-        std::recursive_mutex& resolveMutex() {
-            static std::recursive_mutex mutex;
-            return mutex;
-        }
+    // Every resource carries the state the last End() left it in, which the next End() resolves against — and
+    // Vulkan images carry their layouts, which emitting moves along. Two threads ending command buffers at once
+    // would race on both, as would one resizing an image while another ends. @see resourceState.h
+    std::recursive_mutex& detail::ResourceStateMutex()
+    {
+        static std::recursive_mutex mutex;
+        return mutex;
     }
 
     void CommandBuffer::End()
     {
-        std::lock_guard lock(resolveMutex());
-        // Nothing recorded so far has reached the GPU. Work out where the barriers belong now that
-        // the whole sequence is visible; the backend then emits, or defers emitting to Submit.
-        ResolveBarriers();
-        DoEnd();
-        _recording = false;
+        detail::Finalize(*this);
+    }
+
+    void detail::Finalize(CommandBuffer& commandBuffer)
+    {
+        std::lock_guard lock(ResourceStateMutex());
+        commandBuffer._recording = false;
+        if (commandBuffer._finalized) return;
+        // Nothing recorded so far has reached the GPU. Work out where the barriers belong now that the whole
+        // sequence is visible, from where the command buffer resolved before it left every resource; then emit.
+        commandBuffer.ResolveBarriers();
+        commandBuffer.DoEnd();
+        commandBuffer._finalized = true;
     }
 
     VoidResult CommandBuffer::Submit(const SubmitInfo& info)
     {
+        // Still recording: ended and submitted in one step, in turn with every other — so the next to resolve
+        // is resolved against this one's work, which is ahead of it on the queue.
+        std::lock_guard lock(detail::ResourceStateMutex());
+        detail::Finalize(*this);
+        detail::NoteSubmitted(*this);
         return DoSubmit(info);
+    }
+
+    void detail::NoteSubmitted(CommandBuffer& commandBuffer)
+    {
+        for (const auto& assumed : commandBuffer._assumed) {
+            const bool image = assumed.image.Alive();
+            if (!image && !assumed.buffer.Alive()) continue;
+            auto& order = image ? assumed.image->SubmitOrdering() : assumed.buffer->SubmitOrdering();
+            // Submitted again, or after what it was resolved against: in order.
+            if (order.submittedBy != assumed.ahead && order.submittedBy != commandBuffer._resolution) {
+                const std::string name = image ? assumed.image.Name() : assumed.buffer.Name();
+                commandBuffer.RecordError(ErrorCode::eMissingBarrier, std::format(
+                    "'{}' was resolved, when this command buffer was ended, against work that has not reached its queue "
+                    "ahead of it: command buffers sharing it were submitted in another order than they were ended in, "
+                    "so its barriers start from the wrong state. End and submit them in the same order — on several "
+                    "threads, call Submit() without End(), which ends and submits in one step.",
+                    name.empty() ? (image ? "<unnamed image>" : "<unnamed buffer>") : name));
+            }
+            order.submittedBy = commandBuffer._resolution;
+        }
     }
 
     void CommandBuffer::Reset()
@@ -1446,6 +1524,8 @@ namespace kor
         _state = {};
         ClearRecords();
         _recording = false;
+        _finalized = false;
+        _resolution = 0;
         DoReset();
     }
 

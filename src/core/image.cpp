@@ -3,6 +3,7 @@
 //
 
 #include <image.h>
+#include "resourceState.h"
 #include <buffer.h>
 #include <commandBuffer.h>
 #include <framebuffer.h>
@@ -268,6 +269,10 @@ namespace kor
     void Image::Resize(const glm::uvec3& extent)
     {
         if (_extent == extent || extent.x == 0 || extent.y == 0 || extent.z == 0) return;
+
+        // Not halfway through another thread's End(): that reads the state cleared below, and (Vulkan) the
+        // image handles and layouts the backend replaces.
+        std::lock_guard lock(detail::ResourceStateMutex());
 
         // The extent first, since a backend builds the new image from it.
         _extent = extent;

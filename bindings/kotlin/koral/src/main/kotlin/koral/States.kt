@@ -135,7 +135,8 @@ data class ColorBlendState(
 data class TessellationState(val controlShader: Shader, val evalShader: Shader, val patchControlPoints: Int = 3)
 
 /** kor::VertexInputBindingDescription. */
-data class VertexInputBindingDescription(val binding: Int, val stride: Int)
+/** [inputRate] eInstance: the buffer is stepped through an instance at a time — per-instance data. */
+data class VertexInputBindingDescription(val binding: Int, val stride: Int, val inputRate: VertexInputRate = VertexInputRate.eVertex)
 
 /**
  * kor::VertexLayout: how a mesh's buffers are laid out, attributes matched to a vertex shader's inputs by
@@ -156,8 +157,15 @@ data class VertexLayout(
         val channelType: ChannelType = ChannelType.eFloat,
         val channelCount: Int = 0,
         val location: Int? = null,
+        /** How many consecutive shader locations it fills: 4 for a mat4 (a column each), N for an array of N. */
+        val locations: Int = 1,
+        /** The bytes from one of its locations to the next; 0: packed. */
+        val locationStride: Int = 0,
     ) {
         companion object {
+            /** A matrix of [columns] columns of [rows] floats, a location a column: `Attribute.matrix("TRANSFORM", 1, 0)`. */
+            fun matrix(semantic: String, binding: Int, offset: Int, columns: Int = 4, rows: Int = 4) =
+                Attribute(semantic = semantic, binding = binding, offset = offset, channelType = ChannelType.eFloat, channelCount = rows, locations = columns)
             fun atLocation(location: Int, binding: Int, offset: Int, channelType: ChannelType, channelCount: Int) =
                 Attribute(location = location, binding = binding, offset = offset, channelType = channelType, channelCount = channelCount)
         }
@@ -169,19 +177,20 @@ data class VertexLayout(
         val b = a.allocate(KoralLayouts.KoralVertexBinding, maxOf(1, bindings.size).toLong())
         bindings.forEachIndexed { i, d ->
             Fields(b.asSlice(i * KoralLayouts.KoralVertexBinding.byteSize()), KoralLayouts.KoralVertexBinding)
-                .int("binding", d.binding).int("stride", d.stride)
+                .int("binding", d.binding).int("stride", d.stride).int("input_rate", d.inputRate.value)
         }
         val at = a.allocate(KoralLayouts.KoralVertexAttribute, maxOf(1, attributes.size).toLong())
         attributes.forEachIndexed { i, d ->
             Fields(at.asSlice(i * KoralLayouts.KoralVertexAttribute.byteSize()), KoralLayouts.KoralVertexAttribute)
                 .string(a, "semantic", d.semantic).string(a, "semantic_namespace", d.semanticNamespace)
                 .int("binding", d.binding).int("offset", d.offset).int("channel_type", d.channelType.value)
-                .int("channel_count", d.channelCount).int("location", d.location ?: -1)
+                .int("channel_count", d.channelCount).long("location", (d.location ?: -1).toLong())   // 64-bit: -1 written as 32 bits would read 4294967295
+                .int("locations", d.locations).int("location_stride", d.locationStride)
         }
         return Fields(a, KoralLayouts.KoralVertexLayout)
             .address("bindings", b).long("binding_count", bindings.size.toLong())
             .address("attributes", at).long("attribute_count", attributes.size.toLong())
-            .int("position_attribute", positionAttribute ?: -1).segment
+            .long("position_attribute", (positionAttribute ?: -1).toLong()).segment
     }
 }
 

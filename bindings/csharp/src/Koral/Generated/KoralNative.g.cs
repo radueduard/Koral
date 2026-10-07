@@ -90,6 +90,7 @@ internal unsafe struct KoralVertexBinding
 {
     public uint binding;
     public uint stride;
+    public uint input_rate;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -102,6 +103,8 @@ internal unsafe struct KoralVertexAttribute
     public uint channel_type;
     public uint channel_count;
     public long location;
+    public uint locations;
+    public uint location_stride;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -243,6 +246,8 @@ internal unsafe struct KoralAppSettings
     public int platform;
     public uint frames_in_flight;
     public IntPtr gpu;
+    public ulong required_features;
+    public ulong optional_features;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -607,6 +612,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_cmd_bind_ray_tracing_pipeline(IntPtr commands, IntPtr pipeline);
     [LibraryImport(Library)] internal static partial void koral_cmd_bind_descriptor_set(IntPtr commands, uint index, IntPtr set);
     [LibraryImport(Library)] internal static partial void koral_cmd_bind_mesh(IntPtr commands, IntPtr mesh);
+    [LibraryImport(Library)] internal static partial void koral_cmd_bind_vertex_buffer(IntPtr commands, uint binding, IntPtr buffer, ulong offset);
     [LibraryImport(Library)] internal static partial void koral_cmd_push_constant_block(IntPtr commands, void* data, uint bytes, uint offset);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_push_constant(IntPtr commands, string? name, void* data, uint bytes, KoralValueShape* shape);
     [LibraryImport(Library)] internal static partial void koral_cmd_barrier(IntPtr commands, KoralBufferBarrier* buffers, nuint buffer_count, KoralImageBarrier* images, nuint image_count);
@@ -842,6 +848,9 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial byte koral_context_has_device();
     [LibraryImport(Library)] internal static partial byte koral_context_supports_ray_tracing();
     [LibraryImport(Library)] internal static partial byte koral_context_supports_async_compute();
+    [LibraryImport(Library)] internal static partial byte koral_context_supports_feature(ulong feature);
+    [LibraryImport(Library)] internal static partial byte koral_context_gpu_has_feature(ulong feature);
+    [LibraryImport(Library)] internal static partial byte* koral_feature_name(ulong feature);
     [LibraryImport(Library)] internal static partial byte koral_context_async_compute_is_separate_family();
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial byte* koral_asset_path(string? relative);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial byte* koral_shader_path(string? relative);

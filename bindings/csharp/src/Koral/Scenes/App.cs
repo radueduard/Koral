@@ -52,6 +52,8 @@ public sealed unsafe class App : IDisposable, IResourceOwner
                 platform = (int)Settings.Platform,
                 frames_in_flight = Settings.FramesInFlight,
                 gpu = gpu,
+                required_features = (ulong)Settings.RequiredFeatures,
+                optional_features = (ulong)Settings.OptionalFeatures,
             };
             KoralNative.Check(KoralNative.koral_app_create(&native));
         }
@@ -421,6 +423,8 @@ public sealed unsafe class ProjectConfig : IDisposable
                 Platform = (WindowPlatform)s.platform,
                 FramesInFlight = s.frames_in_flight,
                 Gpu = s.gpu == IntPtr.Zero ? "" : KoralNative.Text((byte*)s.gpu),
+                RequiredFeatures = (Feature)s.required_features,
+                OptionalFeatures = (Feature)s.optional_features,
             };
         }
     }

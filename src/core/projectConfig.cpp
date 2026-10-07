@@ -50,6 +50,7 @@ namespace kor
             std::optional<bool> borderless;     // the inverse of our `decorated`
             std::optional<bool> transparent;
             std::optional<bool> vsync;
+            std::optional<std::vector<std::string>> formats;    // most wanted first: "BGRA8_SRGB", ...
         };
 
         struct RenderingDocument
@@ -72,6 +73,14 @@ namespace kor
             std::optional<std::string> shadersDir;
         };
 
+        // What of the GPU the project needs ("required") and uses where it is there ("optional"), by kor::Feature
+        // name: "AtomicFloat32", "ShaderInt64".
+        struct FeaturesDocument
+        {
+            std::optional<std::vector<std::string>> required;
+            std::optional<std::vector<std::string>> optional;
+        };
+
         struct ConfigDocument
         {
             std::optional<int> schemaVersion;
@@ -83,6 +92,7 @@ namespace kor
             // Top level rather than under "paths", because these are not paths: they are the
             // project's list of optional engine features, which happen to be resolved to files.
             std::optional<std::vector<std::string>> modules;
+            std::optional<FeaturesDocument> features;
         };
     }
 
@@ -114,6 +124,21 @@ namespace kor
                 return std::tolower(static_cast<unsigned char>(a)) == b;
             });
             return isOpenGl ? " (the OpenGL backend is only in Koral v1)" : "";
+        }
+
+        std::optional<Window::Format> parseFormat(std::string_view name)
+        {
+            if (name.starts_with('e') || name.starts_with('E')) name.remove_prefix(1);
+            const auto equalsIgnoringCase = [name](const std::string_view other) {
+                return std::ranges::equal(name, other, [](const char a, const char b) {
+                    return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+                });
+            };
+            if (equalsIgnoringCase("BGRA8_UNORM")) return Window::Format::eBGRA8_UNORM;
+            if (equalsIgnoringCase("BGRA8_SRGB"))  return Window::Format::eBGRA8_SRGB;
+            if (equalsIgnoringCase("RGBA8_UNORM")) return Window::Format::eRGBA8_UNORM;
+            if (equalsIgnoringCase("RGBA8_SRGB"))  return Window::Format::eRGBA8_SRGB;
+            return std::nullopt;
         }
 
         std::optional<WindowPlatform> parsePlatform(std::string_view name)
@@ -209,6 +234,17 @@ namespace kor
                     if (w.borderless)  config.decorated = !*w.borderless;
                     if (w.transparent) config.transparentFramebuffer = *w.transparent;
                     if (w.vsync)       config.vsync = *w.vsync;
+                    if (w.formats) {
+                        // Replaced wholesale, as the directory lists are: a list that could only grow could never drop one.
+                        std::vector<Window::Format> formats;
+                        for (const auto& name : *w.formats) {
+                            const auto parsed = parseFormat(name);
+                            if (!parsed)
+                                return invalid(std::format("'rendering.window.formats' has '{}'; expected 'BGRA8_UNORM', 'BGRA8_SRGB', 'RGBA8_UNORM' or 'RGBA8_SRGB'", name));
+                            formats.push_back(*parsed);
+                        }
+                        config.formats = std::move(formats);
+                    }
                 }
             }
 
@@ -238,6 +274,25 @@ namespace kor
             // Replaced wholesale, like the directory lists and for the same reason: a file that
             // could only add to the binary's list could never turn a module off.
             if (doc.modules) config.modules = *doc.modules;
+
+            // Replaced wholesale, as the lists above are.
+            if (doc.features) {
+                const auto parse = [&](const std::optional<std::vector<std::string>>& names, Flags<Feature>& into, const char* key) -> VoidResult {
+                    if (!names) return {};
+                    Flags<Feature> features;
+                    for (const auto& name : *names) {
+                        const Feature feature = FeatureNamed(name);
+                        if (feature == Feature::eNone)
+                            return invalid(std::format("'features.{}' has '{}', which is no feature; it knows {}", key, name,
+                                                       FeatureNames(Flags<Feature>(static_cast<Feature>(~0ull)))));
+                        features |= feature;
+                    }
+                    into = features;
+                    return {};
+                };
+                if (const auto r = parse(doc.features->required, config.requiredFeatures, "required"); !r) return r;
+                if (const auto o = parse(doc.features->optional, config.optionalFeatures, "optional"); !o) return o;
+            }
 
             return {};
         }

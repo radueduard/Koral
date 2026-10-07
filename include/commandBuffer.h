@@ -63,6 +63,15 @@ namespace kor
         std::vector<Token> signal;  ///< Signalled once the submitted work has finished.
     };
 
+    class CommandBuffer;
+    namespace detail
+    {
+        /** @brief Resolves and emits @p commandBuffer 's recording, if it has not been yet. With ResourceStateMutex held. */
+        KORAL_API void Finalize(CommandBuffer& commandBuffer);
+        /** @brief Checks @p commandBuffer goes to its queue after the work it was resolved against, and notes it has. */
+        KORAL_API void NoteSubmitted(CommandBuffer& commandBuffer);
+    }
+
     /**
      * @brief Records the work a frame submits to the GPU.
      *
@@ -366,15 +375,17 @@ namespace kor
         /**
          * @brief Closes recording and hands the finished sequence to the driver.
          *
-         * This is where the recorded commands are resolved — barriers worked out and inserted —
-         * and then emitted in order. Nothing has reached the GPU before this, and nothing is
-         * executed by it: Submit() does that.
+         * This is where the recorded commands are resolved — barriers worked out and inserted — and then
+         * emitted in order; errors they make are on the buffer from here (Ok(), Errors()), before anything is
+         * submitted. Nothing has reached the GPU yet: Submit() does that.
          *
-         * The barriers depend on where the previous command buffer left each resource, so
-         * command buffers that share resources must be ended in the order they will execute. The
-         * frame takes care of that for anything handed to Scheduler::Execute() — which is why
-         * those are handed over *without* calling End(). Calls from different threads are
-         * serialised.
+         * The barriers depend on where the command buffer resolved before it left each resource, so command
+         * buffers that share resources must be ended in the order they are submitted. On one thread that is
+         * the natural order. On several, call Submit() *without* End(): it ends and submits in one step, in turn
+         * with every other thread's, so the order work is resolved in is the order it reaches the queue. (A
+         * buffer submitted out of the order it was ended in, after one resolved against it, is reported by
+         * Submit().) The frame takes care of this for what is handed to Scheduler::Execute(), which is handed
+         * over without End().
          */
         void End();
 
@@ -382,7 +393,8 @@ namespace kor
         [[nodiscard]] bool IsRecording() const { return _recording; }
 
         /**
-         * @brief Submits the recorded work to its queue.
+         * @brief Submits the recorded work to its queue — ending it first, in the same step, if it is still
+         *        recording: how command buffers recorded on several threads are submitted. @see End
          * @return An empty result on success, or the first error recording produced.
          *
          * @param info Tokens to wait for before the work starts, and to signal once it is done.
@@ -394,6 +406,13 @@ namespace kor
 
         /** @brief Returns the buffer to its initial state, dropping everything recorded. */
         void Reset();
+
+        /// Resolves and emits what was recorded, once a recording: what Submit() and the frame do, under the lock
+        /// they submit under. @see End
+        friend void detail::Finalize(CommandBuffer& commandBuffer);
+        /// Checks it is submitted after what it was resolved against, and notes it submitted: what Submit and the
+        /// frame do, under the lock they submit under.
+        friend void detail::NoteSubmitted(CommandBuffer& commandBuffer);
 
         /**
          * @brief Blocks until the GPU has finished the work submitted from this buffer.
@@ -570,6 +589,21 @@ namespace kor
          * you and is usually what you want.
          */
         CommandBuffer& BindMesh(ResourceRef<const Mesh> mesh, std::source_location where = std::source_location::current());
+
+        /**
+         * @brief Binds @p buffer to vertex-buffer @p binding, from @p offset bytes into it — beside a mesh's own
+         *        bindings, or in place of one of them: per-instance data that changes while the mesh does not.
+         *
+         * @code
+         * cb.BindMesh(cube)
+         *   .BindVertexBuffer(1, transforms)          // binding 1 of the layout: VertexInputRate::eInstance
+         *   .DrawIndexed(kor::WholeSize, count);
+         * @endcode
+         *
+         * A mesh bound after it takes back the bindings it has; the others keep this buffer.
+         */
+        CommandBuffer& BindVertexBuffer(glm::u32 binding, ResourceRef<const Buffer> buffer, glm::u64 offset = 0,
+                                        std::source_location where = std::source_location::current());
 
         /**
          * @brief Uploads a small block of data straight into the bound pipeline's push constants.
@@ -1093,6 +1127,8 @@ namespace kor
             std::optional<kor::ResourceRef<const GraphicsPipeline>> boundGraphicsPipeline = std::nullopt;
             std::optional<kor::ResourceRef<const RayTracingPipeline>> boundRayTracingPipeline = std::nullopt;
             std::optional<kor::ResourceRef<const Mesh>> boundMesh = std::nullopt;
+            /// Vertex buffers bound by themselves (BindVertexBuffer), by binding: what a draw reads besides the mesh.
+            std::map<glm::u32, kor::ResourceRef<const Buffer>> boundVertexBuffers;
 
             std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundGraphicsDescriptorSets;
             std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundComputeDescriptorSets;
@@ -1268,6 +1304,12 @@ namespace kor
         std::vector<Record> _records;
         bool _emitting = false;  ///< True while End() is walking _records.
         bool _recording = false; ///< Between Begin() and End().
+        bool _finalized = false; ///< Resolved and emitted since the last Begin(): ready to submit, as often as asked.
+        /// Its place among resolutions, and what it took to be ahead of it for each resource it resolved: the
+        /// command buffer last resolved against it. Submit checks that one is the one last submitted.
+        struct Assumed { ResourceRef<const Image> image; ResourceRef<const Buffer> buffer; std::uint64_t ahead = 0; };
+        std::uint64_t _resolution = 0;
+        std::vector<Assumed> _assumed;
 
         // ---- Tracked-state updates ------------------------------------------------------------
         //
@@ -1292,8 +1334,10 @@ namespace kor
         void StateBindGraphicsPipeline(const ResourceRef<const GraphicsPipeline>& pipeline);
         /** @brief Records the bound ray-tracing pipeline. */
         void StateBindRayTracingPipeline(const ResourceRef<const RayTracingPipeline>& pipeline);
-        /** @brief Records the bound mesh. */
+        /** @brief Records the bound mesh: the bindings it has are its again. */
         void StateBindMesh(const ResourceRef<const Mesh>& mesh);
+        /** @brief Records a vertex buffer bound to one binding by itself. */
+        void StateBindVertexBuffer(glm::u32 binding, const ResourceRef<const Buffer>& buffer);
         /** @brief Records which descriptor set is bound at which index, for whichever pipeline type is bound. */
         void StateBindDescriptorSet(glm::u32 index, const ResourceRef<const DescriptorSet>& descriptorSet);
 
@@ -1360,6 +1404,7 @@ namespace kor
         virtual CommandBuffer& DoBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
         virtual CommandBuffer& DoBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
         virtual CommandBuffer& DoBindMesh(ResourceRef<const Mesh> mesh) = 0;
+        virtual CommandBuffer& DoBindVertexBuffer(glm::u32 binding, ResourceRef<const Buffer> buffer, glm::u64 offset) = 0;
         virtual CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;
         virtual CommandBuffer& DoDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
         virtual CommandBuffer& DoDrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;

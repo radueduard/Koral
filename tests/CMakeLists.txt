@@ -28,6 +28,7 @@ add_executable(koral_tests
         test_resource.cpp
         test_builder_recoverable.cpp
         test_project_config.cpp
+        test_device_features.cpp
         test_module.cpp
         test_token.cpp
         test_task.cpp
@@ -125,6 +126,8 @@ if(KORAL_BUILD_KOTLIN)
     if(Python3_Interpreter_FOUND)
         add_test(NAME Kotlin.InteropMatchesTheCInterface
                 COMMAND "${Python3_EXECUTABLE}" "${KORAL_KOTLIN_DIR}/tools/generate_kotlin.py" --check)
+        add_test(NAME Kotlin.IconsMatchTheSvgs
+                COMMAND "${Python3_EXECUTABLE}" "${KORAL_KOTLIN_DIR}/tools/generate_icons.py" --check)
     endif()
 endif()
 

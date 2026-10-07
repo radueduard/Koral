@@ -5,6 +5,7 @@
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #define VMA_IMPLEMENTATION
 #define VK_ENABLE_BETA_EXTENSIONS
+#include "../../core/featureState.h"
 #include "device.h"
 #include "log.h"
 #include "../../core/tokenState.h"
@@ -212,6 +213,91 @@ namespace kor::vk {
             .setShaderDrawParameters(require(supported11.shaderDrawParameters, "shaderDrawParameters"))
             .setPNext(&vk12Features);
 
+        // ---- the features a project asked for (kor::Feature): checked, and enabled where they are there ----
+        const auto core = physicalDevice->getFeatures();
+        const bool atomicFloatExtension = physicalDevice.supportsExtension(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+        const bool cooperativeMatrixExtension = physicalDevice.supportsExtension(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+        ::vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT supportedAtomicFloat;
+        ::vk::PhysicalDeviceCooperativeMatrixFeaturesKHR supportedCooperativeMatrix;
+        if (atomicFloatExtension || cooperativeMatrixExtension) {
+            ::vk::PhysicalDeviceFeatures2 query;
+            void* chain = nullptr;
+            if (atomicFloatExtension) { supportedAtomicFloat.pNext = chain; chain = &supportedAtomicFloat; }
+            if (cooperativeMatrixExtension) { supportedCooperativeMatrix.pNext = chain; chain = &supportedCooperativeMatrix; }
+            query.pNext = chain;
+            physicalDevice->getFeatures2(&query);
+        }
+        const bool rayTracing = physicalDevice.supportsExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
+            && physicalDevice.supportsExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)
+            && physicalDevice.supportsExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+        Flags<Feature> available;
+        const auto has = [&available](const bool present, const Feature feature) { if (present) available |= feature; };
+        has(core.shaderFloat64, Feature::eShaderFloat64);
+        has(core.shaderInt64, Feature::eShaderInt64);
+        has(core.shaderInt16, Feature::eShaderInt16);
+        has(supported12.shaderFloat16, Feature::eShaderFloat16);
+        has(supported12.shaderInt8, Feature::eShaderInt8);
+        has(supported11.storageBuffer16BitAccess && supported11.uniformAndStorageBuffer16BitAccess, Feature::eStorage16Bit);
+        has(supported12.storageBuffer8BitAccess && supported12.uniformAndStorageBuffer8BitAccess, Feature::eStorage8Bit);
+        has(supported12.shaderBufferInt64Atomics && supported12.shaderSharedInt64Atomics, Feature::eInt64Atomics);
+        has(atomicFloatExtension && supportedAtomicFloat.shaderBufferFloat32Atomics && supportedAtomicFloat.shaderBufferFloat32AtomicAdd,
+            Feature::eAtomicFloat32);
+        has(atomicFloatExtension && supportedAtomicFloat.shaderBufferFloat64Atomics && supportedAtomicFloat.shaderBufferFloat64AtomicAdd,
+            Feature::eAtomicFloat64);
+        has(core.fragmentStoresAndAtomics, Feature::eFragmentStoresAndAtomics);
+        has(core.vertexPipelineStoresAndAtomics, Feature::eVertexStoresAndAtomics);
+        has(supported12.shaderSubgroupExtendedTypes, Feature::eSubgroupExtendedTypes);
+        has(cooperativeMatrixExtension && supportedCooperativeMatrix.cooperativeMatrix, Feature::eCooperativeMatrix);
+        has(core.multiDrawIndirect, Feature::eMultiDrawIndirect);
+        has(supported12.drawIndirectCount, Feature::eDrawIndirectCount);
+        has(core.geometryShader, Feature::eGeometryShader);
+        has(core.tessellationShader, Feature::eTessellationShader);
+        has(core.fillModeNonSolid, Feature::eFillModeNonSolid);
+        has(core.wideLines, Feature::eWideLines);
+        has(core.samplerAnisotropy, Feature::eSamplerAnisotropy);
+        has(meshShaderSupported, Feature::eMeshShader);
+        has(rayTracing, Feature::eRayTracing);
+
+        // Required and missing: refused here, naming each and who wanted it, rather than by vkCreateDevice.
+        const auto wanted = detail::Wanted();
+        if (const std::string missing = detail::MissingRequired(available, wanted.requests); !missing.empty()) {
+            throw std::runtime_error(std::format("Device::Device : GPU '{}' lacks features the project requires: {}",
+                std::string(physicalDevice.getProperties().deviceName.data()), missing));
+        }
+        // Enabled: what was asked for and is there. The core ones are on wherever present anyway (below), and
+        // mesh shaders and ray tracing are enabled wherever present, asked for or not.
+        const Flags<Feature> enabled = ((wanted.required | wanted.optional) & available)
+            | (available & (Feature::eShaderFloat64 | Feature::eShaderInt64 | Feature::eShaderInt16 | Feature::eFragmentStoresAndAtomics
+                            | Feature::eVertexStoresAndAtomics | Feature::eMultiDrawIndirect | Feature::eGeometryShader
+                            | Feature::eTessellationShader | Feature::eFillModeNonSolid | Feature::eWideLines
+                            | Feature::eSamplerAnisotropy | Feature::eMeshShader | Feature::eRayTracing));
+        if (enabled & Feature::eShaderFloat16) vk12Features.setShaderFloat16(true);
+        if (enabled & Feature::eShaderInt8) vk12Features.setShaderInt8(true);
+        if (enabled & Feature::eStorage16Bit) vk11Features.setStorageBuffer16BitAccess(true).setUniformAndStorageBuffer16BitAccess(true);
+        if (enabled & Feature::eStorage8Bit) vk12Features.setStorageBuffer8BitAccess(true).setUniformAndStorageBuffer8BitAccess(true);
+        if (enabled & Feature::eInt64Atomics) vk12Features.setShaderBufferInt64Atomics(true).setShaderSharedInt64Atomics(true);
+        if (enabled & Feature::eSubgroupExtendedTypes) vk12Features.setShaderSubgroupExtendedTypes(true);
+        if (enabled & Feature::eDrawIndirectCount) vk12Features.setDrawIndirectCount(true);
+        auto atomicFloatFeatures = ::vk::PhysicalDeviceShaderAtomicFloatFeaturesEXT();
+        if (enabled & Feature::eAtomicFloat32)
+            atomicFloatFeatures.setShaderBufferFloat32Atomics(true).setShaderBufferFloat32AtomicAdd(true)
+                .setShaderSharedFloat32Atomics(supportedAtomicFloat.shaderSharedFloat32Atomics)
+                .setShaderSharedFloat32AtomicAdd(supportedAtomicFloat.shaderSharedFloat32AtomicAdd);
+        if (enabled & Feature::eAtomicFloat64)
+            atomicFloatFeatures.setShaderBufferFloat64Atomics(true).setShaderBufferFloat64AtomicAdd(true)
+                .setShaderSharedFloat64Atomics(supportedAtomicFloat.shaderSharedFloat64Atomics)
+                .setShaderSharedFloat64AtomicAdd(supportedAtomicFloat.shaderSharedFloat64AtomicAdd);
+        auto cooperativeMatrixFeatures = ::vk::PhysicalDeviceCooperativeMatrixFeaturesKHR().setCooperativeMatrix(true);
+        // Chained in front of the 1.3 struct's chain: only the extensions' own, and only with the extensions.
+        const auto chainIn = [&vk13Features](auto& features) {
+            features.pNext = const_cast<void*>(static_cast<const void*>(vk13Features.pNext));
+            vk13Features.pNext = &features;
+        };
+        if (enabled & (Feature::eAtomicFloat32 | Feature::eAtomicFloat64)) chainIn(atomicFloatFeatures);
+        if (enabled & Feature::eCooperativeMatrix) chainIn(cooperativeMatrixFeatures);
+        _enabledFeatures = enabled;
+        detail::SetDeviceFeatures(available, enabled);
+
         if (!missingFeatures.empty()) {
             std::string names;
             for (const auto& name : missingFeatures) {
@@ -240,6 +326,8 @@ namespace kor::vk {
             }
         }
         if (fifoLatestReady) deviceExtensions.push_back(fifoLatestReady);
+        if (_enabledFeatures & (Feature::eAtomicFloat32 | Feature::eAtomicFloat64)) deviceExtensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
+        if (_enabledFeatures & Feature::eCooperativeMatrix) deviceExtensions.push_back(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
 
         _supportsRayTracing = physicalDevice.supportsExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
             && physicalDevice.supportsExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)

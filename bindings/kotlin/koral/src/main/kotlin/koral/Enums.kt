@@ -620,6 +620,14 @@ enum class DynamicState(val value: Int) {
     }
 }
 
+/** kor::VertexInputRate: the same names and values, so a value crosses the C interface as itself. */
+enum class VertexInputRate(val value: Int) {
+    eVertex(0),
+    eInstance(1),
+    ;
+    companion object { fun of(value: Int): VertexInputRate = entries.first { it.value == value } }
+}
+
 /** kor::ErrorCode: the same names and values, so a value crosses the C interface as itself. */
 enum class ErrorCode(val value: Int) {
     eNone(0),
@@ -881,4 +889,38 @@ enum class ValueScalar(val value: Int) {
     eOther(5),
     ;
     companion object { fun of(value: Int): ValueScalar = entries.first { it.value == value } }
+}
+
+/** kor::Feature: the same names and values, so a value crosses the C interface as itself. */
+enum class Feature(val value: Int) {
+    eNone(0),
+    eShaderFloat64(1),
+    eShaderInt64(2),
+    eShaderInt16(4),
+    eShaderFloat16(8),
+    eShaderInt8(16),
+    eStorage16Bit(32),
+    eStorage8Bit(64),
+    eInt64Atomics(128),
+    eAtomicFloat32(256),
+    eAtomicFloat64(512),
+    eFragmentStoresAndAtomics(1024),
+    eVertexStoresAndAtomics(2048),
+    eSubgroupExtendedTypes(4096),
+    eCooperativeMatrix(8192),
+    eMultiDrawIndirect(16384),
+    eDrawIndirectCount(32768),
+    eGeometryShader(65536),
+    eTessellationShader(131072),
+    eFillModeNonSolid(262144),
+    eWideLines(524288),
+    eSamplerAnisotropy(1048576),
+    eMeshShader(2097152),
+    eRayTracing(4194304),
+    ;
+    companion object {
+        fun of(value: Int): Feature = entries.first { it.value == value }
+        /** The flags set in [bits]. */
+        fun flagsOf(bits: Int): Set<Feature> = entries.filterTo(mutableSetOf()) { it.value != 0 && bits and it.value == it.value }
+    }
 }

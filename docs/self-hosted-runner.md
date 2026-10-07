@@ -136,3 +136,17 @@ redirected out from under you.
 
 If it ever needs clearing (a corrupt archive, disk pressure), `rm -rf ~/.cache/vcpkg/archives` is
 safe — the next run is slow and then it is fast again.
+
+## The test workflow
+
+`.github/workflows/tests.yml` runs on the same two runners on every push to `master` and `v2-development`
+(docs-only pushes excepted), and on demand. It builds Debug with the tests and runs `ctest`: the unit tests, the
+GPU integration tests with the validation layers, the UI module's, and the C, C# and Kotlin bindings' where their
+toolchains are installed on the runner (.NET 10, JDK 25). Runs of one branch replace each other: the newest wins.
+
+The windowed tests need a display. A runner started from the desktop session has one. A runner installed as a
+service usually doesn't, and then the `VkWindowTest.*` tests are left out, with a warning on the run. Start the
+runner from a session (`./run.sh` in a terminal, or an autostart entry) to have them run too.
+
+Started by hand (Actions → Tests → Run workflow), it can also build on GitHub's hosted Windows runner and run the
+tests that need no GPU there. That is slow and billed, so it is off unless ticked.

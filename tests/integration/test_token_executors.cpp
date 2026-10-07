@@ -15,6 +15,7 @@
 #include "buffer.h"
 #include "commandBuffer.h"
 #include "context.h"
+#include "image.h"
 #include "log.h"
 #include "task.h"
 #include "token.h"
@@ -423,6 +424,99 @@ TEST_F(TokenExecutorTest, SeveralThreadsRecordAndSubmitAtOnce) {
         EXPECT_EQ(record.message.find("THREADING"), std::string::npos) << record.message;
         EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
     }
+}
+
+// One image recorded into by several threads at once, each submitting without End(): Submit ends and submits in
+// one step, in turn with the others, so every command buffer is resolved against the one that is ahead of it on
+// the queue — and every barrier is right, whichever thread gets there first.
+TEST_F(TokenExecutorTest, SeveralThreadsRecordIntoTheSameImage) {
+    constexpr int kThreads = 8;
+    constexpr int kRounds = 30;
+    const auto since = logMark();
+    auto image = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(glm::uvec2{64, 64})
+                     .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled).Build();
+    ASSERT_TRUE(static_cast<bool>(image));
+
+    std::atomic<bool> go{false};
+    std::atomic<int> failures{0};
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&, t] {
+            while (!go.load(std::memory_order_acquire)) std::this_thread::yield();
+            for (int round = 0; round < kRounds; ++round) {
+                auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+                cb->Begin();
+                cb->ClearColorImage(image, glm::vec4(static_cast<float>(t) / kThreads, 0.f, 0.f, 1.f));
+                // No End(): Submit ends it in the same step, in turn with the other threads, so it is resolved
+                // against the work ahead of it on the queue — whichever thread got there first.
+                const Token done = Token::Create();
+                if (!cb->Submit({.signal = {done}})) failures.fetch_add(1);
+                done.Wait();
+            }
+        });
+    }
+    go.store(true, std::memory_order_release);
+    for (auto& thread : threads) thread.join();
+
+    EXPECT_EQ(failures.load(), 0);
+    for (const auto& record : kor::log::HistorySince(since)) {
+        if (record.level != kor::log::Level::eError) continue;
+        EXPECT_EQ(record.message.find("THREADING"), std::string::npos) << record.message;
+        EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
+    }
+}
+
+// The trap the rule above exists for, sprung on purpose: two command buffers sharing an image, ended in one order and
+// submitted in the other. The second was resolved against the first, which is not ahead of it on the queue — Submit
+// says so rather than letting its barriers start from the wrong state in silence.
+TEST_F(TokenExecutorTest, SubmittingInAnotherOrderThanEndedIsReported) {
+    auto image = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(glm::uvec2{8, 8})
+                     .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled).Build();
+    auto first = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    auto second = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
+    first->Begin(); first->ClearColorImage(image); first->End();
+    second->Begin(); second->ClearColorImage(image); second->End();
+    ASSERT_TRUE(first->Ok() && second->Ok());
+
+    const auto out = second->Submit();
+    second->WaitForFence();
+    ASSERT_FALSE(out.has_value()) << "submitted ahead of the one it was resolved against";
+    EXPECT_EQ(out.error().code, kor::ErrorCode::eMissingBarrier);
+    EXPECT_NE(out.error().message.find("submitted in another order than they were ended in"), std::string::npos) << out.error().message;
+    (void)first->Submit();
+    first->WaitForFence();
+
+    // In order, nothing to say. (A fresh image: after a pair out of order the one above was last resolved by one
+    // and last run by the other, which the next command buffer to use it is told about too.)
+    auto fresh = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(glm::uvec2{8, 8})
+                     .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled).Build();
+    first->Begin(); first->ClearColorImage(fresh); first->End();
+    second->Begin(); second->ClearColorImage(fresh); second->End();
+    EXPECT_TRUE(first->Submit().has_value());
+    EXPECT_TRUE(second->Submit().has_value());
+    first->WaitForFence(); second->WaitForFence();
+}
+
+// A task parked on the background pool, cancelled from this thread: woken there at once — resumed by the pool, as a
+// signal would have resumed it — and stopped, so Wait() returns without the token ever happening.
+Task<void> WaitOnTheBackground(Token never, std::atomic<bool>& onBackground) {
+    co_await Context::SwitchToBackgroundThread();
+    onBackground = true;
+    co_await never;
+}
+
+TEST_F(TokenExecutorTest, CancellingATaskWaitingOnTheBackgroundWakesItThere) {
+    const Token never = Token::Create();
+    std::atomic<bool> onBackground{false};
+    auto task = WaitOnTheBackground(never, onBackground);
+    for (int i = 0; i < 2000 && !onBackground; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    ASSERT_TRUE(onBackground.load());
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));   // parked on the token by now
+    EXPECT_FALSE(task.Done());
+
+    task.Cancel();
+    task.Wait();
+    EXPECT_TRUE(task.IsCancelled());
 }
 
 }  // namespace

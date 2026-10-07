@@ -2,6 +2,7 @@
 // Created by radue on 2/28/2026.
 //
 
+#include "../../core/resourceState.h"
 #include "scheduler.h"
 #include "commandBuffer.h"
 #include "log.h"
@@ -232,10 +233,13 @@ namespace kor::vk
         items.push_back({ &commandBuffer, nullptr, &frameQueue });
         for (const auto& e : pending.after) items.push_back({ e.commandBuffer.get(), &e, queueOf(*e.commandBuffer) });
 
-        // Ended in exactly that order, because each End() resolves its barriers against where the one
-        // before it left every resource. Across queues that holds too: whatever runs on another queue
-        // is ordered against this one by the semaphore waits below, which the barriers chain onto.
-        for (const auto& item : items) item.commandBuffer->End();
+        // Resolved in exactly that order, because each resolves its barriers against where the one before it
+        // left every resource. Across queues that holds too: whatever runs on another queue is ordered against
+        // this one by the semaphore waits below, which the barriers chain onto. And under the lock every
+        // submission resolves under, held until the frame's batches are on their queues: so nothing submitted
+        // from another thread meanwhile is resolved after the frame and run before it. @see CommandBuffer::End
+        std::unique_lock resolving(detail::ResourceStateMutex());
+        for (const auto& item : items) detail::Finalize(*item.commandBuffer);
 
         // ---- split into submissions: a run of work on one queue, starting with what it waits for ------
         // Within a queue, submission order orders everything. Across queues only waits do: a
@@ -407,7 +411,9 @@ namespace kor::vk
         tokens.insert(tokens.end(), signalled.begin(), signalled.end());
         frame.hold(std::move(executed), std::move(tokens));
 
+        for (const auto& item : items) detail::NoteSubmitted(*item.commandBuffer);
         for (auto& batch : batches) batch.queue->Submit(batch.info);
+        resolving.unlock();
         for (const auto& token : signalled) TokenReactor::noteSubmittedSignal(token);
 
         // The frame is submitted and the GPU will hold it until its WaitFor() tokens arrive — but a

@@ -231,3 +231,82 @@ TEST(Token, ConcurrentSignalAndAwaitNeverLosesAWakeup) {
 }
 
 }  // namespace
+
+// ---- Cancellation ----------------------------------------------------------------------------------------
+//
+// Cooperative: a cancelled task throws kor::Cancelled at its next suspension point — at once when it is parked on a
+// token or on another task, which is asked to stop too. No executors here, so a task resumes inline wherever it
+// is woken: by the signal, or by Cancel() itself.
+
+namespace {
+Task<void> WaitForever(Token never, std::atomic<int>& tidied) {
+    try {
+        co_await never;
+    } catch (const Cancelled&) {
+        ++tidied;   // a catch may tidy up — and must rethrow for the task to count as cancelled
+        throw;
+    }
+}
+
+Task<int> WaitThenAnswer(Token token) {
+    co_await token;
+    co_return 42;
+}
+
+Task<int> AwaitChild(Task<int>& child) {
+    co_return co_await child;
+}
+
+Task<void> LongWork(std::atomic<int>& steps, Token begin) {
+    co_await begin;
+    for (int i = 0; i < 1000; ++i) {
+        ++steps;
+        co_await CancellationPoint{};
+    }
+}
+}
+
+TEST(Cancellation, ATaskWaitingOnATokenStopsAtOnce) {
+    const Token never = Token::Create();
+    std::atomic<int> tidied{0};
+    auto task = WaitForever(never, tidied);
+    EXPECT_FALSE(task.Done());
+
+    task.Cancel();
+    EXPECT_TRUE(task.Done()) << "woken from its wait, with no signal";
+    EXPECT_TRUE(task.IsCancelled());
+    EXPECT_EQ(tidied.load(), 1) << "its catch ran";
+    const auto taken = task.Take();
+    ASSERT_FALSE(taken.has_value());
+    EXPECT_EQ(taken.error(), "cancelled");
+    never.Signal();   // nothing is resumed twice
+}
+
+TEST(Cancellation, ATaskStopsAtItsNextCancellationPoint) {
+    const Token begin = Token::Create();
+    std::atomic<int> steps{0};
+    auto task = LongWork(steps, begin);
+    task.Cancel();    // while it waits to begin: woken, and stopped there
+    EXPECT_TRUE(task.IsCancelled());
+    EXPECT_EQ(steps.load(), 0);
+}
+
+TEST(Cancellation, CancellingATaskCancelsTheTaskItAwaits) {
+    const Token token = Token::Create();
+    auto child = WaitThenAnswer(token);
+    auto parent = AwaitChild(child);
+    EXPECT_FALSE(parent.Done());
+
+    parent.Cancel();
+    EXPECT_TRUE(child.Done() && child.IsCancelled()) << "asked to stop with it";
+    EXPECT_TRUE(parent.Done() && parent.IsCancelled());
+}
+
+TEST(Cancellation, AnUncancelledTaskIsUntouched) {
+    const Token token = Token::Create();
+    auto task = WaitThenAnswer(token);
+    token.Signal();
+    task.Cancel();    // finished already: nothing to do
+    EXPECT_FALSE(task.IsCancelled());
+    EXPECT_EQ(task.Take().value(), 42);
+}

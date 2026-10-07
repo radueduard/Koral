@@ -759,3 +759,17 @@ TEST_F(ProjectConfigFile, AConfigRootBeatsTheWorkingDirectory)
 
     std::filesystem::current_path(previous);
 }
+
+TEST(ProjectConfig, WindowFormatsAreAListMostWantedFirstAndAnUnknownOneIsRefused) {
+    ProjectConfig config;
+    EXPECT_TRUE(config.formats.empty()) << "none given: the window's own list";
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "window": { "formats": ["BGRA8_SRGB", "eRGBA8_unorm"] } } })", ".").has_value());
+    ASSERT_EQ(config.formats.size(), 2u);
+    EXPECT_EQ(config.formats[0], kor::Window::Format::eBGRA8_SRGB);
+    EXPECT_EQ(config.formats[1], kor::Window::Format::eRGBA8_UNORM) << "the enumerator's spelling, in any case";
+
+    const auto refused = config.Merge(R"({ "rendering": { "window": { "formats": ["R16G16"] } } })", ".");
+    ASSERT_FALSE(refused.has_value());
+    EXPECT_EQ(refused.error().code, ErrorCode::eConfigInvalid);
+    EXPECT_EQ(config.formats.size(), 2u) << "a document refused changes nothing";
+}

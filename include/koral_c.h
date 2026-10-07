@@ -309,12 +309,17 @@ typedef struct KoralColorBlendState {
 } KoralColorBlendState;
 
 /** kor::VertexLayout: its bindings, and attributes matched to shader inputs by semantic (or at a location, >= 0). */
-typedef struct KoralVertexBinding { uint32_t binding, stride; } KoralVertexBinding;
+typedef struct KoralVertexBinding {
+    uint32_t binding, stride;
+    uint32_t input_rate;               /* kor::VertexInputRate: 0 a vertex at a time, 1 an instance at a time */
+} KoralVertexBinding;
 typedef struct KoralVertexAttribute {
     const char* semantic;
     const char* semantic_namespace;
     uint32_t binding, offset, channel_type, channel_count;
     int64_t location;                  /* -1: matched by semantic */
+    uint32_t locations;                /* consecutive locations it fills: 4 for a mat4, N for an array of N; 0 is 1 */
+    uint32_t location_stride;          /* bytes from one of them to the next; 0: packed */
 } KoralVertexAttribute;
 typedef struct KoralVertexLayout {
     const KoralVertexBinding* bindings;
@@ -597,6 +602,8 @@ KORAL_API void koral_cmd_bind_graphics_pipeline(KoralCommandBuffer* commands, Ko
 KORAL_API void koral_cmd_bind_ray_tracing_pipeline(KoralCommandBuffer* commands, KoralRayTracingPipeline* pipeline);
 KORAL_API void koral_cmd_bind_descriptor_set(KoralCommandBuffer* commands, uint32_t index, KoralDescriptorSet* set);
 KORAL_API void koral_cmd_bind_mesh(KoralCommandBuffer* commands, KoralMesh* mesh);
+/** BindVertexBuffer: @p buffer feeds vertex binding @p binding from @p offset bytes in — per-instance data beside a mesh. */
+KORAL_API void koral_cmd_bind_vertex_buffer(KoralCommandBuffer* commands, uint32_t binding, KoralBuffer* buffer, uint64_t offset);
 KORAL_API void koral_cmd_push_constant_block(KoralCommandBuffer* commands, const void* data, uint32_t bytes, uint32_t offset);
 KORAL_API void koral_cmd_push_constant(KoralCommandBuffer* commands, const char* name, const void* data, uint32_t bytes,
                                         const KoralValueShape* shape);
@@ -744,6 +751,8 @@ typedef struct KoralAppSettings {
     KoralPlatform platform;
     uint32_t frames_in_flight;
     const char* gpu;
+    uint64_t required_features;       /* kor::Feature bits: the device must have them */
+    uint64_t optional_features;       /* kor::Feature bits: enabled where the GPU has them */
 } KoralAppSettings;
 typedef struct KoralWindowSettings {
     const char* title;
@@ -1046,6 +1055,12 @@ KORAL_API KoralRenderPass* koral_graph_add_debug_draw_pass(KoralFrameGraph* grap
 KORAL_API bool koral_context_has_device(void);
 KORAL_API bool koral_context_supports_ray_tracing(void);
 KORAL_API bool koral_context_supports_async_compute(void);
+/** Context::Supports: whether the device was made with @p feature (a kor::Feature bit) enabled. */
+KORAL_API bool koral_context_supports_feature(uint64_t feature);
+/** Context::GpuHas: whether the GPU has @p feature, enabled or not. */
+KORAL_API bool koral_context_gpu_has_feature(uint64_t feature);
+/** kor::FeatureName: "AtomicFloat32". The text lives as long as the library. */
+KORAL_API const char* koral_feature_name(uint64_t feature);
 KORAL_API bool koral_context_async_compute_is_separate_family(void);
 KORAL_API const char* koral_asset_path(const char* relative);
 KORAL_API const char* koral_shader_path(const char* relative);

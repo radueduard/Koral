@@ -6,6 +6,7 @@
 
 #include <coroutine>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -144,6 +145,11 @@ namespace kor {
         // resumes it. A no-op once it has been resumed.
         void Cancel(const std::shared_ptr<detail::WaiterSlot>& slot) const noexcept;
 
+        // The coroutine waiting in `slot` is to be resumed now, before the value is reached — a task cancelled
+        // while it waits. Claimed when the resume runs, as a signal's is, so a coroutine destroyed meanwhile is
+        // not resumed. A no-op once it has been resumed or cancelled.
+        void Interrupt(const std::shared_ptr<detail::WaiterSlot>& slot) const noexcept;
+
         std::shared_ptr<detail::TimelineState> _state;
         std::uint64_t _value = 0;
     };
@@ -164,6 +170,15 @@ namespace kor {
         bool await_ready() const noexcept { return token.Ready(); }
         bool await_suspend(const std::coroutine_handle<> h) { return token.Suspend(h, slot); }
         void await_resume() const noexcept {}
+
+        /**
+         * @brief What resumes the coroutine waiting in this awaiter now, before the token happens: for a task
+         *        cancelled while it waits. Taken right after await_suspend, while the frame cannot have gone.
+         */
+        [[nodiscard]] std::function<void()> Interrupter() const
+        {
+            return [token = token, slot = slot] { if (slot) token.Interrupt(slot); };
+        }
     };
 
     inline Token::Awaiter Token::operator co_await() const noexcept { return Awaiter{*this}; }

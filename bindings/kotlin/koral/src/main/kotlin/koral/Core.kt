@@ -81,6 +81,7 @@ internal class Fields(val segment: MemorySegment, private val layout: StructLayo
     /** Copies [value], a struct of the field's own layout, into it. */
     fun struct(field: String, value: MemorySegment) = apply { MemorySegment.copy(value, 0, segment, offset(field), value.byteSize()) }
     fun readInt(field: String, index: Int = 0): Int = segment.get(ValueLayout.JAVA_INT, offset(field) + index * 4L)
+    fun readLong(field: String): Long = segment.get(ValueLayout.JAVA_LONG, offset(field))
     fun readFloat(field: String, index: Int = 0): Float = segment.get(ValueLayout.JAVA_FLOAT, offset(field) + index * 4L)
     fun readBool(field: String): Boolean = segment.get(ValueLayout.JAVA_BOOLEAN, offset(field))
 }

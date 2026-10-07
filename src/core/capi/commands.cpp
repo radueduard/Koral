@@ -227,6 +227,10 @@ void koral_cmd_bind_graphics_pipeline(KoralCommandBuffer* c, KoralGraphicsPipeli
 void koral_cmd_bind_ray_tracing_pipeline(KoralCommandBuffer* c, KoralRayTracingPipeline* p) { Record(c, [&](auto& x) { x.BindRayTracingPipeline(RefOf<RayTracingPipeline>(p)); }); }
 void koral_cmd_bind_descriptor_set(KoralCommandBuffer* c, const uint32_t i, KoralDescriptorSet* s) { Record(c, [&](auto& x) { x.BindDescriptorSet(i, RefOf<DescriptorSet>(s)); }); }
 void koral_cmd_bind_mesh(KoralCommandBuffer* c, KoralMesh* m) { Record(c, [&](auto& x) { x.BindMesh(RefOf<Mesh>(m)); }); }
+void koral_cmd_bind_vertex_buffer(KoralCommandBuffer* c, const uint32_t binding, KoralBuffer* b, const uint64_t offset)
+{
+    Record(c, [&](auto& x) { x.BindVertexBuffer(binding, RefOf<Buffer>(b), offset); });
+}
 void koral_cmd_push_constant_block(KoralCommandBuffer* c, const void* data, const uint32_t bytes, const uint32_t offset)
 {
     Record(c, [&](CommandBuffer& x) { (x.*Access::RawPushConstantBlock())(data, bytes, offset); });

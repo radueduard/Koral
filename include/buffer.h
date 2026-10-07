@@ -1127,6 +1127,8 @@ namespace kor
 
         /** @brief Records the access the buffer has been synchronised for. Called by the barrier resolver. */
         void SetTrackedAccess(const ResourceAccess access) const { _trackedAccess = access; }
+        /** @brief Which command buffer was last resolved against it, and last submitted. For the command buffer. */
+        [[nodiscard]] detail::SubmitOrder& SubmitOrdering() const { return _submitOrder; }
 
         /** @brief Everything this buffer was created to be used for. */
         [[nodiscard]] Flags<Usage> UsageFlags() const { return _usage; }
@@ -1205,6 +1207,7 @@ namespace kor
 
     protected:
         mutable std::optional<ResourceAccess> _trackedAccess;
+        mutable detail::SubmitOrder _submitOrder;
 
         explicit Buffer(const RawBuilder& createInfo);
 

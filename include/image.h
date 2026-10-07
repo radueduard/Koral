@@ -583,6 +583,8 @@ namespace kor
 
         /** @brief Records the access a subresource has been synchronised for. Called by the barrier resolver. */
         void SetTrackedAccess(ResourceAccess access, glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+        /** @brief Which command buffer was last resolved against it, and last submitted. For the command buffer. */
+        [[nodiscard]] detail::SubmitOrder& SubmitOrdering() const { return _submitOrder; }
 
     protected:
         /**
@@ -614,6 +616,7 @@ namespace kor
                  | arrayLayer;
         }
         mutable std::unordered_map<glm::u64, ResourceAccess> _trackedAccess;
+        mutable detail::SubmitOrder _submitOrder;
 
         /// Whole-image views handed out by View(), one per shape asked for. Owned here so that
         /// everything binding this image shares one, and cleared by Resize, which invalidates them

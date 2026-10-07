@@ -11,6 +11,7 @@
 #include <string_view>
 #include <vector>
 
+#include "deviceFeatures.h"
 #include "task.h"
 #include "resource.h"
 
@@ -162,6 +163,15 @@ namespace kor {
          * any window/headless context exists.
          */
         static KORAL_API bool SupportsRayTracing();
+
+        /**
+         * @brief Whether the device was made with @p feature enabled: asked for (KORAL_REQUIRE_FEATURES,
+         *        KORAL_REQUEST_FEATURES, AppSettings, koral.json) and present on the GPU. What code that only
+         *        requested a feature checks before using it. False before the device exists.
+         */
+        [[nodiscard]] static KORAL_API bool Supports(Feature feature);
+        /** @brief Whether the GPU has @p feature, enabled or not. False before the device exists. */
+        [[nodiscard]] static KORAL_API bool GpuHas(Feature feature);
 
         /**
          * @brief Whether the device has a second queue for compute to run alongside the frame's

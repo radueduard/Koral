@@ -5,6 +5,7 @@
 #pragma once
 
 #include "token.h"
+#include "deviceFeatures.h"
 
 #include <map>
 #include <mutex>
@@ -168,5 +169,6 @@ namespace kor::vk {
         mutable std::vector<::vk::CommandPool> _commandPools {};                             // every pool ever made
         bool _supportsRayTracing = false;
         bool _supportsFifoLatestReady = false;
+        Flags<Feature> _enabledFeatures {};    ///< What of kor::Feature the device was made with.
     };
 }

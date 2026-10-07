@@ -155,6 +155,9 @@ namespace kor
         AppSettings settings;
         std::map<std::string, Registration, std::less<>> registry;
         std::vector<std::unique_ptr<Library>> libraries;
+        /// Loaded before the device was made (AppSettings::libraries), so the features they ask for were its: by
+        /// path, until LoadLibrary takes them.
+        std::vector<std::pair<std::filesystem::path, void*>> preloaded;
         std::vector<std::unique_ptr<Stage>> stages;
         std::vector<Request> requests;
         struct SharedEntry { std::weak_ptr<void> object; std::string type; };
@@ -420,6 +423,18 @@ namespace kor
         }
         g_app = this;
 
+        // What the application asks of the GPU, and what the libraries it names do — loaded now, so their
+        // KORAL_REQUIRE_FEATURES have run when the device is made from what was asked.
+        if (s.requiredFeatures || s.optionalFeatures)
+            detail::RegisterFeatures("AppSettings", s.requiredFeatures, s.optionalFeatures);
+        for (const auto& path : s.libraries) {
+            std::error_code ec;
+            const auto canonical = std::filesystem::weakly_canonical(path, ec);
+            std::string error;
+            if (void* handle = openLibrary(canonical, error)) _impl->preloaded.emplace_back(canonical, handle);
+            else log::Warn("[app] could not load '{}' before the device ({}); LoadLibrary will say why", path.string(), error);
+        }
+
         // The device comes up before any window: a scene's window is made against it.
         try {
             _impl->StartDevice();
@@ -504,10 +519,25 @@ namespace kor
             return std::unexpected(Error{.code = ErrorCode::eFileNotReadable, .message = std::format("'{}' does not exist", path.string())});
 
         std::string error;
-        void* handle = openLibrary(canonical, error);
+        void* handle = nullptr;
+        if (const auto preloaded = std::ranges::find(impl.preloaded, canonical, &std::pair<std::filesystem::path, void*>::first);
+            preloaded != impl.preloaded.end()) {
+            handle = preloaded->second;     // loaded before the device: its features are the device's
+            impl.preloaded.erase(preloaded);
+        } else {
+            handle = openLibrary(canonical, error);
+        }
         if (!handle)
             return std::unexpected(Error{.code = ErrorCode::eModuleLoadFailed,
                                          .message = std::format("could not load '{}': {}", path.string(), error)});
+        // Loaded after the device was made, asking for a feature it was made without: it cannot run here.
+        if (auto late = detail::TakeLateFeatureErrors(); !late.empty()) {
+            closeLibrary(handle);
+            std::string message;
+            for (const auto& line : late) message += (message.empty() ? "" : "\n") + line;
+            return std::unexpected(Error{.code = ErrorCode::eModuleLoadFailed,
+                                         .message = std::format("'{}' cannot run on this device: {}", path.string(), message)});
+        }
 
         auto library = std::make_unique<Impl::Library>(Impl::Library{.path = canonical, .handle = handle});
         Impl::Library* owner = library.get();

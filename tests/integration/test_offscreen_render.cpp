@@ -1665,3 +1665,62 @@ TEST_F(GpuTest, UniformUsageIsDeducedFromTheBuffersSize) {
 }
 
 } // namespace
+
+// A mat4 vertex input, fed an instance at a time: one quad drawn twice from one mesh, each copy squeezed into
+// half the target by a transform of its own and coloured by a colour of its own — both per-instance attributes,
+// bound beside the mesh with BindVertexBuffer. The matrix takes four locations, the colour the one after them.
+TEST_F(GpuTest, AMatrixVertexInputIsFedAnInstanceAtATime) {
+    auto colorImage = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM)
+                          .SetExtent(glm::uvec2{kW, kH}).SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc).Build();
+    auto colorView = ImageView::Builder(colorImage).Build();
+    auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} }).Build();
+
+    // The quad, a vertex at a time; the transforms and colours, an instance at a time.
+    struct Instance { glm::mat4 model; glm::vec4 color; };
+    const std::vector<glm::vec2> quad { {-1, -1}, {1, -1}, {1, 1}, {-1, -1}, {1, 1}, {-1, 1} };
+    const auto half = [](const float x) { return glm::mat4 { {0.5f, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {x, 0, 0, 1} }; };
+    const std::vector<Instance> instances { { half(-0.5f), {1, 0, 0, 1} }, { half(0.5f), {0, 0, 1, 1} } };
+    auto vertices = Buffer::Builder<glm::vec2>{}.SetData(quad).SetUsage(Buffer::Usage::eVertex | Buffer::Usage::eTransferDst).SetType(Buffer::Type::eDeviceLocal).Build();
+    auto perInstance = Buffer::Builder<Instance>{}.SetData(instances).SetUsage(Buffer::Usage::eVertex | Buffer::Usage::eTransferDst).SetType(Buffer::Type::eDeviceLocal).Build();
+
+    kor::VertexLayout meshLayout;
+    meshLayout.bindings.push_back({ .binding = 0, .stride = sizeof(glm::vec2) });
+    meshLayout.attributes.push_back(kor::VertexLayout::Attribute::AtLocation(0, 0, 0, kor::ChannelType::eFloat, 2));
+    auto mesh = kor::Mesh::Builder{}.SetVertexLayout(meshLayout).SetVertexBuffer(0, std::move(vertices)).Build();
+
+    kor::VertexLayout layout = meshLayout;
+    layout.bindings.push_back({ .binding = 1, .stride = sizeof(Instance), .inputRate = kor::VertexInputRate::eInstance });
+    auto model = kor::VertexLayout::Attribute::Matrix("", 1, offsetof(Instance, model));
+    model.location = 1;
+    layout.attributes.push_back(model);
+    layout.attributes.push_back(kor::VertexLayout::Attribute::AtLocation(5, 1, offsetof(Instance, color), kor::ChannelType::eFloat, 4));
+
+    const ResourceRef<const Shader> vert = Shader::Builder{}.SetLang<Shader::Lang::eGLSL>().SetStage(Shader::Stage::eVertex)
+        .SetPath(kor::ShaderPath("instancedMatrix.vert.glsl")).GetOrBuild("test.instancedMatrix.vert");
+    const ResourceRef<const Shader> frag = Shader::Builder{}.SetLang<Shader::Lang::eGLSL>().SetStage(Shader::Stage::eFragment)
+        .SetPath(kor::ShaderPath("instancedMatrix.frag.glsl")).GetOrBuild("test.instancedMatrix.frag");
+    ASSERT_TRUE(vert.Valid() && frag.Valid());
+    ASSERT_EQ(vert->BlockLayout().inputs.size(), 3u);
+    for (const auto& input : vert->BlockLayout().inputs)
+        if (input.name == "model") { EXPECT_EQ(input.locationSpan, 4u) << "a column a location"; EXPECT_EQ(input.channelCount, 4u); }
+
+    auto pipeline = GraphicsPipeline::Builder{}.SetVertexShader(vert, layout).SetFragmentShader(frag).SetFramebuffer(framebuffer).Build();
+    ASSERT_TRUE(pipeline.Valid()) << (pipeline.Failure() ? pipeline.Failure()->message : "");
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(framebuffer);
+        cb.BindGraphicsPipeline(pipeline);
+        cb.BindMesh(mesh).BindVertexBuffer(1, perInstance);
+        cb.Draw(6, 2);
+        cb.EndRendering();
+        EXPECT_TRUE(cb.Ok());
+    }, CommandBuffer::Usage::eGraphics).Wait();
+
+    auto readback = Buffer::RawBuilder{}.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+                        .SetUsage(Buffer::Usage::eTransferDst).SetType(Buffer::Type::eReadback).Build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.CopyImageToBuffer(colorImage, readback); }, CommandBuffer::Usage::eTransfer).Wait();
+    const std::vector<Pixel> out = readback->Read<Pixel>();
+    const auto at = [&](const std::uint32_t x, const std::uint32_t y) { return out[y * kW + x]; };
+    EXPECT_EQ(at(2, 8), Pixel(255, 0, 0, 255)) << "the first instance: the left half, red";
+    EXPECT_EQ(at(13, 8), Pixel(0, 0, 255, 255)) << "the second: the right half, blue";
+}

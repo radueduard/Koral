@@ -38,6 +38,17 @@ namespace kor
         glm::u32 framesInFlight = 2;
         /** A GPU to prefer by name (Vulkan only); empty lets the runtime pick. */
         std::string gpu {};
+        /**
+         * Features of the GPU the application cannot run without, and features it uses where they are there:
+         * the device is made with them. Libraries ask for theirs with KORAL_REQUIRE_FEATURES. @see Feature
+         */
+        Flags<Feature> requiredFeatures {};
+        Flags<Feature> optionalFeatures {};
+        /**
+         * Libraries to load before the device is made — what the runtime loads its project through — so that
+         * the features they ask for are the device's. LoadLibrary them later as usual; each is loaded once.
+         */
+        std::vector<std::filesystem::path> libraries {};
     };
 
     /** @brief What makes a scene: given the arguments it is opened with. */

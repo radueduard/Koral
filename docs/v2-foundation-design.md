@@ -308,3 +308,23 @@ and scene-interface cleanup landed here.
   (`Executor::Post`), so a resume already queued is skipped too. Cooperative cancellation
   (`Task::Cancel()`, `kor::Cancelled`) is not built.
 - **ImGui platform-window hazard** fixed by `vcpkg-overlay-ports/imgui`.
+
+## 11. Built after the plan (2026-10-07)
+
+- **Features (§4), explicitly.** `kor::Feature` (deviceFeatures.h) is the curated list: atomic floats, 64-bit
+  integers and atomics, 16- and 8-bit types and storage, subgroup types, cooperative matrices, indirect counts, and
+  the core features. A library asks with `KORAL_REQUIRE_FEATURES` / `KORAL_REQUEST_FEATURES` at namespace scope,
+  which registers when it is loaded; `AppSettings` and koral.json `features` ask too. The device is made from the
+  union, refuses a GPU lacking a required one by name and requester, and enables the rest where present;
+  `Context::Supports` / `GpuHas` answer. A library loaded after the device requiring something the device lacks
+  fails to load, saying so. Not the usage-driven registrar §4 sketches (registration by ODR-use of a gated API):
+  that depends on dead-code elimination and initialisation order behaving alike on three toolchains, and the
+  explicit macro gives the same guarantees.
+- **Cooperative cancellation.** `Task::Cancel()`, `kor::Cancelled`, `kor::CancellationPoint`: every `co_await` in a
+  task goes through its promise's `await_transform`, which throws once it is cancelled, and wakes it where it waits
+  — interrupting a token's waiter, or cancelling an awaited task. Destroying a task running on another thread is
+  still a caller error.
+- **Submission order.** Barriers resolve at `End()` against the command buffer ended before; `Submit()` without
+  `End()` ends and submits in one step under the resource-state lock, which is how several threads share
+  resources safely, and the frame resolves and submits its work under that lock too. Submitting out of the order
+  ended is reported per resource. `Image::Resize` takes the lock.

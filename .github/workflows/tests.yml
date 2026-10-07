@@ -1,0 +1,162 @@
+name: Tests
+
+# Every push to the development branches builds the framework with its tests and runs them — on the GPU, with the
+# validation layers on — on the two self-hosted machines it is developed on. The release workflow builds and packages;
+# this one is what says a commit works.
+#
+# The same runners as release.yml (see docs/self-hosted-runner.md): self-hosted because the GPU tests need a GPU and
+# vcpkg needs a warm cache. Safe for the same reason: the repository is private and this never runs on pull requests.
+on:
+  push:
+    branches: ['master', 'v2-development']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: 'Also build and run the GPU-free tests on a hosted Windows runner (slow and billed)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One run per branch at a time, the newest winning: three pushes in a row test the last of them.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false   # one platform failing must not hide the other's result
+      matrix:
+        include:
+          # Native on the box, not in release.yml's pinned container: the container is there to make a portable
+          # artifact, and a test run wants the machine's own GPU driver instead.
+          - name: linux-x64
+            runner: gfx-linux
+            triplet: x64-linux
+          - name: macos-arm64
+            runner: gfx-macos
+            triplet: arm64-osx
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MoltenVK (Homebrew)
+        if: runner.os == 'macOS'
+        run: brew install molten-vk
+
+      # The same cache local builds use (see release.yml for why `files` and why this path): a dependency built at
+      # the desk is never built again here.
+      - name: Point vcpkg at the binary cache local builds use
+        shell: bash
+        run: |
+          cache="$HOME/.cache/vcpkg/archives"
+          mkdir -p "$cache"
+          echo "VCPKG_BINARY_SOURCES=clear;files,$cache,readwrite" >> "$GITHUB_ENV"
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: b216ddff25a1f432870e6c340ce79357049ef86e   # in step with release.yml
+          vcpkgDirectory: ${{ runner.tool_cache }}/vcpkg
+
+      - name: Configure
+        shell: bash
+        run: |
+          launcher=()
+          if command -v ccache >/dev/null 2>&1; then
+            launcher=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+          fi
+          # Debug: the validation layers ship with it, and the tests read their verdicts.
+          cmake -S . -B build -G Ninja "${launcher[@]}" \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DKORAL_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j
+
+      # Everything ctest knows: the unit tests, the GPU integration tests, the UI module's, and the C, C# and Kotlin
+      # bindings' where their toolchains were found at configure time. The windowed tests need a display: on a
+      # runner with none (one running as a service) they are left out, and the run says so.
+      - name: Test
+        shell: bash
+        run: |
+          exclude=()
+          if [ "$(uname)" = "Linux" ] && [ -z "${DISPLAY}${WAYLAND_DISPLAY}" ]; then
+            echo "::warning::no display on this runner: the windowed tests (VkWindowTest.*, CApi.DrivesASceneFromC) are skipped"
+            exclude=(-E '^(VkWindowTest\.|CApi\.DrivesASceneFromC$)')
+          fi
+          ctest --test-dir build --output-on-failure --timeout 600 -j 8 "${exclude[@]}"
+
+      - name: Keep the test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-log-${{ matrix.name }}
+          path: build/Testing/Temporary/LastTest.log
+
+  # Windows has no self-hosted box and no GPU on the hosted runner: when asked for, it builds everything and runs the
+  # tests that need no device — what says the framework still compiles and behaves under MSVC.
+  windows:
+    name: windows-x64 (no GPU)
+    if: github.event_name == 'workflow_dispatch' && inputs.windows
+    runs-on: windows-2022
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the vcpkg binary cache
+        id: vcpkg-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: vcpkg-tests-windows-${{ hashFiles('vcpkg.json') }}-b216ddff25-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-tests-windows-${{ hashFiles('vcpkg.json') }}-b216ddff25-
+            vcpkg-windows-x64-
+
+      - name: Point vcpkg at the restored cache
+        shell: bash
+        run: |
+          mkdir -p "${RUNNER_TEMP}/vcpkg-cache"
+          echo "VCPKG_BINARY_SOURCES=clear;files,${RUNNER_TEMP}/vcpkg-cache,readwrite" >> "$GITHUB_ENV"
+
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: b216ddff25a1f432870e6c340ce79357049ef86e
+          vcpkgDirectory: ${{ runner.tool_cache }}/vcpkg
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" \
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DKORAL_BUILD_TESTS=ON -DKORAL_BUILD_WINDOW_TESTS=OFF
+
+      - name: Save the vcpkg binary cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/vcpkg-cache
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
+
+      - name: Build
+        run: cmake --build build --config Debug -j
+
+      # The unit tests: no device. (The GPU suites skip themselves without one, but a hosted runner's software
+      # Vulkan, where it has any, is not what they are written against.)
+      - name: Test
+        shell: bash
+        run: ctest --test-dir build -C Debug --output-on-failure --timeout 600 -R '^[A-Za-z]+\.' -E '^(Gpu|VkWindow|Token[A-Za-z]*Test|WidgetTest|DockTest|Dock[A-Za-z]*|IconSheet|Showcase)'

@@ -40,6 +40,19 @@ namespace kor
      */
     inline constexpr glm::u64 WholeSize = std::numeric_limits<glm::u64>::max();
 
+    namespace detail
+    {
+        /**
+         * @brief Which command buffer a resource was last resolved against, and which was last submitted: what
+         *        Submit compares to report command buffers submitted in another order than they were ended in.
+         *        Numbers count resolutions; 0 is none. Read and written with the resource-state lock held.
+         */
+        struct SubmitOrder {
+            std::uint64_t resolvedBy = 0;
+            std::uint64_t submittedBy = 0;
+        };
+    }
+
     enum class ChannelType : std::uint8_t {
         eFloat = 0,
         eInt = 1,
@@ -202,12 +215,20 @@ namespace kor
     /**
      * @brief Description of a vertex input binding. Used to define the format of vertex buffers in the graphics pipeline.
      */
+    /** @brief How a vertex buffer is stepped through: a vertex at a time, or an instance at a time. */
+    enum class VertexInputRate : std::uint8_t {
+        eVertex,    ///< Its next element for each vertex: positions, normals, UVs.
+        eInstance,  ///< Its next element for each instance, the same for every vertex of one: a transform, a colour.
+    };
+
     struct KORAL_API VertexInputBindingDescription
     {
         glm::u32 binding;   ///< The binding index of the vertex buffer. Must match the binding index specified in the vertex input attribute descriptions that reference this binding.
         glm::u32 stride;    ///< The byte stride between consecutive vertices in the vertex buffer. For example, if the vertex struct has
                             ///< a size of 32 bytes, the stride would be 32. It is recommended to use the sizeof operator on the vertex struct to calculate
                             ///< the stride, as this will ensure correct stride even if the struct is modified in the future.
+        /// A vertex at a time, or (eInstance) an instance at a time: per-instance data, such as each copy's transform.
+        VertexInputRate inputRate = VertexInputRate::eVertex;
     };
 
     /**

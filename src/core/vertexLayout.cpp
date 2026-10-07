@@ -44,6 +44,30 @@ namespace kor
 
         // The first location two attributes both claim, if any. Only the layout can produce one:
         // where the shader decides the locations they are distinct by construction.
+        glm::u32 channelBytes(const ChannelType type)
+        {
+            switch (type) {
+            case ChannelType::eDouble: return 8;
+            case ChannelType::eFloat: case ChannelType::eInt: case ChannelType::eUInt: return 4;
+            case ChannelType::eShort: case ChannelType::eUShort: return 2;
+            default: return 1;
+            }
+        }
+
+        // An attribute as the descriptions of each location it fills, from @p location on.
+        void describe(std::vector<VertexInputAttributeDescription>& out, const glm::u32 location, const VertexLayout::Attribute& attribute)
+        {
+            for (glm::u32 i = 0; i < std::max(attribute.locations, 1u); ++i) {
+                out.push_back(VertexInputAttributeDescription{
+                    .location     = location + i,
+                    .binding      = attribute.binding,
+                    .channelCount = attribute.channelCount,
+                    .channelType  = attribute.channelType,
+                    .offset       = attribute.offset + i * attribute.Stride(),
+                });
+            }
+        }
+
         std::optional<glm::u32> duplicateLocation(const std::vector<VertexInputAttributeDescription>& resolved)
         {
             for (std::size_t i = 0; i < resolved.size(); ++i) {
@@ -53,6 +77,11 @@ namespace kor
             }
             return std::nullopt;
         }
+    }
+
+    glm::u32 VertexLayout::Attribute::Stride() const
+    {
+        return locationStride != 0 ? locationStride : channelCount * channelBytes(channelType);
     }
 
     std::optional<VertexInputAttributeDescription> VertexLayout::Position() const
@@ -83,6 +112,7 @@ namespace kor
         for (const auto& input : vertexShader.BlockLayout().inputs) {
             inputs.push_back(ShaderInput{
                 .location          = input.startingLocation,
+                .locationSpan      = input.locationSpan,
                 .name              = input.name,
                 .semanticNamespace = input.semanticNamespace,
                 .semantic          = input.semantic,
@@ -106,15 +136,12 @@ namespace kor
         // reads it or not — an unread one is simply not fetched.
         if (!annotated) {
             resolved.reserve(attributes.size());
-            for (std::size_t i = 0; i < attributes.size(); ++i) {
-                const auto& attribute = attributes[i];
-                resolved.push_back(VertexInputAttributeDescription{
-                    .location     = attribute.location.value_or(static_cast<glm::u32>(i)),
-                    .binding      = attribute.binding,
-                    .channelCount = attribute.channelCount,
-                    .channelType  = attribute.channelType,
-                    .offset       = attribute.offset,
-                });
+            // One that names no location takes its place in the list — counting a matrix before it as
+            // the columns it fills, whatever locations the ones before it named.
+            glm::u32 place = 0;
+            for (const auto& attribute : attributes) {
+                describe(resolved, attribute.location.value_or(place), attribute);
+                place += std::max(attribute.locations, 1u);
             }
 
             // Two attributes at one location is a shader reading one of them and never the other.
@@ -189,13 +216,15 @@ namespace kor
                 }
             }
 
-            resolved.push_back(VertexInputAttributeDescription{
-                .location     = input.location,
-                .binding      = match->binding,
-                .channelCount = match->channelCount,
-                .channelType  = match->channelType,
-                .offset       = match->offset,
-            });
+            // A matrix, an array: as many locations on both sides, or the shader reads past what is fed.
+            if (std::max(match->locations, 1u) != std::max(input.locationSpan, 1u)) {
+                return Fail(ErrorCode::eVertexLayoutMismatch,
+                    "Vertex input '{}' takes {} location(s) (a matrix takes one a column, an array one an element), "
+                    "but the attribute that answers it fills {}. Give the attribute `locations = {}`, or "
+                    "VertexLayout::Attribute::Matrix for a matrix.",
+                    input.name, input.locationSpan, match->locations, input.locationSpan);
+            }
+            describe(resolved, input.location, *match);
         }
 
         return resolved;

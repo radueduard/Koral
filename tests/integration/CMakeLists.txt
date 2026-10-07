@@ -3,6 +3,7 @@ add_executable(koral_integration_tests
         gpu_fixture.cpp
         test_buffer_roundtrip.cpp
         test_compute_dispatch.cpp
+        test_device_features.cpp
         test_gpu_timers.cpp
         test_token_executors.cpp
         test_parallel.cpp

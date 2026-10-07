@@ -36,7 +36,7 @@ ENUMS = [
 ] + [("structs.h", None, name, None, None) for name in [
     "ChannelType", "ResourceAccess", "ImageShape", "DescriptorType", "Topology", "PolygonMode", "CullMode", "FrontFace",
     "SampleCount", "CompareOp", "StencilOp", "BlendFactor", "LogicOp", "BlendOp", "ColorComponent", "ResolveMode",
-    "Filter", "LoadOperation", "StoreOperation", "StencilFace", "DynamicState",
+    "Filter", "LoadOperation", "StoreOperation", "StencilFace", "DynamicState", "VertexInputRate",
 ]] + [
     ("error.h", None, "ErrorCode", None, None),
     ("input.h", None, "Key", None, None),
@@ -48,6 +48,7 @@ ENUMS = [
     ("context.h", None, "API", None, None),
     ("context.h", None, "WindowPlatform", None, None),
     ("shaderValue.h", None, "ValueScalar", None, None),
+    ("deviceFeatures.h", None, "Feature", None, None),
 ]
 
 UI_ENUMS = [
@@ -71,7 +72,7 @@ TARGETS = [
      "ns": "Koral.UI", "cpp": "kui"},
 ]
 
-TYPES = {"std::uint8_t": "byte", "std::uint16_t": "ushort", "std::uint32_t": "uint", "std::int32_t": "int", None: "int"}
+TYPES = {"std::uint64_t": "ulong", "std::uint8_t": "byte", "std::uint16_t": "ushort", "std::uint32_t": "uint", "std::int32_t": "int", None: "int"}
 
 
 def strip_comments(text):

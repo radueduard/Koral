@@ -139,7 +139,8 @@ public sealed record ColorBlendState
 public sealed record TessellationState(Shader ControlShader, Shader EvalShader, uint PatchControlPoints = 3);
 
 /// <summary>kor::VertexInputBindingDescription.</summary>
-public record struct VertexInputBindingDescription(uint Binding, uint Stride);
+/// <remarks>InputRate eInstance: the buffer is stepped through an instance at a time — per-instance data.</remarks>
+public record struct VertexInputBindingDescription(uint Binding, uint Stride, VertexInputRate InputRate = VertexInputRate.eVertex);
 
 /// <summary>
 /// kor::VertexLayout: how a mesh's buffers are laid out, attributes matched to a vertex shader's inputs by
@@ -157,6 +158,14 @@ public sealed class VertexLayout
         public ChannelType ChannelType { get; init; } = ChannelType.eFloat;
         public uint ChannelCount { get; init; }
         public uint? Location { get; init; }
+        /// <summary>How many consecutive shader locations it fills: 4 for a mat4 (a column each), N for an array of N.</summary>
+        public uint Locations { get; init; } = 1;
+        /// <summary>The bytes from one of its locations to the next; 0: packed.</summary>
+        public uint LocationStride { get; init; }
+
+        /// <summary>A matrix of <paramref name="columns"/> columns of <paramref name="rows"/> floats, a location a column.</summary>
+        public static Attribute Matrix(string semantic, uint binding, uint offset, uint columns = 4, uint rows = 4) =>
+            new() { Semantic = semantic, Binding = binding, Offset = offset, ChannelType = ChannelType.eFloat, ChannelCount = rows, Locations = columns };
 
         public static Attribute AtLocation(uint location, uint binding, uint offset, ChannelType channelType, uint channelCount) =>
             new() { Location = location, Binding = binding, Offset = offset, ChannelType = channelType, ChannelCount = channelCount };
@@ -173,7 +182,7 @@ public sealed class VertexLayout
     internal unsafe void WithNative(Action<IntPtr> use)
     {
         var bindings = new KoralVertexBinding[Bindings.Count];
-        for (var i = 0; i < bindings.Length; ++i) bindings[i] = new KoralVertexBinding { binding = Bindings[i].Binding, stride = Bindings[i].Stride };
+        for (var i = 0; i < bindings.Length; ++i) bindings[i] = new KoralVertexBinding { binding = Bindings[i].Binding, stride = Bindings[i].Stride, input_rate = (uint)Bindings[i].InputRate };
         var attributes = new KoralVertexAttribute[Attributes.Count];
         try
         {
@@ -189,6 +198,8 @@ public sealed class VertexLayout
                     channel_type = (uint)a.ChannelType,
                     channel_count = a.ChannelCount,
                     location = a.Location is { } l ? l : -1,
+                    locations = a.Locations,
+                    location_stride = a.LocationStride,
                 };
             }
             fixed (KoralVertexBinding* b = bindings)

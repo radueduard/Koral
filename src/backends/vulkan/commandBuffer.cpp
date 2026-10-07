@@ -477,6 +477,14 @@ namespace kor::vk
         return *this;
     }
 
+    kor::CommandBuffer& CommandBuffer::DoBindVertexBuffer(const glm::u32 binding, kor::ResourceRef<const kor::Buffer> buffer, const glm::u64 offset)
+    {
+        StateBindVertexBuffer(binding, buffer);
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*buffer);
+        _handle.bindVertexBuffers(binding, *vkBuffer, offset);
+        return *this;
+    }
+
     kor::CommandBuffer & CommandBuffer::DoBarrier(
         const std::vector<kor::BufferBarrier> bufferBarriers,
         const std::vector<kor::ImageBarrier> imageBarriers) {

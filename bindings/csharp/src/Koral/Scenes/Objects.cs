@@ -412,6 +412,10 @@ public sealed record AppSettings
     public uint FramesInFlight { get; init; } = 2;
     /// <summary>A GPU to prefer by name; empty lets Koral choose.</summary>
     public string Gpu { get; init; } = "";
+    /// <summary>Features of the GPU it cannot run without: the device is made with them, or refused naming them.</summary>
+    public Feature RequiredFeatures { get; init; }
+    /// <summary>Features it uses where the GPU has them: Context.Supports says which.</summary>
+    public Feature OptionalFeatures { get; init; }
 }
 
 /// <summary>kor::WindowSettings.</summary>
@@ -498,6 +502,10 @@ public static class Context
     public static bool SupportsRayTracing => KoralNative.koral_context_supports_ray_tracing().AsBool();
     public static bool SupportsAsyncCompute => KoralNative.koral_context_supports_async_compute().AsBool();
     public static bool AsyncComputeIsSeparateFamily => KoralNative.koral_context_async_compute_is_separate_family().AsBool();
+    /// <summary>Whether the device was made with <paramref name="feature"/> enabled: asked for, and the GPU has it.</summary>
+    public static bool Supports(Feature feature) => KoralNative.koral_context_supports_feature((ulong)feature).AsBool();
+    /// <summary>Whether the GPU has <paramref name="feature"/>, enabled or not.</summary>
+    public static bool GpuHas(Feature feature) => KoralNative.koral_context_gpu_has_feature((ulong)feature).AsBool();
 }
 
 /// <summary>kor::AssetPath, kor::ShaderPath and kor::AddAssetSearchPath: where a project's files are found.</summary>
