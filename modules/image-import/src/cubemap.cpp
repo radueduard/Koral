@@ -32,7 +32,7 @@ namespace kimg
 {
     namespace
     {
-        constexpr glm::u32 kFaceCount = 6;
+        constexpr kor::u32 kFaceCount = 6;
 
         kor::Resource<kor::Image> failure(std::string what)
         {
@@ -43,7 +43,7 @@ namespace kimg
         }
 
         /** @brief Creates the six-layer image the faces are uploaded into. */
-        kor::Resource<kor::Image> makeCubeImage(const glm::uvec2 faceExtent, const kor::Image::Format format,
+        kor::Resource<kor::Image> makeCubeImage(const kor::UVec2 faceExtent, const kor::Image::Format format,
                                                 const bool generateMipmaps, const bool storage)
         {
             // Six 2D layers is what makes an image cube-compatible; the engine sets the Vulkan
@@ -68,7 +68,7 @@ namespace kimg
 
         /** @brief Uploads one decoded face into its layer. */
         void uploadFace(const kor::ResourceRef<const kor::Image>& cube, const CpuImage& face,
-                        const glm::u32 layer)
+                        const kor::u32 layer)
         {
             detail::uploadSlice(cube, face.pixels, { face.extent.x, face.extent.y, 1 }, layer, 0);
         }
@@ -83,7 +83,7 @@ namespace kimg
         std::optional<std::string> facesDisagree(const std::array<CpuImage, kFaceCount>& faces,
                                                  const std::array<std::filesystem::path, kFaceCount>& paths)
         {
-            for (glm::u32 face = 1; face < kFaceCount; ++face) {
+            for (kor::u32 face = 1; face < kFaceCount; ++face) {
                 if (faces[face].extent != faces[0].extent) {
                     return std::format("cubemap face '{}' is {}x{} but '{}' is {}x{}; every face must match",
                                        paths[face].string(), faces[face].extent.x, faces[face].extent.y,
@@ -107,10 +107,10 @@ namespace kimg
     {
         std::array<std::filesystem::path, kFaceCount> paths{};
         const auto named = faces.InLayerOrder();
-        for (glm::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::AssetPath(named[face]);
+        for (kor::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::AssetPath(named[face]);
 
         std::array<CpuImage, kFaceCount> decoded{};
-        for (glm::u32 face = 0; face < kFaceCount; ++face) {
+        for (kor::u32 face = 0; face < kFaceCount; ++face) {
             auto result = detail::decodeFile(paths[face]);
             if (!result) return failure(std::string(result.error().message));
             decoded[face] = std::move(*result);
@@ -120,7 +120,7 @@ namespace kimg
 
         auto cube = makeCubeImage({ decoded[0].extent.x, decoded[0].extent.y },
                                   decoded[0].format, generateMipmaps, false);
-        for (glm::u32 face = 0; face < kFaceCount; ++face) uploadFace(cube, decoded[face], face);
+        for (kor::u32 face = 0; face < kFaceCount; ++face) uploadFace(cube, decoded[face], face);
         detail::finishUpload(cube, generateMipmaps);
         return cube;
     }
@@ -131,12 +131,12 @@ namespace kimg
         // roots are read-mostly global state the main thread owns.
         std::array<std::filesystem::path, kFaceCount> paths{};
         const auto named = faces.InLayerOrder();
-        for (glm::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::AssetPath(named[face]);
+        for (kor::u32 face = 0; face < kFaceCount; ++face) paths[face] = kor::AssetPath(named[face]);
 
         co_await kor::Context::SwitchToBackgroundThread();
 
         std::array<CpuImage, kFaceCount> decoded{};
-        for (glm::u32 face = 0; face < kFaceCount; ++face) {
+        for (kor::u32 face = 0; face < kFaceCount; ++face) {
             auto result = detail::decodeFile(paths[face]);
             if (!result) {
                 auto message = std::string(result.error().message);
@@ -157,7 +157,7 @@ namespace kimg
         kor::ResourceRef cubeRef = cube;
 
         // One face per short main-thread visit, so a frame can be drawn between them.
-        for (glm::u32 face = 0; face < kFaceCount; ++face) {
+        for (kor::u32 face = 0; face < kFaceCount; ++face) {
             uploadFace(cubeRef, decoded[face], face);
             co_await kor::Context::SwitchToBackgroundThread();
             co_await kor::Context::SwitchToMainThread();
@@ -233,7 +233,7 @@ namespace kimg
     }
 
     kor::Resource<kor::Image> EquirectangularToCubemap(kor::ResourceRef<const kor::Image> equirect,
-                                                       glm::u32 faceSize, const bool generateMipmaps)
+                                                       kor::u32 faceSize, const bool generateMipmaps)
     {
         if (!equirect) {
             return failure("cannot project an equirectangular image that could not be loaded");
@@ -273,8 +273,8 @@ namespace kimg
                                        set.Failure() ? set.Failure()->message : "unknown reason"));
         }
 
-        constexpr glm::u32 kLocalSize = 8;   // matches [numthreads(8, 8, 1)] in equirectToCube.slang
-        const glm::u32 groups = (faceSize + kLocalSize - 1) / kLocalSize;
+        constexpr kor::u32 kLocalSize = 8;   // matches [numthreads(8, 8, 1)] in equirectToCube.slang
+        const kor::u32 groups = (faceSize + kLocalSize - 1) / kLocalSize;
 
         (void)kor::CommandBuffer::Upload([&](kor::CommandBuffer& commandBuffer) {
             commandBuffer.BindComputePipeline(pipeline);
@@ -287,7 +287,7 @@ namespace kimg
     }
 
     kor::Resource<kor::Image> LoadCubemapFromEquirectangular(const std::filesystem::path& relativePath,
-                                                             const glm::u32 faceSize, const bool generateMipmaps)
+                                                             const kor::u32 faceSize, const bool generateMipmaps)
     {
         auto panorama = LoadImage(relativePath);
         if (!panorama) return panorama;   // already poisoned, and already says why
@@ -296,7 +296,7 @@ namespace kimg
     }
 
     kor::Task<kor::Resource<kor::Image>> LoadCubemapFromEquirectangularAsync(std::filesystem::path relativePath,
-                                                                            const glm::u32 faceSize,
+                                                                            const kor::u32 faceSize,
                                                                             const bool generateMipmaps)
     {
         // The file half is what there is to overlap — decoding a 8192x4096 panorama is most of the

@@ -43,10 +43,10 @@ constexpr std::uint32_t kFaceCount = 6;
 
 // The direction the centre of each face looks along, in the order the layers are stored:
 // +X, -X, +Y, -Y, +Z, -Z.
-constexpr std::array<glm::vec3, kFaceCount> kFaceDirections{
-    glm::vec3{ 1.f, 0.f, 0.f }, glm::vec3{ -1.f, 0.f, 0.f },
-    glm::vec3{ 0.f, 1.f, 0.f }, glm::vec3{ 0.f, -1.f, 0.f },
-    glm::vec3{ 0.f, 0.f, 1.f }, glm::vec3{ 0.f, 0.f, -1.f },
+constexpr std::array<kor::Vec3, kFaceCount> kFaceDirections{
+    kor::Vec3{ 1.f, 0.f, 0.f }, kor::Vec3{ -1.f, 0.f, 0.f },
+    kor::Vec3{ 0.f, 1.f, 0.f }, kor::Vec3{ 0.f, -1.f, 0.f },
+    kor::Vec3{ 0.f, 0.f, 1.f }, kor::Vec3{ 0.f, 0.f, -1.f },
 };
 
 std::filesystem::path tempDir() {
@@ -71,11 +71,11 @@ T runToCompletion(kor::Task<T> task) {
 }
 
 /** @brief An 8x8 image of one colour, on the GPU, ready to be saved or read. */
-kor::Resource<Image> solidImage(const glm::vec4 color, const std::uint32_t size = 8) {
+kor::Resource<Image> solidImage(const kor::Vec4 color, const std::uint32_t size = 8) {
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{ size, size })
+        .SetExtent(kor::UVec2{ size, size })
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
         .Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -85,12 +85,12 @@ kor::Resource<Image> solidImage(const glm::vec4 color, const std::uint32_t size 
 }
 
 /** @brief Reads one mip-0 layer of an image back as floats, whatever it is stored as. */
-std::vector<glm::vec4> readLayerAsFloat(const ResourceRef<const Image>& image, const std::uint32_t layer) {
+std::vector<kor::Vec4> readLayerAsFloat(const ResourceRef<const Image>& image, const std::uint32_t layer) {
     const auto extent = image->Extent();
     const auto texels = static_cast<std::size_t>(extent.x) * extent.y;
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(texels * sizeof(glm::vec4)))
+    rb.SetRawSize(static_cast<kor::i64>(texels * sizeof(kor::Vec4)))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -105,16 +105,16 @@ std::vector<glm::vec4> readLayerAsFloat(const ResourceRef<const Image>& image, c
         });
     }, CommandBuffer::Usage::eTransfer).Wait();
 
-    return readback->Read<glm::vec4>();
+    return readback->Read<kor::Vec4>();
 }
 
 /** @brief Reads one mip-0 layer of an 8-bit image back. */
-std::vector<glm::u8vec4> readLayerAsBytes(const ResourceRef<const Image>& image, const std::uint32_t layer) {
+std::vector<kor::U8Vec4> readLayerAsBytes(const ResourceRef<const Image>& image, const std::uint32_t layer) {
     const auto extent = image->Extent();
     const auto texels = static_cast<std::size_t>(extent.x) * extent.y;
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(texels * sizeof(glm::u8vec4)))
+    rb.SetRawSize(static_cast<kor::i64>(texels * sizeof(kor::U8Vec4)))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -129,7 +129,7 @@ std::vector<glm::u8vec4> readLayerAsBytes(const ResourceRef<const Image>& image,
         });
     }, CommandBuffer::Usage::eTransfer).Wait();
 
-    return readback->Read<glm::u8vec4>();
+    return readback->Read<kor::U8Vec4>();
 }
 
 // ---- files ------------------------------------------------------------------------------------
@@ -141,7 +141,7 @@ TEST_F(GpuTest, ImageModuleLoadsFromDisk) {
 
     auto image = kimg::LoadImage(path);
     ASSERT_TRUE(static_cast<bool>(image));
-    const glm::uvec3 extent = image->Extent();
+    const kor::UVec3 extent = image->Extent();
     EXPECT_GT(extent.x, 0u);
     EXPECT_GT(extent.y, 0u);
 
@@ -188,14 +188,14 @@ TEST_F(GpuTest, ImageModuleSaveRoundTrips) {
 
     auto reloaded = kimg::LoadImage(outPath);
     ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(kSize, kSize, 1));
 
     const auto texels = readLayerAsBytes(reloaded, 0);
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSize) * kSize);
     for (const auto& t : texels) {
-        EXPECT_NEAR(t.r, 64, 2);
-        EXPECT_NEAR(t.g, 128, 2);
-        EXPECT_NEAR(t.b, 191, 2);
+        EXPECT_NEAR(t.x, 64, 2);
+        EXPECT_NEAR(t.y, 128, 2);
+        EXPECT_NEAR(t.z, 191, 2);
     }
     std::filesystem::remove(outPath, ec);
 }
@@ -206,7 +206,7 @@ TEST_F(GpuTest, ImageModuleSaveRoundTrips) {
 // assembling them wrong — a swapped pair, an off-by-one — shows up as the wrong layer.
 struct SixFaces {
     kimg::CubeFaces faces;
-    std::array<glm::u8vec4, kFaceCount> colors;
+    std::array<kor::U8Vec4, kFaceCount> colors;
 
     void remove() const {
         std::error_code ec;
@@ -232,7 +232,7 @@ SixFaces writeSixFaces(const std::string& prefix, const std::uint32_t size = 8) 
                                            image);
         EXPECT_TRUE(saved.has_value()) << (saved.has_value() ? std::string{} : saved.error().message);
 
-        written.colors[face] = glm::u8vec4{
+        written.colors[face] = kor::U8Vec4{
             static_cast<std::uint8_t>(std::lround(level * 255.f)),
             static_cast<std::uint8_t>(std::lround((1.f - level) * 255.f)),
             128, 255 };
@@ -247,13 +247,13 @@ SixFaces writeSixFaces(const std::string& prefix, const std::uint32_t size = 8) 
 void expectFacesInOrder(const kor::Resource<Image>& cube, const SixFaces& source) {
     ASSERT_TRUE(static_cast<bool>(cube));
     EXPECT_EQ(cube->ArrayLayers(), kFaceCount);
-    EXPECT_EQ(cube->Extent(), glm::uvec3(8, 8, 1));
+    EXPECT_EQ(cube->Extent(), kor::UVec3(8, 8, 1));
 
     for (std::uint32_t face = 0; face < kFaceCount; ++face) {
         const auto texels = readLayerAsBytes(cube, face);
         ASSERT_FALSE(texels.empty()) << "face " << face;
-        EXPECT_NEAR(texels.front().r, source.colors[face].r, 2) << "face " << face;
-        EXPECT_NEAR(texels.front().g, source.colors[face].g, 2) << "face " << face;
+        EXPECT_NEAR(texels.front().x, source.colors[face].x, 2) << "face " << face;
+        EXPECT_NEAR(texels.front().y, source.colors[face].y, 2) << "face " << face;
     }
 }
 
@@ -303,7 +303,7 @@ TEST_F(GpuTest, CubemapRejectsMismatchedFaces) {
  * order — moves a colour somewhere it does not belong.
  */
 kor::Resource<Image> directionPanorama(const std::uint32_t width, const std::uint32_t height) {
-    std::vector<glm::vec4> texels(static_cast<std::size_t>(width) * height);
+    std::vector<kor::Vec4> texels(static_cast<std::size_t>(width) * height);
     for (std::uint32_t y = 0; y < height; ++y) {
         // Latitude runs from +Y at row 0 down to -Y at the last row, matching the shader.
         const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(height);
@@ -312,24 +312,24 @@ kor::Resource<Image> directionPanorama(const std::uint32_t width, const std::uin
             const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(width);
             const float longitude = (u - 0.5f) * 2.f * std::numbers::pi_v<float>;
 
-            const glm::vec3 direction{
+            const kor::Vec3 direction{
                 std::sin(latitude) * std::cos(longitude),
                 std::cos(latitude),
                 std::sin(latitude) * std::sin(longitude),
             };
-            texels[static_cast<std::size_t>(y) * width + x] = glm::vec4(direction, 1.f);
+            texels[static_cast<std::size_t>(y) * width + x] = kor::Vec4(direction, 1.f);
         }
     }
 
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA32_SFLOAT)
-        .SetExtent(glm::uvec2{ width, height })
+        .SetExtent(kor::UVec2{ width, height })
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
         .Build();
 
-    const auto staging = Buffer::Builder<glm::vec4>()
-        .SetDataView(std::span<const glm::vec4>(texels))
+    const auto staging = Buffer::Builder<kor::Vec4>()
+        .SetDataView(std::span<const kor::Vec4>(texels))
         .SetUsage(Buffer::Usage::eTransferSrc)
         .SetType(Buffer::Type::eStaging)
         .Build();
@@ -352,7 +352,7 @@ TEST_F(GpuTest, EquirectangularProjectsOntoTheRightFaces) {
     auto cube = kimg::EquirectangularToCubemap(panorama, kFaceSize);
     ASSERT_TRUE(static_cast<bool>(cube)) << (cube.Failure() ? cube.Failure()->message : "");
     EXPECT_EQ(cube->ArrayLayers(), kFaceCount);
-    EXPECT_EQ(cube->Extent(), glm::uvec3(kFaceSize, kFaceSize, 1));
+    EXPECT_EQ(cube->Extent(), kor::UVec3(kFaceSize, kFaceSize, 1));
     // 32-bit float whatever the panorama was, so an HDR source keeps its range.
     EXPECT_EQ(cube->PixelFormat(), Image::Format::eRGBA32_SFLOAT);
 
@@ -364,11 +364,11 @@ TEST_F(GpuTest, EquirectangularProjectsOntoTheRightFaces) {
         // even face size, and any of the four is within a texel of the axis.
         const std::size_t mid = kFaceSize / 2;
         const auto& centre = texels[mid * kFaceSize + mid];
-        const glm::vec3 direction{ centre.x, centre.y, centre.z };
+        const kor::Vec3 direction{ centre.x, centre.y, centre.z };
 
         // Within a texel of the axis the face points along: a mapping that is flipped or rotated
         // lands a neighbouring direction here instead, which is far outside this.
-        EXPECT_GT(glm::dot(glm::normalize(direction), kFaceDirections[face]), 0.97f)
+        EXPECT_GT(kor::Dot(kor::Normalize(direction), kFaceDirections[face]), 0.97f)
             << "face " << face << " centre looks along ("
             << direction.x << ", " << direction.y << ", " << direction.z << ")";
     }
@@ -387,12 +387,12 @@ TEST_F(GpuTest, EquirectangularKeepsFaceCornersConsistent) {
         for (const std::size_t y : { std::size_t{0}, static_cast<std::size_t>(kFaceSize - 1) }) {
             for (const std::size_t x : { std::size_t{0}, static_cast<std::size_t>(kFaceSize - 1) }) {
                 const auto& texel = texels[y * kFaceSize + x];
-                const glm::vec3 direction{ texel.x, texel.y, texel.z };
-                ASSERT_GT(glm::length(direction), 0.5f) << "face " << face << " corner is empty";
+                const kor::Vec3 direction{ texel.x, texel.y, texel.z };
+                ASSERT_GT(kor::Length(direction), 0.5f) << "face " << face << " corner is empty";
 
                 // A corner texel of a cube face looks along a direction whose three components are
                 // all about equal in magnitude — the cube's diagonal.
-                const glm::vec3 unit = glm::abs(glm::normalize(direction));
+                const kor::Vec3 unit = kor::Abs(kor::Normalize(direction));
                 EXPECT_NEAR(unit.x, unit.y, 0.12f) << "face " << face;
                 EXPECT_NEAR(unit.y, unit.z, 0.12f) << "face " << face;
             }
@@ -417,7 +417,7 @@ TEST_F(GpuTest, EquirectangularFromFile) {
     // texel in the middle of the top row looks nearly straight up.
     auto reloaded = kimg::LoadImage(outPath);
     ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(128, 64, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(128, 64, 1));
     const auto rows = readLayerAsFloat(reloaded, 0);
     ASSERT_EQ(rows.size(), static_cast<std::size_t>(128) * 64);
     EXPECT_GT(rows[64].y, 0.9f) << "the top row of the panorama should look up";
@@ -425,7 +425,7 @@ TEST_F(GpuTest, EquirectangularFromFile) {
     auto cube = kimg::LoadCubemapFromEquirectangular(outPath, 16);
     ASSERT_TRUE(static_cast<bool>(cube)) << (cube.Failure() ? cube.Failure()->message : "");
     EXPECT_EQ(cube->ArrayLayers(), kFaceCount);
-    EXPECT_EQ(cube->Extent(), glm::uvec3(16, 16, 1));
+    EXPECT_EQ(cube->Extent(), kor::UVec3(16, 16, 1));
 
     auto async = runToCompletion(kimg::LoadCubemapFromEquirectangularAsync(outPath, 16));
     ASSERT_TRUE(static_cast<bool>(async)) << (async.Failure() ? async.Failure()->message : "");
@@ -440,7 +440,7 @@ TEST_F(GpuTest, EquirectangularDefaultsFaceSizeToAQuarterOfTheWidth) {
     auto panorama = directionPanorama(128, 64);
     auto cube = kimg::EquirectangularToCubemap(panorama);
     ASSERT_TRUE(static_cast<bool>(cube)) << (cube.Failure() ? cube.Failure()->message : "");
-    EXPECT_EQ(cube->Extent(), glm::uvec3(32, 32, 1));
+    EXPECT_EQ(cube->Extent(), kor::UVec3(32, 32, 1));
 }
 
 // A cubemap is only useful if it can be *sampled* as one, which needs the image to be
@@ -480,7 +480,7 @@ TEST_F(GpuTest, CompressedImageUploadRoundTrips) {
         auto image = Image::Builder{}
             .SetType(Image::Type::e2D)
             .SetFormat(format)
-            .SetExtent(glm::uvec2{ kSize, kSize })
+            .SetExtent(kor::UVec2{ kSize, kSize })
             .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
             .Build();
         ASSERT_TRUE(static_cast<bool>(image)) << (image.Failure() ? image.Failure()->message : "");
@@ -492,7 +492,7 @@ TEST_F(GpuTest, CompressedImageUploadRoundTrips) {
             .Build();
 
         Buffer::RawBuilder rb;
-        rb.SetRawSize(static_cast<glm::i64>(byteCount))
+        rb.SetRawSize(static_cast<kor::i64>(byteCount))
           .SetUsage(Buffer::Usage::eTransferDst)
           .SetType(Buffer::Type::eReadback);
         auto readback = rb.Build();
@@ -520,7 +520,7 @@ TEST_F(GpuTest, CompressedImageRefusesGeneratedMipmaps) {
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eBC7_UNORM)
-        .SetExtent(glm::uvec2{ 16, 16 })
+        .SetExtent(kor::UVec2{ 16, 16 })
         .SetMipLevels(5)
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
         .Build();

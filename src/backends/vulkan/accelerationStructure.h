@@ -33,7 +33,7 @@ namespace kor::vk
             ::vk::AccelerationStructureBuildGeometryInfoKHR buildInfo,
             const ::vk::AccelerationStructureBuildRangeInfoKHR* rangeInfos,
             const ::vk::AccelerationStructureBuildSizesInfoKHR& sizeInfo,
-            const std::vector<glm::u32>& primitiveCounts);
+            const std::vector<kor::u32>& primitiveCounts);
 
         ::vk::Buffer _asBuffer;
         VmaAllocation _asAllocation = nullptr;

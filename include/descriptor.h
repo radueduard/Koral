@@ -22,8 +22,8 @@ namespace kor
     /** @brief A buffer bound to a shader, and which part of it. */
     struct BufferDescriptor {
         ResourceRef<const Buffer> _buffer;  ///< The buffer.
-        glm::i64 _offset = 0;               ///< Byte offset the shader's view of it starts at.
-        glm::i64 _range = 0;                ///< How many bytes it covers; 0 means the rest. @see BufferView::Builder::range
+        kor::i64 _offset = 0;               ///< Byte offset the shader's view of it starts at.
+        kor::i64 _range = 0;                ///< How many bytes it covers; 0 means the rest. @see BufferView::Builder::range
     };
 
     /** @brief An image bound to a shader without a sampler — a storage image, or a separate sampled image. */
@@ -80,7 +80,7 @@ namespace kor
          * @param offset Byte offset the shader's view of it starts at.
          * @param range How many bytes it covers; 0 means the rest of the buffer.
          */
-        explicit Descriptor(const ResourceRef<const Buffer>& buffer, glm::i64 offset = 0, glm::i64 range = 0);
+        explicit Descriptor(const ResourceRef<const Buffer>& buffer, kor::i64 offset = 0, kor::i64 range = 0);
 
         /** @brief Binds a texture and the sampler to read it with. */
         explicit Descriptor(const ResourceRef<const ImageView>& imageView, const ResourceRef<const Sampler>& sampler);
@@ -115,9 +115,9 @@ namespace kor
         /** @brief The bound buffer. @throws if this descriptor holds something else. */
         [[nodiscard]] const Buffer& BoundBuffer() const;
         /** @brief Byte offset into the bound buffer. @throws if this descriptor holds something else. */
-        [[nodiscard]] glm::i64 Offset() const;
+        [[nodiscard]] kor::i64 Offset() const;
         /** @brief How many bytes of the bound buffer are visible. @throws if this descriptor holds something else. */
-        [[nodiscard]] glm::i64 Range() const;
+        [[nodiscard]] kor::i64 Range() const;
         /** @brief The bound image view. @throws if this descriptor holds something else. */
         [[nodiscard]] const ImageView& BoundImageView() const;
         /** @brief The bound sampler. @throws if this descriptor holds something else. */

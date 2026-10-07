@@ -20,7 +20,7 @@ namespace kcam
         return Of(kor::ResourceRef<const kor::Framebuffer>(window.DefaultFramebuffer()));
     }
 
-    std::optional<glm::uvec2> AspectSource::Extent() const
+    std::optional<kor::UVec2> AspectSource::Extent() const
     {
         switch (kind) {
         case Kind::eNone:
@@ -36,7 +36,7 @@ namespace kcam
         case Kind::eImage:
             // Depth is not part of a shape on screen; a 3D image is followed by its face.
             if (!image.Valid()) return std::nullopt;
-            return glm::uvec2(image->Extent());
+            return kor::UVec2(image->Extent());
         }
         return std::nullopt;
     }
@@ -94,7 +94,7 @@ namespace kcam
         adoptSourceAspect();
     }
 
-    std::optional<glm::uvec2> PerspectiveImpl::renderExtent() const
+    std::optional<kor::UVec2> PerspectiveImpl::renderExtent() const
     {
         if (_aspectSource.kind != AspectSource::Kind::eNone) return _aspectSource.Extent();
         return CameraBase::renderExtent();
@@ -102,7 +102,7 @@ namespace kcam
 
     void PerspectiveImpl::adoptSourceAspect()
     {
-        const std::optional<glm::uvec2> extent = _aspectSource.Extent();
+        const std::optional<kor::UVec2> extent = _aspectSource.Extent();
         if (!extent) {
             if (!_warnedDeadSource && _aspectSource.Dangling()) {
                 _warnedDeadSource = true;
@@ -125,9 +125,9 @@ namespace kcam
         }
     }
 
-    glm::mat4 PerspectiveImpl::computeProjection() const
+    kor::Mat4 PerspectiveImpl::computeProjection() const
     {
-        return glm::perspectiveRH_ZO(_fovY, _aspect, _zNear, _zFar);
+        return kor::Perspective(_fovY, _aspect, _zNear, _zFar);
     }
 
     // ---- orthographic -------------------------------------------------------------------------
@@ -153,8 +153,8 @@ namespace kcam
         markProjectionDirty();
     }
 
-    glm::mat4 OrthoImpl::computeProjection() const
+    kor::Mat4 OrthoImpl::computeProjection() const
     {
-        return glm::orthoRH_ZO(_left, _right, _bottom, _top, _zNear, _zFar);
+        return kor::Orthographic(_left, _right, _bottom, _top, _zNear, _zFar);
     }
 }

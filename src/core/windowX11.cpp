@@ -64,7 +64,7 @@ namespace kor::x11 {
         XFlush(display);
     }
 
-    void SetInputRegion(GLFWwindow* window, const std::span<const glm::ivec4> rects)
+    void SetInputRegion(GLFWwindow* window, const std::span<const kor::IVec4> rects)
     {
         if (!Active() || window == nullptr) return;
         Display* display = glfwGetX11Display();
@@ -82,7 +82,7 @@ namespace kor::x11 {
         XFlush(display);
     }
 
-    glm::ivec2 CursorPosition()
+    kor::IVec2 CursorPosition()
     {
         if (!Active()) return {};
         Display* display = glfwGetX11Display();
@@ -145,10 +145,10 @@ namespace kor::x11 {
 namespace kor::x11 {
     bool Active() { return false; }
     void BeginMoveResize(GLFWwindow*, Grip, bool) {}
-    void SetInputRegion(GLFWwindow*, std::span<const glm::ivec4>) {}
+    void SetInputRegion(GLFWwindow*, std::span<const kor::IVec4>) {}
     void SkipTaskbar(GLFWwindow*) {}
     void ShowWithoutFocus(GLFWwindow*) {}
-    glm::ivec2 CursorPosition() { return {}; }
+    kor::IVec2 CursorPosition() { return {}; }
 }
 
 #endif

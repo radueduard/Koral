@@ -214,9 +214,9 @@ namespace kor {
         return it->second;
     }
 
-    glm::uvec2 PassResources::Extent(const std::string_view name) const {
+    kor::UVec2 PassResources::Extent(const std::string_view name) const {
         const auto img = ImageNamed(name);
-        return img.Alive() ? glm::uvec2(img->Extent()) : glm::uvec2(0);
+        return img.Alive() ? kor::UVec2(img->Extent()) : kor::UVec2(0);
     }
 
     ResourceRef<const Image> FrameGraph::ImageNamed(const std::string_view name, const Flags<Image::Usage> usage) const {
@@ -347,17 +347,17 @@ namespace kor {
     }
 
     namespace {
-        std::string shapeOf(const Image::Format format, const glm::uvec2 size, const glm::u32 mips) {
+        std::string shapeOf(const Image::Format format, const kor::UVec2 size, const kor::u32 mips) {
             return std::format("image {} {}x{} {}", static_cast<int>(format), size.x, size.y, mips);
         }
-        std::string shapeOf(const glm::i64 size, const Buffer::Type type) {
+        std::string shapeOf(const kor::i64 size, const Buffer::Type type) {
             return std::format("buffer {} {}", size, static_cast<int>(type));
         }
-        glm::u64 bytesOf(const Image::Format format, const glm::uvec2 size, const glm::u32 mips) {
-            glm::u64 bytes = 0;
-            for (glm::u32 level = 0; level < std::max(mips, 1u); ++level) {
-                const glm::uvec2 extent = glm::max(size >> level, glm::uvec2(1));
-                bytes += Image::SizeOfRegion(format, glm::uvec3(extent, 1u));
+        kor::u64 bytesOf(const Image::Format format, const kor::UVec2 size, const kor::u32 mips) {
+            kor::u64 bytes = 0;
+            for (kor::u32 level = 0; level < std::max(mips, 1u); ++level) {
+                const kor::UVec2 extent = kor::Max(size >> level, kor::UVec2(1));
+                bytes += Image::SizeOfRegion(format, kor::UVec3(extent, 1u));
             }
             return bytes;
         }
@@ -448,13 +448,13 @@ namespace kor {
             bool image = false;
             std::string shape;
             ImageDesc imageDesc;
-            glm::uvec2 size {0};
+            kor::UVec2 size {0};
             Flags<Image::Usage> imageUsage {};
             BufferDesc bufferDesc;
             Flags<Buffer::Usage> bufferUsage {};
             bool perFrame = false;
             bool shared = false;   ///< An async pass uses it, and the queues are two families.
-            glm::u64 bytes = 0;
+            kor::u64 bytes = 0;
         };
         const bool separateFamily = Context::AsyncComputeIsSeparateFamily();
         std::vector<Planned> planned(compiled->lifetimes.size());
@@ -470,15 +470,15 @@ namespace kor {
             if (const auto it = imageDescs.find(name); it != imageDescs.end()) {
                 plan.image = true;
                 plan.imageDesc = it->second;
-                glm::uvec2 base = _extent;
+                kor::UVec2 base = _extent;
                 if (const auto& of = plan.imageDesc.sizeOf; !of.empty() && !plan.imageDesc.extent) {
                     ResourceRef<const Image> reference;
                     if (const auto imported = _importedImages.find(of); imported != _importedImages.end()) reference = imported->second;
-                    if (reference.Alive()) base = glm::uvec2(reference->Extent());
+                    if (reference.Alive()) base = kor::UVec2(reference->Extent());
                     else problems.push_back(std::format("'{}' is sized after '{}', which is not an imported image.", name, of));
                 }
-                plan.size = plan.imageDesc.extent.value_or(glm::max(
-                    glm::uvec2(glm::vec2(base) * plan.imageDesc.scale), glm::uvec2(1)));
+                plan.size = plan.imageDesc.extent.value_or(kor::Max(
+                    kor::UVec2(kor::Vec2(base) * plan.imageDesc.scale), kor::UVec2(1)));
                 plan.imageUsage = imageUsage[name];
                 if (const auto kept = _kept.find(name); kept != _kept.end()) plan.imageUsage |= kept->second;
                 if (keepsHistory) plan.imageUsage |= Image::Usage::eTransferSrc;
@@ -495,7 +495,7 @@ namespace kor {
                 plan.perFrame = plan.bufferDesc.type != Buffer::Type::eDeviceLocal;
                 shareable = shareable && !plan.perFrame;
                 plan.shape = shapeOf(plan.bufferDesc.size, plan.bufferDesc.type);
-                plan.bytes = static_cast<glm::u64>(std::max<glm::i64>(plan.bufferDesc.size, 0))
+                plan.bytes = static_cast<kor::u64>(std::max<kor::i64>(plan.bufferDesc.size, 0))
                            * (plan.perFrame ? Context::Scheduler().ImageCount() : 1u);
             } else {
                 continue;
@@ -542,7 +542,7 @@ namespace kor {
             const Planned& first = planned[slot.front()];
             std::string names;
             for (const auto i : slot) names += (names.empty() ? "" : " + ") + planned[i].name;
-            memory.resources += static_cast<glm::u32>(slot.size());
+            memory.resources += static_cast<kor::u32>(slot.size());
             for (const auto i : slot) memory.unsharedBytes += planned[i].bytes;
             memory.bytes += first.bytes;
 
@@ -590,7 +590,7 @@ namespace kor {
                 _allocated.push_back(std::move(*allocation));
             }
         }
-        memory.allocations = static_cast<glm::u32>(_allocated.size());
+        memory.allocations = static_cast<kor::u32>(_allocated.size());
 
         // ---- previous frames ---------------------------------------------------------------------------
         // A second copy of each, kept from one frame to the next. Reused across a rebuild when it still
@@ -697,7 +697,7 @@ namespace kor {
         for (RenderPass* pass : _order) {
             const auto& decl = declarations[static_cast<std::size_t>(
                 std::ranges::find(_passes, pass, &std::unique_ptr<RenderPass>::get) - _passes.begin())].decl;
-            std::vector<glm::u64> signature;
+            std::vector<kor::u64> signature;
             for (const auto& use : decl.uses) {
                 const std::string name = use.access == graph::Access::eReadPrevious ? "previous " + use.resource : use.resource;
                 if (use.resource == Screen) {
@@ -772,7 +772,7 @@ namespace kor {
         }
         detail::SceneScope scope(scene);
         detail::WindowScope window(_target);
-        if (const glm::uvec2 extent = TargetWindow()->Extent(); extent != _extent) {
+        if (const kor::UVec2 extent = TargetWindow()->Extent(); extent != _extent) {
             _extent = extent;
             _dirty = true;
         }
@@ -812,7 +812,7 @@ namespace kor {
                         clear->BeginRendering(framebuffer).EndRendering();
                         _historyClears.push_back(std::move(framebuffer));
                     } else {
-                        clear->ClearColorImage(h.previousImage, glm::vec4(0.f));
+                        clear->ClearColorImage(h.previousImage, kor::Vec4(0.f));
                     }
                 }
                 if (h.previousBuffer.Valid()) clear->ClearBuffer(h.previousBuffer);

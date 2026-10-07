@@ -26,7 +26,7 @@ namespace kor::vk
         ~Surface() override;
 
         /** @brief Creates the swap chain presenting to this surface, sized to @p window. */
-        void CreateSwapChain(const kor::Window& window, glm::u32 framesInFlight);
+        void CreateSwapChain(const kor::Window& window, kor::u32 framesInFlight);
         [[nodiscard]] bool HasSwapChain() const { return _swapChain != nullptr; }
         [[nodiscard]] SwapChain& swapChain() const { return *_swapChain; }
 

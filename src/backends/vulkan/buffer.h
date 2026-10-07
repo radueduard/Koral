@@ -29,10 +29,10 @@ namespace kor::vk
 	protected:
     	void Map() const override;
         void Unmap() const override;
-		void Flush(glm::i64 size, glm::u64 offset) const override;
-		void Invalidate(glm::i64 size, glm::u64 offset) const override;
+		void Flush(kor::i64 size, kor::u64 offset) const override;
+		void Invalidate(kor::i64 size, kor::u64 offset) const override;
 		void AutomaticUpdate() override;
-		[[nodiscard]] glm::u32 CopyCount() const override { return static_cast<glm::u32>(_buffers.size()); }
+		[[nodiscard]] kor::u32 CopyCount() const override { return static_cast<kor::u32>(_buffers.size()); }
 
 	public:
 		::vk::Buffer operator*() const;
@@ -42,7 +42,7 @@ namespace kor::vk
 		 * @brief GPU device address of this buffer (current frame if per-frame).
 		 * Requires the buffer to have been created with Usage::eShaderDeviceAddress.
 		 */
-		[[nodiscard]] glm::u64 DeviceAddress() const override;
+		[[nodiscard]] kor::u64 DeviceAddress() const override;
 
 		[[nodiscard]] ::vk::AccessFlags getAccessMask() const;
 		void setAccessMask(::vk::AccessFlags access) const;

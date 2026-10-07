@@ -227,7 +227,7 @@ void koral_pass_builder_create_image(KoralPassBuilder* b, const char* name, cons
             .sizeOf = d->size_of ? d->size_of : "",
             .mipLevels = d->mip_levels ? d->mip_levels : 1,
         };
-        if (d->has_extent) desc.extent = glm::uvec2(d->extent[0], d->extent[1]);
+        if (d->has_extent) desc.extent = kor::UVec2(d->extent[0], d->extent[1]);
         BuilderOf(b).Create(name ? name : "", desc);
     });
 }
@@ -255,7 +255,7 @@ KoralBuffer* koral_pass_resources_writable_buffer_named(KoralPassResources* r, c
 }
 void koral_pass_resources_extent(KoralPassResources* r, const char* name, uint32_t* x, uint32_t* y)
 {
-    const auto e = Guarded([&] { return ResourcesOf(r).Extent(name ? name : ""); }, glm::uvec2(0));
+    const auto e = Guarded([&] { return ResourcesOf(r).Extent(name ? name : ""); }, kor::UVec2(0));
     if (x) *x = e.x;
     if (y) *y = e.y;
 }
@@ -276,7 +276,7 @@ KoralRenderPass* koral_graph_add_debug_draw_pass(KoralFrameGraph* graph, KoralDe
     if (!draw) { Fail("koral_graph_add_debug_draw_pass needs a DebugDraw"); return nullptr; }
     return Guarded([&] {
         auto& pass = GraphOf(graph).Add<DebugDrawPass>(*reinterpret_cast<DebugDraw*>(draw), [viewProjection, owned] {
-            glm::mat4 matrix(1.f);
+            kor::Mat4 matrix(1.f);
             if (viewProjection) viewProjection(&matrix[0][0], owned.get());
             return matrix;
         }, target ? std::string(target) : std::string(FrameGraph::Screen), depth ? std::string(depth) : std::string());

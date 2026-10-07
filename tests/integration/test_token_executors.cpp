@@ -433,7 +433,7 @@ TEST_F(TokenExecutorTest, SeveralThreadsRecordIntoTheSameImage) {
     constexpr int kThreads = 8;
     constexpr int kRounds = 30;
     const auto since = logMark();
-    auto image = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(glm::uvec2{64, 64})
+    auto image = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2{64, 64})
                      .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled).Build();
     ASSERT_TRUE(static_cast<bool>(image));
 
@@ -446,7 +446,7 @@ TEST_F(TokenExecutorTest, SeveralThreadsRecordIntoTheSameImage) {
             for (int round = 0; round < kRounds; ++round) {
                 auto cb = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
                 cb->Begin();
-                cb->ClearColorImage(image, glm::vec4(static_cast<float>(t) / kThreads, 0.f, 0.f, 1.f));
+                cb->ClearColorImage(image, kor::Vec4(static_cast<float>(t) / kThreads, 0.f, 0.f, 1.f));
                 // No End(): Submit ends it in the same step, in turn with the other threads, so it is resolved
                 // against the work ahead of it on the queue — whichever thread got there first.
                 const Token done = Token::Create();
@@ -470,7 +470,7 @@ TEST_F(TokenExecutorTest, SeveralThreadsRecordIntoTheSameImage) {
 // submitted in the other. The second was resolved against the first, which is not ahead of it on the queue — Submit
 // says so rather than letting its barriers start from the wrong state in silence.
 TEST_F(TokenExecutorTest, SubmittingInAnotherOrderThanEndedIsReported) {
-    auto image = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(glm::uvec2{8, 8})
+    auto image = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2{8, 8})
                      .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled).Build();
     auto first = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
     auto second = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
@@ -488,7 +488,7 @@ TEST_F(TokenExecutorTest, SubmittingInAnotherOrderThanEndedIsReported) {
 
     // In order, nothing to say. (A fresh image: after a pair out of order the one above was last resolved by one
     // and last run by the other, which the next command buffer to use it is told about too.)
-    auto fresh = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(glm::uvec2{8, 8})
+    auto fresh = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2{8, 8})
                      .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled).Build();
     first->Begin(); first->ClearColorImage(fresh); first->End();
     second->Begin(); second->ClearColorImage(fresh); second->End();

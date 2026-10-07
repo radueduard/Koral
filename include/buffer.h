@@ -14,7 +14,7 @@
 #include <limits>
 #include <unordered_set>
 
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "flags.h"
 #include "api.h"
@@ -39,10 +39,10 @@ namespace kor
      * that frame comes round. Used internally by Buffer::automaticUpdate.
      */
     struct PendingWrite {
-        glm::u32 srcFrameIndex;                             ///< The frame whose copy already holds the new data.
-        glm::u64 offset;                                    ///< Byte offset of the written region.
-        glm::u64 byteSize;                                  ///< Length of the written region.
-        std::unordered_set<glm::u32> buffersLeftToUpdate;   ///< Frames that have not received it yet.
+        kor::u32 srcFrameIndex;                             ///< The frame whose copy already holds the new data.
+        kor::u64 offset;                                    ///< Byte offset of the written region.
+        kor::u64 byteSize;                                  ///< Length of the written region.
+        std::unordered_set<kor::u32> buffersLeftToUpdate;   ///< Frames that have not received it yet.
         /// The bytes that were written, when the write came with them (Write): the other frames' copies
         /// are filled from here. Without them they are read back out of the copy that was written —
         /// which, for memory the CPU maps but does not cache, is slower by orders of magnitude.
@@ -61,9 +61,9 @@ namespace kor
         /** @brief Hashes a write by the region it covers, so two writes to the same region collapse. */
         struct Hash {
             std::size_t operator()(const PendingWrite& write) const {
-                return std::hash<glm::u32>()(write.srcFrameIndex)
-                    ^ std::hash<glm::u64>()(write.offset)
-                    ^ std::hash<glm::u64>()(write.byteSize);
+                return std::hash<kor::u32>()(write.srcFrameIndex)
+                    ^ std::hash<kor::u64>()(write.offset)
+                    ^ std::hash<kor::u64>()(write.byteSize);
             }
         };
     };
@@ -75,7 +75,7 @@ namespace kor
      * alive:
      *
      * @code
-     * Buffer::Builder<glm::mat4> builder;
+     * Buffer::Builder<kor::Mat4> builder;
      * auto cameraBuffer = builder
      *     .SetInstanceCount(1)
      *     .SetUsage(Buffer::Usage::eUniform | Buffer::Usage::eTransferSrc
@@ -174,7 +174,7 @@ namespace kor
         struct KORAL_API RawBuilder : Builder {
             bool _isPerFrame = false;               ///< Whether the buffer holds one copy per frame in flight.
             bool _sharedAcrossQueues = false;       ///< Used from both queue families. @see Image::Builder::sharedAcrossQueues
-            glm::i64 _size = 0;                     ///< Size in bytes.
+            kor::i64 _size = 0;                     ///< Size in bytes.
             /**
              * @brief Everything the buffer may be used for.
              *
@@ -213,7 +213,7 @@ namespace kor
              * @param size Byte count; must be greater than zero, or the build fails with
              *        ErrorCode::eBufferSizeInvalid.
              */
-            RawBuilder& SetRawSize(const glm::i64 size) {
+            RawBuilder& SetRawSize(const kor::i64 size) {
                 if (size <= 0) {
                     AddError(ErrorCode::eBufferSizeInvalid, "size must be > 0");
                 } else {
@@ -294,7 +294,7 @@ namespace kor
             /// A builder that never calls it keeps the permissive default and the deduction.
             bool _usageExact = false;
 
-            RawBuilder& SetSize(const glm::i64 value) {
+            RawBuilder& SetSize(const kor::i64 value) {
                 if (value <= 0) {
                     AddError(ErrorCode::eBufferSizeInvalid, "RawBuilder::size must be > 0");
                 } else {
@@ -316,10 +316,10 @@ namespace kor
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
         struct Builder : RawBuilder {
-            glm::i64 _instanceCount = 1;    ///< Number of elements of T. The byte size follows from it.
+            kor::i64 _instanceCount = 1;    ///< Number of elements of T. The byte size follows from it.
 
             Builder() {
-                _size = static_cast<glm::i64>(sizeof(T));
+                _size = static_cast<kor::i64>(sizeof(T));
             }
 
         private:
@@ -344,12 +344,12 @@ namespace kor
              * @brief Sizes the buffer to hold @p value elements of T, without giving it contents.
              * @param value Element count; must not be negative.
              */
-            Builder& SetInstanceCount(const glm::i64 value) {
+            Builder& SetInstanceCount(const kor::i64 value) {
                 if (value < 0) {
                     AddError(ErrorCode::eBufferSizeInvalid, "instanceCount must be >= 0");
                 }
                 _instanceCount = value;
-                _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
+                _size = static_cast<kor::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
 
@@ -362,7 +362,7 @@ namespace kor
                 _ownedData.assign(1, value);
                 _externalView = {};
                 _instanceCount = 1;
-                _size = static_cast<glm::i64>(sizeof(T));
+                _size = static_cast<kor::i64>(sizeof(T));
                 return *this;
             }
 
@@ -384,8 +384,8 @@ namespace kor
                     AddError(ErrorCode::eBufferSizeInvalid, "Data container must have size > 0");
                 }
                 _externalView = {};
-                _instanceCount = static_cast<glm::i64>(_ownedData.size());
-                _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
+                _instanceCount = static_cast<kor::i64>(_ownedData.size());
+                _size = static_cast<kor::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
 
@@ -401,8 +401,8 @@ namespace kor
             Builder& SetDataView(R&& view) {
                 _ownedData.clear();
                 _externalView = std::span<const T>(std::ranges::data(view), std::ranges::size(view));
-                _instanceCount = static_cast<glm::i64>(_externalView.size());
-                _size = static_cast<glm::i64>(sizeof(T)) * _instanceCount;
+                _instanceCount = static_cast<kor::i64>(_externalView.size());
+                _size = static_cast<kor::i64>(sizeof(T)) * _instanceCount;
                 return *this;
             }
 
@@ -425,7 +425,7 @@ namespace kor
                                 buffer->UploadPerFrame(std::as_bytes(data), 0);
                                 break;
                             }
-                            const auto byteSize = CheckedByteSize<T>(static_cast<glm::u64>(_instanceCount), "Builder::build");
+                            const auto byteSize = CheckedByteSize<T>(static_cast<kor::u64>(_instanceCount), "Builder::build");
                             Builder<std::byte> stagingBuilder;
                             stagingBuilder
                                 .SetInstanceCount(ToBuilderSize(byteSize, "Builder::build"))
@@ -491,14 +491,14 @@ namespace kor
          * @throws std::out_of_range if the element lies past the end of the buffer.
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
-        [[nodiscard]] T ReadAt(const glm::u64 index = 0) const
+        [[nodiscard]] T ReadAt(const kor::u64 index = 0) const
         {
             ValidateElementRange<T>(index, 1, "ReadAt");
 
             switch (_type) {
                 case Type::eDeviceLocal:
                 {
-                    constexpr glm::u64 elemBytes = sizeof(T);
+                    constexpr kor::u64 elemBytes = sizeof(T);
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
                         .SetInstanceCount(ToBuilderSize(elemBytes, "ReadAt"))
@@ -536,14 +536,14 @@ namespace kor
          * @throws std::out_of_range if the element lies past the end of the buffer.
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
-        void WriteAt(const glm::u64 index, const T& data)
+        void WriteAt(const kor::u64 index, const T& data)
         {
             ValidateElementRange<T>(index, 1, "WriteAt");
 
             switch (_type) {
                 case Type::eDeviceLocal:
                 {
-                    constexpr glm::u64 elemBytes = sizeof(T);
+                    constexpr kor::u64 elemBytes = sizeof(T);
                     Builder<std::byte> stagingBuilder;
                     stagingBuilder
                         .SetInstanceCount(ToBuilderSize(elemBytes, "WriteAt"))
@@ -583,9 +583,9 @@ namespace kor
          * @throws std::out_of_range if the range runs past the end of the buffer.
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
-        std::vector<T> Read(glm::u64 count = WholeSize, const glm::u64 offset = 0) const
+        std::vector<T> Read(kor::u64 count = WholeSize, const kor::u64 offset = 0) const
         {
-            const auto elemCapacity = static_cast<glm::u64>(_size / sizeof(T));
+            const auto elemCapacity = static_cast<kor::u64>(_size / sizeof(T));
             if (offset > elemCapacity) {
                 kor::log::Error("Read: offset exceeds buffer elements. capacity={}, requestedOffset={}", elemCapacity, offset);
                 throw std::out_of_range("Offset exceeds buffer element capacity");
@@ -596,7 +596,7 @@ namespace kor
             ValidateElementRange<T>(offset, count, "Read");
 
             const auto byteSize = CheckedByteSize<T>(count, "Read");
-            const auto byteOffset = offset * static_cast<glm::u64>(sizeof(T));
+            const auto byteOffset = offset * static_cast<kor::u64>(sizeof(T));
 
             // Not an error — it works, it is simply orders of magnitude slower than it looks, and
             // silently so. Anyone reading a buffer they asked to be write-combined has almost
@@ -668,17 +668,17 @@ namespace kor
          * @endcode
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
-        [[nodiscard]] Task<std::vector<T>> ReadAsync(glm::u64 count = WholeSize, const glm::u64 offset = 0) const
+        [[nodiscard]] Task<std::vector<T>> ReadAsync(kor::u64 count = WholeSize, const kor::u64 offset = 0) const
         {
             // Memory the CPU can see is read as it is: there is nothing for the GPU to do.
             if (_type != Type::eDeviceLocal) co_return Read<T>(count, offset);
 
-            const auto elemCapacity = static_cast<glm::u64>(_size / sizeof(T));
+            const auto elemCapacity = static_cast<kor::u64>(_size / sizeof(T));
             if (offset > elemCapacity) throw std::out_of_range("Offset exceeds buffer element capacity");
             if (count == WholeSize) count = elemCapacity - offset;
             ValidateElementRange<T>(offset, count, "ReadAsync");
             const auto byteSize = CheckedByteSize<T>(count, "ReadAsync");
-            const auto byteOffset = offset * static_cast<glm::u64>(sizeof(T));
+            const auto byteOffset = offset * static_cast<kor::u64>(sizeof(T));
 
             Builder<std::byte> stagingBuilder;
             stagingBuilder
@@ -695,12 +695,12 @@ namespace kor
 
         template <typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
             requires RangeOf<R, T> && std::is_trivially_copyable_v<T>
-        void Write(R&& elements, const glm::u64 offset = 0) {
+        void Write(R&& elements, const kor::u64 offset = 0) {
             // Contiguous where it lies, copied into a temporary where it is not — either way what
             // reaches the GPU below is one block of bytes. @see kor::ContiguousCopy
             const ContiguousCopy<T> contiguous(std::forward<R>(elements));
             const std::span<const T> data = contiguous.View();
-            const auto count = static_cast<glm::u64>(data.size());
+            const auto count = static_cast<kor::u64>(data.size());
             ValidateElementRange<T>(offset, count, "Write");
 
             const auto byteSize = CheckedByteSize<T>(count, "Write");
@@ -795,7 +795,7 @@ namespace kor
              * @brief The element at @p index within the mapped range.
              * @warning Not bounds-checked. @p index must be less than the mapped element count.
              */
-            const T& operator[](const glm::u64 index) const {
+            const T& operator[](const kor::u64 index) const {
                 return *reinterpret_cast<const T*>(static_cast<const std::byte*>(_buffer->_mappedPtr) + (_offset + index) * sizeof(T));
             }
 
@@ -814,12 +814,12 @@ namespace kor
              * @return A vector holding the copies.
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
+            std::vector<T> Read(kor::u64 localOffset = 0, kor::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
-                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
+                const kor::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
@@ -840,12 +840,12 @@ namespace kor
              *
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            void Invalidate(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
+            void Invalidate(kor::u64 localOffset = 0, kor::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
-                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
+                const kor::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
@@ -854,15 +854,15 @@ namespace kor
             }
 
         private:
-            explicit ConstMapping(const Buffer& buffer, glm::u64 offset, glm::u64 count)
+            explicit ConstMapping(const Buffer& buffer, kor::u64 offset, kor::u64 count)
                 : _buffer(&buffer), _offset(offset), _count(count), _active(true) {
                 _buffer->AcquireConstMapping();
                 _buffer->Invalidate(offset * sizeof(T), count * sizeof(T));
             }
 
             const Buffer* _buffer = nullptr;
-            glm::u64 _offset = 0;
-            glm::u64 _count = 0;
+            kor::u64 _offset = 0;
+            kor::u64 _count = 0;
             bool _active = false;
          };
 
@@ -914,11 +914,11 @@ namespace kor
              *
              * @warning Not bounds-checked. @p index must be less than the mapped element count.
              */
-            T& operator[](const glm::u64 index) {
+            T& operator[](const kor::u64 index) {
                 if (_buffer->IsPerFrame()) {
                     auto currentImageIndex = kor::Context::Scheduler().CurrentImageIndex();
-                    const glm::u64 writeOffset = (_offset + index) * sizeof(T);
-                    constexpr glm::u64 writeSize = sizeof(T);
+                    const kor::u64 writeOffset = (_offset + index) * sizeof(T);
+                    constexpr kor::u64 writeSize = sizeof(T);
                     // A fresh write to this region supersedes any still-pending propagation
                     // of older data covering it; drop those so AutomaticUpdate() can't copy
                     // stale data over this write (the two run in an unspecified order).
@@ -938,7 +938,7 @@ namespace kor
             }
 
             /** @brief Read-only access to the element at @p index, which records no write. */
-            const T& operator[](glm::u64 index) const {
+            const T& operator[](kor::u64 index) const {
                 return *reinterpret_cast<const T*>(
                 static_cast<const std::byte*>(_buffer->_mappedPtr) + (_offset + index) * sizeof(T));
             }
@@ -964,12 +964,12 @@ namespace kor
              * @return A vector holding the copies.
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            std::vector<T> Read(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
+            std::vector<T> Read(kor::u64 localOffset = 0, kor::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Read range exceeds mapped range");
                 }
-                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
+                const kor::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::Error("Attempted to read beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Read range exceeds mapped range");
@@ -991,10 +991,10 @@ namespace kor
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
             template <RangeOf<T> R = std::span<const T>>
-            void Write(R&& elements, glm::u64 localOffset = 0) {
+            void Write(R&& elements, kor::u64 localOffset = 0) {
                 const ContiguousCopy<T> contiguous(std::forward<R>(elements));
                 const std::span<const T> data = contiguous.View();
-                const auto count = static_cast<glm::u64>(data.size());
+                const auto count = static_cast<kor::u64>(data.size());
                 if (localOffset > _count || count > (_count - localOffset)) {
                     kor::log::Error("Attempted to write beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + count);
                     throw std::out_of_range("Write range exceeds mapped range");
@@ -1004,8 +1004,8 @@ namespace kor
 
                 if (_buffer->IsPerFrame()) {
                     auto currentImageIndex = kor::Context::Scheduler().CurrentImageIndex();
-                    const glm::u64 writeOffset = (_offset + localOffset) * sizeof(T);
-                    const glm::u64 writeSize = count * sizeof(T);
+                    const kor::u64 writeOffset = (_offset + localOffset) * sizeof(T);
+                    const kor::u64 writeSize = count * sizeof(T);
                     // A fresh write to this region supersedes any still-pending propagation
                     // of older data covering it; drop those so AutomaticUpdate() can't copy
                     // stale data over this write (the two run in an unspecified order).
@@ -1033,12 +1033,12 @@ namespace kor
              *
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            void Flush(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
+            void Flush(kor::u64 localOffset = 0, kor::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::Error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Flush range exceeds mapped range");
                 }
-                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
+                const kor::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::Error("Attempted to flush beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Flush range exceeds mapped range");
@@ -1052,12 +1052,12 @@ namespace kor
              * @param count How many elements; 0 means the rest of the mapping.
              * @throws std::out_of_range if the range runs past the end of the mapping.
              */
-            void Invalidate(glm::u64 localOffset = 0, glm::u64 count = WholeSize) const {
+            void Invalidate(kor::u64 localOffset = 0, kor::u64 count = WholeSize) const {
                 if (localOffset > _count) {
                     kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested offset: {}", _count, localOffset);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
                 }
-                const glm::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
+                const kor::u64 n = (count == WholeSize) ? (_count - localOffset) : count;
                 if (n > (_count - localOffset)) {
                     kor::log::Error("Attempted to invalidate beyond the end of the mapped range! Mapped range: [0, {}), requested range: [{}, {})", _count, localOffset, localOffset + n);
                     throw std::out_of_range("Invalidate range exceeds mapped range");
@@ -1066,19 +1066,19 @@ namespace kor
             }
 
         private:
-            explicit MutableMapping(Buffer& buffer, glm::u64 offset, glm::u64 count)
+            explicit MutableMapping(Buffer& buffer, kor::u64 offset, kor::u64 count)
                 : _buffer(&buffer), _offset(offset), _count(count), _active(true) {
                 _buffer->AcquireMutableMapping();
              }
 
             Buffer* _buffer = nullptr;
-            glm::u64 _offset = 0;
-            glm::u64 _count = 0;
+            kor::u64 _offset = 0;
+            kor::u64 _count = 0;
             bool _active = false;
          };
 
         /** @brief The buffer's size in bytes. For a per-frame buffer, the size of one frame's copy. */
-        [[nodiscard]] glm::u64 size() const { return _size; }
+        [[nodiscard]] kor::u64 size() const { return _size; }
 
         /**
          * @brief Part of a buffer, for binding less than the whole of it.
@@ -1097,8 +1097,8 @@ namespace kor
          */
         struct KORAL_API Slice {
             ResourceRef<const Buffer> buffer;   ///< The buffer being sliced.
-            glm::i64 offset = 0;                ///< Byte offset the shader's view of it starts at.
-            glm::i64 size = 0;                  ///< How many bytes it covers; 0 means the rest.
+            kor::i64 offset = 0;                ///< Byte offset the shader's view of it starts at.
+            kor::i64 size = 0;                  ///< How many bytes it covers; 0 means the rest.
         };
 
         /**
@@ -1111,8 +1111,8 @@ namespace kor
          * and an untracked one in a slice held by a descriptor set's builder is exactly the dangling
          * reference the whole ResourceRef design exists to prevent.
          */
-        [[nodiscard]] static Slice SliceOf(ResourceRef<const Buffer> buffer, const glm::i64 offset,
-                                         const glm::i64 size = 0) {
+        [[nodiscard]] static Slice SliceOf(ResourceRef<const Buffer> buffer, const kor::i64 offset,
+                                         const kor::i64 size = 0) {
             return Slice{ std::move(buffer), offset, size };
         }
 
@@ -1157,7 +1157,7 @@ namespace kor
          * @note A buffer a shader reaches through its address appears in no descriptor set, so the
          *       automatic barriers cannot see the access. Declare it with CommandBuffer::Barrier.
          */
-        [[nodiscard]] virtual glm::u64 DeviceAddress() const { return 0; }
+        [[nodiscard]] virtual kor::u64 DeviceAddress() const { return 0; }
 
         /**
          * @brief Maps a range of the buffer for reading.
@@ -1174,7 +1174,7 @@ namespace kor
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
         [[nodiscard]]
-        ConstMapping<T> Map(glm::u64 instanceCount = WholeSize, const glm::u64 offset = 0) const {
+        ConstMapping<T> Map(kor::u64 instanceCount = WholeSize, const kor::u64 offset = 0) const {
             if (instanceCount == WholeSize) {
                 instanceCount = _size / sizeof(T) - offset;
             }
@@ -1197,7 +1197,7 @@ namespace kor
          */
         template <typename T> requires std::is_trivially_copyable_v<T>
         [[nodiscard]]
-        MutableMapping<T> Map(glm::u64 instanceCount = WholeSize, const glm::u64 offset = 0) {
+        MutableMapping<T> Map(kor::u64 instanceCount = WholeSize, const kor::u64 offset = 0) {
             if (instanceCount == WholeSize) {
                 instanceCount = _size / sizeof(T) - offset;
             }
@@ -1212,20 +1212,20 @@ namespace kor
         explicit Buffer(const RawBuilder& createInfo);
 
         /** @brief Converts a byte count to the builder's signed size, or throws if it does not fit. */
-        [[nodiscard]] static glm::i64 ToBuilderSize(const glm::u64 bytes, const char* op) {
-            if (constexpr auto maxI64 = static_cast<glm::u64>((std::numeric_limits<glm::i64>::max)()); bytes > maxI64) {
-                kor::log::Error("{}: requested byte size {} exceeds glm::i64 max {}", op, bytes, maxI64);
+        [[nodiscard]] static kor::i64 ToBuilderSize(const kor::u64 bytes, const char* op) {
+            if (constexpr auto maxI64 = static_cast<kor::u64>((std::numeric_limits<kor::i64>::max)()); bytes > maxI64) {
+                kor::log::Error("{}: requested byte size {} exceeds kor::i64 max {}", op, bytes, maxI64);
                 throw std::out_of_range("Byte size exceeds RawBuilder::size range");
             }
-            return static_cast<glm::i64>(bytes);
+            return static_cast<kor::i64>(bytes);
         }
 
         /** @brief Multiplies an element count by sizeof(T), or throws if the product overflows. */
         template <typename T>
-        [[nodiscard]] static glm::u64 CheckedByteSize(const glm::u64 countElements, const char* op) {
+        [[nodiscard]] static kor::u64 CheckedByteSize(const kor::u64 countElements, const char* op) {
             static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
             constexpr auto elemBytes = sizeof(T);
-            if (countElements > ((std::numeric_limits<glm::u64>::max)() / elemBytes)) {
+            if (countElements > ((std::numeric_limits<kor::u64>::max)() / elemBytes)) {
                 kor::log::Error("{}: element count {} overflows byte size for sizeof(T)={}", op, countElements, elemBytes);
                 throw std::out_of_range("Element byte size overflow");
             }
@@ -1237,13 +1237,13 @@ namespace kor
         virtual void Map() const = 0;
         virtual void Unmap() const = 0;
         /// Makes CPU writes visible to the GPU on non-coherent memory.
-        virtual void Flush(glm::i64 size = 0, glm::u64 offset = 0) const = 0;
+        virtual void Flush(kor::i64 size = 0, kor::u64 offset = 0) const = 0;
         /// Makes GPU writes visible to the CPU on non-coherent memory.
-        virtual void Invalidate(glm::i64 size = 0, glm::u64 offset = 0) const = 0;
+        virtual void Invalidate(kor::i64 size = 0, kor::u64 offset = 0) const = 0;
 
         /** @brief Throws if the element range lies outside the buffer, naming @p op in the message. */
         template <typename T>
-        void ValidateElementRange(const glm::u64 offsetElements, const glm::u64 countElements, const char* op) const {
+        void ValidateElementRange(const kor::u64 offsetElements, const kor::u64 countElements, const char* op) const {
             static_assert(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
 
             const auto elemCapacity = _size / sizeof(T);
@@ -1258,7 +1258,7 @@ namespace kor
 
         bool _isPerFrame = false;
         bool _sharedAcrossQueues = false;
-        glm::u64 _size = 64;
+        kor::u64 _size = 64;
         Flags<Usage> _usage = Usage::eUniform;
         Type _type = Type::eDynamic;
 
@@ -1316,7 +1316,7 @@ namespace kor
         // Scheduler::Execute ahead of that frame's rendering, where the frame's barriers cover it.
 
         /** @brief Stages @p bytes for every copy; the current one gets them now if a frame is being built. */
-        void UploadPerFrame(std::span<const std::byte> bytes, glm::u64 byteOffset);
+        void UploadPerFrame(std::span<const std::byte> bytes, kor::u64 byteOffset);
 
         /** @brief Called once the buffer is a Resource: remembers a tracked ref to itself, delivers what is waiting. */
         static void Adopted(const Resource<Buffer>& buffer);
@@ -1338,7 +1338,7 @@ namespace kor
 
     public:
         /** @brief How many copies of the data the backend keeps: one per frame in flight when per-frame, else one. */
-        [[nodiscard]] virtual glm::u32 CopyCount() const { return 1; }
+        [[nodiscard]] virtual kor::u32 CopyCount() const { return 1; }
     };
 
     // Out here rather than beside the enum: a specialisation cannot be written at class scope,

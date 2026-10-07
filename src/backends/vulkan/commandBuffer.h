@@ -31,14 +31,14 @@ namespace kor::vk
         void DoEnd() override;
         kor::CommandBuffer& DoBeginRendering(const RenderInfo& renderInfo) override;
         kor::CommandBuffer& DoEndRendering() override;
-        kor::CommandBuffer& DoSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
-        kor::CommandBuffer& DoSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) override;
+        kor::CommandBuffer& DoSetViewport(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height) override;
+        kor::CommandBuffer& DoSetScissor(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height) override;
         kor::CommandBuffer& DoSetLineWidth(float lineWidth) override;
         kor::CommandBuffer& DoSetDepthBias(float constantFactor, float clamp, float slopeFactor) override;
-        kor::CommandBuffer& DoSetBlendConstants(glm::vec4 constants) override;
-        kor::CommandBuffer& DoSetStencilCompareMask(StencilFace face, glm::u32 compareMask) override;
-        kor::CommandBuffer& DoSetStencilWriteMask(StencilFace face, glm::u32 writeMask) override;
-        kor::CommandBuffer& DoSetStencilReference(StencilFace face, glm::u32 reference) override;
+        kor::CommandBuffer& DoSetBlendConstants(kor::Vec4 constants) override;
+        kor::CommandBuffer& DoSetStencilCompareMask(StencilFace face, kor::u32 compareMask) override;
+        kor::CommandBuffer& DoSetStencilWriteMask(StencilFace face, kor::u32 writeMask) override;
+        kor::CommandBuffer& DoSetStencilReference(StencilFace face, kor::u32 reference) override;
         kor::CommandBuffer& DoSetCullMode(Flags<CullMode> cullMode) override;
         kor::CommandBuffer& DoSetFrontFace(FrontFace frontFace) override;
         kor::CommandBuffer& DoSetDepthTestEnable(bool enable) override;
@@ -52,27 +52,27 @@ namespace kor::vk
         kor::CommandBuffer& DoBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline) override;
         kor::CommandBuffer& DoBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline) override;
         kor::CommandBuffer& DoBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline) override;
-        kor::CommandBuffer& DoBindDescriptorSet(glm::u32 index, kor::ResourceRef<const kor::DescriptorSet> set) override;
+        kor::CommandBuffer& DoBindDescriptorSet(kor::u32 index, kor::ResourceRef<const kor::DescriptorSet> set) override;
         kor::CommandBuffer& DoBindMesh(kor::ResourceRef<const Mesh> mesh) override;
-        kor::CommandBuffer& DoBindVertexBuffer(glm::u32 binding, kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset) override;
+        kor::CommandBuffer& DoBindVertexBuffer(kor::u32 binding, kor::ResourceRef<const kor::Buffer> buffer, kor::u64 offset) override;
         kor::CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) override;
-        kor::CommandBuffer& DoBeginDebugLabel(const std::string& label, glm::vec4 color) override;
+        kor::CommandBuffer& DoBeginDebugLabel(const std::string& label, kor::Vec4 color) override;
         kor::CommandBuffer& DoEndDebugLabel() override;
-        kor::CommandBuffer& DoInsertDebugLabel(const std::string& label, glm::vec4 color) override;
-        kor::CommandBuffer& DoDispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) override;
-        kor::CommandBuffer& DoDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset) override;
-        kor::CommandBuffer& DoTraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where) override;
-        kor::CommandBuffer& DoDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) override;
-        kor::CommandBuffer& DoDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) override;
-        kor::CommandBuffer& DoDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) override;
-        kor::CommandBuffer& DoDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
-        kor::CommandBuffer& DoDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
-        kor::CommandBuffer& DoDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) override;
+        kor::CommandBuffer& DoInsertDebugLabel(const std::string& label, kor::Vec4 color) override;
+        kor::CommandBuffer& DoDispatch(kor::u32 groupCountX, kor::u32 groupCountY, kor::u32 groupCountZ, std::source_location where) override;
+        kor::CommandBuffer& DoDispatchIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset) override;
+        kor::CommandBuffer& DoTraceRays(kor::u32 width, kor::u32 height, kor::u32 depth, std::source_location where) override;
+        kor::CommandBuffer& DoDraw(kor::u64 vertexCount, kor::u32 instanceCount, kor::u32 firstVertex, kor::u32 firstInstance, std::source_location where) override;
+        kor::CommandBuffer& DoDrawIndexed(kor::u64 indexCount, kor::u32 instanceCount, kor::u32 firstIndex, kor::i32 vertexOffset, kor::u32 firstInstance, std::source_location where) override;
+        kor::CommandBuffer& DoDrawMeshTasks(kor::u32 taskCountX, kor::u32 taskCountY, kor::u32 taskCountZ, std::source_location where) override;
+        kor::CommandBuffer& DoDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) override;
+        kor::CommandBuffer& DoDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) override;
+        kor::CommandBuffer& DoDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) override;
 
-        kor::CommandBuffer& DoClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, glm::u64 offset, glm::u64 size) override;
-        kor::CommandBuffer& DoClearColorImage(kor::ResourceRef<const kor::Image> image, glm::vec4 color) override;
-        kor::CommandBuffer& DoFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, const void* data, glm::u64 offset, glm::u64 size) override;
-        kor::CommandBuffer& DoCopyBuffer(ResourceRef<const kor::Buffer> srcBuffer, ResourceRef<const kor::Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) override;
+        kor::CommandBuffer& DoClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, kor::u64 offset, kor::u64 size) override;
+        kor::CommandBuffer& DoClearColorImage(kor::ResourceRef<const kor::Image> image, kor::Vec4 color) override;
+        kor::CommandBuffer& DoFillBuffer(kor::ResourceRef<const kor::Buffer> buffer, const void* data, kor::u64 offset, kor::u64 size) override;
+        kor::CommandBuffer& DoCopyBuffer(ResourceRef<const kor::Buffer> srcBuffer, ResourceRef<const kor::Buffer> dstBuffer, kor::u64 size, kor::u64 srcOffset, kor::u64 dstOffset) override;
 
         kor::CommandBuffer& DoBlitToScreen(ResourceRef<const Image> srcImage, kor::Blit blitInfo) override;
         kor::CommandBuffer& DoBlit(kor::ResourceRef<const kor::Image> srcImage, kor::ResourceRef<const kor::Image> dstImage, kor::Blit blitInfo) override;
@@ -120,11 +120,11 @@ namespace kor::vk
         }
 
     protected:
-        kor::CommandBuffer & DoPushConstantBlock(const void *data, glm::u32 size, glm::u32 offset) override;
+        kor::CommandBuffer & DoPushConstantBlock(const void *data, kor::u32 size, kor::u32 offset) override;
         kor::Resource<kor::Image> _resolveHelperImage;
 
-        void DoWriteTimerTimestamp(glm::u32 queryIndex) override;
-        bool DoReadTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) override;
+        void DoWriteTimerTimestamp(kor::u32 queryIndex) override;
+        bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut) override;
 
     private:
         const kor::vk::Queue& _queue;

@@ -12,7 +12,6 @@
 # ---------------------------------------------------------------------------
 find_package(GTest CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 add_executable(koral_tests
@@ -36,6 +35,7 @@ add_executable(koral_tests
         test_reflect.cpp
         test_input_bindings.cpp
         test_debug_draw.cpp
+        test_math.cpp
 )
 
 target_link_libraries(koral_tests PRIVATE
@@ -46,7 +46,6 @@ target_link_libraries(koral_tests PRIVATE
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum
-        glm::glm
         # Public GFX headers (mesh.h, buffer.h, context.h, log.h, ...) expose these
         # dependencies' headers directly, so consumers — including this test target —
         # need their include directories, exactly like Koral_Runtime does.
@@ -134,3 +133,11 @@ endif()
 # The UI module's tests live beside it, and need GTest from here.
 add_subdirectory(${CMAKE_SOURCE_DIR}/modules/ui/tests ${CMAKE_BINARY_DIR}/modules/ui/tests)
 add_subdirectory(${CMAKE_SOURCE_DIR}/modules/gui-extras/tests ${CMAKE_BINARY_DIR}/modules/gui-extras/tests)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/net/tests ${CMAKE_BINARY_DIR}/modules/net/tests)
+
+# kmath's C interface, driven from C — which is also the check that koral_math_c.h is C99.
+add_executable(koral_math_c_test test_math_c.c)
+set_target_properties(koral_math_c_test PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF LINKER_LANGUAGE CXX)
+target_compile_options(koral_math_c_test PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-Wall -Wextra -pedantic>)
+target_link_libraries(koral_math_c_test PRIVATE Koral $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
+add_test(NAME CApi.MathFromC COMMAND koral_math_c_test)

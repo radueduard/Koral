@@ -47,15 +47,15 @@
  *
  * ## Integer types
  *
- * GPU-facing surface speaks glm's scalar aliases — `glm::u32` for counts, indices and extents,
- * `glm::u64` for byte sizes and offsets. The infrastructure underneath it (kor::Resource,
+ * GPU-facing surface speaks kmath's scalar aliases (kmath/scalar.h) — `kor::u32` for counts, indices
+ * and extents, `kor::u64` for byte sizes and offsets. The infrastructure underneath it (kor::Resource,
  * kor::Error, kor::log, kor::Task) speaks `std::uintN_t` and `std::size_t` instead, because none of
- * those headers otherwise needs glm and pulling it in for a spelling would be a poor trade. The
+ * those headers otherwise needs kmath and pulling it in for a spelling would be a poor trade. The
  * line is whether the header deals in GPU quantities.
  *
- * Sizes go in signed and come out unsigned, which is deliberate. A builder takes `glm::i64`, so a
+ * Sizes go in signed and come out unsigned, which is deliberate. A builder takes `kor::i64`, so a
  * caller's negative arrives as a negative and is reported — `SetRawSize(-1)` fails with a message
- * rather than allocating sixteen exabytes. An accessor returns `glm::u64`, because by then the
+ * rather than allocating sixteen exabytes. An accessor returns `kor::u64`, because by then the
  * value is stored and cannot be negative.
  */
 

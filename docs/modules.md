@@ -36,7 +36,7 @@ down in reverse. A module that needs a GPU feature asks for it like any library 
 
 ```cpp
 _player = kcam::PerspectiveCamera::Builder{}
-    .SetFovY(glm::radians(70.f))
+    .SetFovY(kor::Radians(70.f))
     .SetPosition({ 0.f, 1.5f, 5.f })
     .LookAt({ 0.f, 0.f, 0.f })
     .SetController({ .kind = kcam::Controller::Kind::eFly })   // moved by the runtime, before the scene's Update

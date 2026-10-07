@@ -27,7 +27,7 @@ namespace kor
 {
     // The constructors no longer throw: an invalid input flips `valid` to false and
     // records the reason in `_error`, which DescriptorSet::Builder::Build() surfaces.
-    Descriptor::Descriptor(const ResourceRef<const Buffer>& buffer, const glm::i64 offset, const glm::i64 range)
+    Descriptor::Descriptor(const ResourceRef<const Buffer>& buffer, const kor::i64 offset, const kor::i64 range)
         : valid(true), _descriptor(BufferDescriptor{ buffer, offset, range })
     {
         if (!buffer) {
@@ -150,7 +150,7 @@ namespace kor
         return *std::get<BufferDescriptor>(_descriptor)._buffer;
     }
 
-    glm::i64 Descriptor::Offset() const {
+    kor::i64 Descriptor::Offset() const {
         if (!valid) {
             kor::log::Error("Attempted to get offset from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -162,7 +162,7 @@ namespace kor
         return std::get<BufferDescriptor>(_descriptor)._offset;
     }
 
-    glm::i64 Descriptor::Range() const {
+    kor::i64 Descriptor::Range() const {
         if (!valid) {
             kor::log::Error("Attempted to get range from an invalid descriptor!");
             throw BackendException(Error{ .code = ErrorCode::eInvalidArgument, .message = "Descriptor accessor used on an invalid or incompatible descriptor." });
@@ -231,7 +231,7 @@ namespace kor
         }
     }
 
-    DescriptorSet::Builder::Builder(ResourceRef<const Pipeline> pipeline, const glm::u32 setIndex)
+    DescriptorSet::Builder::Builder(ResourceRef<const Pipeline> pipeline, const kor::u32 setIndex)
         : pipeline(std::move(pipeline)), setIndex(setIndex)
     {
         // Resolved here *and* on every later attempt: a shader reload can replace the layout, and a
@@ -250,7 +250,7 @@ namespace kor
     {
     }
 
-    std::pair<std::string_view, glm::u32> DescriptorSet::SplitIndex(const std::string_view name)
+    std::pair<std::string_view, kor::u32> DescriptorSet::SplitIndex(const std::string_view name)
     {
         // `textures[3]` selects element 3 of the binding called `textures`. Anything that is not a
         // well-formed trailing subscript is left alone and treated as part of the name, so a
@@ -264,10 +264,10 @@ namespace kor
         const auto digits = name.substr(open + 1, name.size() - open - 2);
         if (digits.empty()) return { name, 0 };
 
-        glm::u32 index = 0;
+        kor::u32 index = 0;
         for (const char c : digits) {
             if (c < '0' || c > '9') return { name, 0 };
-            index = index * 10 + static_cast<glm::u32>(c - '0');
+            index = index * 10 + static_cast<kor::u32>(c - '0');
         }
         return { name.substr(0, open), index };
     }
@@ -281,7 +281,7 @@ namespace kor
         return *this;
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::RejectSemantic(const glm::u32 binding, const char* what,
+    DescriptorSet::Builder& DescriptorSet::Builder::RejectSemantic(const kor::u32 binding, const char* what,
                                                                    const bool unusable)
     {
         return RejectSemantic(std::to_string(binding), what, unusable);
@@ -303,7 +303,7 @@ namespace kor
         return *this;
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::WriteSemantic(const glm::u32 binding, SemanticSerializer& serializer)
+    DescriptorSet::Builder& DescriptorSet::Builder::WriteSemantic(const kor::u32 binding, SemanticSerializer& serializer)
     {
         return RecordSemantic(binding, [&serializer] { return &serializer; }, "<reference>");
     }
@@ -314,7 +314,7 @@ namespace kor
     }
 
     DescriptorSet::Builder& DescriptorSet::Builder::RecordSemantic(
-        const glm::u32 binding, std::function<SemanticSerializer*()> resolve, std::string what)
+        const kor::u32 binding, std::function<SemanticSerializer*()> resolve, std::string what)
     {
         return Record({ .binding = binding,
                         .semantic = SemanticWrite{ std::move(resolve), std::move(what) } });
@@ -328,8 +328,8 @@ namespace kor
                         .semantic = SemanticWrite{ std::move(resolve), std::move(what) } });
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding, const Descriptor& descriptor,
-                                                          const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding, const Descriptor& descriptor,
+                                                          const kor::u32 index)
     {
         return Record({ .binding = binding, .index = index, .descriptor = descriptor });
     }
@@ -343,14 +343,14 @@ namespace kor
     // The resource overloads. Each is the corresponding Descriptor constructor and nothing more —
     // the kind is decided by the argument's type here rather than by the caller naming it, and
     // whether that kind is what the binding actually expects is settled in Resolve().
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const ResourceRef<const Buffer>& buffer, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const ResourceRef<const Buffer>& buffer, const kor::u32 index)
     {
         return Write(binding, Descriptor(buffer), index);
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const Buffer::Slice& slice, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const Buffer::Slice& slice, const kor::u32 index)
     {
         return Write(binding, Descriptor(slice.buffer, slice.offset, slice.size), index);
     }
@@ -360,8 +360,8 @@ namespace kor
         return Write(name, Descriptor(slice.buffer, slice.offset, slice.size));
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const ResourceRef<const BufferView>& bufferView, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const ResourceRef<const BufferView>& bufferView, const kor::u32 index)
     {
         return Write(binding, Descriptor(bufferView), index);
     }
@@ -372,27 +372,27 @@ namespace kor
         return Write(name, Descriptor(bufferView));
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const ResourceRef<const ImageView>& imageView, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const ResourceRef<const ImageView>& imageView, const kor::u32 index)
     {
         return Write(binding, Descriptor(imageView), index);
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
         const ResourceRef<const ImageView>& imageView, const ResourceRef<const Sampler>& sampler,
-        const glm::u32 index)
+        const kor::u32 index)
     {
         return Write(binding, Descriptor(imageView, sampler), index);
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const ResourceRef<const Sampler>& sampler, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const ResourceRef<const Sampler>& sampler, const kor::u32 index)
     {
         return Write(binding, Descriptor(sampler), index);
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const ResourceRef<const AccelerationStructure>& accelerationStructure, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const ResourceRef<const AccelerationStructure>& accelerationStructure, const kor::u32 index)
     {
         return Write(binding, Descriptor(accelerationStructure), index);
     }
@@ -431,14 +431,14 @@ namespace kor
     // binding is filled with a *view*, and which view depends on how the shader declared the
     // binding — 2D, cube, array — which is only known once the layout has been read. So the image
     // is recorded as it was given and turned into a view in Resolve().
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const ResourceRef<const Image>& image, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const ResourceRef<const Image>& image, const kor::u32 index)
     {
         return Record({ .binding = binding, .index = index, .image = image });
     }
 
-    DescriptorSet::Builder& DescriptorSet::Builder::Write(const glm::u32 binding,
-        const ResourceRef<const Image>& image, const ResourceRef<const Sampler>& sampler, const glm::u32 index)
+    DescriptorSet::Builder& DescriptorSet::Builder::Write(const kor::u32 binding,
+        const ResourceRef<const Image>& image, const ResourceRef<const Sampler>& sampler, const kor::u32 index)
     {
         return Record({ .binding = binding, .index = index, .image = image, .imageSampler = sampler });
     }
@@ -491,7 +491,7 @@ namespace kor
         {
             // --- which binding? Numbers are taken as given; names are looked up now, against the
             // layout this attempt found, so a binding that moved is followed rather than missed.
-            glm::u32 binding;
+            kor::u32 binding;
             if (write.binding) {
                 binding = *write.binding;
                 if (!bindings.contains(binding))
@@ -692,7 +692,7 @@ namespace kor
         return set;
     }
 
-    std::optional<glm::u32> DescriptorSet::ResolveWriteTarget(const std::string_view name) const
+    std::optional<kor::u32> DescriptorSet::ResolveWriteTarget(const std::string_view name) const
     {
         if (!_layout.Valid()) {
             log::Error("Cannot write to binding '{}': this set's layout is unusable.", name);
@@ -716,33 +716,33 @@ namespace kor
     // The resource overloads of Rebind(): the matching Descriptor, then the one virtual rebind a
     // backend implements. Named ones look the binding up first; a name nothing answers to is
     // reported by resolveWriteTarget and the rebind is dropped.
-    void DescriptorSet::Rebind(const glm::u32 binding, const ResourceRef<const Buffer>& buffer, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding, const ResourceRef<const Buffer>& buffer, const kor::u32 index)
     { Rebind(binding, Descriptor(buffer), index); }
 
-    void DescriptorSet::Rebind(const glm::u32 binding, const Buffer::Slice& slice, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding, const Buffer::Slice& slice, const kor::u32 index)
     { Rebind(binding, Descriptor(slice.buffer, slice.offset, slice.size), index); }
 
     void DescriptorSet::Rebind(const std::string_view name, const Buffer::Slice& slice)
     { Rebind(name, Descriptor(slice.buffer, slice.offset, slice.size)); }
 
-    void DescriptorSet::Rebind(const glm::u32 binding, const ResourceRef<const BufferView>& bufferView, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding, const ResourceRef<const BufferView>& bufferView, const kor::u32 index)
     { Rebind(binding, Descriptor(bufferView), index); }
 
     void DescriptorSet::Rebind(const std::string_view name, const ResourceRef<const BufferView>& bufferView)
     { Rebind(name, Descriptor(bufferView)); }
 
-    void DescriptorSet::Rebind(const glm::u32 binding, const ResourceRef<const ImageView>& imageView, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding, const ResourceRef<const ImageView>& imageView, const kor::u32 index)
     { Rebind(binding, Descriptor(imageView), index); }
 
-    void DescriptorSet::Rebind(const glm::u32 binding, const ResourceRef<const ImageView>& imageView,
-                              const ResourceRef<const Sampler>& sampler, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding, const ResourceRef<const ImageView>& imageView,
+                              const ResourceRef<const Sampler>& sampler, const kor::u32 index)
     { Rebind(binding, Descriptor(imageView, sampler), index); }
 
-    void DescriptorSet::Rebind(const glm::u32 binding, const ResourceRef<const Sampler>& sampler, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding, const ResourceRef<const Sampler>& sampler, const kor::u32 index)
     { Rebind(binding, Descriptor(sampler), index); }
 
-    void DescriptorSet::Rebind(const glm::u32 binding,
-                              const ResourceRef<const AccelerationStructure>& accelerationStructure, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding,
+                              const ResourceRef<const AccelerationStructure>& accelerationStructure, const kor::u32 index)
     { Rebind(binding, Descriptor(accelerationStructure), index); }
 
     void DescriptorSet::Rebind(const std::string_view name, const Descriptor& descriptor)

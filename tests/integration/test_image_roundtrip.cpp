@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "buffer.h"
 #include "commandBuffer.h"
@@ -28,7 +28,7 @@ using kor::ResourceRef;
 
 namespace {
 
-using Pixel = glm::u8vec4; // RGBA8
+using Pixel = kor::U8Vec4; // RGBA8
 
 constexpr std::uint32_t kW = 8;
 constexpr std::uint32_t kH = 8;
@@ -36,7 +36,7 @@ constexpr std::uint32_t kH = 8;
 // Copies a whole RGBA8 image into a fresh readback buffer and returns its pixels.
 std::vector<Pixel> readbackPixels(const kor::Resource<Image>& image, std::uint32_t w, std::uint32_t h) {
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(w) * h * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(w) * h * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -67,22 +67,22 @@ TEST_F(GpuTest, UploadReadbackRGBA8) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst)   // needed for the upload
       .SetData(std::span<const Pixel>(src));
     auto image = ib.Build();
 
     ASSERT_TRUE(static_cast<bool>(image));
-    EXPECT_EQ(image->Extent(), glm::uvec3(kW, kH, 1));
+    EXPECT_EQ(image->Extent(), kor::UVec3(kW, kH, 1));
     EXPECT_EQ(image->PixelFormat(), Image::Format::eRGBA8_UNORM);
 
     const std::vector<Pixel> out = readbackPixels(image, kW, kH);
     ASSERT_EQ(out.size(), src.size());
     for (std::size_t i = 0; i < src.size(); ++i) {
-        EXPECT_EQ(out[i].r, src[i].r) << "pixel " << i << " channel r";
-        EXPECT_EQ(out[i].g, src[i].g) << "pixel " << i << " channel g";
-        EXPECT_EQ(out[i].b, src[i].b) << "pixel " << i << " channel b";
-        EXPECT_EQ(out[i].a, src[i].a) << "pixel " << i << " channel a";
+        EXPECT_EQ(out[i].x, src[i].x) << "pixel " << i << " channel r";
+        EXPECT_EQ(out[i].y, src[i].y) << "pixel " << i << " channel g";
+        EXPECT_EQ(out[i].z, src[i].z) << "pixel " << i << " channel b";
+        EXPECT_EQ(out[i].w, src[i].w) << "pixel " << i << " channel a";
     }
 }
 
@@ -92,12 +92,12 @@ TEST_F(GpuTest, ClearColorImageThenReadback) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst);
     auto image = ib.Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(image, glm::vec4{1.f, 0.f, 0.f, 1.f});
+        cb.ClearColorImage(image, kor::Vec4{1.f, 0.f, 0.f, 1.f});
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     // Separate submit: SingleTimeCommand waits idle between the two, and the copy's
@@ -106,10 +106,10 @@ TEST_F(GpuTest, ClearColorImageThenReadback) {
     const std::vector<Pixel> out = readbackPixels(image, kW, kH);
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
     for (std::size_t i = 0; i < out.size(); ++i) {
-        EXPECT_EQ(out[i].r, 255) << "pixel " << i;
-        EXPECT_EQ(out[i].g, 0)   << "pixel " << i;
-        EXPECT_EQ(out[i].b, 0)   << "pixel " << i;
-        EXPECT_EQ(out[i].a, 255) << "pixel " << i;
+        EXPECT_EQ(out[i].x, 255) << "pixel " << i;
+        EXPECT_EQ(out[i].y, 0)   << "pixel " << i;
+        EXPECT_EQ(out[i].z, 0)   << "pixel " << i;
+        EXPECT_EQ(out[i].w, 255) << "pixel " << i;
     }
 }
 
@@ -134,13 +134,13 @@ TEST_F(GpuTest, SubRegionReadback) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst)
       .SetData(std::span<const Pixel>(src));
     auto image = ib.Build();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kSubW) * kSubH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kSubW) * kSubH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -158,10 +158,10 @@ TEST_F(GpuTest, SubRegionReadback) {
         for (std::uint32_t i = 0; i < kSubW; ++i) {
             const Pixel& got = out[j * kSubW + i];
             const Pixel& want = src[(kOffY + j) * kW + (kOffX + i)];
-            EXPECT_EQ(got.r, want.r) << "sub texel (" << i << "," << j << ") r";
-            EXPECT_EQ(got.g, want.g) << "sub texel (" << i << "," << j << ") g";
-            EXPECT_EQ(got.b, want.b) << "sub texel (" << i << "," << j << ") b";
-            EXPECT_EQ(got.a, want.a) << "sub texel (" << i << "," << j << ") a";
+            EXPECT_EQ(got.x, want.x) << "sub texel (" << i << "," << j << ") r";
+            EXPECT_EQ(got.y, want.y) << "sub texel (" << i << "," << j << ") g";
+            EXPECT_EQ(got.z, want.z) << "sub texel (" << i << "," << j << ") b";
+            EXPECT_EQ(got.w, want.w) << "sub texel (" << i << "," << j << ") a";
         }
     }
 }
@@ -179,12 +179,12 @@ TEST_F(GpuTest, PartialUploadIntoSubRegion) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst);
     auto image = ib.Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(image, glm::vec4{0.f, 0.f, 0.f, 1.f});
+        cb.ClearColorImage(image, kor::Vec4{0.f, 0.f, 0.f, 1.f});
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     const std::vector<Pixel> patch(kSubW * kSubH, kPatch);
@@ -208,10 +208,10 @@ TEST_F(GpuTest, PartialUploadIntoSubRegion) {
             const bool inPatch = x >= kOffX && x < kOffX + kSubW && y >= kOffY && y < kOffY + kSubH;
             const Pixel& want = inPatch ? kPatch : kBase;
             const Pixel& got = out[y * kW + x];
-            EXPECT_EQ(got.r, want.r) << "texel (" << x << "," << y << ") r";
-            EXPECT_EQ(got.g, want.g) << "texel (" << x << "," << y << ") g";
-            EXPECT_EQ(got.b, want.b) << "texel (" << x << "," << y << ") b";
-            EXPECT_EQ(got.a, want.a) << "texel (" << x << "," << y << ") a";
+            EXPECT_EQ(got.x, want.x) << "texel (" << x << "," << y << ") r";
+            EXPECT_EQ(got.y, want.y) << "texel (" << x << "," << y << ") g";
+            EXPECT_EQ(got.z, want.z) << "texel (" << x << "," << y << ") b";
+            EXPECT_EQ(got.w, want.w) << "texel (" << x << "," << y << ") a";
         }
     }
 }
@@ -225,13 +225,13 @@ TEST_F(GpuTest, OversizeCopyRejectedNotSubmitted) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst);
     auto image = ib.Build();
 
     // Deliberately tiny readback buffer — far too small for the requested region.
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(sizeof(Pixel)))
+    rb.SetRawSize(static_cast<kor::i64>(sizeof(Pixel)))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -258,7 +258,7 @@ TEST_F(GpuTest, ByteSizedGuardRejectsLargeFormatOverflow) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA32_SFLOAT)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst);
     auto image = ib.Build();
 
@@ -296,7 +296,7 @@ TEST_F(GpuTest, BlitFilteringIsHonoured) {
         Image::Builder ib;
         ib.SetType(Image::Type::e2D)
           .SetFormat(Image::Format::eRGBA8_UNORM)
-          .SetExtent(glm::uvec2{2, 2})
+          .SetExtent(kor::UVec2{2, 2})
           .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst)
           .SetData(std::span<const Pixel>(checker));
         return ib.Build();
@@ -307,7 +307,7 @@ TEST_F(GpuTest, BlitFilteringIsHonoured) {
         Image::Builder ib;
         ib.SetType(Image::Type::e2D)
           .SetFormat(Image::Format::eRGBA8_UNORM)
-          .SetExtent(glm::uvec2{1, 1})
+          .SetExtent(kor::UVec2{1, 1})
           .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst);
         auto destination = ib.Build();
 
@@ -318,7 +318,7 @@ TEST_F(GpuTest, BlitFilteringIsHonoured) {
 
         const std::vector<Pixel> out = readbackPixels(destination, 1, 1);
         EXPECT_EQ(out.size(), 1u);
-        return out.front().r;
+        return out.front().x;
     };
 
     const int linear = blitTo1x1(kor::Filter::eLinear);
@@ -341,7 +341,7 @@ TEST_F(GpuTest, PartialRangeImageBarrierStaysInBounds) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{8, 8})
+      .SetExtent(kor::UVec2{8, 8})
       .SetMipLevels(4) // 8 -> 4 -> 2 -> 1
       .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst);
     auto image = ib.Build();

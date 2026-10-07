@@ -14,7 +14,7 @@
 #pragma once
 #include <optional>
 #include <functional>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include <flags.h>
 #include <map>
@@ -48,7 +48,7 @@ namespace kor
     {
         kor::ResourceRef<const Shader> controlShader;   ///< Decides how finely each patch is subdivided.
         kor::ResourceRef<const Shader> evalShader;      ///< Positions each generated vertex.
-        glm::u32 patchControlPoints = 3;                ///< Vertices per patch.
+        kor::u32 patchControlPoints = 3;                ///< Vertices per patch.
     };
 
     /**
@@ -212,8 +212,8 @@ namespace kor
              * @throws std::runtime_error if the accumulated constants exceed the internal buffer.
              */
             template<typename T> requires std::is_trivially_copyable_v<T>
-            Builder& SetSpecializationConstant(glm::u32 id, T value) {
-                const glm::u32 valueSize = sizeof(T);
+            Builder& SetSpecializationConstant(kor::u32 id, T value) {
+                const kor::u32 valueSize = sizeof(T);
                 if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
                     throw std::runtime_error("Exceeded maximum specialization constant data size");
                 }
@@ -223,7 +223,7 @@ namespace kor
                 return *this;
             }
 
-            std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
+            std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> specConstantsMetadata {};
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
 
             /** @brief One build attempt. Internal: prefer Build(). */
@@ -237,7 +237,7 @@ namespace kor
             [[nodiscard]] kor::Resource<GraphicsPipeline> Build(std::source_location where = std::source_location::current()) const;
 
         private:
-            glm::u32 _currentSpecConstantSize = 0;
+            kor::u32 _currentSpecConstantSize = 0;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */
@@ -292,7 +292,7 @@ namespace kor
         std::optional<std::vector<VertexInputAttributeDescription>> _vertexAttributeDescriptions;
         std::optional<std::vector<VertexInputBindingDescription>> _vertexBindingDescriptions;
 
-        std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> _specConstantsMetadata;
+        std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> _specConstantsMetadata;
         std::vector<std::byte> _specConstantsData;
     };
 }

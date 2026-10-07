@@ -286,7 +286,7 @@ TEST(VertexLayoutResolve, AMatrixInputIsFedByAnAttributeThatFillsItsColumns) {
     });
     ASSERT_TRUE(resolved.has_value()) << resolved.error().message;
     ASSERT_EQ(resolved->size(), 4u);
-    for (glm::u32 i = 0; i < 4; ++i) {
+    for (kor::u32 i = 0; i < 4; ++i) {
         EXPECT_EQ((*resolved)[i].location, 3u + i);
         EXPECT_EQ((*resolved)[i].offset, 16u * i) << "a column of four floats apart";
         EXPECT_EQ((*resolved)[i].channelCount, 4u);

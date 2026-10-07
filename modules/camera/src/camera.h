@@ -11,7 +11,7 @@
 #include <optional>
 #include <string>
 
-#include <glm/gtc/matrix_transform.hpp>
+#include <kmath/transform.h>
 
 #include <buffer.h>
 #include <context.h>
@@ -36,50 +36,50 @@ namespace kcam
     class CameraBase : public Interface
     {
     public:
-        [[nodiscard]] glm::vec3 Position() const override { return _position; }
-        [[nodiscard]] glm::quat Rotation() const override { return _rotation; }
-        [[nodiscard]] glm::vec3 Forward() const override { return _rotation * glm::vec3(0.f, 0.f, -1.f); }
+        [[nodiscard]] kor::Vec3 Position() const override { return _position; }
+        [[nodiscard]] kor::Quat Rotation() const override { return _rotation; }
+        [[nodiscard]] kor::Vec3 Forward() const override { return _rotation * kor::Vec3(0.f, 0.f, -1.f); }
         [[nodiscard]] std::string_view Name() const override { return _name; }
 
-        void SetPosition(const glm::vec3 position) override
+        void SetPosition(const kor::Vec3 position) override
         {
             _position = position;
             _viewDirty = true;
         }
 
-        void SetRotation(const glm::quat rotation) override
+        void SetRotation(const kor::Quat rotation) override
         {
-            _rotation = glm::normalize(rotation);
+            _rotation = kor::Normalize(rotation);
             _viewDirty = true;
         }
 
-        void LookAt(const glm::vec3 target, const glm::vec3 up) override
+        void LookAt(const kor::Vec3 target, const kor::Vec3 up) override
         {
-            const glm::vec3 to = target - _position;
-            if (glm::dot(to, to) < 1e-12f) return;  // looking at yourself is not a direction
-            SetRotation(glm::quatLookAt(glm::normalize(to), up));
+            const kor::Vec3 to = target - _position;
+            if (kor::Dot(to, to) < 1e-12f) return;  // looking at yourself is not a direction
+            SetRotation(kor::Quat::LookRotation(kor::Normalize(to), up));
         }
 
-        [[nodiscard]] const glm::mat4& View() const override
+        [[nodiscard]] const kor::Mat4& View() const override
         {
             if (_viewDirty) {
                 // inverse(translate * rotate), assembled directly rather than inverted.
-                _view = glm::mat4_cast(glm::conjugate(_rotation)) *
-                        glm::translate(glm::mat4(1.f), -_position);
+                _view = kor::ToMat4(kor::Conjugate(_rotation)) *
+                        kor::Translate(kor::Mat4(1.f), -_position);
                 _viewDirty = false;
                 _viewProjectionDirty = true;
             }
             return _view;
         }
 
-        [[nodiscard]] const glm::mat4& Projection() const override
+        [[nodiscard]] const kor::Mat4& Projection() const override
         {
-            const glm::mat4& base = unjitteredProjection();
+            const kor::Mat4& base = unjitteredProjection();
             if (_jitteredDirty) {
                 // A translation in clip space, applied after the projection: x' = x + jitter.x * w.
                 // It moves the whole image by a fraction of a pixel and leaves the frustum's shape
                 // — [0][0] and [1][1] — alone, for a perspective and an orthographic camera alike.
-                glm::mat4 shift(1.f);
+                kor::Mat4 shift(1.f);
                 shift[3][0] = _jitter.x;
                 shift[3][1] = _jitter.y;
                 _jitteredProjection = shift * base;
@@ -89,10 +89,10 @@ namespace kcam
             return _jitteredProjection;
         }
 
-        [[nodiscard]] const glm::mat4& ViewProjection() const override
+        [[nodiscard]] const kor::Mat4& ViewProjection() const override
         {
-            const glm::mat4& v = View();
-            const glm::mat4& p = Projection();
+            const kor::Mat4& v = View();
+            const kor::Mat4& p = Projection();
             if (_viewProjectionDirty) {
                 _viewProjection = p * v;
                 _unjitteredViewProjection = unjitteredProjection() * v;
@@ -106,18 +106,18 @@ namespace kcam
         void SetJitter(const bool enabled) override
         {
             _jitterEnabled = enabled;
-            if (!enabled) setJitter(glm::vec2(0.f));
+            if (!enabled) setJitter(kor::Vec2(0.f));
         }
         [[nodiscard]] bool Jittering() const override { return _jitterEnabled; }
-        [[nodiscard]] glm::vec2 Jitter() const override { return _jitter; }
+        [[nodiscard]] kor::Vec2 Jitter() const override { return _jitter; }
 
-        [[nodiscard]] const glm::mat4& UnjitteredViewProjection() const override
+        [[nodiscard]] const kor::Mat4& UnjitteredViewProjection() const override
         {
             (void)ViewProjection();
             return _unjitteredViewProjection;
         }
 
-        [[nodiscard]] const glm::mat4& PreviousViewProjection() const override
+        [[nodiscard]] const kor::Mat4& PreviousViewProjection() const override
         {
             return _hasPrevious ? _previousViewProjection : UnjitteredViewProjection();
         }
@@ -179,10 +179,10 @@ namespace kcam
             if (semantic == sem::ProjectionMatrix)     { slot.Set(Projection()); return true; }
             if (semantic == sem::ViewProjectionMatrix) { slot.Set(ViewProjection()); return true; }
 
-            if (semantic == sem::InverseViewMatrix)       { slot.Set(glm::inverse(View())); return true; }
-            if (semantic == sem::InverseProjectionMatrix) { slot.Set(glm::inverse(Projection())); return true; }
+            if (semantic == sem::InverseViewMatrix)       { slot.Set(kor::Inverse(View())); return true; }
+            if (semantic == sem::InverseProjectionMatrix) { slot.Set(kor::Inverse(Projection())); return true; }
             if (semantic == sem::InverseViewProjectionMatrix) {
-                slot.Set(glm::inverse(ViewProjection()));
+                slot.Set(kor::Inverse(ViewProjection()));
                 return true;
             }
             if (semantic == sem::UnjitteredViewProjectionMatrix) { slot.Set(UnjitteredViewProjection()); return true; }
@@ -191,10 +191,10 @@ namespace kcam
 
             if (semantic == sem::Position) { slot.Set(Position()); return true; }
             if (semantic == sem::Forward)  { slot.Set(Forward()); return true; }
-            if (semantic == sem::Up)       { slot.Set(Rotation() * glm::vec3(0.f, 1.f, 0.f)); return true; }
-            if (semantic == sem::Right)    { slot.Set(Rotation() * glm::vec3(1.f, 0.f, 0.f)); return true; }
+            if (semantic == sem::Up)       { slot.Set(Rotation() * kor::Vec3(0.f, 1.f, 0.f)); return true; }
+            if (semantic == sem::Right)    { slot.Set(Rotation() * kor::Vec3(1.f, 0.f, 0.f)); return true; }
 
-            const glm::vec4 depth = depthRange();
+            const kor::Vec4 depth = depthRange();
             if (semantic == sem::NearPlane)  { slot.Set(depth.x); return true; }
             if (semantic == sem::FarPlane)   { slot.Set(depth.y); return true; }
             if (semantic == sem::DepthRange) { slot.Set(depth); return true; }
@@ -206,17 +206,17 @@ namespace kcam
 
     protected:
         /** @brief x = near, y = far, z = far - near, w = 1 / (far - near). */
-        [[nodiscard]] virtual glm::vec4 depthRange() const = 0;
+        [[nodiscard]] virtual kor::Vec4 depthRange() const = 0;
         template<typename BuilderType>
         explicit CameraBase(const BuilderType& builder)
-            : _name(builder.name), _position(builder.position), _rotation(glm::normalize(builder.rotation)),
+            : _name(builder.name), _position(builder.position), _rotation(kor::Normalize(builder.rotation)),
               _scene(kor::detail::CurrentSceneLife())
         {
             _controller.set(builder.controller);
             _controller.setReleased(builder.released);
         }
 
-        [[nodiscard]] virtual glm::mat4 computeProjection() const = 0;
+        [[nodiscard]] virtual kor::Mat4 computeProjection() const = 0;
 
         void markProjectionDirty() { _projectionDirty = true; }
 
@@ -227,7 +227,7 @@ namespace kcam
          * @brief The size the camera's image is rendered at, which one pixel of jitter is a fraction of.
          * The window, unless the camera knows better (a perspective camera following a viewport).
          */
-        [[nodiscard]] virtual std::optional<glm::uvec2> renderExtent() const
+        [[nodiscard]] virtual std::optional<kor::UVec2> renderExtent() const
         {
             if (const auto* scene = kor::Scene::Current()) return scene->SceneWindow().Extent();
             return std::nullopt;
@@ -235,7 +235,7 @@ namespace kcam
 
     private:
         /** @brief Projection without the jitter, Y already pointing down. */
-        [[nodiscard]] const glm::mat4& unjitteredProjection() const
+        [[nodiscard]] const kor::Mat4& unjitteredProjection() const
         {
             if (_projectionDirty) {
                 _projection = computeProjection();
@@ -249,7 +249,7 @@ namespace kcam
             return _projection;
         }
 
-        void setJitter(const glm::vec2 jitter)
+        void setJitter(const kor::Vec2 jitter)
         {
             if (jitter == _jitter) return;
             _jitter = jitter;
@@ -261,9 +261,9 @@ namespace kcam
         {
             if (!_jitterEnabled) return;
             const auto extent = renderExtent();
-            if (!extent || extent->x == 0 || extent->y == 0) { setJitter(glm::vec2(0.f)); return; }
+            if (!extent || extent->x == 0 || extent->y == 0) { setJitter(kor::Vec2(0.f)); return; }
 
-            const auto halton = [](glm::u32 index, const glm::u32 base) {
+            const auto halton = [](kor::u32 index, const kor::u32 base) {
                 float result = 0.f, fraction = 1.f;
                 for (++index; index > 0; index /= base) {
                     fraction /= static_cast<float>(base);
@@ -272,33 +272,33 @@ namespace kcam
                 return result;
             };
             // [-0.5, 0.5) of a pixel, and a pixel is 2 / extent in NDC.
-            const glm::vec2 pixel(halton(_jitterIndex, 2) - 0.5f, halton(_jitterIndex, 3) - 0.5f);
-            setJitter(pixel * 2.f / glm::vec2(*extent));
+            const kor::Vec2 pixel(halton(_jitterIndex, 2) - 0.5f, halton(_jitterIndex, 3) - 0.5f);
+            setJitter(pixel * 2.f / kor::Vec2(*extent));
             _jitterIndex = (_jitterIndex + 1) % 8;
         }
 
         std::string _name;
-        glm::vec3 _position;
-        glm::quat _rotation;
+        kor::Vec3 _position;
+        kor::Quat _rotation;
         CameraController _controller;
         std::weak_ptr<kor::detail::SceneLife> _scene;   // the scene it was made in
 
         bool _jitterEnabled = false;
-        glm::u32 _jitterIndex = 0;
-        glm::vec2 _jitter { 0.f };
-        glm::mat4 _lastUnjittered { 1.f };          // what this frame serialized
-        glm::mat4 _previousViewProjection { 1.f };  // what the frame before serialized
+        kor::u32 _jitterIndex = 0;
+        kor::Vec2 _jitter { 0.f };
+        kor::Mat4 _lastUnjittered { 1.f };          // what this frame serialized
+        kor::Mat4 _previousViewProjection { 1.f };  // what the frame before serialized
         bool _hasSerialized = false;
         bool _hasPrevious = false;
 
         // Lazy caches: the setters only flip a flag, so a burst of changes costs one recompute
         // at the next read. All mutable because reading through a const interface is still
         // allowed to fill the cache.
-        mutable glm::mat4 _view { 1.f };
-        mutable glm::mat4 _projection { 1.f };            // unjittered
-        mutable glm::mat4 _jitteredProjection { 1.f };
-        mutable glm::mat4 _viewProjection { 1.f };
-        mutable glm::mat4 _unjitteredViewProjection { 1.f };
+        mutable kor::Mat4 _view { 1.f };
+        mutable kor::Mat4 _projection { 1.f };            // unjittered
+        mutable kor::Mat4 _jitteredProjection { 1.f };
+        mutable kor::Mat4 _viewProjection { 1.f };
+        mutable kor::Mat4 _unjitteredViewProjection { 1.f };
         mutable bool _viewDirty = true;
         mutable bool _projectionDirty = true;
         mutable bool _jitteredDirty = true;
@@ -331,17 +331,17 @@ namespace kcam
         void SetAspectSource(AspectSource source) override;
         [[nodiscard]] const AspectSource& AspectSourceSettings() const override { return _aspectSource; }
 
-        [[nodiscard]] glm::vec4 depthRange() const override
+        [[nodiscard]] kor::Vec4 depthRange() const override
         { return { _zNear, _zFar, _zFar - _zNear, 1.f / (_zFar - _zNear) }; }
 
     private:
-        [[nodiscard]] glm::mat4 computeProjection() const override;
+        [[nodiscard]] kor::Mat4 computeProjection() const override;
 
         /** @brief The aspect source, before the matrices are written — so a resize reaches the GPU that frame. */
         void beforeSerialize() override { adoptSourceAspect(); }
 
         /** @brief What the aspect follows, if anything; else the window. */
-        [[nodiscard]] std::optional<glm::uvec2> renderExtent() const override;
+        [[nodiscard]] std::optional<kor::UVec2> renderExtent() const override;
 
         /** @brief Matches the aspect to whatever it follows, if that has a usable size. */
         void adoptSourceAspect();
@@ -358,18 +358,18 @@ namespace kcam
     public:
         explicit OrthoImpl(const Builder& builder);
 
-        [[nodiscard]] glm::vec4 Bounds() const override { return { _left, _right, _bottom, _top }; }
+        [[nodiscard]] kor::Vec4 Bounds() const override { return { _left, _right, _bottom, _top }; }
         [[nodiscard]] float ZNear() const override { return _zNear; }
         [[nodiscard]] float ZFar() const override { return _zFar; }
 
         void SetBounds(float left, float right, float bottom, float top) override;
         void SetNearFar(float zNear, float zFar) override;
 
-        [[nodiscard]] glm::vec4 depthRange() const override
+        [[nodiscard]] kor::Vec4 depthRange() const override
         { return { _zNear, _zFar, _zFar - _zNear, 1.f / (_zFar - _zNear) }; }
 
     private:
-        [[nodiscard]] glm::mat4 computeProjection() const override;
+        [[nodiscard]] kor::Mat4 computeProjection() const override;
 
         float _left, _right, _bottom, _top, _zNear, _zFar;
     };

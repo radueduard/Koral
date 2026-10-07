@@ -17,8 +17,8 @@
 
 namespace kor
 {
-    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBinding(glm::u32 binding, DescriptorType type,
-        glm::u32 count, Shader::AccessKind access, Flags<Shader::Stage> stages, bool active)
+    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBinding(kor::u32 binding, DescriptorType type,
+        kor::u32 count, Shader::AccessKind access, Flags<Shader::Stage> stages, bool active)
     {
         // Defer the failure to Build() (which returns a Result) rather than throwing here.
         if (_bindings.contains(binding)) {
@@ -30,7 +30,7 @@ namespace kor
         return *this;
     }
 
-    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBinding(const glm::u32 binding, Binding description)
+    DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBinding(const kor::u32 binding, Binding description)
     {
         // Same deferral as the overload above: report at Build(), which can return it.
         if (_bindings.contains(binding)) {
@@ -43,9 +43,9 @@ namespace kor
     }
 
     DescriptorSetLayout::Builder& DescriptorSetLayout::Builder::AddBlockBinding(
-        const glm::u32 binding, const DescriptorType type, const glm::u32 count,
+        const kor::u32 binding, const DescriptorType type, const kor::u32 count,
         const Shader::AccessKind access, const Flags<Shader::Stage> stages, const bool active,
-        std::vector<Shader::BlockMember> members, const glm::u32 blockSize)
+        std::vector<Shader::BlockMember> members, const kor::u32 blockSize)
     {
         AddBinding(binding, type, count, access, stages, active);
         if (const auto it = _bindings.find(binding); it != _bindings.end()) {
@@ -89,7 +89,7 @@ namespace kor
         return changed;
     }
 
-    std::optional<glm::u32> DescriptorSetLayout::FindBinding(const std::string_view name) const
+    std::optional<kor::u32> DescriptorSetLayout::FindBinding(const std::string_view name) const
     {
         if (name.empty()) return std::nullopt;
         for (const auto& [binding, description] : _bindings) {
@@ -133,7 +133,7 @@ namespace kor
         return Materialize<DescriptorSetLayout>(*this, "DescriptorSetLayout", where);
     }
 
-    DescriptorType DescriptorSetLayout::BindingType(const glm::u32 binding) const
+    DescriptorType DescriptorSetLayout::BindingType(const kor::u32 binding) const
     {
         if (!_bindings.contains(binding)) {
             throw std::runtime_error("Binding " + std::to_string(binding) + " does not exist in the layout!");

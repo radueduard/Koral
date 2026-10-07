@@ -124,9 +124,9 @@ namespace kimg
             }
 
             const bool wholeImage = slices.size() > 1
-                || static_cast<glm::u32>(slices.size()) == image.MipLevels() * image.ArrayLayers();
-            const glm::u32 levels = wholeImage ? image.MipLevels() : 1;
-            const glm::u32 layers = wholeImage ? image.ArrayLayers() : 1;
+                || static_cast<kor::u32>(slices.size()) == image.MipLevels() * image.ArrayLayers();
+            const kor::u32 levels = wholeImage ? image.MipLevels() : 1;
+            const kor::u32 layers = wholeImage ? image.ArrayLayers() : 1;
 
             // Six 2D layers is a cube map as far as KTX is concerned, and saying so is what lets the
             // file be loaded back as one rather than as an array that happens to have six entries.
@@ -155,8 +155,8 @@ namespace kimg
             // The slices arrive in the order the caller read them: mip-major, layer-minor, which is
             // the order KTX stores them in too.
             std::size_t index = 0;
-            for (glm::u32 level = 0; level < levels; ++level) {
-                for (glm::u32 layer = 0; layer < layers; ++layer) {
+            for (kor::u32 level = 0; level < levels; ++level) {
+                for (kor::u32 layer = 0; layer < layers; ++layer) {
                     if (index >= slices.size()) break;
                     const auto& slice = slices[index++];
                     const auto set = ktxTexture_SetImageFromMemory(
@@ -187,8 +187,8 @@ namespace kimg
             std::vector<detail::ReadBack> slices;
             slices.reserve(static_cast<std::size_t>(image->MipLevels()) * image->ArrayLayers());
 
-            for (glm::u32 level = 0; level < image->MipLevels(); ++level) {
-                for (glm::u32 layer = 0; layer < image->ArrayLayers(); ++layer) {
+            for (kor::u32 level = 0; level < image->MipLevels(); ++level) {
+                for (kor::u32 layer = 0; layer < image->ArrayLayers(); ++layer) {
                     const auto extent = detail::mipExtent(*image, level);
                     auto data = detail::readBack(image, Subimage{
                         .mipLevel = level, .arrayLayer = layer, .offset = { 0, 0, 0 }, .extent = extent });

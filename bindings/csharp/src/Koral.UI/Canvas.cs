@@ -1,4 +1,3 @@
-using System.Numerics;
 using Koral.UI.Native;
 
 namespace Koral.UI;
@@ -108,9 +107,9 @@ public sealed unsafe class Canvas : IDisposable
     public Canvas Save() { KuiNative.kui_canvas_save(Native); return this; }
     public Canvas Restore() { KuiNative.kui_canvas_restore(Native); return this; }
     public ulong SaveCount => KuiNative.kui_canvas_save_count(Native);
-    public Canvas Translate(Vector2 by) { KuiNative.kui_canvas_translate(Native, by.Native()); return this; }
-    public Canvas Scale(Vector2 by) { KuiNative.kui_canvas_scale(Native, by.Native()); return this; }
-    public Canvas Scale(float by) => Scale(new Vector2(by));
+    public Canvas Translate(Vec2 by) { KuiNative.kui_canvas_translate(Native, by.Native()); return this; }
+    public Canvas Scale(Vec2 by) { KuiNative.kui_canvas_scale(Native, by.Native()); return this; }
+    public Canvas Scale(float by) => Scale(new Vec2(by));
     /// <summary>Clockwise on screen, in radians.</summary>
     public Canvas Rotate(float radians) { KuiNative.kui_canvas_rotate(Native, radians); return this; }
     public Canvas Concat(Transform transform) { KuiNative.kui_canvas_concat(Native, transform.Native); return this; }
@@ -123,43 +122,43 @@ public sealed unsafe class Canvas : IDisposable
     // -- shapes
     public Canvas DrawRect(Rect rect, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_rect(Native, rect.Native, &p); return Done(); }
     public Canvas DrawRRect(RRect rrect, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_rrect(Native, rrect.Rect.Native, rrect.Radii.Native, &p); return Done(); }
-    public Canvas DrawCircle(Vector2 center, float radius, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_circle(Native, center.Native(), radius, &p); return Done(); }
+    public Canvas DrawCircle(Vec2 center, float radius, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_circle(Native, center.Native(), radius, &p); return Done(); }
     public Canvas DrawOval(Rect rect, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_oval(Native, rect.Native, &p); return Done(); }
     /// <summary>An arc of the circle at <paramref name="center"/>, clockwise; a pie slice with <paramref name="useCenter"/>, else only stroked.</summary>
-    public Canvas DrawArc(Vector2 center, float radius, float start, float sweep, bool useCenter, Paint paint)
+    public Canvas DrawArc(Vec2 center, float radius, float start, float sweep, bool useCenter, Paint paint)
     {
         var p = paint.Native;
         KuiNative.kui_canvas_draw_arc(Native, center.Native(), radius, start, sweep, KuiNative.Bool(useCenter), &p);
         return Done();
     }
-    public Canvas DrawLine(Vector2 from, Vector2 to, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_line(Native, from.Native(), to.Native(), &p); return Done(); }
-    public Canvas DrawTriangle(Vector2 a, Vector2 b, Vector2 c, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_triangle(Native, a.Native(), b.Native(), c.Native(), &p); return Done(); }
-    public Canvas DrawQuadraticBezier(Vector2 from, Vector2 control, Vector2 to, Paint paint)
+    public Canvas DrawLine(Vec2 from, Vec2 to, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_line(Native, from.Native(), to.Native(), &p); return Done(); }
+    public Canvas DrawTriangle(Vec2 a, Vec2 b, Vec2 c, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_triangle(Native, a.Native(), b.Native(), c.Native(), &p); return Done(); }
+    public Canvas DrawQuadraticBezier(Vec2 from, Vec2 control, Vec2 to, Paint paint)
     {
         var p = paint.Native;
         KuiNative.kui_canvas_draw_quadratic_bezier(Native, from.Native(), control.Native(), to.Native(), &p);
         return Done();
     }
-    public Canvas DrawCubicBezier(Vector2 from, Vector2 control1, Vector2 control2, Vector2 to, Paint paint)
+    public Canvas DrawCubicBezier(Vec2 from, Vec2 control1, Vec2 control2, Vec2 to, Paint paint)
     {
         var p = paint.Native;
         KuiNative.kui_canvas_draw_cubic_bezier(Native, from.Native(), control1.Native(), control2.Native(), to.Native(), &p);
         return Done();
     }
-    public Canvas DrawPolyline(ReadOnlySpan<Vector2> points, Paint paint)
+    public Canvas DrawPolyline(ReadOnlySpan<Vec2> points, Paint paint)
     {
         var p = paint.Native;
-        fixed (Vector2* v = points) KuiNative.kui_canvas_draw_polyline(Native, (KuiVec2*)v, (nuint)points.Length, &p);
+        fixed (Vec2* v = points) KuiNative.kui_canvas_draw_polyline(Native, (KuiVec2*)v, (nuint)points.Length, &p);
         return Done();
     }
-    public Canvas DrawPolygon(ReadOnlySpan<Vector2> points, Paint paint)
+    public Canvas DrawPolygon(ReadOnlySpan<Vec2> points, Paint paint)
     {
         var p = paint.Native;
-        fixed (Vector2* v = points) KuiNative.kui_canvas_draw_polygon(Native, (KuiVec2*)v, (nuint)points.Length, &p);
+        fixed (Vec2* v = points) KuiNative.kui_canvas_draw_polygon(Native, (KuiVec2*)v, (nuint)points.Length, &p);
         return Done();
     }
     public Canvas DrawPath(Path path, Paint paint) { var p = paint.Native; KuiNative.kui_canvas_draw_path(Native, path.Native, &p); return Done(); }
-    public Canvas DrawShadow(RRect rrect, Color color, float blur, Vector2 offset = default, float spread = 0)
+    public Canvas DrawShadow(RRect rrect, Color color, float blur, Vec2 offset = default, float spread = 0)
     {
         KuiNative.kui_canvas_draw_shadow(Native, rrect.Rect.Native, rrect.Radii.Native, color.Native, blur, offset.Native(), spread);
         return Done();
@@ -179,9 +178,9 @@ public sealed unsafe class Canvas : IDisposable
         GC.KeepAlive(image);
         return Done();
     }
-    public Canvas DrawParagraph(Paragraph paragraph, Vector2 position) { KuiNative.kui_canvas_draw_paragraph(Native, paragraph.Native, position.Native()); return Done(); }
+    public Canvas DrawParagraph(Paragraph paragraph, Vec2 position) { KuiNative.kui_canvas_draw_paragraph(Native, paragraph.Native, position.Native()); return Done(); }
     /// <summary>One line of text. Lays it out every call: keep a <see cref="Paragraph"/> for text drawn often.</summary>
-    public Canvas DrawText(string text, Vector2 position, TextStyle style)
+    public Canvas DrawText(string text, Vec2 position, TextStyle style)
     {
         var s = style.Native;
         KuiNative.kui_canvas_draw_text(Native, text, position.Native(), &s);
@@ -208,22 +207,22 @@ public sealed unsafe class Canvas : IDisposable
     // -- the pen
     /// <summary>Starts the pen's path empty. The pen draws a path a segment at a time; Fill and Stroke draw it.</summary>
     public Canvas BeginPath() { KuiNative.kui_canvas_begin_path(Native); return this; }
-    public Canvas MoveTo(Vector2 point) { KuiNative.kui_canvas_move_to(Native, point.Native()); return this; }
-    public Canvas DrawLineTo(Vector2 point) { KuiNative.kui_canvas_draw_line_to(Native, point.Native()); return this; }
-    public Canvas DrawQuadTo(Vector2 control, Vector2 point) { KuiNative.kui_canvas_draw_quad_to(Native, control.Native(), point.Native()); return this; }
-    public Canvas DrawCubicTo(Vector2 control1, Vector2 control2, Vector2 point)
+    public Canvas MoveTo(Vec2 point) { KuiNative.kui_canvas_move_to(Native, point.Native()); return this; }
+    public Canvas DrawLineTo(Vec2 point) { KuiNative.kui_canvas_draw_line_to(Native, point.Native()); return this; }
+    public Canvas DrawQuadTo(Vec2 control, Vec2 point) { KuiNative.kui_canvas_draw_quad_to(Native, control.Native(), point.Native()); return this; }
+    public Canvas DrawCubicTo(Vec2 control1, Vec2 control2, Vec2 point)
     {
         KuiNative.kui_canvas_draw_cubic_to(Native, control1.Native(), control2.Native(), point.Native());
         return this;
     }
     /// <summary>An arc of the circle at <paramref name="center"/>, joined to the pen by a line.</summary>
-    public Canvas DrawArcTo(Vector2 center, float radius, float start, float sweep)
+    public Canvas DrawArcTo(Vec2 center, float radius, float start, float sweep)
     {
         KuiNative.kui_canvas_draw_arc_to(Native, center.Native(), radius, start, sweep);
         return this;
     }
     /// <summary>A rounded corner: towards <paramref name="corner"/>, turning along an arc of <paramref name="radius"/> to head for <paramref name="to"/>.</summary>
-    public Canvas DrawArcTo(Vector2 corner, Vector2 to, float radius)
+    public Canvas DrawArcTo(Vec2 corner, Vec2 to, float radius)
     {
         KuiNative.kui_canvas_draw_arc_to_corner(Native, corner.Native(), to.Native(), radius);
         return this;

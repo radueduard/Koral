@@ -45,7 +45,7 @@ namespace kui::detail
             return a * 0.5;
         }
 
-        bool insideContour(const c2::PathD& path, const glm::dvec2 p)
+        bool insideContour(const c2::PathD& path, const kor::DVec2 p)
         {
             bool in = false;
             for (std::size_t i = 0, j = path.size() - 1; i < path.size(); j = i++) {
@@ -92,11 +92,11 @@ namespace kui::detail
             {
                 const auto& path = *largest;
                 for (std::size_t i = 0; i < path.size(); ++i) {
-                    const glm::dvec2 a { path[i].x, path[i].y }, b { path[(i + 1) % path.size()].x, path[(i + 1) % path.size()].y };
-                    const glm::dvec2 d = b - a;
-                    const double len = glm::length(d);
+                    const kor::DVec2 a { path[i].x, path[i].y }, b { path[(i + 1) % path.size()].x, path[(i + 1) % path.size()].y };
+                    const kor::DVec2 d = b - a;
+                    const double len = kor::Length(d);
                     if (len < 1e-6) continue;
-                    const glm::dvec2 left { -d.y / len, d.x / len };
+                    const kor::DVec2 left { -d.y / len, d.x / len };
                     fillLeft = insideContour(path, (a + b) * 0.5 + left * 1e-3) ? 1.f : -1.f;
                     break;
                 }
@@ -108,8 +108,8 @@ namespace kui::detail
             const auto key = [](const double x, const double y) {
                 return std::pair { std::llround(x * 1000.0), std::llround(y * 1000.0) };   // Precision's grid
             };
-            std::map<std::pair<long long, long long>, glm::vec2> inset;
-            std::vector<std::vector<glm::vec2>> points(clean.size()), normals(clean.size());
+            std::map<std::pair<long long, long long>, kor::Vec2> inset;
+            std::vector<std::vector<kor::Vec2>> points(clean.size()), normals(clean.size());
             for (std::size_t c = 0; c < clean.size(); ++c) {
                 const auto& path = clean[c];
                 const std::size_t n = path.size();
@@ -117,22 +117,22 @@ namespace kui::detail
                 auto& pts = points[c];
                 pts.resize(n);
                 for (std::size_t i = 0; i < n; ++i) pts[i] = { static_cast<float>(path[i].x), static_cast<float>(path[i].y) };
-                std::vector<glm::vec2> edgeNormal(n);
+                std::vector<kor::Vec2> edgeNormal(n);
                 for (std::size_t i = 0; i < n; ++i) {
-                    const glm::vec2 d = pts[(i + 1) % n] - pts[i];
-                    const float len = glm::length(d);
-                    const glm::vec2 left = len > 0.f ? glm::vec2(-d.y, d.x) / len : glm::vec2(0.f);
+                    const kor::Vec2 d = pts[(i + 1) % n] - pts[i];
+                    const float len = kor::Length(d);
+                    const kor::Vec2 left = len > 0.f ? kor::Vec2(-d.y, d.x) / len : kor::Vec2(0.f);
                     edgeNormal[i] = -left * fillLeft;
                 }
                 auto& vertexNormal = normals[c];
                 vertexNormal.resize(n);
                 for (std::size_t i = 0; i < n; ++i) {
-                    const glm::vec2 a = edgeNormal[(i + n - 1) % n], b = edgeNormal[i];
-                    glm::vec2 m = a + b;
-                    const float l = glm::length(m);
+                    const kor::Vec2 a = edgeNormal[(i + n - 1) % n], b = edgeNormal[i];
+                    kor::Vec2 m = a + b;
+                    const float l = kor::Length(m);
                     if (l < 1e-4f) { vertexNormal[i] = b; continue; }
                     m /= l;
-                    const float cosHalf = std::max(glm::dot(m, b), 0.25f);   // at most 4x out, at a hairpin
+                    const float cosHalf = std::max(kor::Dot(m, b), 0.25f);   // at most 4x out, at a hairpin
                     vertexNormal[i] = m / cosHalf;
                 }
                 for (std::size_t i = 0; i < n; ++i) inset.try_emplace(key(path[i].x, path[i].y), pts[i] - vertexNormal[i] * half);
@@ -142,7 +142,7 @@ namespace kui::detail
                 if (t.size() != 3) continue;
                 for (const auto& p : t) {
                     const auto it = inset.find(key(p.x, p.y));
-                    out.Add(it != inset.end() ? it->second : glm::vec2(static_cast<float>(p.x), static_cast<float>(p.y)), 1.f);
+                    out.Add(it != inset.end() ? it->second : kor::Vec2(static_cast<float>(p.x), static_cast<float>(p.y)), 1.f);
                 }
             }
             for (std::size_t c = 0; c < clean.size(); ++c) {
@@ -151,8 +151,8 @@ namespace kui::detail
                 const std::size_t n = pts.size();
                 for (std::size_t i = 0; i < n; ++i) {
                     const std::size_t j = (i + 1) % n;
-                    const glm::vec2 a = pts[i] - vertexNormal[i] * half, b = pts[j] - vertexNormal[j] * half;
-                    const glm::vec2 a2 = pts[i] + vertexNormal[i] * half, b2 = pts[j] + vertexNormal[j] * half;
+                    const kor::Vec2 a = pts[i] - vertexNormal[i] * half, b = pts[j] - vertexNormal[j] * half;
+                    const kor::Vec2 a2 = pts[i] + vertexNormal[i] * half, b2 = pts[j] + vertexNormal[j] * half;
                     out.Add(a, 1.f); out.Add(b, 1.f); out.Add(b2, 0.f);
                     out.Add(a, 1.f); out.Add(b2, 0.f); out.Add(a2, 0.f);
                 }

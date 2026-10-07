@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Koral.UI.Native;
@@ -204,13 +203,13 @@ public sealed record Decoration
     public Radii Radius { get; set; }
     public Color ShadowColor { get; set; } = Color.Transparent;
     public float ShadowBlur { get; set; }
-    public Vector2 ShadowOffset { get; set; }
+    public Vec2 ShadowOffset { get; set; }
 
     public Decoration SetColor(Color value) { Color = value; return this; }
     public Decoration SetGradient(Gradient? value) { Gradient = value; return this; }
     public Decoration SetBorder(float width, Color color) { BorderWidth = width; BorderColor = color; return this; }
     public Decoration SetRadius(Radii value) { Radius = value; return this; }
-    public Decoration SetShadow(Color color, float blur, Vector2 offset = default) { ShadowColor = color; ShadowBlur = blur; ShadowOffset = offset; return this; }
+    public Decoration SetShadow(Color color, float blur, Vec2 offset = default) { ShadowColor = color; ShadowBlur = blur; ShadowOffset = offset; return this; }
 
     internal KuiDecoration Native => new()
     {
@@ -275,30 +274,30 @@ public sealed record PositionedOptions
 public sealed record GestureOptions
 {
     public Action? OnTap { get; set; }
-    public Action<Vector2>? OnTapDown { get; set; }
+    public Action<Vec2>? OnTapDown { get; set; }
     public Action? OnTapUp { get; set; }
-    public Action<Vector2>? OnPanStart { get; set; }
+    public Action<Vec2>? OnPanStart { get; set; }
     /// <summary>The movement, and where the pointer is.</summary>
-    public Action<Vector2, Vector2>? OnPanUpdate { get; set; }
+    public Action<Vec2, Vec2>? OnPanUpdate { get; set; }
     public Action? OnPanEnd { get; set; }
     public Action? OnEnter { get; set; }
     public Action? OnExit { get; set; }
-    public Action<Vector2>? OnHover { get; set; }
+    public Action<Vec2>? OnHover { get; set; }
     /// <summary>Return true when used.</summary>
-    public Func<Vector2, bool>? OnScroll { get; set; }
+    public Func<Vec2, bool>? OnScroll { get; set; }
     /// <summary>Hit even where nothing it holds is drawn.</summary>
     public bool Opaque { get; set; } = true;
 
     public GestureOptions SetOnTap(Action value) { OnTap = value; return this; }
-    public GestureOptions SetOnTapDown(Action<Vector2> value) { OnTapDown = value; return this; }
+    public GestureOptions SetOnTapDown(Action<Vec2> value) { OnTapDown = value; return this; }
     public GestureOptions SetOnTapUp(Action value) { OnTapUp = value; return this; }
-    public GestureOptions SetOnPanStart(Action<Vector2> value) { OnPanStart = value; return this; }
-    public GestureOptions SetOnPanUpdate(Action<Vector2, Vector2> value) { OnPanUpdate = value; return this; }
+    public GestureOptions SetOnPanStart(Action<Vec2> value) { OnPanStart = value; return this; }
+    public GestureOptions SetOnPanUpdate(Action<Vec2, Vec2> value) { OnPanUpdate = value; return this; }
     public GestureOptions SetOnPanEnd(Action value) { OnPanEnd = value; return this; }
     public GestureOptions SetOnEnter(Action value) { OnEnter = value; return this; }
     public GestureOptions SetOnExit(Action value) { OnExit = value; return this; }
-    public GestureOptions SetOnHover(Action<Vector2> value) { OnHover = value; return this; }
-    public GestureOptions SetOnScroll(Func<Vector2, bool> value) { OnScroll = value; return this; }
+    public GestureOptions SetOnHover(Action<Vec2> value) { OnHover = value; return this; }
+    public GestureOptions SetOnScroll(Func<Vec2, bool> value) { OnScroll = value; return this; }
     public GestureOptions SetOpaque(bool value) { Opaque = value; return this; }
 
     internal KuiGestureOptions Native => new()
@@ -539,9 +538,9 @@ public static unsafe partial class Widgets
     }
 
     /// <summary>Draws with a canvas, in a box of <paramref name="size"/> (negative: the child's size, or nothing without one — unless the parent sets it).</summary>
-    public static Widget CustomPaint(Action<Canvas, Vector2> painter, Vector2? size = null, Widget? child = null)
+    public static Widget CustomPaint(Action<Canvas, Vec2> painter, Vec2? size = null, Widget? child = null)
     {
-        var s = size ?? new Vector2(-1, -1);
+        var s = size ?? new Vec2(-1, -1);
         return WithChild(child, c => KuiNative.kui_custom_paint(Callbacks.Painter(painter), s.Native(), c));
     }
 
@@ -561,8 +560,8 @@ public static unsafe partial class Widgets
     public static Widget ShaderBox(ElementShader shader, Radii radius = default, Widget? child = null) =>
         WithChild(child, c => KuiNative.kui_shader_box(shader.Native, null, 0, radius.Native, c));
 
-    public static Widget Image(Koral.Image image, ImageFit fit = ImageFit.eContain, Vector2? size = null) =>
-        Made(KuiNative.kui_image(Resource.HandleOf(image), (uint)fit, (size ?? new Vector2(-1, -1)).Native()));
+    public static Widget Image(Koral.Image image, ImageFit fit = ImageFit.eContain, Vec2? size = null) =>
+        Made(KuiNative.kui_image(Resource.HandleOf(image), (uint)fit, (size ?? new Vec2(-1, -1)).Native()));
 
     /// <summary>
     /// <paramref name="icon"/>, in <paramref name="tint"/> — the theme's text colour unless given another — 24 units
@@ -604,7 +603,7 @@ public static unsafe partial class Widgets
     /// <summary>The child, cut to its box with rounded corners.</summary>
     public static Widget ClipRRect(Radii radius, Widget child) => WithChild(child, c => KuiNative.kui_clip_rrect(radius.Native, c));
     /// <summary>The child, moved by <paramref name="offset"/> where it paints and is hit; layout unchanged.</summary>
-    public static Widget Translate(Vector2 offset, Widget child) => WithChild(child, c => KuiNative.kui_translate(offset.Native(), c));
+    public static Widget Translate(Vec2 offset, Widget child) => WithChild(child, c => KuiNative.kui_translate(offset.Native(), c));
 
     // -- controls
     /// <summary>Any widget, made a button: <paramref name="child"/> in a container that calls <paramref name="onPressed"/> when clicked.</summary>
@@ -676,12 +675,12 @@ internal static unsafe partial class Callbacks
     public static KuiAction Action(Action? a) => a is null ? default : new() { invoke = &InvokeAction, user = Hold(a), destroy = &Free };
     public static KuiBoolAction Bool(Action<bool>? a) => a is null ? default : new() { invoke = &InvokeBool, user = Hold(a), destroy = &Free };
     public static KuiFloatAction Float(Action<float>? a) => a is null ? default : new() { invoke = &InvokeFloat, user = Hold(a), destroy = &Free };
-    public static KuiPointAction Point(Action<Vector2>? a) => a is null ? default : new() { invoke = &InvokePoint, user = Hold(a), destroy = &Free };
-    public static KuiPanAction Pan(Action<Vector2, Vector2>? a) => a is null ? default : new() { invoke = &InvokePan, user = Hold(a), destroy = &Free };
-    public static KuiScrollAction Scroll(Func<Vector2, bool>? a) => a is null ? default : new() { invoke = &InvokeScroll, user = Hold(a), destroy = &Free };
+    public static KuiPointAction Point(Action<Vec2>? a) => a is null ? default : new() { invoke = &InvokePoint, user = Hold(a), destroy = &Free };
+    public static KuiPanAction Pan(Action<Vec2, Vec2>? a) => a is null ? default : new() { invoke = &InvokePan, user = Hold(a), destroy = &Free };
+    public static KuiScrollAction Scroll(Func<Vec2, bool>? a) => a is null ? default : new() { invoke = &InvokeScroll, user = Hold(a), destroy = &Free };
     public static KuiTextAction Text(Action<string>? a) => a is null ? default : new() { invoke = &InvokeText, user = Hold(a), destroy = &Free };
     public static KuiTicker Ticker(Func<float, bool> a) => new() { invoke = &InvokeTicker, user = Hold(a), destroy = &Free };
-    public static KuiPainter Painter(Action<Canvas, Vector2> a) => new() { paint = &InvokePainter, user = Hold(a), destroy = &Free };
+    public static KuiPainter Painter(Action<Canvas, Vec2> a) => new() { paint = &InvokePainter, user = Hold(a), destroy = &Free };
     public static KuiItemBuilder Items(Func<int, Widget> a) => new() { build = &InvokeItems, user = Hold(a), destroy = &Free };
     public static KuiRangeAction Range(Action<int, int> a) => new() { invoke = &InvokeRange, user = Hold(a), destroy = &Free };
 
@@ -716,22 +715,22 @@ internal static unsafe partial class Callbacks
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokePoint(float x, float y, void* user)
     {
-        var a = Target<Action<Vector2>>(user);
-        try { a(new Vector2(x, y)); } catch (Exception e) { Report(a.Target ?? a, a.Method.Name, e); }
+        var a = Target<Action<Vec2>>(user);
+        try { a(new Vec2(x, y)); } catch (Exception e) { Report(a.Target ?? a, a.Method.Name, e); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokePan(float dx, float dy, float x, float y, void* user)
     {
-        var a = Target<Action<Vector2, Vector2>>(user);
-        try { a(new Vector2(dx, dy), new Vector2(x, y)); } catch (Exception e) { Report(a.Target ?? a, a.Method.Name, e); }
+        var a = Target<Action<Vec2, Vec2>>(user);
+        try { a(new Vec2(dx, dy), new Vec2(x, y)); } catch (Exception e) { Report(a.Target ?? a, a.Method.Name, e); }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static byte InvokeScroll(float dx, float dy, void* user)
     {
-        var a = Target<Func<Vector2, bool>>(user);
-        try { return a(new Vector2(dx, dy)) ? (byte)1 : (byte)0; }
+        var a = Target<Func<Vec2, bool>>(user);
+        try { return a(new Vec2(dx, dy)) ? (byte)1 : (byte)0; }
         catch (Exception e) { Report(a.Target ?? a, a.Method.Name, e); return 0; }
     }
 
@@ -753,9 +752,9 @@ internal static unsafe partial class Callbacks
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokePainter(IntPtr canvas, float width, float height, void* user)
     {
-        var a = Target<Action<Canvas, Vector2>>(user);
+        var a = Target<Action<Canvas, Vec2>>(user);
         var borrowed = new Canvas(canvas);
-        try { a(borrowed, new Vector2(width, height)); }
+        try { a(borrowed, new Vec2(width, height)); }
         catch (Exception e) { Report(a.Target ?? a, a.Method.Name, e); }
         finally { borrowed.Expire(); }   // lent for the call only
     }

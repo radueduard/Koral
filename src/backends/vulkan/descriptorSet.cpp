@@ -214,7 +214,7 @@ namespace kor::vk
         });
     }
 
-    void DescriptorSet::Rebind(const glm::u32 binding, const Descriptor &descriptor, const glm::u32 index)
+    void DescriptorSet::Rebind(const kor::u32 binding, const Descriptor &descriptor, const kor::u32 index)
     {
         const auto frameCount = _isPerFrame ? kor::Context::Scheduler().ImageCount() : 1;
         for (int frame = 0; frame < frameCount; ++frame) {

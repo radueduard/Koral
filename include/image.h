@@ -11,7 +11,7 @@
 #include <functional>
 #include <optional>
 #include <unordered_map>
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "flags.h"
 #include "api.h"
@@ -42,10 +42,10 @@ namespace kor
      * kor::Image::Builder builder;
      * auto texture = builder
      *     .SetFormat(kor::Image::Format::eRGBA8_SRGB)
-     *     .SetExtent(glm::uvec2{width, height})
+     *     .SetExtent(kor::UVec2{width, height})
      *     .SetMipLevels(mipCount)
      *     .SetUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eTransferDst)
-     *     .SetData(std::span<const glm::u8vec4>(pixels))
+     *     .SetData(std::span<const kor::U8Vec4>(pixels))
      *     .Build();
      * @endcode
      *
@@ -234,9 +234,9 @@ namespace kor
             bool sharedAcrossQueues = false;
             Type type = Type::e2D;                      ///< How many dimensions it has.
             Format format = Format::eRGBA8_UNORM;       ///< What one pixel holds.
-            glm::uvec3 extent = { 1, 1, 1 };            ///< Size in pixels. Unused dimensions are 1.
-            glm::u32 mipLevels = 1;                     ///< Number of mip levels, counting the full-size one.
-            glm::u32 arrayLayers = 1;                   ///< Number of layers, for texture arrays.
+            kor::UVec3 extent = { 1, 1, 1 };            ///< Size in pixels. Unused dimensions are 1.
+            kor::u32 mipLevels = 1;                     ///< Number of mip levels, counting the full-size one.
+            kor::u32 arrayLayers = 1;                   ///< Number of layers, for texture arrays.
             SampleCount sampleCount = SampleCount::e1;  ///< Samples per pixel; e1 is an ordinary image.
 
             /**
@@ -285,19 +285,19 @@ namespace kor
             }
 
             /** @brief Sets a cubic extent, the same size on every axis. */
-            Builder& SetExtent(const glm::u32& extent) {
+            Builder& SetExtent(const kor::u32& extent) {
                 this->extent = { extent, extent, extent };
                 return *this;
             }
 
             /** @brief Sets a 2D extent in pixels; depth becomes 1. The usual overload. */
-            Builder& SetExtent(const glm::uvec2& extent) {
+            Builder& SetExtent(const kor::UVec2& extent) {
                 this->extent = { extent, 1 };
                 return *this;
             }
 
             /** @brief Sets a 3D extent in pixels, for a volume image. */
-            Builder& SetExtent(const glm::uvec3& extent) {
+            Builder& SetExtent(const kor::UVec3& extent) {
                 this->extent = extent;
                 return *this;
             }
@@ -308,13 +308,13 @@ namespace kor
              * More than one asks for a mip chain; the smaller levels start out empty. Fill them
              * with CommandBuffer::GenerateMipmaps, which SetData() does for you.
              */
-            Builder& SetMipLevels(const glm::u32 mipLevels) {
+            Builder& SetMipLevels(const kor::u32 mipLevels) {
                 this->mipLevels = mipLevels;
                 return *this;
             }
 
             /** @brief Sets how many layers the image has, making it a texture array. */
-            Builder& SetArrayLayers(const glm::u32 arrayLayers) {
+            Builder& SetArrayLayers(const kor::u32 arrayLayers) {
                 this->arrayLayers = arrayLayers;
                 return *this;
             }
@@ -355,7 +355,7 @@ namespace kor
             /**
              * @brief Fills the image from a typed span of pixels.
              * @param source The pixels as any range — a vector, an array, a span — of the type one
-             *        texel is, e.g. glm::u8vec4 for an 8-bit RGBA image.
+             *        texel is, e.g. kor::U8Vec4 for an 8-bit RGBA image.
              *        Copied during this call, and must match the image's format and extent.
              *
              * Uploaded to mip 0 of every array layer when Build() runs; if the image has more mip
@@ -378,7 +378,7 @@ namespace kor
              * @param pixels Start of the pixel data. Copied during this call.
              * @param sizeBytes How many bytes to take, which must match the image's format and extent.
              */
-            Builder& SetData(const void* pixels, const glm::u64 sizeBytes) {
+            Builder& SetData(const void* pixels, const kor::u64 sizeBytes) {
                 const auto* p = static_cast<const std::byte*>(pixels);
                 data.assign(p, p + sizeBytes);
                 usage |= Usage::eTransferDst;
@@ -405,7 +405,7 @@ namespace kor
          * For render targets that follow the window. Anything referring to the old storage — image
          * views, descriptor sets — has to be rebuilt afterwards.
          */
-        void Resize(const glm::uvec3& extent);
+        void Resize(const kor::UVec3& extent);
 
         /**
          * @brief How many times this image has been rebuilt.
@@ -414,10 +414,10 @@ namespace kor
          * allocated with is immutable. Anything holding a handle to the old one (an image view above
          * all) is therefore stale, and this is how it finds out. @see Resize
          */
-        [[nodiscard]] glm::u64 Generation() const { return _generation; }
+        [[nodiscard]] kor::u64 Generation() const { return _generation; }
 
         /** @brief The image's size in pixels. Unused dimensions are 1. */
-        [[nodiscard]] glm::uvec3 Extent() const { return _extent; }
+        [[nodiscard]] kor::UVec3 Extent() const { return _extent; }
 
         /** @brief How many dimensions the image has. */
         [[nodiscard]] Type ImageType() const { return _type; }
@@ -445,9 +445,9 @@ namespace kor
         /** @brief Every role the image was created for. */
         [[nodiscard]] Flags<Usage> UsageFlags() const { return _usage; }
         /** @brief How many mip levels the image has, counting the full-size one. */
-        [[nodiscard]] glm::u32 MipLevels() const { return _mipLevels; }
+        [[nodiscard]] kor::u32 MipLevels() const { return _mipLevels; }
         /** @brief How many array layers the image has. */
-        [[nodiscard]] glm::u32 ArrayLayers() const { return _arrayLayers; }
+        [[nodiscard]] kor::u32 ArrayLayers() const { return _arrayLayers; }
 
         /**
          * @brief How much of the image a default view covers.
@@ -500,12 +500,12 @@ namespace kor
          * @throws std::runtime_error for a block-compressed format, which has no per-channel size.
          *         Guard with isBlockCompressed, or use sizeOfRegion, which answers for both kinds.
          */
-        [[nodiscard]] static glm::u32 ChannelSize(kor::Image::Format format);
+        [[nodiscard]] static kor::u32 ChannelSize(kor::Image::Format format);
         /**
          * @brief Channels in @p format — 1 for eR8_UNORM, 4 for eRGBA8_UNORM.
          * @throws std::runtime_error for a block-compressed format. @see channelSize
          */
-        [[nodiscard]] static glm::u32 ChannelCount(kor::Image::Format format);
+        [[nodiscard]] static kor::u32 ChannelCount(kor::Image::Format format);
 
         /**
          * @brief Whether the active device can hold an image of @p format in the roles @p usage names.
@@ -534,13 +534,13 @@ namespace kor
          * @brief The texels one block of @p format covers — 4x4 for BC, 8x8 for ASTC 8x8.
          * @return {1, 1} for an uncompressed format, so the same arithmetic works for both.
          */
-        [[nodiscard]] static glm::uvec2 BlockExtent(kor::Image::Format format);
+        [[nodiscard]] static kor::UVec2 BlockExtent(kor::Image::Format format);
 
         /**
          * @brief Bytes one block of @p format occupies — 8 for BC1, 16 for BC7.
          * @return For an uncompressed format, the size of one texel, since that is its block.
          */
-        [[nodiscard]] static glm::u32 BlockSize(kor::Image::Format format);
+        [[nodiscard]] static kor::u32 BlockSize(kor::Image::Format format);
 
         /**
          * @brief Bytes a tightly packed region of @p format occupies.
@@ -551,8 +551,8 @@ namespace kor
          * What to size a staging buffer with, and what the copy guards measure against. Correct for
          * compressed and uncompressed alike, which is the point of it existing.
          */
-        [[nodiscard]] static glm::u64 SizeOfRegion(kor::Image::Format format, glm::uvec3 extent,
-                                                   glm::u32 layerCount = 1);
+        [[nodiscard]] static kor::u64 SizeOfRegion(kor::Image::Format format, kor::UVec3 extent,
+                                                   kor::u32 layerCount = 1);
 
         /** @brief Whether the image holds a separate copy per frame in flight. */
         [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
@@ -567,7 +567,7 @@ namespace kor
          * handed out for this frame — which is not the frame in flight: a swap chain has as many
          * images as its driver gave it, and every window's hands them out in its own order.
          */
-        [[nodiscard]] glm::u32 CopyIndex() const;
+        [[nodiscard]] kor::u32 CopyIndex() const;
 
         /**
          * @brief The access one subresource was last synchronised for.
@@ -579,10 +579,10 @@ namespace kor
          * Read by the command buffer's barrier resolver. Tracked per subresource because a mip
          * chain legitimately holds several at once while it is being generated.
          */
-        [[nodiscard]] std::optional<ResourceAccess> TrackedAccess(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+        [[nodiscard]] std::optional<ResourceAccess> TrackedAccess(kor::u32 mipLevel = 0, kor::u32 arrayLayer = 0) const;
 
         /** @brief Records the access a subresource has been synchronised for. Called by the barrier resolver. */
-        void SetTrackedAccess(ResourceAccess access, glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+        void SetTrackedAccess(ResourceAccess access, kor::u32 mipLevel = 0, kor::u32 arrayLayer = 0) const;
         /** @brief Which command buffer was last resolved against it, and last submitted. For the command buffer. */
         [[nodiscard]] detail::SubmitOrder& SubmitOrdering() const { return _submitOrder; }
 
@@ -596,7 +596,7 @@ namespace kor
          * copy reached, and the GPU then samples an untransitioned image. Always 0 for an ordinary
          * image, which has one copy.
          */
-        [[nodiscard]] glm::u32 TrackingFrame() const;
+        [[nodiscard]] kor::u32 TrackingFrame() const;
 
         /**
          * @brief Rebuilds the backend's image at the new extent. Called by Resize, never directly.
@@ -607,15 +607,15 @@ namespace kor
          * to do all of it would eventually forget one, and forgetting the last leaves the barrier
          * resolver believing a brand-new image is already in the layout the old one reached.
          */
-        virtual void DoResize(const glm::uvec3& extent) = 0;
+        virtual void DoResize(const kor::UVec3& extent) = 0;
 
         /// Subresource key: which copy, which mip, which layer.
-        [[nodiscard]] glm::u64 TrackingKey(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
-            return static_cast<glm::u64>(TrackingFrame()) << 48
-                 | static_cast<glm::u64>(mipLevel) << 32
+        [[nodiscard]] kor::u64 TrackingKey(const kor::u32 mipLevel, const kor::u32 arrayLayer) const {
+            return static_cast<kor::u64>(TrackingFrame()) << 48
+                 | static_cast<kor::u64>(mipLevel) << 32
                  | arrayLayer;
         }
-        mutable std::unordered_map<glm::u64, ResourceAccess> _trackedAccess;
+        mutable std::unordered_map<kor::u64, ResourceAccess> _trackedAccess;
         mutable detail::SubmitOrder _submitOrder;
 
         /// Whole-image views handed out by View(), one per shape asked for. Owned here so that
@@ -638,15 +638,15 @@ namespace kor
         bool _isPerFrame = false;
         bool _sharedAcrossQueues = false;
         /// Set for a swap chain's images: which one it acquired for the frame. @see CopyIndex
-        std::function<glm::u32()> _copySelector;
+        std::function<kor::u32()> _copySelector;
         Type _type;
         Format _format;
         bool _bgrOrder = false;
-        glm::uvec3 _extent;
+        kor::UVec3 _extent;
         /// Bumped by a backend's Resize. @see generation
-        glm::u64 _generation = 0;
-        glm::u32 _mipLevels;
-        glm::u32 _arrayLayers;
+        kor::u64 _generation = 0;
+        kor::u32 _mipLevels;
+        kor::u32 _arrayLayers;
         SampleCount _sampleCount;
         Flags<Usage> _usage;
     };

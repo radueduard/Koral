@@ -46,6 +46,10 @@ namespace kor
         case ErrorCode::eFileNotReadable:            return "eFileNotReadable";
         case ErrorCode::eFrameGraphInvalid:          return "eFrameGraphInvalid";
         case ErrorCode::eWindowCreationFailed:       return "eWindowCreationFailed";
+        case ErrorCode::eNetwork:                    return "eNetwork";
+        case ErrorCode::eTimedOut:                   return "eTimedOut";
+        case ErrorCode::eConnectionClosed:           return "eConnectionClosed";
+        case ErrorCode::eProtocol:                   return "eProtocol";
         }
         return "eUnknown";
     }
@@ -113,6 +117,14 @@ namespace kor
             return "The render passes declared something the frame graph cannot schedule: a resource nobody makes, one made twice, or passes that depend on each other in a circle.";
         case ErrorCode::eWindowCreationFailed:
             return "The window, its surface or the graphics device behind it could not be created.";
+        case ErrorCode::eNetwork:
+            return "A network operation failed.";
+        case ErrorCode::eTimedOut:
+            return "A network operation timed out.";
+        case ErrorCode::eConnectionClosed:
+            return "The connection was closed.";
+        case ErrorCode::eProtocol:
+            return "The other side broke its protocol.";
         }
         return "Unknown error.";
     }

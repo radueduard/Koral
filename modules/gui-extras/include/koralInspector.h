@@ -3,7 +3,7 @@
  * @brief An editor for any reflected object: what a property panel is built from.
  *
  * @code
- * struct Light { glm::vec3 position; glm::vec3 color{1.f}; float intensity = 1.f; };
+ * struct Light { kor::Vec3 position; kor::Vec3 color{1.f}; float intensity = 1.f; };
  * inline void KoralReflect(kor::TypeBuilder<Light>& t) {
  *     t.Name("Light");
  *     t.Field("position", &Light::position);

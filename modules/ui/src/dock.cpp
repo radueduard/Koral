@@ -40,9 +40,9 @@ namespace kui
         /// Where the desktop's part of the space starts, in the space's own coordinates: far from the
         /// space itself, so one point is in one of them at most.
         constexpr float WindowSpacing = 100000.f;
-        constexpr glm::vec2 OverlayOrigin { WindowSpacing, 0.f };
+        constexpr kor::Vec2 OverlayOrigin { WindowSpacing, 0.f };
         /** Whether a point of the space's coordinates is one of the desktop's. */
-        constexpr bool InOverlay(const glm::vec2 position) { return position.x >= WindowSpacing * 0.5f; }
+        constexpr bool InOverlay(const kor::Vec2 position) { return position.x >= WindowSpacing * 0.5f; }
 
         /**
          * What the panels that are open are laid out by: a tree of splits over leaves, made again from
@@ -128,9 +128,9 @@ namespace kui
         std::map<std::string, Default> defaults;
         int nextFloat = 1;
         /// How big each panel was when it last floated: what it goes back to when it floats again.
-        std::map<std::string, glm::vec2> floatSize;
+        std::map<std::string, kor::Vec2> floatSize;
         /// And where: a panel that never docks, told to, stays where it floated.
-        std::map<std::string, glm::vec2> floatAt;
+        std::map<std::string, kor::Vec2> floatAt;
         /// Where each panel was last docked: where the button that docks a float back puts it.
         std::map<std::string, DockArea> lastArea;
         std::function<void()> changed;          ///< The dock space showing it.
@@ -514,7 +514,7 @@ namespace kui
         return *this;
     }
 
-    DockLayout& DockLayout::Float(std::string panel, const glm::vec2 at)
+    DockLayout& DockLayout::Float(std::string panel, const kor::Vec2 at)
     {
         const Rect rect = Rect::XYWH(at.x, at.y, 0.f, 0.f);
         Impl::Default where;
@@ -529,7 +529,7 @@ namespace kui
         return *this;
     }
 
-    DockLayout& DockLayout::PopOut(std::string panel, const glm::vec2 size)
+    DockLayout& DockLayout::PopOut(std::string panel, const kor::Vec2 size)
     {
         if (_impl->Known(panel)) _impl->Remove(panel);
         _impl->defaults.erase(panel);
@@ -609,7 +609,7 @@ namespace kui
         float leftWidth = _impl->leftWidth, rightWidth = _impl->rightWidth, bottomHeight = _impl->bottomHeight, bottomSplit = _impl->bottomSplit;
         std::vector<Floating> floats;
         std::set<std::string> closed;
-        std::map<std::string, glm::vec2> floatSize;
+        std::map<std::string, kor::Vec2> floatSize;
         int next = 1;
         while (reader.ok) {
             const std::string word = reader.Word();
@@ -685,7 +685,7 @@ namespace kui
             ClearToNothing() : RenderPass("Clear") {}
             void Setup(kor::PassBuilder& builder) override { builder.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); }
             void Initialize(const kor::PassResources& resources) override { _screen = resources.ImageNamed(kor::FrameGraph::Screen); }
-            void Record(kor::CommandBuffer& commands) const override { commands.ClearColorImage(_screen, glm::vec4(0.f)); }
+            void Record(kor::CommandBuffer& commands) const override { commands.ClearColorImage(_screen, kor::Vec4(0.f)); }
 
         private:
             kor::ResourceRef<const kor::Image> _screen;
@@ -701,7 +701,7 @@ namespace kui
             }
             void Update() override
             {
-                const glm::uvec2 extent = Window::Extent();
+                const kor::UVec2 extent = Window::Extent();
                 if (extent != _last) { _last = extent; if (onResized) onResized(); }
                 if (onFrame) onFrame();
             }
@@ -711,7 +711,7 @@ namespace kui
             std::function<void()> onResized, onFrame, onGone;
 
         private:
-            glm::uvec2 _last {};
+            kor::UVec2 _last {};
         };
 
         class RenderDock final : public RenderContainer {
@@ -746,7 +746,7 @@ namespace kui
 
             [[nodiscard]] bool IsRepaintBoundary() const override { return true; }
 
-            bool HitTest(HitTestResult& result, const glm::vec2 position) override
+            bool HitTest(HitTestResult& result, const kor::Vec2 position) override
             {
                 // Everywhere it shows something — the space, and each panel over the desktop — it is hit;
                 // under that, the panel the point is in.
@@ -769,7 +769,7 @@ namespace kui
             }
 
             bool HandleEvent(const PointerEvent& event) override;
-            void Paint(Canvas& canvas, glm::vec2 offset) override;
+            void Paint(Canvas& canvas, kor::Vec2 offset) override;
 
         protected:
             void PerformLayout() override;
@@ -785,13 +785,13 @@ namespace kui
             struct Overlay {
                 DockWindow* scene = nullptr;
                 std::shared_ptr<Layer> layer;
-                glm::ivec2 at {};               ///< Where on the desktop its window is.
+                kor::IVec2 at {};               ///< Where on the desktop its window is.
                 /// Where on the desktop its coordinates start: the desktop's corner. The window is there
                 /// too unless it is fitted — then it is only as big as the panels in it, and goes where they do.
-                glm::ivec2 origin {};
-                glm::ivec2 desktop {};          ///< How big the desktop is.
+                kor::IVec2 origin {};
+                kor::IVec2 desktop {};          ///< How big the desktop is.
                 bool fitted = false;
-                glm::ivec2 wantedAt {}, wantedSize {};
+                kor::IVec2 wantedAt {}, wantedSize {};
             };
 
             /** One of a stripe's buttons: a docked panel's, where it is drawn, and which group it is of. */
@@ -913,7 +913,7 @@ namespace kui
             [[nodiscard]] float Gap() const { return std::max(_config.options.gap, 1.f); }
             /** The sizes it is drawn and handled with. */
             [[nodiscard]] const DockStyle& S() const { return _config.options.style; }
-            void LayoutStripes(glm::vec2 size);
+            void LayoutStripes(kor::Vec2 size);
             /**
              * How narrow @p node can be with nothing its panels show cut off: the widest least width of its
              * panels' contents (it keeps it whichever is shown); two side by side and the gap between them;
@@ -929,30 +929,30 @@ namespace kui
             void PublishViewports();
             void CloseOverlay();
             static void BringIn(Floating& f);
-            void MoveFloat(Floating& f, glm::vec2 position);
+            void MoveFloat(Floating& f, kor::Vec2 position);
             void Settle(Floating& f);
             [[nodiscard]] bool Fits(const Rect& rect) const;
-            [[nodiscard]] glm::vec2 SpaceFromOverlay(glm::vec2 position) const;
-            [[nodiscard]] glm::vec2 OverlayFromSpace(glm::vec2 position) const;
+            [[nodiscard]] kor::Vec2 SpaceFromOverlay(kor::Vec2 position) const;
+            [[nodiscard]] kor::Vec2 OverlayFromSpace(kor::Vec2 position) const;
             [[nodiscard]] Rect OverlayArea() const;
-            [[nodiscard]] glm::ivec2 OverlayAt() const;
-            bool OverlayFit(glm::ivec2& at, glm::ivec2& size) const;
-            [[nodiscard]] std::optional<glm::vec2> Desktop(glm::vec2 position) const;
-            [[nodiscard]] std::optional<glm::vec2> SpacePoint(glm::vec2 position) const;
-            [[nodiscard]] std::optional<glm::vec2> OverlayPoint(glm::vec2 position) const;
+            [[nodiscard]] kor::IVec2 OverlayAt() const;
+            bool OverlayFit(kor::IVec2& at, kor::IVec2& size) const;
+            [[nodiscard]] std::optional<kor::Vec2> Desktop(kor::Vec2 position) const;
+            [[nodiscard]] std::optional<kor::Vec2> SpacePoint(kor::Vec2 position) const;
+            [[nodiscard]] std::optional<kor::Vec2> OverlayPoint(kor::Vec2 position) const;
             [[nodiscard]] bool CanOpenWindows() const;
-            bool OnSurface(glm::vec2 position, const Floating*& surface) const;
-            [[nodiscard]] Hit Probe(glm::vec2 position) const;
-            static bool ProbeNode(Node& node, glm::vec2 position, Hit& hit);
-            [[nodiscard]] std::optional<glm::vec2> Elsewhere(glm::vec2 position) const;
-            [[nodiscard]] Zone ZoneAt(glm::vec2 position, const std::string& panel) const;
-            [[nodiscard]] Zone StripeZone(int stripe, glm::vec2 position, const std::string& panel) const;
+            bool OnSurface(kor::Vec2 position, const Floating*& surface) const;
+            [[nodiscard]] Hit Probe(kor::Vec2 position) const;
+            static bool ProbeNode(Node& node, kor::Vec2 position, Hit& hit);
+            [[nodiscard]] std::optional<kor::Vec2> Elsewhere(kor::Vec2 position) const;
+            [[nodiscard]] Zone ZoneAt(kor::Vec2 position, const std::string& panel) const;
+            [[nodiscard]] Zone StripeZone(int stripe, kor::Vec2 position, const std::string& panel) const;
             [[nodiscard]] Rect AreaPreview(DockArea area) const;
-            void PaintSurface(Canvas& canvas, glm::vec2 offset, bool overlay);
-            void PaintStripe(Canvas& canvas, glm::vec2 offset, int stripe);
-            void PaintFloat(Canvas& canvas, glm::vec2 offset, Floating& f);
-            void PaintNode(Canvas& canvas, glm::vec2 offset, Node& node);
-            void Drop(glm::vec2 position);
+            void PaintSurface(Canvas& canvas, kor::Vec2 offset, bool overlay);
+            void PaintStripe(Canvas& canvas, kor::Vec2 offset, int stripe);
+            void PaintFloat(Canvas& canvas, kor::Vec2 offset, Floating& f);
+            void PaintNode(Canvas& canvas, kor::Vec2 offset, Node& node);
+            void Drop(kor::Vec2 position);
             void Redock(Floating& floating);
             void Changed();
 
@@ -975,11 +975,11 @@ namespace kui
             Hit _pressed {}, _hover {};
             unsigned _pressRevision = 0;    ///< The layout's tree when the press was made: _pressed.node is of that one.
             std::string _pressedPanel;      ///< The panel the press was on: a button's, a title's.
-            glm::vec2 _pressAt {}, _grab {};
+            kor::Vec2 _pressAt {}, _grab {};
             Rect _floatAtPress {};
             bool _dragging = false;         ///< A panel in hand — by its button, or its title — past the slop.
             std::string _dragged;
-            glm::vec2 _dragAt {};
+            kor::Vec2 _dragAt {};
             Zone _zone {};
         };
 
@@ -1130,7 +1130,7 @@ namespace kui
         }
 
         /** Where the two stripes are, and each of their buttons. */
-        void RenderDock::LayoutStripes(const glm::vec2 size)
+        void RenderDock::LayoutStripes(const kor::Vec2 size)
         {
             auto& layout = L();
             const float inset = (S().stripeWidth - S().buttonSize) * 0.5f;
@@ -1210,7 +1210,7 @@ namespace kui
             if (it == _index.end() || it->second >= Children().size()) return;
             RenderObject* child = Children()[it->second];
             // Where the float is as big as its panel, the panel was laid out already — to say how big.
-            if (!node.fit) child->Layout(BoxConstraints::Tight(glm::max(node.body.Size(), glm::vec2(0.f))));
+            if (!node.fit) child->Layout(BoxConstraints::Tight(kor::Max(node.body.Size(), kor::Vec2(0.f))));
             child->SetOffset(node.body.TopLeft());
             placed[it->second] = true;
             // Its title bar's widget, laid out by Arrange: in the middle of the bar, top to bottom.
@@ -1244,13 +1244,13 @@ namespace kui
             const Owner* owner = GetOwner();
             if (!_overlay.scene || !owner) return Rect::XYWH(OverlayOrigin.x, OverlayOrigin.y, 0.f, 0.f);
             // Fitted, as big as the desktop says, in screen coordinates; otherwise as its window, in pixels.
-            const glm::vec2 extent = _overlay.fitted ? glm::vec2(_overlay.desktop) / owner->desktopScale
-                                                     : glm::vec2(_overlay.scene->SceneWindow().Extent()) / owner->scale;
+            const kor::Vec2 extent = _overlay.fitted ? kor::Vec2(_overlay.desktop) / owner->desktopScale
+                                                     : kor::Vec2(_overlay.scene->SceneWindow().Extent()) / owner->scale;
             return Rect::XYWH(OverlayOrigin.x, OverlayOrigin.y, extent.x, extent.y);
         }
 
         /** Where on the desktop the overlay starts — or would, before there is one: the desktop's own corner. */
-        glm::ivec2 RenderDock::OverlayAt() const
+        kor::IVec2 RenderDock::OverlayAt() const
         {
             return _overlay.scene ? _overlay.origin : kor::Window::Desktop().position;
         }
@@ -1260,7 +1260,7 @@ namespace kui
          * the desktop with room for their shadows — and for a panel's title, while one is in hand out
          * there. In steps, so that a panel resized does not make a new window of it every frame.
          */
-        bool RenderDock::OverlayFit(glm::ivec2& at, glm::ivec2& size) const
+        bool RenderDock::OverlayFit(kor::IVec2& at, kor::IVec2& size) const
         {
             const Owner* owner = GetOwner();
             if (!owner || !_config.layout) return false;
@@ -1272,11 +1272,11 @@ namespace kui
             if (_dragging) if (const auto there = OverlayPoint(_dragAt)) add(Rect::LTRB(there->x - 80.f, there->y - 60.f, there->x + 420.f, there->y + 60.f));
             if (!any) return false;
             constexpr int Step = 128;
-            const glm::vec2 low = (glm::vec2(all.left, all.top) - OverlayOrigin) * owner->desktopScale;
-            const glm::vec2 high = (glm::vec2(all.right, all.bottom) - OverlayOrigin) * owner->desktopScale;
-            at = _overlay.origin + glm::ivec2(glm::floor(low));
-            const glm::ivec2 need = glm::ivec2(glm::ceil(high - glm::floor(low)));
-            size = glm::max((need + Step - 1) / Step * Step, glm::ivec2(2 * Step));
+            const kor::Vec2 low = (kor::Vec2(all.left, all.top) - OverlayOrigin) * owner->desktopScale;
+            const kor::Vec2 high = (kor::Vec2(all.right, all.bottom) - OverlayOrigin) * owner->desktopScale;
+            at = _overlay.origin + kor::IVec2(kor::Floor(low));
+            const kor::IVec2 need = kor::IVec2(kor::Ceil(high - kor::Floor(low)));
+            size = kor::Max((need + Step - 1) / Step * Step, kor::IVec2(2 * Step));
             return true;
         }
 
@@ -1308,16 +1308,16 @@ namespace kui
                 settings.position = desktop.position;
                 // One row short of the desktop: a window that covers a monitor exactly is taken for a
                 // fullscreen one, and shown without being blended with what is behind it.
-                settings.extent = glm::uvec2(glm::max(desktop.size - glm::ivec2(0, 1), glm::ivec2(64)));
+                settings.extent = kor::UVec2(kor::Max(desktop.size - kor::IVec2(0, 1), kor::IVec2(64)));
                 // Where a window is the dearer to show the bigger it is (X11 — under XWayland every frame
                 // of one is copied), and where the pointer can be asked of the desktop while a window moves
                 // under it, the overlay is fitted: as big as the panels in it, and where they are.
                 _overlay.origin = desktop.position;
                 _overlay.desktop = desktop.size;
                 _overlay.fitted = kor::Window::DesktopCursor().has_value();
-                if (glm::ivec2 at, size; _overlay.fitted && OverlayFit(at, size)) {
+                if (kor::IVec2 at, size; _overlay.fitted && OverlayFit(at, size)) {
                     settings.position = at;
-                    settings.extent = glm::uvec2(size);
+                    settings.extent = kor::UVec2(size);
                     _overlay.wantedAt = at;
                     _overlay.wantedSize = size;
                 }
@@ -1374,30 +1374,30 @@ namespace kui
             const Owner* owner = GetOwner();
             if (!_overlay.scene || !owner || !_config.layout) return;
             kor::Window& window = _overlay.scene->SceneWindow();
-            const glm::ivec2 was = _overlay.at;
+            const kor::IVec2 was = _overlay.at;
             _overlay.at = window.Position();
             if (!_overlay.fitted) _overlay.origin = _overlay.at;
             // Fitted, the window goes where the panels have gone, and is as big as they have become;
             // what is drawn in it is drawn from where the window really is.
-            if (glm::ivec2 to, size; _overlay.fitted && OverlayFit(to, size)) {
+            if (kor::IVec2 to, size; _overlay.fitted && OverlayFit(to, size)) {
                 if (to != _overlay.wantedAt) { _overlay.wantedAt = to; window.SetPosition(to); }
-                if (size != _overlay.wantedSize) { _overlay.wantedSize = size; window.Resize(glm::uvec2(size)); }
+                if (size != _overlay.wantedSize) { _overlay.wantedSize = size; window.Resize(kor::UVec2(size)); }
             }
             if (_overlay.at != was) { MarkNeedsPaint(); PublishViewports(); }
-            const glm::vec2 shift = glm::vec2(_overlay.at - _overlay.origin) / owner->desktopScale;
-            const glm::vec2 at = OverlayOrigin + shift + window.CursorPosition() / owner->scale;
+            const kor::Vec2 shift = kor::Vec2(_overlay.at - _overlay.origin) / owner->desktopScale;
+            const kor::Vec2 at = OverlayOrigin + shift + window.CursorPosition() / owner->scale;
             const bool held = _pressInOverlay && _pressed.kind != Hit::Kind::eNothing;
             const bool over = std::ranges::any_of(L().floats, [&](const Floating& f) { return f.window && f.root && f.rect.Inflate(2.f).Contains(at); });
             // Where a window can say which parts of it take the pointer, the panels are those parts and
             // the pointer finds them by itself. (Asking where it is has no answer there while it is
             // over another program's window: under XWayland, X11 hears nothing of it then.)
-            std::vector<glm::ivec4> panels;
+            std::vector<kor::IVec4> panels;
             for (const Floating& f : L().floats) {
                 if (!f.window || !f.root) continue;
                 const Rect r = f.rect.Inflate(2.f);
-                const glm::vec2 low = glm::floor((glm::vec2(r.left, r.top) - OverlayOrigin - shift) * owner->scale);
-                const glm::vec2 high = glm::ceil((glm::vec2(r.right, r.bottom) - OverlayOrigin - shift) * owner->scale);
-                panels.emplace_back(glm::ivec4(low, high - low));
+                const kor::Vec2 low = kor::Floor((kor::Vec2(r.left, r.top) - OverlayOrigin - shift) * owner->scale);
+                const kor::Vec2 high = kor::Ceil((kor::Vec2(r.right, r.bottom) - OverlayOrigin - shift) * owner->scale);
+                panels.emplace_back(kor::IVec4(kor::Vec4(low, high - low)));
             }
             if (!window.SetInputRegion(panels)) window.SetMousePassthrough(!(over || held));
 
@@ -1444,16 +1444,16 @@ namespace kui
             for (const auto& meta : _config.panels) {
                 if (meta.dockable || !layout.GroupOf(meta.id)) continue;
                 const auto kept = layout.floatSize.find(meta.id);
-                const glm::vec2 size = kept != layout.floatSize.end() ? kept->second : glm::vec2(S().minFloatSize * 2.f, S().minFloatSize * 1.5f);
+                const kor::Vec2 size = kept != layout.floatSize.end() ? kept->second : kor::Vec2(S().minFloatSize * 2.f, S().minFloatSize * 1.5f);
                 const auto where = layout.floatAt.find(meta.id);
-                const glm::vec2 at = where != layout.floatAt.end() ? where->second : glm::vec2(40.f);
+                const kor::Vec2 at = where != layout.floatAt.end() ? where->second : kor::Vec2(40.f);
                 layout.Remove(meta.id);
                 layout.FloatPanel(meta.id, Rect::XYWH(at.x, at.y, size.x, size.y), false);
             }
 
             SyncOverlay();
 
-            const glm::vec2 size = Size();
+            const kor::Vec2 size = Size();
             // The areas' sizes, where they were given as shares of a space whose size was not known yet.
             const auto resolve = [&layout](float& extent, const float of) {
                 if (extent >= 0.f || of <= 0.f) return;
@@ -1485,10 +1485,10 @@ namespace kui
                             custom->Layout(BoxConstraints { 0.f, std::max(area.Width() - 2.f, 0.f), 0.f, std::numeric_limits<float>::infinity() }, true);
                             barHeight = std::max(barHeight, std::ceil(custom->Size().y));
                         }
-                        const glm::vec2 frame = bare ? glm::vec2(0.f) : glm::vec2(2.f, barHeight + 2.f);
-                        const glm::vec2 room = glm::max(area.Size() - frame, glm::vec2(0.f));
+                        const kor::Vec2 frame = bare ? kor::Vec2(0.f) : kor::Vec2(2.f, barHeight + 2.f);
+                        const kor::Vec2 room = kor::Max(area.Size() - frame, kor::Vec2(0.f));
                         child->Layout(BoxConstraints { 0.f, room.x, 0.f, room.y }, true);
-                        glm::vec2 wanted = child->Size() + frame;
+                        kor::Vec2 wanted = child->Size() + frame;
                         // And no narrower than its title bar needs, for its title and its buttons.
                         if (!bare) wanted.x = std::max(wanted.x, Title(f.root->tabs.front()).MaxIntrinsicWidth() + 2.f * S().tabPadding + 24.f * static_cast<float>(BarButtons(*f.root)) + 12.f);
                         f.rect = Rect::XYWH(f.rect.left, f.rect.top, wanted.x, wanted.y);
@@ -1516,7 +1516,7 @@ namespace kui
 
         // ---- what is where -------------------------------------------------------------------------------
 
-        bool RenderDock::OnSurface(const glm::vec2 position, const Floating*& surface) const
+        bool RenderDock::OnSurface(const kor::Vec2 position, const Floating*& surface) const
         {
             surface = nullptr;
             if (!_config.layout) return false;
@@ -1525,7 +1525,7 @@ namespace kui
             return Rect::FromSize(Size()).Contains(position);
         }
 
-        bool RenderDock::ProbeNode(Node& node, const glm::vec2 position, Hit& hit)
+        bool RenderDock::ProbeNode(Node& node, const kor::Vec2 position, Hit& hit)
         {
             if (!node.visible || !node.rect.Contains(position)) return false;
             if (node.split) {
@@ -1545,7 +1545,7 @@ namespace kui
             return true;
         }
 
-        RenderDock::Hit RenderDock::Probe(const glm::vec2 position) const
+        RenderDock::Hit RenderDock::Probe(const kor::Vec2 position) const
         {
             Hit hit;
             if (!_config.layout) return hit;
@@ -1603,38 +1603,38 @@ namespace kui
          * began in the window, and the overlay's when it began on a panel out there — and stay so until
          * the button is let go, wherever the pointer goes. Nothing where windows cannot say where they are.
          */
-        std::optional<glm::vec2> RenderDock::Desktop(const glm::vec2 position) const
+        std::optional<kor::Vec2> RenderDock::Desktop(const kor::Vec2 position) const
         {
             const Owner* owner = GetOwner();
             if (!owner || !owner->window || owner->window->IsOffscreen() || !kor::Window::CanBePositioned()) return std::nullopt;
-            if (_pressInOverlay) return glm::vec2(OverlayAt()) + (position - OverlayOrigin) * owner->desktopScale;
-            return glm::vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->desktopScale;
+            if (_pressInOverlay) return kor::Vec2(OverlayAt()) + (position - OverlayOrigin) * owner->desktopScale;
+            return kor::Vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->desktopScale;
         }
 
         /** That point in the space's own coordinates: inside it or not. */
-        std::optional<glm::vec2> RenderDock::SpacePoint(const glm::vec2 position) const
+        std::optional<kor::Vec2> RenderDock::SpacePoint(const kor::Vec2 position) const
         {
             if (!_pressInOverlay) return position;
             const auto desktop = Desktop(position);
             if (!desktop) return std::nullopt;
             const Owner* owner = GetOwner();
-            return (*desktop - glm::vec2(owner->window->Position())) / owner->desktopScale - ToGlobal({ 0.f, 0.f });
+            return (*desktop - kor::Vec2(owner->window->Position())) / owner->desktopScale - ToGlobal({ 0.f, 0.f });
         }
 
         /** That point in the overlay's part of the coordinates: over the desktop. */
-        std::optional<glm::vec2> RenderDock::OverlayPoint(const glm::vec2 position) const
+        std::optional<kor::Vec2> RenderDock::OverlayPoint(const kor::Vec2 position) const
         {
             if (_pressInOverlay) return position;
             const auto desktop = Desktop(position);
             if (!desktop) return std::nullopt;
-            return OverlayOrigin + (*desktop - glm::vec2(OverlayAt())) / GetOwner()->desktopScale;
+            return OverlayOrigin + (*desktop - kor::Vec2(OverlayAt())) / GetOwner()->desktopScale;
         }
 
         /**
          * Where a point of the gesture in hand is on whatever it is over: a panel out over the desktop
          * (in front of the window, so asked first), or the space. Nothing when it is over neither.
          */
-        std::optional<glm::vec2> RenderDock::Elsewhere(const glm::vec2 position) const
+        std::optional<kor::Vec2> RenderDock::Elsewhere(const kor::Vec2 position) const
         {
             if (!_config.layout) return std::nullopt;
             if (const auto there = OverlayPoint(position))
@@ -1645,24 +1645,24 @@ namespace kui
         }
 
         /** A point of the overlay's part of the coordinates, in the space's own — and the other way. Where windows say where they are. */
-        glm::vec2 RenderDock::SpaceFromOverlay(const glm::vec2 position) const
+        kor::Vec2 RenderDock::SpaceFromOverlay(const kor::Vec2 position) const
         {
             const Owner* owner = GetOwner();
-            const glm::vec2 desktop = glm::vec2(OverlayAt()) + (position - OverlayOrigin) * owner->desktopScale;
-            return (desktop - glm::vec2(owner->window->Position())) / owner->desktopScale - ToGlobal({ 0.f, 0.f });
+            const kor::Vec2 desktop = kor::Vec2(OverlayAt()) + (position - OverlayOrigin) * owner->desktopScale;
+            return (desktop - kor::Vec2(owner->window->Position())) / owner->desktopScale - ToGlobal({ 0.f, 0.f });
         }
 
-        glm::vec2 RenderDock::OverlayFromSpace(const glm::vec2 position) const
+        kor::Vec2 RenderDock::OverlayFromSpace(const kor::Vec2 position) const
         {
             const Owner* owner = GetOwner();
-            const glm::vec2 desktop = glm::vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->desktopScale;
-            return OverlayOrigin + (desktop - glm::vec2(OverlayAt())) / owner->desktopScale;
+            const kor::Vec2 desktop = kor::Vec2(owner->window->Position()) + (ToGlobal({ 0.f, 0.f }) + position) * owner->desktopScale;
+            return OverlayOrigin + (desktop - kor::Vec2(OverlayAt())) / owner->desktopScale;
         }
 
         /** Whether @p rect, in the space's coordinates, is wholly inside the space. */
         bool RenderDock::Fits(const Rect& rect) const
         {
-            const glm::vec2 size = Size();
+            const kor::Vec2 size = Size();
             return rect.left >= 0.f && rect.top >= 0.f && rect.right <= size.x && rect.bottom <= size.y;
         }
 
@@ -1671,10 +1671,10 @@ namespace kui
          * in front of the window and everything else — wherever there is a desktop to be over. Where it
          * belongs is settled when it is put down. @see Settle
          */
-        void RenderDock::MoveFloat(Floating& f, const glm::vec2 position)
+        void RenderDock::MoveFloat(Floating& f, const kor::Vec2 position)
         {
-            const glm::vec2 grab = _pressAt - _floatAtPress.TopLeft();
-            const glm::vec2 size = f.rect.Size();
+            const kor::Vec2 grab = _pressAt - _floatAtPress.TopLeft();
+            const kor::Vec2 size = f.rect.Size();
             if (const auto out = CanOpenWindows() ? OverlayPoint(position) : std::nullopt) {
                 f.window = true;
                 f.rect = Rect::XYWH(out->x - grab.x, out->y - grab.y, size.x, size.y);
@@ -1692,7 +1692,7 @@ namespace kui
         void RenderDock::Settle(Floating& f)
         {
             if (!f.window || !CanOpenWindows()) return;
-            const glm::vec2 corner = SpaceFromOverlay(f.rect.TopLeft());
+            const kor::Vec2 corner = SpaceFromOverlay(f.rect.TopLeft());
             const Rect inSpace = Rect::XYWH(corner.x, corner.y, f.rect.Width(), f.rect.Height());
             if (!Fits(inSpace)) return;
             f.window = false;
@@ -1704,7 +1704,7 @@ namespace kui
         Rect RenderDock::AreaPreview(const DockArea area) const
         {
             auto& layout = L();
-            const glm::vec2 size = Size();
+            const kor::Vec2 size = Size();
             const auto extent = [](const float value, const float of) { return value >= 0.f ? value : -value * of; };
             const float bottom = std::min(extent(layout.bottomHeight, size.y), size.y * 0.9f);
             const bool low = !layout.bottomLeft.shown.empty() || !layout.bottomRight.shown.empty();
@@ -1724,7 +1724,7 @@ namespace kui
          * part of its own between two of them or under the last, or — at the stripe's foot — among those
          * of that end of the bottom.
          */
-        RenderDock::Zone RenderDock::StripeZone(const int s, const glm::vec2 position, const std::string& panel) const
+        RenderDock::Zone RenderDock::StripeZone(const int s, const kor::Vec2 position, const std::string& panel) const
         {
             const Stripe& stripe = _stripes[s];
             const DockArea side = s == 0 ? DockArea::eLeft : DockArea::eRight;
@@ -1822,12 +1822,12 @@ namespace kui
          * among its buttons; or in a margin of the space — within Margin of its left, its right or its
          * bottom — the area on that side. Anywhere else, nowhere: it floats.
          */
-        RenderDock::Zone RenderDock::ZoneAt(const glm::vec2 position, const std::string& panel) const
+        RenderDock::Zone RenderDock::ZoneAt(const kor::Vec2 position, const std::string& panel) const
         {
             Zone zone;
             // A panel that never docks has no target anywhere: let go, it floats where it is.
             if (!Dockable(panel) || !_config.layout) return zone;
-            const glm::vec2 size = Size();
+            const kor::Vec2 size = Size();
             if (!Rect::FromSize(size).Contains(position)) return zone;
             for (int s = 0; s < 2; ++s)
                 if (_stripes[s].shown && _stripes[s].rect.Contains(position)) return StripeZone(s, position, panel);
@@ -1874,7 +1874,7 @@ namespace kui
                 const Rect where = middle ? middle->rect : layout.root ? Rect {} : _docked;
                 const bool own = Holds(layout.center, panel) && layout.center.panels.size() == 1;
                 if (!where.Empty() && where.Contains(position) && !own) {
-                    const glm::vec2 at = (position - where.TopLeft()) / glm::max(where.Size(), glm::vec2(1.f));
+                    const kor::Vec2 at = (position - where.TopLeft()) / kor::Max(where.Size(), kor::Vec2(1.f));
                     const bool onBar = middle && middle->center && middle->bar.Contains(position);
                     if (onBar || (std::abs(at.x - 0.5f) <= Middle * 0.5f && std::abs(at.y - 0.5f) <= Middle * 0.5f)) {
                         zone.valid = true;
@@ -1888,7 +1888,7 @@ namespace kui
             // The margins of the space, between its stripes: within Margin of its left, its right or its
             // bottom, the area on that side.
             const float Margin = S().edgeDropMargin;
-            const glm::vec2 t = (position - _docked.TopLeft()) / glm::max(_docked.Size(), glm::vec2(1.f));
+            const kor::Vec2 t = (position - _docked.TopLeft()) / kor::Max(_docked.Size(), kor::Vec2(1.f));
             const float left = t.x, right = 1.f - t.x, bottom = 1.f - t.y;
             const float nearest = std::min({ left, right, bottom });
             if (nearest > Margin) return zone;
@@ -1951,7 +1951,7 @@ namespace kui
             layout.DockAt(panel, area);
         }
 
-        void RenderDock::Drop(const glm::vec2 position)
+        void RenderDock::Drop(const kor::Vec2 position)
         {
             auto& layout = L();
             const std::string panel = _dragged;
@@ -1959,10 +1959,10 @@ namespace kui
             Floating* in = layout.FloatOf(panel);
             // How big it floats: as it is when it floats already; as it last floated, when it has;
             // otherwise what it shows now, and no less than a window is worth.
-            glm::vec2 size { S().minFloatSize * 2.f, S().minFloatSize * 1.5f };
+            kor::Vec2 size { S().minFloatSize * 2.f, S().minFloatSize * 1.5f };
             if (in) size = in->rect.Size();
             else if (const auto kept = layout.floatSize.find(panel); kept != layout.floatSize.end()) size = kept->second;
-            else if (const Node* shown = DockLayout::Impl::FindIn(layout.root.get(), panel); shown && shown->visible) size = glm::max(shown->body.Size(), size);
+            else if (const Node* shown = DockLayout::Impl::FindIn(layout.root.get(), panel); shown && shown->visible) size = kor::Max(shown->body.Size(), size);
 
             if (_zone.valid) {
                 layout.Remove(panel);
@@ -1980,7 +1980,7 @@ namespace kui
                 Rect rect = Rect::XYWH(there->x - _grab.x, there->y - S().titleBarHeight * 0.5f, size.x, size.y);
                 const bool out = !Fits(rect) && CanOpenWindows();
                 if (out) {
-                    const glm::vec2 corner = OverlayFromSpace(rect.TopLeft());
+                    const kor::Vec2 corner = OverlayFromSpace(rect.TopLeft());
                     rect = Rect::XYWH(corner.x, corner.y, size.x, size.y);
                 }
                 if (in) { in->window = out; in->rect = rect; Changed(); return; }
@@ -2005,7 +2005,7 @@ namespace kui
         {
             if (!_config.layout) return false;
             auto& layout = L();
-            const glm::vec2 p = event.local;
+            const kor::Vec2 p = event.local;
             using Kind = Hit::Kind;
 
             switch (event.type) {
@@ -2057,7 +2057,7 @@ namespace kui
                     if (hit.kind == Kind::eBar) _grab = { 24.f, S().titleBarHeight * 0.5f };
                     if (hit.kind == Kind::eTab) {
                         const auto shown = static_cast<std::size_t>(std::ranges::find(node.shown, hit.tab) - node.shown.begin());
-                        _grab = shown < node.tabRects.size() ? p - node.tabRects[shown].TopLeft() : glm::vec2(20.f, 10.f);
+                        _grab = shown < node.tabRects.size() ? p - node.tabRects[shown].TopLeft() : kor::Vec2(20.f, 10.f);
                         // One of several, in the middle: pressed, it is the one shown.
                         if (node.active != hit.tab) { layout.Show(_pressedPanel); Changed(); }
                     }
@@ -2072,7 +2072,7 @@ namespace kui
             }
 
             case PointerEvent::Type::eMove: {
-                const glm::vec2 by = p - _pressAt;
+                const kor::Vec2 by = p - _pressAt;
                 switch (_pressed.kind) {
                 case Kind::eSplitter: {
                     // The line is of the tree as it was when it was pressed: made again since, it is gone.
@@ -2105,7 +2105,7 @@ namespace kui
                 case Kind::eCard:
                     // Past a little slop: something in the card that wants the drag itself — a drag
                     // source — is asked first, and says so by then.
-                    if (glm::length(by) <= 5.f) return false;
+                    if (kor::Length(by) <= 5.f) return false;
                     [[fallthrough]];
                 case Kind::eBar:
                 case Kind::eFrame:
@@ -2120,7 +2120,7 @@ namespace kui
                 case Kind::eTab:
                     // A panel in hand: by its button on a stripe, or by its title.
                     if (!_dragging) {
-                        if (glm::length(by) <= 5.f || _pressedPanel.empty()) return false;
+                        if (kor::Length(by) <= 5.f || _pressedPanel.empty()) return false;
                         _dragging = true;
                         _dragged = _pressedPanel;
                     }
@@ -2193,7 +2193,7 @@ namespace kui
 
         // ---- painting --------------------------------------------------------------------------------------
 
-        void RenderDock::PaintNode(Canvas& canvas, const glm::vec2 offset, Node& node)
+        void RenderDock::PaintNode(Canvas& canvas, const kor::Vec2 offset, Node& node)
         {
             if (!node.visible) return;
             const Theme& t = Theme::Current();
@@ -2207,7 +2207,7 @@ namespace kui
                     if (hot) {
                         const Rect gap = node.line.Shift(offset);
                         const bool upright = gap.Height() > gap.Width();
-                        const glm::vec2 c = gap.Center();
+                        const kor::Vec2 c = gap.Center();
                         const Rect mark = upright ? Rect::LTRB(c.x - 1.f, gap.top + S().radius, c.x + 1.f, gap.bottom - S().radius)
                                                   : Rect::LTRB(gap.left + S().radius, c.y - 1.f, gap.right - S().radius, c.y + 1.f);
                         canvas.DrawRRect({ mark, 1.f }, Paint::Fill(t.primary));
@@ -2281,23 +2281,23 @@ namespace kui
                     const Rect button = BarButton(node, 0).Shift(offset);
                     const bool over = _hover.kind == Hit::Kind::eClose && _hover.node == &node;
                     if (over) canvas.DrawRRect({ button, 6.f }, Paint::Fill(t.surfacePressed));
-                    const glm::vec2 c = button.Center();
+                    const kor::Vec2 c = button.Center();
                     const kui::Paint cross = Paint::Stroked(over ? t.text : t.textMuted, 1.5f);
-                    canvas.DrawLine(c + glm::vec2(-3.5f, -3.5f), c + glm::vec2(3.5f, 3.5f), cross);
-                    canvas.DrawLine(c + glm::vec2(-3.5f, 3.5f), c + glm::vec2(3.5f, -3.5f), cross);
+                    canvas.DrawLine(c + kor::Vec2(-3.5f, -3.5f), c + kor::Vec2(3.5f, 3.5f), cross);
+                    canvas.DrawLine(c + kor::Vec2(-3.5f, 3.5f), c + kor::Vec2(3.5f, -3.5f), cross);
                 }
                 const Rect second = BarButton(node, closable ? 1 : 0).Shift(offset);
                 if (node.tool) {
                     // Docked round the edge: the line that folds it away, back to its button.
                     const bool over = _hover.kind == Hit::Kind::eHide && _hover.node == &node;
                     if (over) canvas.DrawRRect({ second, 6.f }, Paint::Fill(t.surfacePressed));
-                    const glm::vec2 c = second.Center();
-                    canvas.DrawLine(c + glm::vec2(-4.f, 0.f), c + glm::vec2(4.f, 0.f), Paint::Stroked(over ? t.text : t.textMuted, 1.5f));
+                    const kor::Vec2 c = second.Center();
+                    canvas.DrawLine(c + kor::Vec2(-4.f, 0.f), c + kor::Vec2(4.f, 0.f), Paint::Stroked(over ? t.text : t.textMuted, 1.5f));
                 } else if (const Floating* f = FloatOf(&node); f && f->window) {
                     // Out over the desktop: the button that puts it back into the space.
                     const bool over = _hover.kind == Hit::Kind::eRedock && _hover.node == &node;
                     if (over) canvas.DrawRRect({ second, 6.f }, Paint::Fill(t.surfacePressed));
-                    const glm::vec2 c = second.Center();
+                    const kor::Vec2 c = second.Center();
                     canvas.DrawRect(Rect::FromCenter(c, 12.f, 10.f), Paint::Stroked(over ? t.text : t.textMuted, 1.5f));
                     canvas.DrawRect(Rect::LTRB(c.x - 6.f, c.y + 1.f, c.x + 6.f, c.y + 5.f), Paint::Fill(over ? t.text : t.textMuted));
                 }
@@ -2315,7 +2315,7 @@ namespace kui
         }
 
         /** A stripe: its buttons, the one of each open panel in the accent, and the lines between a side's parts. */
-        void RenderDock::PaintStripe(Canvas& canvas, const glm::vec2 offset, const int s)
+        void RenderDock::PaintStripe(Canvas& canvas, const kor::Vec2 offset, const int s)
         {
             const Stripe& stripe = _stripes[s];
             if (!stripe.shown) return;
@@ -2362,7 +2362,7 @@ namespace kui
                 const Meta* meta = MetaOf(button.panel);
                 if (meta && meta->icon) {
                     const float side = std::round(box.Width() * 0.6f);
-                    meta->icon->Draw(canvas, Rect::FromCenter(glm::round(box.Center()), side, side), style.color);
+                    meta->icon->Draw(canvas, Rect::FromCenter(kor::Round(box.Center()), side, side), style.color);
                 } else {
                     canvas.DrawText(icon.Text(), { std::round(box.Center().x - icon.Size().x * 0.5f), std::round(box.Center().y - icon.Size().y * 0.5f) }, style);
                 }
@@ -2370,7 +2370,7 @@ namespace kui
         }
 
         /** A float as it is drawn: a card with its shadow — or, with no title bar, its content alone. */
-        void RenderDock::PaintFloat(Canvas& canvas, const glm::vec2 offset, Floating& f)
+        void RenderDock::PaintFloat(Canvas& canvas, const kor::Vec2 offset, Floating& f)
         {
             const Theme& t = Theme::Current();
             // No title bar: whatever its content draws is all there is of it.
@@ -2386,10 +2386,10 @@ namespace kui
             PaintNode(canvas, offset, *f.root);
             if (!f.fit) {
                 // In from the corner by as much as its rounding takes off it: where the arc crosses the diagonal.
-                const glm::vec2 corner = r.TopLeft() + r.Size() - glm::vec2(S().radius * (1.f - 0.7071f));
+                const kor::Vec2 corner = r.TopLeft() + r.Size() - kor::Vec2(S().radius * (1.f - 0.7071f));
                 const kui::Paint grip = Paint::Stroked(t.textMuted, 1.f);
-                canvas.DrawLine(corner + glm::vec2(-10.f, -3.f), corner + glm::vec2(-3.f, -10.f), grip);
-                canvas.DrawLine(corner + glm::vec2(-6.f, -3.f), corner + glm::vec2(-3.f, -6.f), grip);
+                canvas.DrawLine(corner + kor::Vec2(-10.f, -3.f), corner + kor::Vec2(-3.f, -10.f), grip);
+                canvas.DrawLine(corner + kor::Vec2(-6.f, -3.f), corner + kor::Vec2(-3.f, -6.f), grip);
             }
             canvas.Restore();
             // Its border, round the corners too: what is under its content there is cut away with them.
@@ -2397,7 +2397,7 @@ namespace kui
         }
 
         /** One of the two things it shows on: the space in its window, or (@p overlay) the desktop around it. */
-        void RenderDock::PaintSurface(Canvas& canvas, const glm::vec2 offset, const bool overlay)
+        void RenderDock::PaintSurface(Canvas& canvas, const kor::Vec2 offset, const bool overlay)
         {
             const Theme& t = Theme::Current();
             auto& layout = L();
@@ -2438,7 +2438,7 @@ namespace kui
             canvas.DrawText(title.Text(), { ghost.left + S().tabPadding, ghost.top + (ghost.Height() - title.Size().y) * 0.5f }, style);
         }
 
-        void RenderDock::Paint(Canvas& canvas, const glm::vec2 offset)
+        void RenderDock::Paint(Canvas& canvas, const kor::Vec2 offset)
         {
             if (!_config.layout) return;
             // Panels that are not shown keep their state, and are simply not painted.
@@ -2446,7 +2446,7 @@ namespace kui
             if (_overlay.scene && _overlay.layer) {
                 Canvas desktop;
                 // From where the overlay's window is: the desktop's corner, unless it is fitted to its panels.
-                const glm::vec2 shift = GetOwner() ? glm::vec2(_overlay.at - _overlay.origin) / GetOwner()->desktopScale : glm::vec2(0.f);
+                const kor::Vec2 shift = GetOwner() ? kor::Vec2(_overlay.at - _overlay.origin) / GetOwner()->desktopScale : kor::Vec2(0.f);
                 PaintSurface(desktop, -OverlayOrigin - shift, true);
                 _overlay.layer->SetPicture(desktop.Finish());
             }

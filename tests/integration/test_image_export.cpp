@@ -42,7 +42,7 @@ kor::Resource<Image> mippedImage(const std::uint32_t size, const std::uint32_t m
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{ size, size })
+        .SetExtent(kor::UVec2{ size, size })
         .SetMipLevels(mips)
         .SetArrayLayers(layers)
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc | Image::Usage::eSampled)
@@ -54,11 +54,11 @@ kor::Resource<Image> mippedImage(const std::uint32_t size, const std::uint32_t m
         const std::uint32_t extent = std::max(1u, size >> mip);
         for (std::uint32_t layer = 0; layer < layers; ++layer) {
             const auto texelCount = static_cast<std::size_t>(extent) * extent;
-            std::vector<glm::u8vec4> texels(texelCount, glm::u8vec4{
+            std::vector<kor::U8Vec4> texels(texelCount, kor::U8Vec4{
                 static_cast<std::uint8_t>(10 + mip * 40), static_cast<std::uint8_t>(20 + layer * 30), 200, 255 });
 
-            const auto staging = Buffer::Builder<glm::u8vec4>()
-                .SetDataView(std::span<const glm::u8vec4>(texels))
+            const auto staging = Buffer::Builder<kor::U8Vec4>()
+                .SetDataView(std::span<const kor::U8Vec4>(texels))
                 .SetUsage(Buffer::Usage::eTransferSrc)
                 .SetType(Buffer::Type::eStaging)
                 .Build();
@@ -77,12 +77,12 @@ kor::Resource<Image> mippedImage(const std::uint32_t size, const std::uint32_t m
     return image;
 }
 
-std::vector<glm::u8vec4> readTexels(const ResourceRef<const Image>& image) {
+std::vector<kor::U8Vec4> readTexels(const ResourceRef<const Image>& image) {
     const auto extent = image->Extent();
     const auto texels = static_cast<std::size_t>(extent.x) * extent.y;
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(texels * sizeof(glm::u8vec4)))
+    rb.SetRawSize(static_cast<kor::i64>(texels * sizeof(kor::U8Vec4)))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -90,7 +90,7 @@ std::vector<glm::u8vec4> readTexels(const ResourceRef<const Image>& image) {
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.CopyImageToBuffer(image, readback);
     }, CommandBuffer::Usage::eTransfer).Wait();
-    return readback->Read<glm::u8vec4>();
+    return readback->Read<kor::U8Vec4>();
 }
 
 // ---- one subimage ------------------------------------------------------------------------------
@@ -107,12 +107,12 @@ TEST_F(GpuTest, ExportWritesMipZeroByDefault) {
 
     auto reloaded = kimg::LoadImage(*saved);
     ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(16, 16, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(16, 16, 1));
 
     const auto texels = readTexels(reloaded);
     ASSERT_FALSE(texels.empty());
-    EXPECT_EQ(texels.front().r, 10);   // mip 0, layer 0
-    EXPECT_EQ(texels.front().g, 20);
+    EXPECT_EQ(texels.front().x, 10);   // mip 0, layer 0
+    EXPECT_EQ(texels.front().y, 20);
 }
 
 // Any mip level, on its own, at the size that level actually is.
@@ -125,11 +125,11 @@ TEST_F(GpuTest, ExportWritesAChosenMipLevel) {
 
     auto reloaded = kimg::LoadImage(*saved);
     ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(4, 4, 1));   // 16 >> 2
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(4, 4, 1));   // 16 >> 2
 
     const auto texels = readTexels(reloaded);
     ASSERT_FALSE(texels.empty());
-    EXPECT_EQ(texels.front().r, 10 + 2 * 40);   // the value written into mip 2
+    EXPECT_EQ(texels.front().x, 10 + 2 * 40);   // the value written into mip 2
 }
 
 // Any array layer — which for a cubemap is any face.
@@ -144,7 +144,7 @@ TEST_F(GpuTest, ExportWritesAChosenArrayLayer) {
     ASSERT_TRUE(static_cast<bool>(reloaded));
     const auto texels = readTexels(reloaded);
     ASSERT_FALSE(texels.empty());
-    EXPECT_EQ(texels.front().g, 20 + 4 * 30);   // the value written into layer 4
+    EXPECT_EQ(texels.front().y, 20 + 4 * 30);   // the value written into layer 4
 }
 
 // Any rectangle of any level.
@@ -158,7 +158,7 @@ TEST_F(GpuTest, ExportWritesAChosenRegion) {
 
     auto reloaded = kimg::LoadImage(*saved);
     ASSERT_TRUE(static_cast<bool>(reloaded));
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(8, 4, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(8, 4, 1));
 }
 
 // A subimage that does not exist is refused by name, before anything is written.
@@ -182,12 +182,12 @@ TEST_F(GpuTest, ExportKeepsFloatPrecisionInAFloatContainer) {
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA32_SFLOAT)
-        .SetExtent(glm::uvec2{ 4, 4 })
+        .SetExtent(kor::UVec2{ 4, 4 })
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
         .Build();
     // A value no 8-bit container could hold.
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(image, glm::vec4{ 12.5f, 0.25f, 3.f, 1.f });
+        cb.ClearColorImage(image, kor::Vec4{ 12.5f, 0.25f, 3.f, 1.f });
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     const auto saved = kimg::SaveImage(outDir(), "bright", kimg::FileFormat::eEXR, image);
@@ -197,7 +197,7 @@ TEST_F(GpuTest, ExportKeepsFloatPrecisionInAFloatContainer) {
     ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(4 * 4 * static_cast<glm::i64>(sizeof(glm::vec4)))
+    rb.SetRawSize(4 * 4 * static_cast<kor::i64>(sizeof(kor::Vec4)))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -205,10 +205,10 @@ TEST_F(GpuTest, ExportKeepsFloatPrecisionInAFloatContainer) {
         cb.CopyImageToBuffer(reloaded, readback);
     }, CommandBuffer::Usage::eTransfer).Wait();
 
-    const auto texels = readback->Read<glm::vec4>();
+    const auto texels = readback->Read<kor::Vec4>();
     ASSERT_FALSE(texels.empty());
-    EXPECT_NEAR(texels.front().r, 12.5f, 0.01f);
-    EXPECT_NEAR(texels.front().g, 0.25f, 0.01f);
+    EXPECT_NEAR(texels.front().x, 12.5f, 0.01f);
+    EXPECT_NEAR(texels.front().y, 0.25f, 0.01f);
 }
 
 // ---- the whole image, as KTX2 -------------------------------------------------------------------
@@ -226,7 +226,7 @@ TEST_F(GpuTest, ExportWritesAWholeMippedCubeAsKtx2) {
 
     auto reloaded = kimg::LoadImage(*saved);
     ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(kSize, kSize, 1));
     EXPECT_EQ(reloaded->MipLevels(), kMips);
     EXPECT_EQ(reloaded->ArrayLayers(), 6u);
     EXPECT_EQ(reloaded->PixelFormat(), Image::Format::eRGBA8_UNORM);
@@ -265,7 +265,7 @@ TEST_F(GpuTest, ExportWritesCompressedBlocksIntoKtx2) {
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(format)
-        .SetExtent(glm::uvec2{ kSize, kSize })
+        .SetExtent(kor::UVec2{ kSize, kSize })
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
         .Build();
     ASSERT_TRUE(static_cast<bool>(image));
@@ -286,12 +286,12 @@ TEST_F(GpuTest, ExportWritesCompressedBlocksIntoKtx2) {
     auto reloaded = kimg::LoadImage(*saved);
     ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
     EXPECT_EQ(reloaded->PixelFormat(), format);
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(kSize, kSize, 1));
 
     // The blocks themselves, byte for byte: a compressed texture that survives a round trip is one
     // nothing decoded and re-encoded behind your back.
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(byteCount))
+    rb.SetRawSize(static_cast<kor::i64>(byteCount))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -307,7 +307,7 @@ TEST_F(GpuTest, ExportRefusesCompressedIntoAnOrdinaryContainer) {
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eBC7_UNORM)
-        .SetExtent(glm::uvec2{ 8, 8 })
+        .SetExtent(kor::UVec2{ 8, 8 })
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
         .Build();
 

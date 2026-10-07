@@ -10,7 +10,7 @@
 #include <random>
 #include <set>
 #include <vector>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 #include <string>
 #include "api.h"
 #include <source_location>
@@ -83,11 +83,11 @@ namespace kor
         /** @brief One input or output variable of a stage, as reflected out of the compiled code. */
         struct KORAL_API InputOutput
         {
-            glm::u32 startingLocation;  ///< The location it is bound at.
-            glm::u32 locationSpan;      ///< How many consecutive locations it occupies; a matrix takes several.
+            kor::u32 startingLocation;  ///< The location it is bound at.
+            kor::u32 locationSpan;      ///< How many consecutive locations it occupies; a matrix takes several.
             std::string name;           ///< Its name in the source.
             ChannelType channelType;    ///< The element type of one channel.
-            glm::u32 channelCount;      ///< How many channels — 3 for a vec3.
+            kor::u32 channelCount;      ///< How many channels — 3 for a vec3.
 
             /// Which vocabulary the semantic below is from — the `mesh` of `mesh(POSITION)`. Empty
             /// for a Slang `: POSITION`, which names no module, and for an unannotated input.
@@ -139,11 +139,11 @@ namespace kor
             /// when the field carries no annotation at all.
             std::string semanticNamespace;
             std::string semantic;   ///< What it was annotated with, or empty if it was not.
-            glm::u32 offset = 0;    ///< Byte offset within the block.
-            glm::u32 size = 0;      ///< Its size in bytes, as declared.
-            glm::u8 scalar = 0;     ///< SemanticSlot::Scalar, kept as a plain byte to avoid the include.
-            glm::u8 rows = 1;       ///< Vector components, or matrix rows.
-            glm::u8 columns = 1;    ///< Matrix columns; 1 for scalars and vectors.
+            kor::u32 offset = 0;    ///< Byte offset within the block.
+            kor::u32 size = 0;      ///< Its size in bytes, as declared.
+            kor::u8 scalar = 0;     ///< SemanticSlot::Scalar, kept as a plain byte to avoid the include.
+            kor::u8 rows = 1;       ///< Vector components, or matrix rows.
+            kor::u8 columns = 1;    ///< Matrix columns; 1 for scalars and vectors.
 
             auto operator<=>(const BlockMember& other) const = default;
         };
@@ -152,7 +152,7 @@ namespace kor
         struct KORAL_API Descriptor {
             DescriptorType type;                    ///< What kind of resource it expects.
             std::string name;                       ///< Its name in the source.
-            glm::u32 count;                         ///< How many, for an array binding.
+            kor::u32 count;                         ///< How many, for an array binding.
             Flags<Stage> stages;                    ///< Which stages reach it, unioned across the pipeline's shaders.
             AccessKind access = AccessKind::eRead;  ///< Whether the shader reads it, writes it, or both.
 
@@ -169,7 +169,7 @@ namespace kor
             /// a layout conflict, but a *reload* that only renames a field must not orphan every
             /// descriptor set built from the old layout. @see Descriptor::operator<=>
             std::vector<BlockMember> members;
-            glm::u32 blockSize = 0;                 ///< The block's total size in bytes.
+            kor::u32 blockSize = 0;                 ///< The block's total size in bytes.
 
             /// The block *type's* name, for a uniform or storage buffer; empty for anything else.
             ///
@@ -207,7 +207,7 @@ namespace kor
         /** @brief One set the shader declares, and what sits at each of its bindings. */
         struct KORAL_API DescriptorSet
         {
-            std::map<glm::u32, Descriptor> descriptors; ///< Keyed by binding number.
+            std::map<kor::u32, Descriptor> descriptors; ///< Keyed by binding number.
         };
 
         /**
@@ -219,16 +219,16 @@ namespace kor
          */
         struct KORAL_API PushConstantField {
             std::string name;       ///< Path from the block: `model`, `material.albedo`, `weights[2]`.
-            glm::u32 offset = 0;    ///< Absolute byte offset within the pipeline's push-constant range.
-            glm::u32 size = 0;      ///< Bytes the shader reserves for it, padding included.
+            kor::u32 offset = 0;    ///< Absolute byte offset within the pipeline's push-constant range.
+            kor::u32 size = 0;      ///< Bytes the shader reserves for it, padding included.
 
-            glm::u8 scalar = 5;     ///< ValueScalar, as a plain byte; 5 (eOther) for a struct.
-            glm::u8 rows = 1;       ///< Vector components, or matrix rows.
-            glm::u8 columns = 1;    ///< Matrix columns; 1 for scalars and vectors.
+            kor::u8 scalar = 5;     ///< ValueScalar, as a plain byte; 5 (eOther) for a struct.
+            kor::u8 rows = 1;       ///< Vector components, or matrix rows.
+            kor::u8 columns = 1;    ///< Matrix columns; 1 for scalars and vectors.
 
-            glm::u32 count = 1;         ///< Array elements, or 1. An array *element* is itself 1.
-            glm::u32 arrayStride = 0;   ///< Bytes between array elements, as the shader spaced them.
-            glm::u32 matrixStride = 0;  ///< Bytes between matrix columns, likewise.
+            kor::u32 count = 1;         ///< Array elements, or 1. An array *element* is itself 1.
+            kor::u32 arrayStride = 0;   ///< Bytes between array elements, as the shader spaced them.
+            kor::u32 matrixStride = 0;  ///< Bytes between matrix columns, likewise.
 
             /// Whether this is an aggregate — a struct, or a whole array — rather than a value the
             /// engine can lay out itself. Aggregates are still writable, but only as raw bytes of
@@ -239,8 +239,8 @@ namespace kor
         /** @brief A push-constant block the shader declares. */
         struct KORAL_API PushConstant {
             std::string name;       ///< Its name in the source.
-            glm::u32 size;          ///< Its size in bytes.
-            glm::u32 offset;        ///< Its byte offset within the pipeline's push-constant range.
+            kor::u32 size;          ///< Its size in bytes.
+            kor::u32 offset;        ///< Its byte offset within the pipeline's push-constant range.
             Flags<Stage> stages;    ///< Which stages read it.
 
             /// The block's fields, flattened: every top-level member, every field of a nested
@@ -272,8 +272,8 @@ namespace kor
         {
             std::set<InputOutput> inputs;                       ///< Stage inputs, by location.
             std::set<InputOutput> outputs;                      ///< Stage outputs, by location.
-            std::map<glm::u32, DescriptorSet> descriptorSets;   ///< Declared sets, keyed by set number.
-            std::map<glm::u32, PushConstant> pushConstants;     ///< Declared push-constant blocks, keyed by offset.
+            std::map<kor::u32, DescriptorSet> descriptorSets;   ///< Declared sets, keyed by set number.
+            std::map<kor::u32, PushConstant> pushConstants;     ///< Declared push-constant blocks, keyed by offset.
         };
 
         /**
@@ -441,7 +441,7 @@ namespace kor
         void FetchBlockMembers(const spirv_cross::Compiler& module,
                                const spirv_cross::Resource& resource,
                                std::vector<BlockMember>& members,
-                               glm::u32& blockSize) const;
+                               kor::u32& blockSize) const;
 
         /**
          * @brief Flattens a push-constant block into every path that can be written on its own.
@@ -455,7 +455,7 @@ namespace kor
          */
         static void FlattenPushConstant(const spirv_cross::Compiler& module,
                                         const spirv_cross::SPIRType& type,
-                                        const std::string& prefix, glm::u32 baseOffset,
+                                        const std::string& prefix, kor::u32 baseOffset,
                                         std::vector<PushConstantField>& out);
 
         /**
@@ -490,28 +490,28 @@ namespace kor
          *
          * How pipelines rebuild themselves on a shader edit.
          */
-        glm::u64 RegisterReloadCallback(const std::function<void()>& callback) {
+        kor::u64 RegisterReloadCallback(const std::function<void()>& callback) {
             static std::random_device rd;
             static std::mt19937_64 gen(rd());
             // The parentheses around the name are not noise: <windows.h> defines max() as a
             // function-like macro, which eats `numeric_limits<T>::max()` and yields an unreadable
             // C2589 at the point of use. Wrapping the name blocks macro expansion. This header ships
             // in the SDK, so it cannot rely on the consumer defining NOMINMAX.
-            static std::uniform_int_distribution<glm::u64> dis(1, (std::numeric_limits<glm::u64>::max)());
+            static std::uniform_int_distribution<kor::u64> dis(1, (std::numeric_limits<kor::u64>::max)());
 
-            const glm::u64 callbackId = dis(gen);
+            const kor::u64 callbackId = dis(gen);
             _reloadCallbacks[callbackId] = callback;
             return callbackId;
         }
         /** @brief Releases a registration made by RegisterReloadCallback. */
-        void UnregisterReloadCallback(const glm::u64 callbackId)
+        void UnregisterReloadCallback(const kor::u64 callbackId)
         {
             _reloadCallbacks.erase(callbackId);
         }
 
     protected:
         virtual void OnReload();
-        std::unordered_map<glm::u64, std::function<void()>> _reloadCallbacks;
+        std::unordered_map<kor::u64, std::function<void()>> _reloadCallbacks;
 
         explicit Shader(const Builder& createInfo);
         Stage _stage;
@@ -522,7 +522,7 @@ namespace kor
 
         std::vector<std::filesystem::path> _dependencies;
 
-        std::vector<glm::u32> _spirvCode;
+        std::vector<kor::u32> _spirvCode;
         MemoryLayout _memoryLayout;
 
         /// One field's annotation: which module, and what for.
@@ -537,7 +537,7 @@ namespace kor
         /// reports it by location, and a location is the one name a varying is sure to have: what
         /// Slang calls the parameter rarely survives into the SPIR-V. GLSL's inputs are annotated
         /// like its block members are and arrive through _fieldSemantics instead. @see vertexLayout.h
-        std::map<glm::u32, FieldSemantic> _inputSemantics;
+        std::map<kor::u32, FieldSemantic> _inputSemantics;
         bool _usesDeviceAddresses = false;
 
         // Opaque hot-reload watch state (its concrete type lives in core/shader.cpp). Held here

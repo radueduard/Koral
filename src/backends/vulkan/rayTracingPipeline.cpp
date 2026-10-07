@@ -21,7 +21,7 @@ namespace kor::vk
 {
     namespace
     {
-        constexpr glm::u64 alignUp(const glm::u64 value, const glm::u64 alignment)
+        constexpr kor::u64 alignUp(const kor::u64 value, const kor::u64 alignment)
         {
             return (value + alignment - 1) & ~(alignment - 1);
         }
@@ -92,7 +92,7 @@ namespace kor::vk
 
         auto addStage = [&](const ResourceRef<const kor::Shader>& shaderRef, const ::vk::ShaderStageFlagBits stage) {
             const auto& shader = dynamic_cast<const vk::Shader&>(*shaderRef);
-            const auto index = static_cast<glm::u32>(shaderStages.size());
+            const auto index = static_cast<kor::u32>(shaderStages.size());
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                 .setStage(stage)
                 .setModule(*shader)
@@ -100,7 +100,7 @@ namespace kor::vk
             return index;
         };
 
-        auto generalGroup = [&](const glm::u32 stageIndex) {
+        auto generalGroup = [&](const kor::u32 stageIndex) {
             shaderGroups.push_back(::vk::RayTracingShaderGroupCreateInfoKHR()
                 .setType(::vk::RayTracingShaderGroupTypeKHR::eGeneral)
                 .setGeneralShader(stageIndex)
@@ -153,20 +153,20 @@ namespace kor::vk
         }
         _handle = result.value;
 
-        buildShaderBindingTable(1, static_cast<glm::u32>(_missShaders.size()),
-            static_cast<glm::u32>(_hitGroups.size()), static_cast<glm::u32>(_callableShaders.size()));
+        buildShaderBindingTable(1, static_cast<kor::u32>(_missShaders.size()),
+            static_cast<kor::u32>(_hitGroups.size()), static_cast<kor::u32>(_callableShaders.size()));
     }
 
-    void RayTracingPipeline::buildShaderBindingTable(const glm::u32 raygenCount, const glm::u32 missCount,
-        const glm::u32 hitCount, const glm::u32 callableCount)
+    void RayTracingPipeline::buildShaderBindingTable(const kor::u32 raygenCount, const kor::u32 missCount,
+        const kor::u32 hitCount, const kor::u32 callableCount)
     {
         const auto rtProperties = getRayTracingProperties();
-        const glm::u64 handleSize = rtProperties.shaderGroupHandleSize;
-        const glm::u64 handleAlignment = rtProperties.shaderGroupHandleAlignment;
-        const glm::u64 baseAlignment = rtProperties.shaderGroupBaseAlignment;
-        const glm::u64 handleSizeAligned = alignUp(handleSize, handleAlignment);
+        const kor::u64 handleSize = rtProperties.shaderGroupHandleSize;
+        const kor::u64 handleAlignment = rtProperties.shaderGroupHandleAlignment;
+        const kor::u64 baseAlignment = rtProperties.shaderGroupBaseAlignment;
+        const kor::u64 handleSizeAligned = alignUp(handleSize, handleAlignment);
 
-        const glm::u32 groupCount = raygenCount + missCount + hitCount + callableCount;
+        const kor::u32 groupCount = raygenCount + missCount + hitCount + callableCount;
 
         // Region strides/sizes. The raygen region must have size == stride.
         _raygenRegion.stride = alignUp(handleSizeAligned, baseAlignment);
@@ -179,7 +179,7 @@ namespace kor::vk
         _callableRegion.size = alignUp(callableCount * handleSizeAligned, baseAlignment);
 
         // Fetch the opaque group handles (tightly packed, unaligned).
-        const glm::u64 handlesDataSize = groupCount * handleSize;
+        const kor::u64 handlesDataSize = groupCount * handleSize;
         std::vector<std::byte> handles(handlesDataSize);
         const auto handlesResult = Context::Device()->getRayTracingShaderGroupHandlesKHR(
             _handle, 0, groupCount, handlesDataSize, handles.data());
@@ -187,7 +187,7 @@ namespace kor::vk
             throw std::runtime_error("Failed to fetch ray tracing shader group handles: " + ::vk::to_string(handlesResult));
         }
 
-        const glm::u64 sbtSize = _raygenRegion.size + _missRegion.size + _hitRegion.size + _callableRegion.size;
+        const kor::u64 sbtSize = _raygenRegion.size + _missRegion.size + _hitRegion.size + _callableRegion.size;
 
         const auto bufferCreateInfo = ::vk::BufferCreateInfo()
             .setSize(sbtSize)
@@ -200,10 +200,10 @@ namespace kor::vk
         const ::vk::DeviceAddress sbtAddress = Context::Device()->getBufferAddress(
             ::vk::BufferDeviceAddressInfo().setBuffer(_sbtBuffer));
 
-        glm::u64 raygenOffset = 0;
-        glm::u64 missOffset = raygenOffset + _raygenRegion.size;
-        glm::u64 hitOffset = missOffset + _missRegion.size;
-        glm::u64 callableOffset = hitOffset + _hitRegion.size;
+        kor::u64 raygenOffset = 0;
+        kor::u64 missOffset = raygenOffset + _raygenRegion.size;
+        kor::u64 hitOffset = missOffset + _missRegion.size;
+        kor::u64 callableOffset = hitOffset + _hitRegion.size;
 
         _raygenRegion.deviceAddress = missCount + hitCount + callableCount + raygenCount > 0 ? sbtAddress + raygenOffset : 0;
         _missRegion.deviceAddress = missCount > 0 ? sbtAddress + missOffset : 0;
@@ -212,23 +212,23 @@ namespace kor::vk
 
         // Copy each opaque handle into its slot in the SBT buffer.
         auto* sbt = static_cast<std::byte*>(Context::Allocator().MapMemory(_sbtAllocation));
-        auto handleAt = [&](const glm::u32 groupIndex) {
+        auto handleAt = [&](const kor::u32 groupIndex) {
             return handles.data() + groupIndex * handleSize;
         };
 
-        glm::u32 group = 0;
+        kor::u32 group = 0;
         // Raygen.
         std::memcpy(sbt + raygenOffset, handleAt(group++), handleSize);
         // Miss.
-        for (glm::u32 i = 0; i < missCount; ++i) {
+        for (kor::u32 i = 0; i < missCount; ++i) {
             std::memcpy(sbt + missOffset + i * _missRegion.stride, handleAt(group++), handleSize);
         }
         // Hit.
-        for (glm::u32 i = 0; i < hitCount; ++i) {
+        for (kor::u32 i = 0; i < hitCount; ++i) {
             std::memcpy(sbt + hitOffset + i * _hitRegion.stride, handleAt(group++), handleSize);
         }
         // Callable.
-        for (glm::u32 i = 0; i < callableCount; ++i) {
+        for (kor::u32 i = 0; i < callableCount; ++i) {
             std::memcpy(sbt + callableOffset + i * _callableRegion.stride, handleAt(group++), handleSize);
         }
 

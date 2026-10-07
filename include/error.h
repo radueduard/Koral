@@ -86,6 +86,12 @@ namespace kor
 
         // --- window ---
         eWindowCreationFailed, ///< The window, its surface or the graphics device behind it could not be brought up.
+
+        // --- network (koral-net) ---
+        eNetwork,              ///< A network operation failed: a name not found, a connection refused or reset; see message.
+        eTimedOut,             ///< A network operation took longer than it was allowed.
+        eConnectionClosed,     ///< The other side closed the connection (or this side did) before the operation finished.
+        eProtocol,             ///< The other side sent what its protocol does not allow: malformed HTTP, WebSocket or game packets.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */

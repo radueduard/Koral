@@ -7,7 +7,7 @@
 #include <fstream>
 #include <vector>
 #include <filesystem>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "error.h"
 
@@ -70,7 +70,7 @@ namespace kor::utils
      *         if its size is not a multiple of four — which for a shader binary means it is
      *         truncated or not SPIR-V at all.
      */
-    [[nodiscard]] inline kor::Result<std::vector<glm::u32>> ReadFileAsUInts(const std::filesystem::path& filePath)
+    [[nodiscard]] inline kor::Result<std::vector<kor::u32>> ReadFileAsUInts(const std::filesystem::path& filePath)
     {
         std::ifstream file(filePath, std::ios::binary | std::ios::ate);
         if (!file.is_open())
@@ -79,13 +79,13 @@ namespace kor::utils
         }
 
         const auto fileSize = static_cast<std::size_t>(file.tellg());
-        if (fileSize % sizeof(glm::u32) != 0)
+        if (fileSize % sizeof(kor::u32) != 0)
         {
             return kor::Fail(kor::ErrorCode::eFileNotReadable,
                              "File size {} is not a multiple of 4 bytes: {}", fileSize, filePath.string());
         }
 
-        std::vector<glm::u32> buffer(fileSize / sizeof(glm::u32));
+        std::vector<kor::u32> buffer(fileSize / sizeof(kor::u32));
         file.seekg(0);
         file.read(reinterpret_cast<char*>(buffer.data()), fileSize);
         file.close();
@@ -99,7 +99,7 @@ namespace kor::utils
      * @param data Words to write, in order.
      * @return An empty result, or an error if the file cannot be opened for writing.
      */
-    [[nodiscard]] inline kor::VoidResult WriteUIntsToFile(const std::filesystem::path& filePath, const std::vector<glm::u32>& data)
+    [[nodiscard]] inline kor::VoidResult WriteUIntsToFile(const std::filesystem::path& filePath, const std::vector<kor::u32>& data)
     {
         std::ofstream file(filePath, std::ios::binary);
         if (!file.is_open())
@@ -107,7 +107,7 @@ namespace kor::utils
             return kor::Fail(kor::ErrorCode::eFileNotReadable, "Failed to open file for writing: {}", filePath.string());
         }
 
-        file.write(reinterpret_cast<const char*>(data.data()), data.size() * sizeof(glm::u32));
+        file.write(reinterpret_cast<const char*>(data.data()), data.size() * sizeof(kor::u32));
         file.close();
         return {};
     }

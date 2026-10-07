@@ -25,12 +25,11 @@ target_include_directories(koral-mesh PUBLIC
 # anything that links this module links Koral too, and inherits its include directories.
 target_link_libraries(koral-mesh PUBLIC Koral)
 
-# PRIVATE, exactly as for Koral itself: glm appears in this module's public headers, but a
+# PRIVATE, exactly as for Koral itself: spdlog appears in Koral's public headers, and a
 # consumer gets it from Koral::Koral — in an installed SDK through the vendored copies
-# KoralConfig.cmake attaches to it. Naming it PUBLIC here would put `glm::glm` in the exported
+# KoralConfig.cmake attaches to it. Naming it PUBLIC here would put `spdlog::spdlog` in the exported
 # link interface, where a consumer's CMake has no such target and find_package(Koral) fails.
 target_link_libraries(koral-mesh PRIVATE
-        glm::glm
         spdlog::spdlog
 )
 

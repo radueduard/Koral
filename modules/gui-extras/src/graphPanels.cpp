@@ -29,7 +29,7 @@ namespace kgui
             return kui::ScrollView(kui::Padding(kui::EdgeInsets::All(10.f), Column(std::move(rows), 6.f)));
         }
 
-        double megabytes(const glm::u64 bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0); }
+        double megabytes(const kor::u64 bytes) { return static_cast<double>(bytes) / (1024.0 * 1024.0); }
 
         /** A heading over a list of names, each on its own line. */
         void list(std::vector<kui::Widget>& rows, std::string heading, const std::vector<std::string>& names)

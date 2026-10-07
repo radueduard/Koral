@@ -17,7 +17,7 @@
 
 namespace kor {
 
-    void Framebuffer::Resize(const glm::uvec2& newExtent)
+    void Framebuffer::Resize(const kor::UVec2& newExtent)
     {
         if (newExtent.x == 0 || newExtent.y == 0) return;
 
@@ -72,7 +72,7 @@ namespace kor {
         if (!imageView.Valid()) return;
         const auto image = imageView->SourceImage();
         if (!image.Valid()) return;
-        if (!extent) extent = glm::uvec2{ image->Extent().x, image->Extent().y };
+        if (!extent) extent = kor::UVec2{ image->Extent().x, image->Extent().y };
         if (!sampleCount) sampleCount = image->Samples();
     }
 
@@ -192,7 +192,7 @@ namespace kor {
     }
 
 
-    glm::u32 Framebuffer::ColorAttachmentCount() const { return static_cast<glm::u32>(_colorAttachments.size()); }
+    kor::u32 Framebuffer::ColorAttachmentCount() const { return static_cast<kor::u32>(_colorAttachments.size()); }
     SampleCount Framebuffer::Samples() const { return _sampleCount; }
 
     const std::vector<Framebuffer::Attachment>& Framebuffer::ColorAttachments() const
@@ -200,7 +200,7 @@ namespace kor {
         return _colorAttachments;
     }
 
-    ResourceRef<const ImageView> Framebuffer::ColorAttachment(const glm::u32 index) const
+    ResourceRef<const ImageView> Framebuffer::ColorAttachment(const kor::u32 index) const
     {
         if (index >= _colorAttachments.size()) return {};
         return _colorAttachments[index].view;
@@ -234,7 +234,7 @@ namespace kor {
         return false;
     }
 
-    ResourceRef<const ImageView> Framebuffer::ResolveAttachment(const glm::u32 index) const
+    ResourceRef<const ImageView> Framebuffer::ResolveAttachment(const kor::u32 index) const
     {
         if (index >= _colorAttachments.size()) return {};
         return _colorAttachments[index].resolve;
@@ -257,7 +257,7 @@ namespace kor {
         return view->SourceImage();
     }
 
-    ResourceRef<const Image> Framebuffer::ColorImage(const glm::u32 index) const
+    ResourceRef<const Image> Framebuffer::ColorImage(const kor::u32 index) const
     {
         const auto view = ColorAttachment(index);
         if (!view.Valid()) return {};
@@ -286,7 +286,7 @@ namespace kor {
         }
         return names;
     }
-    const ClearColor& Framebuffer::ClearColorAt(const glm::u32 index) const
+    const ClearColor& Framebuffer::ClearColorAt(const kor::u32 index) const
     {
         return _clearValues.clearColor[index];
     }
@@ -296,7 +296,7 @@ namespace kor {
         return _clearValues.clearDepth;
     }
 
-    glm::i32 Framebuffer::ClearStencil() const
+    kor::i32 Framebuffer::ClearStencil() const
     {
         return _clearValues.clearStencil;
     }
@@ -320,13 +320,13 @@ namespace kor {
             // poisoned for: Create() adopts every attachment, so an unusable one is reported there
             // rather than dereferenced here.
             const auto extentOf = [](const ResourceRef<const ImageView>& view) {
-                if (!view.Valid()) return glm::uvec2{ 0, 0 };
+                if (!view.Valid()) return kor::UVec2{ 0, 0 };
                 const auto image = view->SourceImage();
-                if (!image.Valid()) return glm::uvec2{ 0, 0 };
-                return glm::uvec2{ image->Extent().x, image->Extent().y };
+                if (!image.Valid()) return kor::UVec2{ 0, 0 };
+                return kor::UVec2{ image->Extent().x, image->Extent().y };
             };
             _extent = _colorAttachments.empty()
-                ? (_depthAttachment ? extentOf(_depthAttachment->view) : glm::uvec2{ 0, 0 })
+                ? (_depthAttachment ? extentOf(_depthAttachment->view) : kor::UVec2{ 0, 0 })
                 : extentOf(_colorAttachments[0].view);
         }
     }

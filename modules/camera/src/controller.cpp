@@ -13,7 +13,7 @@ namespace kcam
 {
     namespace
     {
-        constexpr float kMaxPitch = glm::radians(89.f);
+        constexpr float kMaxPitch = kor::Radians(89.f);
 
         /**
          * @brief The input of the scene the camera belongs to — current while it updates — or null for a
@@ -77,10 +77,10 @@ namespace kcam
         {
             float raw = 0.f;
             switch (axis.source) {
-            case AxisSource::eMouseX:  raw = (sceneInput() ? sceneInput()->MousePositionDelta() : glm::vec2(0.f)).x; break;
-            case AxisSource::eMouseY:  raw = (sceneInput() ? sceneInput()->MousePositionDelta() : glm::vec2(0.f)).y; break;
-            case AxisSource::eScrollX: raw = (sceneInput() ? sceneInput()->MouseScrollDelta() : glm::vec2(0.f)).x; break;
-            case AxisSource::eScrollY: raw = (sceneInput() ? sceneInput()->MouseScrollDelta() : glm::vec2(0.f)).y; break;
+            case AxisSource::eMouseX:  raw = (sceneInput() ? sceneInput()->MousePositionDelta() : kor::Vec2(0.f)).x; break;
+            case AxisSource::eMouseY:  raw = (sceneInput() ? sceneInput()->MousePositionDelta() : kor::Vec2(0.f)).y; break;
+            case AxisSource::eScrollX: raw = (sceneInput() ? sceneInput()->MouseScrollDelta() : kor::Vec2(0.f)).x; break;
+            case AxisSource::eScrollY: raw = (sceneInput() ? sceneInput()->MouseScrollDelta() : kor::Vec2(0.f)).y; break;
             case AxisSource::eNone:    return 0.f;
             }
             return raw * axis.sensitivity * (axis.invert ? -1.f : 1.f);
@@ -152,23 +152,23 @@ namespace kcam
 
     void CameraController::deriveAngles(const Camera& camera)
     {
-        const glm::vec3 f = camera.Forward();
-        _pitch = std::asin(glm::clamp(f.y, -1.f, 1.f));
+        const kor::Vec3 f = camera.Forward();
+        _pitch = std::asin(kor::Clamp(f.y, -1.f, 1.f));
         _yaw = std::atan2(-f.x, -f.z);
         _anglesValid = true;
     }
 
     void CameraController::applyAngles(Camera& camera) const
     {
-        camera.SetRotation(glm::angleAxis(_yaw, glm::vec3(0.f, 1.f, 0.f)) *
-                           glm::angleAxis(_pitch, glm::vec3(1.f, 0.f, 0.f)));
+        camera.SetRotation(kor::Quat::AngleAxis(_yaw, kor::Vec3(0.f, 1.f, 0.f)) *
+                           kor::Quat::AngleAxis(_pitch, kor::Vec3(1.f, 0.f, 0.f)));
     }
 
     void CameraController::look(Camera& camera)
     {
         const Bindings& bindings = _controller.bindings;
         _yaw -= value(bindings.yaw);
-        _pitch = glm::clamp(_pitch - value(bindings.pitch), -kMaxPitch, kMaxPitch);
+        _pitch = kor::Clamp(_pitch - value(bindings.pitch), -kMaxPitch, kMaxPitch);
         applyAngles(camera);
     }
 
@@ -231,11 +231,11 @@ namespace kcam
         if ((sceneInput() && sceneInput()->InterfaceWantsKeyboard()) && _controller.input != Controller::Input::eEnabled) return;
         if (_controller.input == Controller::Input::eDisabled) return;
 
-        glm::vec3 move { 0.f };
-        const glm::quat rotation = camera.Rotation();
-        const glm::vec3 forward = rotation * glm::vec3(0.f, 0.f, -1.f);
-        const glm::vec3 right   = rotation * glm::vec3(1.f, 0.f, 0.f);
-        constexpr glm::vec3 up { 0.f, 1.f, 0.f };
+        kor::Vec3 move { 0.f };
+        const kor::Quat rotation = camera.Rotation();
+        const kor::Vec3 forward = rotation * kor::Vec3(0.f, 0.f, -1.f);
+        const kor::Vec3 right   = rotation * kor::Vec3(1.f, 0.f, 0.f);
+        constexpr kor::Vec3 up { 0.f, 1.f, 0.f };
 
         if (held(bindings.moveForward)) move += forward;
         if (held(bindings.moveBack))    move -= forward;
@@ -244,10 +244,10 @@ namespace kcam
         if (held(bindings.moveUp))      move += up;
         if (held(bindings.moveDown))    move -= up;
 
-        if (glm::dot(move, move) < 1e-12f) return;
+        if (kor::Dot(move, move) < 1e-12f) return;
 
         const float boost = held(bindings.boost) ? bindings.boostFactor : 1.f;
-        camera.SetPosition(camera.Position() + glm::normalize(move) * _controller.speed * boost * dt);
+        camera.SetPosition(camera.Position() + kor::Normalize(move) * _controller.speed * boost * dt);
     }
 
     void CameraController::orbit(Camera& camera)
@@ -263,14 +263,14 @@ namespace kcam
 
         if (!_anglesValid) deriveAngles(camera);
 
-        float distance = glm::distance(camera.Position(), _controller.orbitTarget);
+        float distance = kor::Distance(camera.Position(), _controller.orbitTarget);
         if (distance < 1e-3f) distance = 1e-3f;
 
         if (ownsMouse()) {
             _looking = held(bindings.look);
             if (held(bindings.look)) {
                 _yaw -= value(bindings.yaw);
-                _pitch = glm::clamp(_pitch - value(bindings.pitch), -kMaxPitch, kMaxPitch);
+                _pitch = kor::Clamp(_pitch - value(bindings.pitch), -kMaxPitch, kMaxPitch);
             }
             // Exponential: each unit of the zoom axis *scales* the distance, so it feels the same
             // whether the camera is 2 units out or 200.
@@ -280,7 +280,7 @@ namespace kcam
 
         // The camera sits on a sphere around the target, at yaw/pitch, looking inward.
         applyAngles(camera);
-        const glm::vec3 back = camera.Rotation() * glm::vec3(0.f, 0.f, 1.f);
+        const kor::Vec3 back = camera.Rotation() * kor::Vec3(0.f, 0.f, 1.f);
         camera.SetPosition(_controller.orbitTarget + back * distance);
     }
 }

@@ -59,7 +59,7 @@ that's how the command buffer knows what barriers a dispatch or draw needs.
 
 ## Push constants
 
-`cb.PushConstant("tint", glm::vec4{1, 0, 0, 1})` writes one member of the push constant block, by name. Members
+`cb.PushConstant("tint", kor::Vec4{1, 0, 0, 1})` writes one member of the push constant block, by name. Members
 are merged across the pipeline's stages. Two stages declaring the same name with different types is a pipeline
 error. `PushConstantBlock(value)` writes the whole block at once.
 

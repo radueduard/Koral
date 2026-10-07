@@ -180,7 +180,7 @@ kui::DropTarget(kui::DropTargetOptions{}
         .AcceptsType("color")
         .OnEnter([this](const kui::DragData&) { SetState([&] { hot = true; }); })
         .OnLeave([this] { SetState([&] { hot = false; }); })
-        .OnDrop([this](const kui::DragData& d, glm::vec2) { SetState([&] { fill = *d.As<kui::Color>(); }); }),
+        .OnDrop([this](const kui::DragData& d, kor::Vec2) { SetState([&] { fill = *d.As<kui::Color>(); }); }),
     Well(fill, hot))
 ```
 
@@ -381,7 +381,7 @@ float4 fragmentMain(KuiVaryings v) : SV_Target {
 
 ```cpp
 auto plasma = kui::ElementShader::Load("plasma.frag.glsl");      // or ("plasma.slang", "fragmentMain")
-struct Params { glm::vec4 from, to; float speed, pad[3]; };      // std430, as the shader declares it
+struct Params { kor::Vec4 from, to; float speed, pad[3]; };      // std430, as the shader declares it
 canvas.DrawElement(plasma, rect, Params{ ... }, 12.f);             // 12: corner radius
 kui::ShaderBox(plasma, Params{ ... })                             // the same, as a widget
 ```

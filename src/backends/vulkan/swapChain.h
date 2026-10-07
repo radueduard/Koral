@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "device.h"
 #include "imageView.h"
@@ -38,18 +38,18 @@ namespace kor::vk
             explicit Builder(const Surface& surface) : surface(surface) {}
 
             std::reference_wrapper<const Surface> surface;
-            glm::u32 imageCount = 2;        ///< The fewest images to ask for.
-            glm::u32 framesInFlight = 2;    ///< How many frames may be acquiring at once: one semaphore each.
-            glm::uvec2 extent {1, 1};
+            kor::u32 imageCount = 2;        ///< The fewest images to ask for.
+            kor::u32 framesInFlight = 2;    ///< How many frames may be acquiring at once: one semaphore each.
+            kor::UVec2 extent {1, 1};
             bool vsync = true;
             bool transparent = false;
             bool alphaVisual = false;       ///< The window's own pixels have alpha, whatever the surface says. @see setAlphaVisual
             std::vector<kor::Window::Format> formats { kor::Window::Format::eBGRA8_UNORM };   ///< Most wanted first.
             SampleCount sampleCount = SampleCount::e1;
 
-            Builder& setImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
-            Builder& setFramesInFlight(const glm::u32 frames) { this->framesInFlight = frames; return *this; }
-            Builder& setExtent(const glm::uvec2 extent) { this->extent = extent; return *this; }
+            Builder& setImageCount(const kor::u32 imageCount) { this->imageCount = imageCount; return *this; }
+            Builder& setFramesInFlight(const kor::u32 frames) { this->framesInFlight = frames; return *this; }
+            Builder& setExtent(const kor::UVec2 extent) { this->extent = extent; return *this; }
             Builder& setVSync(const bool vsync) { this->vsync = vsync; return *this; }
             Builder& setTransparent(const bool transparent) { this->transparent = transparent; return *this; }
             /**
@@ -66,8 +66,8 @@ namespace kor::vk
         explicit SwapChain(const Builder& createInfo);
         ~SwapChain() override;
 
-        [[nodiscard]] const glm::uvec2 &extent() const { return _extent; }
-        [[nodiscard]] glm::u32 imageCount() const { return _imageCount; }
+        [[nodiscard]] const kor::UVec2 &extent() const { return _extent; }
+        [[nodiscard]] kor::u32 imageCount() const { return _imageCount; }
         [[nodiscard]] ::vk::SampleCountFlagBits getVkSamples() const { return getVkSampleCount(_sampleCount); }
 
         [[nodiscard]] kor::ResourceRef<const kor::Image> image() const { return _swapChainImages; }
@@ -81,22 +81,22 @@ namespace kor::vk
 
         [[nodiscard]] ::vk::Format getImageFormat() const { return _surfaceFormat.format; }
         [[nodiscard]] kor::Window::Format getWindowFormat() const { return _windowFormat; }
-        [[nodiscard]] glm::u32 currentImageIndex() const { return _imageIndex; }
+        [[nodiscard]] kor::u32 currentImageIndex() const { return _imageIndex; }
         /// Whether what it presents is blended with what is behind the window, by its alpha.
         [[nodiscard]] bool compositesAlpha() const { return _composites; }
 
     	[[nodiscard]] ::vk::Semaphore getCurrentRenderFinishedSemaphore() const { return _renderFinishedSemaphores[_imageIndex]; }
         /// Signalled by the acquire made for frame @p slot; what that frame's submit waits for.
-        [[nodiscard]] ::vk::Semaphore getImageAvailableSemaphore(const glm::u32 slot) const { return _imageAvailable[slot]; }
+        [[nodiscard]] ::vk::Semaphore getImageAvailableSemaphore(const kor::u32 slot) const { return _imageAvailable[slot]; }
         [[nodiscard]] const kor::vk::Queue& getPresentQueue() const { return _presentQueue; }
 
         /// Rebuilds it at @p newSize, depth target included. Waits for the device to go idle.
-        void Resize(const glm::uvec2& newSize);
+        void Resize(const kor::UVec2& newSize);
 
         /// Acquires the next image for frame @p slot, signalling that slot's semaphore.
-        ::vk::Result Acquire(glm::u32 slot);
+        ::vk::Result Acquire(kor::u32 slot);
         /// Replaces frame @p slot's semaphore, after an acquire that failed may have left it pending.
-        void ResetImageAvailable(glm::u32 slot);
+        void ResetImageAvailable(kor::u32 slot);
 
         /**
          * Waits until whichever frame last rendered into the just-acquired image has finished, then
@@ -105,7 +105,7 @@ namespace kor::vk
         void ClaimAcquiredImage(const ::vk::Fence& frameFence);
 
     private:
-        glm::uvec2 _extent;
+        kor::UVec2 _extent;
         bool _vsync = true;
         bool _transparent = false;
         bool _alphaVisual = false;
@@ -113,11 +113,11 @@ namespace kor::vk
         SampleCount _sampleCount = SampleCount::e1;
         /// What was asked for, held separately from _imageCount because _imageCount is replaced
         /// by the driver's actual count — and re-requesting that on a Resize would ratchet it up.
-        glm::u32 _requestedImageCount = 0;
-        glm::u32 _imageCount = 0;   ///< What the driver actually allocated.
+        kor::u32 _requestedImageCount = 0;
+        kor::u32 _imageCount = 0;   ///< What the driver actually allocated.
         // Written by Acquire on the main thread, read by any thread whose End() picks a per-frame
         // resource's copy (they all go through CurrentImageIndex()). Atomic so that read is not a race.
-        std::atomic<glm::u32> _imageIndex = 0;
+        std::atomic<kor::u32> _imageIndex = 0;
 
         std::reference_wrapper<const Surface> _surface;
         ::vk::SurfaceFormatKHR _surfaceFormat = {};
@@ -145,6 +145,6 @@ namespace kor::vk
         /** The first of the requested formats the surface offers, else the first it offers that the engine knows. */
         [[nodiscard]] std::pair<::vk::SurfaceFormatKHR, kor::Window::Format> ChooseSurfaceFormat(const std::vector<::vk::SurfaceFormatKHR>& availableFormats) const;
         static ::vk::PresentModeKHR ChoosePresentMode(const std::vector<::vk::PresentModeKHR> &availablePresentModes, bool vsync);
-        static glm::uvec2 ChooseExtent(const ::vk::SurfaceCapabilitiesKHR &capabilities, const glm::uvec2& extent);
+        static kor::UVec2 ChooseExtent(const ::vk::SurfaceCapabilitiesKHR &capabilities, const kor::UVec2& extent);
     };
 }

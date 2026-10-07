@@ -35,11 +35,10 @@ target_compile_definitions(koral-image-import PRIVATE KORAL_IMAGE_IMPORT_EXPORTS
 # that links this module links Koral too, and inherits its include directories.
 target_link_libraries(koral-image-import PUBLIC Koral)
 
-# Everything else is PRIVATE, exactly as for Koral itself — a consumer gets glm through
+# Everything else is PRIVATE, exactly as for Koral itself — a consumer gets spdlog through
 # Koral::Koral (in an installed SDK, through the vendored copies KoralConfig.cmake attaches to it),
 # and never sees OpenImageIO or KTX at all.
 target_link_libraries(koral-image-import PRIVATE
-        glm::glm
         spdlog::spdlog
         OpenImageIO::OpenImageIO
         KTX::ktx

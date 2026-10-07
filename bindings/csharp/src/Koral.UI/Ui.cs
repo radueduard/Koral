@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using Koral.UI.Native;
 
@@ -76,7 +75,7 @@ public sealed unsafe class Ui : IDisposable
     }
 
     /// <summary>The frame, with <paramref name="input"/>, over a target of <paramref name="viewport"/> pixels, <paramref name="dt"/> seconds after the last.</summary>
-    public void Update(Input input, Vector2 viewport, float dt)
+    public void Update(Input input, Vec2 viewport, float dt)
     {
         KuiNative.kui_ui_update_with(Native, input.Native, viewport.X, viewport.Y, dt);
         KuiNative.Check();

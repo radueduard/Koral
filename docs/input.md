@@ -8,7 +8,7 @@ interface undocked — so two scenes in two windows never see each other's keys.
 ```cpp
 if (Input::IsKeyPressed(kor::Key::eSpace)) Jump();          // the frame it went down
 if (Input::IsKeyHeld(kor::Key::eW)) MoveForward();          // every frame after, while down
-glm::vec2 look = Input::MousePositionDelta();
+kor::Vec2 look = Input::MousePositionDelta();
 ```
 
 A key or button is `ePressed` for the one frame it went down, `eHeld` while it stays down,
@@ -40,7 +40,7 @@ Input::BindAxis("MoveX", {{kor::Key::eD, 1.f}, {kor::Key::eA, -1.f}, kor::Gamepa
 Input::BindAxis("MoveY", {{kor::Key::eW, 1.f}, {kor::Key::eS, -1.f}});
 
 if (Input::IsActionPressed("Jump")) Jump();
-glm::vec2 move = Input::Axis2D("MoveX", "MoveY");   // no longer than 1: a diagonal is not faster
+kor::Vec2 move = Input::Axis2D("MoveX", "MoveY");   // no longer than 1: a diagonal is not faster
 ```
 
 An axis source counts as down for an action past halfway — a trigger pulled, a stick pushed.

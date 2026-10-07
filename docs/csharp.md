@@ -9,7 +9,7 @@ library at run time.
 ```csharp
 public sealed class Level : Scene
 {
-    [Keep] private Vector3 _player;                 // kept across a hot reload
+    [Keep] private Vec3 _player;                    // kept across a hot reload
     private GraphicsPipeline _pipeline = null!;
     private Mesh _mesh = null!;
 
@@ -34,7 +34,7 @@ public sealed class Level : Scene
         commandBuffer
             .BeginRendering()
             .BindGraphicsPipeline(_pipeline)
-            .PushConstant("model", Matrix4x4.CreateTranslation(_player))
+            .PushConstant("model", KMath.Translation(_player))
             .BindMesh(_mesh)
             .DrawIndexed()
             .EndRendering();
@@ -54,8 +54,8 @@ The rules are few, and they apply everywhere:
 | `commandBuffer.BindMesh(m).Draw()` | `commandBuffer.BindMesh(m).Draw()` |
 | `kor::Image::Format::eRGBA8_UNORM` | `Image.Format.eRGBA8_UNORM`: the same enumerators, `e` and all |
 | `Flags<Buffer::Usage>`, `a \| b` | a `[Flags]` enum, `a \| b` |
-| `glm::vec3`, `glm::mat4` | `Vector3`, `Matrix4x4` (the same floats, in the same order) |
-| `glm::uvec2`, `glm::ivec3` | `UVec2`, `IVec3` |
+| `kor::Vec3`, `kor::Mat4`, `kor::Quat`, `kor::UVec2` | `Vec3`, `Mat4`, `Quat`, `UVec2`: the same types (they convert to and from System.Numerics' implicitly) |
+| `kor::Dot(a, b)`, `kor::Perspective(...)` | `KMath.Dot(a, b)`, `KMath.Perspective(...)` — or `using static Koral.KMath;` and `Dot(a, b)` ([math](math.md)) |
 | `Window::Extent()` in a scene | `Window.Extent` in a scene |
 | `kor::log::Info("{} left", n)` | `Log.Info($"{n} left")` |
 | `kor::Result<T>` / `VoidResult` | the value, or a `KoralException` with the error |

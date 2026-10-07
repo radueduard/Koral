@@ -18,7 +18,7 @@ namespace {
     struct SceneView final : kui::StatefulWidget {
         kui::Color fill = kui::Color::Hex(0x2B2F6B);
         kui::Widget Build() override {
-            return kui::CustomPaint([c = fill](kui::Canvas& canvas, const glm::vec2 size) {
+            return kui::CustomPaint([c = fill](kui::Canvas& canvas, const kor::Vec2 size) {
                     canvas.DrawRect(kui::Rect::FromSize(size), kui::Paint::Fill(kui::Color::Hex(0x101216)));
                     canvas.DrawCircle(size * 0.5f, std::min(size.x, size.y) * 0.3f, kui::Paint::Fill(c).SetStroke(3.f, kui::colors::White));
                 })

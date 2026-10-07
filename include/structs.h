@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <variant>
 #include <string>
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "flags.h"
 #include "api.h"
@@ -38,7 +38,7 @@ namespace kor
      * const auto none = buffer->Read<T>(0);     // none
      * @endcode
      */
-    inline constexpr glm::u64 WholeSize = std::numeric_limits<glm::u64>::max();
+    inline constexpr kor::u64 WholeSize = std::numeric_limits<kor::u64>::max();
 
     namespace detail
     {
@@ -205,11 +205,11 @@ namespace kor
      */
     struct KORAL_API VertexInputAttributeDescription
     {
-        glm::u32 location;          ///< The location of the vertex attribute in the shader. Must match the location specified in the shader code.
-        glm::u32 binding;           ///< The binding index of the vertex buffer that contains this attribute. Must match the binding index specified in the vertex input binding description.
-        glm::u32 channelCount;      ///< The number of channels in the vertex attribute. For example, a vec3 would have a channel count of 3.
+        kor::u32 location;          ///< The location of the vertex attribute in the shader. Must match the location specified in the shader code.
+        kor::u32 binding;           ///< The binding index of the vertex buffer that contains this attribute. Must match the binding index specified in the vertex input binding description.
+        kor::u32 channelCount;      ///< The number of channels in the vertex attribute. For example, a vec3 would have a channel count of 3.
         ChannelType channelType;    ///< The type of the channels in the vertex attribute. For example, a vec3 of floats would have a channel type of eFloat.
-        glm::u32 offset;            ///< The byte offset of this attribute from the start of the vertex. For example, if the vertex has a vec3 position followed by a vec2 texCoord, the offset of the texCoord attribute would be sizeof(float) * 3 = 12 bytes. If a struct is available, it is recommended to use the offsetof macro to calculate the offset of each attribute within the vertex struct, as this will ensure correct offsets even if the struct is modified in the future.
+        kor::u32 offset;            ///< The byte offset of this attribute from the start of the vertex. For example, if the vertex has a vec3 position followed by a vec2 texCoord, the offset of the texCoord attribute would be sizeof(float) * 3 = 12 bytes. If a struct is available, it is recommended to use the offsetof macro to calculate the offset of each attribute within the vertex struct, as this will ensure correct offsets even if the struct is modified in the future.
     };
 
     /**
@@ -223,8 +223,8 @@ namespace kor
 
     struct KORAL_API VertexInputBindingDescription
     {
-        glm::u32 binding;   ///< The binding index of the vertex buffer. Must match the binding index specified in the vertex input attribute descriptions that reference this binding.
-        glm::u32 stride;    ///< The byte stride between consecutive vertices in the vertex buffer. For example, if the vertex struct has
+        kor::u32 binding;   ///< The binding index of the vertex buffer. Must match the binding index specified in the vertex input attribute descriptions that reference this binding.
+        kor::u32 stride;    ///< The byte stride between consecutive vertices in the vertex buffer. For example, if the vertex struct has
                             ///< a size of 32 bytes, the stride would be 32. It is recommended to use the sizeof operator on the vertex struct to calculate
                             ///< the stride, as this will ensure correct stride even if the struct is modified in the future.
         /// A vertex at a time, or (eInstance) an instance at a time: per-instance data, such as each copy's transform.
@@ -239,7 +239,7 @@ namespace kor
      * @param channelType The type of the channel. For example, if the vertex attribute is a vec3 of floats, the channel type would be eFloat.
      * @return The size in bytes of a single channel of the given channel type. For example, if the channel type is eFloat, this function will return 4.
      */
-    inline glm::u32 SizeofChannelType(const ChannelType channelType) {
+    inline kor::u32 SizeofChannelType(const ChannelType channelType) {
         switch (channelType) {
         case ChannelType::eFloat: return sizeof(float);
         case ChannelType::eInt: return sizeof(int);
@@ -384,9 +384,9 @@ namespace kor
         StencilOp passOp = StencilOp::eKeep;        ///< The operation to perform when the stencil test passes. For example, if the pass operation is eIncrementAndClamp, the stencil value will be incremented by one (and clamped to the maximum representable value) when the stencil test passes.
         StencilOp depthFailOp = StencilOp::eKeep;   ///< The operation to perform when the stencil test passes but the depth test fails. For example, if the depth fail operation is eDecrementAndClamp, the stencil value will be decremented by one (and clamped to zero) when the stencil test passes but the depth test fails.
         CompareOp compareOp = CompareOp::eAlways;   ///< The comparison function to use for the stencil test. For example, if the compare operation is eEqual, the stencil test will pass if the stencil value is equal to the reference value specified in the stencil state.
-        glm::u32 compareMask = 0;                   ///< The mask that is applied to both the stencil value and the reference value during stencil testing. This can be used to ignore certain bits of the stencil value when performing the comparison, which can be useful for rendering techniques that require partial stencil testing, such as stencil shadows or for certain shadow mapping techniques.
-        glm::u32 writeMask = 0;                     ///< The mask that is applied to the stencil value when writing to the stencil buffer. This can be used to ignore certain bits of the stencil value when performing stencil operations, which can be useful for rendering techniques that require partial stencil updates, such as stencil shadows or for certain shadow mapping techniques.
-        glm::u32 reference = 0;                     ///< The reference value that is used in stencil testing and stencil operations. This value is compared against the stencil value in the stencil buffer using the specified compare operation, and is also used in stencil operations that require a reference value (e.g., eReplace).
+        kor::u32 compareMask = 0;                   ///< The mask that is applied to both the stencil value and the reference value during stencil testing. This can be used to ignore certain bits of the stencil value when performing the comparison, which can be useful for rendering techniques that require partial stencil testing, such as stencil shadows or for certain shadow mapping techniques.
+        kor::u32 writeMask = 0;                     ///< The mask that is applied to the stencil value when writing to the stencil buffer. This can be used to ignore certain bits of the stencil value when performing stencil operations, which can be useful for rendering techniques that require partial stencil updates, such as stencil shadows or for certain shadow mapping techniques.
+        kor::u32 reference = 0;                     ///< The reference value that is used in stencil testing and stencil operations. This value is compared against the stencil value in the stencil buffer using the specified compare operation, and is also used in stencil operations that require a reference value (e.g., eReplace).
     };
 
     /**
@@ -509,10 +509,10 @@ namespace kor
      */
     struct KORAL_API IndirectDrawCommand
     {
-        glm::u32 vertexCount;
-        glm::u32 instanceCount;
-        glm::u32 firstVertex;
-        glm::u32 firstInstance;
+        kor::u32 vertexCount;
+        kor::u32 instanceCount;
+        kor::u32 firstVertex;
+        kor::u32 firstInstance;
     };
 
     /**
@@ -520,11 +520,11 @@ namespace kor
      */
     struct KORAL_API IndirectDrawIndexedCommand
     {
-        glm::u32 indexCount;
-        glm::u32 instanceCount;
-        glm::u32 firstIndex;
+        kor::u32 indexCount;
+        kor::u32 instanceCount;
+        kor::u32 firstIndex;
         int32_t vertexOffset;
-        glm::u32 firstInstance;
+        kor::u32 firstInstance;
     };
 
     /**
@@ -532,9 +532,9 @@ namespace kor
      */
     struct KORAL_API IndirectDrawMeshTasksCommand
     {
-        glm::u32 taskCountX;
-        glm::u32 taskCountY;
-        glm::u32 taskCountZ;
+        kor::u32 taskCountX;
+        kor::u32 taskCountY;
+        kor::u32 taskCountZ;
     };
 
     // =========================================================================
@@ -570,19 +570,19 @@ namespace kor
         BufferBarrier(
             const kor::ResourceRef<const kor::Buffer> &buffer,
             ResourceAccess dstAccess,
-            glm::u64 offset = 0,
-            glm::u64 size = WholeSize);
+            kor::u64 offset = 0,
+            kor::u64 size = WholeSize);
 
         [[nodiscard]] kor::ResourceRef<const kor::Buffer> TargetBuffer() const { return _buffer; }
         [[nodiscard]] ResourceAccess DstAccess() const { return _dstAccess; }
-        [[nodiscard]] glm::u64 Offset() const { return _offset; }
-        [[nodiscard]] glm::u64 size() const { return _size; }
+        [[nodiscard]] kor::u64 Offset() const { return _offset; }
+        [[nodiscard]] kor::u64 size() const { return _size; }
 
     private:
         kor::ResourceRef<const kor::Buffer> _buffer;
         ResourceAccess _dstAccess;
-        glm::u64 _offset;
-        glm::u64 _size;
+        kor::u64 _offset;
+        kor::u64 _size;
     };
 
     /**
@@ -611,25 +611,25 @@ namespace kor
         ImageBarrier(
             const kor::ResourceRef<const kor::Image> &image,
             ResourceAccess dstAccess,
-            std::optional<glm::u32> baseMipLevel = std::nullopt,
-            std::optional<glm::u32> levelCount = std::nullopt,
-            std::optional<glm::u32> baseArrayLayer = std::nullopt,
-            std::optional<glm::u32> layerCount = std::nullopt);
+            std::optional<kor::u32> baseMipLevel = std::nullopt,
+            std::optional<kor::u32> levelCount = std::nullopt,
+            std::optional<kor::u32> baseArrayLayer = std::nullopt,
+            std::optional<kor::u32> layerCount = std::nullopt);
 
         [[nodiscard]] kor::ResourceRef<const kor::Image> TargetImage() const { return _image; }
         [[nodiscard]] ResourceAccess DstAccess() const { return _dstAccess; }
-        [[nodiscard]] std::optional<glm::u32> BaseMipLevel() const { return _baseMipLevel; }
-        [[nodiscard]] std::optional<glm::u32> LevelCount() const { return _levelCount; }
-        [[nodiscard]] std::optional<glm::u32> BaseArrayLayer() const { return _baseArrayLayer; }
-        [[nodiscard]] std::optional<glm::u32> LayerCount() const { return _layerCount; }
+        [[nodiscard]] std::optional<kor::u32> BaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] std::optional<kor::u32> LevelCount() const { return _levelCount; }
+        [[nodiscard]] std::optional<kor::u32> BaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] std::optional<kor::u32> LayerCount() const { return _layerCount; }
 
     private:
         kor::ResourceRef<const kor::Image> _image;
         ResourceAccess _dstAccess;
-        std::optional<glm::u32> _baseMipLevel;
-        std::optional<glm::u32> _levelCount;
-        std::optional<glm::u32> _baseArrayLayer;
-        std::optional<glm::u32> _layerCount;
+        std::optional<kor::u32> _baseMipLevel;
+        std::optional<kor::u32> _levelCount;
+        std::optional<kor::u32> _baseArrayLayer;
+        std::optional<kor::u32> _layerCount;
     };
 
     /**
@@ -642,15 +642,15 @@ namespace kor
      */
     class KORAL_API Blit {
     public:
-        glm::ivec3 srcOffset = { 0, 0, 0 };     ///< Texel coordinate the source rectangle starts at.
-        glm::ivec3 srcExtent = { -1, -1, -1 };  ///< Size of the source rectangle in texels. The default (-1) means the source image's full extent.
-        glm::ivec3 dstOffset = { 0, 0, 0 };     ///< Texel coordinate the destination rectangle starts at.
-        glm::ivec3 dstExtent = { -1, -1, -1 };  ///< Size of the destination rectangle in texels. The default (-1) means the destination image's full extent. Differing from @ref srcExtent is what scales the image.
-        glm::u32 srcBaseArrayLayer = 0;         ///< First array layer read from the source.
-        glm::u32 dstBaseArrayLayer = 0;         ///< First array layer written on the destination.
-        glm::u32 layerCount = 1;                ///< How many array layers to blit, starting from the two base layers above.
-        glm::u32 srcMipLevel = 0;               ///< Mip level read from the source.
-        glm::u32 dstMipLevel = 0;               ///< Mip level written on the destination.
+        kor::IVec3 srcOffset = { 0, 0, 0 };     ///< Texel coordinate the source rectangle starts at.
+        kor::IVec3 srcExtent = { -1, -1, -1 };  ///< Size of the source rectangle in texels. The default (-1) means the source image's full extent.
+        kor::IVec3 dstOffset = { 0, 0, 0 };     ///< Texel coordinate the destination rectangle starts at.
+        kor::IVec3 dstExtent = { -1, -1, -1 };  ///< Size of the destination rectangle in texels. The default (-1) means the destination image's full extent. Differing from @ref srcExtent is what scales the image.
+        kor::u32 srcBaseArrayLayer = 0;         ///< First array layer read from the source.
+        kor::u32 dstBaseArrayLayer = 0;         ///< First array layer written on the destination.
+        kor::u32 layerCount = 1;                ///< How many array layers to blit, starting from the two base layers above.
+        kor::u32 srcMipLevel = 0;               ///< Mip level read from the source.
+        kor::u32 dstMipLevel = 0;               ///< Mip level written on the destination.
         kor::Filter filtering = kor::Filter::eNearest;  ///< How texels are sampled when the two extents differ. Only meaningful when they do — a same-size blit reads each texel exactly once either way.
     };
 
@@ -664,15 +664,15 @@ namespace kor
      */
     class KORAL_API Resolve {
     public:
-        glm::ivec3 srcOffset = { 0, 0, 0 };     ///< Texel coordinate the source rectangle starts at.
-        glm::ivec3 srcExtent = { -1, -1, -1 };  ///< Size of the source rectangle in texels. The default (-1) means the source image's full extent.
-        glm::ivec3 dstOffset = { 0, 0, 0 };     ///< Texel coordinate the destination rectangle starts at.
-        glm::ivec3 dstExtent = { -1, -1, -1 };  ///< Size of the destination rectangle in texels. The default (-1) means the destination image's full extent.
-        glm::u32 srcBaseArrayLayer = 0;         ///< First array layer read from the source.
-        glm::u32 dstBaseArrayLayer = 0;         ///< First array layer written on the destination.
-        glm::u32 layerCount = 1;                ///< How many array layers to resolve, starting from the two base layers above.
-        glm::u32 srcMipLevel = 0;               ///< Mip level read from the source.
-        glm::u32 dstMipLevel = 0;               ///< Mip level written on the destination.
+        kor::IVec3 srcOffset = { 0, 0, 0 };     ///< Texel coordinate the source rectangle starts at.
+        kor::IVec3 srcExtent = { -1, -1, -1 };  ///< Size of the source rectangle in texels. The default (-1) means the source image's full extent.
+        kor::IVec3 dstOffset = { 0, 0, 0 };     ///< Texel coordinate the destination rectangle starts at.
+        kor::IVec3 dstExtent = { -1, -1, -1 };  ///< Size of the destination rectangle in texels. The default (-1) means the destination image's full extent.
+        kor::u32 srcBaseArrayLayer = 0;         ///< First array layer read from the source.
+        kor::u32 dstBaseArrayLayer = 0;         ///< First array layer written on the destination.
+        kor::u32 layerCount = 1;                ///< How many array layers to resolve, starting from the two base layers above.
+        kor::u32 srcMipLevel = 0;               ///< Mip level read from the source.
+        kor::u32 dstMipLevel = 0;               ///< Mip level written on the destination.
     };
 
     /**
@@ -685,14 +685,14 @@ namespace kor
      */
     class KORAL_API Copy {
     public:
-        glm::u64 bufferOffset = 0;              ///< Byte offset into the buffer where the texel data begins.
-        glm::u64 bufferRowLength = 0;           ///< Row pitch in *texels*, for buffer memory with padding between rows. The default (0) means rows are tightly packed, i.e. equal to @ref imageExtent.x.
-        glm::u64 bufferImageHeight = 0;         ///< Slice pitch in *rows*, for buffer memory with padding between 2D slices. The default (0) means slices are tightly packed, i.e. equal to @ref imageExtent.y.
-        glm::ivec3 imageOffset = { 0, 0, 0 };   ///< Texel coordinate in the image the copied region starts at.
-        glm::ivec3 imageExtent = { -1, -1, -1 };///< Size of the copied region in texels. The default (-1) means the image's full extent.
-        glm::u32 imageBaseArrayLayer = 0;       ///< First array layer copied.
-        glm::u32 imageLayerCount = 1;           ///< How many array layers to copy, starting from @ref imageBaseArrayLayer.
-        glm::u32 imageMipLevel = 0;             ///< Mip level copied.
+        kor::u64 bufferOffset = 0;              ///< Byte offset into the buffer where the texel data begins.
+        kor::u64 bufferRowLength = 0;           ///< Row pitch in *texels*, for buffer memory with padding between rows. The default (0) means rows are tightly packed, i.e. equal to @ref imageExtent.x.
+        kor::u64 bufferImageHeight = 0;         ///< Slice pitch in *rows*, for buffer memory with padding between 2D slices. The default (0) means slices are tightly packed, i.e. equal to @ref imageExtent.y.
+        kor::IVec3 imageOffset = { 0, 0, 0 };   ///< Texel coordinate in the image the copied region starts at.
+        kor::IVec3 imageExtent = { -1, -1, -1 };///< Size of the copied region in texels. The default (-1) means the image's full extent.
+        kor::u32 imageBaseArrayLayer = 0;       ///< First array layer copied.
+        kor::u32 imageLayerCount = 1;           ///< How many array layers to copy, starting from @ref imageBaseArrayLayer.
+        kor::u32 imageMipLevel = 0;             ///< Mip level copied.
     };
 
     /**
@@ -721,17 +721,17 @@ namespace kor
      */
     using ClearColor = std::variant<
         float,
-        glm::vec2,
-        glm::vec3,
-        glm::vec4,
-        glm::i32,
-        glm::ivec2,
-        glm::ivec3,
-        glm::ivec4,
-        glm::u32,
-        glm::uvec2,
-        glm::uvec3,
-        glm::uvec4
+        kor::Vec2,
+        kor::Vec3,
+        kor::Vec4,
+        kor::i32,
+        kor::IVec2,
+        kor::IVec3,
+        kor::IVec4,
+        kor::u32,
+        kor::UVec2,
+        kor::UVec3,
+        kor::UVec4
     >;
 
     /**
@@ -749,8 +749,8 @@ namespace kor
      * commandBuffer.BeginRendering(gBuffer);                       // clear to the framebuffer's own values
      *
      * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer)        // or override them, this pass only
-     *     .SetClearColor(0, glm::vec4{0.1f, 0.1f, 0.12f, 1.f})
-     *     .SetClearColor(2, glm::uvec4{~0u})                       // an integer attachment's sentinel
+     *     .SetClearColor(0, kor::Vec4{0.1f, 0.1f, 0.12f, 1.f})
+     *     .SetClearColor(2, kor::UVec4{~0u})                       // an integer attachment's sentinel
      *     .SetDepthStoreOperation(kor::StoreOperation::eDontCare));
      *
      * commandBuffer.BeginRendering();                              // the screen, with its own values
@@ -788,7 +788,7 @@ namespace kor
          * Attachments not named here keep the framebuffer's own clear value, so overriding one of
          * five means writing one line, not five.
          */
-        RenderInfo& SetClearColor(const glm::u32 index, const ClearColor &color)
+        RenderInfo& SetClearColor(const kor::u32 index, const ClearColor &color)
         {
             if (index >= _clearColors.size()) {
                 _clearColors.resize(index + 1, std::nullopt);
@@ -797,7 +797,7 @@ namespace kor
             return *this;
         }
         RenderInfo& SetClearDepth(const float depth) { _clearDepth = depth; return *this; }
-        RenderInfo& SetClearStencil(const glm::i32 stencil) { _clearStencil = stencil; return *this; }
+        RenderInfo& SetClearStencil(const kor::i32 stencil) { _clearStencil = stencil; return *this; }
 
         [[nodiscard]] kor::ResourceRef<const kor::Framebuffer> Target() const { return _framebuffer; }
 
@@ -815,13 +815,13 @@ namespace kor
          * run. Black for an attachment neither of them describes, which cannot happen for a pass
          * recorded through BeginRendering.
          */
-        [[nodiscard]] const ClearColor& ClearColorAt(glm::u32 index) const;
+        [[nodiscard]] const ClearColor& ClearColorAt(kor::u32 index) const;
 
         /** @brief What the depth attachment will be cleared to; the far plane if nothing said. */
         [[nodiscard]] float ClearDepth() const { return _clearDepth.value_or(1.f); }
 
         /** @brief What the stencil attachment will be cleared to; 0 if nothing said. */
-        [[nodiscard]] glm::i32 ClearStencil() const { return _clearStencil.value_or(0); }
+        [[nodiscard]] kor::i32 ClearStencil() const { return _clearStencil.value_or(0); }
 
         /**
          * @brief Fills in every clear value this pass did not set from @p framebuffer's own.
@@ -847,7 +847,7 @@ namespace kor
 
         std::vector<std::optional<ClearColor>> _clearColors {};                      ///< Clear values for the color attachments, in the order they are bound. Only used if @ref colorLoadOperation is LoadOperation::eClear.
         std::optional<float> _clearDepth = std::nullopt;                             ///< Clear value for the depth attachment. Only used if @ref depthLoadOperation is LoadOperation::eClear.
-        std::optional<glm::i32> _clearStencil = std::nullopt;                        ///< Clear value for the stencil attachment.
+        std::optional<kor::i32> _clearStencil = std::nullopt;                        ///< Clear value for the stencil attachment.
     };
 
     /**
@@ -861,7 +861,7 @@ namespace kor
     struct TimerResult {
         std::string label;          ///< The name given to BeginTimer.
         double milliseconds = 0.0;  ///< GPU time between the scope's two timestamps.
-        glm::u32 depth = 0;         ///< Nesting depth; 0 for an outermost scope, 1 for one opened inside it, and so on.
+        kor::u32 depth = 0;         ///< Nesting depth; 0 for an outermost scope, 1 for one opened inside it, and so on.
     };
 
     /**

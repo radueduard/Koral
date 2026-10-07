@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Koral.UI.Native;
@@ -35,18 +34,18 @@ public sealed record DropTargetOptions
 {
     /// <summary>The only kind of drag it takes; null: any.</summary>
     public string? AcceptsType { get; set; }
-    public Action<DragData, Vector2>? OnDrop { get; set; }
+    public Action<DragData, Vec2>? OnDrop { get; set; }
     /// <summary>An accepted drag came over it: show it.</summary>
     public Action<DragData>? OnEnter { get; set; }
     /// <summary>It left, was dropped, or was cancelled.</summary>
     public Action? OnLeave { get; set; }
-    public Action<DragData, Vector2>? OnMove { get; set; }
+    public Action<DragData, Vec2>? OnMove { get; set; }
 
     public DropTargetOptions SetAcceptsType(string value) { AcceptsType = value; return this; }
-    public DropTargetOptions SetOnDrop(Action<DragData, Vector2> value) { OnDrop = value; return this; }
+    public DropTargetOptions SetOnDrop(Action<DragData, Vec2> value) { OnDrop = value; return this; }
     public DropTargetOptions SetOnEnter(Action<DragData> value) { OnEnter = value; return this; }
     public DropTargetOptions SetOnLeave(Action value) { OnLeave = value; return this; }
-    public DropTargetOptions SetOnMove(Action<DragData, Vector2> value) { OnMove = value; return this; }
+    public DropTargetOptions SetOnMove(Action<DragData, Vec2> value) { OnMove = value; return this; }
 }
 
 // ---- docking -------------------------------------------------------------------------------------------------
@@ -143,8 +142,8 @@ public sealed unsafe class DockLayout
     public DockLayout Float(string panel, Rect rect) { KuiNative.kui_dock_layout_float(Native, panel, rect.Native); return this; }
     /// <summary>Floats <paramref name="panel"/> outside the window, over the desktop, where the dock space can.</summary>
     /// <summary>Floats <paramref name="panel"/> over the dock space at <paramref name="at"/>, as big as what it shows.</summary>
-    public DockLayout Float(string panel, Vector2 at) { KuiNative.kui_dock_layout_float_at(Native, panel, at.Native()); return this; }
-    public DockLayout PopOut(string panel, Vector2? size = null) { KuiNative.kui_dock_layout_pop_out(Native, panel, (size ?? new Vector2(480, 360)).Native()); return this; }
+    public DockLayout Float(string panel, Vec2 at) { KuiNative.kui_dock_layout_float_at(Native, panel, at.Native()); return this; }
+    public DockLayout PopOut(string panel, Vec2? size = null) { KuiNative.kui_dock_layout_pop_out(Native, panel, (size ?? new Vec2(480, 360)).Native()); return this; }
     public void Close(string panel) => KuiNative.kui_dock_layout_close(Native, panel);
     public void Open(string panel) => KuiNative.kui_dock_layout_open(Native, panel);
     public void Activate(string panel) => KuiNative.kui_dock_layout_activate(Native, panel);
@@ -275,19 +274,19 @@ public static unsafe partial class Widgets
 
 internal static unsafe partial class Callbacks
 {
-    public static KuiDropAction Drop(Action<DragData, Vector2>? a) => a is null ? default : new() { invoke = &InvokeDrop, user = Hold(a), destroy = &Free };
+    public static KuiDropAction Drop(Action<DragData, Vec2>? a) => a is null ? default : new() { invoke = &InvokeDrop, user = Hold(a), destroy = &Free };
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeDrop(byte* type, byte* text, void* payload, float x, float y, void* user)
     {
-        var a = Target<Action<DragData, Vector2>>(user);
+        var a = Target<Action<DragData, Vec2>>(user);
         try
         {
             // A drag begun in C#: the DragData itself. One from elsewhere: its kind and text.
             var data = payload != null && GCHandle.FromIntPtr((IntPtr)payload).Target is DragData own
                 ? own
                 : new DragData(Marshal.PtrToStringUTF8((IntPtr)type) ?? "", Marshal.PtrToStringUTF8((IntPtr)text));
-            a(data, new Vector2(x, y));
+            a(data, new Vec2(x, y));
         }
         catch (Exception e) { Report(a.Target ?? a, a.Method.Name, e); }
     }

@@ -148,15 +148,15 @@ namespace
         return {.space = static_cast<GizmoSpace>(o->space), .size = o->size, .snap = o->snap};
     }
 
-    glm::vec3 Vec3Of(const float* v) { return {v[0], v[1], v[2]}; }
-    glm::mat4 Mat4Of(const float* v)
+    kor::Vec3 Vec3Of(const float* v) { return {v[0], v[1], v[2]}; }
+    kor::Mat4 Mat4Of(const float* v)
     {
-        glm::mat4 m(1.f);
+        kor::Mat4 m(1.f);
         if (v) std::memcpy(&m[0][0], v, sizeof(float) * 16);
         return m;
     }
 
-    void Out2(const glm::vec2 v, float* x, float* y)
+    void Out2(const kor::Vec2 v, float* x, float* y)
     {
         if (x) *x = v.x;
         if (y) *y = v.y;
@@ -189,7 +189,7 @@ namespace
         void Render(CommandBuffer& commands) override {
             if (_c.render) _c.render(Handle(), reinterpret_cast<KoralCommandBuffer*>(&commands), _c.user);
         }
-        void OnResize(const glm::uvec2 extent) override { if (_c.on_resize) _c.on_resize(Handle(), extent.x, extent.y, _c.user); }
+        void OnResize(const kor::UVec2 extent) override { if (_c.on_resize) _c.on_resize(Handle(), extent.x, extent.y, _c.user); }
         void OnSuspend() override { if (_c.on_suspend) _c.on_suspend(Handle(), _c.user); }
         void OnResume() override { if (_c.on_resume) _c.on_resume(Handle(), _c.user); }
         bool OnCloseRequested() override { return _c.on_close_requested ? _c.on_close_requested(Handle(), _c.user) : true; }
@@ -513,7 +513,7 @@ KoralImage* koral_window_image(KoralWindow* w) { return Guarded([&] { return Bor
 void koral_window_resize(KoralWindow* w, const uint32_t x, const uint32_t y) { GuardedVoid([&] { WindowOf(w).Resize({x, y}); }); }
 void koral_window_extent(KoralWindow* w, uint32_t* x, uint32_t* y)
 {
-    const auto e = Guarded([&] { return WindowOf(w).Extent(); }, glm::uvec2(0));
+    const auto e = Guarded([&] { return WindowOf(w).Extent(); }, kor::UVec2(0));
     if (x) *x = e.x;
     if (y) *y = e.y;
 }
@@ -686,8 +686,8 @@ void koral_time_set_time_scale(KoralTime* t, const float s) { GuardedVoid([&] { 
 KoralDebugStyle koral_debug_style_default(void)
 {
     const DebugStyle d;
-    return {.color = {d.color.r, d.color.g, d.color.b, d.color.a}, .duration = d.duration, .on_top = d.onTop,
-            .fill = {d.fill.r, d.fill.g, d.fill.b, d.fill.a}, .fill_only = !d.outline, .line_width = d.lineWidth};
+    return {.color = {d.color.x, d.color.y, d.color.z, d.color.w}, .duration = d.duration, .on_top = d.onTop,
+            .fill = {d.fill.x, d.fill.y, d.fill.z, d.fill.w}, .fill_only = !d.outline, .line_width = d.lineWidth};
 }
 void koral_debug_line(KoralDebugDraw* d, const float from[3], const float to[3], const KoralDebugStyle* s)
 {
@@ -786,12 +786,12 @@ bool koral_debug_gizmo(KoralDebugDraw* d, const uint32_t mode, float transform[1
         if (!transform) return false;
         GizmoPointer pointer;
         if (p) {
-            if (p->has_position) pointer.position = glm::vec2(p->position[0], p->position[1]);
+            if (p->has_position) pointer.position = kor::Vec2(p->position[0], p->position[1]);
             pointer.viewport = {p->viewport[0], p->viewport[1]};
             pointer.down = p->down;
             pointer.pressed = p->pressed;
         }
-        glm::mat4 m = Mat4Of(transform);
+        kor::Mat4 m = Mat4Of(transform);
         const bool changed = DebugOf(d).Gizmo(static_cast<GizmoMode>(mode), m, Mat4Of(viewProjection), pointer, GizmoOptionsOf(o), id);
         std::memcpy(transform, &m[0][0], sizeof(float) * 16);
         return changed;
@@ -803,7 +803,7 @@ bool koral_current_gizmo(const uint32_t mode, float transform[16], const float v
 {
     return Guarded([&] {
         if (!transform) return false;
-        glm::mat4 m = Mat4Of(transform);
+        kor::Mat4 m = Mat4Of(transform);
         const bool changed = Scene::Debug::Gizmo(static_cast<GizmoMode>(mode), m, Mat4Of(viewProjection), GizmoOptionsOf(o), id);
         std::memcpy(transform, &m[0][0], sizeof(float) * 16);
         return changed;

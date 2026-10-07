@@ -80,17 +80,17 @@ namespace kor::capi
         const auto& u = c.value.u;
         switch (c.scalar_type * 4 + (c.components ? c.components - 1 : 3)) {
         case 0: return f[0];
-        case 1: return glm::vec2(f[0], f[1]);
-        case 2: return glm::vec3(f[0], f[1], f[2]);
-        case 3: return glm::vec4(f[0], f[1], f[2], f[3]);
+        case 1: return kor::Vec2(f[0], f[1]);
+        case 2: return kor::Vec3(f[0], f[1], f[2]);
+        case 3: return kor::Vec4(f[0], f[1], f[2], f[3]);
         case 4: return i[0];
-        case 5: return glm::ivec2(i[0], i[1]);
-        case 6: return glm::ivec3(i[0], i[1], i[2]);
-        case 7: return glm::ivec4(i[0], i[1], i[2], i[3]);
+        case 5: return kor::IVec2(i[0], i[1]);
+        case 6: return kor::IVec3(i[0], i[1], i[2]);
+        case 7: return kor::IVec4(i[0], i[1], i[2], i[3]);
         case 8: return u[0];
-        case 9: return glm::uvec2(u[0], u[1]);
-        case 10: return glm::uvec3(u[0], u[1], u[2]);
-        case 11: return glm::uvec4(u[0], u[1], u[2], u[3]);
+        case 9: return kor::UVec2(u[0], u[1]);
+        case 10: return kor::UVec3(u[0], u[1], u[2]);
+        case 11: return kor::UVec4(u[0], u[1], u[2], u[3]);
         default: throw std::runtime_error("a clear colour's scalar type is 0 (float), 1 (int) or 2 (uint)");
         }
     }
@@ -100,13 +100,13 @@ namespace kor::capi
         KoralClearColor out{};
         std::visit([&]<typename V>(const V& value) {
             if constexpr (std::is_same_v<V, float>) { out.scalar_type = 0; out.components = 1; out.value.f[0] = value; }
-            else if constexpr (std::is_same_v<V, glm::i32>) { out.scalar_type = 1; out.components = 1; out.value.i[0] = value; }
-            else if constexpr (std::is_same_v<V, glm::u32>) { out.scalar_type = 2; out.components = 1; out.value.u[0] = value; }
+            else if constexpr (std::is_same_v<V, kor::i32>) { out.scalar_type = 1; out.components = 1; out.value.i[0] = value; }
+            else if constexpr (std::is_same_v<V, kor::u32>) { out.scalar_type = 2; out.components = 1; out.value.u[0] = value; }
             else {
                 using S = typename V::value_type;
                 out.scalar_type = std::is_same_v<S, float> ? 0 : std::is_signed_v<S> ? 1 : 2;
-                out.components = static_cast<std::uint32_t>(V::length());
-                for (glm::length_t k = 0; k < V::length(); ++k) {
+                out.components = static_cast<std::uint32_t>(V::Size);
+                for (int k = 0; k < V::Size; ++k) {
                     if constexpr (std::is_same_v<S, float>) out.value.f[k] = value[k];
                     else if constexpr (std::is_signed_v<S>) out.value.i[k] = value[k];
                     else out.value.u[k] = value[k];
@@ -131,7 +131,7 @@ namespace kor::capi
                 .channelType = static_cast<ChannelType>(a.channel_type),
                 .channelCount = a.channel_count,
             };
-            if (a.location >= 0) attribute.location = static_cast<glm::u32>(a.location);
+            if (a.location >= 0) attribute.location = static_cast<kor::u32>(a.location);
             attribute.locations = std::max(a.locations, 1u);
             attribute.locationStride = a.location_stride;
             out.attributes.push_back(std::move(attribute));
@@ -147,14 +147,14 @@ using namespace kor::capi;
 struct KoralReadback {
     Resource<Buffer> staging;          // device-local: where the GPU copies it to
     std::vector<std::byte> bytes;      // host-visible: read at once
-    glm::u64 size = 0;
+    kor::u64 size = 0;
 };
 
 struct KoralMapping {
     std::optional<Buffer::MutableMapping<std::byte>> mutableMapping;
     std::optional<Buffer::ConstMapping<std::byte>> constMapping;
     std::byte* data = nullptr;
-    glm::u64 size = 0;
+    kor::u64 size = 0;
 };
 
 extern "C" {
@@ -246,13 +246,13 @@ void koral_buffer_builder_set_shared_across_queues(KoralBufferBuilder* b, const 
 }
 KoralBuffer* koral_buffer_builder_build(KoralBufferBuilder* b) { return Build<BufferBuilder>(b, [](auto& x) { return x.Build(); }); }
 
-uint64_t koral_buffer_size(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).size(); }, glm::u64{0}); }
+uint64_t koral_buffer_size(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).size(); }, kor::u64{0}); }
 uint32_t koral_buffer_usage_flags(KoralBuffer* r) { return Guarded([&] { return BitsOf(Get<Buffer>(r).UsageFlags()); }, 0u); }
 uint32_t koral_buffer_memory_type(KoralBuffer* r) { return Guarded([&] { return static_cast<uint32_t>(Get<Buffer>(r).MemoryType()); }, 0u); }
 bool koral_buffer_is_host_visible(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).IsHostVisible(); }, false); }
 bool koral_buffer_is_per_frame(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).IsPerFrame(); }, false); }
 bool koral_buffer_is_shared_across_queues(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).IsSharedAcrossQueues(); }, false); }
-uint64_t koral_buffer_device_address(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).DeviceAddress(); }, glm::u64{0}); }
+uint64_t koral_buffer_device_address(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).DeviceAddress(); }, kor::u64{0}); }
 uint32_t koral_buffer_copy_count(KoralBuffer* r) { return Guarded([&] { return Get<Buffer>(r).CopyCount(); }, 0u); }
 
 KoralStatus koral_buffer_read(KoralBuffer* r, void* into, const uint64_t bytes, const uint64_t offset)
@@ -287,7 +287,7 @@ KoralReadback* koral_buffer_read_async(KoralBuffer* r, const uint64_t bytes, con
             copied.Signal();
         } else {
             readback->staging = Buffer::Builder<std::byte>()
-                .SetInstanceCount(static_cast<glm::i64>(bytes))
+                .SetInstanceCount(static_cast<kor::i64>(bytes))
                 .SetUsage(Buffer::Usage::eTransferDst)
                 .SetType(Buffer::Type::eReadback)
                 .Build();
@@ -376,7 +376,7 @@ void koral_image_builder_set_type(KoralImageBuilder* b, const uint32_t v) { Set<
 void koral_image_builder_set_format(KoralImageBuilder* b, const uint32_t v) { Set<Image::Builder>(b, [&](auto& x) { x.SetFormat(static_cast<Image::Format>(v)); }); }
 void koral_image_builder_set_extent(KoralImageBuilder* b, const uint32_t x_, const uint32_t y, const uint32_t z)
 {
-    Set<Image::Builder>(b, [&](auto& x) { x.SetExtent(glm::uvec3(x_, y, z)); });
+    Set<Image::Builder>(b, [&](auto& x) { x.SetExtent(kor::UVec3(x_, y, z)); });
 }
 void koral_image_builder_set_mip_levels(KoralImageBuilder* b, const uint32_t v) { Set<Image::Builder>(b, [&](auto& x) { x.SetMipLevels(v); }); }
 void koral_image_builder_set_array_layers(KoralImageBuilder* b, const uint32_t v) { Set<Image::Builder>(b, [&](auto& x) { x.SetArrayLayers(v); }); }
@@ -392,10 +392,10 @@ void koral_image_resize(KoralImage* r, const uint32_t x, const uint32_t y, const
 {
     GuardedVoid([&] { const_cast<Image&>(Get<Image>(r)).Resize({x, y, z}); });
 }
-uint64_t koral_image_generation(KoralImage* r) { return Guarded([&] { return Get<Image>(r).Generation(); }, glm::u64{0}); }
+uint64_t koral_image_generation(KoralImage* r) { return Guarded([&] { return Get<Image>(r).Generation(); }, kor::u64{0}); }
 void koral_image_extent(KoralImage* r, uint32_t* x, uint32_t* y, uint32_t* z)
 {
-    const auto e = Guarded([&] { return Get<Image>(r).Extent(); }, glm::uvec3(0));
+    const auto e = Guarded([&] { return Get<Image>(r).Extent(); }, kor::UVec3(0));
     if (x) *x = e.x;
     if (y) *y = e.y;
     if (z) *z = e.z;
@@ -433,7 +433,7 @@ void koral_image_block_extent(const uint32_t f, uint32_t* x, uint32_t* y)
 uint32_t koral_image_block_size(const uint32_t f) { return Image::BlockSize(static_cast<Image::Format>(f)); }
 uint64_t koral_image_size_of_region(const uint32_t f, const uint32_t x, const uint32_t y, const uint32_t z, const uint32_t layers)
 {
-    return Guarded([&] { return Image::SizeOfRegion(static_cast<Image::Format>(f), {x, y, z}, layers); }, glm::u64{0});
+    return Guarded([&] { return Image::SizeOfRegion(static_cast<Image::Format>(f), {x, y, z}, layers); }, kor::u64{0});
 }
 bool koral_is_depth_stencil_format(const uint32_t f) { return IsDepthStencilFormat(static_cast<Image::Format>(f)); }
 bool koral_is_stencil_format(const uint32_t f) { return IsStencilFormat(static_cast<Image::Format>(f)); }
@@ -509,9 +509,9 @@ KoralBuffer* koral_buffer_view_source_buffer(KoralBufferView* r)
     return Guarded([&] { return Borrow(Get<BufferView>(r).SourceBuffer()); }, static_cast<KoralResource*>(nullptr));
 }
 uint32_t koral_buffer_view_pixel_format(KoralBufferView* r) { return Guarded([&] { return static_cast<uint32_t>(Get<BufferView>(r).PixelFormat()); }, 0u); }
-int64_t koral_buffer_view_offset(KoralBufferView* r) { return Guarded([&] { return Get<BufferView>(r).Offset(); }, glm::i64{0}); }
-int64_t koral_buffer_view_range(KoralBufferView* r) { return Guarded([&] { return Get<BufferView>(r).Range(); }, glm::i64{0}); }
-uint64_t koral_buffer_view_texel_count(KoralBufferView* r) { return Guarded([&] { return Get<BufferView>(r).TexelCount(); }, glm::u64{0}); }
+int64_t koral_buffer_view_offset(KoralBufferView* r) { return Guarded([&] { return Get<BufferView>(r).Offset(); }, kor::i64{0}); }
+int64_t koral_buffer_view_range(KoralBufferView* r) { return Guarded([&] { return Get<BufferView>(r).Range(); }, kor::i64{0}); }
+uint64_t koral_buffer_view_texel_count(KoralBufferView* r) { return Guarded([&] { return Get<BufferView>(r).TexelCount(); }, kor::u64{0}); }
 
 // ---- Shader ------------------------------------------------------------------------------------------------------
 
@@ -924,7 +924,7 @@ uint32_t koral_framebuffer_color_attachment_count(KoralFramebuffer* r) { return 
 uint32_t koral_framebuffer_samples(KoralFramebuffer* r) { return Guarded([&] { return static_cast<uint32_t>(Get<Framebuffer>(r).Samples()); }, 0u); }
 void koral_framebuffer_extent(KoralFramebuffer* r, uint32_t* x, uint32_t* y)
 {
-    const auto e = Guarded([&] { return Get<Framebuffer>(r).Extent(); }, glm::uvec2(0));
+    const auto e = Guarded([&] { return Get<Framebuffer>(r).Extent(); }, kor::UVec2(0));
     if (x) *x = e.x;
     if (y) *y = e.y;
 }
@@ -994,7 +994,7 @@ void koral_mesh_builder_set_vertex_layout(KoralMeshBuilder* b, const KoralVertex
     Set<Mesh::Builder>(b, [&](auto& x) { x.SetVertexLayout(VertexLayoutOf(*layout)); });
 }
 KoralMesh* koral_mesh_builder_build(KoralMeshBuilder* b) { return Build<Mesh::Builder>(b, [](auto& x) { return x.Build(); }); }
-uint64_t koral_mesh_vertex_count(KoralMesh* r) { return Guarded([&] { return Get<Mesh>(r).VertexCount(); }, glm::u64{0}); }
+uint64_t koral_mesh_vertex_count(KoralMesh* r) { return Guarded([&] { return Get<Mesh>(r).VertexCount(); }, kor::u64{0}); }
 bool koral_mesh_has_index_buffer(KoralMesh* r) { return Guarded([&] { return Get<Mesh>(r).HasIndexBuffer(); }, false); }
 bool koral_mesh_index_count(KoralMesh* r, uint32_t* count)
 {

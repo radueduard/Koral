@@ -67,8 +67,8 @@ namespace
 
     // ---- values ----------------------------------------------------------------------------------------
 
-    glm::vec2 V(const KuiVec2 v) { return { v.x, v.y }; }
-    KuiVec2 V(const glm::vec2 v) { return { v.x, v.y }; }
+    kor::Vec2 V(const KuiVec2 v) { return { v.x, v.y }; }
+    KuiVec2 V(const kor::Vec2 v) { return { v.x, v.y }; }
     Color C(const KuiColor c) { return { c.r, c.g, c.b, c.a }; }
     KuiColor C(const Color c) { return { c.r, c.g, c.b, c.a }; }
     Rect R(const KuiRect r) { return { r.left, r.top, r.right, r.bottom }; }
@@ -184,23 +184,23 @@ namespace
         if (!o) return {};
         return [o, f = a.invoke](const float v) { f(v, o->user); };
     }
-    std::function<void(glm::vec2)> F(const KuiPointAction& a)
+    std::function<void(kor::Vec2)> F(const KuiPointAction& a)
     {
         auto o = Hold(a);
         if (!o) return {};
-        return [o, f = a.invoke](const glm::vec2 p) { f(p.x, p.y, o->user); };
+        return [o, f = a.invoke](const kor::Vec2 p) { f(p.x, p.y, o->user); };
     }
-    std::function<void(glm::vec2, glm::vec2)> F(const KuiPanAction& a)
+    std::function<void(kor::Vec2, kor::Vec2)> F(const KuiPanAction& a)
     {
         auto o = Hold(a);
         if (!o) return {};
-        return [o, f = a.invoke](const glm::vec2 d, const glm::vec2 p) { f(d.x, d.y, p.x, p.y, o->user); };
+        return [o, f = a.invoke](const kor::Vec2 d, const kor::Vec2 p) { f(d.x, d.y, p.x, p.y, o->user); };
     }
-    std::function<bool(glm::vec2)> F(const KuiScrollAction& a)
+    std::function<bool(kor::Vec2)> F(const KuiScrollAction& a)
     {
         auto o = Hold(a);
         if (!o) return {};
-        return [o, f = a.invoke](const glm::vec2 d) { return f(d.x, d.y, o->user); };
+        return [o, f = a.invoke](const kor::Vec2 d) { return f(d.x, d.y, o->user); };
     }
     std::function<void(const std::string&)> F(const KuiTextAction& a)
     {
@@ -215,11 +215,11 @@ namespace
         std::shared_ptr<Owned> object;
     };
 
-    std::function<void(const DragData&, glm::vec2)> F(const KuiDropAction& a)
+    std::function<void(const DragData&, kor::Vec2)> F(const KuiDropAction& a)
     {
         auto o = Hold(a);
         if (!o) return {};
-        return [o, f = a.invoke](const DragData& data, const glm::vec2 at) {
+        return [o, f = a.invoke](const DragData& data, const kor::Vec2 at) {
             const char* text = "";
             void* object = nullptr;
             if (const auto* c = data.As<CPayload>()) { text = c->text.c_str(); object = c->object ? c->object->user : nullptr; }
@@ -394,7 +394,7 @@ void kui_path_add_circle(KuiPath* p, const KuiVec2 c, const float r) { GuardedVo
 void kui_path_add_oval(KuiPath* p, const KuiRect r) { GuardedVoid([&] { PathOf(p).AddOval(R(r)); }); }
 void kui_path_add_polygon(KuiPath* p, const KuiVec2* points, const size_t count, const bool close)
 {
-    GuardedVoid([&] { PathOf(p).AddPolygon(std::span(reinterpret_cast<const glm::vec2*>(points), count), close); });
+    GuardedVoid([&] { PathOf(p).AddPolygon(std::span(reinterpret_cast<const kor::Vec2*>(points), count), close); });
 }
 void kui_path_set_fill_rule(KuiPath* p, const uint32_t rule) { GuardedVoid([&] { PathOf(p).SetFillRule(static_cast<FillRule>(rule)); }); }
 KuiRect kui_path_bounds(KuiPath* p) { return Guarded([&] { return R(PathOf(p).Bounds()); }, KuiRect {}); }
@@ -477,11 +477,11 @@ void kui_canvas_draw_cubic_bezier(KuiCanvas* c, const KuiVec2 a, const KuiVec2 k
 }
 void kui_canvas_draw_polyline(KuiCanvas* c, const KuiVec2* points, const size_t count, const KuiPaint* p)
 {
-    GuardedVoid([&] { CanvasOf(c).DrawPolyline(std::span(reinterpret_cast<const glm::vec2*>(points), count), PaintOf(p)); });
+    GuardedVoid([&] { CanvasOf(c).DrawPolyline(std::span(reinterpret_cast<const kor::Vec2*>(points), count), PaintOf(p)); });
 }
 void kui_canvas_draw_polygon(KuiCanvas* c, const KuiVec2* points, const size_t count, const KuiPaint* p)
 {
-    GuardedVoid([&] { CanvasOf(c).DrawPolygon(std::span(reinterpret_cast<const glm::vec2*>(points), count), PaintOf(p)); });
+    GuardedVoid([&] { CanvasOf(c).DrawPolygon(std::span(reinterpret_cast<const kor::Vec2*>(points), count), PaintOf(p)); });
 }
 void kui_canvas_draw_path(KuiCanvas* c, KuiPath* path, const KuiPaint* p) { GuardedVoid([&] { CanvasOf(c).DrawPath(PathOf(path), PaintOf(p)); }); }
 void kui_canvas_draw_shadow(KuiCanvas* c, const KuiRect r, const KuiRadii radii, const KuiColor color, const float blur, const KuiVec2 offset, const float spread)
@@ -666,7 +666,7 @@ KuiWidget* kui_scroll_view_observed(KuiWidget* child, const uint32_t axis, const
     return Guarded([&]() -> KuiWidget* {
         ScrollOptions options;
         options.axis = static_cast<Axis>(axis);
-        if (const std::function<void(glm::vec2)> told = F(onScrolled)) options.onScrolled = [told](const float at, const float most) { told({ at, most }); };
+        if (const std::function<void(kor::Vec2)> told = F(onScrolled)) options.onScrolled = [told](const float at, const float most) { told({ at, most }); };
         options.jumpTo = jumpTo;
         options.jump = jump;
         return Give(ScrollView(W(child), std::move(options)));
@@ -682,7 +682,7 @@ void kui_layout_measure(KuiLayoutContext* context, const size_t index, const flo
                         const float maxHeight, float* outWidth, float* outHeight)
 {
     GuardedVoid([&] {
-        const glm::vec2 size = context && context->context ? context->context->measure(index, { minWidth, maxWidth, minHeight, maxHeight }) : glm::vec2 {};
+        const kor::Vec2 size = context && context->context ? context->context->measure(index, { minWidth, maxWidth, minHeight, maxHeight }) : kor::Vec2 {};
         if (outWidth) *outWidth = size.x;
         if (outHeight) *outHeight = size.y;
     });
@@ -696,7 +696,7 @@ KuiWidget* kui_custom_layout(const KuiLayoutRule rule, KuiWidget* const* childre
     return Guarded([&]() -> KuiWidget* {
         auto owned = std::make_shared<Owned>(rule.user, rule.destroy);
         const auto layout = rule.layout;
-        return Give(CustomLayout([owned, layout](LayoutContext& context, const BoxConstraints& c) -> glm::vec2 {
+        return Give(CustomLayout([owned, layout](LayoutContext& context, const BoxConstraints& c) -> kor::Vec2 {
             if (!layout) return c.Smallest();
             KuiLayoutContext handle { &context };
             float width = 0.f, height = 0.f;
@@ -733,7 +733,7 @@ KuiWidget* kui_custom_paint(const KuiPainter painter, const KuiVec2 size, KuiWid
     return Guarded([&]() -> KuiWidget* {
         auto o = std::make_shared<Owned>(painter.user, painter.destroy);
         auto paint = painter.paint;
-        return Give(CustomPaint([o, paint](Canvas& canvas, const glm::vec2 s) {
+        return Give(CustomPaint([o, paint](Canvas& canvas, const kor::Vec2 s) {
             if (paint) paint(reinterpret_cast<KuiCanvas*>(&canvas), s.x, s.y, o->user);
         }, V(size), W(child)));
     }, nullptr);

@@ -146,7 +146,7 @@ namespace kui
                 if (needed > capacity || !buffer.Valid()) {
                     capacity = std::max<std::size_t>(needed + needed / 2, 64);
                     buffer = kor::Buffer::RawBuilder{}
-                        .SetRawSize(static_cast<glm::i64>(capacity * sizeof(T)))
+                        .SetRawSize(static_cast<kor::i64>(capacity * sizeof(T)))
                         .SetUsage(kor::Buffer::Usage::eStorage)
                         .SetType(kor::Buffer::Type::eDeviceDynamic)
                         .SetIsPerFrame(true)
@@ -198,7 +198,7 @@ namespace kui
                 if (needed > capacity || !buffer.Valid()) {
                     capacity = std::max<std::size_t>(needed + needed / 2, 256);
                     buffer = kor::Buffer::RawBuilder{}
-                        .SetRawSize(static_cast<glm::i64>(capacity * sizeof(std::uint32_t)))
+                        .SetRawSize(static_cast<kor::i64>(capacity * sizeof(std::uint32_t)))
                         .SetUsage(kor::Buffer::Usage::eStorage)
                         .SetType(kor::Buffer::Type::eDeviceDynamic)
                         .SetIsPerFrame(true)
@@ -246,13 +246,13 @@ namespace kui
         std::string formatsOf(const kor::Framebuffer& target)
         {
             std::string key;
-            for (glm::u32 i = 0; i < target.ColorAttachmentCount(); ++i)
+            for (kor::u32 i = 0; i < target.ColorAttachmentCount(); ++i)
                 key += std::format("c{},", static_cast<int>(target.ColorImage(i)->PixelFormat()));
             return key;
         }
 
         struct Push {
-            glm::vec2 viewport;
+            kor::Vec2 viewport;
             float scale;
             std::uint32_t flags;
             float time;
@@ -286,7 +286,7 @@ namespace kui
         /** @brief The textures every layer draws from: slot 0 is the glyph atlas. Slots stay put while used. */
         // The generation is the image's as it was bound: an image resized in place (kor::Image::Generation)
         // is another GPU image under the same handle, and the set has to be written again for it.
-        struct Texture { kor::ResourceRef<const kor::Image> image; std::uint32_t uses = 0; glm::u64 generation = 0; };
+        struct Texture { kor::ResourceRef<const kor::Image> image; std::uint32_t uses = 0; kor::u64 generation = 0; };
         std::vector<Texture> textures { 1 };
         bool texturesChanged = true;
 
@@ -364,7 +364,7 @@ namespace kui
         };
         std::map<std::string, Target> targets;
         Target* current = nullptr;
-        glm::vec2 viewport {};
+        kor::Vec2 viewport {};
 
         Statistics stats;
 
@@ -706,7 +706,7 @@ namespace kui
         kor::Resource<kor::DescriptorSet> WriteSet0(const kor::Resource<kor::GraphicsPipeline>& pipeline)
         {
             const auto& bindings = pipeline->SetLayout(0).Bindings();
-            const auto has = [&](const glm::u32 b) { return bindings.contains(b); };
+            const auto has = [&](const kor::u32 b) { return bindings.contains(b); };
             auto builder = kor::DescriptorSet::Builder(kor::ResourceRef<const kor::GraphicsPipeline>(pipeline), 0);
             if (has(0)) builder.Write(0, instances.buffer);
             if (has(1)) builder.Write(1, layers.buffer);
@@ -718,7 +718,7 @@ namespace kui
             if (has(7)) builder.Write(7, vertexOrder.buffer);
             if (has(8))
                 for (std::size_t i = 0; i < textures.size(); ++i)
-                    if (textures[i].image.Valid()) builder.Write(8, textures[i].image, static_cast<glm::u32>(i));
+                    if (textures[i].image.Valid()) builder.Write(8, textures[i].image, static_cast<kor::u32>(i));
             return builder.Build();
         }
 
@@ -750,11 +750,11 @@ namespace kui
             // Glass in the frame: the picture of the target it shows through, as big as half the target.
             if (backdropSlot != 0 && std::ranges::any_of(draws, [](const Draw& d) { return d.kind == RunKind::eBackdrop; })) {
                 const auto full = target->ColorImage(0)->Extent();
-                const glm::uvec2 extent = glm::max(glm::uvec2(full.x, full.y) / 2u, glm::uvec2(1u));
+                const kor::UVec2 extent = kor::Max(kor::UVec2(full.x, full.y) / 2u, kor::UVec2(1u));
                 const auto format = target->ColorImage(0)->PixelFormat();
-                if (!backdrop.Valid() || glm::uvec2(backdrop->Extent().x, backdrop->Extent().y) != extent || backdrop->PixelFormat() != format) {
-                    glm::u32 levels = 1;
-                    for (glm::u32 side = std::max(extent.x, extent.y); side > 8u && levels < 7u; side /= 2u) ++levels;
+                if (!backdrop.Valid() || kor::UVec2(backdrop->Extent().x, backdrop->Extent().y) != extent || backdrop->PixelFormat() != format) {
+                    kor::u32 levels = 1;
+                    for (kor::u32 side = std::max(extent.x, extent.y); side > 8u && levels < 7u; side /= 2u) ++levels;
                     backdrop = kor::Image::Builder{}
                         .SetFormat(format).SetExtent(extent).SetMipLevels(levels)
                         .SetUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst)

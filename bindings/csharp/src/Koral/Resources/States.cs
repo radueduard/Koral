@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.InteropServices;
 using Koral.Native;
 
@@ -132,7 +131,7 @@ public sealed record ColorBlendState
     public bool EnableLogicOp { get; init; }
     public LogicOp LogicOp { get; init; } = LogicOp.eCopy;
     public IReadOnlyList<AttachmentState> Attachments { get; init; } = [];
-    public Vector4 BlendConstants { get; init; }
+    public Vec4 BlendConstants { get; init; }
 }
 
 /// <summary>kor::TessellationState.</summary>
@@ -243,9 +242,9 @@ public readonly struct ClearColor
     private static uint Bits(int i) => unchecked((uint)i);
 
     public static implicit operator ClearColor(float v) => new(0, 1, new UVec4(Bits(v), 0, 0, 0));
-    public static implicit operator ClearColor(Vector2 v) => new(0, 2, new UVec4(Bits(v.X), Bits(v.Y), 0, 0));
-    public static implicit operator ClearColor(Vector3 v) => new(0, 3, new UVec4(Bits(v.X), Bits(v.Y), Bits(v.Z), 0));
-    public static implicit operator ClearColor(Vector4 v) => new(0, 4, new UVec4(Bits(v.X), Bits(v.Y), Bits(v.Z), Bits(v.W)));
+    public static implicit operator ClearColor(Vec2 v) => new(0, 2, new UVec4(Bits(v.X), Bits(v.Y), 0, 0));
+    public static implicit operator ClearColor(Vec3 v) => new(0, 3, new UVec4(Bits(v.X), Bits(v.Y), Bits(v.Z), 0));
+    public static implicit operator ClearColor(Vec4 v) => new(0, 4, new UVec4(Bits(v.X), Bits(v.Y), Bits(v.Z), Bits(v.W)));
     public static implicit operator ClearColor(int v) => new(1, 1, new UVec4(Bits(v), 0, 0, 0));
     public static implicit operator ClearColor(IVec2 v) => new(1, 2, new UVec4(Bits(v.X), Bits(v.Y), 0, 0));
     public static implicit operator ClearColor(IVec3 v) => new(1, 3, new UVec4(Bits(v.X), Bits(v.Y), Bits(v.Z), 0));
@@ -255,8 +254,8 @@ public readonly struct ClearColor
     public static implicit operator ClearColor(UVec3 v) => new(2, 3, new UVec4(v.X, v.Y, v.Z, 0));
     public static implicit operator ClearColor(UVec4 v) => new(2, 4, v);
 
-    /// <summary>What it holds, as a Vector4 of floats (for a float colour).</summary>
-    public Vector4 AsVector4() => new(BitConverter.UInt32BitsToSingle(_bits.X), BitConverter.UInt32BitsToSingle(_bits.Y),
+    /// <summary>What it holds, as a Vec4 of floats (for a float colour).</summary>
+    public Vec4 AsVector4() => new(BitConverter.UInt32BitsToSingle(_bits.X), BitConverter.UInt32BitsToSingle(_bits.Y),
                                       BitConverter.UInt32BitsToSingle(_bits.Z), BitConverter.UInt32BitsToSingle(_bits.W));
 
     internal unsafe KoralClearColor Native

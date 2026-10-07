@@ -18,14 +18,14 @@ namespace kor
 {
     Pipeline::~Pipeline() = default;
 
-    const DescriptorSetLayout& Pipeline::SetLayout(const glm::u32 index) const
+    const DescriptorSetLayout& Pipeline::SetLayout(const kor::u32 index) const
     {
         if (!_setLayouts.contains(index))
             throw std::runtime_error("This pipeline does not contain a set with that index!");
         return *_setLayouts.at(index);
     }
 
-    ResourceRef<const DescriptorSetLayout> Pipeline::SetLayoutRef(const glm::u32 index) const
+    ResourceRef<const DescriptorSetLayout> Pipeline::SetLayoutRef(const kor::u32 index) const
     {
         if (!_setLayouts.contains(index))
             throw std::runtime_error("This pipeline does not contain a set with that index!");
@@ -38,7 +38,7 @@ namespace kor
         return it == _pushConstants.end() ? nullptr : &it->second;
     }
 
-    const Shader::PushConstant& Pipeline::PushConstantRange(const glm::u32 offset) const
+    const Shader::PushConstant& Pipeline::PushConstantRange(const kor::u32 offset) const
     {
         // The range *containing* the offset, not the one that starts at it. A push writes some
         // part of a block — one named constant out of several — so it is only the first field of
@@ -50,7 +50,7 @@ namespace kor
     }
 
     namespace {
-        using MergedSets = std::unordered_map<glm::u32, std::map<glm::u32, Shader::Descriptor>>;
+        using MergedSets = std::unordered_map<kor::u32, std::map<kor::u32, Shader::Descriptor>>;
 
         // Merges one shader's descriptors into `merged`: a (set, binding) several stages declare is
         // one binding, reached by all of them.
@@ -67,8 +67,8 @@ namespace kor
                             conflict(ErrorCode::eDescriptorConflict, std::format(
                                 "Descriptor set layout conflict between shaders in pipeline! Set: {}, Binding: {}, Existing: {{ Type: {}, Name: {}, Count: {} }}, New: {{ Type: {}, Name: {}, Count: {} }}",
                                 setIndex, binding,
-                                static_cast<glm::u32>(existingDescriptor.type), existingDescriptor.name, existingDescriptor.count,
-                                static_cast<glm::u32>(descriptor.type), descriptor.name, descriptor.count));
+                                static_cast<kor::u32>(existingDescriptor.type), existingDescriptor.name, existingDescriptor.count,
+                                static_cast<kor::u32>(descriptor.type), descriptor.name, descriptor.count));
                         }
                         existingDescriptor.stages |= descriptor.stages;
                         // Union the accesses too: a buffer a vertex shader only reads but a
@@ -85,7 +85,7 @@ namespace kor
             }
         }
 
-        DescriptorSetLayout::Builder layoutBuilder(const std::map<glm::u32, Shader::Descriptor>& setDescription) {
+        DescriptorSetLayout::Builder layoutBuilder(const std::map<kor::u32, Shader::Descriptor>& setDescription) {
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription)
             {
@@ -110,7 +110,7 @@ namespace kor
     }
 
     Resource<DescriptorSetLayout> DescriptorSetLayout::FromShaders(const std::span<const ResourceRef<const Shader>> shaders,
-                                                                  const glm::u32 set, const std::source_location where)
+                                                                  const kor::u32 set, const std::source_location where)
     {
         std::optional<Error> failure;
         const auto conflict = [&failure](const ErrorCode code, std::string message) {
@@ -149,7 +149,7 @@ namespace kor
         // Merge per-shader memory layouts: descriptors sharing a (set, binding) are
         // unioned across stages, push constants are unioned by offset.
         MergedSets mergedSetLayouts;
-        std::unordered_map<glm::u32, Shader::PushConstant> mergedPushConstants;
+        std::unordered_map<kor::u32, Shader::PushConstant> mergedPushConstants;
         // Every block as its own shader declared it. The merge above is keyed by offset and keeps
         // the first declaration it sees, which is exactly the case the name merge below has to
         // examine: two stages declaring different blocks at one offset.
@@ -181,7 +181,7 @@ namespace kor
         // Rebuild only the sets whose *interface* actually changed. A shader edit usually changes
         // code, not its bindings, and an unchanged layout must keep its identity: descriptor sets
         // hold a reference to it, and destroying it on every reload is what used to dangle them.
-        std::map<glm::u32, Resource<DescriptorSetLayout>> rebuilt;
+        std::map<kor::u32, Resource<DescriptorSetLayout>> rebuilt;
 
         for (const auto& [setIndex, setDescription] : mergedSetLayouts)
         {
@@ -231,7 +231,7 @@ namespace kor
         // blocks were given different layouts, or two different constants were left to collide at
         // the same offset because neither block said where it starts.
         _pushConstants.clear();
-        std::map<glm::u32, std::string> claimedBytes;   // first byte of each claim -> owner
+        std::map<kor::u32, std::string> claimedBytes;   // first byte of each claim -> owner
         for (const auto* block : declaredPushConstants)
         {
             const auto& pushConstant = *block;
@@ -261,7 +261,7 @@ namespace kor
                 if (const bool atomic = !member.aggregate && member.count == 1; atomic)
                 {
                     bool overlaps = false;
-                    for (glm::u32 byte = member.offset; byte < member.offset + member.size; ++byte)
+                    for (kor::u32 byte = member.offset; byte < member.offset + member.size; ++byte)
                     {
                         const auto owner = claimedBytes.find(byte);
                         if (owner == claimedBytes.end() || owner->second == member.name) continue;
@@ -277,7 +277,7 @@ namespace kor
                     }
                     if (overlaps) continue;
 
-                    for (glm::u32 byte = member.offset; byte < member.offset + member.size; ++byte)
+                    for (kor::u32 byte = member.offset; byte < member.offset + member.size; ++byte)
                         claimedBytes[byte] = member.name;
                 }
 
@@ -295,7 +295,7 @@ namespace kor
 
     void Pipeline::SubscribeReload(const ResourceRef<const Shader>& shader)
     {
-        const glm::u64 id = const_cast<Shader&>(*shader).RegisterReloadCallback([this] { _shouldReload = true; });
+        const kor::u64 id = const_cast<Shader&>(*shader).RegisterReloadCallback([this] { _shouldReload = true; });
         _shaderReloadCallbackIds[&*shader] = id;
     }
 

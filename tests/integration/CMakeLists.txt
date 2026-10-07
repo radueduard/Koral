@@ -36,7 +36,6 @@ target_link_libraries(koral_integration_tests PRIVATE
         GTest::gtest
         GTest::gtest_main
         magic_enum::magic_enum
-        glm::glm
         spdlog::spdlog
         Vulkan::Vulkan
         glfw

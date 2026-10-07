@@ -179,7 +179,7 @@ TEST_F(GpuTest, DeviceAddressHazardIsReported) {
     cb->CopyBuffer(source, buffer);
     // The address the shader will chase. Pushing it is what makes this a realistic
     // device-address workload rather than a shader with an unset push constant.
-    const glm::u64 address = buffer->DeviceAddress();
+    const kor::u64 address = buffer->DeviceAddress();
     cb->PushConstantBlock(address);
     cb->Dispatch(kCount / kLocalSize, 1, 1);
     cb->End();
@@ -297,11 +297,11 @@ TEST_F(GpuTest, ATrailingSubscriptSelectsAnArrayElementByName) {
 // texels through a kor::BufferView. What the view adds over binding the buffer directly is the
 // format — the shader fetches vec4s without declaring a struct for them.
 TEST_F(GpuTest, ATexelBufferIsFetchedThroughABufferView) {
-    constexpr glm::u32 kTexels = 64;
+    constexpr kor::u32 kTexels = 64;
 
     // Four floats per texel, so texel i is {i, 0, 0, 0} and texelFetch(...).x is i.
     std::vector<float> source(kTexels * 4, 0.f);
-    for (glm::u32 i = 0; i < kTexels; ++i) source[i * 4] = static_cast<float>(i);
+    for (kor::u32 i = 0; i < kTexels; ++i) source[i * 4] = static_cast<float>(i);
 
     Buffer::Builder<float> sourceBuilder;
     sourceBuilder.SetData(source)
@@ -313,7 +313,7 @@ TEST_F(GpuTest, ATexelBufferIsFetchedThroughABufferView) {
         .SetFormat(kor::Image::Format::eRGBA32_SFLOAT)
         .Build();
     ASSERT_TRUE(view.Valid()) << (view.Failure() ? view.Failure()->History() : "");
-    EXPECT_EQ(view->Range(), static_cast<glm::i64>(source.size() * sizeof(float)))
+    EXPECT_EQ(view->Range(), static_cast<kor::i64>(source.size() * sizeof(float)))
         << "a range of 0 should have resolved to the rest of the buffer";
 
     Buffer::Builder<float> destBuilder;
@@ -341,7 +341,7 @@ TEST_F(GpuTest, ATexelBufferIsFetchedThroughABufferView) {
 
     const std::vector<float> output = destination->Read<float>();
     ASSERT_EQ(output.size(), static_cast<std::size_t>(kTexels));
-    for (glm::u32 i = 0; i < kTexels; ++i) {
+    for (kor::u32 i = 0; i < kTexels; ++i) {
         EXPECT_FLOAT_EQ(output[i], static_cast<float>(i)) << "at texel " << i;
     }
 }

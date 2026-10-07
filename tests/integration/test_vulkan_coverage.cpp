@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "buffer.h"
 #include "commandBuffer.h"
@@ -95,7 +95,7 @@ kor::Resource<Image> makeImage(kor::Flags<Image::Usage> usage,
     return Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(format)
-        .SetExtent(glm::uvec2{8, 8})
+        .SetExtent(kor::UVec2{8, 8})
         .SetUsage(usage)
         .Build();
 }
@@ -215,11 +215,11 @@ TEST_F(GpuTest, ImageDimensionVariety) {
     auto image3d = Image::Builder{}
                        .SetType(Image::Type::e3D)
                        .SetFormat(Image::Format::eRGBA8_UNORM)
-                       .SetExtent(glm::uvec3{8, 8, 4})
+                       .SetExtent(kor::UVec3{8, 8, 4})
                        .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
                        .Build();
     ASSERT_TRUE(static_cast<bool>(image3d));
-    EXPECT_EQ(image3d->Extent(), glm::uvec3(8, 8, 4));
+    EXPECT_EQ(image3d->Extent(), kor::UVec3(8, 8, 4));
 
     auto view3d = ImageView::Builder(image3d)
                       .SetViewType(ImageView::Type::e3D)
@@ -229,7 +229,7 @@ TEST_F(GpuTest, ImageDimensionVariety) {
     auto arrayImg = Image::Builder{}
                         .SetType(Image::Type::e2D)
                         .SetFormat(Image::Format::eR8_UNORM)
-                        .SetExtent(glm::uvec2{8, 8})
+                        .SetExtent(kor::UVec2{8, 8})
                         .SetArrayLayers(3)
                         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eSampled)
                         .Build();
@@ -248,13 +248,13 @@ TEST_F(GpuTest, GenerateMipmapsRuns) {
     auto image = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{8, 8})
+                     .SetExtent(kor::UVec2{8, 8})
                      .SetMipLevels(4) // 8 -> 4 -> 2 -> 1
                      .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst | Image::Usage::eSampled)
                      .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(image, glm::vec4{0.25f, 0.5f, 0.75f, 1.f});
+        cb.ClearColorImage(image, kor::Vec4{0.25f, 0.5f, 0.75f, 1.f});
         cb.GenerateMipmaps(image);
     }, CommandBuffer::Usage::eGraphics).Wait();
     SUCCEED();
@@ -266,12 +266,12 @@ TEST_F(GpuTest, BlitBetweenImages) {
     auto dst = Image::Builder{}
                    .SetType(Image::Type::e2D)
                    .SetFormat(Image::Format::eRGBA8_UNORM)
-                   .SetExtent(glm::uvec2{4, 4})
+                   .SetExtent(kor::UVec2{4, 4})
                    .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
                    .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.ClearColorImage(src, glm::vec4{1.f, 1.f, 0.f, 1.f});
+        cb.ClearColorImage(src, kor::Vec4{1.f, 1.f, 0.f, 1.f});
         cb.Blit(src, dst, kor::Blit{
             .srcExtent = {8, 8, 1},
             .dstExtent = {4, 4, 1},
@@ -291,7 +291,7 @@ TEST_F(GpuTest, BufferTransferOps) {
     auto src = srcB.Build();
 
     Buffer::RawBuilder dstB;
-    dstB.SetRawSize(static_cast<glm::i64>(data.size() * sizeof(std::uint32_t)))
+    dstB.SetRawSize(static_cast<kor::i64>(data.size() * sizeof(std::uint32_t)))
         .SetUsage(Buffer::Usage::eTransferDst | Buffer::Usage::eTransferSrc)
         .SetType(Buffer::Type::eReadback);
     auto dst = dstB.Build();
@@ -317,7 +317,7 @@ TEST_F(GpuTest, ResolveMultisampleToSingle) {
     auto msaa = Image::Builder{}
                     .SetType(Image::Type::e2D)
                     .SetFormat(Image::Format::eRGBA8_UNORM)
-                    .SetExtent(glm::uvec2{8, 8})
+                    .SetExtent(kor::UVec2{8, 8})
                     .SetSampleCount(kor::SampleCount::e4)
                     .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                     .Build();
@@ -331,7 +331,7 @@ TEST_F(GpuTest, ResolveMultisampleToSingle) {
     // time (it segfaults if these are locals inside the recording lambda).
     auto view = ImageView::Builder(msaa).Build();
     auto fb = kor::Framebuffer::Builder{}
-                  .AddColor({ .view = view, .clear = glm::vec4{0.2f, 0.4f, 0.6f, 1.f} })
+                  .AddColor({ .view = view, .clear = kor::Vec4{0.2f, 0.4f, 0.6f, 1.f} })
                   .Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -350,12 +350,12 @@ TEST_F(GpuTest, CopyValidationBranches) {
     auto image = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{8, 8})
+                     .SetExtent(kor::UVec2{8, 8})
                      .SetUsage(Image::Usage::eTransferSrc | Image::Usage::eTransferDst)
                      .Build();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(8) * 8 * 4)
+    rb.SetRawSize(static_cast<kor::i64>(8) * 8 * 4)
       .SetUsage(Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eStaging);
     auto buf = rb.Build();
@@ -392,10 +392,10 @@ TEST_F(GpuTest, CopyValidationBranches) {
 TEST_F(GpuTest, DebugLabelsRecord) {
     auto image = makeImage(kor::Flags(Image::Usage::eTransferDst) | Image::Usage::eTransferSrc);
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
-        cb.BeginDebugLabel("outer", glm::vec4{1.f, 0.f, 0.f, 1.f});
+        cb.BeginDebugLabel("outer", kor::Vec4{1.f, 0.f, 0.f, 1.f});
         cb.InsertDebugLabel("marker");
         cb.DebugLabel("scoped", [&](CommandBuffer& inner) {
-            inner.ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
+            inner.ClearColorImage(image, kor::Vec4{0.f, 1.f, 0.f, 1.f});
         });
         cb.EndDebugLabel();
     }, CommandBuffer::Usage::eGraphics).Wait();
@@ -428,7 +428,7 @@ TEST_F(GpuTest, ResubmittingACommandBufferIsValid) {
     // trip. Each is a complete record → submit → wait cycle, as a caller reusing the buffer does.
     for (int pass = 0; pass < 3; ++pass) {
         cb->Begin();
-        cb->ClearColorImage(image, glm::vec4{0.f, 1.f, 0.f, 1.f});
+        cb->ClearColorImage(image, kor::Vec4{0.f, 1.f, 0.f, 1.f});
         cb->End();
         ASSERT_TRUE(cb->Submit()) << "pass " << pass << " failed to submit";
         cb->WaitForFence();

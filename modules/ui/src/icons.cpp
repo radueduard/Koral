@@ -87,17 +87,17 @@ namespace kui
             Path& path;
             Transform transform;
 
-            void MoveTo(const glm::vec2 p) const { path.MoveTo(transform.Apply(p)); }
-            void LineTo(const glm::vec2 p) const { path.LineTo(transform.Apply(p)); }
-            void QuadTo(const glm::vec2 c, const glm::vec2 p) const { path.QuadTo(transform.Apply(c), transform.Apply(p)); }
-            void CubicTo(const glm::vec2 c1, const glm::vec2 c2, const glm::vec2 p) const
+            void MoveTo(const kor::Vec2 p) const { path.MoveTo(transform.Apply(p)); }
+            void LineTo(const kor::Vec2 p) const { path.LineTo(transform.Apply(p)); }
+            void QuadTo(const kor::Vec2 c, const kor::Vec2 p) const { path.QuadTo(transform.Apply(c), transform.Apply(p)); }
+            void CubicTo(const kor::Vec2 c1, const kor::Vec2 c2, const kor::Vec2 p) const
             {
                 path.CubicTo(transform.Apply(c1), transform.Apply(c2), transform.Apply(p));
             }
             void Close() const { path.Close(); }
 
             /** @brief An ellipse, as four cubics: under a transform it may be any ellipse at all, which only curves can follow. */
-            void Ellipse(const glm::vec2 c, const glm::vec2 r) const
+            void Ellipse(const kor::Vec2 c, const kor::Vec2 r) const
             {
                 constexpr float k = 0.5522847498f;   // 4/3 (√2 − 1): a quarter circle's control arm
                 MoveTo({ c.x + r.x, c.y });
@@ -109,15 +109,15 @@ namespace kui
             }
 
             /** @brief SVG's arc, from @p from to @p to: the endpoint form turned into its centre (SVG 1.1, F.6.5) and drawn as cubics. */
-            void Arc(const glm::vec2 from, glm::vec2 radii, const float rotationDegrees, const bool large, const bool sweep, const glm::vec2 to) const
+            void Arc(const kor::Vec2 from, kor::Vec2 radii, const float rotationDegrees, const bool large, const bool sweep, const kor::Vec2 to) const
             {
                 if (from == to) return;
-                radii = glm::abs(radii);
+                radii = kor::Abs(radii);
                 if (radii.x < 1e-6f || radii.y < 1e-6f) { LineTo(to); return; }
                 const float phi = rotationDegrees * std::numbers::pi_v<float> / 180.f;
                 const float cosPhi = std::cos(phi), sinPhi = std::sin(phi);
-                const glm::vec2 half = (from - to) * 0.5f;
-                const glm::vec2 p { cosPhi * half.x + sinPhi * half.y, -sinPhi * half.x + cosPhi * half.y };
+                const kor::Vec2 half = (from - to) * 0.5f;
+                const kor::Vec2 p { cosPhi * half.x + sinPhi * half.y, -sinPhi * half.x + cosPhi * half.y };
                 // Radii too small to reach are scaled up until they just do.
                 const float lambda = p.x * p.x / (radii.x * radii.x) + p.y * p.y / (radii.y * radii.y);
                 if (lambda > 1.f) radii *= std::sqrt(lambda);
@@ -126,13 +126,13 @@ namespace kui
                 const float denominator = rx2 * p.y * p.y + ry2 * p.x * p.x;
                 float factor = denominator > 0.f ? std::sqrt(std::max(0.f, numerator / denominator)) : 0.f;
                 if (large == sweep) factor = -factor;
-                const glm::vec2 cp { factor * radii.x * p.y / radii.y, -factor * radii.y * p.x / radii.x };
-                const glm::vec2 center = glm::vec2(cosPhi * cp.x - sinPhi * cp.y, sinPhi * cp.x + cosPhi * cp.y) + (from + to) * 0.5f;
-                const auto angle = [](const glm::vec2 u, const glm::vec2 v) {
+                const kor::Vec2 cp { factor * radii.x * p.y / radii.y, -factor * radii.y * p.x / radii.x };
+                const kor::Vec2 center = kor::Vec2(cosPhi * cp.x - sinPhi * cp.y, sinPhi * cp.x + cosPhi * cp.y) + (from + to) * 0.5f;
+                const auto angle = [](const kor::Vec2 u, const kor::Vec2 v) {
                     return std::atan2(u.x * v.y - u.y * v.x, u.x * v.x + u.y * v.y);
                 };
-                const glm::vec2 u { (p.x - cp.x) / radii.x, (p.y - cp.y) / radii.y };
-                const glm::vec2 v { (-p.x - cp.x) / radii.x, (-p.y - cp.y) / radii.y };
+                const kor::Vec2 u { (p.x - cp.x) / radii.x, (p.y - cp.y) / radii.y };
+                const kor::Vec2 v { (-p.x - cp.x) / radii.x, (-p.y - cp.y) / radii.y };
                 const float start = angle({ 1.f, 0.f }, u);
                 float delta = angle(u, v);
                 constexpr float tau = 2.f * std::numbers::pi_v<float>;
@@ -140,18 +140,18 @@ namespace kui
                 else if (sweep && delta < 0.f) delta += tau;
 
                 // On the unit circle, a quarter turn at most per cubic, then out to the ellipse where it is.
-                const auto onEllipse = [&](const glm::vec2 unit) {
-                    const glm::vec2 s = unit * radii;
-                    return center + glm::vec2(cosPhi * s.x - sinPhi * s.y, sinPhi * s.x + cosPhi * s.y);
+                const auto onEllipse = [&](const kor::Vec2 unit) {
+                    const kor::Vec2 s = unit * radii;
+                    return center + kor::Vec2(cosPhi * s.x - sinPhi * s.y, sinPhi * s.x + cosPhi * s.y);
                 };
                 const int pieces = std::max(1, static_cast<int>(std::ceil(std::abs(delta) / (tau / 4.f) - 1e-3f)));
                 const float step = delta / static_cast<float>(pieces);
                 const float k = 4.f / 3.f * std::tan(step / 4.f);
                 float a = start;
                 for (int i = 0; i < pieces; ++i) {
-                    const glm::vec2 d0 { std::cos(a), std::sin(a) }, d1 { std::cos(a + step), std::sin(a + step) };
-                    const glm::vec2 end = i + 1 == pieces ? to : onEllipse(d1);
-                    CubicTo(onEllipse(d0 + k * glm::vec2(-d0.y, d0.x)), onEllipse(d1 - k * glm::vec2(-d1.y, d1.x)), end);
+                    const kor::Vec2 d0 { std::cos(a), std::sin(a) }, d1 { std::cos(a + step), std::sin(a + step) };
+                    const kor::Vec2 end = i + 1 == pieces ? to : onEllipse(d1);
+                    CubicTo(onEllipse(d0 + k * kor::Vec2(-d0.y, d0.x)), onEllipse(d1 - k * kor::Vec2(-d1.y, d1.x)), end);
                     a += step;
                 }
             }
@@ -161,7 +161,7 @@ namespace kui
         void PathData(const std::string_view d, const Pen& pen)
         {
             Numbers in(d);
-            glm::vec2 current {}, start {}, lastControl {};
+            kor::Vec2 current {}, start {}, lastControl {};
             char previous = 0;
             char command = 0;
             while (!in.Done()) {
@@ -172,12 +172,12 @@ namespace kui
                 else if (command == 'm') command = 'l';
 
                 const bool relative = command >= 'a' && command <= 'z';
-                const glm::vec2 base = relative ? current : glm::vec2 {};
-                const auto point = [&]() -> std::optional<glm::vec2> {
+                const kor::Vec2 base = relative ? current : kor::Vec2 {};
+                const auto point = [&]() -> std::optional<kor::Vec2> {
                     const auto x = in.Number();
                     const auto y = x ? in.Number() : std::nullopt;
                     if (!y) return std::nullopt;
-                    return base + glm::vec2(*x, *y);
+                    return base + kor::Vec2(*x, *y);
                 };
                 const char upper = static_cast<char>(relative ? command - 'a' + 'A' : command);
                 switch (upper) {
@@ -215,7 +215,7 @@ namespace kui
                 }
                 case 'S': {
                     const bool follows = previous == 'C' || previous == 'S';
-                    const glm::vec2 c1 = follows ? 2.f * current - lastControl : current;
+                    const kor::Vec2 c1 = follows ? 2.f * current - lastControl : current;
                     const auto c2 = point(), p = c2 ? point() : std::nullopt;
                     if (!p) return;
                     pen.CubicTo(c1, *c2, *p);
@@ -233,7 +233,7 @@ namespace kui
                 }
                 case 'T': {
                     const bool follows = previous == 'Q' || previous == 'T';
-                    const glm::vec2 c = follows ? 2.f * current - lastControl : current;
+                    const kor::Vec2 c = follows ? 2.f * current - lastControl : current;
                     const auto p = point(); if (!p) return;
                     pen.QuadTo(c, *p);
                     lastControl = c;
@@ -408,9 +408,9 @@ namespace kui
         }
 
         /** @brief Points as `<polygon points="…">` lists them. */
-        std::vector<glm::vec2> PointList(const std::string_view text)
+        std::vector<kor::Vec2> PointList(const std::string_view text)
         {
-            std::vector<glm::vec2> points;
+            std::vector<kor::Vec2> points;
             Numbers in(text);
             while (true) {
                 const auto x = in.Number(), y = x ? in.Number() : std::nullopt;
@@ -476,7 +476,7 @@ namespace kui
                 const float r = tag->Number("r");
                 if (r > 0.f) pen.Ellipse({ tag->Number("cx"), tag->Number("cy") }, { r, r });
             } else if (element == "ellipse") {
-                const glm::vec2 r { tag->Number("rx"), tag->Number("ry") };
+                const kor::Vec2 r { tag->Number("rx"), tag->Number("ry") };
                 if (r.x > 0.f && r.y > 0.f) pen.Ellipse({ tag->Number("cx"), tag->Number("cy") }, r);
             } else if (element == "rect") {
                 const float x = tag->Number("x"), y = tag->Number("y"), w = tag->Number("width"), h = tag->Number("height");
@@ -621,16 +621,16 @@ namespace kui
                 MarkNeedsPaint();
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 if (!_icon) return;
                 // Inheriting, it is the theme's text colour — read now, under whatever theme is over it.
                 const Color tint = _tint.a < 0.f ? Theme::Current().text : _tint;
                 // Fitted, as an image with ImageFit::eContain is: a box of other proportions does not stretch it.
                 const Rect& box = _icon->ViewBox();
-                const glm::vec2 size = Size();
+                const kor::Vec2 size = Size();
                 const float scale = std::min(size.x / box.Width(), size.y / box.Height());
-                const glm::vec2 drawn { box.Width() * scale, box.Height() * scale };
+                const kor::Vec2 drawn { box.Width() * scale, box.Height() * scale };
                 _icon->Draw(canvas, Rect::XYWH(offset.x + (size.x - drawn.x) * 0.5f, offset.y + (size.y - drawn.y) * 0.5f, drawn.x, drawn.y), tint);
             }
 

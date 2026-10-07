@@ -39,7 +39,7 @@ namespace kui
     void RenderAlign::PerformLayout()
     {
         const auto& c = Constraints();
-        glm::vec2 childSize {};
+        kor::Vec2 childSize {};
         if (auto* child = Child()) {
             child->Layout(c.Loosen());
             childSize = child->Size();
@@ -102,7 +102,7 @@ namespace kui
         MarkNeedsPaint();
     }
 
-    void RenderDecorated::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderDecorated::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         PaintDecoration(canvas, _decoration, Rect::XYWH(offset.x, offset.y, Size().x, Size().y));
         RenderContainer::Paint(canvas, offset);
@@ -142,9 +142,9 @@ namespace kui
         // And the size each would have come out, innermost first.
         auto* child = Child();
         bool have = false;
-        glm::vec2 size {}, at {};
+        kor::Vec2 size {}, at {};
         if (_config.alignment) {
-            glm::vec2 childSize {};
+            kor::Vec2 childSize {};
             if (child) { child->Layout(aligned.Loosen()); childSize = child->Size(); }
             size = aligned.Constrain({ aligned.HasBoundedWidth() ? aligned.maxWidth : childSize.x, aligned.HasBoundedHeight() ? aligned.maxHeight : childSize.y });
             at = _config.alignment->Place(childSize, size);
@@ -155,8 +155,8 @@ namespace kui
             have = true;
         }
         if (_config.hasPadding) {
-            size = decorated.Constrain((have ? size : glm::vec2 {}) + _config.padding.Total());
-            at += glm::vec2(_config.padding.left, _config.padding.top);
+            size = decorated.Constrain((have ? size : kor::Vec2 {}) + _config.padding.Total());
+            at += kor::Vec2(_config.padding.left, _config.padding.top);
             have = true;
         }
         if (_config.hasDecoration) {
@@ -167,10 +167,10 @@ namespace kui
             size = sized.Constrain(have ? size : decorated.Smallest());
             have = true;
         }
-        const glm::vec2 inside = size;
-        glm::vec2 origin {};
+        const kor::Vec2 inside = size;
+        kor::Vec2 origin {};
         if (_config.hasMargin) {
-            size = (have ? size : glm::vec2 {}) + _config.margin.Total();
+            size = (have ? size : kor::Vec2 {}) + _config.margin.Total();
             origin = { _config.margin.left, _config.margin.top };
         }
         SetSize(size);
@@ -178,13 +178,13 @@ namespace kui
         if (child) child->SetOffset(origin + at);
     }
 
-    void RenderBox::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderBox::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         if (_config.hasDecoration) PaintDecoration(canvas, _config.decoration, _decorated.Shift(offset));
         RenderContainer::Paint(canvas, offset);
     }
 
-    bool RenderBox::HitTestSelf(const glm::vec2 position) const
+    bool RenderBox::HitTestSelf(const kor::Vec2 position) const
     {
         return _config.hasDecoration && _config.decoration.Visible() && _decorated.Contains(position);
     }
@@ -230,9 +230,9 @@ namespace kui
     {
         const auto& c = Constraints();
         const bool horizontal = _axis == Axis::eHorizontal;
-        const auto main = [&](const glm::vec2 v) { return horizontal ? v.x : v.y; };
-        const auto cross = [&](const glm::vec2 v) { return horizontal ? v.y : v.x; };
-        const auto vec = [&](const float m, const float x) { return horizontal ? glm::vec2(m, x) : glm::vec2(x, m); };
+        const auto main = [&](const kor::Vec2 v) { return horizontal ? v.x : v.y; };
+        const auto cross = [&](const kor::Vec2 v) { return horizontal ? v.y : v.x; };
+        const auto vec = [&](const float m, const float x) { return horizontal ? kor::Vec2(m, x) : kor::Vec2(x, m); };
         const float maxMain = horizontal ? c.maxWidth : c.maxHeight;
         const float minMain = horizontal ? c.minWidth : c.minHeight;
         const float maxCross = horizontal ? c.maxHeight : c.maxWidth;
@@ -322,17 +322,17 @@ namespace kui
     void RenderStack::PerformLayout()
     {
         const auto& c = Constraints();
-        glm::vec2 size {};
+        kor::Vec2 size {};
         bool any = false;
         for (auto* child : _children) {
             if (dynamic_cast<const RenderPositioned*>(child)) continue;
             child->Layout(c.Loosen());
-            size = glm::max(size, child->Size());
+            size = kor::Max(size, child->Size());
             any = true;
         }
         if (any) SetSize(size);
         else SetSize({ c.HasBoundedWidth() ? c.maxWidth : c.minWidth, c.HasBoundedHeight() ? c.maxHeight : c.minHeight });
-        const glm::vec2 box = Size();
+        const kor::Vec2 box = Size();
 
         for (auto* child : _children) {
             const auto* positioned = dynamic_cast<const RenderPositioned*>(child);
@@ -351,8 +351,8 @@ namespace kui
             if (w >= 0.f) cc.minWidth = cc.maxWidth = w;
             if (h >= 0.f) cc.minHeight = cc.maxHeight = h;
             child->Layout(cc);
-            const glm::vec2 s = child->Size();
-            const glm::vec2 aligned = _alignment.Place(s, box);
+            const kor::Vec2 s = child->Size();
+            const kor::Vec2 aligned = _alignment.Place(s, box);
             const float x = o.left ? *o.left : o.right ? box.x - *o.right - s.x : aligned.x;
             const float y = o.top ? *o.top : o.bottom ? box.y - *o.bottom - s.y : aligned.y;
             child->SetOffset({ x, y });
@@ -413,12 +413,12 @@ namespace kui
         return std::ceil(_wrap ? whole.MinIntrinsicWidth() : whole.MaxIntrinsicWidth());
     }
 
-    void RenderParagraph::Paint(Canvas& canvas, const glm::vec2 offset) { canvas.DrawParagraph(_paragraph, offset); }
+    void RenderParagraph::Paint(Canvas& canvas, const kor::Vec2 offset) { canvas.DrawParagraph(_paragraph, offset); }
 
-    void RenderImage::Set(const kor::ResourceRef<const kor::Image>& image, const ImageFit fit, const glm::vec2 size)
+    void RenderImage::Set(const kor::ResourceRef<const kor::Image>& image, const ImageFit fit, const kor::Vec2 size)
     {
         // An image resized in place is the same handle with another extent: laid out and painted again.
-        const glm::u64 generation = image.Valid() ? image->Generation() : 0;
+        const kor::u64 generation = image.Valid() ? image->Generation() : 0;
         if (image.Get() == _image.Get() && generation == _generation && fit == _fit && size == _preferred) return;
         _image = image;
         _generation = generation;
@@ -430,9 +430,9 @@ namespace kui
 
     void RenderImage::PerformLayout()
     {
-        glm::vec2 intrinsic {};
+        kor::Vec2 intrinsic {};
         if (_image.Valid()) intrinsic = { static_cast<float>(_image->Extent().x), static_cast<float>(_image->Extent().y) };
-        glm::vec2 want = intrinsic;
+        kor::Vec2 want = intrinsic;
         if (_preferred.x >= 0.f) want.x = _preferred.x;
         if (_preferred.y >= 0.f) want.y = _preferred.y;
         // Only one side given: the other follows the image's proportions.
@@ -441,11 +441,11 @@ namespace kui
         SetSize(want);
     }
 
-    void RenderImage::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderImage::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         if (!_image.Valid()) return;
-        const glm::vec2 box = Size();
-        const glm::vec2 extent { static_cast<float>(_image->Extent().x), static_cast<float>(_image->Extent().y) };
+        const kor::Vec2 box = Size();
+        const kor::Vec2 extent { static_cast<float>(_image->Extent().x), static_cast<float>(_image->Extent().y) };
         if (extent.x <= 0.f || extent.y <= 0.f) return;
         Rect dst = Rect::XYWH(offset.x, offset.y, box.x, box.y);
         Rect src = Rect::FromSize(extent);
@@ -453,18 +453,18 @@ namespace kui
         case ImageFit::eFill: break;
         case ImageFit::eContain: {
             const float s = std::min(box.x / extent.x, box.y / extent.y);
-            const glm::vec2 size = extent * s;
+            const kor::Vec2 size = extent * s;
             dst = Rect::XYWH(offset.x + (box.x - size.x) * 0.5f, offset.y + (box.y - size.y) * 0.5f, size.x, size.y);
             break;
         }
         case ImageFit::eCover: {
             const float s = std::max(box.x / extent.x, box.y / extent.y);
-            const glm::vec2 visible = box / s;
+            const kor::Vec2 visible = box / s;
             src = Rect::XYWH((extent.x - visible.x) * 0.5f, (extent.y - visible.y) * 0.5f, visible.x, visible.y);
             break;
         }
         case ImageFit::eNone: {
-            const glm::vec2 size = glm::min(extent, box);
+            const kor::Vec2 size = kor::Min(extent, box);
             dst = Rect::XYWH(offset.x + (box.x - size.x) * 0.5f, offset.y + (box.y - size.y) * 0.5f, size.x, size.y);
             src = Rect::XYWH((extent.x - size.x) * 0.5f, (extent.y - size.y) * 0.5f, size.x, size.y);
             break;
@@ -475,7 +475,7 @@ namespace kui
 
     // ---- painting your own ----------------------------------------------------------------------------
 
-    void RenderCustomPaint::Set(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size)
+    void RenderCustomPaint::Set(std::function<void(Canvas&, kor::Vec2)> painter, const kor::Vec2 size)
     {
         _painter = std::move(painter);
         if (size != _preferred) { _preferred = size; MarkNeedsLayout(); }
@@ -493,13 +493,13 @@ namespace kui
             return;
         }
         // Nothing of its own to fit: no size, unless it was given one (or its parent sets it).
-        glm::vec2 want { 0.f, 0.f };
+        kor::Vec2 want { 0.f, 0.f };
         if (_preferred.x >= 0.f) want.x = _preferred.x;
         if (_preferred.y >= 0.f) want.y = _preferred.y;
         SetSize(want);
     }
 
-    void RenderCustomPaint::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderCustomPaint::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         if (_painter) {
             canvas.Save();
@@ -531,7 +531,7 @@ namespace kui
         }
     }
 
-    void RenderShaderBox::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderShaderBox::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         canvas.DrawElement(_shader, Rect::XYWH(offset.x, offset.y, Size().x, Size().y), _parameters, _radius);
         RenderContainer::Paint(canvas, offset);
@@ -559,7 +559,7 @@ namespace kui
         }
     }
 
-    void RenderReveal::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderReveal::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         if (_share >= 1.f) { RenderContainer::Paint(canvas, offset); return; }
         if (Size().y <= 0.f) return;
@@ -576,7 +576,7 @@ namespace kui
         MarkNeedsPaint();
     }
 
-    void RenderClip::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderClip::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         canvas.Save();
         canvas.ClipRRect({ Rect::XYWH(offset.x, offset.y, Size().x, Size().y), _radius });
@@ -584,14 +584,14 @@ namespace kui
         canvas.Restore();
     }
 
-    void RenderTranslate::Set(const glm::vec2 by)
+    void RenderTranslate::Set(const kor::Vec2 by)
     {
         if (by == _by) return;
         _by = by;
         MarkNeedsPaint();
     }
 
-    bool RenderTranslate::HitTest(HitTestResult& result, const glm::vec2 position)
+    bool RenderTranslate::HitTest(HitTestResult& result, const kor::Vec2 position)
     {
         const bool hit = HitTestChildren(result, position);
         if (hit) result.Add(this, position);
@@ -621,11 +621,11 @@ namespace kui
         const bool vertical = _axis == Axis::eVertical;
         if (vertical) child->Layout({ c.minWidth, c.maxWidth, 0.f, Infinity });
         else child->Layout({ 0.f, Infinity, c.minHeight, c.maxHeight });
-        glm::vec2 size = c.Constrain(child->Size());
+        kor::Vec2 size = c.Constrain(child->Size());
         if (vertical ? child->Size().y > size.y : child->Size().x > size.x) {
             if (vertical) child->Layout({ std::max(c.minWidth - Gutter, 0.f), std::max(c.maxWidth - Gutter, 0.f), 0.f, Infinity });
             else child->Layout({ 0.f, Infinity, std::max(c.minHeight - Gutter, 0.f), std::max(c.maxHeight - Gutter, 0.f) });
-            size = c.Constrain(child->Size() + (vertical ? glm::vec2(Gutter, 0.f) : glm::vec2(0.f, Gutter)));
+            size = c.Constrain(child->Size() + (vertical ? kor::Vec2(Gutter, 0.f) : kor::Vec2(0.f, Gutter)));
         }
         child->SetOffset({});
         SetSize(size);
@@ -691,9 +691,9 @@ namespace kui
                                      : Rect::LTRB(visible.left - view, -1.e6f, visible.right + view, 1.e6f));
     }
 
-    glm::vec2 RenderScroll::ScrollVector() const { return _axis == Axis::eVertical ? glm::vec2(0.f, _scroll) : glm::vec2(_scroll, 0.f); }
+    kor::Vec2 RenderScroll::ScrollVector() const { return _axis == Axis::eVertical ? kor::Vec2(0.f, _scroll) : kor::Vec2(_scroll, 0.f); }
 
-    glm::vec2 RenderScroll::ChildOrigin(const RenderObject& child) const { return child.Offset() - ScrollVector(); }
+    kor::Vec2 RenderScroll::ChildOrigin(const RenderObject& child) const { return child.Offset() - ScrollVector(); }
 
     void RenderScroll::PlaceThumb()
     {
@@ -706,10 +706,10 @@ namespace kui
         const float travel = view - length;
         const float at = travel * (_scroll / max);
         _thumb->SetOpacity(1.f);
-        _thumb->SetTransform(Transform::Translation(_axis == Axis::eVertical ? glm::vec2(0.f, at) : glm::vec2(at, 0.f)));
+        _thumb->SetTransform(Transform::Translation(_axis == Axis::eVertical ? kor::Vec2(0.f, at) : kor::Vec2(at, 0.f)));
     }
 
-    void RenderScroll::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderScroll::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         auto* child = Child();
         if (!child) return;
@@ -770,7 +770,7 @@ namespace kui
             return o.onTap || o.onTapDown || o.onTapUp || o.onPanStart || o.onPanUpdate || o.onPanEnd;
         case PointerEvent::Type::eMove:
             if (!_pressed) return false;
-            if (!_panning && (o.onPanStart || o.onPanUpdate || o.onPanEnd) && glm::length(event.local - _down) > slop) {
+            if (!_panning && (o.onPanStart || o.onPanUpdate || o.onPanEnd) && kor::Length(event.local - _down) > slop) {
                 _panning = true;
                 if (o.onPanStart) o.onPanStart(_down);
                 if (o.onPanUpdate) o.onPanUpdate(event.local - _down, event.local);
@@ -784,7 +784,7 @@ namespace kui
             if (_panning) { if (o.onPanEnd) o.onPanEnd(); }
             else {
                 if (o.onTapUp) o.onTapUp();
-                const glm::vec2 s = Size();
+                const kor::Vec2 s = Size();
                 if (o.onTap && event.local.x >= 0.f && event.local.y >= 0.f && event.local.x < s.x && event.local.y < s.y) o.onTap();
             }
             _panning = false;
@@ -811,12 +811,12 @@ namespace kui
             _down = event.local;
             return false;
         case PointerEvent::Type::eMove: {
-            if (!_pressed || glm::length(event.local - _down) <= 4.f) return false;
+            if (!_pressed || kor::Length(event.local - _down) <= 4.f) return false;
             _pressed = false;
             Owner* owner = GetOwner();
             if (!owner || !owner->beginDrag) return false;
             Widget feedback = _config.options.feedback;
-            glm::vec2 hotspot = _down;
+            kor::Vec2 hotspot = _down;
             if (!feedback) {
                 // The thing itself, as big as it is here, a little seen through: held where it was taken hold of.
                 // (Built again for the purpose: what is still in its place stays there.) With no child, a ghost of its size.
@@ -833,7 +833,7 @@ namespace kui
                 const float radius = _config.options.feedbackRadius >= 0.f ? _config.options.feedbackRadius : t.radius;
                 feedback = Container({ .padding = EdgeInsets::All(Line),
                                        .decoration = { .borderWidth = Line, .borderColor = t.primary, .radius = radius + Line } }, std::move(feedback));
-                hotspot += glm::vec2(Line);
+                hotspot += kor::Vec2(Line);
             }
             if (!owner->beginDrag(*this, _config.data, feedback, hotspot, _config.options.onDragEnd)) return false;
             if (_config.options.onDragStart) _config.options.onDragStart();
@@ -986,9 +986,9 @@ namespace kui
         return box<RenderClip, Radii>(radius, one(std::move(child)), [](RenderClip& r, const Radii& c) { r.Set(c); });
     }
 
-    Widget Translate(const glm::vec2 offset, Widget child)
+    Widget Translate(const kor::Vec2 offset, Widget child)
     {
-        return box<RenderTranslate, glm::vec2>(offset, one(std::move(child)), [](RenderTranslate& r, const glm::vec2& c) { r.Set(c); });
+        return box<RenderTranslate, kor::Vec2>(offset, one(std::move(child)), [](RenderTranslate& r, const kor::Vec2& c) { r.Set(c); });
     }
 
     Widget IgnorePointer(Widget child)
@@ -1028,9 +1028,9 @@ namespace kui
             [](RenderPointerListener& r, const GestureOptions& c) { r.Set(c); });
     }
 
-    Widget CustomPaint(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size, Widget child)
+    Widget CustomPaint(std::function<void(Canvas&, kor::Vec2)> painter, const kor::Vec2 size, Widget child)
     {
-        struct Config { std::function<void(Canvas&, glm::vec2)> painter; glm::vec2 size; };
+        struct Config { std::function<void(Canvas&, kor::Vec2)> painter; kor::Vec2 size; };
         return box<RenderCustomPaint, Config>({ std::move(painter), size }, one(std::move(child)),
             [](RenderCustomPaint& r, const Config& c) { r.Set(c.painter, c.size); });
     }
@@ -1042,9 +1042,9 @@ namespace kui
             [](RenderShaderBox& r, const Config& c) { r.Set(c.shader, c.parameters, c.radius); });
     }
 
-    Widget Image(kor::ResourceRef<const kor::Image> image, const ImageFit fit, const glm::vec2 size)
+    Widget Image(kor::ResourceRef<const kor::Image> image, const ImageFit fit, const kor::Vec2 size)
     {
-        struct Config { kor::ResourceRef<const kor::Image> image; ImageFit fit; glm::vec2 size; };
+        struct Config { kor::ResourceRef<const kor::Image> image; ImageFit fit; kor::Vec2 size; };
         return box<RenderImage, Config>({ std::move(image), fit, size }, {},
             [](RenderImage& r, const Config& c) { r.Set(c.image, c.fit, c.size); });
     }

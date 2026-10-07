@@ -133,8 +133,8 @@ namespace kor
         }
 
         SlangCompileResult result;
-        const auto* code = static_cast<const glm::u32*>(spirvBlob->getBufferPointer());
-        const auto words = spirvBlob->getBufferSize() / sizeof(glm::u32);
+        const auto* code = static_cast<const kor::u32*>(spirvBlob->getBufferPointer());
+        const auto words = spirvBlob->getBufferSize() / sizeof(kor::u32);
         result.spirv.assign(code, code + words);
 
         // Stage from reflection of the linked entry point.
@@ -219,10 +219,10 @@ namespace kor
                 // Locations nest: an input struct's fields are offset from where the struct itself
                 // starts, so the walk carries the parent's location down with it.
                 const auto collect = [&](auto&& self, slang::VariableLayoutReflection* variable,
-                                         const glm::u32 baseLocation) -> void {
+                                         const kor::u32 baseLocation) -> void {
                     if (!variable) return;
 
-                    const auto location = baseLocation + static_cast<glm::u32>(
+                    const auto location = baseLocation + static_cast<kor::u32>(
                         variable->getOffset(SLANG_PARAMETER_CATEGORY_VARYING_INPUT));
 
                     if (slang::TypeLayoutReflection* typeLayout = variable->getTypeLayout();

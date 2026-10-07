@@ -15,7 +15,7 @@
 #include <vector>
 
 #include <GLFW/glfw3.h>
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "buffer.h"
 #include "commandBuffer.h"
@@ -35,7 +35,7 @@
 
 namespace orient {
 
-using Pixel = glm::u8vec4; // RGBA8
+using Pixel = kor::U8Vec4; // RGBA8
 inline constexpr std::uint32_t kW = 16;
 inline constexpr std::uint32_t kH = 16;
 
@@ -58,7 +58,7 @@ inline kor::ResourceRef<const kor::Shader> loadShader(const char* file, kor::Sha
 // Copy an image back to host memory, rows top-down.
 inline std::vector<Pixel> readback(const kor::Resource<kor::Image>& image) {
     kor::Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(kor::Buffer::Usage::eTransferDst)
       .SetType(kor::Buffer::Type::eReadback);
     auto buf = rb.Build();
@@ -87,12 +87,12 @@ inline Result rasterTopHalf() {
     auto image = kor::Image::Builder{}
                      .SetType(kor::Image::Type::e2D)
                      .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(kor::Image::Usage::eColorAttachment | kor::Image::Usage::eTransferSrc)
                      .Build();
     auto view = kor::ImageView::Builder(image).Build();
     auto fb = kor::Framebuffer::Builder{}
-                  .AddColor({ .view = view, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                  .AddColor({ .view = view, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                   .Build();
 
     const auto vert = loadShader("topHalfQuad.vert.glsl", kor::Shader::Stage::eVertex, "orient.tophalf.vert");
@@ -122,7 +122,7 @@ inline Result computeTopHalf() {
     auto image = kor::Image::Builder{}
                      .SetType(kor::Image::Type::e2D)
                      .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(kor::Image::Usage::eStorage | kor::Image::Usage::eTransferSrc)
                      .Build();
     auto view = kor::ImageView::Builder(image).Build();
@@ -162,11 +162,11 @@ inline void expectHalfSplit(const std::vector<Pixel>& px) {
         for (std::uint32_t x = 0; x < kW; ++x) {
             const Pixel& p = px[y * kW + x];
             if (expectGreen) {
-                ASSERT_EQ(p.r, 0)   << "row " << y << " col " << x << " should be green";
-                ASSERT_EQ(p.g, 255) << "row " << y << " col " << x << " should be green";
-                ASSERT_EQ(p.b, 0)   << "row " << y << " col " << x << " should be green";
+                ASSERT_EQ(p.x, 0)   << "row " << y << " col " << x << " should be green";
+                ASSERT_EQ(p.y, 255) << "row " << y << " col " << x << " should be green";
+                ASSERT_EQ(p.z, 0)   << "row " << y << " col " << x << " should be green";
             } else {
-                ASSERT_EQ(p.g, 0) << "row " << y << " col " << x << " should be black; "
+                ASSERT_EQ(p.y, 0) << "row " << y << " col " << x << " should be black; "
                                      "green here means the image is vertically flipped";
             }
         }

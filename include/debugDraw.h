@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "buffer.h"
@@ -38,7 +38,7 @@ namespace kor
      */
     struct DebugStyle {
         /** The outline's colour, and a line's. */
-        glm::vec4 color { 1.f, 1.f, 1.f, 1.f };
+        kor::Vec4 color { 1.f, 1.f, 1.f, 1.f };
         /** Seconds of the scene's time to keep drawing it; 0 is this frame only. */
         float duration = 0.f;
         /** Drawn over everything, rather than hidden by what is in front of it. */
@@ -47,7 +47,7 @@ namespace kor
          * The colour to fill the shape with; alpha below 1 is a fill you can see through, and an alpha of
          * 0 — the default — no fill at all. Lines, points, grids and frustums have nothing to fill.
          */
-        glm::vec4 fill { 0.f };
+        kor::Vec4 fill { 0.f };
         /** Draws the outline; false for a shape that is only its fill. */
         bool outline = true;
         /**
@@ -66,9 +66,9 @@ namespace kor
     /** @brief The pointer a gizmo is used with, in the pixels of the image its camera draws. @see DebugDraw::Gizmo */
     struct GizmoPointer {
         /** Where it is, from the image's top-left; none when it is not over the image (or something else has it). */
-        std::optional<glm::vec2> position;
+        std::optional<kor::Vec2> position;
         /** The size of the image, in pixels. */
-        glm::vec2 viewport { 0.f };
+        kor::Vec2 viewport { 0.f };
         /** The button that drags a handle is down. */
         bool down = false;
         /** ...and went down this frame: what grabs a handle. */
@@ -121,38 +121,38 @@ namespace kor
 
         // ---- lines --------------------------------------------------------------------------------
 
-        void Line(glm::vec3 from, glm::vec3 to, const Style& style = {});
+        void Line(kor::Vec3 from, kor::Vec3 to, const Style& style = {});
         /** @brief A line with a head at @p to; filled, the head is a cone. */
-        void Arrow(glm::vec3 from, glm::vec3 to, const Style& style = {});
+        void Arrow(kor::Vec3 from, kor::Vec3 to, const Style& style = {});
         /** @brief A small cross: a point you can see. */
-        void Point(glm::vec3 position, float size = 0.1f, const Style& style = {});
+        void Point(kor::Vec3 position, float size = 0.1f, const Style& style = {});
         /** @brief @p transform's X, Y and Z axes, in red, green and blue. */
-        void Axes(const glm::mat4& transform, float size = 1.f, float duration = 0.f);
+        void Axes(const kor::Mat4& transform, float size = 1.f, float duration = 0.f);
         /** @brief A grid of @p cells by @p cells on the XZ plane. */
-        void Grid(glm::vec3 center, float size, int cells, const Style& style = {});
+        void Grid(kor::Vec3 center, float size, int cells, const Style& style = {});
         /** @brief What a camera with @p viewProjection sees: its frustum's twelve edges. */
-        void Frustum(const glm::mat4& viewProjection, const Style& style = {});
+        void Frustum(const kor::Mat4& viewProjection, const Style& style = {});
 
         // ---- shapes, outlined or filled -----------------------------------------------------------
 
-        void Triangle(glm::vec3 a, glm::vec3 b, glm::vec3 c, const Style& style = {});
+        void Triangle(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, const Style& style = {});
         /** @brief Four corners, in order around the edge. */
-        void Quad(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, const Style& style = {});
+        void Quad(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, kor::Vec3 d, const Style& style = {});
         /** @brief A rectangle of @p size facing along @p normal. */
-        void Plane(glm::vec3 center, glm::vec3 normal, glm::vec2 size, const Style& style = {});
+        void Plane(kor::Vec3 center, kor::Vec3 normal, kor::Vec2 size, const Style& style = {});
         /** @brief Filled, a disc. */
-        void Circle(glm::vec3 center, glm::vec3 normal, float radius, const Style& style = {}, int segments = 32);
+        void Circle(kor::Vec3 center, kor::Vec3 normal, float radius, const Style& style = {}, int segments = 32);
         /** @brief An axis-aligned box. */
-        void Box(glm::vec3 min, glm::vec3 max, const Style& style = {});
+        void Box(kor::Vec3 min, kor::Vec3 max, const Style& style = {});
         /** @brief The unit cube (-0.5 to 0.5) moved by @p transform: a box in any orientation. */
-        void Box(const glm::mat4& transform, const Style& style = {});
+        void Box(const kor::Mat4& transform, const Style& style = {});
         /** @brief Outlined, three circles, one per axis; filled, the sphere. */
-        void Sphere(glm::vec3 center, float radius, const Style& style = {}, int segments = 32);
-        void Cylinder(glm::vec3 from, glm::vec3 to, float radius, const Style& style = {}, int segments = 24);
+        void Sphere(kor::Vec3 center, float radius, const Style& style = {}, int segments = 32);
+        void Cylinder(kor::Vec3 from, kor::Vec3 to, float radius, const Style& style = {}, int segments = 24);
         /** @brief A cone with its base's centre at @p base and its point at @p tip. */
-        void Cone(glm::vec3 base, glm::vec3 tip, float radius, const Style& style = {}, int segments = 24);
+        void Cone(kor::Vec3 base, kor::Vec3 tip, float radius, const Style& style = {}, int segments = 24);
         /** @brief A cylinder from @p from to @p to with a half-sphere at each end. */
-        void Capsule(glm::vec3 from, glm::vec3 to, float radius, const Style& style = {}, int segments = 24);
+        void Capsule(kor::Vec3 from, kor::Vec3 to, float radius, const Style& style = {}, int segments = 24);
 
         // ---- cameras and lights -------------------------------------------------------------------
 
@@ -160,17 +160,17 @@ namespace kor
          * @brief A camera: the pyramid it sees through, @p size deep, with a triangle on top for which way
          *        is up. Any projection — perspective or orthographic — and any convention it was made with.
          */
-        void Camera(const glm::mat4& view, const glm::mat4& projection, float size = 1.f, const Style& style = {});
+        void Camera(const kor::Mat4& view, const kor::Mat4& projection, float size = 1.f, const Style& style = {});
         /** @brief A point light: a star where it is, and the sphere it reaches to (none when @p range is 0: no limit). */
-        void PointLight(glm::vec3 position, float range, const Style& style = {});
+        void PointLight(kor::Vec3 position, float range, const Style& style = {});
         /**
          * @brief A spot light: the cone it lights, out to @p range (1 when 0: no limit). Angles are from the
          *        centre to the edge, in radians; @p innerAngle (the fully lit cone) is a second ring when not 0.
          */
-        void SpotLight(glm::vec3 position, glm::vec3 direction, float range, float outerAngle, float innerAngle = 0.f,
+        void SpotLight(kor::Vec3 position, kor::Vec3 direction, float range, float outerAngle, float innerAngle = 0.f,
                        const Style& style = {});
         /** @brief A directional light — the sun: a disc at @p position with its rays, @p size long. */
-        void DirectionalLight(glm::vec3 position, glm::vec3 direction, float size = 1.f, const Style& style = {});
+        void DirectionalLight(kor::Vec3 position, kor::Vec3 direction, float size = 1.f, const Style& style = {});
 
         // ---- gizmos -------------------------------------------------------------------------------
 
@@ -187,7 +187,7 @@ namespace kor
          *           enough while the same ones are drawn in the same order.
          * @return Whether @p transform changed.
          */
-        bool Gizmo(GizmoMode mode, glm::mat4& transform, const glm::mat4& viewProjection, const GizmoPointer& pointer,
+        bool Gizmo(GizmoMode mode, kor::Mat4& transform, const kor::Mat4& viewProjection, const GizmoPointer& pointer,
                    const GizmoOptions& options = {}, std::uint64_t id = 0);
         /** @brief A handle is being dragged: the pointer is the gizmo's, not the camera's or the picking's. */
         [[nodiscard]] bool GizmoActive() const { return _drag.has_value(); }
@@ -211,15 +211,15 @@ namespace kor
          * @brief Draws the shapes into @p target, over what it holds: depth-tested against its depth
          *        attachment when it has one, over everything when not. On the thread the scene runs on.
          */
-        void Render(CommandBuffer& commandBuffer, const glm::mat4& viewProjection, ResourceRef<const Framebuffer> target);
+        void Render(CommandBuffer& commandBuffer, const kor::Mat4& viewProjection, ResourceRef<const Framebuffer> target);
 
         /**
          * @brief For a pass: brings the GPU's copy of the shapes, and the pipelines for @p target, up to
          *        date — the fills you can see through sorted for @p viewProjection. Main thread.
          */
-        void Prepare(const ResourceRef<const Framebuffer>& target, const glm::mat4& viewProjection);
+        void Prepare(const ResourceRef<const Framebuffer>& target, const kor::Mat4& viewProjection);
         /** @brief For a pass: the draws, after Prepare. Any thread. */
-        void Record(CommandBuffer& commandBuffer, const glm::mat4& viewProjection, const ResourceRef<const Framebuffer>& target) const;
+        void Record(CommandBuffer& commandBuffer, const kor::Mat4& viewProjection, const ResourceRef<const Framebuffer>& target) const;
 
     private:
         friend class App;
@@ -229,8 +229,8 @@ namespace kor
         void EndFrame(float frameTime);
 
         struct Stored {
-            glm::vec3 from, to;
-            glm::vec4 color;
+            kor::Vec3 from, to;
+            kor::Vec4 color;
             float remaining;
             bool onTop;
             float width;
@@ -238,14 +238,14 @@ namespace kor
         /** Triangles of one shape, at [first, first + count) of _solidVertices. */
         struct Solid {
             std::uint32_t first, count;
-            glm::vec4 color;
-            glm::vec3 center;
+            kor::Vec4 color;
+            kor::Vec3 center;
             float remaining;
             bool onTop;
         };
         struct Vertex {
-            glm::vec4 position;
-            glm::vec4 color;
+            kor::Vec4 position;
+            kor::Vec4 color;
         };
 
         /**
@@ -262,23 +262,23 @@ namespace kor
         };
 
         /** A line of a shape's outline: none when the style says no outline. */
-        void Edge(glm::vec3 from, glm::vec3 to, const Style& style);
+        void Edge(kor::Vec3 from, kor::Vec3 to, const Style& style);
         /** A circle's outline alone. */
-        void Ring(glm::vec3 center, glm::vec3 normal, float radius, const Style& style, int segments);
+        void Ring(kor::Vec3 center, kor::Vec3 normal, float radius, const Style& style, int segments);
         /** Starts a filled shape, when @p style has a fill: its triangles are the ones added until EndFill. */
         bool BeginFill(const Style& style);
-        void FillTriangle(glm::vec3 a, glm::vec3 b, glm::vec3 c);
+        void FillTriangle(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c);
         void EndFill();
 
         struct GizmoDrag {
             std::uint64_t key;
             GizmoMode mode;
             int handle;
-            glm::mat4 start;
-            glm::vec3 axis;         ///< The axis it moves along, or turns around; the plane's normal for a plane.
-            glm::vec3 grab;         ///< Where on the axis or plane it was grabbed; for a ring, the direction to the grab.
+            kor::Mat4 start;
+            kor::Vec3 axis;         ///< The axis it moves along, or turns around; the plane's normal for a plane.
+            kor::Vec3 grab;         ///< Where on the axis or plane it was grabbed; for a ring, the direction to the grab.
             float grabParam;        ///< Where along the axis it was grabbed.
-            glm::vec2 grabCursor;
+            kor::Vec2 grabCursor;
             float angle;            ///< A ring's turn so far, and the cursor's last angle around the centre.
             float lastCursorAngle;
             float screenSign;       ///< Which way a turn on screen turns around the axis.
@@ -286,7 +286,7 @@ namespace kor
         };
 
         std::vector<Stored> _lines;
-        std::vector<glm::vec3> _solidVertices;
+        std::vector<kor::Vec3> _solidVertices;
         std::vector<Solid> _solids;
         std::optional<Solid> _filling;
         Resource<Buffer> _buffer;
@@ -308,7 +308,7 @@ namespace kor
      */
     class KORAL_API DebugDrawPass final : public RenderPass {
     public:
-        DebugDrawPass(DebugDraw& draw, std::function<glm::mat4()> viewProjection,
+        DebugDrawPass(DebugDraw& draw, std::function<kor::Mat4()> viewProjection,
                       std::string target = std::string(FrameGraph::Screen), std::string depth = {});
 
         void Setup(PassBuilder& builder) override;
@@ -318,9 +318,9 @@ namespace kor
 
     private:
         DebugDraw& _draw;
-        std::function<glm::mat4()> _viewProjection;
+        std::function<kor::Mat4()> _viewProjection;
         std::string _target, _depth;
         Resource<Framebuffer> _framebuffer;
-        glm::mat4 _matrix { 1.f };
+        kor::Mat4 _matrix { 1.f };
     };
 }

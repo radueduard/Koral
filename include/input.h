@@ -11,7 +11,7 @@
 #include <vector>
 
 #include <string_view>
-#include <glm/vec2.hpp>
+#include <kmath/vector.h>
 
 struct GLFWwindow;
 
@@ -353,16 +353,16 @@ namespace kor {
         [[nodiscard]] bool IsKeyRepeated(Key key) const;
 
         /** @brief Cursor position in pixels, from the top-left of the scene's window. */
-        [[nodiscard]] const glm::vec2& MousePosition() const;
+        [[nodiscard]] const kor::Vec2& MousePosition() const;
 
         /** @brief How far the cursor moved since the previous frame, in pixels. What drives a look-around camera. */
-        [[nodiscard]] const glm::vec2& MousePositionDelta() const;
+        [[nodiscard]] const kor::Vec2& MousePositionDelta() const;
 
         /** @brief How far the wheel turned this frame. Y is the usual vertical wheel. */
-        [[nodiscard]] const glm::vec2& MouseScrollDelta() const;
+        [[nodiscard]] const kor::Vec2& MouseScrollDelta() const;
 
         /** @brief Where the cursor was on the previous frame, in pixels. */
-        [[nodiscard]] const glm::vec2& LastMousePosition() const;
+        [[nodiscard]] const kor::Vec2& LastMousePosition() const;
 
         /**
          * @brief What the cursor does over this scene's windows.
@@ -442,7 +442,7 @@ namespace kor {
         [[nodiscard]] bool IsActionReleased(std::string_view action) const { return ActionState(action) == KeyState::eReleased; }
         [[nodiscard]] float Axis(std::string_view axis) const;
         /** @brief Two axes as one direction, no longer than 1: diagonal on a keyboard is not faster. */
-        [[nodiscard]] glm::vec2 Axis2D(std::string_view x, std::string_view y) const;
+        [[nodiscard]] kor::Vec2 Axis2D(std::string_view x, std::string_view y) const;
         /** @brief Every binding, by name: to save, or to show on a rebinding screen. */
         [[nodiscard]] InputBindings Bindings() const;
         /** @brief Replaces every binding. A source name it cannot read is reported and skipped. */
@@ -459,11 +459,11 @@ namespace kor {
         /** @brief A mouse button went down, or up. */
         void FeedMouseButton(MouseButton button, bool down);
         /** @brief Where the pointer is, in the scene's window's pixels. Moves nothing: see FeedMouseDelta. */
-        void FeedMousePosition(glm::vec2 position);
+        void FeedMousePosition(kor::Vec2 position);
         /** @brief How far the pointer moved, in pixels: MousePositionDelta(). */
-        void FeedMouseDelta(glm::vec2 delta);
+        void FeedMouseDelta(kor::Vec2 delta);
         /** @brief How far the wheel turned: MouseScrollDelta(). */
-        void FeedScroll(glm::vec2 delta);
+        void FeedScroll(kor::Vec2 delta);
         /** @brief Text typed: TypedText(). */
         void FeedText(std::u32string_view text);
         /** @brief A held key repeated: IsKeyRepeated(). */

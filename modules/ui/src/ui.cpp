@@ -75,13 +75,13 @@ namespace kui
         RootRender render, content, overlay;
         unsigned debugRevision = debug::Revision();
         std::vector<RenderObject*> forgotten;   // what left the tree while this frame's events were being sent
-        struct Popup { Widget widget; glm::vec2 at {}; };
+        struct Popup { Widget widget; kor::Vec2 at {}; };
         std::optional<Popup> popup;
         bool stale = false;     ///< Everything is to be built again: asked for through the owner.
         const kor::Window* titled = nullptr;    // the window whose title bar was coloured to go with the theme
         std::string tip;                        // the tooltip that is showing, and where the pointer was when it came up
-        glm::vec2 tipAt {};
-        glm::vec2 logical {};                   // the view's size, in its own units: where a popup is kept inside
+        kor::Vec2 tipAt {};
+        kor::Vec2 logical {};                   // the view's size, in its own units: where a popup is kept inside
         std::unique_ptr<RootElement> element, overlayElement;
         Statistics stats;
 
@@ -91,24 +91,24 @@ namespace kui
         [[nodiscard]] float Scale() const { return settings.scale * pixelRatio; }
 
         // The pointer.
-        glm::vec2 pointer {};
+        kor::Vec2 pointer {};
         bool hasPointer = false;
         // The pointer held in place for a drag (Owner::lockPointer): whose it is, what its cursor did
         // before, and where it is in its viewport's root.
         kor::Input* lockedInput = nullptr;
         kor::Input::CursorMode lockedFrom = kor::Input::CursorMode::eNormal;
-        glm::vec2 viewportLocal {};
+        kor::Vec2 viewportLocal {};
         kor::Input* pointerInput = nullptr;     // whose pointer it was last frame: the view's own window's, or a viewport's
 
         /** A drag in progress: what it carries, what shows under the pointer, and the receiver it is over. */
         struct Drag {
             DragData data;
             Widget feedback;
-            glm::vec2 hotspot {};
+            kor::Vec2 hotspot {};
             std::function<void(bool)> onEnd;
             RenderObject* over = nullptr;
             Impl* overUi = nullptr;         ///< The view the receiver is in: this one, or another the pointer is over.
-            glm::vec2 overAt {};            ///< The pointer, in that view's coordinates.
+            kor::Vec2 overAt {};            ///< The pointer, in that view's coordinates.
         };
         std::optional<Drag> drag;
         std::vector<RenderObject*> hovered;     // deepest first
@@ -144,17 +144,17 @@ namespace kui
                     lockedInput = nullptr;
                 }
             };
-            owner.beginDrag = [this](RenderObject&, DragData data, const Widget& feedback, const glm::vec2 hotspot, std::function<void(bool)> onEnd) {
+            owner.beginDrag = [this](RenderObject&, DragData data, const Widget& feedback, const kor::Vec2 hotspot, std::function<void(bool)> onEnd) {
                 if (drag) return false;
                 drag = Drag { std::move(data), feedback, hotspot, std::move(onEnd) };
                 ShowFeedback();
                 return true;
             };
-            owner.showPopup = [this](const Widget& widget, glm::vec2 at, const glm::vec2 size) {
+            owner.showPopup = [this](const Widget& widget, kor::Vec2 at, const kor::Vec2 size) {
                 // Another popup takes this one's place: whoever showed the one there hears that it went.
                 if (popup) if (const auto closed = std::exchange(owner.onPopupClosed, nullptr)) closed();
                 // Inside the view, where it fits there.
-                at = glm::max(glm::min(at, logical - size - glm::vec2(4.f)), glm::vec2(4.f));
+                at = kor::Max(kor::Min(at, logical - size - kor::Vec2(4.f)), kor::Vec2(4.f));
                 popup = Popup { widget, at };
                 ShowFeedback();
             };
@@ -198,7 +198,7 @@ namespace kui
             std::vector<Widget> layers;
             if (popup) {
                 // Everywhere the popup is not: a press there closes it, and goes no further.
-                layers.push_back(GestureDetector(GestureOptions {}.OnTapDown([this](glm::vec2) { owner.closePopup(); }), SizedBox(1.e6f, 1.e6f)));
+                layers.push_back(GestureDetector(GestureOptions {}.OnTapDown([this](kor::Vec2) { owner.closePopup(); }), SizedBox(1.e6f, 1.e6f)));
                 layers.push_back(Translate(popup->at, popup->widget));
             }
             if (drag) layers.push_back(Translate(pointer - drag->hotspot, IgnorePointer(drag->feedback)));
@@ -209,10 +209,10 @@ namespace kui
                 style.size = std::max(style.size - 2.f, 10.f);
                 constexpr float Widest = 320.f;
                 const Paragraph text(tip, style, Widest);
-                const glm::vec2 size = glm::vec2(std::min(text.MaxIntrinsicWidth(), Widest), text.Size().y) + glm::vec2(20.f, 12.f);
-                glm::vec2 at = tipAt + glm::vec2(14.f, 20.f);
+                const kor::Vec2 size = kor::Vec2(std::min(text.MaxIntrinsicWidth(), Widest), text.Size().y) + kor::Vec2(20.f, 12.f);
+                kor::Vec2 at = tipAt + kor::Vec2(14.f, 20.f);
                 if (at.y + size.y > logical.y - 4.f) at.y = tipAt.y - size.y - 8.f;
-                at = glm::max(glm::min(at, logical - size - glm::vec2(4.f)), glm::vec2(4.f));
+                at = kor::Max(kor::Min(at, logical - size - kor::Vec2(4.f)), kor::Vec2(4.f));
                 layers.push_back(Translate(at, IgnorePointer(Container({
                     .padding = EdgeInsets::Symmetric(10.f, 6.f),
                     .decoration = { .color = t.surfacePressed, .borderWidth = 1.f, .borderColor = t.border, .radius = 8.f },
@@ -225,14 +225,14 @@ namespace kui
 
         /** The drag, as the pointer moves over @p path and the button is let go. */
         /** Where the pointer of @p from's window is in this view, when it is over it. */
-        std::optional<glm::vec2> PointerFrom(const kor::Window* from, const glm::vec2 pixels) const
+        std::optional<kor::Vec2> PointerFrom(const kor::Window* from, const kor::Vec2 pixels) const
         {
             if (!owner.window || !from) return std::nullopt;
-            glm::vec2 mine = pixels;
+            kor::Vec2 mine = pixels;
             if (from != owner.window) {
                 // Another window: by where the two are on the desktop, where the platform says.
                 if (!kor::Window::CanBePositioned() || from->IsOffscreen() || owner.window->IsOffscreen()) return std::nullopt;
-                mine = glm::vec2(from->Position() - owner.window->Position()) * pixelRatio + pixels;
+                mine = kor::Vec2(from->Position() - owner.window->Position()) * pixelRatio + pixels;
             }
             mine /= Scale();
             if (mine.x < 0.f || mine.y < 0.f || mine.x >= render.Size().x || mine.y >= render.Size().y) return std::nullopt;
@@ -240,7 +240,7 @@ namespace kui
         }
 
         /** The deepest receiver under @p position that takes the drag. */
-        RenderObject* ReceiverAt(const glm::vec2 position, const DragData& data)
+        RenderObject* ReceiverAt(const kor::Vec2 position, const DragData& data)
         {
             HitTestResult hit;
             render.HitTest(hit, position);
@@ -249,11 +249,11 @@ namespace kui
             return nullptr;
         }
 
-        void Dragging(kor::Input& input, const kor::Window* window, const std::vector<RenderObject*>& path, const glm::vec2 position, const bool moved)
+        void Dragging(kor::Input& input, const kor::Window* window, const std::vector<RenderObject*>& path, const kor::Vec2 position, const bool moved)
         {
             RenderObject* over = nullptr;
             Impl* overUi = nullptr;
-            glm::vec2 at = position;
+            kor::Vec2 at = position;
             for (auto* object : path) {
                 auto* candidate = dynamic_cast<DropReceiver*>(object);
                 if (!candidate || !candidate->AcceptsDrag(drag->data)) continue;
@@ -306,7 +306,7 @@ namespace kui
             return nullptr;
         }
 
-        static glm::vec2 LocalOf(const RenderObject& object, const glm::vec2 position) { return object.ToLocal(position); }
+        static kor::Vec2 LocalOf(const RenderObject& object, const kor::Vec2 position) { return object.ToLocal(position); }
 
         bool Send(RenderObject& target, PointerEvent event)
         {
@@ -325,14 +325,14 @@ namespace kui
             const PointerViewport* viewport = ViewportFor(own);
             kor::Input& input = viewport ? *viewport->input : own;
             HitTestResult hit;
-            glm::vec2 position;
+            kor::Vec2 position;
             // Held in place, it is where it was: only how far the hand moved is new.
             const bool locked = lockedInput == &input && hasPointer;
             if (viewport) {
-                glm::vec2 local = viewport->origin + input.MousePosition() / Scale();
+                kor::Vec2 local = viewport->origin + input.MousePosition() / Scale();
                 if (viewport->desktopOrigin)
                     if (const auto cursor = kor::Window::DesktopCursor())
-                        local = viewport->origin + glm::vec2(*cursor - *viewport->desktopOrigin) / owner.desktopScale;
+                        local = viewport->origin + kor::Vec2(*cursor - *viewport->desktopOrigin) / owner.desktopScale;
                 if (locked) local = viewportLocal;
                 viewportLocal = local;
                 viewport->root->HitTest(hit, local);
@@ -342,9 +342,9 @@ namespace kui
                 render.HitTest(hit, position);
             }
             const bool sameSource = pointerInput == &input;
-            const glm::vec2 delta = locked ? input.MousePositionDelta() / Scale()
-                                  : hasPointer && sameSource ? position - pointer : glm::vec2(0.f);
-            const bool moved = locked ? delta != glm::vec2(0.f) : !hasPointer || !sameSource || position != pointer;
+            const kor::Vec2 delta = locked ? input.MousePositionDelta() / Scale()
+                                  : hasPointer && sameSource ? position - pointer : kor::Vec2(0.f);
+            const bool moved = locked ? delta != kor::Vec2(0.f) : !hasPointer || !sameSource || position != pointer;
             pointer = position;
             hasPointer = true;
             pointerInput = &input;
@@ -414,7 +414,7 @@ namespace kui
             if (lockedInput == &input && input.MouseButtonState(kor::MouseButton::eLeft) == kor::KeyState::eNotPressed) owner.lockPointer(false);
 
             // The wheel: the deepest thing under the pointer that uses it.
-            if (const glm::vec2 wheel = input.MouseScrollDelta(); wheel != glm::vec2(0.f)) {
+            if (const kor::Vec2 wheel = input.MouseScrollDelta(); wheel != kor::Vec2(0.f)) {
                 for (auto* target : std::vector(path))
                     if (Send(*target, { .type = PointerEvent::Type::eScroll, .position = position, .delta = wheel })) break;
             }
@@ -467,7 +467,7 @@ namespace kui
             if (owner.Focused()) owner.Focused()->FocusTick(dt);
         }
 
-                void Frame(kor::Input* input, const glm::vec2 viewport, const float dt)
+                void Frame(kor::Input* input, const kor::Vec2 viewport, const float dt)
         {
             const ThemeScope theme(settings.theme);
             if (std::exchange(stale, false)) { element->MarkTreeDirty(); overlayElement->MarkTreeDirty(); }
@@ -497,7 +497,7 @@ namespace kui
             builder.Flush();
             const auto t2 = Clock::now();
 
-            const glm::vec2 logical = viewport / Scale();
+            const kor::Vec2 logical = viewport / Scale();
             render.Layout(BoxConstraints::Tight(logical), false);
             owner.FlushLayout();
             const auto t3 = Clock::now();
@@ -589,7 +589,7 @@ namespace kui
     void Ui::Update()
     {
         auto& input = kor::Scene::Input::Get();
-        const glm::uvec2 extent = kor::Scene::Window::Extent();
+        const kor::UVec2 extent = kor::Scene::Window::Extent();
         _impl->owner.window = &kor::Scene::Window::Get();
         // Natural size on a scaled display (Retina): the window's pixels per screen coordinate, times the view's own scale.
         _impl->pixelRatio = _impl->owner.window->PixelRatio();
@@ -599,10 +599,10 @@ namespace kui
             const Theme& t = _impl->settings.theme;
             _impl->owner.window->SetTitleBarColors({ t.background.r, t.background.g, t.background.b }, { t.text.r, t.text.g, t.text.b });
         }
-        _impl->Frame(&input, glm::vec2(extent), kor::Scene::Time::FrameTime());
+        _impl->Frame(&input, kor::Vec2(extent), kor::Scene::Time::FrameTime());
     }
 
-    void Ui::Update(kor::Input& input, const glm::vec2 viewport, const float dt) { _impl->Frame(&input, viewport, dt); }
+    void Ui::Update(kor::Input& input, const kor::Vec2 viewport, const float dt) { _impl->Frame(&input, viewport, dt); }
 
     Renderer& Ui::GetRenderer() { return _impl->renderer; }
     RenderObject* Ui::RootRenderObject() const { return &_impl->render; }

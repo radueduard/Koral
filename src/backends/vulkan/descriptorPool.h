@@ -7,7 +7,7 @@
 #include <mutex>
 #include <unordered_map>
 
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include <vulkan/vulkan.hpp>
 
@@ -31,15 +31,15 @@ namespace kor::vk
         class Builder {
             friend class DescriptorPool;
         public:
-            Builder &addPoolSize(::vk::DescriptorType type, glm::u32 count);
+            Builder &addPoolSize(::vk::DescriptorType type, kor::u32 count);
             Builder &setPoolFlags(::vk::DescriptorPoolCreateFlags flags);
-            Builder &setMaxSets(glm::u32 count);
+            Builder &setMaxSets(kor::u32 count);
             [[nodiscard]] DescriptorPool* build() const;
 
         private:
             std::vector<::vk::DescriptorPoolSize> _poolSizes = {};
             ::vk::DescriptorPoolCreateFlags _flags = {};
-            glm::u32 _maxSets = 1000;
+            kor::u32 _maxSets = 1000;
         };
 
         explicit DescriptorPool(const Builder &builder);
@@ -55,11 +55,11 @@ namespace kor::vk
 
     private:
         mutable std::mutex _mutex;
-        mutable glm::u32 _allocatedSetCount = 0;
-        mutable std::unordered_map<DescriptorType, glm::u32> _allocatedBindingCounts;
+        mutable kor::u32 _allocatedSetCount = 0;
+        mutable std::unordered_map<DescriptorType, kor::u32> _allocatedBindingCounts;
 
         std::vector<::vk::DescriptorPoolSize> _poolSizes;
         ::vk::DescriptorPoolCreateFlags _flags;
-        glm::u32 _maxSets;
+        kor::u32 _maxSets;
     };
 }

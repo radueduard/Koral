@@ -46,7 +46,7 @@ namespace kor::vk
         }
     }
 
-    Frame::Frame(const glm::u32 imageIndex, const Queue& queue) : kor::Frame(imageIndex), _queue(queue)
+    Frame::Frame(const kor::u32 imageIndex, const Queue& queue) : kor::Frame(imageIndex), _queue(queue)
     {
         _commandBuffer = Context::Device().requestCommandBuffer(_queue);
         _inFlightFence = Context::Device()->createFence(::vk::FenceCreateInfo().setFlags(::vk::FenceCreateFlagBits::eSignaled));
@@ -123,7 +123,7 @@ namespace kor::vk
         if (_drawnOnce) AdvanceFrame();
         _drawnOnce = true;
         const auto& frame = dynamic_cast<const kor::vk::Frame&>(CurrentFrame());
-        const glm::u32 slot = frame.ImageIndex();
+        const kor::u32 slot = frame.ImageIndex();
 
         const auto& fence = frame.getInFlightFence();
         // vulkan-hpp throws on error codes rather than returning them, so a lost device surfaces
@@ -215,7 +215,7 @@ namespace kor::vk
                     return std::ranges::any_of(list, [&](const Executed& e) { return e.commandBuffer && e.commandBuffer->HasTouched(image); });
                 };
                 if (!touches(pending.before) && !commandBuffer.HasTouched(image) && !touches(pending.after))
-                    present->ClearColorImage(image, glm::vec4(0.f, 0.f, 0.f, 1.f));
+                    present->ClearColorImage(image, kor::Vec4(0.f, 0.f, 0.f, 1.f));
                 present->ImageBarrier({ image, ResourceAccess::ePresent });
             }
             pending.after.push_back(Executed{ .commandBuffer = std::move(present), .queue = frameQueue.getIdentifier() });
@@ -437,7 +437,7 @@ namespace kor::vk
 
             std::vector<::vk::Semaphore> waits;
             std::vector<::vk::SwapchainKHR> swapChains;
-            std::vector<glm::u32> indices;
+            std::vector<kor::u32> indices;
             for (const auto i : group) {
                 waits.push_back(shown[i].swapChain->getCurrentRenderFinishedSemaphore());
                 swapChains.push_back(**shown[i].swapChain);

@@ -49,16 +49,16 @@ namespace kui
         /** A box that paints itself: as wide as it is given room for (or @p width), @p height tall. */
         class RenderPaintBox final : public RenderContainer {
         public:
-            void Set(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size, std::string text)
+            void Set(std::function<void(Canvas&, kor::Vec2)> painter, const kor::Vec2 size, std::string text)
             {
                 _painter = std::move(painter);
                 _text = std::move(text);
                 if (size != _preferred) { _preferred = size; MarkNeedsLayout(); }
                 MarkNeedsPaint();
             }
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
             [[nodiscard]] std::string DebugText() const override { return _text; }
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 if (!_painter) return;
                 canvas.Save();
@@ -76,23 +76,23 @@ namespace kui
             }
 
         private:
-            std::function<void(Canvas&, glm::vec2)> _painter;
-            glm::vec2 _preferred { -1.f, -1.f };
+            std::function<void(Canvas&, kor::Vec2)> _painter;
+            kor::Vec2 _preferred { -1.f, -1.f };
             std::string _text;      ///< What it says, for debug::Texts: it paints its words itself.
         };
 
         struct PaintBoxWidget final : RenderObjectWidget {
-            std::function<void(Canvas&, glm::vec2)> painter;
-            glm::vec2 size;
+            std::function<void(Canvas&, kor::Vec2)> painter;
+            kor::Vec2 size;
             std::string text;
-            PaintBoxWidget(std::function<void(Canvas&, glm::vec2)> p, const glm::vec2 s, std::string t)
+            PaintBoxWidget(std::function<void(Canvas&, kor::Vec2)> p, const kor::Vec2 s, std::string t)
                 : painter(std::move(p)), size(s), text(std::move(t)) {}
             [[nodiscard]] std::unique_ptr<RenderObject> CreateRenderObject() const override { return std::make_unique<RenderPaintBox>(); }
             void UpdateRenderObject(RenderObject& object) const override { static_cast<RenderPaintBox&>(object).Set(painter, size, text); }
         };
 
         /** @p text: what it says, when it paints words of its own — what debug::Texts reads. */
-        Widget paintBox(std::function<void(Canvas&, glm::vec2)> painter, const glm::vec2 size, std::string text = {})
+        Widget paintBox(std::function<void(Canvas&, kor::Vec2)> painter, const kor::Vec2 size, std::string text = {})
         {
             return Make<PaintBoxWidget>(std::move(painter), size, std::move(text));
         }
@@ -107,15 +107,15 @@ namespace kui
 
         Widget arrow(const bool open, const Color color)
         {
-            return CustomPaint([open, color](Canvas& canvas, const glm::vec2 size) {
-                const glm::vec2 c = size * 0.5f;
+            return CustomPaint([open, color](Canvas& canvas, const kor::Vec2 size) {
+                const kor::Vec2 c = size * 0.5f;
                 const Paint paint = Paint::Stroked(color, 1.5f);
                 if (open) {
-                    canvas.DrawLine(c + glm::vec2(-4.f, -2.f), c + glm::vec2(0.f, 2.5f), paint);
-                    canvas.DrawLine(c + glm::vec2(0.f, 2.5f), c + glm::vec2(4.f, -2.f), paint);
+                    canvas.DrawLine(c + kor::Vec2(-4.f, -2.f), c + kor::Vec2(0.f, 2.5f), paint);
+                    canvas.DrawLine(c + kor::Vec2(0.f, 2.5f), c + kor::Vec2(4.f, -2.f), paint);
                 } else {
-                    canvas.DrawLine(c + glm::vec2(-2.f, -4.f), c + glm::vec2(2.5f, 0.f), paint);
-                    canvas.DrawLine(c + glm::vec2(2.5f, 0.f), c + glm::vec2(-2.f, 4.f), paint);
+                    canvas.DrawLine(c + kor::Vec2(-2.f, -4.f), c + kor::Vec2(2.5f, 0.f), paint);
+                    canvas.DrawLine(c + kor::Vec2(2.5f, 0.f), c + kor::Vec2(-2.f, 4.f), paint);
                 }
             }, { 16.f, 16.f });
         }
@@ -126,7 +126,7 @@ namespace kui
         class RenderTooltip final : public RenderContainer {
         public:
             void Set(std::string text) { _text = std::move(text); }
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
             bool HandleEvent(const PointerEvent& event) override
             {
                 // The innermost has it: it is told first, and one around it leaves what it said alone.
@@ -152,7 +152,7 @@ namespace kui
         /** Its child, and someone told how big that came out whenever it comes out another size. */
         class RenderSizeObserver final : public RenderContainer {
         public:
-            void Set(std::function<void(glm::vec2, glm::vec2)> onChanged) { _onChanged = std::move(onChanged); }
+            void Set(std::function<void(kor::Vec2, kor::Vec2)> onChanged) { _onChanged = std::move(onChanged); }
 
         protected:
             void PerformLayout() override
@@ -164,16 +164,16 @@ namespace kui
                 _told = Size();
                 const float scale = GetOwner() ? GetOwner()->scale : 1.f;
                 // Copied out first: what it runs may well replace this widget.
-                if (const auto tell = _onChanged) tell(_told, glm::round(_told * scale));
+                if (const auto tell = _onChanged) tell(_told, kor::Round(_told * scale));
             }
 
         private:
-            std::function<void(glm::vec2, glm::vec2)> _onChanged;
-            glm::vec2 _told { -1.f, -1.f };
+            std::function<void(kor::Vec2, kor::Vec2)> _onChanged;
+            kor::Vec2 _told { -1.f, -1.f };
         };
 
         struct SizeObserverWidget final : RenderObjectWidget {
-            std::function<void(glm::vec2, glm::vec2)> onChanged;
+            std::function<void(kor::Vec2, kor::Vec2)> onChanged;
             std::vector<Widget> children;
             [[nodiscard]] std::unique_ptr<RenderObject> CreateRenderObject() const override { return std::make_unique<RenderSizeObserver>(); }
             void UpdateRenderObject(RenderObject& object) const override { static_cast<RenderSizeObserver&>(object).Set(onChanged); }
@@ -202,7 +202,7 @@ namespace kui
         {
             const float h = (in.h - std::floor(in.h)) * 6.f;
             const float c = in.v * in.s, x = c * (1.f - std::abs(std::fmod(h, 2.f) - 1.f)), m = in.v - c;
-            glm::vec3 rgb;
+            kor::Vec3 rgb;
             switch (static_cast<int>(h)) {
             case 0: rgb = { c, x, 0.f }; break;
             case 1: rgb = { x, c, 0.f }; break;
@@ -211,7 +211,7 @@ namespace kui
             case 4: rgb = { x, 0.f, c }; break;
             default: rgb = { c, 0.f, x }; break;
             }
-            return { rgb.r + m, rgb.g + m, rgb.b + m, alpha };
+            return { rgb.x + m, rgb.y + m, rgb.z + m, alpha };
         }
 
         /** A square of every saturation and value of a hue, a bar of hues under it and, when asked, one of alpha. */
@@ -246,13 +246,13 @@ namespace kui
                 if (const auto told = onChanged) told(now);
             }
 
-            Widget Bar(const float width, std::function<void(float)> set, std::function<void(Canvas&, glm::vec2)> painter) const
+            Widget Bar(const float width, std::function<void(float)> set, std::function<void(Canvas&, kor::Vec2)> painter) const
             {
-                const auto at = [set = std::move(set), width](const glm::vec2 local) { set(std::clamp(local.x / std::max(width, 1.f), 0.f, 1.f)); };
+                const auto at = [set = std::move(set), width](const kor::Vec2 local) { set(std::clamp(local.x / std::max(width, 1.f), 0.f, 1.f)); };
                 GestureOptions gestures;
                 gestures.onTapDown = at;
                 gestures.onPanStart = at;
-                gestures.onPanUpdate = [at](glm::vec2, const glm::vec2 local) { at(local); };
+                gestures.onPanUpdate = [at](kor::Vec2, const kor::Vec2 local) { at(local); };
                 return GestureDetector(std::move(gestures), CustomPaint(std::move(painter), { width, 14.f }));
             }
 
@@ -264,7 +264,7 @@ namespace kui
                 const Color full = fromHsv({ shown.h, 1.f, 1.f });
                 const float alpha = color.a;
 
-                const auto pick = [this, width, square](const glm::vec2 local) {
+                const auto pick = [this, width, square](const kor::Vec2 local) {
                     hsv.s = std::clamp(local.x / width, 0.f, 1.f);
                     hsv.v = 1.f - std::clamp(local.y / square, 0.f, 1.f);
                     Say();
@@ -272,25 +272,25 @@ namespace kui
                 GestureOptions gestures;
                 gestures.onTapDown = pick;
                 gestures.onPanStart = pick;
-                gestures.onPanUpdate = [pick](glm::vec2, const glm::vec2 local) { pick(local); };
-                Widget field = GestureDetector(std::move(gestures), CustomPaint([t, shown, full](Canvas& canvas, const glm::vec2 size) {
+                gestures.onPanUpdate = [pick](kor::Vec2, const kor::Vec2 local) { pick(local); };
+                Widget field = GestureDetector(std::move(gestures), CustomPaint([t, shown, full](Canvas& canvas, const kor::Vec2 size) {
                     const RRect box { Rect::FromSize(size), 10.f };
                     // White to the hue across, and over that clear to black downwards.
                     canvas.DrawRRect(box, Paint {}.SetGradient(Gradient::Linear({ 0.f, 0.f }, { size.x, 0.f }, colors::White, full)));
                     canvas.DrawRRect(box, Paint {}.SetGradient(Gradient::Linear({ 0.f, 0.f }, { 0.f, size.y }, colors::Black.WithAlpha(0.f), colors::Black)));
-                    const glm::vec2 at { shown.s * size.x, (1.f - shown.v) * size.y };
+                    const kor::Vec2 at { shown.s * size.x, (1.f - shown.v) * size.y };
                     canvas.DrawCircle(at, 6.f, Paint::Stroked(colors::Black.WithAlpha(0.6f), 3.f));
                     canvas.DrawCircle(at, 6.f, Paint::Fill(fromHsv(shown)).SetStroke(2.f, colors::White));
                 }, { width, square }));
 
-                const auto thumb = [](Canvas& canvas, const glm::vec2 size, const float where, const Color fill) {
-                    const glm::vec2 at { std::clamp(where * size.x, 7.f, size.x - 7.f), size.y * 0.5f };
+                const auto thumb = [](Canvas& canvas, const kor::Vec2 size, const float where, const Color fill) {
+                    const kor::Vec2 at { std::clamp(where * size.x, 7.f, size.x - 7.f), size.y * 0.5f };
                     canvas.DrawCircle(at, 7.f, Paint::Stroked(colors::Black.WithAlpha(0.5f), 3.f));
                     canvas.DrawCircle(at, 7.f, Paint::Fill(fill).SetStroke(2.f, colors::White));
                 };
                 std::vector<Widget> parts;
                 parts.push_back(std::move(field));
-                parts.push_back(Bar(width, [this](const float v) { hsv.h = std::min(v, 0.9999f); Say(); }, [shown, full, thumb](Canvas& canvas, const glm::vec2 size) {
+                parts.push_back(Bar(width, [this](const float v) { hsv.h = std::min(v, 0.9999f); Say(); }, [shown, full, thumb](Canvas& canvas, const kor::Vec2 size) {
                     std::vector<GradientStop> stops;
                     for (int i = 0; i <= 6; ++i) stops.push_back({ static_cast<float>(i) / 6.f, fromHsv({ static_cast<float>(i) / 6.f, 1.f, 1.f }) });
                     canvas.DrawRRect({ Rect::FromSize(size), size.y * 0.5f }, Paint {}.SetGradient(Gradient::Linear({ 0.f, 0.f }, { size.x, 0.f }, std::move(stops))));
@@ -301,7 +301,7 @@ namespace kui
                         const Color now = color.WithAlpha(v);
                         SetState([this, now] { color = now; });
                         if (const auto told = onChanged) told(now);
-                    }, [t, shown, alpha, thumb](Canvas& canvas, const glm::vec2 size) {
+                    }, [t, shown, alpha, thumb](Canvas& canvas, const kor::Vec2 size) {
                         const Color solid = fromHsv(shown);
                         const RRect bar { Rect::FromSize(size), size.y * 0.5f };
                         canvas.DrawRRect(bar, Paint::Fill(t.surfacePressed));
@@ -319,7 +319,7 @@ namespace kui
                     style.size = std::max(t.textStyle.size - 2.f, 10.f);
                     const Color swatch = color;
                     parts.push_back(Row({
-                        CustomPaint([swatch, t](Canvas& canvas, const glm::vec2 size) {
+                        CustomPaint([swatch, t](Canvas& canvas, const kor::Vec2 size) {
                             canvas.DrawRRect({ Rect::FromSize(size), 6.f }, Paint::Fill(swatch).SetStroke(1.f, t.border));
                         }, { 28.f, 18.f }),
                         Text(text, style, TextAlign::eStart, false),
@@ -350,7 +350,7 @@ namespace kui
                 MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
 
             bool HandleEvent(const PointerEvent& event) override
             {
@@ -374,10 +374,10 @@ namespace kui
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
-                const glm::vec2 size = Size();
+                const kor::Vec2 size = Size();
                 canvas.Save();
                 canvas.Translate(offset);
                 // The wide one, and in it the one that says where it is.
@@ -390,7 +390,7 @@ namespace kui
                 TextStyle style = t.textStyle;
                 style.size = std::max(style.size - 2.f, 10.f);
                 for (int i = 0; i < _config.steps; ++i) {
-                    const glm::vec2 c { Inset + step * (static_cast<float>(i) + 0.5f), size.y * 0.5f };
+                    const kor::Vec2 c { Inset + step * (static_cast<float>(i) + 0.5f), size.y * 0.5f };
                     if (static_cast<std::size_t>(i) < _config.options.labels.size() && !_config.options.labels[static_cast<std::size_t>(i)].empty()) {
                         const std::string& label = _config.options.labels[static_cast<std::size_t>(i)];
                         style.color = i == at ? t.onPrimary : t.text;
@@ -470,7 +470,7 @@ namespace kui
                 MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
 
             bool HandleEvent(const PointerEvent& event) override
             {
@@ -523,7 +523,7 @@ namespace kui
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
                 canvas.Save();
@@ -565,7 +565,7 @@ namespace kui
             [[nodiscard]] float OffsetAt(const float x) const { return std::clamp((x - Pad) / std::max(Size().x - 2.f * Pad, 1.f), 0.f, 1.f); }
 
             /** The handle under @p local — the nearest, when they crowd — or -1. Its pin, or the bar right over it. */
-            [[nodiscard]] int HandleAt(const glm::vec2 local) const
+            [[nodiscard]] int HandleAt(const kor::Vec2 local) const
             {
                 int found = -1;
                 float nearest = local.y > Bar - 2.f ? 9.f : 5.f;
@@ -692,7 +692,7 @@ namespace kui
                 MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
 
             bool HandleEvent(const PointerEvent& event) override
             {
@@ -726,13 +726,13 @@ namespace kui
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
                 const kor::Window* window = GetOwner() ? GetOwner()->window : nullptr;
                 // The window is the interface's to head now.
                 if (window && !window->HasCustomTitleBar()) window->SetCustomTitleBar(true);
-                const glm::vec2 size = Size();
+                const kor::Vec2 size = Size();
                 canvas.Save();
                 canvas.Translate(offset);
                 if (_config.kind == Kind::eSystemButtons) {
@@ -752,18 +752,18 @@ namespace kui
                     const bool close = _config.kind == Kind::eClose;
                     if (_hovered) canvas.DrawRect(Rect::FromSize(size), kui::Paint::Fill(close ? Color::Hex(0xE81123) : _pressed ? t.surfacePressed : t.surfaceHover));
                     const kui::Paint ink = kui::Paint::Stroked(close && _hovered ? colors::White : t.text, 1.f);
-                    const glm::vec2 c = glm::round(size * 0.5f) + glm::vec2(0.5f);
+                    const kor::Vec2 c = kor::Round(size * 0.5f) + kor::Vec2(0.5f);
                     constexpr float R = 5.f;
                     if (_config.kind == Kind::eMinimize) {
-                        canvas.DrawLine(c + glm::vec2(-R, 0.f), c + glm::vec2(R, 0.f), ink);
+                        canvas.DrawLine(c + kor::Vec2(-R, 0.f), c + kor::Vec2(R, 0.f), ink);
                     } else if (close) {
-                        canvas.DrawLine(c + glm::vec2(-R, -R), c + glm::vec2(R, R), ink);
-                        canvas.DrawLine(c + glm::vec2(R, -R), c + glm::vec2(-R, R), ink);
+                        canvas.DrawLine(c + kor::Vec2(-R, -R), c + kor::Vec2(R, R), ink);
+                        canvas.DrawLine(c + kor::Vec2(R, -R), c + kor::Vec2(-R, R), ink);
                     } else if (window && window->IsMaximized()) {
                         // Two, one behind the other: it goes back to the size it had.
                         canvas.DrawRRect({ Rect::LTRB(c.x - R, c.y - R + 2.f, c.x + R - 2.f, c.y + R), 1.5f }, ink);
-                        canvas.DrawLine(c + glm::vec2(-R + 2.f, -R), c + glm::vec2(R, -R), ink);
-                        canvas.DrawLine(c + glm::vec2(R, -R), c + glm::vec2(R, R - 2.f), ink);
+                        canvas.DrawLine(c + kor::Vec2(-R + 2.f, -R), c + kor::Vec2(R, -R), ink);
+                        canvas.DrawLine(c + kor::Vec2(R, -R), c + kor::Vec2(R, R - 2.f), ink);
                     } else {
                         canvas.DrawRRect({ Rect::FromCenter(c, 2.f * R, 2.f * R), 1.5f }, ink);
                     }
@@ -800,23 +800,23 @@ namespace kui
         /** The mark before a status line: an i in a ring, a warning's triangle, an error's cross in a disc. */
         Widget statusMark(const StatusLevel level, const Color color)
         {
-            return CustomPaint([level, color](Canvas& canvas, const glm::vec2 size) {
-                const glm::vec2 c = size * 0.5f;
+            return CustomPaint([level, color](Canvas& canvas, const kor::Vec2 size) {
+                const kor::Vec2 c = size * 0.5f;
                 switch (level) {
                 case StatusLevel::eInfo:
                     canvas.DrawCircle(c, 6.5f, Paint::Stroked(color, 1.5f));
-                    canvas.DrawLine(c + glm::vec2(0.f, -0.5f), c + glm::vec2(0.f, 3.5f), Paint::Stroked(color, 1.5f));
-                    canvas.DrawCircle(c + glm::vec2(0.f, -3.f), 1.f, Paint::Fill(color));
+                    canvas.DrawLine(c + kor::Vec2(0.f, -0.5f), c + kor::Vec2(0.f, 3.5f), Paint::Stroked(color, 1.5f));
+                    canvas.DrawCircle(c + kor::Vec2(0.f, -3.f), 1.f, Paint::Fill(color));
                     break;
                 case StatusLevel::eWarning:
-                    canvas.DrawTriangle(c + glm::vec2(0.f, -7.f), c + glm::vec2(-7.5f, 6.f), c + glm::vec2(7.5f, 6.f), Paint::Fill(color));
-                    canvas.DrawLine(c + glm::vec2(0.f, -2.5f), c + glm::vec2(0.f, 1.5f), Paint::Stroked(colors::Black, 1.5f));
-                    canvas.DrawCircle(c + glm::vec2(0.f, 3.8f), 0.9f, Paint::Fill(colors::Black));
+                    canvas.DrawTriangle(c + kor::Vec2(0.f, -7.f), c + kor::Vec2(-7.5f, 6.f), c + kor::Vec2(7.5f, 6.f), Paint::Fill(color));
+                    canvas.DrawLine(c + kor::Vec2(0.f, -2.5f), c + kor::Vec2(0.f, 1.5f), Paint::Stroked(colors::Black, 1.5f));
+                    canvas.DrawCircle(c + kor::Vec2(0.f, 3.8f), 0.9f, Paint::Fill(colors::Black));
                     break;
                 case StatusLevel::eError:
                     canvas.DrawCircle(c, 7.f, Paint::Fill(color));
-                    canvas.DrawLine(c + glm::vec2(-2.5f, -2.5f), c + glm::vec2(2.5f, 2.5f), Paint::Stroked(colors::White, 1.5f));
-                    canvas.DrawLine(c + glm::vec2(2.5f, -2.5f), c + glm::vec2(-2.5f, 2.5f), Paint::Stroked(colors::White, 1.5f));
+                    canvas.DrawLine(c + kor::Vec2(-2.5f, -2.5f), c + kor::Vec2(2.5f, 2.5f), Paint::Stroked(colors::White, 1.5f));
+                    canvas.DrawLine(c + kor::Vec2(2.5f, -2.5f), c + kor::Vec2(-2.5f, 2.5f), Paint::Stroked(colors::White, 1.5f));
                     break;
                 }
             }, { 18.f, 18.f });
@@ -889,13 +889,13 @@ namespace kui
     {
         const bool across = axis == Axis::eHorizontal;
         // In the theme it is painted in, which is the one where it is.
-        return paintBox([](Canvas& canvas, const glm::vec2 size) { canvas.DrawRect(Rect::FromSize(size), Paint::Fill(Theme::Current().border)); },
-                        across ? glm::vec2(-1.f, thickness) : glm::vec2(thickness, -1.f));
+        return paintBox([](Canvas& canvas, const kor::Vec2 size) { canvas.DrawRect(Rect::FromSize(size), Paint::Fill(Theme::Current().border)); },
+                        across ? kor::Vec2(-1.f, thickness) : kor::Vec2(thickness, -1.f));
     }
 
     Widget BackdropFilter(const Backdrop backdrop, const Radii radius, Widget child)
     {
-        return CustomPaint([backdrop, radius](Canvas& canvas, const glm::vec2 size) {
+        return CustomPaint([backdrop, radius](Canvas& canvas, const kor::Vec2 size) {
             canvas.DrawBackdrop({ Rect::FromSize(size), radius }, backdrop);
         }, { -1.f, -1.f }, std::move(child));
     }
@@ -1033,8 +1033,8 @@ namespace kui
         return detail::Deferred([=]() -> Widget {
             const Theme t = Theme::Current();
             return Make<Hover>([t, selected, label = label](const bool hovered) {
-                Widget ring = CustomPaint([t, selected, hovered](Canvas& canvas, const glm::vec2 size) {
-                    const glm::vec2 c = size * 0.5f;
+                Widget ring = CustomPaint([t, selected, hovered](Canvas& canvas, const kor::Vec2 size) {
+                    const kor::Vec2 c = size * 0.5f;
                     switch (t.design) {
                     case ThemeDesign::eMaterial:
                         // A thick ring with nothing in it but the dot, and the pointer's wash round it.
@@ -1140,7 +1140,7 @@ namespace kui
                 }
                 case ThemeDesign::eCupertino:
                     // A bar of clear glass.
-                    return CustomPaint([t, hovered](Canvas& canvas, const glm::vec2 size) {
+                    return CustomPaint([t, hovered](Canvas& canvas, const kor::Vec2 size) {
                         detail::PaintGlass(canvas, t, { Rect::FromSize(size), std::min(size.y * 0.5f, 12.f) }, colors::Transparent,
                                            (t.IsDark() ? -0.06f : -0.3f) + (hovered ? 0.05f : 0.f), false);
                     }, { -1.f, -1.f }, Container({ .height = t.controlHeight, .padding = EdgeInsets::Symmetric(10.f, 0.f), .alignment = Alignment::CenterLeft() },
@@ -1201,7 +1201,7 @@ namespace kui
                     if (selected) style.color = t.primary;
                     break;
                 }
-                Widget mark = leaf ? CustomPaint([ink](Canvas& canvas, const glm::vec2 size) { canvas.DrawCircle(size * 0.5f, 2.f, Paint::Fill(ink)); }, { 16.f, 16.f })
+                Widget mark = leaf ? CustomPaint([ink](Canvas& canvas, const kor::Vec2 size) { canvas.DrawCircle(size * 0.5f, 2.f, Paint::Fill(ink)); }, { 16.f, 16.f })
                                    : arrow(open, ink);
                 return Container({
                     .height = height,
@@ -1240,12 +1240,12 @@ namespace kui
                         }, Center(Text(title, style, TextAlign::eStart, false)));
                         // The one in front is a piece of glass lying on the bar; the others are the bar's.
                         if (!on) return segment;
-                        return CustomPaint([t](Canvas& canvas, const glm::vec2 size) {
+                        return CustomPaint([t](Canvas& canvas, const kor::Vec2 size) {
                             detail::PaintGlass(canvas, t, { Rect::FromSize(size), size.y * 0.5f }, colors::Transparent, t.IsDark() ? 0.10f : 0.18f);
                         }, { -1.f, -1.f }, segment);
                     }, [index, onSelected] { if (onSelected) onSelected(index); }));
                 }
-                return Row({ CustomPaint([t](Canvas& canvas, const glm::vec2 size) {
+                return Row({ CustomPaint([t](Canvas& canvas, const kor::Vec2 size) {
                     detail::PaintGlass(canvas, t, { Rect::FromSize(size), size.y * 0.5f }, colors::Transparent, t.IsDark() ? -0.05f : -0.3f, false);
                 }, { -1.f, -1.f }, Padding(EdgeInsets::All(3.f), Row(row, { .mainAxisSize = MainAxisSize::eMin }))) });
             }
@@ -1257,7 +1257,7 @@ namespace kui
                     const bool material = t.design == ThemeDesign::eMaterial;
                     style.color = on ? (material ? t.primary : t.text) : hovered ? t.text : t.textMuted;
                     // The one in front is underlined in the accent: Material's line stands on the foot, round at the top only.
-                    return CustomPaint([t, on, material](Canvas& canvas, const glm::vec2 size) {
+                    return CustomPaint([t, on, material](Canvas& canvas, const kor::Vec2 size) {
                         if (!on) return;
                         if (material) canvas.DrawRRect({ Rect::LTRB(12.f, size.y - 3.f, size.x - 12.f, size.y), Radii(3.f, 3.f, 0.f, 0.f) }, Paint::Fill(t.primary));
                         else canvas.DrawRRect({ Rect::LTRB(10.f, size.y - 3.f, size.x - 10.f, size.y - 1.f), 1.f }, Paint::Fill(t.primary));
@@ -1282,7 +1282,7 @@ namespace kui
         return Widget(widget);
     }
 
-    Widget SizeObserver(std::function<void(glm::vec2, glm::vec2)> onChanged, Widget child)
+    Widget SizeObserver(std::function<void(kor::Vec2, kor::Vec2)> onChanged, Widget child)
     {
         auto widget = std::make_shared<SizeObserverWidget>();
         widget->onChanged = std::move(onChanged);
@@ -1321,7 +1321,7 @@ namespace kui
         // Built where it is in the tree, so that it is in the theme set there.
         return detail::Deferred([=]() -> Widget {
             const Theme t = Theme::Current();
-            return paintBox([t, values = values, options](Canvas& canvas, const glm::vec2 size) {
+            return paintBox([t, values = values, options](Canvas& canvas, const kor::Vec2 size) {
                 const Color ink = options.color.Visible() ? options.color : t.primary;
                 const RRect box { Rect::FromSize(size), 8.f };
                 canvas.DrawRRect(box, Paint::Fill(t.surfaceHover.WithAlpha(0.6f)));
@@ -1346,9 +1346,9 @@ namespace kui
                         Paint line = Paint::Stroked(ink, 1.5f);
                         line.stroke.cap = StrokeCap::eRound;
                         const float step = width / static_cast<float>(values.size() - 1);
-                        glm::vec2 from { pad, y(values[0]) };
+                        kor::Vec2 from { pad, y(values[0]) };
                         for (std::size_t i = 1; i < values.size(); ++i) {
-                            const glm::vec2 to { pad + step * static_cast<float>(i), y(values[i]) };
+                            const kor::Vec2 to { pad + step * static_cast<float>(i), y(values[i]) };
                             canvas.DrawLine(from, to, line);
                             from = to;
                         }

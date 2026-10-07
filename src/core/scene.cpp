@@ -147,7 +147,7 @@ namespace kor
         if (auto* window = detail::CurrentWindowOverride()) return *window;
         return required("Window").SceneWindow();
     }
-    glm::uvec2 Scene::Window::Extent() { return Get().Extent(); }
+    kor::UVec2 Scene::Window::Extent() { return Get().Extent(); }
     bool Scene::Window::HasResized() { return Get().HasResized(); }
     bool Scene::Window::IsPaused() { return Get().IsPaused(); }
     bool Scene::Window::IsFocused() { return Get().IsFocused(); }
@@ -172,10 +172,10 @@ namespace kor
     std::optional<MouseButton> Scene::Input::FirstMouseButtonPressed() { return Get().FirstMouseButtonPressed(); }
     bool Scene::Input::InterfaceWantsMouse() { return Get().InterfaceWantsMouse(); }
     bool Scene::Input::InterfaceWantsKeyboard() { return Get().InterfaceWantsKeyboard(); }
-    const glm::vec2& Scene::Input::MousePosition() { return Get().MousePosition(); }
-    const glm::vec2& Scene::Input::MousePositionDelta() { return Get().MousePositionDelta(); }
-    const glm::vec2& Scene::Input::MouseScrollDelta() { return Get().MouseScrollDelta(); }
-    const glm::vec2& Scene::Input::LastMousePosition() { return Get().LastMousePosition(); }
+    const kor::Vec2& Scene::Input::MousePosition() { return Get().MousePosition(); }
+    const kor::Vec2& Scene::Input::MousePositionDelta() { return Get().MousePositionDelta(); }
+    const kor::Vec2& Scene::Input::MouseScrollDelta() { return Get().MouseScrollDelta(); }
+    const kor::Vec2& Scene::Input::LastMousePosition() { return Get().LastMousePosition(); }
     void Scene::Input::SetCursorMode(const CursorMode mode) { Get().SetCursorMode(mode); }
     Scene::Input::CursorMode Scene::Input::CurrentCursorMode() { return Get().CurrentCursorMode(); }
     bool Scene::Input::IsGamepadConnected(const int pad) { return Get().IsGamepadConnected(pad); }
@@ -190,7 +190,7 @@ namespace kor
     bool Scene::Input::IsActionHeld(const std::string_view action) { return Get().IsActionHeld(action); }
     bool Scene::Input::IsActionReleased(const std::string_view action) { return Get().IsActionReleased(action); }
     float Scene::Input::Axis(const std::string_view axis) { return Get().Axis(axis); }
-    glm::vec2 Scene::Input::Axis2D(const std::string_view x, const std::string_view y) { return Get().Axis2D(x, y); }
+    kor::Vec2 Scene::Input::Axis2D(const std::string_view x, const std::string_view y) { return Get().Axis2D(x, y); }
 
     // ---- Time:: -----------------------------------------------------------------------------------
 
@@ -208,38 +208,38 @@ namespace kor
     // ---- Debug:: ------------------------------------------------------------------------------------
 
     kor::DebugDraw& Scene::Debug::Get() { return required("Debug").SceneDebug(); }
-    void Scene::Debug::Line(const glm::vec3 from, const glm::vec3 to, const Style& style) { Get().Line(from, to, style); }
-    void Scene::Debug::Box(const glm::vec3 min, const glm::vec3 max, const Style& style) { Get().Box(min, max, style); }
-    void Scene::Debug::Box(const glm::mat4& transform, const Style& style) { Get().Box(transform, style); }
-    void Scene::Debug::Circle(const glm::vec3 center, const glm::vec3 normal, const float radius, const Style& style) { Get().Circle(center, normal, radius, style); }
-    void Scene::Debug::Sphere(const glm::vec3 center, const float radius, const Style& style) { Get().Sphere(center, radius, style); }
-    void Scene::Debug::Arrow(const glm::vec3 from, const glm::vec3 to, const Style& style) { Get().Arrow(from, to, style); }
-    void Scene::Debug::Point(const glm::vec3 position, const float size, const Style& style) { Get().Point(position, size, style); }
-    void Scene::Debug::Axes(const glm::mat4& transform, const float size, const float duration) { Get().Axes(transform, size, duration); }
-    void Scene::Debug::Grid(const glm::vec3 center, const float size, const int cells, const Style& style) { Get().Grid(center, size, cells, style); }
-    void Scene::Debug::Triangle(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const Style& style) { Get().Triangle(a, b, c, style); }
-    void Scene::Debug::Quad(const glm::vec3 a, const glm::vec3 b, const glm::vec3 c, const glm::vec3 d, const Style& style) { Get().Quad(a, b, c, d, style); }
-    void Scene::Debug::Plane(const glm::vec3 center, const glm::vec3 normal, const glm::vec2 size, const Style& style) { Get().Plane(center, normal, size, style); }
-    void Scene::Debug::Cylinder(const glm::vec3 from, const glm::vec3 to, const float radius, const Style& style) { Get().Cylinder(from, to, radius, style); }
-    void Scene::Debug::Cone(const glm::vec3 base, const glm::vec3 tip, const float radius, const Style& style) { Get().Cone(base, tip, radius, style); }
-    void Scene::Debug::Capsule(const glm::vec3 from, const glm::vec3 to, const float radius, const Style& style) { Get().Capsule(from, to, radius, style); }
-    void Scene::Debug::Camera(const glm::mat4& view, const glm::mat4& projection, const float size, const Style& style) { Get().Camera(view, projection, size, style); }
-    void Scene::Debug::PointLight(const glm::vec3 position, const float range, const Style& style) { Get().PointLight(position, range, style); }
-    void Scene::Debug::SpotLight(const glm::vec3 position, const glm::vec3 direction, const float range, const float outerAngle,
+    void Scene::Debug::Line(const kor::Vec3 from, const kor::Vec3 to, const Style& style) { Get().Line(from, to, style); }
+    void Scene::Debug::Box(const kor::Vec3 min, const kor::Vec3 max, const Style& style) { Get().Box(min, max, style); }
+    void Scene::Debug::Box(const kor::Mat4& transform, const Style& style) { Get().Box(transform, style); }
+    void Scene::Debug::Circle(const kor::Vec3 center, const kor::Vec3 normal, const float radius, const Style& style) { Get().Circle(center, normal, radius, style); }
+    void Scene::Debug::Sphere(const kor::Vec3 center, const float radius, const Style& style) { Get().Sphere(center, radius, style); }
+    void Scene::Debug::Arrow(const kor::Vec3 from, const kor::Vec3 to, const Style& style) { Get().Arrow(from, to, style); }
+    void Scene::Debug::Point(const kor::Vec3 position, const float size, const Style& style) { Get().Point(position, size, style); }
+    void Scene::Debug::Axes(const kor::Mat4& transform, const float size, const float duration) { Get().Axes(transform, size, duration); }
+    void Scene::Debug::Grid(const kor::Vec3 center, const float size, const int cells, const Style& style) { Get().Grid(center, size, cells, style); }
+    void Scene::Debug::Triangle(const kor::Vec3 a, const kor::Vec3 b, const kor::Vec3 c, const Style& style) { Get().Triangle(a, b, c, style); }
+    void Scene::Debug::Quad(const kor::Vec3 a, const kor::Vec3 b, const kor::Vec3 c, const kor::Vec3 d, const Style& style) { Get().Quad(a, b, c, d, style); }
+    void Scene::Debug::Plane(const kor::Vec3 center, const kor::Vec3 normal, const kor::Vec2 size, const Style& style) { Get().Plane(center, normal, size, style); }
+    void Scene::Debug::Cylinder(const kor::Vec3 from, const kor::Vec3 to, const float radius, const Style& style) { Get().Cylinder(from, to, radius, style); }
+    void Scene::Debug::Cone(const kor::Vec3 base, const kor::Vec3 tip, const float radius, const Style& style) { Get().Cone(base, tip, radius, style); }
+    void Scene::Debug::Capsule(const kor::Vec3 from, const kor::Vec3 to, const float radius, const Style& style) { Get().Capsule(from, to, radius, style); }
+    void Scene::Debug::Camera(const kor::Mat4& view, const kor::Mat4& projection, const float size, const Style& style) { Get().Camera(view, projection, size, style); }
+    void Scene::Debug::PointLight(const kor::Vec3 position, const float range, const Style& style) { Get().PointLight(position, range, style); }
+    void Scene::Debug::SpotLight(const kor::Vec3 position, const kor::Vec3 direction, const float range, const float outerAngle,
                                  const float innerAngle, const Style& style)
     {
         Get().SpotLight(position, direction, range, outerAngle, innerAngle, style);
     }
-    void Scene::Debug::DirectionalLight(const glm::vec3 position, const glm::vec3 direction, const float size, const Style& style)
+    void Scene::Debug::DirectionalLight(const kor::Vec3 position, const kor::Vec3 direction, const float size, const Style& style)
     {
         Get().DirectionalLight(position, direction, size, style);
     }
-    bool Scene::Debug::Gizmo(const GizmoMode mode, glm::mat4& transform, const glm::mat4& viewProjection, const GizmoOptions& options,
+    bool Scene::Debug::Gizmo(const GizmoMode mode, kor::Mat4& transform, const kor::Mat4& viewProjection, const GizmoOptions& options,
                              const std::uint64_t id)
     {
         kor::DebugDraw& draw = Get();
         const kor::Input& input = Input::Get();
-        GizmoPointer pointer {.viewport = glm::vec2(Window::Extent()),
+        GizmoPointer pointer {.viewport = kor::Vec2(Window::Extent()),
                               .down = input.IsMouseButtonHeld(MouseButton::eLeft),
                               .pressed = input.IsMouseButtonPressed(MouseButton::eLeft)};
         if (!input.InterfaceWantsMouse() || draw.GizmoActive()) pointer.position = input.MousePosition();
@@ -248,7 +248,7 @@ namespace kor
     }
     bool Scene::Debug::GizmoActive() { return Get().GizmoActive(); }
     bool Scene::Debug::GizmoHovered() { return Get().GizmoHovered(); }
-    void Scene::Debug::Frustum(const glm::mat4& viewProjection, const Style& style) { Get().Frustum(viewProjection, style); }
+    void Scene::Debug::Frustum(const kor::Mat4& viewProjection, const Style& style) { Get().Frustum(viewProjection, style); }
 
     // ---- state ---------------------------------------------------------------------------------------
 
@@ -281,7 +281,7 @@ namespace kor
 
     ResourceRef<const kor::Image> View::Image() const { return _window->Image(); }
 
-    void View::Resize(const glm::uvec2 extent) { _window->Resize(extent); }
+    void View::Resize(const kor::UVec2 extent) { _window->Resize(extent); }
 
     View& Scene::AddView(std::string name, const OffscreenSettings& target)
     {

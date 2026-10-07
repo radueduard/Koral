@@ -73,7 +73,7 @@ std::filesystem::path writeSourceFile(const std::string& name, const std::uint32
     auto image = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{ size, size })
+        .SetExtent(kor::UVec2{ size, size })
         .SetUsage(Image::Usage::eTransferDst | Image::Usage::eTransferSrc)
         .Build();
 
@@ -119,7 +119,7 @@ TEST_F(GpuTest, CompressUastcRoundTripsThroughTheLoader) {
 
     auto reloaded = kimg::LoadImage(*written);
     ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(kSize, kSize, 1));
     // A mip chain, because the encoder was asked for one and a compressed texture cannot be given
     // one afterwards. 64 -> 1 is seven levels.
     EXPECT_EQ(reloaded->MipLevels(), 7u);
@@ -146,7 +146,7 @@ TEST_F(GpuTest, CompressEtc1sIsSmallerThanUastc) {
 
     auto reloaded = kimg::LoadImage(*etc1s);
     ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
-    EXPECT_EQ(reloaded->Extent(), glm::uvec3(kSize, kSize, 1));
+    EXPECT_EQ(reloaded->Extent(), kor::UVec3(kSize, kSize, 1));
 }
 
 // ASTC is encoded directly rather than transcoded, so the file names a real GPU format — and can only
@@ -162,7 +162,7 @@ TEST_F(GpuTest, CompressAstcWritesARealGpuFormat) {
     if (Image::IsFormatSupported(Image::Format::eASTC_4x4_SRGB)
         || Image::IsFormatSupported(Image::Format::eASTC_4x4_UNORM)) {
         ASSERT_TRUE(static_cast<bool>(reloaded)) << (reloaded.Failure() ? reloaded.Failure()->message : "");
-        EXPECT_EQ(reloaded->Extent(), glm::uvec3(32, 32, 1));
+        EXPECT_EQ(reloaded->Extent(), kor::UVec3(32, 32, 1));
         EXPECT_TRUE(Image::IsBlockCompressed(reloaded->PixelFormat()));
     } else {
         // No ASTC here — a desktop GPU, most likely. The file is still valid; this device simply

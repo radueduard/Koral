@@ -13,7 +13,7 @@ namespace kor {
         // How many bytes one index of this type occupies, and 0 for a channel type that cannot be
         // an index at all. Signed types answer for their unsigned counterpart: an index is never
         // negative, so the two are the same bytes, and the backends only know the unsigned ones.
-        glm::u32 indexWidth(const ChannelType type)
+        kor::u32 indexWidth(const ChannelType type)
         {
             switch (type) {
             case ChannelType::eByte:
@@ -36,7 +36,7 @@ namespace kor {
         }
     }
 
-    Mesh::Builder& Mesh::Builder::SetVertexBuffer(const glm::u32 binding, ResourceRef<Buffer> vertexBuffer)
+    Mesh::Builder& Mesh::Builder::SetVertexBuffer(const kor::u32 binding, ResourceRef<Buffer> vertexBuffer)
     {
         if (_vertexBuffers.size() <= binding)
             _vertexBuffers.resize(binding + 1);
@@ -44,7 +44,7 @@ namespace kor {
         return *this;
     }
 
-    Mesh::Builder& Mesh::Builder::SetVertexBuffer(const glm::u32 binding, Resource<Buffer>&& vertexBuffer)
+    Mesh::Builder& Mesh::Builder::SetVertexBuffer(const kor::u32 binding, Resource<Buffer>&& vertexBuffer)
     {
         auto owned = std::make_shared<Resource<Buffer>>(std::move(vertexBuffer));
         SetVertexBuffer(binding, ResourceRef<Buffer>(*owned));
@@ -77,12 +77,12 @@ namespace kor {
     {
         // Vertex buffers are addressed by binding number, both here and where they are bound: the
         // backends hand the whole list to the API starting at binding 0, so index i *is* binding i.
-        glm::u32 bindingCount = 0;
+        kor::u32 bindingCount = 0;
         for (const auto& binding : _vertexLayout.bindings)
             bindingCount = std::max(bindingCount, binding.binding + 1);
 
         std::vector<ResourceRef<Buffer>> vertexBuffers(bindingCount);
-        glm::u64 vertexCount = 0;
+        kor::u64 vertexCount = 0;
         bool counted = false;
 
         for (const auto& [binding, stride, inputRate] : _vertexLayout.bindings)
@@ -130,7 +130,7 @@ namespace kor {
 
         // A buffer set for a binding the layout says nothing about would never be read, and is far
         // more likely to be a layout that was forgotten or written with the wrong binding numbers.
-        for (glm::u32 binding = 0; binding < _vertexBuffers.size(); ++binding) {
+        for (kor::u32 binding = 0; binding < _vertexBuffers.size(); ++binding) {
             if (!_vertexBuffers[binding].Alive()) continue;
             const auto declared = std::ranges::any_of(_vertexLayout.bindings,
                 [binding](const auto& b) { return b.binding == binding; });
@@ -146,7 +146,7 @@ namespace kor {
         }
 
         std::optional<ResourceRef<Buffer>> indexBuffer;
-        std::optional<glm::u32> indexCount;
+        std::optional<kor::u32> indexCount;
         std::optional<ChannelType> indexType;
 
         if (_indexBuffer.has_value())
@@ -164,7 +164,7 @@ namespace kor {
                 } else {
                     indexBuffer = *_indexBuffer;
                     indexType = unsignedIndexType(_indexType);
-                    indexCount = static_cast<glm::u32>((*_indexBuffer)->size() / width);
+                    indexCount = static_cast<kor::u32>((*_indexBuffer)->size() / width);
                 }
             }
         }

@@ -126,7 +126,7 @@ namespace kor
 
     namespace {
         template<typename V>
-        constexpr int componentsOf() { return V::length(); }
+        constexpr int componentsOf() { return V::Size; }
 
         std::size_t componentCount(const TypeKind kind)
         {

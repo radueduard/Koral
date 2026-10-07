@@ -53,9 +53,9 @@ target_link_libraries(koral-ui PUBLIC Koral)
 find_package(Clipper2 CONFIG REQUIRED)
 target_link_libraries(koral-ui PRIVATE Clipper2::Clipper2)
 
-# glm appears in the public headers but reaches consumers through Koral, as for the other modules.
+# spdlog appears in the public headers but reaches consumers through Koral, as for the other modules.
 # stb_truetype is header-only and compiled into text.cpp.
-target_link_libraries(koral-ui PRIVATE glm::glm spdlog::spdlog)
+target_link_libraries(koral-ui PRIVATE spdlog::spdlog)
 
 set_target_properties(koral-ui PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/modules

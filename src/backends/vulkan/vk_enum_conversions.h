@@ -350,7 +350,7 @@ namespace kor
         }
     }
 
-    inline ::vk::Format getVkFormat(ChannelType channelType, glm::u32 channelCount)
+    inline ::vk::Format getVkFormat(ChannelType channelType, kor::u32 channelCount)
     {
         switch (channelType)
         {
@@ -769,27 +769,27 @@ namespace kor
             using T = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<T, float>)
                 return ::vk::ClearColorValue{ std::array<float,4>{ value, 0.f, 0.f, 0.f } };
-            else if constexpr (std::is_same_v<T, glm::vec2>)
+            else if constexpr (std::is_same_v<T, kor::Vec2>)
                 return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, 0.f, 0.f } };
-            else if constexpr (std::is_same_v<T, glm::vec3>)
+            else if constexpr (std::is_same_v<T, kor::Vec3>)
                 return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, value.z, 0.f } };
-            else if constexpr (std::is_same_v<T, glm::vec4>)
+            else if constexpr (std::is_same_v<T, kor::Vec4>)
                 return ::vk::ClearColorValue{ std::array<float,4>{ value.x, value.y, value.z, value.w } };
-            else if constexpr (std::is_same_v<T, glm::i32>)
+            else if constexpr (std::is_same_v<T, kor::i32>)
                 return ::vk::ClearColorValue{ std::array<int32_t,4>{ value, 0, 0, 0 } };
-            else if constexpr (std::is_same_v<T, glm::ivec2>)
+            else if constexpr (std::is_same_v<T, kor::IVec2>)
                 return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, 0, 0 } };
-            else if constexpr (std::is_same_v<T, glm::ivec3>)
+            else if constexpr (std::is_same_v<T, kor::IVec3>)
                 return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, value.z, 0 } };
-            else if constexpr (std::is_same_v<T, glm::ivec4>)
+            else if constexpr (std::is_same_v<T, kor::IVec4>)
                 return ::vk::ClearColorValue{ std::array<int32_t,4>{ value.x, value.y, value.z, value.w } };
-            else if constexpr (std::is_same_v<T, glm::u32>)
+            else if constexpr (std::is_same_v<T, kor::u32>)
                 return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value, 0u, 0u, 0u } };
-            else if constexpr (std::is_same_v<T, glm::uvec2>)
+            else if constexpr (std::is_same_v<T, kor::UVec2>)
                 return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, 0u, 0u } };
-            else if constexpr (std::is_same_v<T, glm::uvec3>)
+            else if constexpr (std::is_same_v<T, kor::UVec3>)
                 return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, value.z, 0u } };
-            else if constexpr (std::is_same_v<T, glm::uvec4>)
+            else if constexpr (std::is_same_v<T, kor::UVec4>)
                 return ::vk::ClearColorValue{ std::array<uint32_t,4>{ value.x, value.y, value.z, value.w } };
             else
                 return ::vk::ClearColorValue{ std::array<float,4>{ 0.f, 0.f, 0.f, 0.f } };

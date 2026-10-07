@@ -69,7 +69,7 @@ namespace kor::vk
 			.setSize(_size)
 			.setUsage(getVkBufferUsageFlags(_usage))
 			.setSharingMode(::vk::SharingMode::eExclusive);
-		const auto families = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<glm::u32>{};
+		const auto families = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<kor::u32>{};
 		if (!families.empty()) bufferInfo.setSharingMode(::vk::SharingMode::eConcurrent).setQueueFamilyIndices(families);
 
 
@@ -107,12 +107,12 @@ namespace kor::vk
 		}
 	}
 
-	void Buffer::Flush(glm::i64 size, glm::u64 offset) const {
+	void Buffer::Flush(kor::i64 size, kor::u64 offset) const {
 		const auto _allocation = getAllocation();
 		Context::Allocator().FlushAllocation(_allocation, offset, size);
 	}
 
-	void Buffer::Invalidate(glm::i64 size, glm::u64 offset) const {
+	void Buffer::Invalidate(kor::i64 size, kor::u64 offset) const {
 		const auto _allocation = getAllocation();
 		Context::Allocator().InvalidateAllocation(_allocation, offset, size);
 	}
@@ -122,9 +122,9 @@ namespace kor::vk
 		return _buffers[_isPerFrame ? kor::Context::Scheduler().CurrentImageIndex() : 0];
 	}
 
-	glm::u64 Buffer::DeviceAddress() const
+	kor::u64 Buffer::DeviceAddress() const
 	{
-		return static_cast<glm::u64>(
+		return static_cast<kor::u64>(
 			Context::Device()->getBufferAddress(::vk::BufferDeviceAddressInfo().setBuffer(**this)));
 	}
 
@@ -155,7 +155,7 @@ namespace kor::vk
 
 		// What this frame has to receive, kept as well as the per-buffer copy regions: the host path
 		// below needs the source frame of each, which a vk::BufferCopy does not carry.
-		struct FrameWrite { glm::u32 srcFrameIndex; glm::u64 offset; glm::u64 byteSize; std::shared_ptr<const std::vector<std::byte>> data; };
+		struct FrameWrite { kor::u32 srcFrameIndex; kor::u64 offset; kor::u64 byteSize; std::shared_ptr<const std::vector<std::byte>> data; };
 		std::vector<FrameWrite> _pendingWritesForThisFrame;
 
 		std::unordered_set<PendingWrite, PendingWrite::Hash> remaining;

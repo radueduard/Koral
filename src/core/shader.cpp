@@ -470,7 +470,7 @@ namespace kor {
 	 * What one location of a stage variable holds: a matrix's is one column (as many channels as it has rows),
 	 * an array's one element. A struct's members are each their own: it says what its first does.
 	 */
-	std::pair<ChannelType, glm::u32> SPIRTypeConverter(const spirv_cross::Compiler& module, const spirv_cross::SPIRType& type)
+	std::pair<ChannelType, kor::u32> SPIRTypeConverter(const spirv_cross::Compiler& module, const spirv_cross::SPIRType& type)
     {
     	if (type.basetype == spirv_cross::SPIRType::BaseType::Struct) {
     		if (type.member_types.empty()) return { ChannelType::eFloat, 0 };
@@ -496,9 +496,9 @@ namespace kor {
 	 * How many consecutive locations a stage variable of @p type takes: a location a matrix column, an array
 	 * element and a struct member — and two for a 64-bit vector of three or four, which is wider than one.
 	 */
-	glm::u32 LocationSpan(const spirv_cross::Compiler& module, const spirv_cross::SPIRType& type)
+	kor::u32 LocationSpan(const spirv_cross::Compiler& module, const spirv_cross::SPIRType& type)
 	{
-		glm::u32 span = 0;
+		kor::u32 span = 0;
 		if (type.basetype == spirv_cross::SPIRType::BaseType::Struct) {
 			for (const auto member : type.member_types) span += LocationSpan(module, module.get_type(member));
 		} else {
@@ -510,7 +510,7 @@ namespace kor {
 		return std::max(span, 1u);
 	}
 
-	glm::u32 GetCount(const spirv_cross::SPIRType& type) {
+	kor::u32 GetCount(const spirv_cross::SPIRType& type) {
     	uint32_t count = 1;
     	for (const auto& arraySize : type.array) {
     		count *= arraySize;
@@ -662,23 +662,23 @@ namespace kor {
     void Shader::FetchBlockMembers(const spirv_cross::Compiler& module,
                                    const spirv_cross::Resource& resource,
                                    std::vector<BlockMember>& members,
-                                   glm::u32& blockSize) const
+                                   kor::u32& blockSize) const
     {
     	const auto& blockType = module.get_type(resource.base_type_id);
     	if (blockType.basetype != spirv_cross::SPIRType::Struct) return;
 
-    	blockSize = static_cast<glm::u32>(module.get_declared_struct_size(blockType));
+    	blockSize = static_cast<kor::u32>(module.get_declared_struct_size(blockType));
     	members.reserve(blockType.member_types.size());
 
-    	for (glm::u32 i = 0; i < blockType.member_types.size(); ++i) {
+    	for (kor::u32 i = 0; i < blockType.member_types.size(); ++i) {
     		const auto& memberType = module.get_type(blockType.member_types[i]);
 
     		BlockMember member;
     		member.name = module.get_member_name(resource.base_type_id, i);
     		member.offset = module.type_struct_member_offset(blockType, i);
-    		member.size = static_cast<glm::u32>(module.get_declared_struct_member_size(blockType, i));
-    		member.rows = static_cast<glm::u8>(memberType.vecsize);
-    		member.columns = static_cast<glm::u8>(memberType.columns);
+    		member.size = static_cast<kor::u32>(module.get_declared_struct_member_size(blockType, i));
+    		member.rows = static_cast<kor::u8>(memberType.vecsize);
+    		member.columns = static_cast<kor::u8>(memberType.columns);
 
     		// Mirrors SemanticSlot::Scalar. Kept as a number here so shader.h does not have to
     		// include semantics.h, which includes resource.h, which would be a cycle.
@@ -707,7 +707,7 @@ namespace kor {
         // merely protected, so this two-line subclass reaches it rather than writing the rules
         // out a second time and getting one of them subtly wrong.
         struct PackingProbe final : spirv_cross::CompilerGLSL {
-            explicit PackingProbe(const std::vector<glm::u32>& spirv) : CompilerGLSL(spirv) {}
+            explicit PackingProbe(const std::vector<kor::u32>& spirv) : CompilerGLSL(spirv) {}
             using CompilerGLSL::buffer_is_packing_standard;
         };
     }
@@ -718,23 +718,23 @@ namespace kor {
     // disagree about padding — which is the whole point of walking down to the leaves.
     void Shader::FlattenPushConstant(const spirv_cross::Compiler& module,
                                      const spirv_cross::SPIRType& type,
-                                     const std::string& prefix, const glm::u32 baseOffset,
+                                     const std::string& prefix, const kor::u32 baseOffset,
                                      std::vector<PushConstantField>& out)
     {
     	if (type.basetype != spirv_cross::SPIRType::Struct) return;
 
-    	for (glm::u32 i = 0; i < type.member_types.size(); ++i) {
+    	for (kor::u32 i = 0; i < type.member_types.size(); ++i) {
     		const auto& memberType = module.get_type(type.member_types[i]);
     		const auto name = prefix + module.get_member_name(type.self, i);
     		const auto offset = baseOffset + module.type_struct_member_offset(type, i);
-    		const auto size = static_cast<glm::u32>(module.get_declared_struct_member_size(type, i));
+    		const auto size = static_cast<kor::u32>(module.get_declared_struct_member_size(type, i));
 
     		PushConstantField field;
     		field.name = name;
     		field.offset = offset;
     		field.size = size;
-    		field.rows = static_cast<glm::u8>(memberType.vecsize);
-    		field.columns = static_cast<glm::u8>(memberType.columns);
+    		field.rows = static_cast<kor::u8>(memberType.vecsize);
+    		field.columns = static_cast<kor::u8>(memberType.columns);
 
     		switch (memberType.basetype) {
     		case spirv_cross::SPIRType::Float:  field.scalar = 0; break;
@@ -763,7 +763,7 @@ namespace kor {
     			elementType.array.clear();
     			elementType.array_size_literal.clear();
 
-    			for (glm::u32 element = 0; element < field.count; ++element) {
+    			for (kor::u32 element = 0; element < field.count; ++element) {
     				const auto elementOffset = offset + element * field.arrayStride;
     				const auto elementName = std::format("{}[{}]", name, element);
 
@@ -956,8 +956,8 @@ namespace kor {
 			const auto& name = module.get_name(pushConstant.id);
 			const auto& type = module.get_type(pushConstant.type_id);
     		// const auto offset = module.get_decoration(pushConstant.id, spv::DecorationOffset);
-    		glm::u32 start = 0xFFFFFFFF;
-    		glm::u32 end = 0;
+    		kor::u32 start = 0xFFFFFFFF;
+    		kor::u32 end = 0;
     		auto memberCount = type.member_types.size();
 			for (uint32_t i = 0; i < memberCount; i++) {
 				const auto memberOffset = module.get_member_decoration(type.self, i, spv::DecorationOffset);
@@ -976,7 +976,7 @@ namespace kor {
 			// value in four.
 			{
 				PackingProbe probe(_spirvCode);
-				glm::u32 failedIndex = 0;
+				kor::u32 failedIndex = 0;
 				if (const auto& probeType = probe.get_type(pushConstant.base_type_id);
 					!probe.buffer_is_packing_standard(probeType, spirv_cross::BufferPackingStd430, &failedIndex))
 				{

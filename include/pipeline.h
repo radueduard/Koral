@@ -17,7 +17,7 @@
 #include <memory>
 #include <span>
 #include <unordered_map>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "descriptorSetLayout.h"
@@ -67,7 +67,7 @@ namespace kor
          * @param index Descriptor set number.
          * @return Descriptor set layout associated with @p index.
          */
-        [[nodiscard]] const DescriptorSetLayout& SetLayout(glm::u32 index) const;
+        [[nodiscard]] const DescriptorSetLayout& SetLayout(kor::u32 index) const;
 
         /**
          * @brief Lifetime-tracked reference to the descriptor set layout for @p index.
@@ -75,14 +75,14 @@ namespace kor
          * Prefer this over SetLayout(): a reload can replace the layout, and a raw reference
          * into _setLayouts would be left dangling by that. A ResourceRef notices instead.
          */
-        [[nodiscard]] ResourceRef<const DescriptorSetLayout> SetLayoutRef(glm::u32 index) const;
+        [[nodiscard]] ResourceRef<const DescriptorSetLayout> SetLayoutRef(kor::u32 index) const;
 
         /**
          * @brief Get push-constant range by byte offset.
          * @param offset Byte offset into declared push constant ranges.
          * @return Push-constant range covering @p offset.
          */
-        [[nodiscard]] const Shader::PushConstant& PushConstantRange(glm::u32 offset) const;
+        [[nodiscard]] const Shader::PushConstant& PushConstantRange(kor::u32 offset) const;
 
         /**
          * @brief One push constant the pipeline's shaders declare, addressed by name.
@@ -91,16 +91,16 @@ namespace kor
          * writing this constant means writing @ref size bytes at @ref offset and nothing else.
          */
         struct KORAL_API PushConstantMember {
-            glm::u32 offset = 0;        ///< Byte offset within the pipeline's push-constant range.
-            glm::u32 size = 0;          ///< Its size in bytes, as the shader reserves it.
+            kor::u32 offset = 0;        ///< Byte offset within the pipeline's push-constant range.
+            kor::u32 size = 0;          ///< Its size in bytes, as the shader reserves it.
             Flags<Shader::Stage> stages;///< Which stages declare a block containing it.
 
-            glm::u8 scalar = 5;         ///< ValueScalar, as a plain byte; 5 (eOther) for an aggregate.
-            glm::u8 rows = 1;           ///< Vector components, or matrix rows.
-            glm::u8 columns = 1;        ///< Matrix columns; 1 for scalars and vectors.
-            glm::u32 count = 1;         ///< Array elements, or 1.
-            glm::u32 arrayStride = 0;   ///< Bytes between array elements, as the shader spaced them.
-            glm::u32 matrixStride = 0;  ///< Bytes between matrix columns, likewise.
+            kor::u8 scalar = 5;         ///< ValueScalar, as a plain byte; 5 (eOther) for an aggregate.
+            kor::u8 rows = 1;           ///< Vector components, or matrix rows.
+            kor::u8 columns = 1;        ///< Matrix columns; 1 for scalars and vectors.
+            kor::u32 count = 1;         ///< Array elements, or 1.
+            kor::u32 arrayStride = 0;   ///< Bytes between array elements, as the shader spaced them.
+            kor::u32 matrixStride = 0;  ///< Bytes between matrix columns, likewise.
             bool aggregate = false;     ///< A struct or an array of structs: writable only as raw bytes.
         };
 
@@ -170,10 +170,10 @@ namespace kor
         bool _shouldReload = false;
         // Keyed by shader pointer (not stage): ray-tracing pipelines may hold several
         // shaders of the same stage (multiple miss / hit-group shaders).
-        std::unordered_map<const Shader*, glm::u64> _shaderReloadCallbackIds;
+        std::unordered_map<const Shader*, kor::u64> _shaderReloadCallbackIds;
 
-        std::map<glm::u32, Resource<DescriptorSetLayout>> _setLayouts;
-        std::map<glm::u32, Shader::PushConstant> _pushConstantRanges;
+        std::map<kor::u32, Resource<DescriptorSetLayout>> _setLayouts;
+        std::map<kor::u32, Shader::PushConstant> _pushConstantRanges;
         /// The same ranges' fields, flattened by name and unioned across stages. @see findPushConstant
         std::map<std::string, PushConstantMember, std::less<>> _pushConstants;
         bool _usesDeviceAddresses = false;

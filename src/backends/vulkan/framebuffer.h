@@ -21,7 +21,7 @@ namespace kor::vk
         explicit Framebuffer(const Framebuffer::Builder& builder);
 
         ~Framebuffer() override;
-        void DoResize(const glm::uvec2& newExtent) override;
+        void DoResize(const kor::UVec2& newExtent) override;
 
     private:
         void attachSwapChain();

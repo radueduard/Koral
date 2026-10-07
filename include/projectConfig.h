@@ -71,7 +71,7 @@
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "context.h" // kor::API
@@ -147,7 +147,7 @@ namespace kor
         std::string title;
 
         /** @brief Initial size of the drawable area, in pixels. */
-        glm::uvec2 extent = { 1280, 720 };
+        kor::UVec2 extent = { 1280, 720 };
 
         /** @brief Which graphics backend to bring up. */
         API api = API::eVulkan;

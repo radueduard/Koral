@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "buffer.h"
 #include "commandBuffer.h"
@@ -44,7 +44,7 @@ using kor::DescriptorSet;
 
 namespace {
 
-using Pixel = glm::u8vec4; // RGBA8
+using Pixel = kor::U8Vec4; // RGBA8
 
 constexpr std::uint32_t kW = 16;
 constexpr std::uint32_t kH = 16;
@@ -57,7 +57,7 @@ TEST_F(GpuTest, OffscreenTriangleFillsTarget) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc);    // read back afterwards
     auto colorImage = ib.Build();
 
@@ -66,7 +66,7 @@ TEST_F(GpuTest, OffscreenTriangleFillsTarget) {
 
     auto framebuffer =
         Framebuffer::Builder{}
-            .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+            .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
             .Build();
 
     // --- shaders + graphics pipeline -------------------------------------
@@ -104,7 +104,7 @@ TEST_F(GpuTest, OffscreenTriangleFillsTarget) {
 
     // --- read the target back and verify ---------------------------------
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -116,10 +116,10 @@ TEST_F(GpuTest, OffscreenTriangleFillsTarget) {
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
     for (std::size_t i = 0; i < out.size(); ++i) {
-        EXPECT_EQ(out[i].r, 0)   << "texel " << i << " r";
-        EXPECT_EQ(out[i].g, 255) << "texel " << i << " g";
-        EXPECT_EQ(out[i].b, 0)   << "texel " << i << " b";
-        EXPECT_EQ(out[i].a, 255) << "texel " << i << " a";
+        EXPECT_EQ(out[i].x, 0)   << "texel " << i << " r";
+        EXPECT_EQ(out[i].y, 255) << "texel " << i << " g";
+        EXPECT_EQ(out[i].z, 0)   << "texel " << i << " b";
+        EXPECT_EQ(out[i].w, 255) << "texel " << i << " a";
     }
 }
 
@@ -135,14 +135,14 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
     Image::Builder ib;
     ib.SetType(Image::Type::e2D)
       .SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kW, kH})
+      .SetExtent(kor::UVec2{kW, kH})
       .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc);
     auto colorImage = ib.Build();
 
     auto colorView = ImageView::Builder(colorImage).Build();
     auto framebuffer =
         Framebuffer::Builder{}
-            .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+            .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
             .Build();
 
     const ResourceRef<const Shader> vert =
@@ -175,7 +175,7 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -191,11 +191,11 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
             const bool inScissor = x >= kSx && x < kSx + kSw && y >= kSy && y < kSy + kSh;
             const Pixel& got = out[y * kW + x];
             if (inScissor) {
-                EXPECT_EQ(got.g, 255) << "scissored texel (" << x << "," << y << ") should be green";
-                EXPECT_EQ(got.r, 0)   << "scissored texel (" << x << "," << y << ") r";
+                EXPECT_EQ(got.y, 255) << "scissored texel (" << x << "," << y << ") should be green";
+                EXPECT_EQ(got.x, 0)   << "scissored texel (" << x << "," << y << ") r";
             } else {
-                EXPECT_EQ(got.g, 0) << "clipped texel (" << x << "," << y << ") should stay black";
-                EXPECT_EQ(got.r, 0) << "clipped texel (" << x << "," << y << ") r";
+                EXPECT_EQ(got.y, 0) << "clipped texel (" << x << "," << y << ") should stay black";
+                EXPECT_EQ(got.x, 0) << "clipped texel (" << x << "," << y << ") r";
             }
         }
     }
@@ -209,13 +209,13 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto depth = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eD32_SFLOAT)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eDepthStencilAttachment)
                      .Build();
 
@@ -223,7 +223,7 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
     auto depthView = ImageView::Builder(depth).Build();
 
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .SetDepth({ .view = depthView, .depth = 1.f })
                            .Build();
 
@@ -264,7 +264,7 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -276,7 +276,7 @@ TEST_F(GpuTest, OffscreenColorDepthBlend) {
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
     // Opaque green (alpha 1) over black with src-alpha blending stays green.
     for (std::size_t i = 0; i < out.size(); ++i) {
-        EXPECT_EQ(out[i].g, 255) << "texel " << i << " g";
+        EXPECT_EQ(out[i].y, 255) << "texel " << i << " g";
     }
 }
 
@@ -289,9 +289,9 @@ TEST_F(GpuTest, MeshIndexedDraw) {
     using PosMesh = kmesh::ParamMesh<PosVertex>;
 
     std::vector<PosVertex> verts = {
-        PosVertex{ glm::vec3{-1.0f, -1.0f, 0.0f} },
-        PosVertex{ glm::vec3{ 3.0f, -1.0f, 0.0f} },
-        PosVertex{ glm::vec3{-1.0f,  3.0f, 0.0f} },
+        PosVertex{ kor::Vec3{-1.0f, -1.0f, 0.0f} },
+        PosVertex{ kor::Vec3{ 3.0f, -1.0f, 0.0f} },
+        PosVertex{ kor::Vec3{-1.0f,  3.0f, 0.0f} },
     };
     std::vector<std::uint32_t> indices = {0, 1, 2};
     auto mesh = PosMesh::Create(verts, indices);
@@ -300,12 +300,12 @@ TEST_F(GpuTest, MeshIndexedDraw) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -332,7 +332,7 @@ TEST_F(GpuTest, MeshIndexedDraw) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -343,7 +343,7 @@ TEST_F(GpuTest, MeshIndexedDraw) {
     const std::vector<Pixel> out = readback->Read<Pixel>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
     int green = 0;
-    for (const auto& p : out) if (p.g == 255) ++green;
+    for (const auto& p : out) if (p.y == 255) ++green;
     EXPECT_GT(green, 0) << "the mesh triangle should have covered some pixels";
 }
 
@@ -361,10 +361,10 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
 
     // Clip y in [-1, 0] = the top half under a Y-down NDC; full width.
     std::vector<PosVertex> verts = {
-        PosVertex{ glm::vec3{-1.0f, -1.0f, 0.0f} },
-        PosVertex{ glm::vec3{ 1.0f, -1.0f, 0.0f} },
-        PosVertex{ glm::vec3{ 1.0f,  0.0f, 0.0f} },
-        PosVertex{ glm::vec3{-1.0f,  0.0f, 0.0f} },
+        PosVertex{ kor::Vec3{-1.0f, -1.0f, 0.0f} },
+        PosVertex{ kor::Vec3{ 1.0f, -1.0f, 0.0f} },
+        PosVertex{ kor::Vec3{ 1.0f,  0.0f, 0.0f} },
+        PosVertex{ kor::Vec3{-1.0f,  0.0f, 0.0f} },
     };
     std::vector<std::uint32_t> indices = {0, 1, 2, 0, 2, 3};
     auto mesh = PosMesh::Create(verts, indices);
@@ -373,12 +373,12 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -404,7 +404,7 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -417,18 +417,18 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
 
     // Sanity: the draw must have covered something, or the assertions below pass vacuously.
     int green = 0;
-    for (const auto& p : out) if (p.g == 255) ++green;
+    for (const auto& p : out) if (p.y == 255) ++green;
     ASSERT_GT(green, 0) << "the quad covered nothing; the orientation check would be vacuous";
 
     for (std::uint32_t y = 0; y < kH; ++y) {
         for (std::uint32_t x = 0; x < kW; ++x) {
             const Pixel& got = out[y * kW + x];
             if (y < kH / 2) {
-                EXPECT_EQ(got.g, 255)
+                EXPECT_EQ(got.y, 255)
                     << "row " << y << " is in the top half of clip space and must be green; "
                        "green in the bottom rows instead means Y is inverted";
             } else {
-                EXPECT_EQ(got.g, 0) << "row " << y << " is below the quad and must stay black";
+                EXPECT_EQ(got.y, 0) << "row " << y << " is below the quad and must stay black";
             }
         }
     }
@@ -441,18 +441,18 @@ TEST_F(GpuTest, CanonicalOrientationPutsClipTopInRowZero) {
 // write it would have to wait on. The engine has to say so rather than emit a barrier
 // somewhere harmless-looking, which is what it used to do.
 TEST_F(GpuTest, FeedbackLoopInsideRenderPassIsReported) {
-    constexpr glm::u32 kSize = 16;
+    constexpr kor::u32 kSize = 16;
 
     Image::Builder ib;
     ib.SetFormat(Image::Format::eRGBA8_UNORM)
-      .SetExtent(glm::uvec2{kSize, kSize})
+      .SetExtent(kor::UVec2{kSize, kSize})
       .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eSampled);
     auto colorImage = ib.Build();
     ASSERT_TRUE(colorImage.Valid());
 
     auto colorView = ImageView::Builder(colorImage).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
     auto sampler = Sampler::Builder{}.Build();
     ASSERT_TRUE(sampler.Valid());
@@ -520,12 +520,12 @@ TEST_F(GpuTest, ADrawWithNoViewportCoversItsOwnFramebuffer) {
     auto color = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{kSize, kSize})
+        .SetExtent(kor::UVec2{kSize, kSize})
         .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
         .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-        .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+        .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
         .Build();
 
     const ResourceRef<const Shader> vert = Shader::Builder{}
@@ -543,7 +543,7 @@ TEST_F(GpuTest, ADrawWithNoViewportCoversItsOwnFramebuffer) {
     ASSERT_TRUE(static_cast<bool>(pipeline)) << (pipeline.Failure() ? pipeline.Failure()->message : "");
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kSize) * kSize * 4)
+    rb.SetRawSize(static_cast<kor::i64>(kSize) * kSize * 4)
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -557,14 +557,14 @@ TEST_F(GpuTest, ADrawWithNoViewportCoversItsOwnFramebuffer) {
         cb.CopyImageToBuffer(color, readback);
     }, CommandBuffer::Usage::eGraphics).Wait();
 
-    const auto texels = readback->Read<glm::u8vec4>();
+    const auto texels = readback->Read<kor::U8Vec4>();
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSize) * kSize);
 
     // The shader paints the whole clip volume, so every texel of *this* target must be painted. With a
     // window-sized viewport only the top-left corner of the triangle would land here, leaving the far
     // side of the image at the clear colour.
     std::size_t painted = 0;
-    for (const auto& texel : texels) if (texel != glm::u8vec4(0, 0, 0, 255)) ++painted;
+    for (const auto& texel : texels) if (texel != kor::U8Vec4(0, 0, 0, 255)) ++painted;
     EXPECT_EQ(painted, texels.size()) << "the draw did not cover its own framebuffer";
 }
 
@@ -580,13 +580,13 @@ TEST_F(GpuTest, FramebufferResizeResizesItsAttachments) {
     auto color = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{kFirst, kFirst})
+        .SetExtent(kor::UVec2{kFirst, kFirst})
         .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
         .Build();
     auto depth = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eD32_SFLOAT)
-        .SetExtent(glm::uvec2{kFirst, kFirst})
+        .SetExtent(kor::UVec2{kFirst, kFirst})
         .SetUsage(Image::Usage::eDepthStencilAttachment)
         .Build();
 
@@ -594,17 +594,17 @@ TEST_F(GpuTest, FramebufferResizeResizesItsAttachments) {
     auto depthView = ImageView::Builder(depth).Build();
 
     auto framebuffer = Framebuffer::Builder{}
-        .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+        .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
         .SetDepth({ .view = depthView })
         .Build();
     ASSERT_TRUE(static_cast<bool>(framebuffer));
     const auto generationBefore = color->Generation();
 
-    framebuffer->Resize(glm::uvec2{kSecond, kSecond});
+    framebuffer->Resize(kor::UVec2{kSecond, kSecond});
 
-    EXPECT_EQ(framebuffer->Extent(), glm::uvec2(kSecond, kSecond));
-    EXPECT_EQ(color->Extent(), glm::uvec3(kSecond, kSecond, 1)) << "the colour attachment followed";
-    EXPECT_EQ(depth->Extent(), glm::uvec3(kSecond, kSecond, 1)) << "and so did the depth one";
+    EXPECT_EQ(framebuffer->Extent(), kor::UVec2(kSecond, kSecond));
+    EXPECT_EQ(color->Extent(), kor::UVec3(kSecond, kSecond, 1)) << "the colour attachment followed";
+    EXPECT_EQ(depth->Extent(), kor::UVec3(kSecond, kSecond, 1)) << "and so did the depth one";
     // The image was *replaced*, which is what tells a view holding the old one to rebuild.
     EXPECT_GT(color->Generation(), generationBefore);
 
@@ -616,7 +616,7 @@ TEST_F(GpuTest, FramebufferResizeResizesItsAttachments) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kSecond) * kSecond * 4)
+    rb.SetRawSize(static_cast<kor::i64>(kSecond) * kSecond * 4)
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -624,10 +624,10 @@ TEST_F(GpuTest, FramebufferResizeResizesItsAttachments) {
         cb.CopyImageToBuffer(color, readback);
     }, CommandBuffer::Usage::eTransfer).Wait();
 
-    const auto texels = readback->Read<glm::u8vec4>();
+    const auto texels = readback->Read<kor::U8Vec4>();
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(kSecond) * kSecond);
     // Cleared to the framebuffer's own colour, at the new size.
-    EXPECT_EQ(texels.front(), glm::u8vec4(0, 0, 0, 255));
+    EXPECT_EQ(texels.front(), kor::U8Vec4(0, 0, 0, 255));
 }
 
 // Resizing to the size it already is changes nothing, so a scene may call it every frame.
@@ -635,19 +635,19 @@ TEST_F(GpuTest, FramebufferResizeToTheSameSizeIsANoOp) {
     auto color = Image::Builder{}
         .SetType(Image::Type::e2D)
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{32, 32})
+        .SetExtent(kor::UVec2{32, 32})
         .SetUsage(Image::Usage::eColorAttachment)
         .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-        .AddColor({ .view = colorView, .clear = glm::vec4{0.f} })
+        .AddColor({ .view = colorView, .clear = kor::Vec4{0.f} })
         .Build();
 
     const auto generation = color->Generation();
-    framebuffer->Resize(glm::uvec2{32, 32});
-    framebuffer->Resize(glm::uvec2{0, 16});     // a zero extent names nothing and is ignored
+    framebuffer->Resize(kor::UVec2{32, 32});
+    framebuffer->Resize(kor::UVec2{0, 16});     // a zero extent names nothing and is ignored
     EXPECT_EQ(color->Generation(), generation) << "the image was not replaced";
-    EXPECT_EQ(color->Extent(), glm::uvec3(32, 32, 1));
+    EXPECT_EQ(color->Extent(), kor::UVec3(32, 32, 1));
 }
 
 // Push constants addressed by name, declared once in a shared header and read by two stages.
@@ -660,12 +660,12 @@ TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -685,8 +685,8 @@ TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
     const auto* colorConstant = pipeline->FindPushConstant("color");
     ASSERT_NE(offsetConstant, nullptr);
     ASSERT_NE(colorConstant, nullptr);
-    EXPECT_EQ(offsetConstant->size, sizeof(glm::vec2));
-    EXPECT_EQ(colorConstant->size, sizeof(glm::vec4));
+    EXPECT_EQ(offsetConstant->size, sizeof(kor::Vec2));
+    EXPECT_EQ(colorConstant->size, sizeof(kor::Vec4));
     EXPECT_NE(colorConstant->offset, offsetConstant->offset) << "two constants cannot share bytes";
     EXPECT_TRUE(offsetConstant->stages & Shader::Stage::eVertex);
     EXPECT_TRUE(colorConstant->stages & Shader::Stage::eFragment);
@@ -697,14 +697,14 @@ TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
         // No offsets, no struct mirroring the block: the names are the whole contract.
-        cb.PushConstant("offset", glm::vec2{2.f, 0.f});   // shifts the triangle off to the right
-        cb.PushConstant("color", glm::vec4{0.f, 0.f, 1.f, 1.f});
+        cb.PushConstant("offset", kor::Vec2{2.f, 0.f});   // shifts the triangle off to the right
+        cb.PushConstant("color", kor::Vec4{0.f, 0.f, 1.f, 1.f});
         cb.Draw(3);
         cb.EndRendering();
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto shifted = rb.Build();
@@ -723,8 +723,8 @@ TEST_F(GpuTest, PushConstantsByNameAcrossStages) {
         cb.BindGraphicsPipeline(pipeline);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
-        cb.PushConstant("offset", glm::vec2{0.f, 0.f});
-        cb.PushConstant("color", glm::vec4{0.f, 0.f, 1.f, 1.f});
+        cb.PushConstant("offset", kor::Vec2{0.f, 0.f});
+        cb.PushConstant("color", kor::Vec4{0.f, 0.f, 1.f, 1.f});
         cb.Draw(3);
         cb.EndRendering();
     }, CommandBuffer::Usage::eGraphics).Wait();
@@ -747,12 +747,12 @@ TEST_F(GpuTest, PushConstantByNameRejectsWhatTheShaderDoesNotDeclare) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -772,7 +772,7 @@ TEST_F(GpuTest, PushConstantByNameRejectsWhatTheShaderDoesNotDeclare) {
     unknown->Begin();
     unknown->BeginRendering(framebuffer);
     unknown->BindGraphicsPipeline(pipeline);
-    unknown->PushConstant("tint", glm::vec4{1.f});
+    unknown->PushConstant("tint", kor::Vec4{1.f});
     unknown->EndRendering();
     unknown->End();
 
@@ -786,7 +786,7 @@ TEST_F(GpuTest, PushConstantByNameRejectsWhatTheShaderDoesNotDeclare) {
     wrongSize->Begin();
     wrongSize->BeginRendering(framebuffer);
     wrongSize->BindGraphicsPipeline(pipeline);
-    wrongSize->PushConstant("color", glm::vec2{1.f});   // the shader declares a vec4
+    wrongSize->PushConstant("color", kor::Vec2{1.f});   // the shader declares a vec4
     wrongSize->EndRendering();
     wrongSize->End();
 
@@ -796,7 +796,7 @@ TEST_F(GpuTest, PushConstantByNameRejectsWhatTheShaderDoesNotDeclare) {
     // And with nothing bound to look the name up on.
     const auto unbound = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
     unbound->Begin();
-    unbound->PushConstant("color", glm::vec4{1.f});
+    unbound->PushConstant("color", kor::Vec4{1.f});
     unbound->End();
     ASSERT_FALSE(unbound->Errors().empty());
     EXPECT_EQ(unbound->Errors().front().code, kor::ErrorCode::eNoPipelineBound);
@@ -815,12 +815,12 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -884,7 +884,7 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -896,10 +896,10 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
     // shader reads them.
     EXPECT_EQ(readback->Read<Pixel>().front(), Pixel(0, 0, 255, 255));
 
-    // The obvious C++ mirror of that struct is also exactly 20 bytes — glm's vectors carry no
+    // The obvious C++ mirror of that struct is also exactly 20 bytes — kor's vectors carry no
     // extra alignment by default — so a nested struct is pushed as itself, not as a byte blob.
-    struct CppMaterial { glm::vec4 albedo; float roughness; };
-    static_assert(sizeof(CppMaterial) == 20, "glm gained alignment; the mirror no longer matches");
+    struct CppMaterial { kor::Vec4 albedo; float roughness; };
+    static_assert(sizeof(CppMaterial) == 20, "kor::Vec gained alignment; the mirror no longer matches");
     EXPECT_EQ(sizeof(CppMaterial), material->size);
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
@@ -907,7 +907,7 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
         cb.BindGraphicsPipeline(pipeline);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
-        cb.PushConstant("material", CppMaterial{ glm::vec4{0.f, 1.f, 0.f, 1.f}, 1.f });
+        cb.PushConstant("material", CppMaterial{ kor::Vec4{0.f, 1.f, 0.f, 1.f}, 1.f });
         cb.PushConstant("weights", weightsValue);
         cb.Draw(3);
         cb.EndRendering();
@@ -927,7 +927,7 @@ TEST_F(GpuTest, NestedPushConstantMembersAreWholeConstants) {
         cb.BindGraphicsPipeline(pipeline);
         cb.SetViewport(0, 0, kW, kH);
         cb.SetScissor(0, 0, kW, kH);
-        cb.PushConstant("material.albedo", glm::vec4{1.f, 0.f, 0.f, 1.f});
+        cb.PushConstant("material.albedo", kor::Vec4{1.f, 0.f, 0.f, 1.f});
         cb.PushConstant("material.roughness", 1.f);
         cb.PushConstant("weights[2]", 1.f);
         cb.Draw(3);
@@ -948,12 +948,12 @@ TEST_F(GpuTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -975,17 +975,17 @@ TEST_F(GpuTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
     ASSERT_NE(tints, nullptr);
     EXPECT_EQ(basis->size, 48u) << "three columns of four floats";
     EXPECT_EQ(basis->matrixStride, 16u);
-    EXPECT_EQ(sizeof(glm::mat3), 36u) << "which is not what glm hands over";
+    EXPECT_EQ(sizeof(kor::Mat3), 36u) << "which is not what kor::Mat3 hands over";
     EXPECT_EQ(tints->arrayStride, 16u);
-    EXPECT_EQ(sizeof(std::array<glm::vec3, 3>), 36u);
+    EXPECT_EQ(sizeof(std::array<kor::Vec3, 3>), 36u);
 
     // Columns and elements chosen so every one of them contributes a distinct, exactly
     // representable amount: a value that landed in the wrong column cannot produce this colour.
-    glm::mat3 basisValue(0.f);
-    basisValue[0] = glm::vec3{0.2f, 0.f, 0.f};
-    basisValue[1] = glm::vec3{0.f, 0.4f, 0.f};
-    basisValue[2] = glm::vec3{0.f, 0.f, 0.6f};
-    const std::array tintsValue{ glm::vec3{0.2f, 0.f, 0.f}, glm::vec3{0.f, 0.2f, 0.f}, glm::vec3{0.f, 0.f, 0.2f} };
+    kor::Mat3 basisValue(0.f);
+    basisValue[0] = kor::Vec3{0.2f, 0.f, 0.f};
+    basisValue[1] = kor::Vec3{0.f, 0.4f, 0.f};
+    basisValue[2] = kor::Vec3{0.f, 0.f, 0.6f};
+    const std::array tintsValue{ kor::Vec3{0.2f, 0.f, 0.f}, kor::Vec3{0.f, 0.2f, 0.f}, kor::Vec3{0.f, 0.f, 0.2f} };
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginRendering(framebuffer);
@@ -999,7 +999,7 @@ TEST_F(GpuTest, PushConstantsAreLaidOutIntoTheShadersPadding) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -1024,12 +1024,12 @@ TEST_F(GpuTest, PipelinePoisonsWhenTwoStagesDeclareAPushConstantDifferently) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -1061,18 +1061,18 @@ TEST_F(GpuTest, TwoPassesClearOneFramebufferToDifferentColors) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     // Built with blue, which neither pass below asks for: what lands in the image is whichever
     // override was recorded, never the framebuffer's own.
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 1.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 1.f, 1.f} })
                            .Build();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto firstPass = rb.Build();
@@ -1082,13 +1082,13 @@ TEST_F(GpuTest, TwoPassesClearOneFramebufferToDifferentColors) {
         // Pass one: red. Copied out before the second pass overwrites it, so both records are in
         // one command buffer — replaying them in order is exactly what the GL backend does.
         cb.BeginRendering(kor::RenderInfo(framebuffer)
-                              .SetClearColor(0, glm::vec4{1.f, 0.f, 0.f, 1.f}));
+                              .SetClearColor(0, kor::Vec4{1.f, 0.f, 0.f, 1.f}));
         cb.EndRendering();
         cb.CopyImageToBuffer(color, firstPass);
 
         // Pass two: green, same framebuffer.
         cb.BeginRendering(kor::RenderInfo(framebuffer)
-                              .SetClearColor(0, glm::vec4{0.f, 1.f, 0.f, 1.f}));
+                              .SetClearColor(0, kor::Vec4{0.f, 1.f, 0.f, 1.f}));
         cb.EndRendering();
         cb.CopyImageToBuffer(color, secondPass);
     }, CommandBuffer::Usage::eGraphics).Wait();
@@ -1107,16 +1107,16 @@ TEST_F(GpuTest, APassWithoutOverridesUsesTheFramebuffersClearValues) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 1.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 1.f, 1.f} })
                            .Build();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -1138,28 +1138,28 @@ TEST_F(GpuTest, AnIntegerAttachmentIsClearedWithAnIntegerOverride) {
     auto ids = Image::Builder{}
                    .SetType(Image::Type::e2D)
                    .SetFormat(Image::Format::eR32_UINT)
-                   .SetExtent(glm::uvec2{kW, kH})
+                   .SetExtent(kor::UVec2{kW, kH})
                    .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                    .Build();
     auto idsView = ImageView::Builder(ids).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = idsView, .clear = glm::uvec4{0u} })
+                           .AddColor({ .view = idsView, .clear = kor::UVec4{0u} })
                            .Build();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(glm::u32))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(kor::u32))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
 
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
         cb.BeginRendering(kor::RenderInfo(framebuffer)
-                              .SetClearColor(0, glm::uvec4{0xFFFFFFFFu}));
+                              .SetClearColor(0, kor::UVec4{0xFFFFFFFFu}));
         cb.EndRendering();
         cb.CopyImageToBuffer(ids, readback);
     }, CommandBuffer::Usage::eGraphics).Wait();
 
-    const std::vector<glm::u32> out = readback->Read<glm::u32>();
+    const std::vector<kor::u32> out = readback->Read<kor::u32>();
     ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
     EXPECT_EQ(out.front(), 0xFFFFFFFFu);
 }
@@ -1168,8 +1168,8 @@ TEST_F(GpuTest, AnIntegerAttachmentIsClearedWithAnIntegerOverride) {
 // colour deliberately does not sit at offset 0: if the layout's offsets were ignored the shader
 // would read the position as a colour, and the readback below would not be flat blue.
 struct HandWrittenVertex {
-    glm::vec3 position;
-    glm::vec3 color;
+    kor::Vec3 position;
+    kor::Vec3 color;
 };
 
 // The base Mesh built straight from buffers and a VertexLayout — no mesh module, no vertex type
@@ -1177,9 +1177,9 @@ struct HandWrittenVertex {
 // semantic. This is the whole point of the builder: geometry whose format is decided at runtime.
 TEST_F(GpuTest, MeshBuilderDrawsHandWrittenVertexFormat) {
     const std::vector<HandWrittenVertex> vertices = {
-        { glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{0.f, 0.f, 1.f} },
-        { glm::vec3{ 3.f, -1.f, 0.f}, glm::vec3{0.f, 0.f, 1.f} },
-        { glm::vec3{-1.f,  3.f, 0.f}, glm::vec3{0.f, 0.f, 1.f} },
+        { kor::Vec3{-1.f, -1.f, 0.f}, kor::Vec3{0.f, 0.f, 1.f} },
+        { kor::Vec3{ 3.f, -1.f, 0.f}, kor::Vec3{0.f, 0.f, 1.f} },
+        { kor::Vec3{-1.f,  3.f, 0.f}, kor::Vec3{0.f, 0.f, 1.f} },
     };
     const std::vector<std::uint32_t> indices = {0, 1, 2};
 
@@ -1213,12 +1213,12 @@ TEST_F(GpuTest, MeshBuilderDrawsHandWrittenVertexFormat) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -1244,7 +1244,7 @@ TEST_F(GpuTest, MeshBuilderDrawsHandWrittenVertexFormat) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -1266,9 +1266,9 @@ TEST_F(GpuTest, MeshBuilderDrawsHandWrittenVertexFormat) {
 // so a result that is still correct proves the locations decided it and not the order.
 TEST_F(GpuTest, MeshBuilderDrawsALayoutDescribedByLocationAlone) {
     const std::vector<HandWrittenVertex> vertices = {
-        { glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{1.f, 0.f, 0.f} },
-        { glm::vec3{ 3.f, -1.f, 0.f}, glm::vec3{1.f, 0.f, 0.f} },
-        { glm::vec3{-1.f,  3.f, 0.f}, glm::vec3{1.f, 0.f, 0.f} },
+        { kor::Vec3{-1.f, -1.f, 0.f}, kor::Vec3{1.f, 0.f, 0.f} },
+        { kor::Vec3{ 3.f, -1.f, 0.f}, kor::Vec3{1.f, 0.f, 0.f} },
+        { kor::Vec3{-1.f,  3.f, 0.f}, kor::Vec3{1.f, 0.f, 0.f} },
     };
     const std::vector<std::uint32_t> indices = {0, 1, 2};
 
@@ -1291,12 +1291,12 @@ TEST_F(GpuTest, MeshBuilderDrawsALayoutDescribedByLocationAlone) {
     auto color = Image::Builder{}
                      .SetType(Image::Type::e2D)
                      .SetFormat(Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{kW, kH})
+                     .SetExtent(kor::UVec2{kW, kH})
                      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
                      .Build();
     auto colorView = ImageView::Builder(color).Build();
     auto framebuffer = Framebuffer::Builder{}
-                           .AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} })
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
                            .Build();
 
     const ResourceRef<const Shader> vert =
@@ -1322,7 +1322,7 @@ TEST_F(GpuTest, MeshBuilderDrawsALayoutDescribedByLocationAlone) {
     }, CommandBuffer::Usage::eGraphics).Wait();
 
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -1340,8 +1340,8 @@ TEST_F(GpuTest, MeshBuilderDrawsALayoutDescribedByLocationAlone) {
 // A buffer handed over as an rvalue belongs to the mesh, which is what geometry nothing else
 // refers to wants: the mesh keeps it alive on its own.
 TEST_F(GpuTest, MeshBuilderAdoptsBuffersGivenAsRvalues) {
-    const std::vector<glm::vec3> positions = {
-        glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{3.f, -1.f, 0.f}, glm::vec3{-1.f, 3.f, 0.f},
+    const std::vector<kor::Vec3> positions = {
+        kor::Vec3{-1.f, -1.f, 0.f}, kor::Vec3{3.f, -1.f, 0.f}, kor::Vec3{-1.f, 3.f, 0.f},
     };
 
     kor::Resource<kor::Mesh> mesh;
@@ -1350,7 +1350,7 @@ TEST_F(GpuTest, MeshBuilderAdoptsBuffersGivenAsRvalues) {
         mesh = kor::Mesh::Builder()
             .SetVertexBuffer(0, std::move(vertexBuffer))
             .SetVertexLayout(kor::VertexLayout {
-                .bindings = { kor::VertexInputBindingDescription(0, sizeof(glm::vec3)) },
+                .bindings = { kor::VertexInputBindingDescription(0, sizeof(kor::Vec3)) },
                 .attributes = {
                     kor::VertexLayout::Attribute("POSITION", "vertex", 0, 0, kor::ChannelType::eFloat, 3),
                 },
@@ -1368,18 +1368,18 @@ TEST_F(GpuTest, MeshBuilderAdoptsBuffersGivenAsRvalues) {
 // Geometry that does not match its description is a poisoned mesh naming what is wrong, not a
 // draw that reads the wrong bytes.
 TEST_F(GpuTest, MeshBuilderPoisonsMisdescribedGeometry) {
-    const std::vector<glm::vec3> positions = {
-        glm::vec3{-1.f, -1.f, 0.f}, glm::vec3{3.f, -1.f, 0.f}, glm::vec3{-1.f, 3.f, 0.f},
+    const std::vector<kor::Vec3> positions = {
+        kor::Vec3{-1.f, -1.f, 0.f}, kor::Vec3{3.f, -1.f, 0.f}, kor::Vec3{-1.f, 3.f, 0.f},
     };
-    const std::vector<glm::vec2> uvs = { glm::vec2{0.f}, glm::vec2{1.f} };   // one vertex short
+    const std::vector<kor::Vec2> uvs = { kor::Vec2{0.f}, kor::Vec2{1.f} };   // one vertex short
 
     auto positionBuffer = kor::Mesh::MakeBuffer(positions, Buffer::Usage::eVertex);
     auto uvBuffer = kor::Mesh::MakeBuffer(uvs, Buffer::Usage::eVertex);
 
     const kor::VertexLayout twoBindings {
         .bindings = {
-            kor::VertexInputBindingDescription(0, sizeof(glm::vec3)),
-            kor::VertexInputBindingDescription(1, sizeof(glm::vec2)),
+            kor::VertexInputBindingDescription(0, sizeof(kor::Vec3)),
+            kor::VertexInputBindingDescription(1, sizeof(kor::Vec2)),
         },
         .attributes = {
             kor::VertexLayout::Attribute("POSITION", "vertex", 0, 0, kor::ChannelType::eFloat, 3),
@@ -1409,7 +1409,7 @@ TEST_F(GpuTest, MeshBuilderPoisonsMisdescribedGeometry) {
     EXPECT_TRUE(undescribed.Poisoned()) << "no vertex layout was set";
 
     // A buffer that was never made a vertex buffer.
-    auto plain = Buffer::Builder<glm::vec3>()
+    auto plain = Buffer::Builder<kor::Vec3>()
         .SetDataView(positions)
         .SetUsage(Buffer::Usage::eStorage)
         .SetType(Buffer::Type::eDynamic)    // host-visible, so the data needs no staging copy
@@ -1417,7 +1417,7 @@ TEST_F(GpuTest, MeshBuilderPoisonsMisdescribedGeometry) {
     const auto wrongUsage = kor::Mesh::Builder()
         .SetVertexBuffer(0, plain)
         .SetVertexLayout(kor::VertexLayout {
-            .bindings = { kor::VertexInputBindingDescription(0, sizeof(glm::vec3)) },
+            .bindings = { kor::VertexInputBindingDescription(0, sizeof(kor::Vec3)) },
             .attributes = {
                 kor::VertexLayout::Attribute("POSITION", "vertex", 0, 0, kor::ChannelType::eFloat, 3),
             },
@@ -1454,11 +1454,11 @@ TEST_F(GpuTest, APushConstantBlockThatIsNotStd430DoesNotLoad) {
 // An Image binds straight to a texture binding: the view is built from what the *shader* declared
 // the binding as, and owned by the image, so nothing here constructs an ImageView at all.
 TEST_F(GpuTest, AnImageBindsWithoutAViewBeingBuilt) {
-    constexpr glm::u32 kSize = 8;
+    constexpr kor::u32 kSize = 8;
 
     auto texture = Image::Builder{}
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{kSize, kSize})
+        .SetExtent(kor::UVec2{kSize, kSize})
         .SetUsage(Image::Usage::eSampled | Image::Usage::eTransferDst)
         .Build();
     ASSERT_TRUE(texture.Valid());
@@ -1473,7 +1473,7 @@ TEST_F(GpuTest, AnImageBindsWithoutAViewBeingBuilt) {
 
     auto target = Image::Builder{}
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{kSize, kSize})
+        .SetExtent(kor::UVec2{kSize, kSize})
         .SetUsage(Image::Usage::eColorAttachment)
         .Build();
     ASSERT_TRUE(target.Valid());
@@ -1510,13 +1510,13 @@ TEST_F(GpuTest, AnImageBindsWithoutAViewBeingBuilt) {
 TEST_F(GpuTest, ResizingAnImageKeepsTheViewsItHandedOut) {
     auto image = Image::Builder{}
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{8, 8})
+        .SetExtent(kor::UVec2{8, 8})
         .SetUsage(Image::Usage::eSampled | Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
         .Build();
     ASSERT_TRUE(image.Valid());
     const auto before = image->View(kor::ImageShape::e2D);
     ASSERT_TRUE(before.Valid());
-    auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = image, .clear = glm::vec4(0.f, 0.f, 1.f, 1.f) }).Build();
+    auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = image, .clear = kor::Vec4(0.f, 0.f, 1.f, 1.f) }).Build();
     ASSERT_TRUE(framebuffer.Valid());
 
     const auto generationBefore = image->Generation();
@@ -1532,7 +1532,7 @@ TEST_F(GpuTest, ResizingAnImageKeepsTheViewsItHandedOut) {
         cb.BeginRendering(framebuffer).EndRendering();
         cb.CopyImageToBuffer(image, readback);
     }, CommandBuffer::Usage::eGraphics).Wait();
-    const auto texels = readback->Read<glm::u8>(16 * 16 * 4);
+    const auto texels = readback->Read<kor::u8>(16 * 16 * 4);
     EXPECT_EQ(texels[4 * (16 * 16 - 1) + 2], 255) << "the resized framebuffer rendered into all of the new storage";
 }
 
@@ -1541,7 +1541,7 @@ TEST_F(GpuTest, ResizingAnImageKeepsTheViewsItHandedOut) {
 TEST_F(GpuTest, AnImageMissingItsUsageIsReportedWithTheFlagToAdd) {
     auto texture = Image::Builder{}
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{8, 8})
+        .SetExtent(kor::UVec2{8, 8})
         .SetUsage(Image::Usage::eColorAttachment)   // deliberately not eSampled
         .Build();
     ASSERT_TRUE(texture.Valid());
@@ -1553,7 +1553,7 @@ TEST_F(GpuTest, AnImageMissingItsUsageIsReportedWithTheFlagToAdd) {
         .SetPath(kor::ShaderPath("sampleTexture.frag.glsl")).GetOrBuild("test.usage.frag");
 
     auto target = Image::Builder{}.SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{8, 8}).SetUsage(Image::Usage::eColorAttachment).Build();
+        .SetExtent(kor::UVec2{8, 8}).SetUsage(Image::Usage::eColorAttachment).Build();
     auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = target }).Build();
     auto pipeline = GraphicsPipeline::Builder{}
         .SetVertexShader(vert).SetFragmentShader(frag)
@@ -1575,8 +1575,8 @@ TEST_F(GpuTest, TransferUsageIsNotSomethingYouHaveToRemember) {
     // eTransferDst on the image, the mip chain needs both, and the readback needs eTransferSrc.
     auto texture = Image::Builder{}
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{8, 8})
-        .SetData(std::vector<glm::u8vec4>(8 * 8, glm::u8vec4{40, 80, 120, 255}))
+        .SetExtent(kor::UVec2{8, 8})
+        .SetData(std::vector<kor::U8Vec4>(8 * 8, kor::U8Vec4{40, 80, 120, 255}))
         .Build();
     ASSERT_TRUE(texture.Valid()) << (texture.Failure() ? texture.Failure()->History() : "");
 
@@ -1591,9 +1591,9 @@ TEST_F(GpuTest, TransferUsageIsNotSomethingYouHaveToRemember) {
                              << (cb.Ok() ? "" : cb.Outcome().error().ToString());
     }, CommandBuffer::Usage::eTransfer).Wait();
 
-    const auto pixels = readback->Read<glm::u8vec4>();
+    const auto pixels = readback->Read<kor::U8Vec4>();
     ASSERT_EQ(pixels.size(), static_cast<std::size_t>(8 * 8));
-    EXPECT_EQ(pixels[0], (glm::u8vec4{40, 80, 120, 255}));
+    EXPECT_EQ(pixels[0], (kor::U8Vec4{40, 80, 120, 255}));
 }
 
 // Opting out is still possible, and getting it wrong afterwards is now Koral's error rather than
@@ -1601,7 +1601,7 @@ TEST_F(GpuTest, TransferUsageIsNotSomethingYouHaveToRemember) {
 TEST_F(GpuTest, AMissingTransferUsageIsNamedAtTheCommandThatNeededIt) {
     auto image = Image::Builder{}
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{8, 8})
+        .SetExtent(kor::UVec2{8, 8})
         .SetUsage(Image::Usage::eSampled)   // exactly this: no transfer roles
         .Build();
     ASSERT_TRUE(image.Valid());
@@ -1671,20 +1671,20 @@ TEST_F(GpuTest, UniformUsageIsDeducedFromTheBuffersSize) {
 // bound beside the mesh with BindVertexBuffer. The matrix takes four locations, the colour the one after them.
 TEST_F(GpuTest, AMatrixVertexInputIsFedAnInstanceAtATime) {
     auto colorImage = Image::Builder{}.SetType(Image::Type::e2D).SetFormat(Image::Format::eRGBA8_UNORM)
-                          .SetExtent(glm::uvec2{kW, kH}).SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc).Build();
+                          .SetExtent(kor::UVec2{kW, kH}).SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc).Build();
     auto colorView = ImageView::Builder(colorImage).Build();
-    auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = colorView, .clear = glm::vec4{0.f, 0.f, 0.f, 1.f} }).Build();
+    auto framebuffer = Framebuffer::Builder{}.AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} }).Build();
 
     // The quad, a vertex at a time; the transforms and colours, an instance at a time.
-    struct Instance { glm::mat4 model; glm::vec4 color; };
-    const std::vector<glm::vec2> quad { {-1, -1}, {1, -1}, {1, 1}, {-1, -1}, {1, 1}, {-1, 1} };
-    const auto half = [](const float x) { return glm::mat4 { {0.5f, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {x, 0, 0, 1} }; };
+    struct Instance { kor::Mat4 model; kor::Vec4 color; };
+    const std::vector<kor::Vec2> quad { {-1, -1}, {1, -1}, {1, 1}, {-1, -1}, {1, 1}, {-1, 1} };
+    const auto half = [](const float x) { return kor::Mat4 { {0.5f, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {x, 0, 0, 1} }; };
     const std::vector<Instance> instances { { half(-0.5f), {1, 0, 0, 1} }, { half(0.5f), {0, 0, 1, 1} } };
-    auto vertices = Buffer::Builder<glm::vec2>{}.SetData(quad).SetUsage(Buffer::Usage::eVertex | Buffer::Usage::eTransferDst).SetType(Buffer::Type::eDeviceLocal).Build();
+    auto vertices = Buffer::Builder<kor::Vec2>{}.SetData(quad).SetUsage(Buffer::Usage::eVertex | Buffer::Usage::eTransferDst).SetType(Buffer::Type::eDeviceLocal).Build();
     auto perInstance = Buffer::Builder<Instance>{}.SetData(instances).SetUsage(Buffer::Usage::eVertex | Buffer::Usage::eTransferDst).SetType(Buffer::Type::eDeviceLocal).Build();
 
     kor::VertexLayout meshLayout;
-    meshLayout.bindings.push_back({ .binding = 0, .stride = sizeof(glm::vec2) });
+    meshLayout.bindings.push_back({ .binding = 0, .stride = sizeof(kor::Vec2) });
     meshLayout.attributes.push_back(kor::VertexLayout::Attribute::AtLocation(0, 0, 0, kor::ChannelType::eFloat, 2));
     auto mesh = kor::Mesh::Builder{}.SetVertexLayout(meshLayout).SetVertexBuffer(0, std::move(vertices)).Build();
 
@@ -1716,7 +1716,7 @@ TEST_F(GpuTest, AMatrixVertexInputIsFedAnInstanceAtATime) {
         EXPECT_TRUE(cb.Ok());
     }, CommandBuffer::Usage::eGraphics).Wait();
 
-    auto readback = Buffer::RawBuilder{}.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    auto readback = Buffer::RawBuilder{}.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
                         .SetUsage(Buffer::Usage::eTransferDst).SetType(Buffer::Type::eReadback).Build();
     CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.CopyImageToBuffer(colorImage, readback); }, CommandBuffer::Usage::eTransfer).Wait();
     const std::vector<Pixel> out = readback->Read<Pixel>();

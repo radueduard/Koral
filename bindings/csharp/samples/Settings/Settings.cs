@@ -23,7 +23,7 @@ public sealed class SettingsPanel : StatefulWidget
                     .SetColor(theme.Surface)
                     .SetBorder(1, theme.Border)
                     .SetRadius(12)
-                    .SetShadow(Color.Black.WithAlpha(0.5f), 14, new Vector2(0, 6))),
+                    .SetShadow(Color.Black.WithAlpha(0.5f), 14, new Vec2(0, 6))),
             Column([
                 Text("Settings", new TextStyle().SetSize(22)),
                 TextField(new TextFieldOptions().SetPlaceholder("Player name").SetOnChanged(name => _name = name)),
@@ -48,11 +48,11 @@ public sealed class Badge : StatelessWidget
         var c = size / 2;
         canvas.DrawCircle(c, 70, Paint.Fill(Color.Hex(0x2B2F6B)).SetStroke(3, Color.Hex(0x7090FF)))
               .BeginPath()
-              .MoveTo(c + new Vector2(-40, 10))
-              .DrawLineTo(c + new Vector2(-10, 40))
-              .DrawArcTo(c + new Vector2(40, -40), c + new Vector2(45, -40), 6)
+              .MoveTo(c + new Vec2(-40, 10))
+              .DrawLineTo(c + new Vec2(-10, 40))
+              .DrawArcTo(c + new Vec2(40, -40), c + new Vec2(45, -40), 6)
               .Stroke(new Paint().SetStroke(new Stroke { Width = 10, Color = Color.White, Cap = StrokeCap.eRound, Join = StrokeJoin.eRound }));
-    }, new Vector2(200, 200));
+    }, new Vec2(200, 200));
 }
 
 public sealed class Settings : Scene

@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <koralCamera.h>
 

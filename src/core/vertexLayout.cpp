@@ -44,7 +44,7 @@ namespace kor
 
         // The first location two attributes both claim, if any. Only the layout can produce one:
         // where the shader decides the locations they are distinct by construction.
-        glm::u32 channelBytes(const ChannelType type)
+        kor::u32 channelBytes(const ChannelType type)
         {
             switch (type) {
             case ChannelType::eDouble: return 8;
@@ -55,9 +55,9 @@ namespace kor
         }
 
         // An attribute as the descriptions of each location it fills, from @p location on.
-        void describe(std::vector<VertexInputAttributeDescription>& out, const glm::u32 location, const VertexLayout::Attribute& attribute)
+        void describe(std::vector<VertexInputAttributeDescription>& out, const kor::u32 location, const VertexLayout::Attribute& attribute)
         {
-            for (glm::u32 i = 0; i < std::max(attribute.locations, 1u); ++i) {
+            for (kor::u32 i = 0; i < std::max(attribute.locations, 1u); ++i) {
                 out.push_back(VertexInputAttributeDescription{
                     .location     = location + i,
                     .binding      = attribute.binding,
@@ -68,7 +68,7 @@ namespace kor
             }
         }
 
-        std::optional<glm::u32> duplicateLocation(const std::vector<VertexInputAttributeDescription>& resolved)
+        std::optional<kor::u32> duplicateLocation(const std::vector<VertexInputAttributeDescription>& resolved)
         {
             for (std::size_t i = 0; i < resolved.size(); ++i) {
                 for (std::size_t j = i + 1; j < resolved.size(); ++j) {
@@ -79,7 +79,7 @@ namespace kor
         }
     }
 
-    glm::u32 VertexLayout::Attribute::Stride() const
+    kor::u32 VertexLayout::Attribute::Stride() const
     {
         return locationStride != 0 ? locationStride : channelCount * channelBytes(channelType);
     }
@@ -138,7 +138,7 @@ namespace kor
             resolved.reserve(attributes.size());
             // One that names no location takes its place in the list — counting a matrix before it as
             // the columns it fills, whatever locations the ones before it named.
-            glm::u32 place = 0;
+            kor::u32 place = 0;
             for (const auto& attribute : attributes) {
                 describe(resolved, attribute.location.value_or(place), attribute);
                 place += std::max(attribute.locations, 1u);

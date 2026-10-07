@@ -70,18 +70,18 @@ public:
         _image = kor::Image::Builder{}
                      .SetType(kor::Image::Type::e2D)
                      .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-                     .SetExtent(glm::uvec2{16, 16})
+                     .SetExtent(kor::UVec2{16, 16})
                      .SetUsage(kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst | kor::Image::Usage::eSampled)
                      .Build();
         kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& cb) {
-            cb.ClearColorImage(_image, glm::vec4{0.3f, 0.6f, 0.9f, 1.f});
+            cb.ClearColorImage(_image, kor::Vec4{0.3f, 0.6f, 0.9f, 1.f});
         }, kor::CommandBuffer::Usage::eGraphics).Wait();
         viewport->SetImage(_image);
 
         viewportTarget = kor::Image::Builder{}
             .SetType(kor::Image::Type::e2D)
             .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-            .SetExtent(glm::uvec2{64, 64})
+            .SetExtent(kor::UVec2{64, 64})
             .SetIsPerFrame(true)            // one copy per frame in flight, like a real render target
             // eTransferSrc because AResizedViewportTargetIsShownAtItsNewSize copies it back out;
             // setUsage names the whole set, so it has to be listed with the other two.
@@ -91,7 +91,7 @@ public:
         sampledOnlyTarget = kor::Image::Builder{}
             .SetType(kor::Image::Type::e2D)
             .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-            .SetExtent(glm::uvec2{32, 32})
+            .SetExtent(kor::UVec2{32, 32})
             .SetIsPerFrame(true)
             .SetUsage(kor::Image::Usage::eSampled)
             .Build();
@@ -104,7 +104,7 @@ public:
 
         viewportTargetView = kor::ImageView::Builder(viewportTarget).Build();
         viewportFramebuffer = kor::Framebuffer::Builder{}
-            .AddColor({ .view = viewportTargetView, .clear = glm::vec4{0.2f, 0.f, 0.4f, 1.f} })
+            .AddColor({ .view = viewportTargetView, .clear = kor::Vec4{0.2f, 0.f, 0.4f, 1.f} })
             .Build();
         ui.SetRoot(Interface());
     }
@@ -117,7 +117,7 @@ public:
         // frame — and every replacement is a fresh image in an undefined layout that the interface
         // samples in the same frame. This is the shape of that.
         if (resizeTargetEveryFrame) {
-            const glm::uvec2 next{ 64 + (updates % 17), 48 + (updates % 13) };
+            const kor::UVec2 next{ 64 + (updates % 17), 48 + (updates % 13) };
             viewportFramebuffer->Resize(next);
         }
 
@@ -150,7 +150,7 @@ public:
         if (onRender) onRender(cb);
     }
 
-    void OnResize(glm::uvec2 extent) override { lastResize = extent; }
+    void OnResize(kor::UVec2 extent) override { lastResize = extent; }
 
     /** The scene's own interface: text and a slider, the image, the viewports, the log and the statistics. */
     kui::Widget Interface() {
@@ -169,7 +169,7 @@ public:
     }
 
     int updates = 0;
-    glm::uvec2 lastResize{0, 0};
+    kor::UVec2 lastResize{0, 0};
     /// Runs inside the frame, where a scene's own Update would write its per-frame data.
     std::function<void()> onUpdate;
     /// Records a test's own work into the frame, after (or, with drawDefault off, instead of) the scene's.
@@ -353,9 +353,9 @@ using kor::Shader;
 class Probe final : public kor::SemanticSerializer
 {
 public:
-    glm::vec4 alpha { 1.f, 2.f, 3.f, 4.f };
-    glm::vec4 beta  { 5.f, 6.f, 7.f, 8.f };
-    glm::vec4 gamma { 9.f, 10.f, 11.f, 12.f };
+    kor::Vec4 alpha { 1.f, 2.f, 3.f, 4.f };
+    kor::Vec4 beta  { 5.f, 6.f, 7.f, 8.f };
+    kor::Vec4 gamma { 9.f, 10.f, 11.f, 12.f };
 
     [[nodiscard]] std::string_view SemanticNamespace() const override { return "probe"; }
 
@@ -432,8 +432,8 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
 
     // Somewhere for the shader to put what it was given, big enough for the field that does not
     // exist yet — the test reads it back to see whether it arrived.
-    auto readback = Buffer::Builder<glm::vec4>()
-        .SetData(std::vector<glm::vec4>(4, glm::vec4(0.f)))
+    auto readback = Buffer::Builder<kor::Vec4>()
+        .SetData(std::vector<kor::Vec4>(4, kor::Vec4(0.f)))
         .SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
         .SetType(Buffer::Type::eDeviceLocal)
         .Build();
@@ -464,7 +464,7 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
             cb.BindDescriptorSet(0, set);
             cb.Dispatch(1, 1, 1);
         }, CommandBuffer::Usage::eCompute).Wait();
-        return readback->Read<glm::vec4>();
+        return readback->Read<kor::Vec4>();
     };
 
     {
@@ -472,7 +472,7 @@ TEST_F(VkWindowTest, AddingAFieldToABlockDeliversItWithoutARestart) {
         ASSERT_GE(values.size(), 3u);
         EXPECT_EQ(values[0], probe.alpha);
         EXPECT_EQ(values[1], probe.beta);
-        EXPECT_EQ(values[2], glm::vec4(0.f)) << "nothing has written a third field yet";
+        EXPECT_EQ(values[2], kor::Vec4(0.f)) << "nothing has written a third field yet";
     }
 
     const auto setGeneration = set.Generation();
@@ -527,7 +527,7 @@ TEST_F(VkWindowTest, GuiExtrasDrawInARealFrame) {
 
     // In pixels: twice the layout's size on a Retina display.
     const float ratio = scene.SceneWindow().PixelRatio();
-    EXPECT_EQ(scene.viewport->Size(), glm::uvec2(glm::vec2(64, 64) * ratio)) << "laid out at the size it was given";
+    EXPECT_EQ(scene.viewport->Size(), kor::UVec2(kor::Vec2(64, 64) * ratio)) << "laid out at the size it was given";
     EXPECT_GT(scene.directViewport->Size().x, 0u);
     EXPECT_GT(scene.sampledOnlyViewport->Size().x, 0u);
     EXPECT_FALSE(scene.viewport->Dragging()) << "nothing was pressed";
@@ -586,7 +586,7 @@ TEST_F(VkWindowTest, APerFrameBufferPropagatesAWriteToEveryCopy) {
     ASSERT_GE(copies, 2u) << "nothing to propagate to with a single copy";
 
     kor::Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+    rb.SetRawSize(static_cast<kor::i64>(sizeof(kor::u32)))
       .SetUsage(kor::Buffer::Usage::eUniform)
       .SetIsPerFrame(true)
       .SetType(kor::Buffer::Type::eDynamic);
@@ -594,15 +594,15 @@ TEST_F(VkWindowTest, APerFrameBufferPropagatesAWriteToEveryCopy) {
     ASSERT_TRUE(static_cast<bool>(buffer));
 
     // Written once, on whichever frame is current — exactly what a camera does when it stops moving.
-    constexpr glm::u32 kValue = 0xC0FFEE;
-    const std::array<glm::u32, 1> value{ kValue };
-    buffer->Write(std::span<const glm::u32>(value), 0);
+    constexpr kor::u32 kValue = 0xC0FFEE;
+    const std::array<kor::u32, 1> value{ kValue };
+    buffer->Write(std::span<const kor::u32>(value), 0);
 
     // Then several frames with no further write. Every copy must come to hold it.
-    std::vector<glm::u32> seen;
-    for (glm::u32 i = 0; i < copies * 2 + 1; ++i) {
+    std::vector<kor::u32> seen;
+    for (kor::u32 i = 0; i < copies * 2 + 1; ++i) {
         drawFrame(scene);
-        seen.push_back(buffer->Read<glm::u32>(1).front());
+        seen.push_back(buffer->Read<kor::u32>(1).front());
     }
 
     for (std::size_t i = 0; i < seen.size(); ++i) {
@@ -636,7 +636,7 @@ namespace {
         void Prepare() override { _frameValue = _value; }
         void Record(kor::CommandBuffer& cb) const override {
             if (_framebuffer) cb.BeginRendering(kor::RenderInfo(_framebuffer).SetClearDepth(_frameValue)).EndRendering();
-            else cb.ClearColorImage(_stamp, glm::vec4(_frameValue));
+            else cb.ClearColorImage(_stamp, kor::Vec4(_frameValue));
         }
     private:
         kor::Image::Format _format;
@@ -654,14 +654,14 @@ namespace {
         void Initialize(const kor::PassResources& r) override {
             _previous = r.PreviousImageNamed("stamp");
             readback = kor::Buffer::RawBuilder{}
-                .SetRawSize(static_cast<glm::i64>(sizeof(float)))
+                .SetRawSize(static_cast<kor::i64>(sizeof(float)))
                 .SetUsage(kor::Buffer::Usage::eTransferDst)
                 .SetType(kor::Buffer::Type::eReadback)
                 .Build();
         }
         void Prepare() override { hadPrevious = HasPrevious("stamp"); }
         void Record(kor::CommandBuffer& cb) const override {
-            cb.CopyImageToBuffer(_previous, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+            cb.CopyImageToBuffer(_previous, readback, kor::Copy{ .imageExtent = kor::IVec3(1, 1, 1) });
         }
         bool hadPrevious = false;
         kor::Resource<kor::Buffer> readback;
@@ -774,7 +774,7 @@ namespace {
 
     kor::Resource<kor::Buffer> makeReadback() {
         return kor::Buffer::RawBuilder{}
-            .SetRawSize(static_cast<glm::i64>(sizeof(float)))
+            .SetRawSize(static_cast<kor::i64>(sizeof(float)))
             .SetUsage(kor::Buffer::Usage::eTransferDst)
             .SetType(kor::Buffer::Type::eReadback)
             .Build();
@@ -793,12 +793,12 @@ namespace {
         out.fill->setup = [=](kor::PassBuilder& b) { b.Create(image, {.format = kor::Image::Format::eR32_SFLOAT,
                                                                       .usage = kor::Image::Usage::eTransferDst}); };
         out.fill->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(image); };
-        out.fill->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, glm::vec4(value)); };
+        out.fill->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, kor::Vec4(value)); };
         out.read = &graph.Add<LambdaPass>("Read " + image);
         out.read->setup = [=](kor::PassBuilder& b) { b.Read(image, kor::Image::Usage::eTransferSrc).SideEffect(); };
         out.read->initialize = [=](const kor::PassResources& r) { *target = r.ImageNamed(image); };
         out.read->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.readback)](kor::CommandBuffer& cb) {
-            cb.CopyImageToBuffer(*target, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+            cb.CopyImageToBuffer(*target, readback, kor::Copy{ .imageExtent = kor::IVec3(1, 1, 1) });
         };
         return out;
     }
@@ -993,7 +993,7 @@ namespace {
         out.fill = &graph.Add<LambdaPass>("Fill");
         out.fill->setup = [=](kor::PassBuilder& b) { b.Create("a", desc); };
         out.fill->initialize = [=](const kor::PassResources& r) { *a = r.ImageNamed("a"); };
-        out.fill->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*a, glm::vec4(value)); };
+        out.fill->record = [=](kor::CommandBuffer& cb) { cb.ClearColorImage(*a, kor::Vec4(value)); };
         out.copy = &graph.Add<LambdaPass>("Copy");
         out.copy->setup = [=](kor::PassBuilder& p) { p.Read("a", kor::Image::Usage::eTransferSrc).Create("b", desc).AsyncCompute(); };
         out.copy->initialize = [=](const kor::PassResources& r) { *a = r.ImageNamed("a"); *b = r.ImageNamed("b"); };
@@ -1002,13 +1002,13 @@ namespace {
         out.beside->setup = [=](kor::PassBuilder& p) { p.Read("a", kor::Image::Usage::eTransferSrc).SideEffect(); };
         out.beside->initialize = [=](const kor::PassResources& r) { *a = r.ImageNamed("a"); };
         out.beside->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.besideReadback)](kor::CommandBuffer& cb) {
-            cb.CopyImageToBuffer(*a, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+            cb.CopyImageToBuffer(*a, readback, kor::Copy{ .imageExtent = kor::IVec3(1, 1, 1) });
         };
         out.read = &graph.Add<LambdaPass>("Read");
         out.read->setup = [=](kor::PassBuilder& p) { p.Read("b", kor::Image::Usage::eTransferSrc).SideEffect(); };
         out.read->initialize = [=](const kor::PassResources& r) { *b = r.ImageNamed("b"); };
         out.read->record = [=, readback = kor::ResourceRef<const kor::Buffer>(out.readback)](kor::CommandBuffer& cb) {
-            cb.CopyImageToBuffer(*b, readback, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+            cb.CopyImageToBuffer(*b, readback, kor::Copy{ .imageExtent = kor::IVec3(1, 1, 1) });
         };
         return out;
     }
@@ -1144,12 +1144,12 @@ namespace {
             auto& paint = Graph().Add<LambdaPass>("Paint");
             paint.setup = [](kor::PassBuilder& b) { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); };
             paint.initialize = [target](const kor::PassResources& r) { *target = r.ImageNamed(kor::FrameGraph::Screen); };
-            paint.record = [target, red = red](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, glm::vec4(red, 0.f, 0.f, 1.f)); };
+            paint.record = [target, red = red](kor::CommandBuffer& cb) { cb.ClearColorImage(*target, kor::Vec4(red, 0.f, 0.f, 1.f)); };
             auto& read = Graph().Add<LambdaPass>("Read");
             read.setup = [](kor::PassBuilder& b) { b.Read(kor::FrameGraph::Screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
             read.initialize = [target](const kor::PassResources& r) { *target = r.ImageNamed(kor::FrameGraph::Screen); };
             read.record = [target, out = kor::ResourceRef<const kor::Buffer>(readback)](kor::CommandBuffer& cb) {
-                cb.CopyImageToBuffer(*target, out, kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+                cb.CopyImageToBuffer(*target, out, kor::Copy{ .imageExtent = kor::IVec3(1, 1, 1) });
             };
         }
         void Update() override {
@@ -1161,15 +1161,15 @@ namespace {
         void OnResume() override { ++events()["resume " + Name()]; }
         void Shutdown() override { ++events()["shutdown " + Name()]; }
 
-        [[nodiscard]] glm::u8 Red() const {
-            const auto texel = readback->Read<glm::u8>(4);
+        [[nodiscard]] kor::u8 Red() const {
+            const auto texel = readback->Read<kor::u8>(4);
             return SceneWindow().DefaultFramebuffer()->ColorImage(0)->IsBgrOrder() ? texel[2] : texel[0];
         }
 
         float red;
         int updates = 0;
         kor::Scene* currentInUpdate = nullptr;
-        glm::uvec2 extentInUpdate {0};
+        kor::UVec2 extentInUpdate {0};
         kor::Resource<kor::Buffer> readback;
     };
 
@@ -1427,10 +1427,10 @@ namespace {
             delta = Input::MousePositionDelta();
             ++updates;
         }
-        void OnResize(const glm::uvec2 extent) override { resizedTo = extent; }
+        void OnResize(const kor::UVec2 extent) override { resizedTo = extent; }
         bool spacePressed = false, spaceHeld = false, spaceReleased = false, leftPressed = false;
-        glm::vec2 mouse{0.f}, delta{0.f};
-        glm::uvec2 resizedTo{0, 0};
+        kor::Vec2 mouse{0.f}, delta{0.f};
+        kor::UVec2 resizedTo{0, 0};
         int updates = 0;
     };
 }
@@ -1446,13 +1446,13 @@ TEST_F(VkWindowTest, AnOffscreenSceneDrawsIntoItsOwnImage) {
     const auto& window = scene->SceneWindow();
     EXPECT_TRUE(window.IsOffscreen());
     EXPECT_EQ(*window, nullptr) << "no OS window behind it";
-    EXPECT_EQ(window.Extent(), glm::uvec2(64, 48));
+    EXPECT_EQ(window.Extent(), kor::UVec2(64, 48));
     EXPECT_TRUE(window.IsShownThisFrame());
     ASSERT_TRUE(window.Image().Alive());
-    EXPECT_EQ(window.Image()->Extent(), glm::uvec3(64, 48, 1));
+    EXPECT_EQ(window.Image()->Extent(), kor::UVec3(64, 48, 1));
     EXPECT_FALSE(window.Image()->IsBgrOrder());
     EXPECT_EQ(scene->currentInUpdate, scene);
-    EXPECT_EQ(scene->extentInUpdate, glm::uvec2(64, 48)) << "Window:: is its own window";
+    EXPECT_EQ(scene->extentInUpdate, kor::UVec2(64, 48)) << "Window:: is its own window";
     EXPECT_NEAR(scene->Red(), 128, 1) << "what it painted is in its image";
     EXPECT_EQ(std::ranges::count(app.Scenes(), scene), 1);
 
@@ -1470,11 +1470,11 @@ TEST_F(VkWindowTest, AnOffscreenWindowIsResizedWhenAskedAndItsSceneHearsOfIt) {
     const auto generation = scene->SceneWindow().Image()->Generation();
 
     scene->SceneWindow().Resize({100, 30});
-    EXPECT_EQ(scene->SceneWindow().Extent(), glm::uvec2(64, 64)) << "not until the next frame";
+    EXPECT_EQ(scene->SceneWindow().Extent(), kor::UVec2(64, 64)) << "not until the next frame";
     settle();
-    EXPECT_EQ(scene->SceneWindow().Extent(), glm::uvec2(100, 30));
-    EXPECT_EQ(scene->resizedTo, glm::uvec2(100, 30));
-    EXPECT_EQ(scene->SceneWindow().Image()->Extent(), glm::uvec3(100, 30, 1));
+    EXPECT_EQ(scene->SceneWindow().Extent(), kor::UVec2(100, 30));
+    EXPECT_EQ(scene->resizedTo, kor::UVec2(100, 30));
+    EXPECT_EQ(scene->SceneWindow().Image()->Extent(), kor::UVec3(100, 30, 1));
     EXPECT_NE(scene->SceneWindow().Image()->Generation(), generation) << "a view holding it notices";
 
     app.Close(*scene);
@@ -1496,13 +1496,13 @@ TEST_F(VkWindowTest, InputFedToAnOffscreenSceneArrivesAsAWindowsWould) {
     settle();
     EXPECT_TRUE(scene->spacePressed);
     EXPECT_TRUE(scene->leftPressed);
-    EXPECT_EQ(scene->mouse, glm::vec2(10.f, 20.f));
-    EXPECT_EQ(scene->delta, glm::vec2(3.f, -4.f));
+    EXPECT_EQ(scene->mouse, kor::Vec2(10.f, 20.f));
+    EXPECT_EQ(scene->delta, kor::Vec2(3.f, -4.f));
 
     settle();
     EXPECT_FALSE(scene->spacePressed);
     EXPECT_TRUE(scene->spaceHeld) << "and then held, until it is fed up";
-    EXPECT_EQ(scene->delta, glm::vec2(0.f)) << "movement is per frame";
+    EXPECT_EQ(scene->delta, kor::Vec2(0.f)) << "movement is per frame";
 
     input.ReleaseAll();
     settle();
@@ -1531,7 +1531,7 @@ TEST_F(VkWindowTest, ActionsAndAxesFollowTheKeysAndGamepadsTheyAreBoundTo) {
         }
         kor::KeyState jump = kor::KeyState::eNotPressed;
         float moveX = 0.f;
-        glm::vec2 move{0.f};
+        kor::Vec2 move{0.f};
         bool aHeld = false;
     };
     auto& app = VkEnvironment::app();
@@ -1558,7 +1558,7 @@ TEST_F(VkWindowTest, ActionsAndAxesFollowTheKeysAndGamepadsTheyAreBoundTo) {
     input.FeedKey(kor::Key::eW, true);
     settle();
     EXPECT_EQ(player->moveX, 1.f);
-    EXPECT_NEAR(glm::length(player->move), 1.f, 1e-5f) << "a diagonal is no faster";
+    EXPECT_NEAR(kor::Length(player->move), 1.f, 1e-5f) << "a diagonal is no faster";
     input.FeedKey(kor::Key::eD, false);
     input.FeedKey(kor::Key::eW, false);
 
@@ -1588,7 +1588,7 @@ TEST_F(VkWindowTest, ASceneViewShowsAnOffscreenSceneSizedToThePanel) {
     editor.testInterface = {};
 
     // In pixels: twice the panel's layout size on a Retina display.
-    EXPECT_EQ(state->Size(), glm::uvec2(glm::vec2(200, 150) * editor.SceneWindow().PixelRatio())) << "the panel's size";
+    EXPECT_EQ(state->Size(), kor::UVec2(kor::Vec2(200, 150) * editor.SceneWindow().PixelRatio())) << "the panel's size";
     EXPECT_EQ(game->SceneWindow().Extent(), state->Size()) << "sized to the panel";
     EXPECT_EQ(game->resizedTo, state->Size());
     EXPECT_EQ(state->Image().Get(), game->SceneWindow().Image().Get()) << "showing the scene's picture";
@@ -1604,11 +1604,11 @@ namespace {
     // texel back, and noting what `Window::` was while it recorded.
     class TwoViews final : public kor::Scene {
     public:
-        struct Seen { const kor::Window* window = nullptr; glm::uvec2 extent{0, 0}; };
+        struct Seen { const kor::Window* window = nullptr; kor::UVec2 extent{0, 0}; };
 
         void Initialize() override {
-            for (const auto& [name, red, extent] : {std::tuple{"Left", 0.25f, glm::uvec2{40, 30}},
-                                                    std::tuple{"Right", 0.75f, glm::uvec2{20, 10}}}) {
+            for (const auto& [name, red, extent] : {std::tuple{"Left", 0.25f, kor::UVec2{40, 30}},
+                                                    std::tuple{"Right", 0.75f, kor::UVec2{20, 10}}}) {
                 auto& view = AddView(name, {.extent = extent});
                 auto readback = std::make_shared<kor::Resource<kor::Buffer>>(kor::Buffer::RawBuilder{}.SetRawSize(4)
                     .SetUsage(kor::Buffer::Usage::eTransferDst).SetType(kor::Buffer::Type::eReadback).Build());
@@ -1624,12 +1624,12 @@ namespace {
                 paint.record = [target, readback, seen, red](kor::CommandBuffer& cb) {
                     seen->window = &Window::Get();
                     seen->extent = Window::Extent();
-                    cb.ClearColorImage(*target, glm::vec4(red, 0.f, 0.f, 1.f));
-                    cb.CopyImageToBuffer(*target, kor::ResourceRef<const kor::Buffer>(*readback), kor::Copy{ .imageExtent = glm::ivec3(1, 1, 1) });
+                    cb.ClearColorImage(*target, kor::Vec4(red, 0.f, 0.f, 1.f));
+                    cb.CopyImageToBuffer(*target, kor::ResourceRef<const kor::Buffer>(*readback), kor::Copy{ .imageExtent = kor::IVec3(1, 1, 1) });
                 };
             }
         }
-        [[nodiscard]] glm::u8 Red(const std::string& view) const { return (*readbacks.at(view))->Read<glm::u8>(4)[0]; }
+        [[nodiscard]] kor::u8 Red(const std::string& view) const { return (*readbacks.at(view))->Read<kor::u8>(4)[0]; }
 
         std::map<std::string, std::shared_ptr<kor::Resource<kor::Buffer>>> readbacks;
         std::map<std::string, std::shared_ptr<Seen>> seens;
@@ -1649,24 +1649,24 @@ TEST_F(VkWindowTest, ASceneDrawsEachOfItsViewsIntoItsOwnImage) {
     auto* right = scene->FindView("Right");
     ASSERT_NE(left, nullptr);
     ASSERT_NE(right, nullptr);
-    EXPECT_EQ(left->Image()->Extent(), glm::uvec3(40, 30, 1));
-    EXPECT_EQ(right->Image()->Extent(), glm::uvec3(20, 10, 1));
+    EXPECT_EQ(left->Image()->Extent(), kor::UVec3(40, 30, 1));
+    EXPECT_EQ(right->Image()->Extent(), kor::UVec3(20, 10, 1));
     EXPECT_NEAR(scene->Red("Left"), 64, 1);
     EXPECT_NEAR(scene->Red("Right"), 191, 1);
     EXPECT_EQ(scene->seens["Left"]->window, &left->Target()) << "Window:: in a view's pass is the view's target";
-    EXPECT_EQ(scene->seens["Left"]->extent, glm::uvec2(40, 30));
-    EXPECT_EQ(scene->seens["Right"]->extent, glm::uvec2(20, 10));
+    EXPECT_EQ(scene->seens["Left"]->extent, kor::UVec2(40, 30));
+    EXPECT_EQ(scene->seens["Right"]->extent, kor::UVec2(20, 10));
 
     // Resized, its passes see the new size; switched off, it is not drawn.
     left->Resize({50, 20});
     right->SetEnabled(false);
     const auto rightSeen = scene->seens["Right"]->extent;
     settle();
-    EXPECT_EQ(scene->seens["Left"]->extent, glm::uvec2(50, 20));
-    EXPECT_EQ(left->Image()->Extent(), glm::uvec3(50, 20, 1));
+    EXPECT_EQ(scene->seens["Left"]->extent, kor::UVec2(50, 20));
+    EXPECT_EQ(left->Image()->Extent(), kor::UVec3(50, 20, 1));
     scene->seens["Right"]->extent = {};
     settle();
-    EXPECT_EQ(scene->seens["Right"]->extent, glm::uvec2(0, 0)) << "a view switched off is not drawn";
+    EXPECT_EQ(scene->seens["Right"]->extent, kor::UVec2(0, 0)) << "a view switched off is not drawn";
     (void)rightSeen;
 
     scene->RemoveView("Right");
@@ -1685,7 +1685,7 @@ TEST_F(VkWindowTest, ASceneViewShowsOneOfTheScenesOwnViews) {
     editor.testInterface = kui::Align(kui::Alignment::TopLeft(), kui::SizedBox(120.f, 90.f, kgui::SceneView(view, state)));
     for (int frame = 0; frame < 4; ++frame) settle();
     editor.testInterface = {};
-    EXPECT_EQ(state->Size(), glm::uvec2(glm::vec2(120, 90) * editor.SceneWindow().PixelRatio()));
+    EXPECT_EQ(state->Size(), kor::UVec2(kor::Vec2(120, 90) * editor.SceneWindow().PixelRatio()));
     EXPECT_EQ(view.Target().Extent(), state->Size());
     EXPECT_EQ(state->Image().Get(), view.Image().Get());
     editor.RemoveView("Preview");
@@ -1706,9 +1706,9 @@ TEST_F(VkWindowTest, DebugLinesAreDrawnForTheirFrameOrTheirDuration) {
             auto& clear = Graph().Add<LambdaPass>("Clear");
             clear.setup = [](kor::PassBuilder& b) { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); };
             clear.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
-            clear.record = [screen](kor::CommandBuffer& cb) { cb.ClearColorImage(*screen, glm::vec4(0.f, 0.f, 0.f, 1.f)); };
+            clear.record = [screen](kor::CommandBuffer& cb) { cb.ClearColorImage(*screen, kor::Vec4(0.f, 0.f, 0.f, 1.f)); };
             // Clip space is world space here: a line along y = 0 crosses the middle row.
-            Graph().Add<kor::DebugDrawPass>(SceneDebug(), [] { return glm::mat4(1.f); });
+            Graph().Add<kor::DebugDrawPass>(SceneDebug(), [] { return kor::Mat4(1.f); });
             auto& read = Graph().Add<LambdaPass>("Read");
             read.setup = [](kor::PassBuilder& b) { b.Read(kor::FrameGraph::Screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
             read.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
@@ -1720,9 +1720,9 @@ TEST_F(VkWindowTest, DebugLinesAreDrawnForTheirFrameOrTheirDuration) {
             if (drawLine) Debug::Line({-1.f, 0.f, 0.5f}, {1.f, 0.f, 0.5f}, {.color = {1.f, 0.f, 0.f, 1.f}, .duration = duration});
             drawLine = false;
         }
-        [[nodiscard]] glm::u8 RedAt(const int x, const int y) const { return readback->Read<glm::u8>(32 * 32 * 4)[(y * 32 + x) * 4]; }
+        [[nodiscard]] kor::u8 RedAt(const int x, const int y) const { return readback->Read<kor::u8>(32 * 32 * 4)[(y * 32 + x) * 4]; }
         // y = 0 falls between the two middle rows; the rasterizer's edge rule picks one of them.
-        [[nodiscard]] glm::u8 RedInTheMiddle() const { return std::max(RedAt(16, 15), RedAt(16, 16)); }
+        [[nodiscard]] kor::u8 RedInTheMiddle() const { return std::max(RedAt(16, 15), RedAt(16, 16)); }
         kor::Resource<kor::Buffer> readback;
         bool drawLine = false;
         float duration = 0.f;
@@ -1763,8 +1763,8 @@ TEST_F(VkWindowTest, DebugFillsAreSolidOrSeeThrough) {
             auto& clear = Graph().Add<LambdaPass>("Clear");
             clear.setup = [](kor::PassBuilder& b) { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); };
             clear.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
-            clear.record = [screen](kor::CommandBuffer& cb) { cb.ClearColorImage(*screen, glm::vec4(0.f, 0.f, 0.f, 1.f)); };
-            Graph().Add<kor::DebugDrawPass>(SceneDebug(), [] { return glm::mat4(1.f); });
+            clear.record = [screen](kor::CommandBuffer& cb) { cb.ClearColorImage(*screen, kor::Vec4(0.f, 0.f, 0.f, 1.f)); };
+            Graph().Add<kor::DebugDrawPass>(SceneDebug(), [] { return kor::Mat4(1.f); });
             auto& read = Graph().Add<LambdaPass>("Read");
             read.setup = [](kor::PassBuilder& b) { b.Read(kor::FrameGraph::Screen, kor::Image::Usage::eTransferSrc).SideEffect(); };
             read.initialize = [screen](const kor::PassResources& r) { *screen = r.ImageNamed(kor::FrameGraph::Screen); };
@@ -1783,8 +1783,8 @@ TEST_F(VkWindowTest, DebugFillsAreSolidOrSeeThrough) {
             // A white line 5 pixels wide, a quarter of the way down: rows 6 to 10.
             Debug::Line({-1.f, -0.5f, 0.5f}, {1.f, -0.5f, 0.5f}, {.color = {1.f, 1.f, 1.f, 1.f}, .lineWidth = 5.f});
         }
-        [[nodiscard]] glm::u8vec4 At(const int x, const int y) const {
-            const auto pixels = readback->Read<glm::u8>(32 * 32 * 4);
+        [[nodiscard]] kor::U8Vec4 At(const int x, const int y) const {
+            const auto pixels = readback->Read<kor::u8>(32 * 32 * 4);
             const int i = (y * 32 + x) * 4;
             return {pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]};
         }
@@ -1797,16 +1797,16 @@ TEST_F(VkWindowTest, DebugFillsAreSolidOrSeeThrough) {
     settle();
 
     const auto solid = scene->At(8, 4), seeThrough = scene->At(24, 4);
-    EXPECT_EQ(solid.r, 255) << "a solid fill is its colour";
-    EXPECT_EQ(solid.g, 0);
-    EXPECT_NEAR(seeThrough.g, 128, 2) << "half see-through over black is half its colour";
-    EXPECT_EQ(seeThrough.r, 0);
-    const auto line = std::max(scene->At(8, 15).b, scene->At(8, 16).b);
+    EXPECT_EQ(solid.x, 255) << "a solid fill is its colour";
+    EXPECT_EQ(solid.y, 0);
+    EXPECT_NEAR(seeThrough.y, 128, 2) << "half see-through over black is half its colour";
+    EXPECT_EQ(seeThrough.x, 0);
+    const auto line = std::max(scene->At(8, 15).z, scene->At(8, 16).z);
     EXPECT_EQ(line, 255) << "the line is drawn over the solid fill";
     for (const int row : {7, 8, 9})
-        EXPECT_EQ(scene->At(8, row), glm::u8vec4(255, 255, 255, 255)) << "a wide line covers row " << row;
-    EXPECT_EQ(scene->At(8, 4).r, 255) << "and not what is beyond its width";
-    EXPECT_EQ(scene->At(8, 4).g, 0);
+        EXPECT_EQ(scene->At(8, row), kor::U8Vec4(255, 255, 255, 255)) << "a wide line covers row " << row;
+    EXPECT_EQ(scene->At(8, 4).x, 255) << "and not what is beyond its width";
+    EXPECT_EQ(scene->At(8, 4).y, 0);
 
     app.Close(*scene);
     settle();
@@ -1924,7 +1924,7 @@ TEST_F(VkWindowTest, AReloadedScenesStateSurvivesTheReload) {
 namespace {
     kor::Resource<kor::Buffer> makeDeviceLocalPerFrameU32() {
         kor::Buffer::RawBuilder rb;
-        rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+        rb.SetRawSize(static_cast<kor::i64>(sizeof(kor::u32)))
           .SetUsage(kor::Buffer::Usage::eStorage | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst)
           .SetIsPerFrame(true)
           .SetType(kor::Buffer::Type::eDeviceLocal);
@@ -1940,12 +1940,12 @@ TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferPropagatesAWriteToEveryCopy) {
     ASSERT_TRUE(static_cast<bool>(buffer));
 
     // Between frames, the way a loading coroutine or a scene's Initialize writes.
-    constexpr glm::u32 kValue = 0xC0FFEE;
-    buffer->Write(std::array<glm::u32, 1>{ kValue }, 0);
+    constexpr kor::u32 kValue = 0xC0FFEE;
+    buffer->Write(std::array<kor::u32, 1>{ kValue }, 0);
 
-    for (glm::u32 i = 0; i < copies * 2 + 1; ++i) {
+    for (kor::u32 i = 0; i < copies * 2 + 1; ++i) {
         drawFrame(scene);
-        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), kValue) << "frame " << i << " read a copy that never got the write";
+        EXPECT_EQ(buffer->Read<kor::u32>(1).front(), kValue) << "frame " << i << " read a copy that never got the write";
     }
 }
 
@@ -1956,12 +1956,12 @@ TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferWrittenInsideAFramePropagatesToEv
     ASSERT_TRUE(static_cast<bool>(buffer));
 
     // Once, from inside a frame, and never again.
-    constexpr glm::u32 kValue = 0xBEEF;
-    scene.onUpdate = [&] { buffer->Write(std::array<glm::u32, 1>{ kValue }, 0); scene.onUpdate = nullptr; };
+    constexpr kor::u32 kValue = 0xBEEF;
+    scene.onUpdate = [&] { buffer->Write(std::array<kor::u32, 1>{ kValue }, 0); scene.onUpdate = nullptr; };
 
-    for (glm::u32 i = 0; i < copies * 2 + 1; ++i) {
+    for (kor::u32 i = 0; i < copies * 2 + 1; ++i) {
         drawFrame(scene);
-        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), kValue) << "frame " << i << " read a copy that never got the write";
+        EXPECT_EQ(buffer->Read<kor::u32>(1).front(), kValue) << "frame " << i << " read a copy that never got the write";
     }
     scene.onUpdate = nullptr;
 }
@@ -1973,11 +1973,11 @@ TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferWrittenEveryFrameReadsBackThatFra
 
     // Every frame a new value — so an older write still on its way to a copy must never land on top
     // of a newer one.
-    glm::u32 value = 0;
-    scene.onUpdate = [&] { ++value; buffer->Write(std::array<glm::u32, 1>{ value }, 0); };
+    kor::u32 value = 0;
+    scene.onUpdate = [&] { ++value; buffer->Write(std::array<kor::u32, 1>{ value }, 0); };
     for (int i = 0; i < 12; ++i) {
         drawFrame(scene);
-        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), value) << "frame " << i << " read another frame's value";
+        EXPECT_EQ(buffer->Read<kor::u32>(1).front(), value) << "frame " << i << " read another frame's value";
     }
     scene.onUpdate = nullptr;
 }
@@ -1986,8 +1986,8 @@ TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferBuiltWithDataHoldsItInEveryCopy) 
     auto& scene = VkEnvironment::scene();
     const auto copies = kor::Context::Scheduler().ImageCount();
 
-    constexpr glm::u32 kValue = 0xF00D;
-    auto buffer = kor::Buffer::Builder<glm::u32>()
+    constexpr kor::u32 kValue = 0xF00D;
+    auto buffer = kor::Buffer::Builder<kor::u32>()
         .SetData(kValue)
         .SetUsage(kor::Buffer::Usage::eStorage | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst)
         .SetIsPerFrame(true)
@@ -1995,9 +1995,9 @@ TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferBuiltWithDataHoldsItInEveryCopy) 
         .Build();
     ASSERT_TRUE(static_cast<bool>(buffer));
 
-    for (glm::u32 i = 0; i < copies * 2 + 1; ++i) {
+    for (kor::u32 i = 0; i < copies * 2 + 1; ++i) {
         drawFrame(scene);
-        EXPECT_EQ(buffer->Read<glm::u32>(1).front(), kValue) << "frame " << i << " read a copy the initial data never reached";
+        EXPECT_EQ(buffer->Read<kor::u32>(1).front(), kValue) << "frame " << i << " read a copy the initial data never reached";
     }
 }
 
@@ -2013,22 +2013,22 @@ TEST_F(VkWindowTest, ADeviceLocalPerFrameBufferReleasesItsStagingOnceDelivered) 
     const auto copies = kor::Context::Scheduler().ImageCount();
     auto buffer = makeDeviceLocalPerFrameU32();
     ASSERT_TRUE(static_cast<bool>(buffer));
-    for (glm::u32 i = 0; i < copies + 1; ++i) drawFrame(scene);
-    (void)buffer->Read<glm::u32>(1);
+    for (kor::u32 i = 0; i < copies + 1; ++i) drawFrame(scene);
+    (void)buffer->Read<kor::u32>(1);
     drawFrame(scene);
     const auto baseline = kor::Context::Repository().TrackedResources();
 
-    glm::u32 value = 0;
-    scene.onUpdate = [&] { buffer->Write(std::array<glm::u32, 1>{ ++value }, 0); };
+    kor::u32 value = 0;
+    scene.onUpdate = [&] { buffer->Write(std::array<kor::u32, 1>{ ++value }, 0); };
     for (int i = 0; i < 20; ++i) drawFrame(scene);
     scene.onUpdate = nullptr;
-    buffer->Write(std::array<glm::u32, 1>{ ++value }, 0);   // and one between frames
+    buffer->Write(std::array<kor::u32, 1>{ ++value }, 0);   // and one between frames
 
     int frames = 0;
     for (; frames < 200 && kor::Context::Repository().TrackedResources() != baseline; ++frames) drawFrame(scene);
     EXPECT_EQ(kor::Context::Repository().TrackedResources(), baseline)
         << "staging buffers were still held " << frames << " frames after the last write";
-    EXPECT_EQ(buffer->Read<glm::u32>(1).front(), value);
+    EXPECT_EQ(buffer->Read<kor::u32>(1).front(), value);
 }
 
 // The moving-camera case: a per-frame buffer written with a *different* value every frame must read
@@ -2040,19 +2040,19 @@ TEST_F(VkWindowTest, APerFrameBufferWrittenEveryFrameReadsBackWhatItWasGiven) {
     auto& scene = VkEnvironment::scene();
 
     kor::Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+    rb.SetRawSize(static_cast<kor::i64>(sizeof(kor::u32)))
       .SetUsage(kor::Buffer::Usage::eUniform)
       .SetIsPerFrame(true)
       .SetType(kor::Buffer::Type::eDynamic);
     auto buffer = rb.Build();
     ASSERT_TRUE(static_cast<bool>(buffer));
 
-    for (glm::u32 i = 1; i <= 12; ++i) {
+    for (kor::u32 i = 1; i <= 12; ++i) {
         // Written where a camera writes it: from the repository update at the top of the frame.
-        const std::array<glm::u32, 1> value{ i };
-        buffer->Write(std::span<const glm::u32>(value), 0);
+        const std::array<kor::u32, 1> value{ i };
+        buffer->Write(std::span<const kor::u32>(value), 0);
 
-        const auto readBack = buffer->Read<glm::u32>(1).front();
+        const auto readBack = buffer->Read<kor::u32>(1).front();
         EXPECT_EQ(readBack, i) << "frame " << i << " read a value from another frame";
 
         drawFrame(scene);
@@ -2104,7 +2104,7 @@ TEST_F(VkWindowTest, MeasurePerFrameBufferWriteCost) {
     auto& scene = VkEnvironment::scene();
 
     kor::Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+    rb.SetRawSize(static_cast<kor::i64>(sizeof(kor::u32)))
       .SetUsage(kor::Buffer::Usage::eUniform)
       .SetIsPerFrame(true)
       .SetType(kor::Buffer::Type::eDynamic);
@@ -2115,8 +2115,8 @@ TEST_F(VkWindowTest, MeasurePerFrameBufferWriteCost) {
         const auto start = std::chrono::steady_clock::now();
         for (int i = 0; i < count; ++i) {
             if (writing) {
-                const std::array<glm::u32, 1> value{ static_cast<glm::u32>(i) };
-                buffer->Write(std::span<const glm::u32>(value), 0);
+                const std::array<kor::u32, 1> value{ static_cast<kor::u32>(i) };
+                buffer->Write(std::span<const kor::u32>(value), 0);
             }
             drawFrame(scene);
         }
@@ -2152,14 +2152,14 @@ TEST_F(VkWindowTest, CapturingTheCursorReportsNoMovementForIt) {
     EXPECT_EQ(glfwGetInputMode(*VkEnvironment::scene().SceneWindow(), GLFW_CURSOR), GLFW_CURSOR_DISABLED);
 
     drawFrame(scene);
-    EXPECT_EQ(VkEnvironment::scene().SceneInput().MousePositionDelta(), glm::vec2(0.f, 0.f))
+    EXPECT_EQ(VkEnvironment::scene().SceneInput().MousePositionDelta(), kor::Vec2(0.f, 0.f))
         << "the warp that capturing performs was reported as movement";
 
     VkEnvironment::scene().SceneInput().SetCursorMode(kor::Input::CursorMode::eNormal);
     EXPECT_EQ(glfwGetInputMode(*VkEnvironment::scene().SceneWindow(), GLFW_CURSOR), GLFW_CURSOR_NORMAL);
 
     drawFrame(scene);
-    EXPECT_EQ(VkEnvironment::scene().SceneInput().MousePositionDelta(), glm::vec2(0.f, 0.f))
+    EXPECT_EQ(VkEnvironment::scene().SceneInput().MousePositionDelta(), kor::Vec2(0.f, 0.f))
         << "releasing the cursor was reported as movement";
 
     // Hidden is the middle setting: invisible, but still free to move.
@@ -2269,16 +2269,16 @@ TEST_F(VkWindowTest, AResizedViewportTargetIsShownAtItsNewSize) {
     scene.resizeTargetEveryFrame = false;
 
     // Settle: one frame to resize, one to render into it and show it.
-    scene.viewportFramebuffer->Resize(glm::uvec2{ 96, 72 });
+    scene.viewportFramebuffer->Resize(kor::UVec2{ 96, 72 });
     for (int i = 0; i < 3; ++i) drawFrame(scene);
 
-    EXPECT_EQ(scene.viewportTarget->Extent(), glm::uvec3(96, 72, 1));
+    EXPECT_EQ(scene.viewportTarget->Extent(), kor::UVec3(96, 72, 1));
     EXPECT_EQ(scene.directViewport->Image().Get(), scene.viewportTarget.Get()) << "the viewport still shows the target";
 
     // The target holds what the pass cleared it to, at the new size — so it was rendered into after
     // being replaced, not left undefined.
     kor::Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(96) * 72 * 4)
+    rb.SetRawSize(static_cast<kor::i64>(96) * 72 * 4)
       .SetUsage(kor::Buffer::Usage::eTransferDst)
       .SetType(kor::Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -2288,11 +2288,11 @@ TEST_F(VkWindowTest, AResizedViewportTargetIsShownAtItsNewSize) {
                              readback);
     }, kor::CommandBuffer::Usage::eTransfer).Wait();
 
-    const auto texels = readback->Read<glm::u8vec4>();
+    const auto texels = readback->Read<kor::U8Vec4>();
     ASSERT_EQ(texels.size(), static_cast<std::size_t>(96) * 72);
     // The framebuffer's own clear colour, {0.2, 0, 0.4, 1}.
-    EXPECT_NEAR(texels.front().r, 51, 3);
-    EXPECT_NEAR(texels.front().b, 102, 3);
+    EXPECT_NEAR(texels.front().x, 51, 3);
+    EXPECT_NEAR(texels.front().z, 102, 3);
 }
 
 // A frame that never touches the window's framebuffer must still come out as the colour that
@@ -2333,7 +2333,7 @@ TEST_F(VkWindowTest, ATouchedScreenIsNotClearedAgain) {
         const auto framebuffer = VkEnvironment::scene().SceneWindow().DefaultFramebuffer();
         const auto screen = framebuffer->ColorImage(0);
 
-        cb.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
+        cb.ClearColorImage(screen, kor::Vec4{0.1f, 0.2f, 0.3f, 1.f});
         EXPECT_TRUE(cb.HasTouched(screen)) << "a clear is an interaction with the framebuffer";
 
     });
@@ -2355,7 +2355,7 @@ TEST_F(VkWindowTest, BlittingToTheScreenCountsAsTouchingIt) {
     const auto canvas = kor::Image::Builder{}
         .SetType(kor::Image::Type::e2D)
         .SetFormat(kor::Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2{64, 64})
+        .SetExtent(kor::UVec2{64, 64})
         .SetUsage(kor::Image::Usage::eTransferSrc | kor::Image::Usage::eTransferDst)
         .Build();
     ASSERT_TRUE(canvas);
@@ -2365,7 +2365,7 @@ TEST_F(VkWindowTest, BlittingToTheScreenCountsAsTouchingIt) {
         ASSERT_TRUE(framebuffer.Valid());
         const auto screen = framebuffer->ColorImage(0);
 
-        cb.ClearColorImage(canvas, glm::vec4{0.9f, 0.2f, 0.1f, 1.f})
+        cb.ClearColorImage(canvas, kor::Vec4{0.9f, 0.2f, 0.1f, 1.f})
           .BlitToScreen(canvas);
 
         EXPECT_TRUE(cb.HasTouched(screen))
@@ -2398,7 +2398,7 @@ TEST_F(VkWindowTest, FrameTimersReportTheFramesOwnWork) {
             const auto screen = framebuffer->ColorImage(0);
 
             cb.Timer("frame.clear", [&](kor::CommandBuffer& inner) {
-                inner.ClearColorImage(screen, glm::vec4{0.1f, 0.2f, 0.3f, 1.f});
+                inner.ClearColorImage(screen, kor::Vec4{0.1f, 0.2f, 0.3f, 1.f});
             });
         });
 
@@ -2471,22 +2471,22 @@ TEST_F(VkWindowTest, AnExecutedCommandBufferUsesTheCopyOfTheFrameItRunsIn) {
     ASSERT_GE(scheduler.ImageCount(), 2u) << "one copy per frame makes the question moot";
 
     kor::Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(sizeof(glm::u32)))
+    rb.SetRawSize(static_cast<kor::i64>(sizeof(kor::u32)))
       .SetUsage(kor::Flags(kor::Buffer::Usage::eUniform) | kor::Buffer::Usage::eTransferSrc)
       .SetIsPerFrame(true)
       .SetType(kor::Buffer::Type::eDynamic);
     auto perFrame = rb.Build();
     ASSERT_TRUE(static_cast<bool>(perFrame));
 
-    kor::Buffer::Builder<glm::u32> db;
-    db.SetData(std::vector<glm::u32>{0});
+    kor::Buffer::Builder<kor::u32> db;
+    db.SetData(std::vector<kor::u32>{0});
     db.SetUsage(kor::Flags(kor::Buffer::Usage::eStorage) | kor::Buffer::Usage::eTransferSrc | kor::Buffer::Usage::eTransferDst);
     db.SetType(kor::Buffer::Type::eDeviceLocal);
     auto destination = db.Build();
     ASSERT_TRUE(static_cast<bool>(destination));
 
     drawFrame(scene);
-    for (glm::u32 value = 1; value <= scheduler.ImageCount() * 2; ++value) {
+    for (kor::u32 value = 1; value <= scheduler.ImageCount() * 2; ++value) {
         std::unique_ptr<kor::CommandBuffer> copy;
         std::thread([&] {
             copy = kor::CommandBuffer::Create(kor::CommandBuffer::Usage::eGraphics);
@@ -2497,12 +2497,12 @@ TEST_F(VkWindowTest, AnExecutedCommandBufferUsesTheCopyOfTheFrameItRunsIn) {
 
         // This frame writes its own copy; the previous frame's still holds the previous value.
         drawCustomFrame(VkEnvironment::scene(), [&](kor::CommandBuffer&) {
-            const std::array<glm::u32, 1> v{ value };
-            perFrame->Write(std::span<const glm::u32>(v), 0);
+            const std::array<kor::u32, 1> v{ value };
+            perFrame->Write(std::span<const kor::u32>(v), 0);
         }, /*drawDefault=*/true);
 
         ASSERT_TRUE(seam::drawUntil(done, [&] { drawFrame(scene); }));
-        EXPECT_EQ(destination->Read<glm::u32>(1).front(), value)
+        EXPECT_EQ(destination->Read<kor::u32>(1).front(), value)
             << "the executed copy read another frame's copy of the per-frame buffer";
     }
 }

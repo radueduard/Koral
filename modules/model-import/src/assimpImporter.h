@@ -57,7 +57,7 @@ namespace kmdl {
             return relative;
         }
 
-        std::expected<std::vector<glm::mat4>, std::string> GetBoneTransformationMatrices() override;
+        std::expected<std::vector<kor::Mat4>, std::string> GetBoneTransformationMatrices() override;
 
     private:
         /**
@@ -70,17 +70,17 @@ namespace kmdl {
          * both go through these; the name-keyed public overrides resolve a name and then land here,
          * for a caller that has a name and nothing else.
          */
-        Mesh GetMeshAt(glm::u32 meshIndex);
-        Material GetMaterialAt(glm::u32 materialIndex);
+        Mesh GetMeshAt(kor::u32 meshIndex);
+        Material GetMaterialAt(kor::u32 materialIndex);
 
         Assimp::Importer _importer = {};
         Assimp::Exporter _exporter = {};
         const aiScene* _scene;
-        std::unordered_map<std::string, glm::u32> _meshNameToIndex;
-        std::unordered_map<glm::u32, std::string> _indexToMeshName;
+        std::unordered_map<std::string, kor::u32> _meshNameToIndex;
+        std::unordered_map<kor::u32, std::string> _indexToMeshName;
 
-        std::unordered_map<std::string, glm::u32> _materialNameToIndex;
-        std::unordered_map<glm::u32, std::string> _indexToMaterialName;
+        std::unordered_map<std::string, kor::u32> _materialNameToIndex;
+        std::unordered_map<kor::u32, std::string> _indexToMaterialName;
     };
 
     inline AssimpImporter::AssimpImporter(const std::filesystem::path &path) {
@@ -140,7 +140,7 @@ namespace kmdl {
         return GetMeshAt(meshIndexIt->second);
     }
 
-    inline Importer::Mesh AssimpImporter::GetMeshAt(const glm::u32 meshIndex) {
+    inline Importer::Mesh AssimpImporter::GetMeshAt(const kor::u32 meshIndex) {
         if (meshIndex >= _scene->mNumMeshes) {
             throw std::runtime_error("Mesh index out of range: " + std::to_string(meshIndex));
         }
@@ -154,7 +154,7 @@ namespace kmdl {
         }
 
         if (mesh->HasNormals()) {
-            std::vector<glm::vec3> normals;
+            std::vector<kor::Vec3> normals;
             normals.reserve(mesh->mNumVertices);
             for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
                 normals.emplace_back(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
@@ -163,9 +163,9 @@ namespace kmdl {
         }
 
         if (mesh->HasTangentsAndBitangents()) {
-            std::vector<glm::vec3> tangents;
+            std::vector<kor::Vec3> tangents;
             tangents.reserve(mesh->mNumVertices);
-            std::vector<glm::vec3> bitangents;
+            std::vector<kor::Vec3> bitangents;
             bitangents.reserve(mesh->mNumVertices);
             for (unsigned int i = 0; i < mesh->mNumVertices; ++i) {
                 tangents.emplace_back(mesh->mTangents[i].x, mesh->mTangents[i].y, mesh->mTangents[i].z);
@@ -177,7 +177,7 @@ namespace kmdl {
 
         for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_TEXTURECOORDS; ++i) {
             if (mesh->HasTextureCoords(i)) {
-                std::vector<glm::vec2> vertexUVs;
+                std::vector<kor::Vec2> vertexUVs;
                 vertexUVs.reserve(mesh->mNumVertices);
                 for (unsigned int j = 0; j < mesh->mNumVertices; ++j) {
                     vertexUVs.emplace_back(mesh->mTextureCoords[i][j].x, mesh->mTextureCoords[i][j].y);
@@ -188,7 +188,7 @@ namespace kmdl {
 
         for (unsigned int i = 0; i < AI_MAX_NUMBER_OF_COLOR_SETS; ++i) {
             if (mesh->HasVertexColors(i)) {
-                std::vector<glm::vec3> vertexColors;
+                std::vector<kor::Vec3> vertexColors;
                 vertexColors.reserve(mesh->mNumVertices);
                 for (unsigned int j = 0; j < mesh->mNumVertices; ++j) {
                     vertexColors.emplace_back(mesh->mColors[i][j].r, mesh->mColors[i][j].g, mesh->mColors[i][j].b);
@@ -198,8 +198,8 @@ namespace kmdl {
         }
 
         if (mesh->HasBones()) {
-            std::vector boneWeights(mesh->mNumVertices, glm::vec4(0.f));
-            std::vector boneIDs(mesh->mNumVertices, glm::uvec4(0));
+            std::vector boneWeights(mesh->mNumVertices, kor::Vec4(0.f));
+            std::vector boneIDs(mesh->mNumVertices, kor::UVec4(0));
             for (unsigned int i = 0; i < mesh->mNumBones; ++i) {
                 const auto& bone = mesh->mBones[i];
                 for (unsigned int j = 0; j < bone->mNumWeights; ++j) {
@@ -220,7 +220,7 @@ namespace kmdl {
         }
 
         if (mesh->HasFaces()) {
-            std::vector<glm::u32> indices;
+            std::vector<kor::u32> indices;
             indices.reserve(mesh->mNumFaces * 3); // Assuming triangulated mesh
             for (unsigned int i = 0; i < mesh->mNumFaces; ++i) {
                 const auto& face = mesh->mFaces[i];
@@ -247,7 +247,7 @@ namespace kmdl {
         return GetMaterialAt(materialIndexIt->second);
     }
 
-    inline Importer::Material AssimpImporter::GetMaterialAt(const glm::u32 materialIndex) {
+    inline Importer::Material AssimpImporter::GetMaterialAt(const kor::u32 materialIndex) {
         if (materialIndex >= _scene->mNumMaterials) {
             throw std::runtime_error("Material index out of range: " + std::to_string(materialIndex));
         }
@@ -258,12 +258,12 @@ namespace kmdl {
 
         aiColor4D baseColorFactor;
         if (material->Get(AI_MATKEY_BASE_COLOR, baseColorFactor) == AI_SUCCESS) {
-            result.baseColorFactor = glm::vec4(baseColorFactor.r, baseColorFactor.g, baseColorFactor.b, baseColorFactor.a);
+            result.baseColorFactor = kor::Vec4(baseColorFactor.r, baseColorFactor.g, baseColorFactor.b, baseColorFactor.a);
         }
 
         aiColor3D emissiveFactor;
         if (material->Get(AI_MATKEY_COLOR_EMISSIVE, emissiveFactor) == AI_SUCCESS) {
-            result.emissiveFactor = glm::vec4(emissiveFactor.r, emissiveFactor.g, emissiveFactor.b, 1.f);
+            result.emissiveFactor = kor::Vec4(emissiveFactor.r, emissiveFactor.g, emissiveFactor.b, 1.f);
         }
 
         float roughness;
@@ -294,7 +294,7 @@ namespace kmdl {
             } else if (mode == "MASK") {
                 float cutoff = 0.5f; // glTF default mask cutoff
                 material->Get(AI_MATKEY_GLTF_ALPHACUTOFF, cutoff);
-                result.alphaCutoff = glm::clamp(cutoff, 0.0001f, 1.0f);
+                result.alphaCutoff = kor::Clamp(cutoff, 0.0001f, 1.0f);
             } else { // "OPAQUE"
                 result.alphaCutoff = 1.0f;
             }
@@ -409,23 +409,23 @@ namespace kmdl {
         aiVector3D rotation;
         aiVector3D scale;
         node->mTransformation.Decompose(scale, rotation, position);
-        result.position = glm::vec3(position.x, position.y, position.z);
-        result.rotation = glm::degrees(glm::vec3(rotation.x, rotation.y, rotation.z));
-        result.scale = glm::vec3(scale.x, scale.y, scale.z);
+        result.position = kor::Vec3(position.x, position.y, position.z);
+        result.rotation = kor::Degrees(kor::Vec3(rotation.x, rotation.y, rotation.z));
+        result.scale = kor::Vec3(scale.x, scale.y, scale.z);
 
         result.aabb = {
-            .min = glm::vec3(std::numeric_limits<float>::max()),
-            .max = glm::vec3(std::numeric_limits<float>::min())
+            .min = kor::Vec3(std::numeric_limits<float>::max()),
+            .max = kor::Vec3(std::numeric_limits<float>::min())
         };
         for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
             const auto& mesh = _scene->mMeshes[node->mMeshes[i]];
             auto meshAABB = mesh->mAABB;
-            result.aabb.min = glm::min(result.aabb.min, glm::vec3(meshAABB.mMin.x, meshAABB.mMin.y, meshAABB.mMin.z));
-            result.aabb.max = glm::max(result.aabb.max, glm::vec3(meshAABB.mMax.x, meshAABB.mMax.y, meshAABB.mMax.z));
+            result.aabb.min = kor::Min(result.aabb.min, kor::Vec3(meshAABB.mMin.x, meshAABB.mMin.y, meshAABB.mMin.z));
+            result.aabb.max = kor::Max(result.aabb.max, kor::Vec3(meshAABB.mMax.x, meshAABB.mMax.y, meshAABB.mMax.z));
         }
         if (node->mNumMeshes == 0) {
-            result.aabb.min = glm::vec3(0.f);
-            result.aabb.max = glm::vec3(0.f);
+            result.aabb.min = kor::Vec3(0.f);
+            result.aabb.max = kor::Vec3(0.f);
         }
 
         result.name = node->mName.C_Str();
@@ -450,14 +450,14 @@ namespace kmdl {
             result.materials.emplace_back(GetMaterialAt(i));
         }
 
-        std::queue<std::pair<aiNode*, glm::u32>> nodeQueue;
+        std::queue<std::pair<aiNode*, kor::u32>> nodeQueue;
         nodeQueue.emplace(_scene->mRootNode, -1);
         while (!nodeQueue.empty()) {
             const auto [currentNode, parentIndex] = nodeQueue.front();
             nodeQueue.pop();
 
             const std::string nodeName = currentNode->mName.C_Str();
-            const auto nodeIndex = static_cast<glm::u32>(result.nodes.size());
+            const auto nodeIndex = static_cast<kor::u32>(result.nodes.size());
             result.nodes.emplace_back(GetNode(currentNode));
             if (parentIndex != -1) {
                 result.nodes[parentIndex].childIndices.emplace_back(nodeIndex);
@@ -498,18 +498,18 @@ namespace kmdl {
 
             Importer::Light out;
             out.name      = light->mName.C_Str();
-            out.position  = glm::vec3(pos.x, pos.y, pos.z);
-            out.direction = glm::vec3(dir.x, dir.y, dir.z);
+            out.position  = kor::Vec3(pos.x, pos.y, pos.z);
+            out.direction = kor::Vec3(dir.x, dir.y, dir.z);
             if (fromFile) {
                 out.color     = declared[i].color;
                 out.intensity = declared[i].intensity;
                 out.range     = declared[i].range;
             } else {
                 // Only the product is known: take its brightest channel as the intensity.
-                const glm::vec3 product(light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b);
-                const float brightest = glm::max(product.r, glm::max(product.g, product.b));
+                const kor::Vec3 product(light->mColorDiffuse.r, light->mColorDiffuse.g, light->mColorDiffuse.b);
+                const float brightest = kor::Max(product.x, kor::Max(product.y, product.z));
                 out.intensity = brightest;
-                out.color     = brightest > 0.f ? product / brightest : glm::vec3(1.f);
+                out.color     = brightest > 0.f ? product / brightest : kor::Vec3(1.f);
             }
             out.innerConeAngle = light->mAngleInnerCone;
             out.outerConeAngle = light->mAngleOuterCone;
@@ -526,8 +526,8 @@ namespace kmdl {
         return result;
     }
 
-    inline std::expected<std::vector<glm::mat4>, std::string> AssimpImporter::GetBoneTransformationMatrices() {
-        std::vector<glm::mat4> boneMatrices;
+    inline std::expected<std::vector<kor::Mat4>, std::string> AssimpImporter::GetBoneTransformationMatrices() {
+        std::vector<kor::Mat4> boneMatrices;
         boneMatrices.reserve(_scene->mNumMeshes);
         for (unsigned int i = 0; i < _scene->mNumSkeletons; ++i) {
             const auto& skeleton = _scene->mSkeletons[i];

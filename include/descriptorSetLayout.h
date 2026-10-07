@@ -44,7 +44,7 @@ namespace kor
          * valid for every pipeline made from the same shaders.
          */
         [[nodiscard]] static kor::Resource<DescriptorSetLayout> FromShaders(
-            std::span<const ResourceRef<const Shader>> shaders, glm::u32 set,
+            std::span<const ResourceRef<const Shader>> shaders, kor::u32 set,
             std::source_location where = std::source_location::current());
 
         /**
@@ -56,7 +56,7 @@ namespace kor
          */
         struct KORAL_API Binding {
             DescriptorType type;                                        ///< What kind of resource belongs here.
-            glm::u32 count = 1;                                         ///< How many, for an array binding.
+            kor::u32 count = 1;                                         ///< How many, for an array binding.
             Shader::AccessKind access = Shader::AccessKind::eRead;      ///< Whether shaders read it, write it, or both.
             Flags<Shader::Stage> stages;                                ///< Which shader stages reach it.
             bool active = true;                                         ///< Whether the entry point actually uses it; an unused binding needs no synchronisation.
@@ -65,7 +65,7 @@ namespace kor
             /// know the shape the shader asked for. Outside Matches(), for the same reason the
             /// rest of the non-interface state is. @see semantics.h
             std::vector<Shader::BlockMember> members;
-            glm::u32 blockSize = 0;
+            kor::u32 blockSize = 0;
 
             /// What the shader calls this binding, so a set can be written by name rather than by
             /// number. @see Shader::Descriptor::name
@@ -114,7 +114,7 @@ namespace kor
              * @param stages Which shader stages reach it.
              * @param active Whether the entry point actually uses it.
              */
-            Builder& AddBinding(glm::u32 binding, DescriptorType type, glm::u32 count = 1,
+            Builder& AddBinding(kor::u32 binding, DescriptorType type, kor::u32 count = 1,
                                 Shader::AccessKind access = Shader::AccessKind::eRead,
                                 Flags<Shader::Stage> stages = {}, bool active = true);
 
@@ -126,7 +126,7 @@ namespace kor
              * better served by the overload above, and may name a binding by filling in
              * Binding::name if it wants to write to it by name too.
              */
-            Builder& AddBinding(glm::u32 binding, Binding description);
+            Builder& AddBinding(kor::u32 binding, Binding description);
 
             /**
              * @brief Declares a buffer binding along with the block's fields.
@@ -134,9 +134,9 @@ namespace kor
              * Only reflection calls this — the members come out of the compiled shader, and a
              * hand-written layout has none to give. @see semantics.h
              */
-            Builder& AddBlockBinding(glm::u32 binding, DescriptorType type, glm::u32 count,
+            Builder& AddBlockBinding(kor::u32 binding, DescriptorType type, kor::u32 count,
                                      Shader::AccessKind access, Flags<Shader::Stage> stages, bool active,
-                                     std::vector<Shader::BlockMember> members, glm::u32 blockSize);
+                                     std::vector<Shader::BlockMember> members, kor::u32 blockSize);
 
             /** @brief One build attempt. Internal: prefer Build(). */
             [[nodiscard]] Result<std::unique_ptr<DescriptorSetLayout>> Create() const;
@@ -144,7 +144,7 @@ namespace kor
             /** @brief Creates the layout, poisoned rather than thrown if a binding is contradictory. */
             [[nodiscard]] kor::Resource<DescriptorSetLayout> Build(std::source_location where = std::source_location::current()) const;
         private:
-            std::map<glm::u32, Binding> _bindings;
+            std::map<kor::u32, Binding> _bindings;
             std::optional<Error> _error;
         };
 
@@ -162,10 +162,10 @@ namespace kor
          * matter and `| std::views::values` for the descriptions, and note that a lookup by
          * binding number is a find() on this rather than a scan.
          */
-        [[nodiscard]] const std::map<glm::u32, Binding>& Bindings() const { return _bindings; }
+        [[nodiscard]] const std::map<kor::u32, Binding>& Bindings() const { return _bindings; }
 
         /** @brief What kind of resource belongs at @p binding. */
-        [[nodiscard]] DescriptorType BindingType(glm::u32 binding) const;
+        [[nodiscard]] DescriptorType BindingType(kor::u32 binding) const;
 
         /**
          * @brief The number of the binding the shader calls @p name.
@@ -174,7 +174,7 @@ namespace kor
          * Matches either name a binding has: the variable's, and — for a block declared without an
          * instance name — the block type's. @see Binding::NamedBy
          */
-        [[nodiscard]] std::optional<glm::u32> FindBinding(std::string_view name) const;
+        [[nodiscard]] std::optional<kor::u32> FindBinding(std::string_view name) const;
 
         /**
          * @brief Every name this set's bindings answer to, in binding order, for a diagnostic.
@@ -207,6 +207,6 @@ namespace kor
 
     protected:
 
-        std::map<glm::u32, Binding> _bindings;
+        std::map<kor::u32, Binding> _bindings;
     };
 }

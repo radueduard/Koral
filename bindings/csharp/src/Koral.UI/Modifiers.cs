@@ -1,4 +1,3 @@
-using System.Numerics;
 
 namespace Koral.UI;
 
@@ -23,7 +22,7 @@ public static class WidgetModifiers
         Widgets.DecoratedBox(new Decoration().SetBorder(width, color).SetRadius(radius), widget);
 
     /// <summary>A shadow under its box.</summary>
-    public static Widget Shadow(this Widget widget, Color color, float blur, Vector2 offset = default, Radii radius = default) =>
+    public static Widget Shadow(this Widget widget, Color color, float blur, Vec2 offset = default, Radii radius = default) =>
         Widgets.DecoratedBox(new Decoration().SetShadow(color, blur, offset).SetRadius(radius), widget);
 
     /// <summary>Any decoration behind it.</summary>
@@ -51,7 +50,7 @@ public static class WidgetModifiers
     /// <summary>Cut to its box, with rounded corners.</summary>
     public static Widget Clip(this Widget widget, Radii radius = default) => Widgets.ClipRRect(radius, widget);
     /// <summary>Moved where it is drawn and hit; its layout unchanged.</summary>
-    public static Widget Offset(this Widget widget, Vector2 by) => Widgets.Translate(by, widget);
+    public static Widget Offset(this Widget widget, Vec2 by) => Widgets.Translate(by, widget);
     public static Widget Scrollable(this Widget widget, Axis axis = Axis.eVertical) => Widgets.ScrollView(widget, axis);
     public static Widget RepaintBoundary(this Widget widget) => Widgets.RepaintBoundary(widget);
 

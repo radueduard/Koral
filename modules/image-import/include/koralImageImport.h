@@ -56,7 +56,7 @@
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <error.h>
 #include <image.h>
@@ -96,11 +96,11 @@ namespace kimg
     struct KIMG_IMPORT_API CpuImage
     {
         std::vector<unsigned char> pixels;      ///< Tightly packed, in `format`'s own layout.
-        glm::uvec3 extent { 1, 1, 1 };          ///< Width, height, depth in texels.
+        kor::UVec3 extent { 1, 1, 1 };          ///< Width, height, depth in texels.
         kor::Image::Format format = kor::Image::Format::eRGBA8_UNORM;  ///< What one texel — or block — holds.
 
         /** @brief How many bytes `pixels` holds for this extent and format. */
-        [[nodiscard]] glm::u64 ByteCount() const { return kor::Image::SizeOfRegion(format, extent); }
+        [[nodiscard]] kor::u64 ByteCount() const { return kor::Image::SizeOfRegion(format, extent); }
     };
 
     /**
@@ -193,11 +193,11 @@ namespace kimg
      * six faces are written as the layers of a storage image.
      */
     [[nodiscard]] KIMG_IMPORT_API kor::Resource<kor::Image> LoadCubemapFromEquirectangular(
-        const std::filesystem::path& relativePath, glm::u32 faceSize = 0, bool generateMipmaps = false);
+        const std::filesystem::path& relativePath, kor::u32 faceSize = 0, bool generateMipmaps = false);
 
     /** @brief Loads and projects an equirectangular image without blocking the frame. @see LoadCubemapFromEquirectangular */
     [[nodiscard]] KIMG_IMPORT_API kor::Task<kor::Resource<kor::Image>> LoadCubemapFromEquirectangularAsync(
-        std::filesystem::path relativePath, glm::u32 faceSize = 0, bool generateMipmaps = false);
+        std::filesystem::path relativePath, kor::u32 faceSize = 0, bool generateMipmaps = false);
 
     /**
      * @brief Projects an equirectangular image already on the GPU onto a cubemap.
@@ -210,5 +210,5 @@ namespace kimg
      * have to come from a file — one rendered or generated in the same frame projects the same way.
      */
     [[nodiscard]] KIMG_IMPORT_API kor::Resource<kor::Image> EquirectangularToCubemap(
-        kor::ResourceRef<const kor::Image> equirect, glm::u32 faceSize = 0, bool generateMipmaps = false);
+        kor::ResourceRef<const kor::Image> equirect, kor::u32 faceSize = 0, bool generateMipmaps = false);
 }

@@ -1,4 +1,3 @@
-using System.Numerics;
 using Koral.UI;
 using static Koral.UI.Widgets;
 using Buffer = Koral.Buffer;
@@ -19,7 +18,7 @@ public sealed class MoreScene : Scene
     public uint Jump;
     public int Finished;
     public float Slid;
-    public Vector2 Laid;
+    public Vec2 Laid;
 
     public MoreScene() => Last = this;
 
@@ -38,9 +37,9 @@ public sealed class MoreScene : Scene
         // 70 to 80: a layout of its own, putting a green box thirty along.
         CustomLayout((context, constraints) =>
         {
-            Laid = context.Measure(0, BoxConstraints.Loose(new Vector2(100, 10)));
-            context.Place(0, new Vector2(30, 0));
-            return new Vector2(100, 10);
+            Laid = context.Measure(0, BoxConstraints.Loose(new Vec2(100, 10)));
+            context.Place(0, new Vec2(30, 0));
+            return new Vec2(100, 10);
         }, [Box(10, 10, new Color(0, 1, 0))]),
         // 80 on: a slider that says when it is let go of.
         SizedBox(100, 30, Slider(Slid, v => Slid = v, 0, 1, () => ++Finished)),
@@ -58,7 +57,7 @@ public sealed class MoreScene : Scene
             Separator(),
             Tooltip("a tip", Text("One line, cut", new TextStyle().Bold().SetItalic().SetUnderline(), TextAlign.eStart, false, 1, true)),
             ContextMenu([new MenuItem("Copy")], Disabled(Button("Off", null))),
-            AspectRatio(4f, FractionallySizedBox(0.5f, 0, TransformBox(Transform.Rotation(0.1f), Box(20, 5, Color.Green)))),
+            AspectRatio(4f, FractionallySizedBox(0.5f, 0, TransformBox(UI.Transform.Rotation(0.1f), Box(20, 5, Color.Green)))),
             SizeObserver((_, _) => { }, PopupAnchor(false, Text("popup"))),
             TextField(new TextFieldOptions().SetMultiline(2, 4).SetPlaceholder("notes")),
             StatusBar("Ready", StatusLevel.Warning),
@@ -111,7 +110,7 @@ public static partial class Cases
         var scene = app.OpenOffscreen("MoreScene", Offscreen(MoreScene.Side));
         var more = MoreScene.Last!;
         var input = scene.SceneInput;
-        input.FeedMousePosition(new Vector2(150, 150));
+        input.FeedMousePosition(new Vec2(150, 150));
         Frames(app, 4);
 
         bool Near(byte[] p, Color c) => Math.Abs(p[0] - c.R * 255) <= 4 && Math.Abs(p[1] - c.G * 255) <= 4 && Math.Abs(p[2] - c.B * 255) <= 4;
@@ -123,7 +122,7 @@ public static partial class Cases
         Check.That(more.Pixel(35, 65) is [0, 0, 255], $"Intrinsic: as wide as the widest: {Said(more.Pixel(35, 65))}");
         Check.That(more.Pixel(45, 65) is not [0, 0, 255], "and no wider");
         Check.That(more.Pixel(35, 75) is [0, 255, 0], $"a layout of its own places its child: {Said(more.Pixel(35, 75))}");
-        Check.Equal(new Vector2(10, 10), more.Laid, "and measures it");
+        Check.Equal(new Vec2(10, 10), more.Laid, "and measures it");
 
         more.Jump = 1;
         more.Ui.SetRoot(more.Root());
@@ -131,7 +130,7 @@ public static partial class Cases
         Check.Equal(101, more.First, "sent to an item, it is first in view");
         Check.That(more.Pixel(10, 15) is [0, 255, 0], $"an odd one: {Said(more.Pixel(10, 15))}");
 
-        void At(float x, float y) { input.FeedMousePosition(new Vector2(x, y)); Frames(app, 1); }
+        void At(float x, float y) { input.FeedMousePosition(new Vec2(x, y)); Frames(app, 1); }
         At(20, 95);
         input.FeedMouseButton(MouseButton.eLeft, true);
         Frames(app, 1);

@@ -5,7 +5,7 @@
 #pragma once
 
 #include <span>
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 struct GLFWwindow;
 
@@ -24,10 +24,10 @@ namespace kor::x11 {
     void BeginMoveResize(GLFWwindow* window, Grip grip, bool releaseHere);
 
     /** The only places of the window the pointer lands on, in pixels (x, y, width, height); elsewhere it goes through. */
-    void SetInputRegion(GLFWwindow* window, std::span<const glm::ivec4> rects);
+    void SetInputRegion(GLFWwindow* window, std::span<const kor::IVec4> rects);
 
     /** Where the pointer is on the desktop, in pixels: asked of the server, whatever window it is over. */
-    [[nodiscard]] glm::ivec2 CursorPosition();
+    [[nodiscard]] kor::IVec2 CursorPosition();
 
     /**
      * Says of a window not yet shown that showing it is not the user's doing, so the window manager

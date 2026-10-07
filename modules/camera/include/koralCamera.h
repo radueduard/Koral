@@ -14,7 +14,7 @@
  *
  * _player = kcam::PerspectiveCamera::Builder{}
  *     .SetName("player")
- *     .SetFovY(glm::radians(70.f))
+ *     .SetFovY(kor::Radians(70.f))
  *     .SetPosition({ 0.f, 1.5f, 5.f })
  *     .LookAt({ 0.f, 0.f, 0.f })
  *     .SetController({ .kind = kcam::Controller::Kind::eFly })  // the runtime moves it, before the scene runs
@@ -57,8 +57,8 @@
 #include <string_view>
 #include <utility>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include <kmath/matrix.h>
+#include <kmath/quaternion.h>
 
 #include <builder.h>
 #include <error.h>
@@ -476,7 +476,7 @@ namespace kcam
         float speed = 5.f;
 
         /** @brief Orbit: the point circled. Ignored by the others. */
-        glm::vec3 orbitTarget { 0.f, 0.f, 0.f };
+        kor::Vec3 orbitTarget { 0.f, 0.f, 0.f };
 
         /** @brief The keys and mouse button this controller answers to. */
         Bindings bindings;
@@ -493,22 +493,22 @@ namespace kcam
     {
     public:
         /** @brief World-space position of the eye. */
-        [[nodiscard]] virtual glm::vec3 Position() const = 0;
+        [[nodiscard]] virtual kor::Vec3 Position() const = 0;
 
         /** @brief World-space orientation. Identity looks down -Z with +Y up. */
-        [[nodiscard]] virtual glm::quat Rotation() const = 0;
+        [[nodiscard]] virtual kor::Quat Rotation() const = 0;
 
         /** @brief The direction the camera looks along, derived from @ref rotation. */
-        [[nodiscard]] virtual glm::vec3 Forward() const = 0;
+        [[nodiscard]] virtual kor::Vec3 Forward() const = 0;
 
-        virtual void SetPosition(glm::vec3 position) = 0;
-        virtual void SetRotation(glm::quat rotation) = 0;
+        virtual void SetPosition(kor::Vec3 position) = 0;
+        virtual void SetRotation(kor::Quat rotation) = 0;
 
         /** @brief Turns the camera (from wherever it stands) to look at @p target. */
-        virtual void LookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f }) = 0;
+        virtual void LookAt(kor::Vec3 target, kor::Vec3 up = { 0.f, 1.f, 0.f }) = 0;
 
         /** @brief World → view. */
-        [[nodiscard]] virtual const glm::mat4& View() const = 0;
+        [[nodiscard]] virtual const kor::Mat4& View() const = 0;
 
         /**
          * @brief View → clip, in the engine's clip conventions (zero-to-one depth, Y down).
@@ -517,10 +517,10 @@ namespace kcam
          * rasterised with, so it is what every camera semantic but the unjittered and previous
          * ones is built from.
          */
-        [[nodiscard]] virtual const glm::mat4& Projection() const = 0;
+        [[nodiscard]] virtual const kor::Mat4& Projection() const = 0;
 
         /** @brief Projection() * View(), cached — the matrix a draw usually wants. */
-        [[nodiscard]] virtual const glm::mat4& ViewProjection() const = 0;
+        [[nodiscard]] virtual const kor::Mat4& ViewProjection() const = 0;
 
         // ---- temporal effects ---------------------------------------------------------------------
 
@@ -538,10 +538,10 @@ namespace kcam
         [[nodiscard]] virtual bool Jittering() const = 0;
 
         /** @brief This frame's jitter, in clip space (NDC units); zero when jitter is off. */
-        [[nodiscard]] virtual glm::vec2 Jitter() const = 0;
+        [[nodiscard]] virtual kor::Vec2 Jitter() const = 0;
 
         /** @brief ViewProjection() without the jitter: where a point sits on the pixel grid itself. */
-        [[nodiscard]] virtual const glm::mat4& UnjitteredViewProjection() const = 0;
+        [[nodiscard]] virtual const kor::Mat4& UnjitteredViewProjection() const = 0;
 
         /**
          * @brief The unjittered view-projection the previous frame was rendered with.
@@ -549,7 +549,7 @@ namespace kcam
          * Maps a world-space point to where it was on screen last frame — the reprojection a TAA
          * resolve or motion vectors need. The same as UnjitteredViewProjection() on the first frame.
          */
-        [[nodiscard]] virtual const glm::mat4& PreviousViewProjection() const = 0;
+        [[nodiscard]] virtual const kor::Mat4& PreviousViewProjection() const = 0;
 
         /** @brief The name given at build time, for interfaces and logs. */
         [[nodiscard]] virtual std::string_view Name() const = 0;
@@ -657,7 +657,7 @@ namespace kcam
         { return { .kind = Kind::eImage, .image = std::move(image) }; }
 
         /** @brief The extent to match, or nothing when there is nothing to read. */
-        [[nodiscard]] KCAM_API std::optional<glm::uvec2> Extent() const;
+        [[nodiscard]] KCAM_API std::optional<kor::UVec2> Extent() const;
 
         /**
          * @brief Whether this names a resource that cannot be read — destroyed, or poisoned.
@@ -679,12 +679,12 @@ namespace kcam
         struct KCAM_API Builder : kor::Builder
         {
             std::string name = "camera";            ///< Label for interfaces and logs.
-            float fovY = glm::radians(60.f);        ///< Vertical field of view, in radians.
+            float fovY = kor::Radians(60.f);        ///< Vertical field of view, in radians.
             float aspect = 16.f / 9.f;              ///< Width over height. @see setFollowWindowAspect
             float zNear = 0.1f;                     ///< Near plane. Must be > 0.
             float zFar = 1000.f;                    ///< Far plane. Must be > zNear.
-            glm::vec3 position = { 0.f, 0.f, 3.f }; ///< Starting position.
-            glm::quat rotation = { 1.f, 0.f, 0.f, 0.f };  ///< Starting orientation. @see lookAt
+            kor::Vec3 position = { 0.f, 0.f, 3.f }; ///< Starting position.
+            kor::Quat rotation = { 1.f, 0.f, 0.f, 0.f };  ///< Starting orientation. @see lookAt
 
             Controller controller;                  ///< What drives it each frame, if anything.
             AspectSource aspectSource;              ///< What its aspect is kept matched to, if anything.
@@ -704,13 +704,13 @@ namespace kcam
             { this->zNear = zNear; this->zFar = zFar; return *this; }
 
             /** @brief Sets where the camera starts. */
-            Builder& SetPosition(const glm::vec3 position) { this->position = position; return *this; }
+            Builder& SetPosition(const kor::Vec3 position) { this->position = position; return *this; }
 
             /** @brief Sets which way the camera starts out facing. */
-            Builder& SetRotation(const glm::quat rotation) { this->rotation = rotation; return *this; }
+            Builder& SetRotation(const kor::Quat rotation) { this->rotation = rotation; return *this; }
 
             /** @brief Points the camera at @p target from wherever @ref setPosition put it. */
-            Builder& LookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f });
+            Builder& LookAt(kor::Vec3 target, kor::Vec3 up = { 0.f, 1.f, 0.f });
 
             /**
              * @brief Hands the camera to the runtime, which moves it from input every frame.
@@ -803,8 +803,8 @@ namespace kcam
             float bottom = -1.f, top = 1.f;         ///< Vertical extent of the view volume.
             float zNear = 0.1f;                     ///< Near plane.
             float zFar = 1000.f;                    ///< Far plane. Must be > zNear.
-            glm::vec3 position = { 0.f, 0.f, 3.f }; ///< Starting position.
-            glm::quat rotation = { 1.f, 0.f, 0.f, 0.f };  ///< Starting orientation. @see lookAt
+            kor::Vec3 position = { 0.f, 0.f, 3.f }; ///< Starting position.
+            kor::Quat rotation = { 1.f, 0.f, 0.f, 0.f };  ///< Starting orientation. @see lookAt
 
             Controller controller;                  ///< What drives it each frame, if anything.
             bool released = true;                   ///< Whether it starts with the cursor let go. @see setReleased
@@ -821,13 +821,13 @@ namespace kcam
             { this->zNear = zNear; this->zFar = zFar; return *this; }
 
             /** @brief Sets where the camera starts. */
-            Builder& SetPosition(const glm::vec3 position) { this->position = position; return *this; }
+            Builder& SetPosition(const kor::Vec3 position) { this->position = position; return *this; }
 
             /** @brief Sets which way the camera starts out facing. */
-            Builder& SetRotation(const glm::quat rotation) { this->rotation = rotation; return *this; }
+            Builder& SetRotation(const kor::Quat rotation) { this->rotation = rotation; return *this; }
 
             /** @brief Points the camera at @p target from wherever @ref setPosition put it. */
-            Builder& LookAt(glm::vec3 target, glm::vec3 up = { 0.f, 1.f, 0.f });
+            Builder& LookAt(kor::Vec3 target, kor::Vec3 up = { 0.f, 1.f, 0.f });
 
             /** @brief Hands the camera to the runtime, which moves it from input every frame. */
             Builder& SetController(const Controller& controller)
@@ -845,7 +845,7 @@ namespace kcam
                 std::source_location where = std::source_location::current()) const;
         };
 
-        [[nodiscard]] virtual glm::vec4 Bounds() const = 0;   ///< left, right, bottom, top.
+        [[nodiscard]] virtual kor::Vec4 Bounds() const = 0;   ///< left, right, bottom, top.
         [[nodiscard]] virtual float ZNear() const = 0;
         [[nodiscard]] virtual float ZFar() const = 0;
 

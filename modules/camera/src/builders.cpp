@@ -65,14 +65,14 @@ namespace kcam
 
     // ---- perspective ----------------------------------------------------------------------------
 
-    PerspectiveCamera::Builder& PerspectiveCamera::Builder::LookAt(const glm::vec3 target, const glm::vec3 up)
+    PerspectiveCamera::Builder& PerspectiveCamera::Builder::LookAt(const kor::Vec3 target, const kor::Vec3 up)
     {
-        const glm::vec3 to = target - position;
-        if (glm::dot(to, to) < 1e-12f) {
+        const kor::Vec3 to = target - position;
+        if (kor::Dot(to, to) < 1e-12f) {
             Warn("lookAt() was given the camera's own position; the rotation is unchanged");
             return *this;
         }
-        rotation = glm::quatLookAt(glm::normalize(to), up);
+        rotation = kor::Quat::LookRotation(kor::Normalize(to), up);
         return *this;
     }
 
@@ -80,10 +80,10 @@ namespace kcam
     {
         BeginAttempt();
 
-        if (fovY <= 0.f || fovY >= glm::pi<float>())
+        if (fovY <= 0.f || fovY >= kor::Pi<float>)
             AddError(kor::ErrorCode::eInvalidArgument,
                      std::format("the vertical field of view must be between 0 and pi radians, "
-                                 "not {} ({:.1f} degrees)", fovY, glm::degrees(fovY)));
+                                 "not {} ({:.1f} degrees)", fovY, kor::Degrees(fovY)));
 
         if (aspect <= 0.f)
             AddError(kor::ErrorCode::eInvalidArgument,
@@ -106,14 +106,14 @@ namespace kcam
 
     // ---- orthographic ---------------------------------------------------------------------------
 
-    OrthographicCamera::Builder& OrthographicCamera::Builder::LookAt(const glm::vec3 target, const glm::vec3 up)
+    OrthographicCamera::Builder& OrthographicCamera::Builder::LookAt(const kor::Vec3 target, const kor::Vec3 up)
     {
-        const glm::vec3 to = target - position;
-        if (glm::dot(to, to) < 1e-12f) {
+        const kor::Vec3 to = target - position;
+        if (kor::Dot(to, to) < 1e-12f) {
             Warn("lookAt() was given the camera's own position; the rotation is unchanged");
             return *this;
         }
-        rotation = glm::quatLookAt(glm::normalize(to), up);
+        rotation = kor::Quat::LookRotation(kor::Normalize(to), up);
         return *this;
     }
 

@@ -39,7 +39,7 @@ using kor::Shader;
 
 namespace {
 
-constexpr glm::u64 kElements = 4u << 20;   // 16 MiB of uint32
+constexpr kor::u64 kElements = 4u << 20;   // 16 MiB of uint32
 constexpr int kRepeats = 5;
 
 // Reduced by minimum over repeats: a transfer can only be *slowed* by something else on the
@@ -90,7 +90,7 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
 
     for (const auto type : { Buffer::Type::eDeviceLocal, Buffer::Type::eStaging, Buffer::Type::eReadback, Buffer::Type::eDynamic, Buffer::Type::eDeviceDynamic }) {
         Buffer::RawBuilder builder;
-        builder.SetRawSize(static_cast<glm::i64>(kElements * sizeof(std::uint32_t)))
+        builder.SetRawSize(static_cast<kor::i64>(kElements * sizeof(std::uint32_t)))
                .SetUsage(Buffer::Usage::eStorage | Buffer::Usage::eTransferSrc | Buffer::Usage::eTransferDst)
                .SetType(type);
         auto buffer = builder.Build();
@@ -136,7 +136,7 @@ TEST_F(GpuTest, MeasureHostAccessCostPerBufferType) {
             cb->BindDescriptorSet(0, descriptorSet);
             cb->BeginTimer("pass");
             for (int i = 0; i < kDispatches; ++i)
-                cb->Dispatch(static_cast<glm::u32>(kElements / kLocalSize), 1, 1);
+                cb->Dispatch(static_cast<kor::u32>(kElements / kLocalSize), 1, 1);
             cb->EndTimer();
             cb->End();
             ASSERT_TRUE(cb->Submit());

@@ -56,7 +56,7 @@ namespace kui
 
     Rect Transform::MapRect(const Rect& r) const
     {
-        const glm::vec2 p[4] = { Apply({ r.left, r.top }), Apply({ r.right, r.top }), Apply({ r.right, r.bottom }), Apply({ r.left, r.bottom }) };
+        const kor::Vec2 p[4] = { Apply({ r.left, r.top }), Apply({ r.right, r.top }), Apply({ r.right, r.bottom }), Apply({ r.left, r.bottom }) };
         Rect out { p[0].x, p[0].y, p[0].x, p[0].y };
         for (const auto& q : p) {
             out.left = std::min(out.left, q.x); out.top = std::min(out.top, q.y);
@@ -65,26 +65,26 @@ namespace kui
         return out;
     }
 
-    Gradient Gradient::Linear(const glm::vec2 from, const glm::vec2 to, std::vector<GradientStop> stops)
+    Gradient Gradient::Linear(const kor::Vec2 from, const kor::Vec2 to, std::vector<GradientStop> stops)
     {
         Gradient g;
         g.type = Type::eLinear; g.start = from; g.end = to; g.stops = std::move(stops);
         return g;
     }
 
-    Gradient Gradient::Linear(const glm::vec2 from, const glm::vec2 to, const Color a, const Color b)
+    Gradient Gradient::Linear(const kor::Vec2 from, const kor::Vec2 to, const Color a, const Color b)
     {
         return Linear(from, to, { { 0.f, a }, { 1.f, b } });
     }
 
-    Gradient Gradient::Radial(const glm::vec2 center, const float radius, std::vector<GradientStop> stops)
+    Gradient Gradient::Radial(const kor::Vec2 center, const float radius, std::vector<GradientStop> stops)
     {
         Gradient g;
         g.type = Type::eRadial; g.start = center; g.radius = radius; g.stops = std::move(stops);
         return g;
     }
 
-    Gradient Gradient::Sweep(const glm::vec2 center, const float angle, std::vector<GradientStop> stops)
+    Gradient Gradient::Sweep(const kor::Vec2 center, const float angle, std::vector<GradientStop> stops)
     {
         Gradient g;
         g.type = Type::eSweep; g.start = center; g.angle = angle; g.stops = std::move(stops);
@@ -289,8 +289,8 @@ namespace kui
     }
 
     std::size_t Canvas::SaveCount() const { return _state->stack.size(); }
-    Canvas& Canvas::Translate(const glm::vec2 by) { _state->current.transform = _state->current.transform * Transform::Translation(by); return *this; }
-    Canvas& Canvas::Scale(const glm::vec2 by) { _state->current.transform = _state->current.transform * Transform::Scaling(by); return *this; }
+    Canvas& Canvas::Translate(const kor::Vec2 by) { _state->current.transform = _state->current.transform * Transform::Translation(by); return *this; }
+    Canvas& Canvas::Scale(const kor::Vec2 by) { _state->current.transform = _state->current.transform * Transform::Scaling(by); return *this; }
     Canvas& Canvas::Rotate(const float radians) { _state->current.transform = _state->current.transform * Transform::Rotation(radians); return *this; }
     Canvas& Canvas::Concat(const Transform& t) { _state->current.transform = _state->current.transform * t; return *this; }
     Canvas& Canvas::SetTransform(const Transform& t) { _state->current.transform = t; return *this; }
@@ -347,7 +347,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawCircle(const glm::vec2 center, const float radius, const Paint& paint)
+    Canvas& Canvas::DrawCircle(const kor::Vec2 center, const float radius, const Paint& paint)
     {
         DrawOval(Rect::FromCenter(center, radius * 2.f, radius * 2.f), paint);
         return *this;
@@ -365,7 +365,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawArc(const glm::vec2 center, const float radius, const float start, const float sweep,
+    Canvas& Canvas::DrawArc(const kor::Vec2 center, const float radius, const float start, const float sweep,
                          const bool useCenter, const Paint& paint)
     {
         if (!useCenter && !paint.HasStroke()) return *this;
@@ -380,7 +380,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawLine(const glm::vec2 from, const glm::vec2 to, const Paint& paint)
+    Canvas& Canvas::DrawLine(const kor::Vec2 from, const kor::Vec2 to, const Paint& paint)
     {
         Paint line = paint;
         if (!line.HasStroke()) {
@@ -398,7 +398,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawTriangle(const glm::vec2 a, const glm::vec2 b, const glm::vec2 c, const Paint& paint)
+    Canvas& Canvas::DrawTriangle(const kor::Vec2 a, const kor::Vec2 b, const kor::Vec2 c, const Paint& paint)
     {
         if (!paint.HasFill() && !paint.HasStroke()) return *this;
         // The SDF triangle's stroke would round its corners; a joined stroke is a path's job.
@@ -408,7 +408,7 @@ namespace kui
                 fill.stroke.width = 0.f;
                 DrawTriangle(a, b, c, fill);
             }
-            const glm::vec2 points[] = { a, b, c };
+            const kor::Vec2 points[] = { a, b, c };
             Paint stroke = paint;
             stroke.fill = colors::Transparent;
             stroke.gradient.reset();
@@ -427,7 +427,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawQuadraticBezier(const glm::vec2 from, const glm::vec2 control, const glm::vec2 to, const Paint& paint)
+    Canvas& Canvas::DrawQuadraticBezier(const kor::Vec2 from, const kor::Vec2 control, const kor::Vec2 to, const Paint& paint)
     {
         Paint line = paint;
         if (!line.HasStroke()) {
@@ -455,7 +455,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawCubicBezier(const glm::vec2 from, const glm::vec2 c1, const glm::vec2 c2, const glm::vec2 to, const Paint& paint)
+    Canvas& Canvas::DrawCubicBezier(const kor::Vec2 from, const kor::Vec2 c1, const kor::Vec2 c2, const kor::Vec2 to, const Paint& paint)
     {
         Path path;
         path.MoveTo(from).CubicTo(c1, c2, to);
@@ -467,7 +467,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawPolyline(const std::span<const glm::vec2> points, const Paint& paint)
+    Canvas& Canvas::DrawPolyline(const std::span<const kor::Vec2> points, const Paint& paint)
     {
         Path path;
         path.AddPolygon(points, false);
@@ -479,7 +479,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawPolygon(const std::span<const glm::vec2> points, const Paint& paint)
+    Canvas& Canvas::DrawPolygon(const std::span<const kor::Vec2> points, const Paint& paint)
     {
         Path path;
         path.AddPolygon(points, true);
@@ -496,7 +496,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawShadow(const RRect& rrect, const Color color, const float blur, const glm::vec2 offset, const float spread)
+    Canvas& Canvas::DrawShadow(const RRect& rrect, const Color color, const float blur, const kor::Vec2 offset, const float spread)
     {
         if (!color.Visible()) return *this;
         const Rect box = rrect.rect.Shift(offset).Inflate(spread);
@@ -529,7 +529,7 @@ namespace kui
     Canvas& Canvas::DrawImage(const kor::ResourceRef<const kor::Image>& image, const Rect& destination, const Rect& source, const Color tint)
     {
         if (!image.Valid() || destination.Empty()) return *this;
-        const glm::vec2 extent = glm::vec2(image->Extent().x, image->Extent().y);
+        const kor::Vec2 extent = kor::Vec2(image->Extent().x, image->Extent().y);
         const Rect src = source.Empty() ? Rect::FromSize(extent) : source;
         Instance it = _state->Make(detail::eImage, destination);
         it.shape0 = { destination.left, destination.top, destination.right, destination.bottom };
@@ -540,7 +540,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawParagraph(const Paragraph& paragraph, const glm::vec2 position)
+    Canvas& Canvas::DrawParagraph(const Paragraph& paragraph, const kor::Vec2 position)
     {
         const TextStyle& style = paragraph.Style();
         // Of no colour of its own, it is the colour of text in the theme this is drawn in.
@@ -599,7 +599,7 @@ namespace kui
         return *this;
     }
 
-    Canvas& Canvas::DrawText(const std::string_view text, const glm::vec2 position, const TextStyle& style)
+    Canvas& Canvas::DrawText(const std::string_view text, const kor::Vec2 position, const TextStyle& style)
     {
         const Paragraph paragraph(std::string(text), style);
         DrawParagraph(paragraph, position);
@@ -681,12 +681,12 @@ namespace kui
     // ---- the pen ----------------------------------------------------------------------------------------
 
     Canvas& Canvas::BeginPath() { _state->pen = Path(); return *this; }
-    Canvas& Canvas::MoveTo(const glm::vec2 point) { _state->pen.MoveTo(point); return *this; }
-    Canvas& Canvas::DrawLineTo(const glm::vec2 point) { _state->pen.LineTo(point); return *this; }
-    Canvas& Canvas::DrawQuadTo(const glm::vec2 control, const glm::vec2 point) { _state->pen.QuadTo(control, point); return *this; }
-    Canvas& Canvas::DrawCubicTo(const glm::vec2 c1, const glm::vec2 c2, const glm::vec2 point) { _state->pen.CubicTo(c1, c2, point); return *this; }
-    Canvas& Canvas::DrawArcTo(const glm::vec2 center, const float radius, const float start, const float sweep) { _state->pen.ArcTo(center, radius, start, sweep); return *this; }
-    Canvas& Canvas::DrawArcTo(const glm::vec2 corner, const glm::vec2 to, const float radius) { _state->pen.ArcTo(corner, to, radius); return *this; }
+    Canvas& Canvas::MoveTo(const kor::Vec2 point) { _state->pen.MoveTo(point); return *this; }
+    Canvas& Canvas::DrawLineTo(const kor::Vec2 point) { _state->pen.LineTo(point); return *this; }
+    Canvas& Canvas::DrawQuadTo(const kor::Vec2 control, const kor::Vec2 point) { _state->pen.QuadTo(control, point); return *this; }
+    Canvas& Canvas::DrawCubicTo(const kor::Vec2 c1, const kor::Vec2 c2, const kor::Vec2 point) { _state->pen.CubicTo(c1, c2, point); return *this; }
+    Canvas& Canvas::DrawArcTo(const kor::Vec2 center, const float radius, const float start, const float sweep) { _state->pen.ArcTo(center, radius, start, sweep); return *this; }
+    Canvas& Canvas::DrawArcTo(const kor::Vec2 corner, const kor::Vec2 to, const float radius) { _state->pen.ArcTo(corner, to, radius); return *this; }
     Canvas& Canvas::ClosePath() { _state->pen.Close(); return *this; }
     const Path& Canvas::CurrentPath() const { return _state->pen; }
 

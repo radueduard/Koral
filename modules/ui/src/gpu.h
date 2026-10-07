@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <image.h>
 #include <resource.h>
@@ -26,13 +26,13 @@ namespace kui::detail
     inline constexpr std::uint32_t None = 0xffff;
 
     struct Instance {
-        glm::vec4 bounds {};
-        glm::vec4 xform { 1.f, 0.f, 0.f, 1.f };
-        glm::vec2 translate {};
+        kor::Vec4 bounds {};
+        kor::Vec4 xform { 1.f, 0.f, 0.f, 1.f };
+        kor::Vec2 translate {};
         std::uint32_t layerClip = None;     ///< layer << 16 | clip
         std::uint32_t kindFlags = 0;        ///< texture << 16 | flags << 8 | kind
-        glm::vec4 shape0 {};
-        glm::vec4 shape1 {};
+        kor::Vec4 shape0 {};
+        kor::Vec4 shape1 {};
         std::uint32_t fill = 0;
         std::uint32_t stroke = 0;
         float strokeWidth = 0.f;
@@ -48,39 +48,39 @@ namespace kui::detail
     static_assert(sizeof(Instance) == 96);
 
     struct Vertex {
-        glm::vec2 position {};
+        kor::Vec2 position {};
         float coverage = 1.f;
         std::uint32_t instance = 0;
     };
     static_assert(sizeof(Vertex) == 16);
 
     struct GpuLayer {
-        glm::vec4 m { 1.f, 0.f, 0.f, 1.f };
-        glm::vec2 t {};
+        kor::Vec4 m { 1.f, 0.f, 0.f, 1.f };
+        kor::Vec2 t {};
         float opacity = 1.f;
         std::uint32_t pad = 0;
     };
     static_assert(sizeof(GpuLayer) == 32);
 
     struct GpuClip {
-        glm::vec4 m { 1.f, 0.f, 0.f, 1.f };
-        glm::vec2 t {};
+        kor::Vec4 m { 1.f, 0.f, 0.f, 1.f };
+        kor::Vec2 t {};
         std::uint32_t parent = None;
         std::uint32_t pad = 0;
-        glm::vec4 rect {};
-        glm::vec4 radii {};
+        kor::Vec4 rect {};
+        kor::Vec4 radii {};
     };
     static_assert(sizeof(GpuClip) == 64);
 
     struct GpuGradient {
-        glm::vec4 geometry {};
+        kor::Vec4 geometry {};
         std::uint32_t type = 0, count = 0, pad0 = 0, pad1 = 0;
         std::uint32_t colors[8] {};
         float stops[8] {};
     };
     static_assert(sizeof(GpuGradient) == 96);
 
-    inline glm::vec4 Pack(const Transform& t) { return { t.a, t.b, t.c, t.d }; }
+    inline kor::Vec4 Pack(const Transform& t) { return { t.a, t.b, t.c, t.d }; }
 }
 
 namespace kui

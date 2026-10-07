@@ -14,7 +14,7 @@
 #include <utility>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "commandBuffer.h"
@@ -153,7 +153,7 @@ namespace kor
         /** @brief What the view drew. @see Window::Image */
         [[nodiscard]] ResourceRef<const kor::Image> Image() const;
         /** @brief Asks for a new size, taken at the start of the next frame. @see Window::Resize */
-        void Resize(glm::uvec2 extent);
+        void Resize(kor::UVec2 extent);
         /** @brief Whether it is drawn at all. A view nobody is looking at can be switched off. */
         [[nodiscard]] bool Enabled() const { return _enabled; }
         void SetEnabled(bool enabled) { _enabled = enabled; }
@@ -247,7 +247,7 @@ namespace kor
         virtual void Render(kor::CommandBuffer& commandBuffer) {}
 
         /** @brief Called the frame after the window's drawable area changed size. */
-        virtual void OnResize(glm::uvec2 extent) {}
+        virtual void OnResize(kor::UVec2 extent) {}
 
         /** @brief Called when another scene is pushed over this one in its window. It is neither updated nor drawn until OnResume. */
         virtual void OnSuspend() {}
@@ -272,7 +272,7 @@ namespace kor
          * LoadState read and write, for saving a game or an editor's play-mode snapshot.
          *
          * @code
-         * struct Progress { glm::vec3 camera; int level = 1; };
+         * struct Progress { kor::Vec3 camera; int level = 1; };
          * KORAL_REFLECT(Progress, camera, level)
          *
          * class Game final : public kor::Scene {
@@ -339,7 +339,7 @@ namespace kor
         /** @brief The current scene's window. @see kor::Window */
         struct KORAL_API Window {
             [[nodiscard]] static kor::Window& Get();
-            [[nodiscard]] static glm::uvec2 Extent();
+            [[nodiscard]] static kor::UVec2 Extent();
             [[nodiscard]] static bool HasResized();
             [[nodiscard]] static bool IsPaused();
             [[nodiscard]] static bool IsFocused();
@@ -367,10 +367,10 @@ namespace kor
             [[nodiscard]] static std::optional<MouseButton> FirstMouseButtonPressed();
             [[nodiscard]] static bool InterfaceWantsMouse();
             [[nodiscard]] static bool InterfaceWantsKeyboard();
-            [[nodiscard]] static const glm::vec2& MousePosition();
-            [[nodiscard]] static const glm::vec2& MousePositionDelta();
-            [[nodiscard]] static const glm::vec2& MouseScrollDelta();
-            [[nodiscard]] static const glm::vec2& LastMousePosition();
+            [[nodiscard]] static const kor::Vec2& MousePosition();
+            [[nodiscard]] static const kor::Vec2& MousePositionDelta();
+            [[nodiscard]] static const kor::Vec2& MouseScrollDelta();
+            [[nodiscard]] static const kor::Vec2& LastMousePosition();
             static void SetCursorMode(CursorMode mode);
             [[nodiscard]] static CursorMode CurrentCursorMode();
             [[nodiscard]] static std::string Describe(Key key) { return kor::Input::Describe(key); }
@@ -387,41 +387,41 @@ namespace kor
             [[nodiscard]] static bool IsActionHeld(std::string_view action);
             [[nodiscard]] static bool IsActionReleased(std::string_view action);
             [[nodiscard]] static float Axis(std::string_view axis);
-            [[nodiscard]] static glm::vec2 Axis2D(std::string_view x, std::string_view y);
+            [[nodiscard]] static kor::Vec2 Axis2D(std::string_view x, std::string_view y);
         };
 
         /** @brief The current scene's debug lines. @see kor::DebugDraw */
         struct KORAL_API Debug {
             using Style = kor::DebugDraw::Style;
             [[nodiscard]] static kor::DebugDraw& Get();
-            static void Line(glm::vec3 from, glm::vec3 to, const Style& style = {});
-            static void Box(glm::vec3 min, glm::vec3 max, const Style& style = {});
-            static void Box(const glm::mat4& transform, const Style& style = {});
-            static void Circle(glm::vec3 center, glm::vec3 normal, float radius, const Style& style = {});
-            static void Sphere(glm::vec3 center, float radius, const Style& style = {});
-            static void Arrow(glm::vec3 from, glm::vec3 to, const Style& style = {});
-            static void Point(glm::vec3 position, float size = 0.1f, const Style& style = {});
-            static void Axes(const glm::mat4& transform, float size = 1.f, float duration = 0.f);
-            static void Grid(glm::vec3 center, float size, int cells, const Style& style = {});
-            static void Frustum(const glm::mat4& viewProjection, const Style& style = {});
-            static void Triangle(glm::vec3 a, glm::vec3 b, glm::vec3 c, const Style& style = {});
-            static void Quad(glm::vec3 a, glm::vec3 b, glm::vec3 c, glm::vec3 d, const Style& style = {});
-            static void Plane(glm::vec3 center, glm::vec3 normal, glm::vec2 size, const Style& style = {});
-            static void Cylinder(glm::vec3 from, glm::vec3 to, float radius, const Style& style = {});
-            static void Cone(glm::vec3 base, glm::vec3 tip, float radius, const Style& style = {});
-            static void Capsule(glm::vec3 from, glm::vec3 to, float radius, const Style& style = {});
-            static void Camera(const glm::mat4& view, const glm::mat4& projection, float size = 1.f, const Style& style = {});
-            static void PointLight(glm::vec3 position, float range, const Style& style = {});
-            static void SpotLight(glm::vec3 position, glm::vec3 direction, float range, float outerAngle, float innerAngle = 0.f,
+            static void Line(kor::Vec3 from, kor::Vec3 to, const Style& style = {});
+            static void Box(kor::Vec3 min, kor::Vec3 max, const Style& style = {});
+            static void Box(const kor::Mat4& transform, const Style& style = {});
+            static void Circle(kor::Vec3 center, kor::Vec3 normal, float radius, const Style& style = {});
+            static void Sphere(kor::Vec3 center, float radius, const Style& style = {});
+            static void Arrow(kor::Vec3 from, kor::Vec3 to, const Style& style = {});
+            static void Point(kor::Vec3 position, float size = 0.1f, const Style& style = {});
+            static void Axes(const kor::Mat4& transform, float size = 1.f, float duration = 0.f);
+            static void Grid(kor::Vec3 center, float size, int cells, const Style& style = {});
+            static void Frustum(const kor::Mat4& viewProjection, const Style& style = {});
+            static void Triangle(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, const Style& style = {});
+            static void Quad(kor::Vec3 a, kor::Vec3 b, kor::Vec3 c, kor::Vec3 d, const Style& style = {});
+            static void Plane(kor::Vec3 center, kor::Vec3 normal, kor::Vec2 size, const Style& style = {});
+            static void Cylinder(kor::Vec3 from, kor::Vec3 to, float radius, const Style& style = {});
+            static void Cone(kor::Vec3 base, kor::Vec3 tip, float radius, const Style& style = {});
+            static void Capsule(kor::Vec3 from, kor::Vec3 to, float radius, const Style& style = {});
+            static void Camera(const kor::Mat4& view, const kor::Mat4& projection, float size = 1.f, const Style& style = {});
+            static void PointLight(kor::Vec3 position, float range, const Style& style = {});
+            static void SpotLight(kor::Vec3 position, kor::Vec3 direction, float range, float outerAngle, float innerAngle = 0.f,
                                   const Style& style = {});
-            static void DirectionalLight(glm::vec3 position, glm::vec3 direction, float size = 1.f, const Style& style = {});
+            static void DirectionalLight(kor::Vec3 position, kor::Vec3 direction, float size = 1.f, const Style& style = {});
             /**
              * @brief kor::DebugDraw::Gizmo, used with the scene's own mouse — its left button — over its
              *        window. The pointer is the interface's while it wants the mouse and no handle is held.
              *        For a camera drawing into something else (an editor's viewport), call DebugDraw::Gizmo
              *        with a pointer of your own.
              */
-            static bool Gizmo(GizmoMode mode, glm::mat4& transform, const glm::mat4& viewProjection,
+            static bool Gizmo(GizmoMode mode, kor::Mat4& transform, const kor::Mat4& viewProjection,
                               const GizmoOptions& options = {}, std::uint64_t id = 0);
             [[nodiscard]] static bool GizmoActive();
             [[nodiscard]] static bool GizmoHovered();

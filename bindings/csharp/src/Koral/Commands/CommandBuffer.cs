@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Koral.Native;
@@ -14,7 +13,7 @@ namespace Koral;
 ///     .BeginRendering()
 ///     .BindGraphicsPipeline(_pipeline)
 ///     .BindDescriptorSet(0, _set)
-///     .PushConstant("tint", new Vector4(1, 0.5f, 0, 1))
+///     .PushConstant("tint", new Vec4(1, 0.5f, 0, 1))
 ///     .BindMesh(_mesh)
 ///     .DrawIndexed()
 ///     .EndRendering();
@@ -192,7 +191,7 @@ public sealed unsafe partial class CommandBuffer : IDisposable
     public CommandBuffer SetScissor(uint x, uint y, uint width, uint height) { KoralNative.koral_cmd_set_scissor(N, x, y, width, height); return this; }
     public CommandBuffer SetLineWidth(float lineWidth) { KoralNative.koral_cmd_set_line_width(N, lineWidth); return this; }
     public CommandBuffer SetDepthBias(float constantFactor, float clamp, float slopeFactor) { KoralNative.koral_cmd_set_depth_bias(N, constantFactor, clamp, slopeFactor); return this; }
-    public CommandBuffer SetBlendConstants(Vector4 constants) { KoralNative.koral_cmd_set_blend_constants(N, (float*)&constants); return this; }
+    public CommandBuffer SetBlendConstants(Vec4 constants) { KoralNative.koral_cmd_set_blend_constants(N, (float*)&constants); return this; }
     public CommandBuffer SetStencilCompareMask(StencilFace face, uint compareMask) { KoralNative.koral_cmd_set_stencil_compare_mask(N, (uint)face, compareMask); return this; }
     public CommandBuffer SetStencilWriteMask(StencilFace face, uint writeMask) { KoralNative.koral_cmd_set_stencil_write_mask(N, (uint)face, writeMask); return this; }
     public CommandBuffer SetStencilReference(StencilFace face, uint reference) { KoralNative.koral_cmd_set_stencil_reference(N, (uint)face, reference); return this; }
@@ -262,24 +261,24 @@ public sealed unsafe partial class CommandBuffer : IDisposable
     public CommandBuffer BufferBarrier(BufferBarrier barrier) => Barrier([barrier]);
     public CommandBuffer ImageBarrier(ImageBarrier barrier) => Barrier(null, [barrier]);
 
-    public CommandBuffer BeginDebugLabel(string label, Vector4? color = null)
+    public CommandBuffer BeginDebugLabel(string label, Vec4? color = null)
     {
-        var c = color ?? Vector4.One;
+        var c = color ?? Vec4.One;
         KoralNative.koral_cmd_begin_debug_label(N, label, (float*)&c);
         return this;
     }
 
     public CommandBuffer EndDebugLabel() { KoralNative.koral_cmd_end_debug_label(N); return this; }
 
-    public CommandBuffer InsertDebugLabel(string label, Vector4? color = null)
+    public CommandBuffer InsertDebugLabel(string label, Vec4? color = null)
     {
-        var c = color ?? Vector4.One;
+        var c = color ?? Vec4.One;
         KoralNative.koral_cmd_insert_debug_label(N, label, (float*)&c);
         return this;
     }
 
     /// <summary>DebugLabel(label, body, color): a labelled scope around what <paramref name="body"/> records.</summary>
-    public CommandBuffer DebugLabel(string label, Action<CommandBuffer> body, Vector4? color = null)
+    public CommandBuffer DebugLabel(string label, Action<CommandBuffer> body, Vec4? color = null)
     {
         BeginDebugLabel(label, color);
         body(this);
@@ -312,9 +311,9 @@ public sealed unsafe partial class CommandBuffer : IDisposable
 
     public CommandBuffer ClearBuffer(Buffer buffer, ulong offset = 0, ulong size = WholeSize) { KoralNative.koral_cmd_clear_buffer(N, buffer.Handle, offset, size); return this; }
 
-    public CommandBuffer ClearColorImage(Image image, Vector4? color = null)
+    public CommandBuffer ClearColorImage(Image image, Vec4? color = null)
     {
-        var c = color ?? new Vector4(0, 0, 0, 1);
+        var c = color ?? new Vec4(0, 0, 0, 1);
         KoralNative.koral_cmd_clear_color_image(N, image.Handle, (float*)&c);
         return this;
     }
@@ -453,10 +452,10 @@ public readonly record struct ValueShape(ValueScalar Scalar, byte Rows = 1, byte
         if (t == typeof(double)) return new(ValueScalar.eDouble);
         if (t == typeof(int)) return new(ValueScalar.eInt);
         if (t == typeof(uint)) return new(ValueScalar.eUInt);
-        if (t == typeof(Vector2)) return new(ValueScalar.eFloat, 2);
-        if (t == typeof(Vector3)) return new(ValueScalar.eFloat, 3);
-        if (t == typeof(Vector4) || t == typeof(Quaternion)) return new(ValueScalar.eFloat, 4);
-        if (t == typeof(Matrix4x4)) return new(ValueScalar.eFloat, 4, 4);
+        if (t == typeof(Vec2)) return new(ValueScalar.eFloat, 2);
+        if (t == typeof(Vec3)) return new(ValueScalar.eFloat, 3);
+        if (t == typeof(Vec4) || t == typeof(Quat)) return new(ValueScalar.eFloat, 4);
+        if (t == typeof(Mat4)) return new(ValueScalar.eFloat, 4, 4);
         if (t == typeof(IVec2)) return new(ValueScalar.eInt, 2);
         if (t == typeof(IVec3)) return new(ValueScalar.eInt, 3);
         if (t == typeof(IVec4)) return new(ValueScalar.eInt, 4);

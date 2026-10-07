@@ -15,7 +15,7 @@ namespace kui
 {
     // ---- constraints ----------------------------------------------------------------------------------
 
-    glm::vec2 BoxConstraints::Constrain(const glm::vec2 size) const
+    kor::Vec2 BoxConstraints::Constrain(const kor::Vec2 size) const
     {
         return { std::clamp(size.x, minWidth, std::max(minWidth, maxWidth)), std::clamp(size.y, minHeight, std::max(minHeight, maxHeight)) };
     }
@@ -92,13 +92,13 @@ namespace kui
         return depth;
     }
 
-    void RenderObject::SetSize(const glm::vec2 size)
+    void RenderObject::SetSize(const kor::Vec2 size)
     {
-        const glm::vec2 constrained = _constraints.Constrain(size);
+        const kor::Vec2 constrained = _constraints.Constrain(size);
         _size = { std::isfinite(constrained.x) ? constrained.x : 0.f, std::isfinite(constrained.y) ? constrained.y : 0.f };
     }
 
-    void RenderObject::SetOffset(const glm::vec2 offset)
+    void RenderObject::SetOffset(const kor::Vec2 offset)
     {
         if (offset == _offset) return;
         _offset = offset;
@@ -154,9 +154,9 @@ namespace kui
         unsigned debugRevision = 0;
 
         /** The outline debug::SetPaintBounds asks for, of @p object laid out at @p at. */
-        void OutlineBounds(RenderObject& object, Canvas& canvas, const glm::vec2 at)
+        void OutlineBounds(RenderObject& object, Canvas& canvas, const kor::Vec2 at)
         {
-            const glm::vec2 size = object.Size();
+            const kor::Vec2 size = object.Size();
             if (size.x <= 0.f || size.y <= 0.f) return;
             bool holds = false;
             object.VisitChildren([&holds](RenderObject&) { holds = true; });
@@ -192,7 +192,7 @@ namespace kui
         if (_owner) ++_owner->paints;
     }
 
-    void RenderObject::PaintChild(RenderObject& child, Canvas& canvas, const glm::vec2 offset)
+    void RenderObject::PaintChild(RenderObject& child, Canvas& canvas, const kor::Vec2 offset)
     {
         PaintChildAt(child, canvas, offset + ChildOrigin(child));
     }
@@ -204,7 +204,7 @@ namespace kui
         MarkNeedsPaint();
     }
 
-    void RenderObject::PaintChildAt(RenderObject& child, Canvas& canvas, const glm::vec2 at)
+    void RenderObject::PaintChildAt(RenderObject& child, Canvas& canvas, const kor::Vec2 at)
     {
         // Wholly outside what will be looked at — and by enough that a shadow or something hung off it
         // would be too: left out. It keeps whatever it was owed; it is painted when it comes into view.
@@ -223,7 +223,7 @@ namespace kui
         }
     }
 
-    bool RenderObject::HitTest(HitTestResult& result, const glm::vec2 position)
+    bool RenderObject::HitTest(HitTestResult& result, const kor::Vec2 position)
     {
         if (position.x < 0.f || position.y < 0.f || position.x >= _size.x || position.y >= _size.y) return false;
         const bool hit = HitTestChildren(result, position) || HitTestSelf(position);
@@ -231,7 +231,7 @@ namespace kui
         return hit;
     }
 
-    bool RenderObject::HitTestChildren(HitTestResult& result, const glm::vec2 position)
+    bool RenderObject::HitTestChildren(HitTestResult& result, const kor::Vec2 position)
     {
         std::vector<RenderObject*> children;
         VisitChildren([&](RenderObject& child) { children.push_back(&child); });
@@ -240,14 +240,14 @@ namespace kui
         return false;
     }
 
-    glm::vec2 RenderObject::ToGlobal(const glm::vec2 local) const
+    kor::Vec2 RenderObject::ToGlobal(const kor::Vec2 local) const
     {
-        glm::vec2 p = local;
+        kor::Vec2 p = local;
         for (const RenderObject* node = this; node->_parent; node = node->_parent) p += node->_parent->ChildOrigin(*node);
         return p;
     }
 
-    glm::vec2 RenderObject::ToLocal(const glm::vec2 global) const
+    kor::Vec2 RenderObject::ToLocal(const kor::Vec2 global) const
     {
         return _parent ? _parent->MapToChild(*this, _parent->ToLocal(global)) : global;
     }
@@ -369,7 +369,7 @@ namespace kui
         return width;
     }
 
-    void RenderContainer::Paint(Canvas& canvas, const glm::vec2 offset)
+    void RenderContainer::Paint(Canvas& canvas, const kor::Vec2 offset)
     {
         for (auto* child : _children) PaintChild(*child, canvas, offset);
     }

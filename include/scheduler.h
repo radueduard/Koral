@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 #include <cstdint>
 #include <map>
 #include <vector>
@@ -34,7 +34,7 @@ namespace kor
     class KORAL_API Frame
     {
     public:
-        explicit Frame(glm::u32 imageIndex);
+        explicit Frame(kor::u32 imageIndex);
         virtual ~Frame() = default;
 
         Frame(const Frame&) = delete;
@@ -46,12 +46,12 @@ namespace kor
          * Not a swap-chain image. Each window's swap chain hands out its images in its own order, and
          * the image a window shows is the one its swap chain acquired (Image::CopyIndex).
          */
-		[[nodiscard]] glm::u32 ImageIndex() const { return _imageIndex; }
+		[[nodiscard]] kor::u32 ImageIndex() const { return _imageIndex; }
 
         /** @brief The command buffer this frame's work is recorded into. */
 		[[nodiscard]] kor::CommandBuffer& Commands() const { return *_commandBuffer; }
     protected:
-        glm::u32 _imageIndex;
+        kor::u32 _imageIndex;
 		std::unique_ptr<kor::CommandBuffer> _commandBuffer;
     };
 
@@ -76,10 +76,10 @@ namespace kor
              * Each window's swap chain has however many images its driver gives it, which is a
              * separate number: those are never indexed by the frame.
              */
-            glm::u32 imageCount = 2;
+            kor::u32 imageCount = 2;
 
             /** @brief Sets how many frames may be in flight at once. */
-            Builder& SetImageCount(const glm::u32 imageCount) { this->imageCount = imageCount; return *this; }
+            Builder& SetImageCount(const kor::u32 imageCount) { this->imageCount = imageCount; return *this; }
             /**
              * @brief Creates the scheduler for the active backend.
              * @return The scheduler; poisoned, with the reason, when the active API has no scheduler.
@@ -98,14 +98,14 @@ namespace kor
     	virtual void Initialize() = 0;
 
         /** @brief How many frames are in flight: how many copies a per-frame resource has. Fixed for the scheduler's life. */
-        [[nodiscard]] glm::u32 ImageCount() const { return _imageCount; }
+        [[nodiscard]] kor::u32 ImageCount() const { return _imageCount; }
 
         /**
          * @brief Which frame is currently being recorded.
          * @return An index below ImageCount(). A per-frame buffer or image uses this to select
          *         the copy that is safe to write this frame.
          */
-    	[[nodiscard]] virtual glm::u32 CurrentImageIndex() const { return _currentFrame; }
+    	[[nodiscard]] virtual kor::u32 CurrentImageIndex() const { return _currentFrame; }
 
         /** @brief The frame currently being recorded. */
         [[nodiscard]] const kor::Frame &CurrentFrame() const { return *_frames.at(_currentFrame); }
@@ -253,10 +253,10 @@ namespace kor
          * @brief Every frame index except @p index.
          * @return The frames a write to @p index still has to be propagated to; see PendingWrite.
          */
-    	std::unordered_set<glm::u32> ImageIndicesExcept(const glm::u32 index) const
+    	std::unordered_set<kor::u32> ImageIndicesExcept(const kor::u32 index) const
 		{
-			std::unordered_set<glm::u32> indices;
-			for (glm::u32 i = 0; i < _imageCount; ++i) {
+			std::unordered_set<kor::u32> indices;
+			for (kor::u32 i = 0; i < _imageCount; ++i) {
 				if (i != index) {
 					indices.insert(i);
 				}
@@ -302,8 +302,8 @@ namespace kor
          */
         Pending TakePending();
 
-        glm::u32 _imageCount;
-	    glm::u32 _currentFrame = 0;
+        kor::u32 _imageCount;
+	    kor::u32 _currentFrame = 0;
     	std::vector<std::unique_ptr<Frame>> _frames;
 
     private:

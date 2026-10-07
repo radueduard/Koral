@@ -33,11 +33,10 @@ target_compile_definitions(koral-image-compress PRIVATE KORAL_IMAGE_COMPRESS_EXP
 # kimg::CpuImage, so anything that links this links both and inherits their include directories.
 target_link_libraries(koral-image-compress PUBLIC Koral koral-image-import)
 
-# Everything else is PRIVATE, exactly as for Koral itself — a consumer gets glm through Koral::Koral
+# Everything else is PRIVATE, exactly as for Koral itself — a consumer gets spdlog through Koral::Koral
 # (in an installed SDK, through the vendored copies KoralConfig.cmake attaches to it) and never sees
 # libktx at all.
 target_link_libraries(koral-image-compress PRIVATE
-        glm::glm
         spdlog::spdlog
         KTX::ktx
         # Vulkan for the VkFormat enum a KTX2 names its format with, as constants only: this module

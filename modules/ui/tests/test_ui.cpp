@@ -31,7 +31,7 @@ namespace {
         ClearPass() : RenderPass("Clear") {}
         void Setup(kor::PassBuilder& b) override { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); }
         void Initialize(const kor::PassResources& r) override { _screen = r.ImageNamed(kor::FrameGraph::Screen); }
-        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, glm::vec4(0.f, 0.f, 0.f, 1.f)); }
+        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, kor::Vec4(0.f, 0.f, 0.f, 1.f)); }
     private:
         kor::ResourceRef<const kor::Image> _screen;
     };
@@ -57,8 +57,8 @@ namespace {
             Graph().Add<kui::UiPass>(ui);
             Graph().Add<ReadPass>(kor::ResourceRef<const kor::Buffer>(readback));
         }
-        [[nodiscard]] glm::u8vec4 At(const int x, const int y) const {
-            const auto pixels = readback->Read<glm::u8vec4>(Size * Size);
+        [[nodiscard]] kor::U8Vec4 At(const int x, const int y) const {
+            const auto pixels = readback->Read<kor::U8Vec4>(Size * Size);
             return pixels[static_cast<std::size_t>(y) * Size + x];
         }
         kui::Renderer ui;
@@ -109,10 +109,10 @@ namespace {
     constexpr kui::Color Green { 0.f, 1.f, 0.f, 1.f };
     constexpr kui::Color Blue { 0.f, 0.f, 1.f, 1.f };
 
-    bool IsRed(const glm::u8vec4 p) { return p.r > 240 && p.g < 15 && p.b < 15; }
-    bool IsGreen(const glm::u8vec4 p) { return p.g > 240 && p.r < 15 && p.b < 15; }
-    bool IsBlue(const glm::u8vec4 p) { return p.b > 240 && p.r < 15 && p.g < 15; }
-    bool IsBlack(const glm::u8vec4 p) { return p.r < 5 && p.g < 5 && p.b < 5; }
+    bool IsRed(const kor::U8Vec4 p) { return p.x > 240 && p.y < 15 && p.z < 15; }
+    bool IsGreen(const kor::U8Vec4 p) { return p.y > 240 && p.x < 15 && p.z < 15; }
+    bool IsBlue(const kor::U8Vec4 p) { return p.z > 240 && p.x < 15 && p.y < 15; }
+    bool IsBlack(const kor::U8Vec4 p) { return p.x < 5 && p.y < 5 && p.z < 5; }
 }
 
 // ---- drawn ----------------------------------------------------------------------------------------------
@@ -136,8 +136,8 @@ TEST_F(Gpu, RoundedCornersAndCirclesLeaveTheirCornersOut) {
     EXPECT_TRUE(IsGreen(scene->At(48, 48)));
     EXPECT_TRUE(IsBlack(scene->At(39, 39))) << "outside the circle, inside its square";
     const auto edge = scene->At(58, 48);   // the circle's edge runs through this pixel
-    EXPECT_GT(edge.g, 40);
-    EXPECT_LT(edge.g, 215) << "anti-aliased";
+    EXPECT_GT(edge.y, 40);
+    EXPECT_LT(edge.y, 215) << "anti-aliased";
 }
 
 TEST_F(Gpu, AStrokeOutlinesWithoutFilling) {
@@ -199,9 +199,9 @@ TEST_F(Gpu, AStrokedPathIsOneShapeEvenWhereItsPiecesOverlap) {
     });
     const auto crossing = scene->At(32, 32);   // two segments cross here
     const auto single = scene->At(16, 32);
-    EXPECT_NEAR(crossing.r, single.r, 3) << "a translucent stroke does not darken where it crosses itself";
-    EXPECT_GT(single.r, 100);
-    EXPECT_LT(single.r, 160);
+    EXPECT_NEAR(crossing.x, single.x, 3) << "a translucent stroke does not darken where it crosses itself";
+    EXPECT_GT(single.x, 100);
+    EXPECT_LT(single.x, 160);
 }
 
 TEST_F(Gpu, ThePenDrawsAPathASegmentAtATimeAndFillsThenStrokesIt) {
@@ -227,10 +227,10 @@ TEST_F(Gpu, AGradientRunsFromItsStartToItsEnd) {
         c.DrawRect(kui::Rect::LTRB(0, 0, 64, 64), kui::Paint{}.SetGradient(kui::Gradient::Linear({ 0, 0 }, { 64, 0 }, Red, Blue)));
     });
     const auto left = scene->At(1, 32), right = scene->At(62, 32), mid = scene->At(32, 32);
-    EXPECT_GT(left.r, 240);
-    EXPECT_GT(right.b, 240);
-    EXPECT_NEAR(mid.r, 127, 6);
-    EXPECT_NEAR(mid.b, 127, 6);
+    EXPECT_GT(left.x, 240);
+    EXPECT_GT(right.z, 240);
+    EXPECT_NEAR(mid.x, 127, 6);
+    EXPECT_NEAR(mid.z, 127, 6);
 }
 
 TEST_F(Gpu, NothingIsDrawnOutsideAClip) {
@@ -305,7 +305,7 @@ TEST_F(Gpu, TextIsDrawnFromTheAtlas) {
     Draw([](kui::Canvas& c) { c.DrawText("I", { 20, 0 }, { .size = 60.f, .color = kui::colors::White }); });
     int lit = 0;
     for (int y = 0; y < Size; ++y)
-        for (int x = 0; x < Size; ++x) lit += scene->At(x, y).r > 128;
+        for (int x = 0; x < Size; ++x) lit += scene->At(x, y).x > 128;
     EXPECT_GT(lit, 60) << "a capital I at 60 units is a solid bar";
     EXPECT_LT(lit, 1200);
 }
@@ -313,7 +313,7 @@ TEST_F(Gpu, TextIsDrawnFromTheAtlas) {
 TEST_F(Gpu, AnElementShaderFillsItsRectangleWithItsParameters) {
     const auto shader = kui::ElementShader::Load(std::filesystem::path(KUI_TEST_SHADERS) / "testElement.frag.glsl");
     ASSERT_TRUE(shader->Valid());
-    struct Params { glm::vec4 left, right; };
+    struct Params { kor::Vec4 left, right; };
     Draw([&](kui::Canvas& c) {
         c.DrawElement(shader, kui::Rect::LTRB(0, 0, 64, 32), Params{ { 1, 0, 0, 1 }, { 0, 1, 0, 1 } });
         c.DrawElement(shader, kui::Rect::LTRB(0, 32, 64, 64), Params{ { 0, 0, 1, 1 }, { 1, 0, 0, 1 } }, 0.f);
@@ -328,7 +328,7 @@ TEST_F(Gpu, AnElementShaderFillsItsRectangleWithItsParameters) {
 TEST_F(Gpu, AnElementShaderCanBeWrittenInSlang) {
     const auto shader = kui::ElementShader::Load(std::filesystem::path(KUI_TEST_SHADERS) / "testElement.slang", "fragmentMain");
     ASSERT_TRUE(shader->Valid());
-    struct Params { glm::vec4 left, right; };
+    struct Params { kor::Vec4 left, right; };
     Draw([&](kui::Canvas& c) {
         c.ClipRect(kui::Rect::LTRB(0, 0, 64, 48));
         c.DrawElement(shader, kui::Rect::LTRB(0, 0, 64, 64), Params{ { 0, 0, 1, 1 }, { 0, 1, 0, 1 } }, 0.f);
@@ -341,10 +341,10 @@ TEST_F(Gpu, AnElementShaderCanBeWrittenInSlang) {
 TEST_F(Gpu, AShadowFadesOutwards) {
     Draw([](kui::Canvas& c) { c.DrawShadow({ kui::Rect::LTRB(16, 16, 48, 48), 4.f }, kui::colors::White, 4.f); });
     const auto inside = scene->At(32, 32), edge = scene->At(48, 32), far = scene->At(60, 32);
-    EXPECT_GT(inside.r, 240);
-    EXPECT_GT(edge.r, 80);
-    EXPECT_LT(edge.r, 180);
-    EXPECT_LT(far.r, 10);
+    EXPECT_GT(inside.x, 240);
+    EXPECT_GT(edge.x, 80);
+    EXPECT_LT(edge.x, 180);
+    EXPECT_LT(far.x, 10);
 }
 
 TEST_F(Gpu, ShapesAreOneDrawUntilAMeshInterrupts) {
@@ -364,9 +364,9 @@ TEST(Path, CurvesFlattenWithinTheirTolerance) {
     ASSERT_EQ(contours.size(), 1u);
     EXPECT_TRUE(contours[0].closed);
     for (std::size_t i = 0; i < contours[0].points.size(); ++i) {
-        const glm::vec2 a = contours[0].points[i], b = contours[0].points[(i + 1) % contours[0].points.size()];
-        EXPECT_NEAR(glm::length(a), 100.f, 0.05f);
-        EXPECT_GT(glm::length((a + b) * 0.5f), 100.f - 0.2f) << "each chord stays near the arc";
+        const kor::Vec2 a = contours[0].points[i], b = contours[0].points[(i + 1) % contours[0].points.size()];
+        EXPECT_NEAR(kor::Length(a), 100.f, 0.05f);
+        EXPECT_GT(kor::Length((a + b) * 0.5f), 100.f - 0.2f) << "each chord stays near the arc";
     }
 }
 
@@ -387,17 +387,17 @@ TEST(Paragraph, WrapsAtWordsAndMeasuresItsLines) {
     EXPECT_EQ(breaks.LineCount(), 3u);
 
     // The caret before 'w' is where "hello " ends, and a click there finds it again.
-    const glm::vec2 caret = one.CaretPosition(6);
+    const kor::Vec2 caret = one.CaretPosition(6);
     EXPECT_GT(caret.x, 0.f);
-    EXPECT_EQ(one.IndexAt(caret + glm::vec2(0.5f, 2.f)), 6u);
+    EXPECT_EQ(one.IndexAt(caret + kor::Vec2(0.5f, 2.f)), 6u);
 }
 
 TEST(Transform, ComposesLikeMatrices) {
     const auto t = kui::Transform::Translation({ 10, 0 }) * kui::Transform::Rotation(std::numbers::pi_v<float> * 0.5f);
-    const glm::vec2 p = t.Apply({ 1, 0 });
+    const kor::Vec2 p = t.Apply({ 1, 0 });
     EXPECT_NEAR(p.x, 10.f, 1e-5f);
     EXPECT_NEAR(p.y, 1.f, 1e-5f);
-    const glm::vec2 back = t.Inverse().Apply(p);
+    const kor::Vec2 back = t.Inverse().Apply(p);
     EXPECT_NEAR(back.x, 1.f, 1e-5f);
     EXPECT_NEAR(back.y, 0.f, 1e-5f);
 }
@@ -415,8 +415,8 @@ namespace {
             Graph().Add<ReadPass>(kor::ResourceRef<const kor::Buffer>(readback));
         }
         void Update() override { ui.Update(); }
-        [[nodiscard]] glm::u8vec4 At(const int x, const int y) const {
-            return readback->Read<glm::u8vec4>(Size * Size)[static_cast<std::size_t>(y) * Size + x];
+        [[nodiscard]] kor::U8Vec4 At(const int x, const int y) const {
+            return readback->Read<kor::U8Vec4>(Size * Size)[static_cast<std::size_t>(y) * Size + x];
         }
         kui::Ui ui;
         kor::Resource<kor::Buffer> readback;
@@ -434,7 +434,7 @@ namespace {
         }
         void Show(kui::Widget root) { scene->ui.SetRoot(std::move(root)); settle(); settle(); }
         /** @brief A click at @p p: the pointer moved there, then the button down, then up, a frame each. */
-        void Click(const glm::vec2 p) {
+        void Click(const kor::Vec2 p) {
             auto& input = scene->SceneInput();
             input.FeedMousePosition(p);
             settle();
@@ -447,8 +447,8 @@ namespace {
     };
 
     /** @brief A box that reports the size it was given each time it paints. */
-    kui::Widget Probe(glm::vec2& size, const kui::Color color = Red) {
-        return kui::CustomPaint([&size, color](kui::Canvas& c, const glm::vec2 s) {
+    kui::Widget Probe(kor::Vec2& size, const kui::Color color = Red) {
+        return kui::CustomPaint([&size, color](kui::Canvas& c, const kor::Vec2 s) {
             size = s;
             c.DrawRect(kui::Rect::FromSize(s), kui::Paint::Fill(color));
         });
@@ -456,7 +456,7 @@ namespace {
 }
 
 TEST_F(WidgetTest, RowsShareWhatIsLeftAmongTheirExpandedChildren) {
-    glm::vec2 a {}, b {};
+    kor::Vec2 a {}, b {};
     Show(kui::Row({
         kui::SizedBox(10.f, 20.f),
         kui::Expanded(Probe(a)),
@@ -592,7 +592,7 @@ TEST_F(WidgetTest, WhatIsScrolledFarOutOfViewIsNotPainted) {
     std::vector<int> painted(200, 0);
     std::vector<kui::Widget> rows;
     for (int i = 0; i < 200; ++i) {
-        rows.push_back(kui::CustomPaint([&painted, i](kui::Canvas& c, const glm::vec2 s) {
+        rows.push_back(kui::CustomPaint([&painted, i](kui::Canvas& c, const kor::Vec2 s) {
             ++painted[static_cast<std::size_t>(i)];
             c.DrawRect(kui::Rect::FromSize(s), kui::Paint::Fill(i % 2 ? Green : Red));
         }, { 64.f, 16.f }));
@@ -670,7 +670,7 @@ TEST_F(WidgetTest, ATextFieldSelectsReplacesAndTakesSeveralLines) {
     EXPECT_EQ(text, "");
 
     // Several lines: Enter starts another, and the field grows to hold it.
-    glm::vec2 before = {};
+    kor::Vec2 before = {};
     Show(kui::Align(kui::Alignment::TopLeft(), kui::TextField(kui::TextFieldOptions {}.SetWidth(60.f).SetMultiline(1, 3)
                                                                   .OnChanged([&](const std::string& t) { text = t; }))));
     Click({ 20.f, 10.f });
@@ -870,7 +870,7 @@ TEST_F(WidgetTest, TabGoesFromOneFieldToTheNext) {
 }
 
 TEST_F(WidgetTest, SharesRatiosTransformsAndLayoutsOfTheCallersOwn) {
-    glm::vec2 size {};
+    kor::Vec2 size {};
     Show(kui::FractionallySizedBox(0.5f, 0.25f, Probe(size)));
     EXPECT_FLOAT_EQ(size.x, 32.f);
     EXPECT_FLOAT_EQ(size.y, 16.f);
@@ -884,7 +884,7 @@ TEST_F(WidgetTest, SharesRatiosTransformsAndLayoutsOfTheCallersOwn) {
     Show(kui::CustomLayout([](kui::LayoutContext& context, const kui::BoxConstraints& c) {
         context.measure(0, kui::BoxConstraints::Tight({ 6.f, 6.f }));
         context.place(0, { 0.f, 0.f });
-        const glm::vec2 second = context.measure(1, kui::BoxConstraints::Loose({ 10.f, 10.f }).Tighten(10.f, 10.f));
+        const kor::Vec2 second = context.measure(1, kui::BoxConstraints::Loose({ 10.f, 10.f }).Tighten(10.f, 10.f));
         context.place(1, { 40.f, second.y });
         return c.Biggest();
     }, { dot(Red), dot(Green) }));
@@ -945,10 +945,10 @@ TEST_F(WidgetTest, AThemeOfItsOwnLinesKeptToAFewAndASliderLetGoOf) {
     EXPECT_TRUE(IsRed(scene->At(2, 2))) << "filled to its corner: not a circle";
 
     if (kui::Font::Default()) {
-        glm::vec2 size {};
+        kor::Vec2 size {};
         kui::TextStyle style { .size = 10.f, .color = kui::colors::White };
         const auto text = [&](const int lines) {
-            return kui::Align(kui::Alignment::TopLeft(), kui::SizeObserver([&](const glm::vec2 s, glm::vec2) { size = s; },
+            return kui::Align(kui::Alignment::TopLeft(), kui::SizeObserver([&](const kor::Vec2 s, kor::Vec2) { size = s; },
                               kui::Text("one two three four five six seven eight nine ten", style, kui::TextAlign::eStart, true, lines, true)));
         };
         Show(text(0));
@@ -1058,7 +1058,7 @@ TEST_F(WidgetTest, IntrinsicIsAsWideAsItsWidestChildAndTextThatSaysBlackIsBlack)
 
     const auto darkest = [&] {
         int least = 255;
-        for (int y = 0; y < 30; ++y) for (int x = 0; x < 60; ++x) least = std::min<int>(least, scene->At(x, y).r);
+        for (int y = 0; y < 30; ++y) for (int x = 0; x < 60; ++x) least = std::min<int>(least, scene->At(x, y).x);
         return least;
     };
     kui::TextStyle black;
@@ -1105,7 +1105,7 @@ namespace {
             kui::TextStyle muted = t.textStyle;
             muted.color = t.textMuted;
 
-            auto shapes = kui::CustomPaint([](kui::Canvas& c, const glm::vec2 size) {
+            auto shapes = kui::CustomPaint([](kui::Canvas& c, const kor::Vec2 size) {
                 c.DrawRRect({ kui::Rect::FromSize(size), 10.f }, kui::Paint{}.SetGradient(
                     kui::Gradient::Linear({ 0, 0 }, { size.x, size.y }, kui::Color::Hex(0x2B2F6B), kui::Color::Hex(0x6B2B5E))));
                 c.DrawCircle({ 50, 60 }, 30.f, kui::Paint::Fill(kui::Color::Hex(0xFFB74D)).SetStroke(3.f, kui::colors::White));
@@ -1115,7 +1115,7 @@ namespace {
                 kui::Path star;
                 for (int i = 0; i < 10; ++i) {
                     const float a = -1.5708f + i * 3.14159f / 5.f, r = i % 2 ? 12.f : 30.f;
-                    const glm::vec2 p { 290 + r * std::cos(a), 62 + r * std::sin(a) };
+                    const kor::Vec2 p { 290 + r * std::cos(a), 62 + r * std::sin(a) };
                     if (i == 0) star.MoveTo(p); else star.LineTo(p);
                 }
                 star.Close();
@@ -1176,7 +1176,7 @@ TEST(Showcase, Renders) {
     auto* scene = s_app->OpenOffscreen<ShowcaseScene>({ .title = "showcase", .extent = { ShowW, ShowH }, .format = kor::Window::Format::eRGBA8_SRGB });
     ASSERT_NE(scene, nullptr);
     for (int i = 0; i < 4; ++i) settle();
-    const auto pixels = scene->readback->Read<glm::u8vec4>(ShowW * ShowH);
+    const auto pixels = scene->readback->Read<kor::U8Vec4>(ShowW * ShowH);
     stbi_write_png(out, ShowW, ShowH, 4, pixels.data(), ShowW * 4);
     s_app->Close(*scene);
     settle();
@@ -1193,7 +1193,7 @@ TEST_F(Gpu, AStrokedCurveHasNoHolesAtAnyOffset) {
                 kui::Path star;
                 for (int i = 0; i < 10; ++i) {
                     const float a = -1.5708f + i * 3.14159f / 5.f, r = i % 2 ? 12.f : 30.f;
-                    const glm::vec2 q { 290 + r * std::cos(a), 62 + r * std::sin(a) };
+                    const kor::Vec2 q { 290 + r * std::cos(a), 62 + r * std::sin(a) };
                     if (i == 0) star.MoveTo(q); else star.LineTo(q);
                 }
                 star.Close();
@@ -1205,14 +1205,14 @@ TEST_F(Gpu, AStrokedCurveHasNoHolesAtAnyOffset) {
             path.MoveTo({ 20, 120 }).CubicTo({ 100, 80 }, { 200, 160 }, { 320, 110 });
             const auto line = path.Flatten(0.01f)[0].points;
             for (int y = 0; y < Size; ++y) for (int x = 0; x < Size; ++x) {
-                const glm::vec2 p { x + 0.5f + 63.f - fx, y + 0.5f + 76.f - fy };
+                const kor::Vec2 p { x + 0.5f + 63.f - fx, y + 0.5f + 76.f - fy };
                 float d = 1e9f;
                 for (std::size_t i = 0; i + 1 < line.size(); ++i) {
-                    const glm::vec2 a = line[i], b = line[i + 1];
-                    const float h = std::clamp(glm::dot(p - a, b - a) / glm::dot(b - a, b - a), 0.f, 1.f);
-                    d = std::min(d, glm::length(p - a - (b - a) * h));
+                    const kor::Vec2 a = line[i], b = line[i + 1];
+                    const float h = std::clamp(kor::Dot(p - a, b - a) / kor::Dot(b - a, b - a), 0.f, 1.f);
+                    d = std::min(d, kor::Length(p - a - (b - a) * h));
                 }
-                if (d < 0.9f) EXPECT_GT(scene->At(x, y).r, 190) << "pixel " << x << "," << y << " at offset " << fx << "," << fy << " d=" << d;
+                if (d < 0.9f) EXPECT_GT(scene->At(x, y).x, 190) << "pixel " << x << "," << y << " at offset " << fx << "," << fy << " d=" << d;
             }
         }
     }
@@ -1306,7 +1306,7 @@ TEST_F(WidgetTest, WhatCanBePickedTellsWhenItIs) {
     EXPECT_EQ(picked, 1) << "the whole line, not only its text";
 
     // A header says what it should be now; whoever builds it keeps that, and shows what is under it.
-    glm::vec2 under {};
+    kor::Vec2 under {};
     const auto header = [&] { return kui::Align(kui::Alignment::TopLeft(), kui::CollapsingHeader("h", open, [&](const bool now) { open = now; }, Probe(under))); };
     Show(header());
     EXPECT_TRUE(IsBlack(scene->At(30, 50))) << "shut: nothing under it";
@@ -1326,7 +1326,7 @@ TEST_F(WidgetTest, AStepSliderStopsOnlyAtItsSteps) {
     const auto slider = [&] { return kui::Align(kui::Alignment::TopLeft(), kui::StepSlider(value, 4, [&](const int step) { value = step; }, { .width = 62.f })); };
     Show(slider());
     // Four places of fourteen, three in from each end; the thumb is the accent's, in the first.
-    const auto accent = [&](const int x) { const auto p = scene->At(x, 16); return p.r > 200 && p.g > 90 && p.g < 170 && p.b < 120; };
+    const auto accent = [&](const int x) { const auto p = scene->At(x, 16); return p.x > 200 && p.y > 90 && p.y < 170 && p.z < 120; };
     EXPECT_TRUE(accent(6));
     EXPECT_FALSE(accent(34));
     Click({ 40.f, 16.f });
@@ -1379,14 +1379,14 @@ TEST_F(WidgetTest, AStatusBarShowsTheLastThingSaidInTheWindowsOwnColour) {
     EXPECT_TRUE(IsBlack(scene->At(60, 39))) << "the bar, in the background's colour — as what is round the docked panels is";
     EXPECT_TRUE(IsBlack(scene->At(60, 60)));
     const auto mark = scene->At(15, 51);
-    EXPECT_GT(mark.r, 180) << "an error's mark, in red";
-    EXPECT_LT(mark.b, 120);
+    EXPECT_GT(mark.x, 180) << "an error's mark, in red";
+    EXPECT_LT(mark.z, 120);
 }
 
 TEST_F(WidgetTest, AScrollThumbHasAStripOfItsOwnBesideTheContent) {
-    glm::vec2 size {};
+    kor::Vec2 size {};
     const auto content = [&](const float height) {
-        return kui::ScrollView(kui::CustomPaint([&size](kui::Canvas& c, const glm::vec2 s) {
+        return kui::ScrollView(kui::CustomPaint([&size](kui::Canvas& c, const kor::Vec2 s) {
             size = s;
             c.DrawRect(kui::Rect::FromSize(s), kui::Paint::Fill(Red));
         }, { -1.f, height }));
@@ -1400,9 +1400,9 @@ TEST_F(WidgetTest, AScrollThumbHasAStripOfItsOwnBesideTheContent) {
 }
 
 TEST_F(WidgetTest, ASizeObserverTellsTheSizeWhenItChanges) {
-    std::vector<glm::vec2> told;
+    std::vector<kor::Vec2> told;
     const auto root = [&](const float height) {
-        return kui::Column({ kui::SizedBox(64.f, height), kui::Expanded(kui::SizeObserver([&](const glm::vec2 size, glm::vec2) { told.push_back(size); })) },
+        return kui::Column({ kui::SizedBox(64.f, height), kui::Expanded(kui::SizeObserver([&](const kor::Vec2 size, kor::Vec2) { told.push_back(size); })) },
                            { .crossAxisAlignment = kui::CrossAxisAlignment::eStretch });
     };
     Show(root(24.f));
@@ -1499,10 +1499,10 @@ TEST_F(WidgetTest, ADragIsDroppedOnTheTargetThatAcceptsIt) {
         kui::SizedBox(20.f, 64.f).Background(Blue).OnDrop("number", [&](const kui::DragData&) { dropped = "wrong target"; }),
         kui::SizedBox(24.f, 64.f).Background(Green).DropTarget(kui::DropTargetOptions {}.AcceptsType("word")
             .OnEnter([&](const kui::DragData&) { ++entered; }).OnLeave([&] { ++left; })
-            .OnDrop([&](const kui::DragData& d, glm::vec2) { dropped = *d.As<std::string>(); })),
+            .OnDrop([&](const kui::DragData& d, kor::Vec2) { dropped = *d.As<std::string>(); })),
     }));
     auto& input = scene->SceneInput();
-    const auto frame = [&](const glm::vec2 p) { input.FeedMousePosition(p); settle(); };
+    const auto frame = [&](const kor::Vec2 p) { input.FeedMousePosition(p); settle(); };
 
     frame({ 10.f, 30.f });
     input.FeedMouseButton(kor::MouseButton::eLeft, true);
@@ -1552,10 +1552,10 @@ namespace {
     struct Tapped final : kui::StatefulWidget {
         int n = 0;
         int* out;
-        glm::vec2* size;
-        Tapped(int* o, glm::vec2* s) : out(o), size(s) {}
+        kor::Vec2* size;
+        Tapped(int* o, kor::Vec2* s) : out(o), size(s) {}
         kui::Widget Build() override {
-            return kui::CustomPaint([s = size](kui::Canvas&, const glm::vec2 given) { if (s) *s = given; })
+            return kui::CustomPaint([s = size](kui::Canvas&, const kor::Vec2 given) { if (s) *s = given; })
                 .OnTap([this] { SetState([&] { ++n; }); if (out) *out = n; });
         }
     };
@@ -1579,17 +1579,17 @@ namespace {
         void TearDown() override {
             if (scene) { s_app->Close(*scene); settle(); }
         }
-        void Move(const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); }
+        void Move(const kor::Vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); }
         void Button(const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); }
-        void Click(const glm::vec2 p) { Move(p); Button(true); Button(false); }
-        void Drag(const glm::vec2 from, const glm::vec2 to) {
+        void Click(const kor::Vec2 p) { Move(p); Button(true); Button(false); }
+        void Drag(const kor::Vec2 from, const kor::Vec2 to) {
             Move(from); Button(true);
             Move(from + (to - from) * 0.5f); Move(to); Move(to);
             Button(false); settle();
         }
         DockScene* scene = nullptr;
         std::shared_ptr<kui::DockLayout> layout;
-        glm::vec2 view {}, inspector {}, log {};
+        kor::Vec2 view {}, inspector {}, log {};
         int taps = 0, changes = 0;
         std::string closed;
     };
@@ -1605,7 +1605,7 @@ namespace {
         SkyPass() : RenderPass("Sky") {}
         void Setup(kor::PassBuilder& b) override { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); }
         void Initialize(const kor::PassResources& r) override { _screen = r.ImageNamed(kor::FrameGraph::Screen); }
-        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, glm::vec4(0.10f, 0.32f, 0.55f, 1.f)); }
+        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, kor::Vec4(0.10f, 0.32f, 0.55f, 1.f)); }
     private:
         kor::ResourceRef<const kor::Image> _screen;
     };
@@ -1631,7 +1631,7 @@ TEST(DockShowcase, Renders) {
     const char* out = std::getenv("KUI_DOCK_SHOWCASE");
     if (!s_app || !out) GTEST_SKIP() << "set KUI_DOCK_SHOWCASE to a path prefix to render the dock space";
     if (const char* size = std::getenv("KUI_DOCK_SHOWCASE_SIZE")) std::sscanf(size, "%dx%d", &DockShowW, &DockShowH);
-    auto* scene = s_app->OpenOffscreen<DockShowScene>({ .title = "dock showcase", .extent = { static_cast<glm::u32>(DockShowW), static_cast<glm::u32>(DockShowH) }, .format = kor::Window::Format::eRGBA8_SRGB });
+    auto* scene = s_app->OpenOffscreen<DockShowScene>({ .title = "dock showcase", .extent = { static_cast<kor::u32>(DockShowW), static_cast<kor::u32>(DockShowH) }, .format = kor::Window::Format::eRGBA8_SRGB });
     ASSERT_NE(scene, nullptr);
     auto layout = std::make_shared<kui::DockLayout>();
     layout->Dock("project", kui::DockArea::eLeft, 0).Dock("structure", kui::DockArea::eLeft, 1)
@@ -1666,10 +1666,10 @@ TEST(DockShowcase, Renders) {
     scene->ui.SetRoot(kui::DockSpace(layout, panels));
     const auto shot = [&](const std::string& name) {
         for (int i = 0; i < 4; ++i) settle();
-        const auto pixels = scene->readback->Read<glm::u8vec4>(DockShowW * DockShowH);
+        const auto pixels = scene->readback->Read<kor::U8Vec4>(DockShowW * DockShowH);
         stbi_write_png((std::string(out) + "-" + name + ".png").c_str(), DockShowW, DockShowH, 4, pixels.data(), DockShowW * 4);
     };
-    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto move = [&](const kor::Vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
     const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
 
     move({ DockShowW * 0.5f, DockShowH * 0.5f });
@@ -1762,18 +1762,18 @@ TEST(DockTitleBar, APanelsOwnTitleBarSitsBetweenItsTitleAndItsButtons) {
     ASSERT_NE(scene, nullptr);
     auto layout = std::make_shared<kui::DockLayout>();
     layout->Dock("scene");
-    glm::vec2 view {}, tool {};
+    kor::Vec2 view {}, tool {};
     int toolTaps = 0;
     kui::DockPanel panel { "scene", "Scene", kui::Make<Tapped>(nullptr, &view) };
     // A tool button 20 by 36 at its end; the rest of it takes no press.
     panel.titleBar = kui::Row({ kui::SizedBox(20.f, 36.f, kui::Make<Tapped>(&toolTaps, &tool)) }, { .mainAxisAlignment = kui::MainAxisAlignment::eEnd });
     scene->ui.SetRoot(kui::DockSpace(layout, { panel }, kui::DockOptions {}.SetGap(4.f).SetStripeGap(0.f)));
     settle(); settle();
-    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto move = [&](const kor::Vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
     const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
-    const auto drag = [&](const glm::vec2 from, const glm::vec2 to) { move(from); button(true); move((from + to) * 0.5f); move(to); move(to); button(false); settle(); };
+    const auto drag = [&](const kor::Vec2 from, const kor::Vec2 to) { move(from); button(true); move((from + to) * 0.5f); move(to); move(to); button(false); settle(); };
 
-    EXPECT_EQ(tool, glm::vec2(20.f, 36.f));
+    EXPECT_EQ(tool, kor::Vec2(20.f, 36.f));
     EXPECT_FLOAT_EQ(view.y, 120.f) << "the bar grew from 28 to 36 for it";
     EXPECT_FLOAT_EQ(view.x, 236.f);
 
@@ -1796,16 +1796,16 @@ TEST(DockMinWidth, APanelIsNoNarrowerThanItsContentNeedsAndItsDragsShareTheRest)
     ASSERT_NE(scene, nullptr);
     auto layout = std::make_shared<kui::DockLayout>();
     layout->Dock("scene").Dock("transform", kui::DockSide::eRight, "scene", 0.05f);   // asked for 40 wide: far too little
-    glm::vec2 view {}, x {}, y {}, z {};
-    const auto drag = [](glm::vec2& size, std::string label) {
-        return kui::Expanded(kui::SizeObserver([&size](const glm::vec2 s, glm::vec2) { size = s; },
+    kor::Vec2 view {}, x {}, y {}, z {};
+    const auto drag = [](kor::Vec2& size, std::string label) {
+        return kui::Expanded(kui::SizeObserver([&size](const kor::Vec2 s, kor::Vec2) { size = s; },
                                                kui::DragValue(0.f, [](float) {}, kui::DragValueOptions {}.SetLabel(std::move(label)))));
     };
     scene->ui.SetRoot(kui::DockSpace(layout, {
         { "scene", "Scene", kui::Make<Tapped>(nullptr, &view) },
         { "transform", "Transform", kui::Padding(kui::EdgeInsets::All(12.f), kui::Row({ drag(x, "X"), drag(y, "Y"), drag(z, "Z") }, { .gap = 6.f })) },
     }, kui::DockOptions {}.SetGap(4.f).SetStripeGap(0.f)));
-    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto move = [&](const kor::Vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
     const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
     settle(); settle();
 
@@ -1813,7 +1813,7 @@ TEST(DockMinWidth, APanelIsNoNarrowerThanItsContentNeedsAndItsDragsShareTheRest)
     const kui::TextStyle style = kui::Theme::Current().textStyle;
     const float number = kui::Paragraph("-8888.00", style).Size().x;
     const float label = kui::Paragraph("X", style).Size().x;
-    for (const glm::vec2 size : { x, y, z }) EXPECT_GE(size.x, number + label) << "every drag shows its widest value whole";
+    for (const kor::Vec2 size : { x, y, z }) EXPECT_GE(size.x, number + label) << "every drag shows its widest value whole";
     const float least = x.x + y.x + z.x + 2.f * 6.f + 2.f * 12.f;
     // The space is 800: a stripe of 38 for the transform's button, half a gap at the left, the gap between the two.
     const float panel = 800.f - 38.f - 2.f - 4.f - view.x;
@@ -1840,11 +1840,11 @@ TEST(DockStyle, TheSizesAreTheStylesToSay) {
     if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
     auto* scene = s_app->OpenOffscreen<DockScene>({ .title = "dock style", .extent = { 240, 160 } });
     ASSERT_NE(scene, nullptr);
-    glm::vec2 size {};
+    kor::Vec2 size {};
     const auto show = [&](const kui::DockStyle style) {
         auto layout = std::make_shared<kui::DockLayout>();
         layout->Dock("a", kui::DockArea::eCenter);
-        scene->ui.SetRoot(kui::DockSpace(layout, { { "a", "Alpha", kui::CustomPaint([&size](kui::Canvas&, const glm::vec2 s) { size = s; }) } },
+        scene->ui.SetRoot(kui::DockSpace(layout, { { "a", "Alpha", kui::CustomPaint([&size](kui::Canvas&, const kor::Vec2 s) { size = s; }) } },
                                          kui::DockOptions {}.SetStyle(style)));
         settle(); settle();
     };
@@ -1953,9 +1953,9 @@ TEST(DockLevels, ASidesMarginHasABandForEachLevelAndOneMore) {
     settle(); settle();
     layout->Hide("a");   // folded away: the left side's one level shows nothing, and its margin is free to drop on
     settle(); settle();
-    const auto move = [&](const glm::vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
+    const auto move = [&](const kor::Vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); };
     const auto button = [&](const bool down) { scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, down); settle(); };
-    const auto drag = [&](const glm::vec2 from, const glm::vec2 to) {
+    const auto drag = [&](const kor::Vec2 from, const kor::Vec2 to) {
         move(from); button(true);
         move((from + to) * 0.5f); move(to); move(to);
         button(false); settle(); settle();
@@ -2039,7 +2039,7 @@ TEST_F(DockTest, APanelFloatsAgainAtTheSizeItFloatedAtBefore) {
     layout->Float("inspector", kui::Rect::XYWH(10.f, 10.f, 150.f, 100.f));
     settle(); settle();
     ASSERT_TRUE(layout->IsFloating("inspector"));
-    const glm::vec2 floated = inspector;
+    const kor::Vec2 floated = inspector;
 
     layout->Dock("inspector", kui::DockArea::eRight);
     settle(); settle();
@@ -2078,7 +2078,7 @@ TEST(DragAcrossUis, ADragFromOneUiLandsInAnother) {
         .Align(kui::Alignment::TopLeft()));
     settle(); settle();
     auto& input = scene->SceneInput();
-    const auto frame = [&](const glm::vec2 p) { input.FeedMousePosition(p); settle(); };
+    const auto frame = [&](const kor::Vec2 p) { input.FeedMousePosition(p); settle(); };
     frame({ 10.f, 10.f });
     input.FeedMouseButton(kor::MouseButton::eLeft, true);
     settle();
@@ -2100,7 +2100,7 @@ namespace {
         kui::Rect r { 1e9f, 1e9f, -1e9f, -1e9f };
         for (const auto& shape : image.Shapes())
             for (const auto& contour : shape.path.Flatten(0.01f))
-                for (const glm::vec2 p : contour.points) {
+                for (const kor::Vec2 p : contour.points) {
                     r.left = std::min(r.left, p.x); r.top = std::min(r.top, p.y);
                     r.right = std::max(r.right, p.x); r.bottom = std::max(r.bottom, p.y);
                 }
@@ -2177,7 +2177,7 @@ TEST_F(WidgetTest, AnIconIs24UnitsInTheThemesTextColourUnlessSizedOrTinted) {
     Show(kui::Align(kui::Alignment::TopLeft(), kui::SizedBox(48.f, 48.f, kui::Icon("add"))));
     const auto text = kui::Theme::Current().text;
     const auto p = scene->At(24, 12);
-    EXPECT_NEAR(p.r, text.r * 255.f, 3.f); EXPECT_NEAR(p.g, text.g * 255.f, 3.f) << "the theme's text colour";
+    EXPECT_NEAR(p.x, text.r * 255.f, 3.f); EXPECT_NEAR(p.y, text.g * 255.f, 3.f) << "the theme's text colour";
     EXPECT_TRUE(IsBlack(scene->At(14, 14))) << "twice the size";
     EXPECT_FALSE(IsBlack(scene->At(24, 36)));
 }
@@ -2222,7 +2222,7 @@ TEST(IconSheet, Renders) {
                                                              .format = kor::Window::Format::eRGBA8_SRGB });
         ASSERT_NE(scene, nullptr);
         for (int i = 0; i < 4; ++i) settle();
-        const auto pixels = scene->readback->Read<glm::u8vec4>(static_cast<std::size_t>(SheetW) * SheetH);
+        const auto pixels = scene->readback->Read<kor::U8Vec4>(static_cast<std::size_t>(SheetW) * SheetH);
         stbi_write_png((std::string(out) + "-" + name + ".png").c_str(), SheetW, SheetH, 4, pixels.data(), SheetW * 4);
         s_app->Close(*scene);
         settle();

@@ -1,4 +1,3 @@
-using System.Numerics;
 using Koral.Native;
 
 namespace Koral;
@@ -7,7 +6,7 @@ namespace Koral;
 /// <example>
 /// <code>
 /// var gbuffer = new Framebuffer.Builder()
-///     .AddColor(new() { Name = "albedo", View = albedo, Clear = new Vector4(0, 0, 0, 1) })
+///     .AddColor(new() { Name = "albedo", View = albedo, Clear = new Vec4(0, 0, 0, 1) })
 ///     .SetDepth(new() { Name = "depth", View = depth })
 ///     .Build();
 /// </code>
@@ -34,7 +33,7 @@ public sealed unsafe class Framebuffer : Resource
             public string Name { get; init; } = "";
             public AttachmentSource View { get; init; }
             public AttachmentSource Resolve { get; init; }
-            public ClearColor Clear { get; init; } = new Vector4(0, 0, 0, 1);
+            public ClearColor Clear { get; init; } = new Vec4(0, 0, 0, 1);
         }
 
         /// <summary>kor::Framebuffer::Builder::DepthStencilAttachment.</summary>
@@ -232,7 +231,7 @@ public sealed unsafe partial class AccelerationStructure : Resource
     /// <summary>kor::AccelerationStructure::Instance.</summary>
     public sealed record Instance(AccelerationStructure Blas)
     {
-        public Matrix4x4 Transform { get; init; } = Matrix4x4.Identity;
+        public Mat4 Transform { get; init; } = Mat4.Identity;
         public uint InstanceCustomIndex { get; init; }
         public uint HitGroupIndex { get; init; }
     }

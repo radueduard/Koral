@@ -17,7 +17,7 @@
 #include <utility>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "buffer.h"
@@ -55,8 +55,8 @@ namespace kor {
         /** What `scale` is relative to, when not the graph's screen: an image imported into the graph. */
         std::string sizeOf {};
         /** A fixed size instead, for targets that do not follow the window (a shadow map). */
-        std::optional<glm::uvec2> extent {};
-        glm::u32 mipLevels = 1;
+        std::optional<kor::UVec2> extent {};
+        kor::u32 mipLevels = 1;
     };
 
     /**
@@ -67,7 +67,7 @@ namespace kor {
      * never shared, so a frame being written cannot disturb the one the GPU is still reading.
      */
     struct BufferDesc {
-        glm::i64 size = 0;  ///< In bytes.
+        kor::i64 size = 0;  ///< In bytes.
         /** How the creating pass uses it; other passes add theirs as for ImageDesc::usage. */
         Flags<Buffer::Usage> usage = Buffer::Usage::eStorage;
         Buffer::Type type = Buffer::Type::eDeviceLocal;
@@ -170,7 +170,7 @@ namespace kor {
          */
         [[nodiscard]] ResourceRef<Buffer> WritableBufferNamed(std::string_view name) const;
         /** @brief The size an image the graph made has (or will have, after a resize). */
-        [[nodiscard]] glm::uvec2 Extent(std::string_view name) const;
+        [[nodiscard]] kor::UVec2 Extent(std::string_view name) const;
         /** @brief Where last frame's @p name is kept, for a pass that declared PassBuilder::ReadPrevious. */
         [[nodiscard]] ResourceRef<const Image> PreviousImageNamed(std::string_view name) const;
         [[nodiscard]] ResourceRef<const Buffer> PreviousBufferNamed(std::string_view name) const;
@@ -369,7 +369,7 @@ namespace kor {
         /** @brief One pass as scheduled: its name, and how deep in the dependencies it sits. */
         struct Scheduled {
             std::string name;
-            glm::u32 level;
+            kor::u32 level;
             bool async = false;  ///< Runs on the async compute queue.
         };
         /** @brief The passes that run, in order. Passes on one level do not depend on each other. */
@@ -441,10 +441,10 @@ namespace kor {
 
         /** @brief What the graph's own resources take, with and without sharing. */
         struct MemoryUse {
-            glm::u64 bytes = 0;          ///< Allocated: images, buffers and previous-frame copies.
-            glm::u64 unsharedBytes = 0;  ///< What they would take with every resource on its own.
-            glm::u32 resources = 0;      ///< Named resources the graph makes.
-            glm::u32 allocations = 0;    ///< The images and buffers actually allocated for them.
+            kor::u64 bytes = 0;          ///< Allocated: images, buffers and previous-frame copies.
+            kor::u64 unsharedBytes = 0;  ///< What they would take with every resource on its own.
+            kor::u32 resources = 0;      ///< Named resources the graph makes.
+            kor::u32 allocations = 0;    ///< The images and buffers actually allocated for them.
         };
         [[nodiscard]] const MemoryUse& Memory() const { return _memory; }
 
@@ -493,17 +493,17 @@ namespace kor {
         // fits — and only the passes whose resources actually changed are initialized again.
         struct Allocated {
             std::string key;
-            glm::u64 id = 0;   // never reused, unlike an address
+            kor::u64 id = 0;   // never reused, unlike an address
             Resource<Image> image;
             Resource<Buffer> buffer;
         };
         std::vector<Allocated> _allocated;
-        std::map<std::string, glm::u64, std::less<>> _resourceIds;         // every name, aliases and imports included
-        std::map<std::string, glm::u64, std::less<>> _importIds;           // bumped when an import changes
-        std::map<const RenderPass*, std::vector<glm::u64>> _initializedWith; // what each pass was last initialized with
+        std::map<std::string, kor::u64, std::less<>> _resourceIds;         // every name, aliases and imports included
+        std::map<std::string, kor::u64, std::less<>> _importIds;           // bumped when an import changes
+        std::map<const RenderPass*, std::vector<kor::u64>> _initializedWith; // what each pass was last initialized with
         std::vector<std::vector<std::size_t>> _dependencies;               // per position in _order
         std::vector<std::unique_ptr<RenderPass>> _refused;                 // added when the graph could not take them
-        glm::u64 _nextId = 1;
+        kor::u64 _nextId = 1;
         mutable std::map<std::string, Flags<Image::Usage>, std::less<>> _kept;   // asked for by name: never shared, and made with these too
         bool _aliasing = true;
         MemoryUse _memory;
@@ -523,17 +523,17 @@ namespace kor {
             ResourceRef<const Buffer> buffer;
             Resource<Image> previousImage;   // the copy kept
             Resource<Buffer> previousBuffer;
-            glm::u64 id = 0;
-            glm::u64 frames = 0;             // frames copied into it since it was made; 0 needs clearing
+            kor::u64 id = 0;
+            kor::u64 frames = 0;             // frames copied into it since it was made; 0 needs clearing
         };
         std::vector<History> _historyCopies;
         std::map<std::string, std::size_t, std::less<>> _historyIndex;     // every name reaching one, aliases included
         std::vector<Resource<Framebuffer>> _historyClears;  // what cleared a depth history, kept until rebuilt
         std::vector<std::string> _history;                  // the physical names, for KeptForNextFrame
-        glm::uvec2 _extent {0, 0};
+        kor::UVec2 _extent {0, 0};
         /// The window's image the graph was last built for: which one, and how many times rebuilt.
         std::uintptr_t _screenSeen = 0;
-        glm::u64 _screenGeneration = 0;
+        kor::u64 _screenGeneration = 0;
         mutable bool _dirty = true;
         bool _broken = false;
     };

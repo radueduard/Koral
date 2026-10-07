@@ -74,7 +74,7 @@ namespace kmdl::detail
         std::vector<GltfLight> lights;
         for (const auto& light : document->extensions->punctual.value()->lights) {
             GltfLight out;
-            if (light.color) out.color = glm::vec3((*light.color)[0], (*light.color)[1], (*light.color)[2]);
+            if (light.color) out.color = kor::Vec3((*light.color)[0], (*light.color)[1], (*light.color)[2]);
             // The spec's defaults: intensity 1, and no range at all.
             out.intensity = light.intensity.value_or(1.f);
             out.range = light.range.value_or(0.f);

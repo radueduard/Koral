@@ -27,9 +27,9 @@ namespace
     // member pointers, which name them without needing to be a command buffer. Clang only grants protected
     // access when the member is named through the derived class, so the accessors must not reuse the names.
     struct Access : CommandBuffer {
-        using PushConstantRaw = CommandBuffer& (CommandBuffer::*)(std::string_view, const void*, glm::u32, ValueShape,
+        using PushConstantRaw = CommandBuffer& (CommandBuffer::*)(std::string_view, const void*, kor::u32, ValueShape,
                                                                    std::source_location);
-        using PushBlockRaw = CommandBuffer& (CommandBuffer::*)(const void*, glm::u32, glm::u32);
+        using PushBlockRaw = CommandBuffer& (CommandBuffer::*)(const void*, kor::u32, kor::u32);
         static PushConstantRaw RawPushConstant() { return &Access::PushConstant; }
         static PushBlockRaw RawPushConstantBlock() { return &Access::PushConstantBlock; }
     };
@@ -40,8 +40,8 @@ namespace
         GuardedVoid([&] { body(CommandsOf(commands)); });
     }
 
-    glm::vec4 Vec4Of(const float* v) { return v ? glm::vec4(v[0], v[1], v[2], v[3]) : glm::vec4(1.f); }
-    glm::ivec3 IVec3Of(const int32_t* v) { return {v[0], v[1], v[2]}; }
+    kor::Vec4 Vec4Of(const float* v) { return v ? kor::Vec4(v[0], v[1], v[2], v[3]) : kor::Vec4(1.f); }
+    kor::IVec3 IVec3Of(const int32_t* v) { return {v[0], v[1], v[2]}; }
 
     Blit BlitOf(const KoralBlit* b)
     {
@@ -102,15 +102,15 @@ namespace
            .SetDepthStoreOperation(static_cast<StoreOperation>(info->depth_store))
            .SetStencilStoreOperation(static_cast<StoreOperation>(info->stencil_store));
         for (std::size_t i = 0; i < info->clear_color_count; ++i)
-            if (info->clear_colors[i].components) out.SetClearColor(static_cast<glm::u32>(i), ClearColorOf(info->clear_colors[i]));
+            if (info->clear_colors[i].components) out.SetClearColor(static_cast<kor::u32>(i), ClearColorOf(info->clear_colors[i]));
         if (info->has_clear_depth) out.SetClearDepth(info->clear_depth);
         if (info->has_clear_stencil) out.SetClearStencil(info->clear_stencil);
         return out;
     }
 
-    std::optional<glm::u32> OptionalOf(const int64_t value)
+    std::optional<kor::u32> OptionalOf(const int64_t value)
     {
-        return value < 0 ? std::nullopt : std::optional(static_cast<glm::u32>(value));
+        return value < 0 ? std::nullopt : std::optional(static_cast<kor::u32>(value));
     }
 }
 
@@ -192,7 +192,7 @@ const char* koral_cmd_timing(KoralCommandBuffer* c, const uint32_t i, double* mi
 bool koral_cmd_supports_timers(KoralCommandBuffer* c) { return Guarded([&] { return CommandsOf(c).SupportsTimers(); }, false); }
 uint64_t koral_cmd_last_frame_command_count(KoralCommandBuffer* c)
 {
-    return Guarded([&] { return CommandsOf(c).LastFrameCommandCount(); }, glm::u64{0});
+    return Guarded([&] { return CommandsOf(c).LastFrameCommandCount(); }, kor::u64{0});
 }
 
 void koral_cmd_begin_rendering(KoralCommandBuffer* c, const KoralRenderInfo* info) { Record(c, [&](auto& x) { x.BeginRendering(RenderInfoOf(info)); }); }

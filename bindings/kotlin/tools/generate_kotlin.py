@@ -18,6 +18,10 @@ TARGETS = [
     {"header": ROOT / "include" / "koral_c.h", "out": KOTLIN / "koral" / "src" / "main" / "kotlin" / "koral" / "interop" / "KoralNative.kt",
      "api": "KORAL_API", "prefix": "koral_", "obj": "KoralNative", "layouts": "KoralLayouts", "pkg": "koral.interop",
      "library": "Native.koral", "imports": []},
+    # kmath's C interface: what the Kotlin math is tested against, and what its bulk operations call.
+    {"header": ROOT / "include" / "koral_math_c.h", "out": KOTLIN / "koral" / "src" / "main" / "kotlin" / "koral" / "interop" / "KoralMathNative.kt",
+     "api": "KORAL_API", "prefix": "koral_", "obj": "KoralMathNative", "layouts": "KoralMathLayouts", "pkg": "koral.interop",
+     "library": "Native.koral", "imports": []},
     {"header": ROOT / "modules" / "ui" / "include" / "koralUI_c.h", "out": KOTLIN / "koral-ui" / "src" / "main" / "kotlin" / "koral" / "ui" / "interop" / "KuiNative.kt",
      "api": "KUI_API", "prefix": "kui_", "obj": "KuiNative", "layouts": "KuiLayouts", "pkg": "koral.ui.interop",
      "library": "Native.koralUi", "imports": ["koral.interop.Native", "koral.interop.KoralLayouts"]},
@@ -28,7 +32,7 @@ SCALARS = {
     "bool": ("JAVA_BOOLEAN", "Boolean", 1), "char": ("JAVA_BYTE", "Byte", 1), "uint8_t": ("JAVA_BYTE", "Byte", 1),
     "int32_t": ("JAVA_INT", "Int", 4), "uint32_t": ("JAVA_INT", "Int", 4), "int": ("JAVA_INT", "Int", 4),
     "float": ("JAVA_FLOAT", "Float", 4), "double": ("JAVA_DOUBLE", "Double", 8),
-    "int64_t": ("JAVA_LONG", "Long", 8), "uint64_t": ("JAVA_LONG", "Long", 8), "size_t": ("JAVA_LONG", "Long", 8),
+    "uint16_t": ("JAVA_SHORT", "Short", 2), "int64_t": ("JAVA_LONG", "Long", 8), "uint64_t": ("JAVA_LONG", "Long", 8), "size_t": ("JAVA_LONG", "Long", 8),
 }
 ENUMS = {"KoralStatus", "KoralLogLevel", "KoralResourceKind", "KoralPlatform"}
 POINTER = ("ADDRESS", "MemorySegment", 8)
@@ -147,6 +151,7 @@ def ffm(t, structs):
 
 def generate(target, known):
     text = strip(target["header"].read_text())
+    ENUMS.update(re.findall(r"typedef\s+enum\s+\w*\s*\{[^}]*\}\s*(\w+)\s*;", text))   # each crosses as its int
     structs = Structs(text, known)
     structs.other_layouts = "KoralLayouts"
     structs.own_layouts = target["layouts"]

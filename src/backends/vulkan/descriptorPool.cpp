@@ -13,7 +13,7 @@
 
 namespace kor::vk
 {
-    DescriptorPool::Builder & DescriptorPool::Builder::addPoolSize(const ::vk::DescriptorType type, const glm::u32 count) {
+    DescriptorPool::Builder & DescriptorPool::Builder::addPoolSize(const ::vk::DescriptorType type, const kor::u32 count) {
         const auto DescriptorPoolSize = ::vk::DescriptorPoolSize()
             .setType(type)
             .setDescriptorCount(count);
@@ -26,7 +26,7 @@ namespace kor::vk
         return *this;
     }
 
-    DescriptorPool::Builder & DescriptorPool::Builder::setMaxSets(const glm::u32 count) {
+    DescriptorPool::Builder & DescriptorPool::Builder::setMaxSets(const kor::u32 count) {
         _maxSets = count;
         return *this;
     }
@@ -60,7 +60,7 @@ namespace kor::vk
     {
         const auto layoutHandle = *layout;
 
-        glm::u32 variableDescriptorCount = 0;
+        kor::u32 variableDescriptorCount = 0;
         for (const auto& description : layout.Bindings() | std::views::values) {
             if (description.count == 0) {
                 // Unbounded (bindless) array: allocate up to the layout's cap.
@@ -113,7 +113,7 @@ namespace kor::vk
         if (allocatedSets.size() != layouts.size()) {
             throw std::runtime_error("Failed to allocate descriptor sets!");
         }
-        _allocatedSetCount += static_cast<glm::u32>(layouts.size());
+        _allocatedSetCount += static_cast<kor::u32>(layouts.size());
         return allocatedSets;
     }
 

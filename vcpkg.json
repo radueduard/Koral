@@ -16,9 +16,6 @@
     "name" : "magic-enum",
     "version>=" : "0.9.7#1"
   }, {
-    "name" : "glm",
-    "version>=" : "1.0.3"
-  }, {
     "name" : "stb",
     "version>=" : "2024-07-29#1"
   }, {
@@ -42,7 +39,7 @@
   }, {
     "name" : "jasper",
     "version>=" : "4.2.9"
-  }, {
+  }, "openssl", {
     "name" : "zlib",
     "version>=" : "1.3.1"
   }, {

@@ -67,7 +67,7 @@ long-lived loop costs nothing while idle, and the pool multiplexes many.
 ```cpp
 Task<void> physicsLoop(BiToken& sync) {
     co_await Context::SwitchToBackgroundThread();
-    for (glm::u64 n = 1; running; ++n) {
+    for (kor::u64 n = 1; running; ++n) {
         co_await sync.awaitRequest(n);   // suspends; frees the pool thread
         simulateStepsFor(n);             // record + dispatch (or CPU sim)
         sync.signalDone(n);              // hand results back to the frame

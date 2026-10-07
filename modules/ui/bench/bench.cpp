@@ -27,7 +27,7 @@ namespace {
     double since(const Clock::time_point from) { return std::chrono::duration<double, std::milli>(Clock::now() - from).count(); }
 
     /** The colour of cell @p index at @p phase: a hue that moves along the grid, as the benchmark scene's does. */
-    glm::vec3 hue(const float h)
+    kor::Vec3 hue(const float h)
     {
         const float x = (h - std::floor(h)) * 6.f;
         const auto channel = [x](const float n) {
@@ -42,7 +42,7 @@ namespace {
         ClearPass() : RenderPass("Clear") {}
         void Setup(kor::PassBuilder& b) override { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); }
         void Initialize(const kor::PassResources& r) override { _screen = r.ImageNamed(kor::FrameGraph::Screen); }
-        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, glm::vec4(0.f, 0.f, 0.f, 1.f)); }
+        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, kor::Vec4(0.f, 0.f, 0.f, 1.f)); }
     private:
         kor::ResourceRef<const kor::Image> _screen;
     };
@@ -65,10 +65,10 @@ namespace {
         for (int first = 0; first < cells; first += PerRow) {
             std::vector<kui::Widget> row;
             for (int i = first; i < std::min(first + PerRow, cells); ++i) {
-                const glm::vec3 c = hue(static_cast<float>(i) * 0.011f + phase);
+                const kor::Vec3 c = hue(static_cast<float>(i) * 0.011f + phase);
                 row.push_back(kui::Container({
                     .width = 34.f, .height = 20.f,
-                    .decoration = { .color = { c.r, c.g, c.b }, .radius = 5.f },
+                    .decoration = { .color = { c.x, c.y, c.z }, .radius = 5.f },
                     .alignment = kui::Alignment::Center(),
                 }, kui::Text(std::to_string(i), number, kui::TextAlign::eStart, false)));
             }

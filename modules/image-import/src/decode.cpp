@@ -176,7 +176,7 @@ namespace kimg::detail
     // ---- upload ---------------------------------------------------------------------------------
 
     void uploadSlice(const kor::ResourceRef<const kor::Image>& image, const std::span<const unsigned char> bytes,
-                     const glm::uvec3 extent, const glm::u32 layer, const glm::u32 mip)
+                     const kor::UVec3 extent, const kor::u32 layer, const kor::u32 mip)
     {
         const auto staging = kor::Buffer::Builder<unsigned char>()
             .SetDataView(bytes)
@@ -188,7 +188,7 @@ namespace kimg::detail
         (void)kor::CommandBuffer::Upload([&](kor::CommandBuffer& commandBuffer) {
             commandBuffer.CopyBufferToImage(staging, image, kor::Copy {
                 .imageOffset = { 0, 0, 0 },
-                .imageExtent = extent,
+                .imageExtent = kor::IVec3(extent),
                 .imageBaseArrayLayer = layer,
                 .imageLayerCount = 1,
                 .imageMipLevel = mip,
@@ -475,19 +475,19 @@ namespace kimg::detail
         ktx.format = *format;
         ktx.type = imageTypeFromKtx(texture.get());
         ktx.extent = { texture->baseWidth, texture->baseHeight, texture->baseDepth };
-        const glm::u32 layers = std::max<glm::u32>(1u, texture->numLayers);
-        const glm::u32 faces  = std::max<glm::u32>(1u, texture->numFaces);
+        const kor::u32 layers = std::max<kor::u32>(1u, texture->numLayers);
+        const kor::u32 faces  = std::max<kor::u32>(1u, texture->numFaces);
         ktx.arrayLayers = layers * faces;
-        ktx.fileMipLevels = std::max<glm::u32>(1u, texture->numLevels);
+        ktx.fileMipLevels = std::max<kor::u32>(1u, texture->numLevels);
 
         if (texture->pData == nullptr)
             return std::unexpected(fileError(path, "the file carries no image data"));
 
         ktx.slices.reserve(static_cast<std::size_t>(ktx.fileMipLevels) * ktx.arrayLayers);
-        for (glm::u32 mip = 0; mip < ktx.fileMipLevels; ++mip) {
+        for (kor::u32 mip = 0; mip < ktx.fileMipLevels; ++mip) {
             const std::size_t perImage = ktxTexture_GetImageSize(texture.get(), mip);
-            for (glm::u32 layer = 0; layer < layers; ++layer) {
-                for (glm::u32 face = 0; face < faces; ++face) {
+            for (kor::u32 layer = 0; layer < layers; ++layer) {
+                for (kor::u32 face = 0; face < faces; ++face) {
                     ktx_size_t offset = 0;
                     const KTX_error_code query = ktxTexture_GetImageOffset(texture.get(), mip, layer, face, &offset);
                     if (query != KTX_SUCCESS)
@@ -522,7 +522,7 @@ namespace kimg::detail
 
         // The file's own mip chain wins; failing that, generate one if asked — unless the format is
         // compressed, which cannot be blitted into.
-        const glm::u32 mipLevels = ktx.fileMipLevels > 1
+        const kor::u32 mipLevels = ktx.fileMipLevels > 1
             ? ktx.fileMipLevels
             : ((generateMipmaps && !kor::Image::IsBlockCompressed(ktx.format)) ? 0u : 1u);
 

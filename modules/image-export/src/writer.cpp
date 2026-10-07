@@ -28,7 +28,7 @@ namespace kimg
                                .message = std::format("{}: {}", path.string(), std::move(what)) };
         }
 
-        glm::uvec3 mipExtent(const kor::Image& image, const glm::u32 mipLevel)
+        kor::UVec3 mipExtent(const kor::Image& image, const kor::u32 mipLevel)
         {
             const auto base = image.Extent();
             return { std::max(1u, base.x >> mipLevel),
@@ -95,7 +95,7 @@ namespace kimg
             const auto byteCount = kor::Image::SizeOfRegion(image->PixelFormat(), subimage.extent);
 
             kor::Buffer::RawBuilder builder;
-            builder.SetRawSize(static_cast<glm::i64>(byteCount))
+            builder.SetRawSize(static_cast<kor::i64>(byteCount))
 
                 .SetType(kor::Buffer::Type::eReadback);
             auto staging = builder.Build();
@@ -109,8 +109,8 @@ namespace kimg
             // would leave the buffer empty and the file full of zeroes.
             kor::CommandBuffer::SingleTimeCommand([&](kor::CommandBuffer& commandBuffer) {
                 commandBuffer.CopyImageToBuffer(image, staging, kor::Copy {
-                    .imageOffset = subimage.offset,
-                    .imageExtent = subimage.extent,
+                    .imageOffset = kor::IVec3(subimage.offset),
+                    .imageExtent = kor::IVec3(subimage.extent),
                     .imageBaseArrayLayer = subimage.arrayLayer,
                     .imageLayerCount = 1,
                     .imageMipLevel = subimage.mipLevel,

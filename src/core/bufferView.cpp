@@ -13,9 +13,9 @@ namespace kor
     namespace
     {
         /** @brief Bytes one texel of @p format occupies. */
-        glm::u64 texelSize(const Image::Format format)
+        kor::u64 texelSize(const Image::Format format)
         {
-            return Image::SizeOfRegion(format, glm::uvec3{ 1, 1, 1 });
+            return Image::SizeOfRegion(format, kor::UVec3{ 1, 1, 1 });
         }
 
         /**
@@ -24,10 +24,10 @@ namespace kor
          * Shared by Create()'s validation and the constructor so the value the view reports is the
          * value that was checked. Only meaningful once the buffer is known usable.
          */
-        glm::i64 resolveRange(const BufferView::Builder& builder)
+        kor::i64 resolveRange(const BufferView::Builder& builder)
         {
             if (builder.range != 0) return builder.range;
-            return static_cast<glm::i64>(builder.buffer->size()) - builder.offset;
+            return static_cast<kor::i64>(builder.buffer->size()) - builder.offset;
         }
     }
 
@@ -80,8 +80,8 @@ namespace kor
 
         if (auto v = Validate(); !v) return std::unexpected(v.error());
 
-        const auto bufferSize = static_cast<glm::i64>(buffer->size());
-        const glm::i64 resolved = resolveRange(*this);
+        const auto bufferSize = static_cast<kor::i64>(buffer->size());
+        const kor::i64 resolved = resolveRange(*this);
 
         if (resolved <= 0 || offset + resolved > bufferSize) {
             AddError(ErrorCode::eInvalidArgument,
@@ -91,7 +91,7 @@ namespace kor
 
         // Both are hard requirements of the API underneath: a texel buffer is addressed in texels,
         // so a view that starts or ends part-way through one has no meaning.
-        const auto texel = static_cast<glm::i64>(texelSize(*format));
+        const auto texel = static_cast<kor::i64>(texelSize(*format));
         if (texel > 0 && offset % texel != 0) {
             AddError(ErrorCode::eInvalidArgument,
                      std::format("A buffer view's offset must be a whole number of texels: {} is "
@@ -124,6 +124,6 @@ namespace kor
         _format(*createInfo.format),
         _offset(createInfo.offset),
         _range(resolveRange(createInfo)),
-        _texelCount(static_cast<glm::u64>(_range) / texelSize(_format)),
+        _texelCount(static_cast<kor::u64>(_range) / texelSize(_format)),
         _isPerFrame(_buffer->IsPerFrame()) {}
 }

@@ -9,7 +9,7 @@
 #include <format>
 #include <map>
 
-#include <glm/gtc/quaternion.hpp>
+#include <kmath/quaternion.h>
 
 #include "kgui/layout.h"
 
@@ -116,10 +116,10 @@ namespace kgui
             {
                 const auto& now = *static_cast<V*>(address);
                 std::vector<float> values;
-                for (int i = 0; i < V::length(); ++i) values.push_back(static_cast<float>(now[i]));
+                for (int i = 0; i < V::Size; ++i) values.push_back(static_cast<float>(now[i]));
                 return Labeled(label, DragFloats(std::move(values), [this, get, whole](const std::vector<float>& v) {
                     if (V* target = At<V>(get))
-                        for (int i = 0; i < V::length(); ++i)
+                        for (int i = 0; i < V::Size; ++i)
                             (*target)[i] = static_cast<typename V::value_type>(whole ? std::round(v[i]) : v[i]);
                     Changed();
                 }, whole ? 0.2f : speed, whole ? 0 : 3));
@@ -129,13 +129,13 @@ namespace kgui
             kui::Widget Colour(const std::string& label, void* address, const Getter& get)
             {
                 const auto& value = *static_cast<V*>(address);
-                const kui::Color now { value[0], value[1], value[2], V::length() == 4 ? value[3] : 1.f };
+                const kui::Color now { value[0], value[1], value[2], V::Size == 4 ? value[3] : 1.f };
                 kui::ColorPickerOptions options;
-                options.alpha = V::length() == 4;
+                options.alpha = V::Size == 4;
                 return Labeled(label, kui::ColorEdit(now, [this, get](const kui::Color c) {
                     if (V* target = At<V>(get)) {
                         (*target)[0] = c.r; (*target)[1] = c.g; (*target)[2] = c.b;
-                        if constexpr (V::length() == 4) (*target)[3] = c.a;
+                        if constexpr (V::Size == 4) (*target)[3] = c.a;
                     }
                     Changed();
                 }, {}, options));
@@ -175,31 +175,31 @@ namespace kgui
                     editor = Labeled(label, kui::TextField(std::move(options)));
                     break;
                 }
-                case TypeKind::eVec2: editor = Vector<glm::vec2>(label, address, get, false); break;
-                case TypeKind::eVec3: editor = field && field->color ? Colour<glm::vec3>(label, address, get) : Vector<glm::vec3>(label, address, get, false); break;
-                case TypeKind::eVec4: editor = field && field->color ? Colour<glm::vec4>(label, address, get) : Vector<glm::vec4>(label, address, get, false); break;
-                case TypeKind::eIVec2: editor = Vector<glm::ivec2>(label, address, get, true); break;
-                case TypeKind::eIVec3: editor = Vector<glm::ivec3>(label, address, get, true); break;
-                case TypeKind::eIVec4: editor = Vector<glm::ivec4>(label, address, get, true); break;
-                case TypeKind::eUVec2: editor = Vector<glm::uvec2>(label, address, get, true); break;
-                case TypeKind::eUVec3: editor = Vector<glm::uvec3>(label, address, get, true); break;
-                case TypeKind::eUVec4: editor = Vector<glm::uvec4>(label, address, get, true); break;
+                case TypeKind::eVec2: editor = Vector<kor::Vec2>(label, address, get, false); break;
+                case TypeKind::eVec3: editor = field && field->color ? Colour<kor::Vec3>(label, address, get) : Vector<kor::Vec3>(label, address, get, false); break;
+                case TypeKind::eVec4: editor = field && field->color ? Colour<kor::Vec4>(label, address, get) : Vector<kor::Vec4>(label, address, get, false); break;
+                case TypeKind::eIVec2: editor = Vector<kor::IVec2>(label, address, get, true); break;
+                case TypeKind::eIVec3: editor = Vector<kor::IVec3>(label, address, get, true); break;
+                case TypeKind::eIVec4: editor = Vector<kor::IVec4>(label, address, get, true); break;
+                case TypeKind::eUVec2: editor = Vector<kor::UVec2>(label, address, get, true); break;
+                case TypeKind::eUVec3: editor = Vector<kor::UVec3>(label, address, get, true); break;
+                case TypeKind::eUVec4: editor = Vector<kor::UVec4>(label, address, get, true); break;
                 case TypeKind::eQuat: {
                     // As Euler angles in degrees: what a person thinks in.
-                    const glm::vec3 degrees = glm::degrees(glm::eulerAngles(*static_cast<glm::quat*>(address)));
+                    const kor::Vec3 degrees = kor::Degrees(kor::EulerAngles(*static_cast<kor::Quat*>(address)));
                     editor = Labeled(label, DragFloats({ degrees.x, degrees.y, degrees.z }, [this, get](const std::vector<float>& v) {
-                        if (auto* rotation = At<glm::quat>(get)) *rotation = glm::quat(glm::radians(glm::vec3(v[0], v[1], v[2])));
+                        if (auto* rotation = At<kor::Quat>(get)) *rotation = kor::Quat::FromEuler(kor::Radians(kor::Vec3(v[0], v[1], v[2])));
                         Changed();
                     }, 0.5f, 1));
                     break;
                 }
                 case TypeKind::eMat4: {
-                    const auto& matrix = *static_cast<glm::mat4*>(address);
+                    const auto& matrix = *static_cast<kor::Mat4*>(address);
                     std::vector<kui::Widget> columns;
                     for (int column = 0; column < 4; ++column) {
-                        const glm::vec4 c = matrix[column];
+                        const kor::Vec4 c = matrix[column];
                         columns.push_back(DragFloats({ c.x, c.y, c.z, c.w }, [this, get, column](const std::vector<float>& v) {
-                            if (auto* target = At<glm::mat4>(get)) (*target)[column] = { v[0], v[1], v[2], v[3] };
+                            if (auto* target = At<kor::Mat4>(get)) (*target)[column] = { v[0], v[1], v[2], v[3] };
                             Changed();
                         }));
                     }

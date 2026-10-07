@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <iostream>
 #include <unordered_set>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "runtime.h"
 #include "vulkanContext.h"

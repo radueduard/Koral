@@ -38,7 +38,7 @@ namespace kor::vk
         _presentModes = physicalDevice->getSurfacePresentModesKHR(_handle);
     }
 
-    void Surface::CreateSwapChain(const kor::Window& window, const glm::u32 framesInFlight)
+    void Surface::CreateSwapChain(const kor::Window& window, const kor::u32 framesInFlight)
     {
         _swapChain = SwapChain::Builder(*this)
             .setImageCount(2)

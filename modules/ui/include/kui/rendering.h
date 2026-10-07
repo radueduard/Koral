@@ -14,7 +14,7 @@
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <input.h>
 
@@ -39,7 +39,7 @@ namespace kui
         static constexpr EdgeInsets Only(const float l, const float t, const float r, const float b) { return { l, t, r, b }; }
         [[nodiscard]] constexpr float Horizontal() const { return left + right; }
         [[nodiscard]] constexpr float Vertical() const { return top + bottom; }
-        [[nodiscard]] constexpr glm::vec2 Total() const { return { Horizontal(), Vertical() }; }
+        [[nodiscard]] constexpr kor::Vec2 Total() const { return { Horizontal(), Vertical() }; }
         constexpr bool operator==(const EdgeInsets&) const = default;
     };
 
@@ -50,15 +50,15 @@ namespace kui
     struct KUI_API BoxConstraints {
         float minWidth = 0.f, maxWidth = Infinity, minHeight = 0.f, maxHeight = Infinity;
 
-        static constexpr BoxConstraints Tight(const glm::vec2 size) { return { size.x, size.x, size.y, size.y }; }
-        static constexpr BoxConstraints Loose(const glm::vec2 size) { return { 0.f, size.x, 0.f, size.y }; }
+        static constexpr BoxConstraints Tight(const kor::Vec2 size) { return { size.x, size.x, size.y, size.y }; }
+        static constexpr BoxConstraints Loose(const kor::Vec2 size) { return { 0.f, size.x, 0.f, size.y }; }
 
-        [[nodiscard]] glm::vec2 Constrain(glm::vec2 size) const;
+        [[nodiscard]] kor::Vec2 Constrain(kor::Vec2 size) const;
         [[nodiscard]] constexpr bool IsTight() const { return minWidth >= maxWidth && minHeight >= maxHeight; }
         [[nodiscard]] constexpr bool HasBoundedWidth() const { return maxWidth < Infinity; }
         [[nodiscard]] constexpr bool HasBoundedHeight() const { return maxHeight < Infinity; }
-        [[nodiscard]] constexpr glm::vec2 Biggest() const { return { maxWidth, maxHeight }; }
-        [[nodiscard]] constexpr glm::vec2 Smallest() const { return { minWidth, minHeight }; }
+        [[nodiscard]] constexpr kor::Vec2 Biggest() const { return { maxWidth, maxHeight }; }
+        [[nodiscard]] constexpr kor::Vec2 Smallest() const { return { minWidth, minHeight }; }
         [[nodiscard]] constexpr BoxConstraints Loosen() const { return { 0.f, maxWidth, 0.f, maxHeight }; }
         /** @brief Room left once @p insets are taken off every side. */
         [[nodiscard]] BoxConstraints Deflate(const EdgeInsets& insets) const;
@@ -92,9 +92,9 @@ namespace kui
     struct PointerEvent {
         enum class Type : std::uint8_t { eDown, eMove, eUp, eCancel, eHover, eScroll, eEnter, eExit };
         Type type = Type::eHover;
-        glm::vec2 position {};          ///< In the view's logical coordinates.
-        glm::vec2 local {};             ///< In the receiving render object's own coordinates.
-        glm::vec2 delta {};             ///< Movement since the last event, or the wheel's turn for eScroll.
+        kor::Vec2 position {};          ///< In the view's logical coordinates.
+        kor::Vec2 local {};             ///< In the receiving render object's own coordinates.
+        kor::Vec2 delta {};             ///< Movement since the last event, or the wheel's turn for eScroll.
         kor::MouseButton button = kor::MouseButton::eLeft;
         /// For eDown, which everything under the pointer hears, deepest first: whether something
         /// deeper has already taken this press (a button, a slider). What is behind can then leave it be.
@@ -120,9 +120,9 @@ namespace kui
         virtual ~DropReceiver() = default;
         [[nodiscard]] virtual bool AcceptsDrag(const DragData& data) const = 0;
         virtual void DragEntered(const DragData& data) {}
-        virtual void DragMoved(const DragData& data, glm::vec2 local) {}
+        virtual void DragMoved(const DragData& data, kor::Vec2 local) {}
         virtual void DragLeft() {}
-        virtual void Dropped(const DragData& data, glm::vec2 local) = 0;
+        virtual void Dropped(const DragData& data, kor::Vec2 local) = 0;
     };
 
     /**
@@ -134,17 +134,17 @@ namespace kui
         kor::Input* input = nullptr;
         const kor::Window* window = nullptr;
         RenderObject* root = nullptr;
-        glm::vec2 origin {};
+        kor::Vec2 origin {};
         /// Where on the desktop @p origin is, in pixels, for a window that moves under the pointer: the
         /// pointer is then asked of the desktop (kor::Window::DesktopCursor), not of the window.
-        std::optional<glm::ivec2> desktopOrigin;
+        std::optional<kor::IVec2> desktopOrigin;
     };
 
     /** @brief What a pointer is over, deepest first, with where it is in each. */
     struct HitTestResult {
-        struct Entry { RenderObject* target; glm::vec2 local; };
+        struct Entry { RenderObject* target; kor::Vec2 local; };
         std::vector<Entry> path;
-        void Add(RenderObject* target, const glm::vec2 local) { path.push_back({ target, local }); }
+        void Add(RenderObject* target, const kor::Vec2 local) { path.push_back({ target, local }); }
     };
 
     /**
@@ -186,10 +186,10 @@ namespace kui
         /** @brief Lays out under @p constraints; nothing happens when neither they nor the subtree changed. */
         void Layout(const BoxConstraints& constraints, bool parentUsesSize = true);
         [[nodiscard]] const BoxConstraints& Constraints() const { return _constraints; }
-        [[nodiscard]] glm::vec2 Size() const { return _size; }
+        [[nodiscard]] kor::Vec2 Size() const { return _size; }
         /** @brief Where the parent put it, in the parent's coordinates. */
-        [[nodiscard]] glm::vec2 Offset() const { return _offset; }
-        void SetOffset(glm::vec2 offset);
+        [[nodiscard]] kor::Vec2 Offset() const { return _offset; }
+        void SetOffset(kor::Vec2 offset);
         void MarkNeedsLayout();
         [[nodiscard]] bool NeedsLayout() const { return _needsLayout; }
         /**
@@ -202,11 +202,11 @@ namespace kui
 
         // -- painting
         /** @brief Paints itself and its children at @p offset. */
-        virtual void Paint(Canvas& canvas, glm::vec2 offset) {}
+        virtual void Paint(Canvas& canvas, kor::Vec2 offset) {}
         /** @brief Paints @p child where it was placed — or shows its layer, if it keeps one. */
-        void PaintChild(RenderObject& child, Canvas& canvas, glm::vec2 offset);
+        void PaintChild(RenderObject& child, Canvas& canvas, kor::Vec2 offset);
         /** @brief Paints @p child with its top-left at @p at — for a parent whose own space is not its children's (a scrolled layer). */
-        void PaintChildAt(RenderObject& child, Canvas& canvas, glm::vec2 at);
+        void PaintChildAt(RenderObject& child, Canvas& canvas, kor::Vec2 at);
         void MarkNeedsPaint();
         /** @brief Whether it keeps its own layer, so that repainting it repaints nothing else. */
         [[nodiscard]] virtual bool IsRepaintBoundary() const { return false; }
@@ -224,15 +224,15 @@ namespace kui
 
         // -- the pointer
         /** @brief Adds itself (and whatever under it is hit) to @p result when @p position, in its own coordinates, is over it. */
-        virtual bool HitTest(HitTestResult& result, glm::vec2 position);
+        virtual bool HitTest(HitTestResult& result, kor::Vec2 position);
         /** @brief The children's turn, topmost first. Returns whether one was hit. */
-        virtual bool HitTestChildren(HitTestResult& result, glm::vec2 position);
+        virtual bool HitTestChildren(HitTestResult& result, kor::Vec2 position);
         /** @brief Whether it counts as hit at all at @p position — false lets the pointer through to what is below. */
-        [[nodiscard]] virtual bool HitTestSelf(glm::vec2 position) const { return false; }
+        [[nodiscard]] virtual bool HitTestSelf(kor::Vec2 position) const { return false; }
         /** @brief A pointer event on it (or something in it). Return true to stop it going further up. */
         virtual bool HandleEvent(const PointerEvent& event) { return false; }
         /** @brief Where a child's coordinates start, in its own: how a scroll view shifts its content. */
-        [[nodiscard]] virtual glm::vec2 ChildOrigin(const RenderObject& child) const { return child.Offset(); }
+        [[nodiscard]] virtual kor::Vec2 ChildOrigin(const RenderObject& child) const { return child.Offset(); }
 
         // -- the keyboard
         /** @brief Text typed while it has focus. */
@@ -251,18 +251,18 @@ namespace kui
         [[nodiscard]] const Theme* InheritedTheme() const;
 
         /** @brief Where @p local, in its coordinates, is in the view's. */
-        [[nodiscard]] glm::vec2 ToGlobal(glm::vec2 local) const;
+        [[nodiscard]] kor::Vec2 ToGlobal(kor::Vec2 local) const;
         /** @brief Where @p global — a point of the view — is in this object's own coordinates: through whatever moves or transforms it. */
-        [[nodiscard]] glm::vec2 ToLocal(glm::vec2 global) const;
+        [[nodiscard]] kor::Vec2 ToLocal(kor::Vec2 global) const;
         /** @brief A point of this object's, in @p child 's coordinates. What draws a child anywhere but at its offset says where. */
-        [[nodiscard]] virtual glm::vec2 MapToChild(const RenderObject& child, const glm::vec2 point) const { return point - ChildOrigin(child); }
+        [[nodiscard]] virtual kor::Vec2 MapToChild(const RenderObject& child, const kor::Vec2 point) const { return point - ChildOrigin(child); }
         /** @brief How deep in the tree it is: the root is 0. */
         [[nodiscard]] int Depth() const;
 
     protected:
         /** @brief Sets the size (kept within the constraints) and lays out the children. */
         virtual void PerformLayout() = 0;
-        void SetSize(glm::vec2 size);
+        void SetSize(kor::Vec2 size);
         /** @brief Whether its size depends on nothing but its constraints (so a change below does not move its parent). */
         [[nodiscard]] virtual bool SizedByParent() const { return false; }
 
@@ -271,7 +271,7 @@ namespace kui
         RenderObject* _parent = nullptr;
         Owner* _owner = nullptr;
         BoxConstraints _constraints {};
-        glm::vec2 _size {}, _offset {};
+        kor::Vec2 _size {}, _offset {};
         RenderObject* _relayoutBoundary = nullptr;
         bool _needsLayout = true, _needsPaint = true, _hasLaidOut = false;
         std::shared_ptr<Layer> _layer;
@@ -315,7 +315,7 @@ namespace kui
          *        @p hotspot inside it), drop receivers are offered it, and @p onEnd hears whether one took it.
          *        Returns false when a drag is already going. Set by the view.
          */
-        std::function<bool(RenderObject& source, DragData data, const Widget& feedback, glm::vec2 hotspot,
+        std::function<bool(RenderObject& source, DragData data, const Widget& feedback, kor::Vec2 hotspot,
                            std::function<void(bool accepted)> onEnd)> beginDrag;
         /**
          * @brief Shows @p popup over everything else in the view — a menu, a dropdown's list — with its
@@ -324,7 +324,7 @@ namespace kui
          *        closePopup, which whatever is in it calls once it has been used. One at a time: showing
          *        another replaces it. Set by the view.
          */
-        std::function<void(const Widget& popup, glm::vec2 at, glm::vec2 size)> showPopup;
+        std::function<void(const Widget& popup, kor::Vec2 at, kor::Vec2 size)> showPopup;
         std::function<void()> closePopup;
         /// Asks that everything be built again, from the next frame: what it was built from — a theme set for
         /// part of the view — has changed. Set by the view.

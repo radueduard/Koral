@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Koral.UI.Native;
@@ -65,17 +64,17 @@ public readonly unsafe ref struct LayoutContext
     internal LayoutContext(IntPtr native) => _native = native;
     public int Count => (int)KuiNative.kui_layout_count(_native);
     /// <summary>Lays child <paramref name="index"/> out with <paramref name="constraints"/>; its size.</summary>
-    public Vector2 Measure(int index, BoxConstraints constraints)
+    public Vec2 Measure(int index, BoxConstraints constraints)
     {
         float w, h;
         KuiNative.kui_layout_measure(_native, (nuint)index, constraints.MinWidth, constraints.MaxWidth, constraints.MinHeight, constraints.MaxHeight, &w, &h);
         return new(w, h);
     }
-    public void Place(int index, Vector2 at) => KuiNative.kui_layout_place(_native, (nuint)index, at.X, at.Y);
+    public void Place(int index, Vec2 at) => KuiNative.kui_layout_place(_native, (nuint)index, at.X, at.Y);
 }
 
 /// <summary>A rule of layout: measures and places the children through the context, and says how big the whole is.</summary>
-public delegate Vector2 LayoutRule(LayoutContext context, BoxConstraints constraints);
+public delegate Vec2 LayoutRule(LayoutContext context, BoxConstraints constraints);
 
 /// <summary>How the system looks: whether it is dark, and its accent. <see cref="Known"/> is false where it has no such setting.</summary>
 public readonly record struct SystemAppearance(bool Known, bool Dark, Color Accent)
@@ -132,7 +131,7 @@ public static unsafe partial class Widgets
     /// <summary><paramref name="child"/>, with <paramref name="text"/> shown by the pointer while it rests on it.</summary>
     public static Widget Tooltip(string text, Widget child) => WithChild(child, c => KuiNative.kui_tooltip(text, c));
     /// <summary>Tells <paramref name="onChanged"/> how big <paramref name="child"/> is laid out — in the interface's units, and in pixels — when that changes.</summary>
-    public static Widget SizeObserver(Action<Vector2, Vector2> onChanged, Widget child) =>
+    public static Widget SizeObserver(Action<Vec2, Vec2> onChanged, Widget child) =>
         WithChild(child, c => KuiNative.kui_size_observer(Callbacks.Pan(onChanged), c));
 
     /// <summary><paramref name="child"/>, and while <paramref name="open"/> a <paramref name="dialog"/> over it and everything else.</summary>
@@ -185,11 +184,11 @@ public static unsafe partial class Widgets
 
     /// <summary>Values as a line or as bars. With no <paramref name="min"/> or <paramref name="max"/>, the values' own.</summary>
     public static Widget Plot(ReadOnlySpan<float> values, PlotKind kind = PlotKind.Line, float? min = null, float? max = null,
-                              Vector2? size = null, string? overlay = null, Color? color = null)
+                              Vec2? size = null, string? overlay = null, Color? color = null)
     {
         fixed (float* p = values)
             return Made(KuiNative.kui_plot(p, (nuint)values.Length, (uint)kind, min ?? float.NaN, max ?? float.NaN,
-                                           (size ?? new Vector2(-1, 60)).Native(), overlay, (color ?? Color.Transparent).Native));
+                                           (size ?? new Vec2(-1, 60)).Native(), overlay, (color ?? Color.Transparent).Native));
     }
 
     /// <summary>Rows of cells under titled columns. <paramref name="rows"/> are its rows, each a cell a column (null: empty).</summary>
@@ -307,7 +306,7 @@ public static unsafe partial class Widgets
         WithChildren(children, (p, n) => KuiNative.kui_custom_layout(Callbacks.Layout(rule), (IntPtr*)p, n));
 
     /// <summary>Takes no room; while <paramref name="open"/>, <paramref name="popup"/> is shown over everything, under (or over) what this is in.</summary>
-    public static Widget PopupAnchor(bool open, Widget popup, Action? onDismiss = null, Vector2 offset = default, bool below = true) =>
+    public static Widget PopupAnchor(bool open, Widget popup, Action? onDismiss = null, Vec2 offset = default, bool below = true) =>
         WithChild(popup, p => KuiNative.kui_popup_anchor(KuiNative.Bool(open), p, Callbacks.Action(onDismiss), offset.Native(), KuiNative.Bool(below)));
 
     /// <summary><paramref name="child"/> in <paramref name="theme"/>, whatever the Ui's is.</summary>

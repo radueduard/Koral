@@ -37,7 +37,7 @@ namespace kui
                 MarkNeedsPaint();
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 canvas.Save();
                 canvas.Translate(offset);
@@ -46,7 +46,7 @@ namespace kui
                 canvas.Restore();
             }
 
-            bool HitTest(HitTestResult& result, const glm::vec2 position) override
+            bool HitTest(HitTestResult& result, const kor::Vec2 position) override
             {
                 // Where the pointer is in the child's own space: it may well be outside this box, turned or grown.
                 const bool hit = HitTestChildren(result, Matrix().Inverse().Apply(position));
@@ -54,7 +54,7 @@ namespace kui
                 return hit;
             }
 
-            [[nodiscard]] glm::vec2 MapToChild(const RenderObject& child, const glm::vec2 point) const override
+            [[nodiscard]] kor::Vec2 MapToChild(const RenderObject& child, const kor::Vec2 point) const override
             {
                 return Matrix().Inverse().Apply(point) - child.Offset();
             }
@@ -62,7 +62,7 @@ namespace kui
         private:
             [[nodiscard]] Transform Matrix() const
             {
-                const glm::vec2 pivot = _config.origin.Place({}, Size());
+                const kor::Vec2 pivot = _config.origin.Place({}, Size());
                 return Transform::Translation(pivot) * _config.transform * Transform::Translation(-pivot);
             }
             Config _config {};
@@ -85,7 +85,7 @@ namespace kui
             {
                 const auto& c = Constraints();
                 const float ratio = _ratio > 0.f ? _ratio : 1.f;
-                glm::vec2 size {};
+                kor::Vec2 size {};
                 if (c.HasBoundedWidth()) {
                     size = { c.maxWidth, c.maxWidth / ratio };
                     if (c.HasBoundedHeight() && size.y > c.maxHeight) size = { c.maxHeight * ratio, c.maxHeight };
@@ -106,7 +106,7 @@ namespace kui
         /** As wide, and as tall, as that share of what it is allowed: Compose's fillMaxWidth(0.5f). A share of 0 leaves that way alone. */
         class RenderFractional final : public RenderContainer {
         public:
-            void Set(const glm::vec2 share)
+            void Set(const kor::Vec2 share)
             {
                 if (share == _share) return;
                 _share = share;
@@ -129,14 +129,14 @@ namespace kui
             }
 
         private:
-            glm::vec2 _share {};
+            kor::Vec2 _share {};
         };
 
         // ---- a layout of the caller's own -----------------------------------------------------------------
 
         class RenderCustomLayout final : public RenderContainer {
         public:
-            void Set(std::function<glm::vec2(LayoutContext&, const BoxConstraints&)> layout)
+            void Set(std::function<kor::Vec2(LayoutContext&, const BoxConstraints&)> layout)
             {
                 _layout = std::move(layout);
                 MarkNeedsLayout();   // a rule is code: there is no telling whether it would lay out the same
@@ -148,14 +148,14 @@ namespace kui
                 std::vector<bool> measured(_children.size(), false);
                 LayoutContext context;
                 context.count = _children.size();
-                context.measure = [&](const std::size_t i, const BoxConstraints& c) -> glm::vec2 {
+                context.measure = [&](const std::size_t i, const BoxConstraints& c) -> kor::Vec2 {
                     if (i >= _children.size()) return {};
                     _children[i]->Layout(c);
                     measured[i] = true;
                     return _children[i]->Size();
                 };
-                context.place = [&](const std::size_t i, const glm::vec2 at) { if (i < _children.size()) _children[i]->SetOffset(at); };
-                const glm::vec2 size = _layout ? _layout(context, Constraints()) : Constraints().Smallest();
+                context.place = [&](const std::size_t i, const kor::Vec2 at) { if (i < _children.size()) _children[i]->SetOffset(at); };
+                const kor::Vec2 size = _layout ? _layout(context, Constraints()) : Constraints().Smallest();
                 // What the rule did not measure has no room: laid out all the same, so that it is consistent.
                 for (std::size_t i = 0; i < _children.size(); ++i)
                     if (!measured[i]) _children[i]->Layout(BoxConstraints::Tight({}));
@@ -163,7 +163,7 @@ namespace kui
             }
 
         private:
-            std::function<glm::vec2(LayoutContext&, const BoxConstraints&)> _layout;
+            std::function<kor::Vec2(LayoutContext&, const BoxConstraints&)> _layout;
         };
 
         // ---- shown over everything, from here ---------------------------------------------------------------
@@ -174,7 +174,7 @@ namespace kui
          */
         class RenderPopupAnchor final : public RenderContainer {
         public:
-            struct Config { bool open = false; Widget popup; std::function<void()> onDismiss; glm::vec2 offset {}; bool below = true; };
+            struct Config { bool open = false; Widget popup; std::function<void()> onDismiss; kor::Vec2 offset {}; bool below = true; };
 
             void Set(const Config& c)
             {
@@ -183,7 +183,7 @@ namespace kui
                 if (again) { _stale = true; MarkNeedsPaint(); }
             }
 
-            void Paint(Canvas&, glm::vec2) override
+            void Paint(Canvas&, kor::Vec2) override
             {
                 if (!_stale) return;
                 _stale = false;
@@ -191,7 +191,7 @@ namespace kui
                 if (!owner || !owner->showPopup) return;
                 if (_config.open && _config.popup) {
                     const RenderObject* in = Parent();
-                    const glm::vec2 at = (in ? in->ToGlobal({ 0.f, _config.below ? in->Size().y : 0.f }) : ToGlobal({})) + _config.offset;
+                    const kor::Vec2 at = (in ? in->ToGlobal({ 0.f, _config.below ? in->Size().y : 0.f }) : ToGlobal({})) + _config.offset;
                     owner->showPopup(_config.popup, at, { 1.f, 1.f });
                     _shown = true;
                     // Closed by anything but this — a press elsewhere, Escape — whoever opened it hears of it.
@@ -253,7 +253,7 @@ namespace kui
                 if (_config.width) { free.minWidth = 0.f; free.maxWidth = Infinity; }
                 if (_config.height) { free.minHeight = 0.f; free.maxHeight = Infinity; }
                 child.Layout(free);
-                const glm::vec2 own = c.Constrain(child.Size());
+                const kor::Vec2 own = c.Constrain(child.Size());
                 // And held to it, so that what in it fills the room there is fills that.
                 BoxConstraints held = c;
                 if (_config.width) held.minWidth = held.maxWidth = own.x;
@@ -305,7 +305,7 @@ namespace kui
 
             [[nodiscard]] const Theme* ProvidedTheme() const override { return &_theme; }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const ThemeScope scope(_theme);
                 RenderContainer::Paint(canvas, offset);
@@ -391,16 +391,16 @@ namespace kui
 
     Widget FractionallySizedBox(const float widthShare, const float heightShare, Widget child)
     {
-        return make<RenderFractional, glm::vec2>({ widthShare, heightShare }, only(std::move(child)), [](RenderFractional& r, const glm::vec2& c) { r.Set(c); });
+        return make<RenderFractional, kor::Vec2>({ widthShare, heightShare }, only(std::move(child)), [](RenderFractional& r, const kor::Vec2& c) { r.Set(c); });
     }
 
-    Widget CustomLayout(std::function<glm::vec2(LayoutContext&, const BoxConstraints&)> layout, std::vector<Widget> children)
+    Widget CustomLayout(std::function<kor::Vec2(LayoutContext&, const BoxConstraints&)> layout, std::vector<Widget> children)
     {
-        using Rule = std::function<glm::vec2(LayoutContext&, const BoxConstraints&)>;
+        using Rule = std::function<kor::Vec2(LayoutContext&, const BoxConstraints&)>;
         return make<RenderCustomLayout, Rule>(std::move(layout), std::move(children), [](RenderCustomLayout& r, const Rule& c) { r.Set(c); });
     }
 
-    Widget PopupAnchor(const bool open, Widget popup, std::function<void()> onDismiss, const glm::vec2 offset, const bool below)
+    Widget PopupAnchor(const bool open, Widget popup, std::function<void()> onDismiss, const kor::Vec2 offset, const bool below)
     {
         return make<RenderPopupAnchor, RenderPopupAnchor::Config>({ open, std::move(popup), std::move(onDismiss), offset, below }, {},
                                                                   [](RenderPopupAnchor& r, const RenderPopupAnchor::Config& c) { r.Set(c); });

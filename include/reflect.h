@@ -16,8 +16,8 @@
 #include <type_traits>
 #include <vector>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
+#include <kmath/matrix.h>
+#include <kmath/quaternion.h>
 
 #include "api.h"
 #include "error.h"
@@ -32,8 +32,8 @@
  *
  * @code
  * struct Light {
- *     glm::vec3 position;
- *     glm::vec3 color {1.f};
+ *     kor::Vec3 position;
+ *     kor::Vec3 color {1.f};
  *     float intensity = 1.f;
  *     std::vector<std::string> tags;
  * };
@@ -56,8 +56,8 @@
  * }
  * @endcode
  *
- * Built in: bool, the integer and floating-point types, std::string, glm's vectors (float, int, uint),
- * glm::quat and glm::mat4, std::vector of any of these or of a reflected type, and enums (named with
+ * Built in: bool, the integer and floating-point types, std::string, kor's vectors (float, int, uint),
+ * kor::Quat and kor::Mat4, std::vector of any of these or of a reflected type, and enums (named with
  * KORAL_REFLECT_ENUM, or as plain integers without).
  */
 namespace kor
@@ -198,17 +198,17 @@ namespace kor
             else if constexpr (std::is_same_v<T, float>) return TypeKind::eFloat;
             else if constexpr (std::is_same_v<T, double>) return TypeKind::eDouble;
             else if constexpr (std::is_same_v<T, std::string>) return TypeKind::eString;
-            else if constexpr (std::is_same_v<T, glm::vec2>) return TypeKind::eVec2;
-            else if constexpr (std::is_same_v<T, glm::vec3>) return TypeKind::eVec3;
-            else if constexpr (std::is_same_v<T, glm::vec4>) return TypeKind::eVec4;
-            else if constexpr (std::is_same_v<T, glm::ivec2>) return TypeKind::eIVec2;
-            else if constexpr (std::is_same_v<T, glm::ivec3>) return TypeKind::eIVec3;
-            else if constexpr (std::is_same_v<T, glm::ivec4>) return TypeKind::eIVec4;
-            else if constexpr (std::is_same_v<T, glm::uvec2>) return TypeKind::eUVec2;
-            else if constexpr (std::is_same_v<T, glm::uvec3>) return TypeKind::eUVec3;
-            else if constexpr (std::is_same_v<T, glm::uvec4>) return TypeKind::eUVec4;
-            else if constexpr (std::is_same_v<T, glm::quat>) return TypeKind::eQuat;
-            else if constexpr (std::is_same_v<T, glm::mat4>) return TypeKind::eMat4;
+            else if constexpr (std::is_same_v<T, kor::Vec2>) return TypeKind::eVec2;
+            else if constexpr (std::is_same_v<T, kor::Vec3>) return TypeKind::eVec3;
+            else if constexpr (std::is_same_v<T, kor::Vec4>) return TypeKind::eVec4;
+            else if constexpr (std::is_same_v<T, kor::IVec2>) return TypeKind::eIVec2;
+            else if constexpr (std::is_same_v<T, kor::IVec3>) return TypeKind::eIVec3;
+            else if constexpr (std::is_same_v<T, kor::IVec4>) return TypeKind::eIVec4;
+            else if constexpr (std::is_same_v<T, kor::UVec2>) return TypeKind::eUVec2;
+            else if constexpr (std::is_same_v<T, kor::UVec3>) return TypeKind::eUVec3;
+            else if constexpr (std::is_same_v<T, kor::UVec4>) return TypeKind::eUVec4;
+            else if constexpr (std::is_same_v<T, kor::Quat>) return TypeKind::eQuat;
+            else if constexpr (std::is_same_v<T, kor::Mat4>) return TypeKind::eMat4;
             else return std::nullopt;
         }
 

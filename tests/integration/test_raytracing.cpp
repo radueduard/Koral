@@ -15,7 +15,7 @@
 #include <cstdint>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "accelerationStructure.h"
 #include "buffer.h"
@@ -43,7 +43,7 @@ using kor::Shader;
 
 namespace {
 
-using Pixel = glm::u8vec4;
+using Pixel = kor::U8Vec4;
 using PosVertex = kmesh::ParamVertex<kmesh::Position>;
 using PosMesh = kmesh::ParamMesh<PosVertex>;
 
@@ -57,9 +57,9 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
 
     // --- triangle mesh (position-only) -----------------------------------
     std::vector<PosVertex> verts = {
-        PosVertex{ glm::vec3{-0.8f, -0.8f, 0.0f} },
-        PosVertex{ glm::vec3{ 0.8f, -0.8f, 0.0f} },
-        PosVertex{ glm::vec3{ 0.0f,  0.8f, 0.0f} },
+        PosVertex{ kor::Vec3{-0.8f, -0.8f, 0.0f} },
+        PosVertex{ kor::Vec3{ 0.8f, -0.8f, 0.0f} },
+        PosVertex{ kor::Vec3{ 0.0f,  0.8f, 0.0f} },
     };
     std::vector<std::uint32_t> indices = {0, 1, 2};
     auto mesh = PosMesh::Create(verts, indices);
@@ -74,7 +74,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     auto tlas = AccelerationStructure::Builder{}
                     .AddInstance(AccelerationStructure::Instance{
                         .blas = ResourceRef<const AccelerationStructure>(blas),
-                        .transform = glm::mat4(1.0f),
+                        .transform = kor::Mat4(1.0f),
                     })
                     .Build();
     ASSERT_EQ(tlas->StructureType(), AccelerationStructure::Type::eTopLevel);
@@ -83,7 +83,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     auto outImage = Image::Builder{}
                         .SetType(Image::Type::e2D)
                         .SetFormat(Image::Format::eRGBA8_UNORM)
-                        .SetExtent(glm::uvec2{kW, kH})
+                        .SetExtent(kor::UVec2{kW, kH})
                         .SetUsage(Image::Usage::eStorage | Image::Usage::eTransferSrc)
                         .Build();
     auto outView = ImageView::Builder(outImage).Build();
@@ -121,7 +121,7 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
 
     // --- read the image back and verify the trace ran --------------------
     Buffer::RawBuilder rb;
-    rb.SetRawSize(static_cast<glm::i64>(kW) * kH * sizeof(Pixel))
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
       .SetUsage(Buffer::Usage::eTransferDst)
       .SetType(Buffer::Type::eReadback);
     auto readback = rb.Build();
@@ -135,8 +135,8 @@ TEST_F(GpuTest, TraceTriangleIntoStorageImage) {
     // triangle we expect both to appear.
     int green = 0, blue = 0;
     for (const auto& p : out) {
-        if (p.g > 200 && p.r < 50 && p.b < 50) ++green;
-        if (p.b > 200 && p.r < 50 && p.g < 50) ++blue;
+        if (p.y > 200 && p.x < 50 && p.z < 50) ++green;
+        if (p.z > 200 && p.x < 50 && p.y < 50) ++blue;
     }
     EXPECT_GT(green, 0) << "expected some rays to hit the triangle";
     EXPECT_GT(blue, 0) << "expected some rays to miss the triangle";

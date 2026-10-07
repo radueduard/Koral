@@ -147,7 +147,7 @@ TEST_F(ParallelTest, AnImagesPixelsAreThereForTheFirstCopy) {
     std::iota(pixels.begin(), pixels.end(), 1u);
     auto image = Image::Builder()
         .SetFormat(Image::Format::eRGBA8_UNORM)
-        .SetExtent(glm::uvec2(16, 16))
+        .SetExtent(kor::UVec2(16, 16))
         .SetData(pixels)
         .SetMipLevels(3)
         .Build();

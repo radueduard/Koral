@@ -33,21 +33,21 @@ namespace kor::vk
     	void Clear(const kor::vk::CommandBuffer& commandBuffer, const ::vk::ClearValue& clearValue) const;
     	void Clear(const ::vk::ClearValue& clearValue) const;
 
-    	void DoResize(const glm::uvec3& extent) override;
+    	void DoResize(const kor::UVec3& extent) override;
 
     	/** @brief A swap chain's images, in @p format; @p acquired says which one the frame uses. */
-    	explicit Image(const std::vector<::vk::Image>& surfaceImages, glm::uvec2 extent, kor::Window::Format format, SampleCount msaa,
-    	               std::function<glm::u32()> acquired);
+    	explicit Image(const std::vector<::vk::Image>& surfaceImages, kor::UVec2 extent, kor::Window::Format format, SampleCount msaa,
+    	               std::function<kor::u32()> acquired);
 
     	/** @brief The Vulkan format it really is: for a swap chain's, not always PixelFormat()'s. */
     	[[nodiscard]] ::vk::Format getFormat() const { return _vkFormat; }
 
     	::vk::Image operator*() const;
     	VmaAllocation getAllocation() const;
-    	[[nodiscard]] ::vk::ImageLayout getImageLayout(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
-		[[nodiscard]] ::vk::AccessFlags getAccessMask(glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
-		void SetImageLayout(::vk::ImageLayout newLayout, glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
-		void SetAccessMask(::vk::AccessFlags newAccessMask, glm::u32 mipLevel = 0, glm::u32 arrayLayer = 0) const;
+    	[[nodiscard]] ::vk::ImageLayout getImageLayout(kor::u32 mipLevel = 0, kor::u32 arrayLayer = 0) const;
+		[[nodiscard]] ::vk::AccessFlags getAccessMask(kor::u32 mipLevel = 0, kor::u32 arrayLayer = 0) const;
+		void SetImageLayout(::vk::ImageLayout newLayout, kor::u32 mipLevel = 0, kor::u32 arrayLayer = 0) const;
+		void SetAccessMask(::vk::AccessFlags newAccessMask, kor::u32 mipLevel = 0, kor::u32 arrayLayer = 0) const;
 
 		::vk::ImageAspectFlags getAspectFlags() const;
 
@@ -55,7 +55,7 @@ namespace kor::vk
     	::vk::Format _vkFormat;
     	std::vector<::vk::Image> _images;
     	std::vector<VmaAllocation> _allocations;
-		mutable std::unordered_map<glm::u32, ::vk::ImageLayout> _layouts {};
-		mutable std::unordered_map<glm::u32, ::vk::AccessFlags> _accessMasks {};
+		mutable std::unordered_map<kor::u32, ::vk::ImageLayout> _layouts {};
+		mutable std::unordered_map<kor::u32, ::vk::AccessFlags> _accessMasks {};
     };
 }

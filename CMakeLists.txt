@@ -118,7 +118,6 @@ find_package(Jasper REQUIRED)
 
 find_package(glfw3 CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
 # Assimp is found here but linked only by modules/model-import — the engine itself no longer reads
 # model files. Kept at this level so the module (a subdirectory) sees the imported target.
 find_package(assimp REQUIRED)
@@ -237,6 +236,15 @@ file(GLOB_RECURSE SOURCE_FILES
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 
+# kmath's noise, bulk operations and random numbers promise the same bits as their C# and Kotlin ports and
+# as the one-at-a-time functions. A fused multiply-add rounds once where those round twice, so the compiler
+# must not form any (GCC and Clang do by default wherever the target has FMA — every ARM64 machine).
+if(NOT MSVC)
+    set_source_files_properties(src/core/math/noise.cpp src/core/math/bulk.cpp src/core/math/random.cpp
+            src/core/math/interp.cpp src/core/math/geometry.cpp src/core/capi/math.cpp
+            PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+endif()
+
 generate_export_header(${PROJECT_NAME}
         BASE_NAME KORAL
         EXPORT_MACRO_NAME KORAL_API
@@ -266,7 +274,6 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PRIVATE X11::X11 X11::Xext)
 endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE magic_enum::magic_enum)
-target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
 # assimp is deliberately absent: model importing lives in modules/model-import, which links it.
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
@@ -355,7 +362,7 @@ endif()
 #
 # Caught by the "Verify the SDK links standalone" step, which builds exactly that project. Worth
 # keeping in mind that anything leaking out of the public headers becomes a consumer's problem —
-# the same reason the SDK vendors glm/spdlog/fmt in the first place.
+# the same reason the SDK vendors spdlog/fmt in the first place.
 #
 # /Zc:preprocessor for the same reason: KORAL_REFLECT (reflect.h) walks its __VA_ARGS__, which MSVC's
 # traditional preprocessor passes on as one argument, and consumers expand it in their own code.
@@ -429,7 +436,6 @@ target_link_libraries(Koral_Runtime PRIVATE ${PROJECT_NAME})
 
 # Koral_Runtime includes public headers from GFX that expose these deps directly
 target_link_libraries(Koral_Runtime PRIVATE
-        glm::glm
         spdlog::spdlog
         Vulkan::Vulkan
         glfw
@@ -684,11 +690,10 @@ install(CODE [[
 # ---------------------------------------------------------------------------
 # Vendored public dependencies
 #
-# Koral's public headers expose two third-party libraries: glm (in ~20 headers — vectors and
-# matrices are part of the API's vocabulary) and spdlog (log.h, whose inline templates take
-# spdlog::format_string_t). A consumer therefore cannot compile against Koral without their
-# headers, nor link against it without their objects — spdlog is a static lib whose symbols do not
-# escape libKoral.
+# Koral's public headers expose one third-party library: spdlog (log.h, whose inline templates take
+# spdlog::format_string_t), and with it fmt. A consumer therefore cannot compile against Koral without
+# their headers, nor link against it without their objects — spdlog is a static lib whose symbols do
+# not escape libKoral. (glm used to be the other one; vectors and matrices are Koral's own now, kmath.h.)
 #
 # Rather than making that the consumer's problem (they would need vcpkg with matching versions,
 # which for a launcher-generated project is an absurd amount of setup), the SDK *ships* them. A
@@ -699,16 +704,14 @@ install(CODE [[
 # block and the vendored copies simply stop shipping — no consumer CMake changes.
 # ---------------------------------------------------------------------------
 option(KORAL_VENDOR_PUBLIC_DEPS
-       "Ship glm/spdlog/fmt inside the SDK so consumers need no package manager" ON)
+       "Ship spdlog/fmt inside the SDK so consumers need no package manager" ON)
 
 if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
     set(KORAL_VENDOR_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/koral-vendor)
     set(KORAL_VENDOR_LIBDIR ${CMAKE_INSTALL_LIBDIR}/koral-vendor)
 
-    # Headers. glm and fmt are header-only from the consumer's point of view; fmt comes along
-    # because spdlog's headers include it.
+    # Headers. fmt comes along because spdlog's headers include it.
     install(DIRECTORY
-            "${KORAL_VCPKG_PREFIX}/include/glm"
             "${KORAL_VCPKG_PREFIX}/include/spdlog"
             "${KORAL_VCPKG_PREFIX}/include/fmt"
             DESTINATION ${KORAL_VENDOR_INCLUDEDIR})
@@ -813,7 +816,7 @@ if(KORAL_VENDOR_PUBLIC_DEPS AND KORAL_VCPKG_PREFIX)
 
     file(APPEND "${KORAL_INSTALL_CONFIG}"
 "
-# Koral's public headers expose glm and spdlog, so the SDK ships them; see KORAL_VENDOR_PUBLIC_DEPS
+# Koral's public headers expose spdlog (and so fmt), so the SDK ships them; see KORAL_VENDOR_PUBLIC_DEPS
 # in the top-level CMakeLists. Consumers do not name these — they are pulled in by linking Koral.
 #
 # Which set to link is decided here rather than baked in, because the same config file is installed

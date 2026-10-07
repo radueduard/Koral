@@ -14,7 +14,7 @@
 #include <ranges>
 #include <unordered_map>
 #include <GLFW/glfw3.h>
-#include <glm/vec2.hpp>
+#include <kmath/vector.h>
 #include <magic_enum/magic_enum.hpp>
 
 
@@ -41,10 +41,10 @@ namespace kor {
 		std::unordered_map<Key, KeyState> keys;
 		std::unordered_map<MouseButton, KeyState> buttons;
 
-		glm::vec2 lastMousePosition {};
-		glm::vec2 mousePosition {};        ///< In the scene's own window's client space.
-		glm::vec2 mouseDelta {};
-		glm::vec2 scrollDelta {};
+		kor::Vec2 lastMousePosition {};
+		kor::Vec2 mousePosition {};        ///< In the scene's own window's client space.
+		kor::Vec2 mouseDelta {};
+		kor::Vec2 scrollDelta {};
 		std::u32string typed;                ///< This frame's text. @see TypedText
 		std::vector<Key> repeated;           ///< Keys that repeated this frame.
 		/// Interfaces that say they are using the pointer or the keyboard, by who said so. @see ClaimInterface
@@ -52,7 +52,7 @@ namespace kor {
 
 		/// The cursor in virtual-desktop coordinates, the only space every window shares and so the
 		/// only one a delta can be taken in — the pointer may cross into an undocked panel.
-		glm::vec2 globalMousePosition {};
+		kor::Vec2 globalMousePosition {};
 		bool hasMousePosition = false;
 
 		std::vector<GLFWwindow*> windows;   ///< the scene's own first
@@ -166,9 +166,9 @@ namespace kor {
 			int windowX = 0, windowY = 0;
 			glfwGetWindowPos(window, &windowX, &windowY);
 			const float ratio = pixelRatioOf(window);
-			_state->mousePosition = glm::vec2(cx, cy) * ratio;
+			_state->mousePosition = kor::Vec2(cx, cy) * ratio;
 			_state->lastMousePosition = _state->mousePosition;
-			_state->globalMousePosition = glm::vec2(windowX + cx, windowY + cy) * ratio;
+			_state->globalMousePosition = kor::Vec2(windowX + cx, windowY + cy) * ratio;
 			_state->hasMousePosition = true;
 		}
 	}
@@ -247,15 +247,15 @@ namespace kor {
 		_state->fed.emplace_back([=](State& s) { press(s.buttons[button], down); });
 	}
 
-	void Input::FeedMousePosition(const glm::vec2 position) {
+	void Input::FeedMousePosition(const kor::Vec2 position) {
 		_state->fed.emplace_back([=](State& s) { s.mousePosition = position; });
 	}
 
-	void Input::FeedMouseDelta(const glm::vec2 delta) {
+	void Input::FeedMouseDelta(const kor::Vec2 delta) {
 		_state->fed.emplace_back([=](State& s) { s.mouseDelta += delta; });
 	}
 
-	void Input::FeedScroll(const glm::vec2 delta) {
+	void Input::FeedScroll(const kor::Vec2 delta) {
 		_state->fed.emplace_back([=](State& s) { s.scrollDelta += delta; });
 	}
 
@@ -304,8 +304,8 @@ namespace kor {
 				if (state == KeyState::ePressed) FeedMouseButton(button, true);
 				else if (state == KeyState::eReleased) FeedMouseButton(button, false);
 			}
-			if (from.mouseDelta != glm::vec2(0.f)) FeedMouseDelta(from.mouseDelta);
-			if (from.scrollDelta != glm::vec2(0.f)) FeedScroll(from.scrollDelta);
+			if (from.mouseDelta != kor::Vec2(0.f)) FeedMouseDelta(from.mouseDelta);
+			if (from.scrollDelta != kor::Vec2(0.f)) FeedScroll(from.scrollDelta);
 		}
 	}
 
@@ -386,10 +386,10 @@ namespace kor {
         return std::ranges::find(_state->repeated, key) != _state->repeated.end();
     }
 
-    const glm::vec2& Input::MousePosition() const { return _state->mousePosition; }
-    const glm::vec2& Input::MousePositionDelta() const { return _state->mouseDelta; }
-    const glm::vec2& Input::MouseScrollDelta() const { return _state->scrollDelta; }
-    const glm::vec2& Input::LastMousePosition() const { return _state->lastMousePosition; }
+    const kor::Vec2& Input::MousePosition() const { return _state->mousePosition; }
+    const kor::Vec2& Input::MousePositionDelta() const { return _state->mouseDelta; }
+    const kor::Vec2& Input::MouseScrollDelta() const { return _state->scrollDelta; }
+    const kor::Vec2& Input::LastMousePosition() const { return _state->lastMousePosition; }
 
     // ---- callbacks ----------------------------------------------------------------------------------
     // Each finds the scene the window feeds, and records the event in that scene's input.
@@ -416,14 +416,14 @@ namespace kor {
         int windowX = 0, windowY = 0;
         glfwGetWindowPos(handle, &windowX, &windowY);
         const float ratio = pixelRatioOf(handle);
-        const glm::vec2 global = glm::vec2(static_cast<float>(windowX) + static_cast<float>(x),
+        const kor::Vec2 global = kor::Vec2(static_cast<float>(windowX) + static_cast<float>(x),
                                            static_cast<float>(windowY) + static_cast<float>(y)) * ratio;
         if (state.hasMousePosition) state.mouseDelta += global - state.globalMousePosition;
         state.globalMousePosition = global;
         state.hasMousePosition = true;
         // Window-local, and only from the scene's own window: where the cursor is in the picture it drew.
         if (!state.windows.empty() && handle == state.windows.front())
-            state.mousePosition = glm::vec2(static_cast<float>(x), static_cast<float>(y)) * ratio;
+            state.mousePosition = kor::Vec2(static_cast<float>(x), static_cast<float>(y)) * ratio;
     }
 
     void Input::Callbacks::MouseButtonCallback(GLFWwindow* handle, const int button, const int action, const int mods) {
@@ -439,7 +439,7 @@ namespace kor {
     void Input::Callbacks::ScrollCallback(GLFWwindow* handle, const double x, const double y) {
         Input* input = routeOf(handle);
         if (!input) return;
-        input->_state->scrollDelta += glm::vec2 { x, y };
+        input->_state->scrollDelta += kor::Vec2 { x, y };
     }
 
     void Input::Callbacks::FocusCallback(GLFWwindow* handle, const int focus) {
@@ -615,9 +615,9 @@ namespace kor {
         return std::clamp(sum, -1.f, 1.f);
     }
 
-    glm::vec2 Input::Axis2D(const std::string_view x, const std::string_view y) const
+    kor::Vec2 Input::Axis2D(const std::string_view x, const std::string_view y) const
     {
-        const glm::vec2 direction { Axis(x), Axis(y) };
+        const kor::Vec2 direction { Axis(x), Axis(y) };
         const float length = std::sqrt(direction.x * direction.x + direction.y * direction.y);
         return length > 1.f ? direction / length : direction;
     }

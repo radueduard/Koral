@@ -36,21 +36,21 @@ TEST(ImageFormat, EveryCompressedFamilyIsRecognised) {
 // Block extent: 1x1 for a texel format, so the same arithmetic serves both.
 // -----------------------------------------------------------------------------
 TEST(ImageFormat, UncompressedBlockIsOneTexel) {
-    EXPECT_EQ(Image::BlockExtent(Format::eRGBA8_UNORM), glm::uvec2(1, 1));
+    EXPECT_EQ(Image::BlockExtent(Format::eRGBA8_UNORM), kor::UVec2(1, 1));
     EXPECT_EQ(Image::BlockSize(Format::eRGBA8_UNORM), 4u);
     EXPECT_EQ(Image::BlockSize(Format::eRGBA32_SFLOAT), 16u);
     EXPECT_EQ(Image::BlockSize(Format::eR8_UNORM), 1u);
 }
 
 TEST(ImageFormat, BlockExtentsFollowTheFamily) {
-    EXPECT_EQ(Image::BlockExtent(Format::eBC7_UNORM), glm::uvec2(4, 4));
-    EXPECT_EQ(Image::BlockExtent(Format::eBC1_RGB_UNORM), glm::uvec2(4, 4));
-    EXPECT_EQ(Image::BlockExtent(Format::eETC2_RGBA8_UNORM), glm::uvec2(4, 4));
-    EXPECT_EQ(Image::BlockExtent(Format::eEAC_R11_UNORM), glm::uvec2(4, 4));
+    EXPECT_EQ(Image::BlockExtent(Format::eBC7_UNORM), kor::UVec2(4, 4));
+    EXPECT_EQ(Image::BlockExtent(Format::eBC1_RGB_UNORM), kor::UVec2(4, 4));
+    EXPECT_EQ(Image::BlockExtent(Format::eETC2_RGBA8_UNORM), kor::UVec2(4, 4));
+    EXPECT_EQ(Image::BlockExtent(Format::eEAC_R11_UNORM), kor::UVec2(4, 4));
     // ASTC is the family that names its block size, and it is the only one with a choice.
-    EXPECT_EQ(Image::BlockExtent(Format::eASTC_4x4_SRGB), glm::uvec2(4, 4));
-    EXPECT_EQ(Image::BlockExtent(Format::eASTC_6x6_UNORM), glm::uvec2(6, 6));
-    EXPECT_EQ(Image::BlockExtent(Format::eASTC_8x8_SRGB), glm::uvec2(8, 8));
+    EXPECT_EQ(Image::BlockExtent(Format::eASTC_4x4_SRGB), kor::UVec2(4, 4));
+    EXPECT_EQ(Image::BlockExtent(Format::eASTC_6x6_UNORM), kor::UVec2(6, 6));
+    EXPECT_EQ(Image::BlockExtent(Format::eASTC_8x8_SRGB), kor::UVec2(8, 8));
 }
 
 TEST(ImageFormat, BlockSizesAreEightOrSixteenBytes) {
@@ -106,9 +106,9 @@ TEST(ImageFormat, APartialBlockStillCostsAWholeBlock) {
 
 TEST(ImageFormat, AMipChainOfACompressedTextureNeverGoesBelowOneBlock) {
     // What a KTX loader adds up when it sizes its upload: every level of a 16x16 BC7 chain.
-    glm::u64 total = 0;
-    for (glm::u32 mip = 0; mip < 5; ++mip) {
-        const glm::u32 size = std::max(1u, 16u >> mip);
+    kor::u64 total = 0;
+    for (kor::u32 mip = 0; mip < 5; ++mip) {
+        const kor::u32 size = std::max(1u, 16u >> mip);
         total += Image::SizeOfRegion(Format::eBC7_UNORM, { size, size, 1 });
     }
     // 16x16 -> 16 blocks, 8x8 -> 4, and 4x4/2x2/1x1 -> one block each.

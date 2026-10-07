@@ -80,7 +80,7 @@ namespace kor::vk
             .setFlags(imageCreateFlags);
         // Used from both queues, and those are two families: concurrent, so neither needs the image
         // handed over. Only then — concurrent images lose compression on some GPUs.
-        const auto families = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<glm::u32>{};
+        const auto families = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<kor::u32>{};
         if (!families.empty()) {
             imageCreateInfo.setSharingMode(::vk::SharingMode::eConcurrent).setQueueFamilyIndices(families);
         }
@@ -93,7 +93,7 @@ namespace kor::vk
             _allocations.emplace_back(allocation);
             for (uint32_t mipLevel = 0; mipLevel < _mipLevels; mipLevel++) {
                 for (uint32_t arrayLayer = 0; arrayLayer < _arrayLayers; arrayLayer++) {
-                    glm::u32 key = (i << 24) | (mipLevel << 12) | arrayLayer;
+                    kor::u32 key = (i << 24) | (mipLevel << 12) | arrayLayer;
                     _layouts[key] = ::vk::ImageLayout::eUndefined;
                     _accessMasks[key] = ::vk::AccessFlagBits::eNone;
                 }
@@ -110,8 +110,8 @@ namespace kor::vk
         });
     }
 
-    Image::Image(const std::vector<::vk::Image>& surfaceImages, const glm::uvec2 extent, const kor::Window::Format format, const SampleCount msaa,
-                 std::function<glm::u32()> acquired)
+    Image::Image(const std::vector<::vk::Image>& surfaceImages, const kor::UVec2 extent, const kor::Window::Format format, const SampleCount msaa,
+                 std::function<kor::u32()> acquired)
         : kor::Image(Builder()
             .SetIsPerFrame(true)
             .SetType(Type::e2D)
@@ -127,34 +127,34 @@ namespace kor::vk
 
         int frameIndex = 0;
         for (const auto& _ : surfaceImages) {
-            glm::u32 key = (frameIndex << 24) | (0 << 12) | 0;
+            kor::u32 key = (frameIndex << 24) | (0 << 12) | 0;
             _layouts[key] = ::vk::ImageLayout::eUndefined;
             _accessMasks[key] = ::vk::AccessFlagBits::eNone;
             frameIndex++;
         }
     }
 
-    ::vk::ImageLayout Image::getImageLayout(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    ::vk::ImageLayout Image::getImageLayout(const kor::u32 mipLevel, const kor::u32 arrayLayer) const
     {
         const auto currentFrame = CopyIndex();
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _layouts[key];
     }
 
-    ::vk::AccessFlags Image::getAccessMask(const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
+    ::vk::AccessFlags Image::getAccessMask(const kor::u32 mipLevel, const kor::u32 arrayLayer) const {
         const auto currentFrame = CopyIndex();
         const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer;
         return _accessMasks[key];
     }
 
-    void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
+    void Image::SetImageLayout(const ::vk::ImageLayout newLayout, const kor::u32 mipLevel, const kor::u32 arrayLayer) const {
         const auto currentFrame = CopyIndex();
         if (const uint32_t key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _layouts[key] != newLayout) {
             _layouts[key] = newLayout;
         }
     }
 
-    void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const glm::u32 mipLevel, const glm::u32 arrayLayer) const {
+    void Image::SetAccessMask(const ::vk::AccessFlags newAccessMask, const kor::u32 mipLevel, const kor::u32 arrayLayer) const {
         const auto currentFrame = CopyIndex();
         if (const auto key = (currentFrame << 24) | (mipLevel << 12) | arrayLayer; _accessMasks[key] != newAccessMask) {
             _accessMasks[key] = newAccessMask;
@@ -227,7 +227,7 @@ namespace kor::vk
         }, ::vk::QueueFlagBits::eGraphics));
     }
 
-    void Image::DoResize(const glm::uvec3 &extent) {
+    void Image::DoResize(const kor::UVec3 &extent) {
         // The frames still in flight may be reading the old images — a resize is not always between
         // frames: Scene::Update runs inside the frame's recording, and a window being dragged resizes
         // there, every frame. So the old ones are freed once the GPU is done with them, instead of
@@ -253,12 +253,12 @@ namespace kor::vk
             .setSharingMode(::vk::SharingMode::eExclusive)
             .setInitialLayout(::vk::ImageLayout::eUndefined)
             .setFlags(_arrayLayers == 6 ? ::vk::ImageCreateFlagBits::eCubeCompatible : ::vk::ImageCreateFlags());
-        const auto resizeFamilies = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<glm::u32>{};
+        const auto resizeFamilies = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<kor::u32>{};
         if (!resizeFamilies.empty()) {
             imageCreateInfo.setSharingMode(::vk::SharingMode::eConcurrent).setQueueFamilyIndices(resizeFamilies);
         }
 
-        for (glm::u32 frameIndex = 0; frameIndex < static_cast<glm::u32>(_images.size()); ++frameIndex) {
+        for (kor::u32 frameIndex = 0; frameIndex < static_cast<kor::u32>(_images.size()); ++frameIndex) {
             auto [image, allocation] = Context::Allocator().AllocateImage(imageCreateInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE, VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT);
             _images[frameIndex] = image;
             _allocations[frameIndex] = allocation;
@@ -267,7 +267,7 @@ namespace kor::vk
             // had been transitioned to.
             for (uint32_t mipLevel = 0; mipLevel < _mipLevels; mipLevel++) {
                 for (uint32_t arrayLayer = 0; arrayLayer < _arrayLayers; arrayLayer++) {
-                    glm::u32 key = (frameIndex << 24) | (mipLevel << 12) | arrayLayer;
+                    kor::u32 key = (frameIndex << 24) | (mipLevel << 12) | arrayLayer;
                     _layouts[key] = ::vk::ImageLayout::eUndefined;
                     _accessMasks[key] = ::vk::AccessFlagBits::eNone;
                 }

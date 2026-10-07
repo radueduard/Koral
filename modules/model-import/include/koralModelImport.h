@@ -41,7 +41,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <buffer.h>
 #include <context.h>
@@ -72,8 +72,8 @@ namespace kmdl
 
     /** @brief An axis-aligned bounding box, in the space of whatever it bounds. */
     struct KMDL_API AABB {
-        glm::vec3 min;  ///< Lowest corner.
-        glm::vec3 max;  ///< Highest corner.
+        kor::Vec3 min;  ///< Lowest corner.
+        kor::Vec3 max;  ///< Highest corner.
     };
 
     /**
@@ -111,8 +111,8 @@ namespace kmdl
             std::string name;
 
             float alphaCutoff = 1.f;
-            glm::vec4 baseColorFactor = glm::vec4(1.0f);
-            glm::vec4 emissiveFactor = glm::vec4(1.0f);
+            kor::Vec4 baseColorFactor = kor::Vec4(1.0f);
+            kor::Vec4 emissiveFactor = kor::Vec4(1.0f);
             float roughness = 1.0f;
             float metallic = 1.0f;
             int doubleSided = false;
@@ -144,28 +144,28 @@ namespace kmdl
         struct KMDL_API Mesh {
             std::string name;                                                       ///< Name in the file.
 
-            std::vector<glm::vec3> positions;                                       ///< Vertex positions. Always present.
-            std::optional<std::vector<glm::vec3>> normals;                          ///< Surface normals, if the file has them.
-            std::optional<std::vector<glm::vec3>> tangents;                         ///< Tangents, for normal mapping.
-            std::optional<std::vector<glm::vec3>> bitangents;                       ///< Bitangents.
-            std::unordered_map<glm::u32, std::vector<glm::vec3>> vertexColors;      ///< Vertex colour sets, keyed by channel.
-            std::unordered_map<glm::u32, std::vector<glm::vec2>> vertexUVs;         ///< Texture coordinate sets, keyed by channel.
-            std::optional<std::pair<std::vector<glm::vec4>, std::vector<glm::uvec4>>> boneData;  ///< Skinning weights and the bone ids they apply to.
-            std::optional<std::vector<glm::u32>> indices;                           ///< Triangle indices, if the mesh is indexed.
+            std::vector<kor::Vec3> positions;                                       ///< Vertex positions. Always present.
+            std::optional<std::vector<kor::Vec3>> normals;                          ///< Surface normals, if the file has them.
+            std::optional<std::vector<kor::Vec3>> tangents;                         ///< Tangents, for normal mapping.
+            std::optional<std::vector<kor::Vec3>> bitangents;                       ///< Bitangents.
+            std::unordered_map<kor::u32, std::vector<kor::Vec3>> vertexColors;      ///< Vertex colour sets, keyed by channel.
+            std::unordered_map<kor::u32, std::vector<kor::Vec2>> vertexUVs;         ///< Texture coordinate sets, keyed by channel.
+            std::optional<std::pair<std::vector<kor::Vec4>, std::vector<kor::UVec4>>> boneData;  ///< Skinning weights and the bone ids they apply to.
+            std::optional<std::vector<kor::u32>> indices;                           ///< Triangle indices, if the mesh is indexed.
         };
 
         /** @brief A node of the scene graph: a transform, the meshes it draws, and its children. */
         struct KMDL_API Node {
-            glm::i32 id = -1;                       ///< Index of this node, or -1 if it has none.
+            kor::i32 id = -1;                       ///< Index of this node, or -1 if it has none.
             std::string name;                       ///< Name in the file.
-            std::vector<glm::u32> childIndices;     ///< Indices into Scene::nodes.
+            std::vector<kor::u32> childIndices;     ///< Indices into Scene::nodes.
 
-            std::vector<glm::u32> meshIndices;      ///< Indices into Scene::meshes.
-            std::vector<glm::u32> materialIndices;  ///< Indices into Scene::materials, one per mesh above.
+            std::vector<kor::u32> meshIndices;      ///< Indices into Scene::meshes.
+            std::vector<kor::u32> materialIndices;  ///< Indices into Scene::materials, one per mesh above.
 
-            glm::vec3 position = glm::vec3(0.f, 0.f, 0.f);  ///< Translation relative to the parent.
-            glm::vec3 rotation = glm::vec3(0.f, 0.f, 0.f);  ///< Euler rotation relative to the parent, in **degrees** (X, Y, Z).
-            glm::vec3 scale = glm::vec3(1.f, 1.f, 1.f);     ///< Scale relative to the parent.
+            kor::Vec3 position = kor::Vec3(0.f, 0.f, 0.f);  ///< Translation relative to the parent.
+            kor::Vec3 rotation = kor::Vec3(0.f, 0.f, 0.f);  ///< Euler rotation relative to the parent, in **degrees** (X, Y, Z).
+            kor::Vec3 scale = kor::Vec3(1.f, 1.f, 1.f);     ///< Scale relative to the parent.
             AABB aabb;                                      ///< Bounds of the meshes under this node.
         };
 
@@ -180,9 +180,9 @@ namespace kmdl
 
             std::string name;                                   ///< Name in the file.
             Type      type      = Type::ePoint;                 ///< What shape it emits in.
-            glm::vec3 position  = glm::vec3(0.0f);              ///< World-space position. Unused by directional lights.
-            glm::vec3 direction = glm::vec3(0.0f, -1.0f, 0.0f); ///< World-space direction. Used by spot and directional lights.
-            glm::vec3 color     = glm::vec3(1.0f);              ///< Emitted colour, without the intensity in it.
+            kor::Vec3 position  = kor::Vec3(0.0f);              ///< World-space position. Unused by directional lights.
+            kor::Vec3 direction = kor::Vec3(0.0f, -1.0f, 0.0f); ///< World-space direction. Used by spot and directional lights.
+            kor::Vec3 color     = kor::Vec3(1.0f);              ///< Emitted colour, without the intensity in it.
             /**
              * Brightness, in the file's own units — for glTF, candela for point and spot lights and
              * lux for directional ones. 0 is a light the file switched off.
@@ -232,7 +232,7 @@ namespace kmdl
          * @brief The skeleton's bind-pose transforms, for a skinned model.
          * @return One matrix per bone, or a message when the file carries no skeleton.
          */
-        virtual std::expected<std::vector<glm::mat4>, std::string> GetBoneTransformationMatrices() = 0;
+        virtual std::expected<std::vector<kor::Mat4>, std::string> GetBoneTransformationMatrices() = 0;
 
     protected:
         std::filesystem::path _path;

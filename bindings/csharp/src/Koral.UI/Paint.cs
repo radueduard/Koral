@@ -1,4 +1,3 @@
-using System.Numerics;
 using Koral.UI.Native;
 
 namespace Koral.UI;
@@ -17,12 +16,12 @@ public sealed unsafe class Gradient
     private Gradient(IntPtr native) => Native = KuiNative.Check(native);
     ~Gradient() => KuiNative.kui_gradient_release(Native);
 
-    public static Gradient Linear(Vector2 from, Vector2 to, params GradientStop[] stops) =>
+    public static Gradient Linear(Vec2 from, Vec2 to, params GradientStop[] stops) =>
         Make(stops, (o, c, n) => KuiNative.kui_gradient_linear(from.Native(), to.Native(), o, c, n));
-    public static Gradient Linear(Vector2 from, Vector2 to, Color a, Color b) => Linear(from, to, new GradientStop(0, a), new GradientStop(1, b));
-    public static Gradient Radial(Vector2 center, float radius, params GradientStop[] stops) =>
+    public static Gradient Linear(Vec2 from, Vec2 to, Color a, Color b) => Linear(from, to, new GradientStop(0, a), new GradientStop(1, b));
+    public static Gradient Radial(Vec2 center, float radius, params GradientStop[] stops) =>
         Make(stops, (o, c, n) => KuiNative.kui_gradient_radial(center.Native(), radius, o, c, n));
-    public static Gradient Sweep(Vector2 center, float angle, params GradientStop[] stops) =>
+    public static Gradient Sweep(Vec2 center, float angle, params GradientStop[] stops) =>
         Make(stops, (o, c, n) => KuiNative.kui_gradient_sweep(center.Native(), angle, o, c, n));
 
     private delegate IntPtr Maker(float* offsets, KuiColor* colors, nuint count);
@@ -101,22 +100,22 @@ public sealed unsafe class Path : IDisposable
         }
     }
 
-    public Path MoveTo(Vector2 p) { KuiNative.kui_path_move_to(Native, p.Native()); return this; }
-    public Path LineTo(Vector2 p) { KuiNative.kui_path_line_to(Native, p.Native()); return this; }
-    public Path QuadTo(Vector2 control, Vector2 p) { KuiNative.kui_path_quad_to(Native, control.Native(), p.Native()); return this; }
-    public Path CubicTo(Vector2 control1, Vector2 control2, Vector2 p) { KuiNative.kui_path_cubic_to(Native, control1.Native(), control2.Native(), p.Native()); return this; }
+    public Path MoveTo(Vec2 p) { KuiNative.kui_path_move_to(Native, p.Native()); return this; }
+    public Path LineTo(Vec2 p) { KuiNative.kui_path_line_to(Native, p.Native()); return this; }
+    public Path QuadTo(Vec2 control, Vec2 p) { KuiNative.kui_path_quad_to(Native, control.Native(), p.Native()); return this; }
+    public Path CubicTo(Vec2 control1, Vec2 control2, Vec2 p) { KuiNative.kui_path_cubic_to(Native, control1.Native(), control2.Native(), p.Native()); return this; }
     /// <summary>An arc of the circle at <paramref name="center"/>, joined by a line from where the path was.</summary>
-    public Path ArcTo(Vector2 center, float radius, float start, float sweep) { KuiNative.kui_path_arc_to(Native, center.Native(), radius, start, sweep); return this; }
+    public Path ArcTo(Vec2 center, float radius, float start, float sweep) { KuiNative.kui_path_arc_to(Native, center.Native(), radius, start, sweep); return this; }
     /// <summary>A rounded corner: towards <paramref name="corner"/>, turning along an arc of <paramref name="radius"/> to head for <paramref name="to"/>.</summary>
-    public Path ArcTo(Vector2 corner, Vector2 to, float radius) { KuiNative.kui_path_arc_to_corner(Native, corner.Native(), to.Native(), radius); return this; }
+    public Path ArcTo(Vec2 corner, Vec2 to, float radius) { KuiNative.kui_path_arc_to_corner(Native, corner.Native(), to.Native(), radius); return this; }
     public Path Close() { KuiNative.kui_path_close(Native); return this; }
     public Path AddRect(Rect rect) { KuiNative.kui_path_add_rect(Native, rect.Native); return this; }
     public Path AddRRect(RRect rrect) { KuiNative.kui_path_add_rrect(Native, rrect.Rect.Native, rrect.Radii.Native); return this; }
-    public Path AddCircle(Vector2 center, float radius) { KuiNative.kui_path_add_circle(Native, center.Native(), radius); return this; }
+    public Path AddCircle(Vec2 center, float radius) { KuiNative.kui_path_add_circle(Native, center.Native(), radius); return this; }
     public Path AddOval(Rect rect) { KuiNative.kui_path_add_oval(Native, rect.Native); return this; }
-    public Path AddPolygon(ReadOnlySpan<Vector2> points, bool close = true)
+    public Path AddPolygon(ReadOnlySpan<Vec2> points, bool close = true)
     {
-        fixed (Vector2* p = points) KuiNative.kui_path_add_polygon(Native, (KuiVec2*)p, (nuint)points.Length, KuiNative.Bool(close));
+        fixed (Vec2* p = points) KuiNative.kui_path_add_polygon(Native, (KuiVec2*)p, (nuint)points.Length, KuiNative.Bool(close));
         return this;
     }
     public Path SetFillRule(FillRule rule) { KuiNative.kui_path_set_fill_rule(Native, (uint)rule); return this; }

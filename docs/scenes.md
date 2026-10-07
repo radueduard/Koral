@@ -174,7 +174,7 @@ A scene says what state it keeps by returning a reflected member from `State()` 
 [Reflection and serialization](reflection.md)):
 
 ```cpp
-struct Progress { glm::vec3 camera; int level = 1; };
+struct Progress { kor::Vec3 camera; int level = 1; };
 KORAL_REFLECT(Progress, camera, level)
 
 class Game final : public kor::Scene {

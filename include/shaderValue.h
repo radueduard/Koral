@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include <glm/glm.hpp>
+#include <kmath/quaternion.h>
 
 #include "api.h"
 
@@ -84,19 +84,25 @@ namespace kor
         }
     }
 
-    /// Every glm vector: vec2/3/4 and their integer, unsigned, double and boolean forms.
-    template<glm::length_t L, typename T, glm::qualifier Q>
-    struct ShaderValueTraits<glm::vec<L, T, Q>> {
+    /// Every kor vector: Vec2/3/4 and their integer, unsigned, double and boolean forms.
+    template<kor::Scalar T, int L>
+    struct ShaderValueTraits<kor::Vec<T, L>> {
         static constexpr ValueShape shape{ detail::ScalarOf<T>(), static_cast<std::uint8_t>(L), 1, 1,
                                            detail::ScalarOf<T>() != ValueScalar::eOther };
     };
 
-    /// Every glm matrix, square or not. C is the column count, R the rows — glm's own order.
-    template<glm::length_t C, glm::length_t R, typename T, glm::qualifier Q>
-    struct ShaderValueTraits<glm::mat<C, R, T, Q>> {
+    /// Every kor matrix, square or not. C is the column count, R the rows.
+    template<kor::Scalar T, int C, int R>
+    struct ShaderValueTraits<kor::Mat<T, C, R>> {
         static constexpr ValueShape shape{ detail::ScalarOf<T>(), static_cast<std::uint8_t>(R),
                                            static_cast<std::uint8_t>(C), 1,
                                            detail::ScalarOf<T>() != ValueScalar::eOther };
+    };
+
+    /// A quaternion is a vector of four as far as a shader is concerned (x, y, z, w).
+    template<std::floating_point T>
+    struct ShaderValueTraits<kor::QuatT<T>> {
+        static constexpr ValueShape shape{ detail::ScalarOf<T>(), 4, 1, 1, true };
     };
 
     /// A std::array of anything the engine already knows: an array of that, N elements long.

@@ -1,4 +1,3 @@
-using System.Numerics;
 using Koral.Scripting;
 using Koral.UI;
 using static Koral.UI.Widgets;
@@ -32,10 +31,10 @@ public sealed class Tapper : StatefulWidget
         return Button(
             CustomPaint((canvas, size) => canvas
                 .BeginPath()
-                .MoveTo(Vector2.Zero)
-                .DrawLineTo(new Vector2(size.X, 0))
+                .MoveTo(Vec2.Zero)
+                .DrawLineTo(new Vec2(size.X, 0))
                 .DrawLineTo(size)
-                .DrawLineTo(new Vector2(0, size.Y))
+                .DrawLineTo(new Vec2(0, size.Y))
                 .ClosePath()
                 .Fill(UiPaint.Fill(color))),
             () => SetState(() => { ++Count; ++Taps; }),
@@ -81,14 +80,14 @@ public static partial class Cases
         using var canvas = new Canvas();
         var picture = canvas
             .DrawRRect(new RRect(Rect.XYWH(0, 0, 40, 20), 6), UiPaint.Fill(Color.Hex(0x3F51B5)).SetStroke(1, Color.White))
-            .DrawCircle(new Vector2(10, 10), 4, UiPaint.Fill(Color.Red))
-            .BeginPath().MoveTo(Vector2.Zero).DrawArcTo(new Vector2(20, 0), new Vector2(20, 20), 5).Stroke(UiPaint.Stroked(Color.Green, 2))
+            .DrawCircle(new Vec2(10, 10), 4, UiPaint.Fill(Color.Red))
+            .BeginPath().MoveTo(Vec2.Zero).DrawArcTo(new Vec2(20, 0), new Vec2(20, 20), 5).Stroke(UiPaint.Stroked(Color.Green, 2))
             .Finish();
         Check.That(picture.InstanceCount >= 3, $"three shapes and more: {picture.InstanceCount}");
         Check.That(picture.Bounds.Width >= 40, $"its bounds: {picture.Bounds}");
-        var layer = Layer.Create().SetPicture(picture).SetOpacity(0.5f).SetTransform(Transform.Translation(new Vector2(5, 0)));
+        var layer = Layer.Create().SetPicture(picture).SetOpacity(0.5f).SetTransform(UI.Transform.Translation(new Vec2(5, 0)));
         Check.Equal(0.5f, layer.Opacity, "a layer, chained");
-        using var path = new Path().MoveTo(Vector2.Zero).LineTo(new Vector2(10, 0)).QuadTo(new Vector2(10, 10), new Vector2(0, 10)).Close();
+        using var path = new Path().MoveTo(Vec2.Zero).LineTo(new Vec2(10, 0)).QuadTo(new Vec2(10, 10), new Vec2(0, 10)).Close();
         Check.Equal(10f, path.Bounds.Width, "a path, chained");
     }
 
@@ -103,7 +102,7 @@ public static partial class Cases
         Check.That(ui.Pixel(8, 8) is [0, 255, 0, 255], $"green before a tap: [{string.Join(", ", ui.Pixel(8, 8))}]");
         var builds = Tapper.Builds;
 
-        scene.SceneInput.FeedMousePosition(new Vector2(8, 8));
+        scene.SceneInput.FeedMousePosition(new Vec2(8, 8));
         Frames(app, 1);
         scene.SceneInput.FeedMouseButton(MouseButton.eLeft, true);
         Frames(app, 1);
@@ -240,7 +239,7 @@ public static partial class Cases
         Frames(app, 3);
 
         // Two panels side by side, a bar of 28 over each: the red box is in the left one, the target is the right one.
-        void At(float x, float y) { input.FeedMousePosition(new Vector2(x, y)); Frames(app, 1); }
+        void At(float x, float y) { input.FeedMousePosition(new Vec2(x, y)); Frames(app, 1); }
         // The right one's title bar, 79 to 199: "Target", then its own strip up to its one button (it folds it away) at 173.
         At(166, 14);
         input.FeedMouseButton(MouseButton.eLeft, true);

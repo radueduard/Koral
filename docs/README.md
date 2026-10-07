@@ -15,6 +15,9 @@
 - [Input](input.md) — keys, mouse, gamepads, actions and axes, rebinding, feeding offscreen scenes.
 - [Parallel work and waiting](parallel.md) — `kor::ParallelFor`, and uploads and readbacks that don't
   stall the CPU.
+- [Mathematics](math.md) — `kmath.h`: vectors, matrices, quaternions, transforms and cameras, geometry and
+  intersection, random numbers and noise, easing and splines, colour, vectorised bulk operations; the same in C,
+  C# and Kotlin.
 - [Reflection and serialization](reflection.md) — describing types, JSON, the inspector.
 - [Scenes in C#](csharp.md) — the C# bindings, `koral-dotnet`, and scripts reloaded while they run.
 - [Kotlin and Compose](kotlin.md) — the JVM bindings over java.lang.foreign, and interfaces in Jetpack Compose.

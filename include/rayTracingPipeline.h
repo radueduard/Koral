@@ -16,7 +16,7 @@
 #pragma once
 #include <optional>
 #include <vector>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include <source_location>
@@ -80,7 +80,7 @@ namespace kor
             std::vector<ResourceRef<const Shader>> missShaders = {};                ///< Run when a ray hits nothing; the shader index is chosen by the trace call.
             std::vector<HitGroup> hitGroups = {};                                   ///< Run when a ray hits geometry; the group is chosen by the instance it hit.
             std::vector<ResourceRef<const Shader>> callableShaders = {};            ///< Invoked explicitly by other ray-tracing shaders.
-            glm::u32 maxRecursionDepth = 1;                                         ///< How deep rays may recurse.
+            kor::u32 maxRecursionDepth = 1;                                         ///< How deep rays may recurse.
 
             /** @brief Sets the raygen shader — the entry point run once per ray. Required. */
             Builder& SetRaygenShader(ResourceRef<const Shader> raygenShader);
@@ -99,7 +99,7 @@ namespace kor
              * @param maxRecursionDepth The limit. Keep it as low as the effect allows; devices cap
              *        it, and deeper recursion costs stack memory per ray.
              */
-            Builder& SetMaxRecursionDepth(glm::u32 maxRecursionDepth);
+            Builder& SetMaxRecursionDepth(kor::u32 maxRecursionDepth);
 
             /** @brief One build attempt. Internal: prefer Build(). */
             [[nodiscard]] Result<std::unique_ptr<RayTracingPipeline>> Create() const;
@@ -116,7 +116,7 @@ namespace kor
         ~RayTracingPipeline() override;
 
         /** @brief Maximum ray recursion depth this pipeline was created with. */
-        [[nodiscard]] glm::u32 MaxRecursionDepth() const { return _maxRecursionDepth; }
+        [[nodiscard]] kor::u32 MaxRecursionDepth() const { return _maxRecursionDepth; }
 
     protected:
         explicit RayTracingPipeline(const Builder& createInfo);
@@ -130,6 +130,6 @@ namespace kor
         std::vector<ResourceRef<const Shader>> _missShaders;
         std::vector<HitGroup> _hitGroups;
         std::vector<ResourceRef<const Shader>> _callableShaders;
-        glm::u32 _maxRecursionDepth = 1;
+        kor::u32 _maxRecursionDepth = 1;
     };
 }

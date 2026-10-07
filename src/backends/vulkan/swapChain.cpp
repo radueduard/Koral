@@ -66,13 +66,13 @@ namespace kor::vk
         return ::vk::PresentModeKHR::eFifo;
     }
 
-    glm::uvec2 SwapChain::ChooseExtent(const ::vk::SurfaceCapabilitiesKHR &capabilities, const glm::uvec2& extent) {
+    kor::UVec2 SwapChain::ChooseExtent(const ::vk::SurfaceCapabilitiesKHR &capabilities, const kor::UVec2& extent) {
         if (capabilities.currentExtent.width != UINT32_MAX) {
-            return glm::uvec2(capabilities.currentExtent.width, capabilities.currentExtent.height);
+            return kor::UVec2(capabilities.currentExtent.width, capabilities.currentExtent.height);
         }
-        glm::uvec2 actualExtent = extent;
-        actualExtent.x = std::max<glm::u32>(capabilities.minImageExtent.width, std::min<glm::u32>(capabilities.maxImageExtent.width, actualExtent.x));
-        actualExtent.y = std::max<glm::u32>(capabilities.minImageExtent.height, std::min<glm::u32>(capabilities.maxImageExtent.height, actualExtent.y));
+        kor::UVec2 actualExtent = extent;
+        actualExtent.x = std::max<kor::u32>(capabilities.minImageExtent.width, std::min<kor::u32>(capabilities.maxImageExtent.width, actualExtent.x));
+        actualExtent.y = std::max<kor::u32>(capabilities.minImageExtent.height, std::min<kor::u32>(capabilities.maxImageExtent.height, actualExtent.y));
         return actualExtent;
     }
 
@@ -89,7 +89,7 @@ namespace kor::vk
         _formats = createInfo.formats;
         vk::Context::Device().waitIdle();
 
-        for (glm::u32 i = 0; i < std::max(createInfo.framesInFlight, 1u); ++i)
+        for (kor::u32 i = 0; i < std::max(createInfo.framesInFlight, 1u); ++i)
             _imageAvailable.push_back(Context::Device()->createSemaphore({}));
         CreateSwapChain();
         CreateDepthResources();
@@ -107,7 +107,7 @@ namespace kor::vk
         // layer flags, so clamp up. maxImageCount == 0 means "no upper bound"; when it is set, stay
         // within it. The driver may still hand out more than requested; that actual count is adopted
         // from getSwapchainImagesKHR below.
-        glm::u32 requestedImageCount = std::max(_requestedImageCount, surfaceCapabilities.minImageCount);
+        kor::u32 requestedImageCount = std::max(_requestedImageCount, surfaceCapabilities.minImageCount);
         if (surfaceCapabilities.maxImageCount > 0)
             requestedImageCount = std::min(requestedImageCount, surfaceCapabilities.maxImageCount);
 
@@ -171,7 +171,7 @@ namespace kor::vk
         // that real count as _imageCount from here on, because everything downstream (the scheduler's
         // frame/resource sizing, the per-image semaphores below) has to be sized to the number of
         // images the acquire index can actually reach — not the number we requested.
-        _imageCount = static_cast<glm::u32>(swapChainImageHandles.size());
+        _imageCount = static_cast<kor::u32>(swapChainImageHandles.size());
 
         // The render-finished semaphore is per *swapchain image*: it is signalled by the submit that
         // renders into the acquired image and waited on by that image's present, and indexed by the
@@ -238,7 +238,7 @@ namespace kor::vk
         }
     }
 
-    void SwapChain::Resize(const glm::uvec2& newSize) {
+    void SwapChain::Resize(const kor::UVec2& newSize) {
         _extent = newSize;
         Context::Device().waitIdle();
         CreateSwapChain();
@@ -246,12 +246,12 @@ namespace kor::vk
         // The window's default framebuffer is re-pointed by whoever resized it. @see vk::Scheduler
     }
 
-    void SwapChain::ResetImageAvailable(const glm::u32 slot) {
+    void SwapChain::ResetImageAvailable(const kor::u32 slot) {
         Context::Device()->destroySemaphore(_imageAvailable[slot]);
         _imageAvailable[slot] = Context::Device()->createSemaphore({});
     }
 
-    ::vk::Result SwapChain::Acquire(const glm::u32 slot) {
+    ::vk::Result SwapChain::Acquire(const kor::u32 slot) {
         try {
             const auto result = Context::Device()->acquireNextImageKHR(
                 _handle,

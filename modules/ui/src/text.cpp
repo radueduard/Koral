@@ -180,7 +180,7 @@ namespace kui
         if (!a.image.Valid()) {
             a.image = kor::Image::Builder{}
                 .SetFormat(kor::Image::Format::eR8_UNORM)
-                .SetExtent(glm::uvec2(AtlasSize, AtlasSize))
+                .SetExtent(kor::UVec2(AtlasSize, AtlasSize))
                 .SetUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eTransferDst)
                 .SetData(a.pixels.data(), a.pixels.size())
                 .Build();
@@ -193,7 +193,7 @@ namespace kui
             const std::size_t offset = static_cast<std::size_t>(a.dirtyTop) * AtlasSize;
             const std::size_t size = static_cast<std::size_t>(rows) * AtlasSize;
             auto staging = kor::Buffer::RawBuilder{}
-                .SetRawSize(static_cast<glm::i64>(size))
+                .SetRawSize(static_cast<kor::i64>(size))
                 .SetUsage(kor::Buffer::Usage::eTransferSrc)
                 .SetType(kor::Buffer::Type::eStaging)
                 .Build();
@@ -408,7 +408,7 @@ namespace kui
         _size = { widest, top };
     }
 
-    glm::vec2 Paragraph::CaretPosition(const std::size_t index) const
+    kor::Vec2 Paragraph::CaretPosition(const std::size_t index) const
     {
         if (_lines.empty()) return {};
         for (std::size_t l = 0; l < _lines.size(); ++l) {
@@ -423,7 +423,7 @@ namespace kui
         return { _lines.back().carets.back(), _lines.back().top };
     }
 
-    std::size_t Paragraph::IndexAt(const glm::vec2 point) const
+    std::size_t Paragraph::IndexAt(const kor::Vec2 point) const
     {
         if (_lines.empty()) return 0;
         const float lh = LineHeight();

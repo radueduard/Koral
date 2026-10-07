@@ -38,7 +38,7 @@ namespace kor
         return *this;
     }
 
-    RayTracingPipeline::Builder& RayTracingPipeline::Builder::SetMaxRecursionDepth(const glm::u32 maxRecursionDepth)
+    RayTracingPipeline::Builder& RayTracingPipeline::Builder::SetMaxRecursionDepth(const kor::u32 maxRecursionDepth)
     {
         this->maxRecursionDepth = maxRecursionDepth;
         return *this;

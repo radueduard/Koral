@@ -135,7 +135,7 @@ namespace kui
                 gestures.onEnter = [this] { SetState([this] { hovered = true; }); };
                 gestures.onExit = [this] { SetState([this] { hovered = false; pressed = false; }); };
                 if (enabled) {
-                    gestures.onTapDown = [this](glm::vec2) { SetState([this] { pressed = true; }); };
+                    gestures.onTapDown = [this](kor::Vec2) { SetState([this] { pressed = true; }); };
                     gestures.onTapUp = [this] { SetState([this] { pressed = false; }); };
                     gestures.onTap = [this] { if (onPressed) onPressed(); };
                 }
@@ -143,7 +143,7 @@ namespace kui
                     // Glass: the accent's for the primary one, clear for the other; lighter under the pointer, darker pressed.
                     const float lift = pressed ? -0.05f : hovered ? 0.07f : 0.f;
                     const float opacity = enabled ? 1.f : 0.45f;
-                    return GestureDetector(std::move(gestures), CustomPaint([t, primary, lift, opacity](Canvas& canvas, const glm::vec2 size) {
+                    return GestureDetector(std::move(gestures), CustomPaint([t, primary, lift, opacity](Canvas& canvas, const kor::Vec2 size) {
                         detail::PaintGlass(canvas, t, { Rect::FromSize(size), std::min(t.ButtonRadius(), size.y * 0.5f) },
                                            primary ? t.primary : colors::Transparent, lift, true, opacity);
                     }, { -1.f, -1.f }, Container({ .padding = padding }, std::move(content))));
@@ -179,8 +179,8 @@ namespace kui
                 const Theme& t = Theme::Current();
                 const bool on = value, hover = hovered;
                 // One UI's: a circle — a ring while off, filled with the accent and ticked while on.
-                Widget box = CustomPaint([t, on, hover](Canvas& canvas, const glm::vec2 size) {
-                    const glm::vec2 c = size * 0.5f;
+                Widget box = CustomPaint([t, on, hover](Canvas& canvas, const kor::Vec2 size) {
+                    const kor::Vec2 c = size * 0.5f;
                     const float r = std::min(size.x, size.y) * 0.5f;
                     if (t.design == ThemeDesign::eMaterial) {
                         // Material's: a small square in a thick outline, and the pointer's wash round it, a circle.
@@ -276,10 +276,10 @@ namespace kui
                 GestureOptions gestures;
                 gestures.onTap = [this] { if (onChanged) onChanged(!value); };
                 // As big as the design's own is.
-                const glm::vec2 extent = t.design == ThemeDesign::eMaterial ? glm::vec2(52.f, 32.f)
-                                       : t.design == ThemeDesign::eCupertino ? glm::vec2(58.f, 30.f)
-                                       : t.design == ThemeDesign::eFluent ? glm::vec2(40.f, 20.f) : glm::vec2(46.f, 26.f);
-                return GestureDetector(std::move(gestures), CustomPaint([t, p](Canvas& canvas, const glm::vec2 size) {
+                const kor::Vec2 extent = t.design == ThemeDesign::eMaterial ? kor::Vec2(52.f, 32.f)
+                                       : t.design == ThemeDesign::eCupertino ? kor::Vec2(58.f, 30.f)
+                                       : t.design == ThemeDesign::eFluent ? kor::Vec2(40.f, 20.f) : kor::Vec2(46.f, 26.f);
+                return GestureDetector(std::move(gestures), CustomPaint([t, p](Canvas& canvas, const kor::Vec2 size) {
                     const float r = size.y * 0.5f;
                     const float x = r + (size.x - 2.f * r) * p;
                     const RRect track { Rect::FromSize(size), r };
@@ -340,7 +340,7 @@ namespace kui
                 if (changed || turned) MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
 
             bool HandleEvent(const PointerEvent& event) override
             {
@@ -367,14 +367,14 @@ namespace kui
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 at) override
+            void Paint(Canvas& canvas, const kor::Vec2 at) override
             {
                 const Theme& t = Theme::Current();
                 // Upright, it is the same slider turned a quarter of the way round: drawn along its own
                 // length from its foot, which is where its least value is.
                 const bool upright = _config.axis == Axis::eVertical;
-                const glm::vec2 offset = upright ? glm::vec2(0.f) : at;
-                const glm::vec2 size = upright ? glm::vec2(Size().y, Size().x) : Size();
+                const kor::Vec2 offset = upright ? kor::Vec2(0.f) : at;
+                const kor::Vec2 size = upright ? kor::Vec2(Size().y, Size().x) : Size();
                 canvas.Save();
                 if (upright) {
                     canvas.Translate({ at.x, at.y + Size().y });
@@ -443,11 +443,11 @@ namespace kui
             void PerformLayout() override
             {
                 // No content to fit: a default, which a stretching parent overrides.
-                SetSize(_config.axis == Axis::eVertical ? glm::vec2(28.f, 200.f) : glm::vec2(200.f, 28.f));
+                SetSize(_config.axis == Axis::eVertical ? kor::Vec2(28.f, 200.f) : kor::Vec2(200.f, 28.f));
             }
 
         private:
-            void Pick(const glm::vec2 local)
+            void Pick(const kor::Vec2 local)
             {
                 const float knob = 8.f;
                 // Along its length from where its least value is: its left end — or, upright, its foot.
@@ -519,7 +519,7 @@ class RenderTextField final : public RenderContainer {
             }
 
             [[nodiscard]] bool IsRepaintBoundary() const override { return true; }   // the caret blinks alone
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
             [[nodiscard]] bool Focusable() const override { return true; }
             [[nodiscard]] std::string DebugText() const override { return _text; }
 
@@ -608,7 +608,7 @@ class RenderTextField final : public RenderContainer {
                 case kor::Key::eUp:
                 case kor::Key::eDown: {
                     if (!_options.multiline) return false;
-                    const glm::vec2 at = _paragraph.CaretPosition(_caret);
+                    const kor::Vec2 at = _paragraph.CaretPosition(_caret);
                     const float line = _paragraph.LineHeight();
                     const float y = at.y + line * (key == kor::Key::eUp ? -0.5f : 1.5f);
                     Move(y < 0.f ? 0 : _paragraph.IndexAt({ at.x, y }), shift);
@@ -619,7 +619,7 @@ class RenderTextField final : public RenderContainer {
                     std::size_t to = key == kor::Key::eHome ? 0 : _text.size();
                     if (_options.multiline && !control) {
                         // Of the line the caret is on.
-                        const glm::vec2 at = _paragraph.CaretPosition(_caret);
+                        const kor::Vec2 at = _paragraph.CaretPosition(_caret);
                         to = _paragraph.IndexAt({ key == kor::Key::eHome ? -1.e6f : 1.e6f, at.y + _paragraph.LineHeight() * 0.5f });
                     }
                     Move(to, shift);
@@ -660,7 +660,7 @@ class RenderTextField final : public RenderContainer {
                 if ((_blink < 0.5f) != before) MarkNeedsPaint();
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
                 const Rect box = Rect::XYWH(offset.x, offset.y, Size().x, Size().y);
@@ -671,7 +671,7 @@ class RenderTextField final : public RenderContainer {
                 canvas.ClipRect(box.Deflate(2.f));
 
                 // Scrolled so the caret stays in view: sideways on one line, up and down on several.
-                const glm::vec2 caret = _paragraph.CaretPosition(_caret);
+                const kor::Vec2 caret = _paragraph.CaretPosition(_caret);
                 const float line = _paragraph.LineHeight();
                 if (_options.multiline) {
                     const float visible = Size().y - 2.f * Pad;
@@ -683,7 +683,7 @@ class RenderTextField final : public RenderContainer {
                     if (caret.x - _scroll > visible) _scroll = caret.x - visible;
                     if (caret.x < _scroll) _scroll = caret.x;
                 }
-                const glm::vec2 origin = offset + TextOrigin();
+                const kor::Vec2 origin = offset + TextOrigin();
 
                 // What is selected, a line at a time, behind the text.
                 if (HasSelection()) {
@@ -691,12 +691,12 @@ class RenderTextField final : public RenderContainer {
                     std::size_t at = Low();
                     const std::size_t end = High();
                     while (at < end) {
-                        const glm::vec2 from = _paragraph.CaretPosition(at);
+                        const kor::Vec2 from = _paragraph.CaretPosition(at);
                         std::size_t to = at;
-                        glm::vec2 last = from;
+                        kor::Vec2 last = from;
                         while (to < end) {
                             const std::size_t next = Next(to);
-                            const glm::vec2 there = _paragraph.CaretPosition(next);
+                            const kor::Vec2 there = _paragraph.CaretPosition(next);
                             if (there.y != from.y) break;
                             to = next;
                             last = there;
@@ -749,7 +749,7 @@ class RenderTextField final : public RenderContainer {
             static constexpr float Inset = 14.f;   // clear of a pill's round ends
             static constexpr float Pad = 9.f;      // over and under several lines
 
-            [[nodiscard]] glm::vec2 TextOrigin() const
+            [[nodiscard]] kor::Vec2 TextOrigin() const
             {
                 if (_options.multiline) return { Inset, Pad - _scroll };
                 return { Inset - _scroll, std::round((Size().y - _paragraph.LineHeight()) * 0.5f) };
@@ -861,7 +861,7 @@ class RenderTextField final : public RenderContainer {
                  * To be typed in: double-clicked, or given the keyboard (Tab) — with the size it is laid out at.
                  * Where it is set, it is in the order Tab goes through the fields.
                  */
-                std::function<void(glm::vec2)> onEdit;
+                std::function<void(kor::Vec2)> onEdit;
             };
 
             void Set(const Config& c)
@@ -869,7 +869,7 @@ class RenderTextField final : public RenderContainer {
                 const bool look = c.value != _config.value || c.options.label != _config.options.label || c.options.decimals != _config.options.decimals;
                 _config = c;
                 // As wide as what it shows needs, where no width is given: which a longer number changes.
-                const glm::vec2 wanted = Wanted();
+                const kor::Vec2 wanted = Wanted();
                 const bool size = wanted != _wanted;
                 _wanted = wanted;
                 _minWidth = Content().x;
@@ -877,7 +877,7 @@ class RenderTextField final : public RenderContainer {
                 if (look) MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
             [[nodiscard]] bool Focusable() const override { return static_cast<bool>(_config.onEdit); }
             [[nodiscard]] std::string DebugText() const override
             {
@@ -942,7 +942,7 @@ class RenderTextField final : public RenderContainer {
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
                 const Rect box = Rect::XYWH(offset.x, offset.y, Size().x, Size().y);
@@ -1038,7 +1038,7 @@ class RenderTextField final : public RenderContainer {
              * a number of four whole digits and a sign. (A range as wide as a whole kind of number is no range to
              * size for: an Int's own limits would make every field of whole numbers ten digits wide.)
              */
-            [[nodiscard]] glm::vec2 Content() const
+            [[nodiscard]] kor::Vec2 Content() const
             {
                 const auto& o = _config.options;
                 const TextStyle style = Theme::Current().textStyle;
@@ -1049,7 +1049,7 @@ class RenderTextField final : public RenderContainer {
                     number = std::max(number, Paragraph(formatted(widest, o.decimals), style).Size().x);
                 }
                 if (Upright()) {
-                    const glm::vec2 label = o.label.empty() ? glm::vec2(0.f) : Paragraph(o.label, style).Size();
+                    const kor::Vec2 label = o.label.empty() ? kor::Vec2(0.f) : Paragraph(o.label, style).Size();
                     return { std::ceil(std::max(label.x, number) + 2.f * UprightPad), std::ceil(2.f * UprightArrow + label.y + shown.Size().y) };
                 }
                 const float label = o.label.empty() ? 0.f : Paragraph(o.label, style).Size().x + Gap;
@@ -1057,9 +1057,9 @@ class RenderTextField final : public RenderContainer {
             }
 
             /** How big it is of itself: its content, and no narrower than the width it was given (120 where none was). */
-            [[nodiscard]] glm::vec2 Wanted() const
+            [[nodiscard]] kor::Vec2 Wanted() const
             {
-                const glm::vec2 content = Content();
+                const kor::Vec2 content = Content();
                 const float least = _config.options.width >= 0.f ? _config.options.width : Upright() ? Theme::Current().controlHeight : 120.f;
                 return { std::max(least, content.x), content.y };
             }
@@ -1073,7 +1073,7 @@ class RenderTextField final : public RenderContainer {
 
         private:
             Config _config;
-            glm::vec2 _wanted { 120.f, 36.f };
+            kor::Vec2 _wanted { 120.f, 36.f };
             float _minWidth = 0.f;      ///< Content's width, worked out with _wanted.
             float _from = 0.f, _travelled = 0.f;
             bool _dragging = false, _hovered = false;
@@ -1108,7 +1108,7 @@ class RenderTextField final : public RenderContainer {
         struct TypeableDragValue final : StatefulWidget {
             RenderDragValue::Config config;
             bool editing = false;
-            glm::vec2 size { 0.f };
+            kor::Vec2 size { 0.f };
             std::uint32_t focus = 0;    // a new one each time it is typed in: what gives the text box the keyboard
 
             explicit TypeableDragValue(RenderDragValue::Config c) : config(std::move(c)) {}
@@ -1119,7 +1119,7 @@ class RenderTextField final : public RenderContainer {
             {
                 if (!editing) {
                     RenderDragValue::Config drag = config;
-                    drag.onEdit = [this](const glm::vec2 at) { SetState([&] { editing = true; size = at; ++focus; }); };
+                    drag.onEdit = [this](const kor::Vec2 at) { SetState([&] { editing = true; size = at; ++focus; }); };
                     return Make<DragValueWidget>(std::move(drag));
                 }
                 TextFieldOptions options;
@@ -1149,7 +1149,7 @@ class RenderTextField final : public RenderContainer {
 
         constexpr float MenuRow = 36.f, MenuPad = 6.f, MenuLine = 9.f;
 
-        glm::vec2 menuSize(const std::vector<MenuItem>& items, const float width)
+        kor::Vec2 menuSize(const std::vector<MenuItem>& items, const float width)
         {
             float height = 2.f * MenuPad;
             for (const auto& item : items) height += item.separator ? MenuLine : MenuRow;
@@ -1267,7 +1267,7 @@ class RenderTextField final : public RenderContainer {
                     }, std::move(list));
                 case ThemeDesign::eCupertino:
                     // A sheet of glass.
-                    return CustomPaint([t](Canvas& canvas, const glm::vec2 size) {
+                    return CustomPaint([t](Canvas& canvas, const kor::Vec2 size) {
                         // What is behind it shows through, blurred, under a wash of the surface: its text is still read.
                         canvas.DrawShadow({ Rect::FromSize(size), 14.f }, colors::Black.WithAlpha(t.IsDark() ? 0.4f : 0.16f), 10.f, { 0.f, 4.f });
                         canvas.DrawBackdrop({ Rect::FromSize(size), 14.f }, Backdrop {}.SetBlur(16.f).SetRefraction(8.f).SetTint(t.surface.WithAlpha(0.62f)));
@@ -1310,7 +1310,7 @@ class RenderTextField final : public RenderContainer {
                 MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
             [[nodiscard]] std::string DebugText() const override
             {
                 const auto& items = _config.items;
@@ -1341,7 +1341,7 @@ class RenderTextField final : public RenderContainer {
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
                 const Rect box = Rect::XYWH(offset.x, offset.y, Size().x, Size().y);
@@ -1356,10 +1356,10 @@ class RenderTextField final : public RenderContainer {
                 canvas.DrawText(text, { box.left + 14.f, std::round(box.Center().y - shown.Size().y * 0.5f) }, style);
                 canvas.Restore();
                 // The arrow that says there is more under it.
-                const glm::vec2 c { box.right - 18.f, box.Center().y + 1.f };
+                const kor::Vec2 c { box.right - 18.f, box.Center().y + 1.f };
                 const kui::Paint arrow = Paint::Stroked(t.textMuted, 1.5f);
-                canvas.DrawLine(c + glm::vec2(-4.f, -3.f), c + glm::vec2(0.f, 2.f), arrow);
-                canvas.DrawLine(c + glm::vec2(0.f, 2.f), c + glm::vec2(4.f, -3.f), arrow);
+                canvas.DrawLine(c + kor::Vec2(-4.f, -3.f), c + kor::Vec2(0.f, 2.f), arrow);
+                canvas.DrawLine(c + kor::Vec2(0.f, 2.f), c + kor::Vec2(4.f, -3.f), arrow);
             }
 
         protected:
@@ -1443,7 +1443,7 @@ class RenderTextField final : public RenderContainer {
                 MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
 
             bool HandleEvent(const PointerEvent& event) override
             {
@@ -1458,7 +1458,7 @@ class RenderTextField final : public RenderContainer {
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
                 const Rect box = Rect::XYWH(offset.x, offset.y, Size().x, Size().y);
@@ -1524,7 +1524,7 @@ class RenderTextField final : public RenderContainer {
                 MarkNeedsPaint();
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
 
             bool HandleEvent(const PointerEvent& event) override
             {
@@ -1537,7 +1537,7 @@ class RenderTextField final : public RenderContainer {
                 }
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 const Theme& t = Theme::Current();
                 const Rect swatch = Rect::XYWH(offset.x, offset.y + (Size().y - Swatch.y) * 0.5f, Swatch.x, Swatch.y);
@@ -1565,7 +1565,7 @@ class RenderTextField final : public RenderContainer {
             }
 
         private:
-            static constexpr glm::vec2 Swatch { 44.f, 24.f };
+            static constexpr kor::Vec2 Swatch { 44.f, 24.f };
 
             void Open()
             {
@@ -1638,7 +1638,7 @@ class RenderTextField final : public RenderContainer {
     Widget ProgressBar(const float value)
     {
         const float v = std::clamp(value, 0.f, 1.f);
-        return CustomPaint([v](Canvas& canvas, const glm::vec2 size) {
+        return CustomPaint([v](Canvas& canvas, const kor::Vec2 size) {
             const Theme& t = Theme::Current();      // the one it is painted in: where it is
             const float r = size.y * 0.5f;
             if (t.design == ThemeDesign::eMaterial) {

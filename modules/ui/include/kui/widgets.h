@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <image.h>
 #include <input.h>
@@ -78,7 +78,7 @@ namespace kui
         /** @brief An outline, drawn inside its box. */
         [[nodiscard]] Widget Border(float width, Color color, Radii radius = {}) const;
         /** @brief A shadow under its box. */
-        [[nodiscard]] Widget Shadow(Color color, float blur, glm::vec2 offset = {}, Radii radius = {}) const;
+        [[nodiscard]] Widget Shadow(Color color, float blur, kor::Vec2 offset = {}, Radii radius = {}) const;
         /** @brief Any decoration behind it. */
         [[nodiscard]] Widget Decorated(const Decoration& decoration) const;
         /** @brief An exact size; a negative dimension is left to the widget. */
@@ -100,7 +100,7 @@ namespace kui
         /** @brief Cut to its box, with rounded corners. */
         [[nodiscard]] Widget Clip(Radii radius = {}) const;
         /** @brief Moved where it is drawn and hit; its layout unchanged. */
-        [[nodiscard]] Widget Offset(glm::vec2 by) const;
+        [[nodiscard]] Widget Offset(kor::Vec2 by) const;
         [[nodiscard]] Widget Scrollable(Axis axis = Axis::eVertical) const;
         [[nodiscard]] Widget RepaintBoundary() const;
         /** @brief Calls @p onTap when clicked, and nothing else: no hover or press look (see Button for those). */
@@ -229,7 +229,7 @@ namespace kui
         void SetChildren(const std::vector<RenderObject*>& children);
         [[nodiscard]] const std::vector<RenderObject*>& Children() const { return _children; }
         [[nodiscard]] RenderObject* Child() const { return _children.empty() ? nullptr : _children.front(); }
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
         void ChildDestroyed(RenderObject& child) override;
         /** @brief Its widest child's: what holds one child, or lays its children over one another, is that wide at least. */
         [[nodiscard]] float MinIntrinsicWidth() const override;
@@ -319,7 +319,7 @@ namespace kui
         static constexpr Alignment BottomCenter() { return { 0.f, 1.f }; }
         static constexpr Alignment BottomRight() { return { 1.f, 1.f }; }
         /** @brief Where something of @p inner size goes in @p outer. */
-        [[nodiscard]] glm::vec2 Place(const glm::vec2 inner, const glm::vec2 outer) const { return (outer - inner) * 0.5f * glm::vec2(x + 1.f, y + 1.f); }
+        [[nodiscard]] kor::Vec2 Place(const kor::Vec2 inner, const kor::Vec2 outer) const { return (outer - inner) * 0.5f * kor::Vec2(x + 1.f, y + 1.f); }
         constexpr bool operator==(const Alignment&) const = default;
     };
 
@@ -347,7 +347,7 @@ namespace kui
         Radii radius {};
         Color shadowColor = colors::Transparent;
         float shadowBlur = 0.f;
-        glm::vec2 shadowOffset {};
+        kor::Vec2 shadowOffset {};
         [[nodiscard]] bool Visible() const { return color.Visible() || gradient || (borderWidth > 0.f && borderColor.Visible()) || shadowColor.Visible(); }
         bool operator==(const Decoration&) const = default;
 
@@ -359,7 +359,7 @@ namespace kui
         Decoration& SetRadius(Radii value) { radius = std::move(value); return *this; }
         Decoration& SetShadowColor(Color value) { shadowColor = std::move(value); return *this; }
         Decoration& SetShadowBlur(float value) { shadowBlur = std::move(value); return *this; }
-        Decoration& SetShadowOffset(glm::vec2 value) { shadowOffset = std::move(value); return *this; }
+        Decoration& SetShadowOffset(kor::Vec2 value) { shadowOffset = std::move(value); return *this; }
     };
 
     struct ContainerOptions {
@@ -393,30 +393,30 @@ namespace kui
 
     struct GestureOptions {
         std::function<void()> onTap;
-        std::function<void(glm::vec2 local)> onTapDown;
+        std::function<void(kor::Vec2 local)> onTapDown;
         std::function<void()> onTapUp;
-        std::function<void(glm::vec2 local)> onPanStart;
-        std::function<void(glm::vec2 delta, glm::vec2 local)> onPanUpdate;
+        std::function<void(kor::Vec2 local)> onPanStart;
+        std::function<void(kor::Vec2 delta, kor::Vec2 local)> onPanUpdate;
         std::function<void()> onPanEnd;
         std::function<void()> onEnter;
         std::function<void()> onExit;
-        std::function<void(glm::vec2 local)> onHover;
-        std::function<bool(glm::vec2 delta)> onScroll;   ///< Return true when used.
+        std::function<void(kor::Vec2 local)> onHover;
+        std::function<bool(kor::Vec2 delta)> onScroll;   ///< Return true when used.
         /** Hit even where nothing it holds is drawn — a transparent area that still takes clicks. */
         bool opaque = true;
 
         // Chainable: `kui::GestureOptions{}.Set...(...).Set...(...)`.
         GestureOptions& SetOpaque(bool value) { opaque = value; return *this; }
         GestureOptions& OnTap(std::function<void()> f) { onTap = std::move(f); return *this; }
-        GestureOptions& OnTapDown(std::function<void(glm::vec2)> f) { onTapDown = std::move(f); return *this; }
+        GestureOptions& OnTapDown(std::function<void(kor::Vec2)> f) { onTapDown = std::move(f); return *this; }
         GestureOptions& OnTapUp(std::function<void()> f) { onTapUp = std::move(f); return *this; }
-        GestureOptions& OnPanStart(std::function<void(glm::vec2)> f) { onPanStart = std::move(f); return *this; }
-        GestureOptions& OnPanUpdate(std::function<void(glm::vec2, glm::vec2)> f) { onPanUpdate = std::move(f); return *this; }
+        GestureOptions& OnPanStart(std::function<void(kor::Vec2)> f) { onPanStart = std::move(f); return *this; }
+        GestureOptions& OnPanUpdate(std::function<void(kor::Vec2, kor::Vec2)> f) { onPanUpdate = std::move(f); return *this; }
         GestureOptions& OnPanEnd(std::function<void()> f) { onPanEnd = std::move(f); return *this; }
         GestureOptions& OnEnter(std::function<void()> f) { onEnter = std::move(f); return *this; }
         GestureOptions& OnExit(std::function<void()> f) { onExit = std::move(f); return *this; }
-        GestureOptions& OnHover(std::function<void(glm::vec2)> f) { onHover = std::move(f); return *this; }
-        GestureOptions& OnScroll(std::function<bool(glm::vec2)> f) { onScroll = std::move(f); return *this; }
+        GestureOptions& OnHover(std::function<void(kor::Vec2)> f) { onHover = std::move(f); return *this; }
+        GestureOptions& OnScroll(std::function<bool(kor::Vec2)> f) { onScroll = std::move(f); return *this; }
     };
 
     enum class ImageFit : std::uint8_t { eFill, eContain, eCover, eNone };
@@ -529,20 +529,20 @@ namespace kui
     /** @brief What a CustomLayout's rule measures and places its children through. */
     struct LayoutContext {
         std::size_t count = 0;
-        std::function<glm::vec2(std::size_t index, const BoxConstraints& constraints)> measure;    ///< Lays child @p index out; its size.
-        std::function<void(std::size_t index, glm::vec2 at)> place;
+        std::function<kor::Vec2(std::size_t index, const BoxConstraints& constraints)> measure;    ///< Lays child @p index out; its size.
+        std::function<void(std::size_t index, kor::Vec2 at)> place;
     };
     /** @brief @p children laid out by @p layout: it measures each with the constraints it likes, places it, and returns its own size. */
-    KUI_API Widget CustomLayout(std::function<glm::vec2(LayoutContext&, const BoxConstraints&)> layout, std::vector<Widget> children);
+    KUI_API Widget CustomLayout(std::function<kor::Vec2(LayoutContext&, const BoxConstraints&)> layout, std::vector<Widget> children);
 
     /**
      * @brief Takes no room; while @p open, @p popup is shown over everything, at the left of whatever this is
      *        in — under it, or (@p below false) over its top — moved by @p offset. A press outside the popup, or
      *        Escape, closes it and calls @p onDismiss. A dropdown menu is one of these beside its button.
      */
-    KUI_API Widget PopupAnchor(bool open, Widget popup, std::function<void()> onDismiss, glm::vec2 offset = {}, bool below = true);
+    KUI_API Widget PopupAnchor(bool open, Widget popup, std::function<void()> onDismiss, kor::Vec2 offset = {}, bool below = true);
     /** @brief Draws with a canvas, in a box of @p size (negative: as large as the child, or nothing without one — unless the parent sets its size). */
-    KUI_API Widget CustomPaint(std::function<void(Canvas&, glm::vec2 size)> painter, glm::vec2 size = { -1.f, -1.f }, Widget child = {});
+    KUI_API Widget CustomPaint(std::function<void(Canvas&, kor::Vec2 size)> painter, kor::Vec2 size = { -1.f, -1.f }, Widget child = {});
     /** @brief An element shader filling the box. @see ElementShader */
     KUI_API Widget ShaderBox(std::shared_ptr<ElementShader> shader, std::vector<std::byte> parameters = {}, Radii radius = {}, Widget child = {});
     template <typename T> requires std::is_trivially_copyable_v<T>
@@ -550,7 +550,7 @@ namespace kui
         const auto bytes = std::as_bytes(std::span(&parameters, 1));
         return ShaderBox(std::move(shader), std::vector<std::byte>(bytes.begin(), bytes.end()), radius, std::move(child));
     }
-    KUI_API Widget Image(kor::ResourceRef<const kor::Image> image, ImageFit fit = ImageFit::eContain, glm::vec2 size = { -1.f, -1.f });
+    KUI_API Widget Image(kor::ResourceRef<const kor::Image> image, ImageFit fit = ImageFit::eContain, kor::Vec2 size = { -1.f, -1.f });
     /** @brief Keeps the child in a layer of its own: repainting it repaints nothing around it, and the other way round. */
     KUI_API Widget RepaintBoundary(Widget child);
     /** @brief The child, faded. Changing it re-records nothing. */
@@ -558,7 +558,7 @@ namespace kui
     /** @brief The child, cut to its box with rounded corners: nothing it paints shows outside. */
     KUI_API Widget ClipRRect(Radii radius, Widget child);
     /** @brief The child, moved by @p offset where it paints and is hit — its layout, and its parent's, unchanged. */
-    KUI_API Widget Translate(glm::vec2 offset, Widget child);
+    KUI_API Widget Translate(kor::Vec2 offset, Widget child);
 
     /** @brief The child, which the pointer goes through as if it were not there. */
     KUI_API Widget IgnorePointer(Widget child);
@@ -648,7 +648,7 @@ namespace kui
      * @code
      * kui::Draggable({ "color", kui::colors::Red }, Swatch(kui::colors::Red))
      * kui::DropTarget({ .accepts = [](const kui::DragData& d) { return d.type == "color"; },
-     *                   .onDrop = [this](const kui::DragData& d, glm::vec2) { SetState([&] { fill = *d.As<kui::Color>(); }); } },
+     *                   .onDrop = [this](const kui::DragData& d, kor::Vec2) { SetState([&] { fill = *d.As<kui::Color>(); }); } },
      *                 Well(fill))
      * @endcode
      */
@@ -656,19 +656,19 @@ namespace kui
 
     struct DropTargetOptions {
         std::function<bool(const DragData&)> accepts;                       ///< Empty: anything.
-        std::function<void(const DragData&, glm::vec2 local)> onDrop;
+        std::function<void(const DragData&, kor::Vec2 local)> onDrop;
         std::function<void(const DragData&)> onEnter;                       ///< An accepted drag came over it: show it.
         std::function<void()> onLeave;                                      ///< It left, was dropped, or was cancelled.
-        std::function<void(const DragData&, glm::vec2 local)> onMove;
+        std::function<void(const DragData&, kor::Vec2 local)> onMove;
 
         // Chainable: `kui::DropTargetOptions{}.Accepts(...).OnDrop(...)`.
         DropTargetOptions& Accepts(std::function<bool(const DragData&)> f) { accepts = std::move(f); return *this; }
         /** @brief Accepts drags of this type only. */
         DropTargetOptions& AcceptsType(std::string type) { accepts = [type = std::move(type)](const DragData& d) { return d.type == type; }; return *this; }
-        DropTargetOptions& OnDrop(std::function<void(const DragData&, glm::vec2)> f) { onDrop = std::move(f); return *this; }
+        DropTargetOptions& OnDrop(std::function<void(const DragData&, kor::Vec2)> f) { onDrop = std::move(f); return *this; }
         DropTargetOptions& OnEnter(std::function<void(const DragData&)> f) { onEnter = std::move(f); return *this; }
         DropTargetOptions& OnLeave(std::function<void()> f) { onLeave = std::move(f); return *this; }
-        DropTargetOptions& OnMove(std::function<void(const DragData&, glm::vec2)> f) { onMove = std::move(f); return *this; }
+        DropTargetOptions& OnMove(std::function<void(const DragData&, kor::Vec2)> f) { onMove = std::move(f); return *this; }
     };
     /** @brief The child, as somewhere drags can be dropped. Of nested targets, the deepest that accepts gets it. */
     KUI_API Widget DropTarget(DropTargetOptions options, Widget child);
@@ -837,7 +837,7 @@ namespace kui
      * Called while the interface is laid out, in Ui::Update: what it does to the interface (a SetState)
      * shows from the next frame.
      */
-    KUI_API Widget SizeObserver(std::function<void(glm::vec2 size, glm::vec2 pixels)> onChanged, Widget child = {});
+    KUI_API Widget SizeObserver(std::function<void(kor::Vec2 size, kor::Vec2 pixels)> onChanged, Widget child = {});
 
     /**
      * @brief @p child and, while @p open, @p dialog on a card in the middle of it, over a shade that dims
@@ -864,13 +864,13 @@ namespace kui
         PlotKind kind = PlotKind::eLines;
         float min = std::numeric_limits<float>::quiet_NaN();    ///< What the foot of the plot is: the least value, when not given.
         float max = std::numeric_limits<float>::quiet_NaN();    ///< What its top is: the greatest value, when not given.
-        glm::vec2 size { -1.f, 60.f };                          ///< Negative: as much as it is given room for.
+        kor::Vec2 size { -1.f, 60.f };                          ///< Negative: as much as it is given room for.
         std::string overlay;                                    ///< Written over it, along its top: "16.6 ms".
         Color color = colors::Transparent;                      ///< The theme's accent, when not given.
 
         PlotOptions& SetKind(PlotKind value) { kind = value; return *this; }
         PlotOptions& SetRange(float low, float high) { min = low; max = high; return *this; }
-        PlotOptions& SetSize(glm::vec2 value) { size = value; return *this; }
+        PlotOptions& SetSize(kor::Vec2 value) { size = value; return *this; }
         PlotOptions& SetOverlay(std::string value) { overlay = std::move(value); return *this; }
         PlotOptions& SetColor(Color value) { color = value; return *this; }
     };
@@ -1064,7 +1064,7 @@ namespace kui
         /** @brief The frame, with the current scene's input and window. */
         void Update();
         /** @brief The frame, with @p input, over a target of @p viewport pixels, @p dt seconds after the last. */
-        void Update(kor::Input& input, glm::vec2 viewport, float dt);
+        void Update(kor::Input& input, kor::Vec2 viewport, float dt);
 
         [[nodiscard]] Renderer& GetRenderer();
         /** @brief The render tree's root, after the first Update. */

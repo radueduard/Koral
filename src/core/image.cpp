@@ -26,9 +26,9 @@ namespace kor
     // (Scheduler::Draw), so record order is execute order. Should that become several buffers, or
     // several threads, the resolver needs per-buffer entry/exit states reconciled at submit instead
     // of a single value read at record time.
-    glm::u32 Image::TrackingFrame() const { return CopyIndex(); }
+    kor::u32 Image::TrackingFrame() const { return CopyIndex(); }
 
-    glm::u32 Image::CopyIndex() const
+    kor::u32 Image::CopyIndex() const
     {
         // Only a per-frame image has more than one copy, and only then does which frame it is matter.
         // Asked rather than remembered, so it is always the copy a command recorded now would touch.
@@ -38,14 +38,14 @@ namespace kor
         return Context::Scheduler().CurrentImageIndex();
     }
 
-    std::optional<ResourceAccess> Image::TrackedAccess(const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    std::optional<ResourceAccess> Image::TrackedAccess(const kor::u32 mipLevel, const kor::u32 arrayLayer) const
     {
         const auto tracked = _trackedAccess.find(TrackingKey(mipLevel, arrayLayer));
         if (tracked == _trackedAccess.end()) return std::nullopt;
         return tracked->second;
     }
 
-    void Image::SetTrackedAccess(const ResourceAccess access, const glm::u32 mipLevel, const glm::u32 arrayLayer) const
+    void Image::SetTrackedAccess(const ResourceAccess access, const kor::u32 mipLevel, const kor::u32 arrayLayer) const
     {
         _trackedAccess[TrackingKey(mipLevel, arrayLayer)] = access;
     }
@@ -120,7 +120,7 @@ namespace kor
         return Materialize<Image>(*this, "Image", where);
     }
 
-    glm::u32 Image::ChannelSize(const kor::Image::Format format)
+    kor::u32 Image::ChannelSize(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -198,7 +198,7 @@ namespace kor
         }
     }
 
-    glm::u32 Image::ChannelCount(const kor::Image::Format format)
+    kor::u32 Image::ChannelCount(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -266,7 +266,7 @@ namespace kor
         }
     }
 
-    void Image::Resize(const glm::uvec3& extent)
+    void Image::Resize(const kor::UVec3& extent)
     {
         if (_extent == extent || extent.x == 0 || extent.y == 0 || extent.z == 0) return;
 
@@ -394,7 +394,7 @@ namespace kor
         }
     }
 
-    glm::uvec2 Image::BlockExtent(const kor::Image::Format format)
+    kor::UVec2 Image::BlockExtent(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -406,11 +406,11 @@ namespace kor
         default:
             // Every other compressed format is 4x4; an uncompressed one is its own texel, which
             // makes the block arithmetic in sizeOfRegion the same code for both.
-            return IsBlockCompressed(format) ? glm::uvec2{ 4, 4 } : glm::uvec2{ 1, 1 };
+            return IsBlockCompressed(format) ? kor::UVec2{ 4, 4 } : kor::UVec2{ 1, 1 };
         }
     }
 
-    glm::u32 Image::BlockSize(const kor::Image::Format format)
+    kor::u32 Image::BlockSize(const kor::Image::Format format)
     {
         switch (format)
         {
@@ -439,16 +439,16 @@ namespace kor
         }
     }
 
-    glm::u64 Image::SizeOfRegion(const kor::Image::Format format, const glm::uvec3 extent,
-                                 const glm::u32 layerCount)
+    kor::u64 Image::SizeOfRegion(const kor::Image::Format format, const kor::UVec3 extent,
+                                 const kor::u32 layerCount)
     {
         const auto block = BlockExtent(format);
         // Round up: a 5-texel row of a 4x4 format still costs two blocks, and a buffer sized for
         // one and a quarter would be short.
-        const glm::u64 blocksX = (static_cast<glm::u64>(extent.x) + block.x - 1) / block.x;
-        const glm::u64 blocksY = (static_cast<glm::u64>(extent.y) + block.y - 1) / block.y;
-        const glm::u64 depth = std::max(1u, extent.z);
-        const glm::u64 layers = std::max(1u, layerCount);
+        const kor::u64 blocksX = (static_cast<kor::u64>(extent.x) + block.x - 1) / block.x;
+        const kor::u64 blocksY = (static_cast<kor::u64>(extent.y) + block.y - 1) / block.y;
+        const kor::u64 depth = std::max(1u, extent.z);
+        const kor::u64 layers = std::max(1u, layerCount);
 
         return blocksX * blocksY * depth * layers * BlockSize(format);
     }
@@ -464,7 +464,7 @@ namespace kor
         _sampleCount(createInfo.sampleCount),
         _usage(createInfo.usage) {
         if (_mipLevels == 0) {
-            _mipLevels = 1 + static_cast<glm::u32>(std::floor(std::log2(std::max(_extent.x, std::max(_extent.y, _extent.z)))));
+            _mipLevels = 1 + static_cast<kor::u32>(std::floor(std::log2(std::max(_extent.x, std::max(_extent.y, _extent.z)))));
         }
     }
 

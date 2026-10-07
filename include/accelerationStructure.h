@@ -15,8 +15,8 @@
 #pragma once
 #include <cstdint>
 #include <vector>
-#include <glm/mat4x4.hpp>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
+
 
 #include "api.h"
 #include <source_location>
@@ -64,9 +64,9 @@ namespace kor
         struct KORAL_API Instance
         {
             ResourceRef<const AccelerationStructure> blas;   ///< The geometry being placed. Must be a bottom-level structure.
-            glm::mat4 transform = glm::mat4(1.0f);           ///< Where it sits in world space.
-            glm::u32 instanceCustomIndex = 0;   ///< Available to shaders as gl_InstanceCustomIndexEXT.
-            glm::u32 hitGroupIndex = 0;         ///< SBT hit-group record offset for this instance.
+            kor::Mat4 transform = kor::Mat4(1.0f);           ///< Where it sits in world space.
+            kor::u32 instanceCustomIndex = 0;   ///< Available to shaders as gl_InstanceCustomIndexEXT.
+            kor::u32 hitGroupIndex = 0;         ///< SBT hit-group record offset for this instance.
         };
 
         /**
@@ -80,10 +80,10 @@ namespace kor
         struct KORAL_API Geometry
         {
             ResourceRef<const Mesh> mesh;   ///< Source of the vertex/index buffers and position attribute.
-            glm::u64 firstVertex = 0;       ///< First vertex (element offset) covered by this geometry.
-            glm::u64 vertexCount = 0;       ///< Number of vertices; 0 means "the rest of the mesh".
-            glm::u64 firstIndex  = 0;       ///< First index (element offset) covered by this geometry.
-            glm::u64 indexCount  = 0;       ///< Number of indices; 0 means "all of the mesh's indices".
+            kor::u64 firstVertex = 0;       ///< First vertex (element offset) covered by this geometry.
+            kor::u64 vertexCount = 0;       ///< Number of vertices; 0 means "the rest of the mesh".
+            kor::u64 firstIndex  = 0;       ///< First index (element offset) covered by this geometry.
+            kor::u64 indexCount  = 0;       ///< Number of indices; 0 means "all of the mesh's indices".
         };
 
         struct KORAL_API Builder : kor::Builder

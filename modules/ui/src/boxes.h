@@ -47,8 +47,8 @@ namespace kui
     class RenderDecorated final : public RenderContainer {
     public:
         void Set(const Decoration& decoration);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return _decoration.Visible(); }
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return _decoration.Visible(); }
     private:
         Decoration _decoration {};
     };
@@ -68,8 +68,8 @@ namespace kui
             bool hasMargin = false, hasPadding = false, hasSize = false, hasDecoration = false;
         };
         void Set(const Config& config);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2 position) const override;
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
+        [[nodiscard]] bool HitTestSelf(kor::Vec2 position) const override;
         [[nodiscard]] float MinIntrinsicWidth() const override;
     protected:
         void PerformLayout() override;
@@ -130,7 +130,7 @@ namespace kui
     class RenderParagraph final : public RenderContainer {
     public:
         void Set(const std::string& text, const TextStyle& style, TextAlign align, bool wrap, int maxLines = 0, bool ellipsis = false);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
         [[nodiscard]] const Paragraph& GetParagraph() const { return _paragraph; }
         [[nodiscard]] std::string DebugText() const override { return _text; }
         /** @brief Its longest word, where it wraps; all of it on one line, where it does not; nothing, where it ends in an ellipsis. */
@@ -148,35 +148,35 @@ namespace kui
 
     class RenderImage final : public RenderContainer {
     public:
-        void Set(const kor::ResourceRef<const kor::Image>& image, ImageFit fit, glm::vec2 size);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+        void Set(const kor::ResourceRef<const kor::Image>& image, ImageFit fit, kor::Vec2 size);
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
     protected:
         void PerformLayout() override;
     private:
         kor::ResourceRef<const kor::Image> _image;
-        glm::u64 _generation = 0;
+        kor::u64 _generation = 0;
         ImageFit _fit = ImageFit::eContain;
-        glm::vec2 _preferred { -1.f, -1.f };
+        kor::Vec2 _preferred { -1.f, -1.f };
     };
 
     class RenderCustomPaint final : public RenderContainer {
     public:
-        void Set(std::function<void(Canvas&, glm::vec2)> painter, glm::vec2 size);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+        void Set(std::function<void(Canvas&, kor::Vec2)> painter, kor::Vec2 size);
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
     protected:
         void PerformLayout() override;
     private:
-        std::function<void(Canvas&, glm::vec2)> _painter;
-        glm::vec2 _preferred { -1.f, -1.f };
+        std::function<void(Canvas&, kor::Vec2)> _painter;
+        kor::Vec2 _preferred { -1.f, -1.f };
     };
 
     class RenderShaderBox final : public RenderContainer {
     public:
         void Set(std::shared_ptr<ElementShader> shader, std::vector<std::byte> parameters, Radii radius);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
     protected:
         void PerformLayout() override;
     private:
@@ -201,7 +201,7 @@ namespace kui
     class RenderReveal final : public RenderContainer {
     public:
         void Set(float share);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
     protected:
         void PerformLayout() override;
     private:
@@ -216,28 +216,28 @@ namespace kui
     class RenderClip final : public RenderContainer {
     public:
         void Set(const Radii& radius);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
     private:
         Radii _radius {};
     };
 
     class RenderTranslate final : public RenderContainer {
     public:
-        void Set(glm::vec2 by);
-        [[nodiscard]] glm::vec2 ChildOrigin(const RenderObject& child) const override { return child.Offset() + _by; }
+        void Set(kor::Vec2 by);
+        [[nodiscard]] kor::Vec2 ChildOrigin(const RenderObject& child) const override { return child.Offset() + _by; }
         /** Hit where its child is drawn, which may be outside its own box. */
-        bool HitTest(HitTestResult& result, glm::vec2 position) override;
+        bool HitTest(HitTestResult& result, kor::Vec2 position) override;
     private:
-        glm::vec2 _by {};
+        kor::Vec2 _by {};
     };
 
     class RenderScroll final : public RenderContainer {
     public:
         void Set(Axis axis);
-        void Paint(Canvas& canvas, glm::vec2 offset) override;
+        void Paint(Canvas& canvas, kor::Vec2 offset) override;
         bool HandleEvent(const PointerEvent& event) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
-        [[nodiscard]] glm::vec2 ChildOrigin(const RenderObject& child) const override;
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
+        [[nodiscard]] kor::Vec2 ChildOrigin(const RenderObject& child) const override;
         /** @brief Scrolls by @p by units; returns whether it moved. */
         bool Scroll(float by);
         /** @brief Scrolled across, any width: what does not fit is scrolled to. Up and down, its content's. */
@@ -247,7 +247,7 @@ namespace kui
     protected:
         void PerformLayout() override;
     private:
-        [[nodiscard]] glm::vec2 ScrollVector() const;
+        [[nodiscard]] kor::Vec2 ScrollVector() const;
         void PlaceThumb();
     public:
         void Observe(std::function<void(float, float)> onScrolled, float jumpTo, std::uint32_t jump);
@@ -265,7 +265,7 @@ namespace kui
 
     class RenderIgnorePointer final : public RenderContainer {
     public:
-        bool HitTest(HitTestResult&, glm::vec2) override { return false; }
+        bool HitTest(HitTestResult&, kor::Vec2) override { return false; }
     };
 
     class RenderDraggable final : public RenderContainer {
@@ -273,22 +273,22 @@ namespace kui
         struct Config { DragData data; DraggableOptions options; Widget child; };   // the child: what follows the pointer, unless told
         void Set(const Config& config) { _config = config; }
         bool HandleEvent(const PointerEvent& event) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
     private:
         Config _config;
         bool _pressed = false;
-        glm::vec2 _down {};
+        kor::Vec2 _down {};
     };
 
     class RenderDropTarget final : public RenderContainer, public DropReceiver {
     public:
         void Set(const DropTargetOptions& options) { _options = options; }
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
         [[nodiscard]] bool AcceptsDrag(const DragData& data) const override { return !_options.accepts || _options.accepts(data); }
         void DragEntered(const DragData& data) override { if (_options.onEnter) _options.onEnter(data); }
-        void DragMoved(const DragData& data, const glm::vec2 local) override { if (_options.onMove) _options.onMove(data, local); }
+        void DragMoved(const DragData& data, const kor::Vec2 local) override { if (_options.onMove) _options.onMove(data, local); }
         void DragLeft() override { if (_options.onLeave) _options.onLeave(); }
-        void Dropped(const DragData& data, const glm::vec2 local) override { if (_options.onDrop) _options.onDrop(data, local); }
+        void Dropped(const DragData& data, const kor::Vec2 local) override { if (_options.onDrop) _options.onDrop(data, local); }
     private:
         DropTargetOptions _options;
     };
@@ -297,10 +297,10 @@ namespace kui
     public:
         void Set(const GestureOptions& options) { _options = options; }
         bool HandleEvent(const PointerEvent& event) override;
-        [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return _options.opaque; }
+        [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return _options.opaque; }
     private:
         GestureOptions _options;
         bool _pressed = false, _panning = false;
-        glm::vec2 _down {};
+        kor::Vec2 _down {};
     };
 }

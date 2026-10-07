@@ -84,10 +84,10 @@ namespace kor
             /// "any", so a shader annotated for one module still matches.
             std::string semanticNamespace;
 
-            glm::u32 binding = 0;                       ///< Which vertex buffer it is read from.
-            glm::u32 offset = 0;                        ///< Its byte offset within the vertex.
+            kor::u32 binding = 0;                       ///< Which vertex buffer it is read from.
+            kor::u32 offset = 0;                        ///< Its byte offset within the vertex.
             ChannelType channelType = ChannelType::eFloat;  ///< The element type of one channel.
-            glm::u32 channelCount = 0;                  ///< How many channels — 3 for a vec3.
+            kor::u32 channelCount = 0;                  ///< How many channels — 3 for a vec3.
 
             /**
              * @brief Which shader location reads it, for a layout that says so outright.
@@ -97,7 +97,7 @@ namespace kor
              * attributes in an order that is not the shader's. Either way it is only consulted for
              * inputs the shader did not annotate: a semantic, where there is one, wins.
              */
-            std::optional<glm::u32> location = std::nullopt;
+            std::optional<kor::u32> location = std::nullopt;
 
             /**
              * @brief How many consecutive shader locations it fills: 4 for a `mat4` (a column each), N for an
@@ -105,19 +105,19 @@ namespace kor
              *        locationStride bytes after the last. A shader input that spans several locations is only
              *        matched by an attribute that fills as many.
              */
-            glm::u32 locations = 1;
+            kor::u32 locations = 1;
             /** @brief The bytes from one of its locations to the next; 0: packed, one location's channels apart. */
-            glm::u32 locationStride = 0;
+            kor::u32 locationStride = 0;
 
             /** @brief The bytes from one of its locations to the next, worked out where it was left 0. */
-            [[nodiscard]] glm::u32 Stride() const;
+            [[nodiscard]] kor::u32 Stride() const;
 
             /**
              * @brief A matrix of @p columns columns of @p rows floats, a location a column — a per-instance
              *        transform is `Matrix("TRANSFORM", 1, offsetof(Instance, model))`, read by a `mat4`.
              */
-            [[nodiscard]] static Attribute Matrix(std::string semantic, glm::u32 binding, glm::u32 offset,
-                                                  glm::u32 columns = 4, glm::u32 rows = 4)
+            [[nodiscard]] static Attribute Matrix(std::string semantic, kor::u32 binding, kor::u32 offset,
+                                                  kor::u32 columns = 4, kor::u32 rows = 4)
             {
                 return Attribute{
                     .semantic     = std::move(semantic),
@@ -148,9 +148,9 @@ namespace kor
              * semantics buy: renumber the shader's inputs and this layout is silently feeding them
              * the wrong bytes, where a named attribute would have moved with them.
              */
-            [[nodiscard]] static Attribute AtLocation(const glm::u32 location, const glm::u32 binding,
-                                                      const glm::u32 offset, const ChannelType channelType,
-                                                      const glm::u32 channelCount)
+            [[nodiscard]] static Attribute AtLocation(const kor::u32 location, const kor::u32 binding,
+                                                      const kor::u32 offset, const ChannelType channelType,
+                                                      const kor::u32 channelCount)
             {
                 return Attribute{
                     .binding      = binding,
@@ -170,8 +170,8 @@ namespace kor
          */
         struct KORAL_API ShaderInput
         {
-            glm::u32 location = 0;              ///< Where the shader declared it.
-            glm::u32 locationSpan = 1;          ///< How many consecutive locations it takes: 4 for a `mat4`.
+            kor::u32 location = 0;              ///< Where the shader declared it.
+            kor::u32 locationSpan = 1;          ///< How many consecutive locations it takes: 4 for a `mat4`.
             std::string_view name;              ///< Its name in the source, for diagnostics.
             std::string_view semanticNamespace; ///< Which vocabulary it named, if any.
             std::string_view semantic;          ///< What it asked for, or empty if it asked by position.

@@ -35,7 +35,7 @@ namespace kor
          */
         WindowPlatform platform = WindowPlatform::eAuto;
         /** How many frames the CPU may run ahead of the GPU: how many copies a per-frame resource has. */
-        glm::u32 framesInFlight = 2;
+        kor::u32 framesInFlight = 2;
         /** A GPU to prefer by name (Vulkan only); empty lets the runtime pick. */
         std::string gpu {};
         /**

@@ -19,7 +19,7 @@
 
 namespace kor
 {
-    Frame::Frame(const glm::u32 imageIndex) : _imageIndex(imageIndex)
+    Frame::Frame(const kor::u32 imageIndex) : _imageIndex(imageIndex)
     {
         _commandBuffer = CommandBuffer::Create(CommandBuffer::Usage::eGraphics);
     }

@@ -67,7 +67,7 @@ namespace kor {
             _monitor = glfwGetPrimaryMonitor();
             if (_monitor) {
                 _videoMode = glfwGetVideoMode(_monitor);
-                _extent = { static_cast<glm::u32>(_videoMode->width), static_cast<glm::u32>(_videoMode->height) };
+                _extent = { static_cast<kor::u32>(_videoMode->width), static_cast<kor::u32>(_videoMode->height) };
             }
         }
 
@@ -114,7 +114,7 @@ namespace kor {
         if (width == 0 || height == 0) {
             _paused = true;
         } else {
-            _extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
+            _extent = { static_cast<kor::u32>(width), static_cast<kor::u32>(height) };
         }
         _focused = glfwGetWindowAttrib(_window, GLFW_FOCUSED) == GLFW_TRUE;
 
@@ -142,7 +142,7 @@ namespace kor {
 
     bool Window::IsHovered() const { return _window != nullptr && glfwGetWindowAttrib(_window, GLFW_HOVERED) == GLFW_TRUE; }
 
-    glm::ivec2 Window::Position() const
+    kor::IVec2 Window::Position() const
     {
         if (_window == nullptr || !CanBePositioned()) return {};
         int x = 0, y = 0;
@@ -150,7 +150,7 @@ namespace kor {
         return { x, y };
     }
 
-    void Window::SetPosition(const glm::ivec2 position)
+    void Window::SetPosition(const kor::IVec2 position)
     {
         if (_window != nullptr && CanBePositioned()) glfwSetWindowPos(_window, position.x, position.y);
     }
@@ -168,13 +168,13 @@ namespace kor {
         glfwSetWindowAttrib(_window, GLFW_MOUSE_PASSTHROUGH, passthrough);
     }
 
-    std::optional<glm::ivec2> Window::DesktopCursor()
+    std::optional<kor::IVec2> Window::DesktopCursor()
     {
         if (!x11::Active()) return std::nullopt;
         return x11::CursorPosition();
     }
 
-    bool Window::SetInputRegion(const std::span<const glm::ivec4> rects)
+    bool Window::SetInputRegion(const std::span<const kor::IVec4> rects)
     {
         if (_window == nullptr || !x11::Active()) return false;
         // Asked every frame by what follows something that moves: the server is told only of a change.
@@ -184,7 +184,7 @@ namespace kor {
         return true;
     }
 
-    glm::vec2 Window::CursorPosition() const
+    kor::Vec2 Window::CursorPosition() const
     {
         if (_window == nullptr) return {};
         double x = 0., y = 0.;
@@ -192,8 +192,8 @@ namespace kor {
         // GLFW answers in screen coordinates, which are not pixels where the display is scaled (macOS, Wayland).
         int width = 0, height = 0;
         glfwGetWindowSize(_window, &width, &height);
-        const glm::vec2 scale = width > 0 && height > 0 ? glm::vec2(_extent) / glm::vec2(width, height) : glm::vec2(1.f);
-        return glm::vec2(x, y) * scale;
+        const kor::Vec2 scale = width > 0 && height > 0 ? kor::Vec2(_extent) / kor::Vec2(width, height) : kor::Vec2(1.f);
+        return kor::Vec2(x, y) * scale;
     }
 
     float Window::PixelRatio() const
@@ -448,7 +448,7 @@ namespace kor {
 
     void Window::RequestClose() const { if (_window) glfwSetWindowShouldClose(_window, GLFW_TRUE); }
 
-    void Window::SetTitleBarColors(const glm::vec3 background, const glm::vec3 text) const
+    void Window::SetTitleBarColors(const kor::Vec3 background, const kor::Vec3 text) const
     {
         if (_window == nullptr) return;
 #ifdef _WIN32
@@ -461,7 +461,7 @@ namespace kor {
         }();
         if (!set) return;
         const HWND handle = glfwGetWin32Window(_window);
-        const auto colour = [](const glm::vec3 c) -> COLORREF {
+        const auto colour = [](const kor::Vec3 c) -> COLORREF {
             const auto byte = [](const float v) { return static_cast<DWORD>(std::clamp(v, 0.f, 1.f) * 255.f + 0.5f); };
             return byte(c.r) | (byte(c.g) << 8) | (byte(c.b) << 16);
         };
@@ -520,16 +520,16 @@ namespace kor {
     {
         int count = 0;
         GLFWmonitor** monitors = glfwGetMonitors(&count);
-        glm::ivec2 low { 0 }, high { 0 };
+        kor::IVec2 low { 0 }, high { 0 };
         bool any = false;
         for (int i = 0; i < count; ++i) {
             const GLFWvidmode* mode = glfwGetVideoMode(monitors[i]);
             if (!mode) continue;
-            glm::ivec2 at {};
+            kor::IVec2 at {};
             glfwGetMonitorPos(monitors[i], &at.x, &at.y);
-            const glm::ivec2 end = at + glm::ivec2(mode->width, mode->height);
-            low = any ? glm::min(low, at) : at;
-            high = any ? glm::max(high, end) : end;
+            const kor::IVec2 end = at + kor::IVec2(mode->width, mode->height);
+            low = any ? kor::Min(low, at) : at;
+            high = any ? kor::Max(high, end) : end;
             any = true;
         }
         return { low, high - low };
@@ -544,7 +544,7 @@ namespace kor {
 
     Window::Window(const OffscreenSettings& settings) :
         _title(settings.title),
-        _extent(glm::max(settings.extent, glm::uvec2(1))),
+        _extent(kor::Max(settings.extent, kor::UVec2(1))),
         _resizable(true),
         _fullscreen(false),
         _decorated(false),
@@ -572,7 +572,7 @@ namespace kor {
         _offscreenDepth.SetName(_title + " depth");
         // The same targets, names and clears as a window's own, so a scene cannot tell the two apart.
         _framebuffer = Framebuffer::Builder()
-            .AddColor({ .name = "color", .view = _offscreenColor, .clear = glm::vec4(0.f) })
+            .AddColor({ .name = "color", .view = _offscreenColor, .clear = kor::Vec4(0.f) })
             .SetDepthStencil({ .name = "depth", .view = _offscreenDepth })
             .Build();
         if (!_framebuffer.Valid())
@@ -595,7 +595,7 @@ namespace kor {
         return {};
     }
 
-    void Window::Resize(const glm::uvec2 extent)
+    void Window::Resize(const kor::UVec2 extent)
     {
         if (extent.x == 0 || extent.y == 0) return;
         if (_offscreen) {
@@ -687,7 +687,7 @@ namespace kor {
     	const auto window = static_cast<Window*>(glfwGetWindowUserPointer(handle));
         if (!window) return;
         window->_hasResized = true;
-    	window->_extent = { static_cast<glm::u32>(width), static_cast<glm::u32>(height) };
+    	window->_extent = { static_cast<kor::u32>(width), static_cast<kor::u32>(height) };
     	if (width == 0 || height == 0) window->Pause();
     	else window->Unpause();
     }

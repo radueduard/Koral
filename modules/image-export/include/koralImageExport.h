@@ -45,7 +45,7 @@
 #include <string>
 #include <string_view>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <error.h>
 #include <image.h>
@@ -99,12 +99,12 @@ namespace kimg
      */
     struct KIMG_EXPORT_API Subimage
     {
-        glm::u32 mipLevel = 0;      ///< Which mip level. Its extent is the image's, halved that many times.
-        glm::u32 arrayLayer = 0;    ///< Which array layer, or which cube face: +X, -X, +Y, -Y, +Z, -Z.
-        glm::uvec3 offset { 0, 0, 0 };   ///< Where in the level to start. Must land on a block boundary for a compressed format.
+        kor::u32 mipLevel = 0;      ///< Which mip level. Its extent is the image's, halved that many times.
+        kor::u32 arrayLayer = 0;    ///< Which array layer, or which cube face: +X, -X, +Y, -Y, +Z, -Z.
+        kor::UVec3 offset { 0, 0, 0 };   ///< Where in the level to start. Must land on a block boundary for a compressed format.
         /// How much of it to take, in texels. Zero in any component means "the rest of the level",
         /// so the default is the whole thing.
-        glm::uvec3 extent { 0, 0, 0 };
+        kor::UVec3 extent { 0, 0, 0 };
     };
 
     /**

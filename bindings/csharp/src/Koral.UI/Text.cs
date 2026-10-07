@@ -1,4 +1,3 @@
-using System.Numerics;
 using Koral.UI.Native;
 
 namespace Koral.UI;
@@ -94,15 +93,15 @@ public sealed unsafe class Paragraph : IDisposable
     }
 
     public Paragraph Layout(float maxWidth) { KuiNative.kui_paragraph_layout(Native, maxWidth); return this; }
-    public Vector2 Size => KuiNative.kui_paragraph_size(Native).Managed();
+    public Vec2 Size => KuiNative.kui_paragraph_size(Native).Managed();
     public ulong LineCount => KuiNative.kui_paragraph_line_count(Native);
     public float LineHeight => KuiNative.kui_paragraph_line_height(Native);
     public float MinIntrinsicWidth => KuiNative.kui_paragraph_min_intrinsic_width(Native);
     public float MaxIntrinsicWidth => KuiNative.kui_paragraph_max_intrinsic_width(Native);
     /// <summary>Top of the caret before the character at byte <paramref name="index"/> (UTF-8).</summary>
-    public Vector2 CaretPosition(ulong index) => KuiNative.kui_paragraph_caret_position(Native, (nuint)index).Managed();
+    public Vec2 CaretPosition(ulong index) => KuiNative.kui_paragraph_caret_position(Native, (nuint)index).Managed();
     /// <summary>The byte index (UTF-8) of the caret position nearest <paramref name="point"/>.</summary>
-    public ulong IndexAt(Vector2 point) => KuiNative.kui_paragraph_index_at(Native, point.Native());
+    public ulong IndexAt(Vec2 point) => KuiNative.kui_paragraph_index_at(Native, point.Native());
 
     public void Dispose()
     {

@@ -135,15 +135,15 @@ namespace kor
 
     BufferBarrier::BufferBarrier(
         const kor::ResourceRef<const kor::Buffer> &buffer, const ResourceAccess dstAccess,
-        const glm::u64 offset, const glm::u64 size)
+        const kor::u64 offset, const kor::u64 size)
       : _buffer(buffer), _dstAccess(dstAccess),
         _offset(offset), _size(size) {}
 
     ImageBarrier::ImageBarrier(
         const kor::ResourceRef<const kor::Image> &image,
         const ResourceAccess dstAccess,
-        const std::optional<glm::u32> baseMipLevel, const std::optional<glm::u32> levelCount,
-        const std::optional<glm::u32> baseArrayLayer, const std::optional<glm::u32> layerCount)
+        const std::optional<kor::u32> baseMipLevel, const std::optional<kor::u32> levelCount,
+        const std::optional<kor::u32> baseArrayLayer, const std::optional<kor::u32> layerCount)
         : _image(image), _dstAccess(dstAccess),
           _baseMipLevel(baseMipLevel), _levelCount(levelCount),
           _baseArrayLayer(baseArrayLayer), _layerCount(layerCount) {}
@@ -165,11 +165,11 @@ namespace kor
     RenderInfo::RenderInfo(const kor::Resource<kor::Framebuffer>& framebuffer)
         : RenderInfo(ResourceRef<const Framebuffer>(framebuffer)) {}
 
-    const ClearColor& RenderInfo::ClearColorAt(const glm::u32 index) const
+    const ClearColor& RenderInfo::ClearColorAt(const kor::u32 index) const
     {
         // Opaque black, for an attachment that neither the pass nor the framebuffer describes.
         // Unreachable through BeginRendering, which resolves against the framebuffer first.
-        static const ClearColor black = glm::vec4(0.f, 0.f, 0.f, 1.f);
+        static const ClearColor black = kor::Vec4(0.f, 0.f, 0.f, 1.f);
         if (index >= _clearColors.size() || !_clearColors[index].has_value()) return black;
         return *_clearColors[index];
     }
@@ -181,7 +181,7 @@ namespace kor
 
         for (std::size_t i = 0; i < _clearColors.size(); ++i) {
             if (_clearColors[i].has_value()) continue;
-            if (i < declared) _clearColors[i] = framebuffer.ClearColorAt(static_cast<glm::u32>(i));
+            if (i < declared) _clearColors[i] = framebuffer.ClearColorAt(static_cast<kor::u32>(i));
         }
 
         if (!_clearDepth.has_value()) _clearDepth = framebuffer.ClearDepth();
@@ -260,8 +260,8 @@ namespace kor
 
     namespace {
         // "float3", "float4x4", "float3[4]" — how a shape reads in a mismatch report.
-        std::string describeShape(const ValueScalar scalar, const glm::u8 rows, const glm::u8 columns,
-                                  const glm::u32 count)
+        std::string describeShape(const ValueScalar scalar, const kor::u8 rows, const kor::u8 columns,
+                                  const kor::u32 count)
         {
             static constexpr std::string_view names[] { "float", "int", "uint", "bool", "double", "struct" };
             const auto index = static_cast<std::size_t>(scalar);
@@ -274,7 +274,7 @@ namespace kor
         }
     }
 
-    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const void* data, const glm::u32 size,
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const void* data, const kor::u32 size,
                                                const ValueShape shape, const std::source_location where)
     {
         if (_failed) return *this;
@@ -326,26 +326,26 @@ namespace kor
         // columns however its own rules say, and C++ packs them tight. Copying the value straight
         // over is what puts two thirds of a mat3 in the right place and the rest anywhere; so it is
         // reassembled here, one column at a time, into the strides reflection reported.
-        const glm::u32 scalarSize = shape.ScalarSize();
-        const glm::u32 tightColumn = scalarSize * shape.rows;
-        const glm::u32 tightElement = tightColumn * shape.columns;
-        const glm::u32 columnStride = member->matrixStride > 0 ? member->matrixStride : tightColumn;
-        const glm::u32 elementStride = member->arrayStride > 0 ? member->arrayStride : tightElement;
+        const kor::u32 scalarSize = shape.ScalarSize();
+        const kor::u32 tightColumn = scalarSize * shape.rows;
+        const kor::u32 tightElement = tightColumn * shape.columns;
+        const kor::u32 columnStride = member->matrixStride > 0 ? member->matrixStride : tightColumn;
+        const kor::u32 elementStride = member->arrayStride > 0 ? member->arrayStride : tightElement;
 
         if (elementStride == tightElement && columnStride == tightColumn)
             return PushConstantBlock(data, size, member->offset);   // laid out alike; nothing to do
 
         std::vector<std::byte> laidOut(member->size, std::byte{});
         const auto* source = static_cast<const std::byte*>(data);
-        for (glm::u32 element = 0; element < shape.count; ++element) {
-            for (glm::u32 column = 0; column < shape.columns; ++column) {
-                const glm::u32 to = element * elementStride + column * columnStride;
-                const glm::u32 from = element * tightElement + column * tightColumn;
+        for (kor::u32 element = 0; element < shape.count; ++element) {
+            for (kor::u32 column = 0; column < shape.columns; ++column) {
+                const kor::u32 to = element * elementStride + column * columnStride;
+                const kor::u32 from = element * tightElement + column * tightColumn;
                 if (to + tightColumn > laidOut.size() || from + tightColumn > size) break;
                 std::memcpy(laidOut.data() + to, source + from, tightColumn);
             }
         }
-        return PushConstantBlock(laidOut.data(), static_cast<glm::u32>(laidOut.size()), member->offset);
+        return PushConstantBlock(laidOut.data(), static_cast<kor::u32>(laidOut.size()), member->offset);
     }
 
     namespace {
@@ -450,15 +450,15 @@ namespace kor
         // alone for buffers, which have no subresources.
         struct Key {
             const void* resource;
-            glm::u32 mip;
-            glm::u32 layer;
+            kor::u32 mip;
+            kor::u32 layer;
             bool operator==(const Key&) const = default;
         };
         struct KeyHash {
             std::size_t operator()(const Key& key) const noexcept {
                 return std::hash<const void*>{}(key.resource)
-                     ^ (std::hash<glm::u32>{}(key.mip) << 1)
-                     ^ (std::hash<glm::u32>{}(key.layer) << 2);
+                     ^ (std::hash<kor::u32>{}(key.mip) << 1)
+                     ^ (std::hash<kor::u32>{}(key.layer) << 2);
             }
         };
         std::unordered_map<Key, ResourceAccess, KeyHash> state;
@@ -906,7 +906,7 @@ namespace kor
         return DoEndRendering();
     }
 
-    CommandBuffer& CommandBuffer::SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    CommandBuffer& CommandBuffer::SetViewport(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height)
     {
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the viewport without a graphics pipeline bound.");
@@ -914,7 +914,7 @@ namespace kor
         return DoSetViewport(x, y, width, height);
     }
 
-    CommandBuffer& CommandBuffer::SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height)
+    CommandBuffer& CommandBuffer::SetScissor(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height)
     {
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot set the scissor without a graphics pipeline bound.");
@@ -939,16 +939,16 @@ namespace kor
     CommandBuffer& CommandBuffer::SetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
     { KORAL_DYNAMIC_STATE_SETTER_GUARD(eDepthBias, "depth bias") return DoSetDepthBias(constantFactor, clamp, slopeFactor); }
 
-    CommandBuffer& CommandBuffer::SetBlendConstants(const glm::vec4 constants)
+    CommandBuffer& CommandBuffer::SetBlendConstants(const kor::Vec4 constants)
     { KORAL_DYNAMIC_STATE_SETTER_GUARD(eBlendConstants, "blend constants") return DoSetBlendConstants(constants); }
 
-    CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const glm::u32 compareMask)
+    CommandBuffer& CommandBuffer::SetStencilCompareMask(const StencilFace face, const kor::u32 compareMask)
     { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilCompareMask, "stencil compare mask") return DoSetStencilCompareMask(face, compareMask); }
 
-    CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const glm::u32 writeMask)
+    CommandBuffer& CommandBuffer::SetStencilWriteMask(const StencilFace face, const kor::u32 writeMask)
     { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilWriteMask, "stencil write mask") return DoSetStencilWriteMask(face, writeMask); }
 
-    CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const glm::u32 reference)
+    CommandBuffer& CommandBuffer::SetStencilReference(const StencilFace face, const kor::u32 reference)
     { KORAL_DYNAMIC_STATE_SETTER_GUARD(eStencilReference, "stencil reference") return DoSetStencilReference(face, reference); }
 
     CommandBuffer& CommandBuffer::SetCullMode(const Flags<CullMode> cullMode)
@@ -1055,7 +1055,7 @@ namespace kor
         // reading them — so the sets tracked here must follow the same rule. Forgetting them all
         // (as this once did) left the draws after a pipeline switch with no recorded uses, and the
         // barriers their images needed were never emitted.
-        void keepCompatibleSets(std::map<glm::u32, kor::ResourceRef<const DescriptorSet>>& sets, const Pipeline& pipeline) {
+        void keepCompatibleSets(std::map<kor::u32, kor::ResourceRef<const DescriptorSet>>& sets, const Pipeline& pipeline) {
             for (auto it = sets.begin(); it != sets.end(); ++it) {
                 const auto wanted = pipeline.SetLayoutRef(it->first);
                 const auto& set = it->second;
@@ -1144,7 +1144,7 @@ namespace kor
             [this, pipeline] { DoBindRayTracingPipeline(pipeline); });
     }
 
-    CommandBuffer& CommandBuffer::TraceRays(const glm::u32 width, const glm::u32 height, const glm::u32 depth, const std::source_location where)
+    CommandBuffer& CommandBuffer::TraceRays(const kor::u32 width, const kor::u32 height, const kor::u32 depth, const std::source_location where)
     {
         if (_failed) return *this;
         if (!_state.boundRayTracingPipeline.has_value())
@@ -1152,7 +1152,7 @@ namespace kor
         return DoTraceRays(width, height, depth, where);
     }
 
-    CommandBuffer& CommandBuffer::DoTraceRays(glm::u32, glm::u32, glm::u32, std::source_location)
+    CommandBuffer& CommandBuffer::DoTraceRays(kor::u32, kor::u32, kor::u32, std::source_location)
     {
         return RecordError(ErrorCode::eRayTracingUnsupported, "Ray tracing is not supported on this backend.");
     }
@@ -1163,9 +1163,9 @@ namespace kor
     }
 
     // A backend without debug-marker support ignores these; the do* defaults are the no-ops.
-    CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const glm::vec4 color) { return DoBeginDebugLabel(label, color); }
+    CommandBuffer& CommandBuffer::BeginDebugLabel(const std::string& label, const kor::Vec4 color) { return DoBeginDebugLabel(label, color); }
     CommandBuffer& CommandBuffer::EndDebugLabel() { return DoEndDebugLabel(); }
-    CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const glm::vec4 color) { return DoInsertDebugLabel(label, color); }
+    CommandBuffer& CommandBuffer::InsertDebugLabel(const std::string& label, const kor::Vec4 color) { return DoInsertDebugLabel(label, color); }
 
     // ---- GPU timers ---------------------------------------------------------------------------
     //
@@ -1194,10 +1194,10 @@ namespace kor
             });
         }
 
-        const auto scope = static_cast<glm::u32>(_pendingTimers.size());
+        const auto scope = static_cast<kor::u32>(_pendingTimers.size());
         _pendingTimers.push_back(TimerScope{
             .label = std::move(label),
-            .depth = static_cast<glm::u32>(_timerStack.size()),
+            .depth = static_cast<kor::u32>(_timerStack.size()),
             .where = where,
         });
         _timerStack.push_back(scope);
@@ -1236,7 +1236,7 @@ namespace kor
         std::vector<double> milliseconds;
         // Not ready is not an error — the results simply stay as they were, which keeps a
         // profiler's readings steady instead of flickering to nothing.
-        if (!DoReadTimerTimestamps(static_cast<glm::u32>(_submittedTimers.size()), milliseconds)
+        if (!DoReadTimerTimestamps(static_cast<kor::u32>(_submittedTimers.size()), milliseconds)
             || milliseconds.size() != _submittedTimers.size())
             return false;
 
@@ -1332,12 +1332,12 @@ namespace kor
         std::erase_if(_state.boundVertexBuffers, [count](const auto& bound) { return bound.first < count; });
     }
 
-    void CommandBuffer::StateBindVertexBuffer(const glm::u32 binding, const kor::ResourceRef<const Buffer>& buffer)
+    void CommandBuffer::StateBindVertexBuffer(const kor::u32 binding, const kor::ResourceRef<const Buffer>& buffer)
     {
         _state.boundVertexBuffers.insert_or_assign(binding, buffer);
     }
 
-    CommandBuffer& CommandBuffer::BindVertexBuffer(const glm::u32 binding, kor::ResourceRef<const Buffer> buffer, const glm::u64 offset,
+    CommandBuffer& CommandBuffer::BindVertexBuffer(const kor::u32 binding, kor::ResourceRef<const Buffer> buffer, const kor::u64 offset,
                                                    const std::source_location where)
     {
         if (_failed) return *this;
@@ -1360,7 +1360,7 @@ namespace kor
             [this, mesh] { DoBindMesh(mesh); });
     }
 
-    glm::uvec2 CommandBuffer::DefaultViewportExtent() const
+    kor::UVec2 CommandBuffer::DefaultViewportExtent() const
     {
         // The framebuffer being rendered into, not the window.
         //
@@ -1378,7 +1378,7 @@ namespace kor
         return { 1, 1 };
     }
 
-    CommandBuffer& CommandBuffer::Draw(glm::u64 vertexCount, const glm::u32 instanceCount, const glm::u32 firstVertex, const glm::u32 firstInstance, const std::source_location where)
+    CommandBuffer& CommandBuffer::Draw(kor::u64 vertexCount, const kor::u32 instanceCount, const kor::u32 firstVertex, const kor::u32 firstInstance, const std::source_location where)
     {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
@@ -1396,7 +1396,7 @@ namespace kor
         return DoDraw(vertexCount, instanceCount, firstVertex, firstInstance, where);
     }
 
-    CommandBuffer & CommandBuffer::DrawIndexed(glm::u64 indexCount, const glm::u32 instanceCount, const glm::u32 firstIndex, const glm::i32 vertexOffset, const glm::u32 firstInstance, const std::source_location where) {
+    CommandBuffer & CommandBuffer::DrawIndexed(kor::u64 indexCount, const kor::u32 instanceCount, const kor::u32 firstIndex, const kor::i32 vertexOffset, const kor::u32 firstInstance, const std::source_location where) {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
@@ -1412,7 +1412,7 @@ namespace kor
         return DoDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, where);
     }
 
-    CommandBuffer & CommandBuffer::DrawMeshTasks(const glm::u32 taskCountX, const glm::u32 taskCountY, const glm::u32 taskCountZ, const std::source_location where) {
+    CommandBuffer & CommandBuffer::DrawMeshTasks(const kor::u32 taskCountX, const kor::u32 taskCountY, const kor::u32 taskCountZ, const std::source_location where) {
         if (_failed) return *this;
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw mesh tasks without a graphics pipeline bound.");
@@ -1436,7 +1436,7 @@ namespace kor
         }
     }
 
-    CommandBuffer& CommandBuffer::Dispatch(const glm::u32 groupCountX, const glm::u32 groupCountY, const glm::u32 groupCountZ, const std::source_location where)
+    CommandBuffer& CommandBuffer::Dispatch(const kor::u32 groupCountX, const kor::u32 groupCountY, const kor::u32 groupCountZ, const std::source_location where)
     {
         if (_failed) return *this;
         if (!_state.boundComputePipeline.has_value())
@@ -1540,7 +1540,7 @@ namespace kor
         return DoRun(command);
     }
 
-    CommandBuffer& CommandBuffer::PushConstantBlock(const void* data, const glm::u32 size, const glm::u32 offset)
+    CommandBuffer& CommandBuffer::PushConstantBlock(const void* data, const kor::u32 size, const kor::u32 offset)
     {
         if (_failed) return *this;
         return DoPushConstantBlock(data, size, offset);
@@ -1594,9 +1594,9 @@ namespace kor
         const auto mipLevels = image->MipLevels();
         const auto arrayLayers = image->ArrayLayers();
 
-        auto mipWidth = static_cast<glm::i32>(extent.x);
-        auto mipHeight = static_cast<glm::i32>(extent.y);
-        auto mipDepth = static_cast<glm::i32>(extent.z);
+        auto mipWidth = static_cast<kor::i32>(extent.x);
+        auto mipHeight = static_cast<kor::i32>(extent.y);
+        auto mipDepth = static_cast<kor::i32>(extent.z);
 
         for (uint32_t i = 1; i < mipLevels; i++) {
             Blit(
@@ -1648,7 +1648,7 @@ namespace kor
         return done;
     }
 
-    CommandBuffer& CommandBuffer::DrawMesh(kor::ResourceRef<const Mesh> mesh, const glm::u32 instanceCount, const glm::u32 baseInstance)
+    CommandBuffer& CommandBuffer::DrawMesh(kor::ResourceRef<const Mesh> mesh, const kor::u32 instanceCount, const kor::u32 baseInstance)
     {
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
@@ -1665,7 +1665,7 @@ namespace kor
         return *this;
     }
 
-    CommandBuffer & CommandBuffer::DrawSubMesh(kor::ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount) {
+    CommandBuffer & CommandBuffer::DrawSubMesh(kor::ResourceRef<const Mesh> mesh, kor::u32 baseIndex, kor::u32 indexCount) {
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw a mesh without a graphics pipeline bound.");
         if (!_state.viewportSet) {
@@ -1697,7 +1697,7 @@ namespace kor
         }
     }
 
-    void CommandBuffer::StateBindDescriptorSet(const glm::u32 index, const kor::ResourceRef<const DescriptorSet>& descriptorSet)
+    void CommandBuffer::StateBindDescriptorSet(const kor::u32 index, const kor::ResourceRef<const DescriptorSet>& descriptorSet)
     {
         // Mirrors the dispatch the backends do: the set belongs to whichever pipeline type is
         // currently bound. With none bound the backends log and drop it, so do nothing here too.
@@ -1754,15 +1754,15 @@ namespace kor
         // layer that does not exist — invalid in its own right, and reported as such — for a
         // command that then never runs. Clamping keeps every emitted barrier well-formed and
         // leaves the rejection itself to the backend, which owns the error codes for it.
-        struct ClampedSubresource { glm::u32 baseMip, mipCount, baseLayer, layerCount; };
+        struct ClampedSubresource { kor::u32 baseMip, mipCount, baseLayer, layerCount; };
 
-        ClampedSubresource clampToImage(const Image& image, const glm::u32 baseMip, const glm::u32 mipCount,
-                                        const glm::u32 baseLayer, const glm::u32 layerCount)
+        ClampedSubresource clampToImage(const Image& image, const kor::u32 baseMip, const kor::u32 mipCount,
+                                        const kor::u32 baseLayer, const kor::u32 layerCount)
         {
-            const glm::u32 mips = std::max(image.MipLevels(), 1u);
-            const glm::u32 layers = std::max(image.ArrayLayers(), 1u);
-            const glm::u32 firstMip = std::min(baseMip, mips - 1);
-            const glm::u32 firstLayer = std::min(baseLayer, layers - 1);
+            const kor::u32 mips = std::max(image.MipLevels(), 1u);
+            const kor::u32 layers = std::max(image.ArrayLayers(), 1u);
+            const kor::u32 firstMip = std::min(baseMip, mips - 1);
+            const kor::u32 firstLayer = std::min(baseLayer, layers - 1);
             return {
                 firstMip,   std::min(mipCount,   mips - firstMip),
                 firstLayer, std::min(layerCount, layers - firstLayer),
@@ -1771,11 +1771,11 @@ namespace kor
 
         // Same idea for buffers: an offset past the end would name a range outside the
         // allocation. WholeSize keeps its "to the end" meaning.
-        std::pair<glm::u64, glm::u64> clampToBuffer(const Buffer& buffer, const glm::u64 offset, const glm::u64 size)
+        std::pair<kor::u64, kor::u64> clampToBuffer(const Buffer& buffer, const kor::u64 offset, const kor::u64 size)
         {
-            const glm::u64 total = buffer.size();
+            const kor::u64 total = buffer.size();
             // Strictly inside the allocation: Vulkan requires offset < size, not <=.
-            const glm::u64 start = total == 0 ? 0 : std::min(offset, total - 1);
+            const kor::u64 start = total == 0 ? 0 : std::min(offset, total - 1);
             if (size == WholeSize) return { start, WholeSize };
             return { start, std::min(size, total - start) };
         }
@@ -1788,7 +1788,7 @@ namespace kor
     // resource they receive is alive and usable — that is what the validation here guarantees —
     // and additionally that whatever barriers they need have already been emitted ahead of them.
 
-    CommandBuffer& CommandBuffer::BindDescriptorSet(const glm::u32 index, kor::ResourceRef<const DescriptorSet> descriptorSet,
+    CommandBuffer& CommandBuffer::BindDescriptorSet(const kor::u32 index, kor::ResourceRef<const DescriptorSet> descriptorSet,
                                                     const std::source_location where)
     {
         if (_failed) return *this;
@@ -1798,7 +1798,7 @@ namespace kor
             [this, index, descriptorSet] { DoBindDescriptorSet(index, descriptorSet); });
     }
 
-    CommandBuffer& CommandBuffer::DispatchIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset,
+    CommandBuffer& CommandBuffer::DispatchIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset,
                                                    const std::source_location where)
     {
         if (_failed) return *this;
@@ -1813,7 +1813,7 @@ namespace kor
             /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
-    CommandBuffer& CommandBuffer::DrawIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride,
+    CommandBuffer& CommandBuffer::DrawIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset, const kor::u32 drawCount, const kor::u32 stride,
                                                const std::source_location where)
     {
         if (_failed) return *this;
@@ -1833,7 +1833,7 @@ namespace kor
             /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
-    CommandBuffer& CommandBuffer::DrawIndexedIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride,
+    CommandBuffer& CommandBuffer::DrawIndexedIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset, const kor::u32 drawCount, const kor::u32 stride,
                                                       const std::source_location where)
     {
         if (_failed) return *this;
@@ -1855,7 +1855,7 @@ namespace kor
             /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
-    CommandBuffer& CommandBuffer::DrawMeshTasksIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const glm::u64 offset, const glm::u32 drawCount, const glm::u32 stride,
+    CommandBuffer& CommandBuffer::DrawMeshTasksIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset, const kor::u32 drawCount, const kor::u32 stride,
                                                         const std::source_location where)
     {
         if (_failed) return *this;
@@ -1875,7 +1875,7 @@ namespace kor
             /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
-    CommandBuffer& CommandBuffer::ClearBuffer(kor::ResourceRef<const Buffer> buffer, const glm::u64 offset, const glm::u64 size,
+    CommandBuffer& CommandBuffer::ClearBuffer(kor::ResourceRef<const Buffer> buffer, const kor::u64 offset, const kor::u64 size,
                                               const std::source_location where)
     {
         if (_failed) return *this;
@@ -1886,7 +1886,7 @@ namespace kor
             PassEdge::eNone, [this, buffer, offset, size] { DoClearBuffer(buffer, offset, size); });
     }
 
-    CommandBuffer& CommandBuffer::ClearColorImage(kor::ResourceRef<const Image> image, const glm::vec4 color,
+    CommandBuffer& CommandBuffer::ClearColorImage(kor::ResourceRef<const Image> image, const kor::Vec4 color,
                                                   const std::source_location where)
     {
         if (_failed) return *this;
@@ -1896,7 +1896,7 @@ namespace kor
             PassEdge::eNone, [this, image, color] { DoClearColorImage(image, color); });
     }
 
-    CommandBuffer& CommandBuffer::FillBuffer(kor::ResourceRef<const Buffer> buffer, const void* data, const glm::u64 offset, const glm::u64 size,
+    CommandBuffer& CommandBuffer::FillBuffer(kor::ResourceRef<const Buffer> buffer, const void* data, const kor::u64 offset, const kor::u64 size,
                                              const std::source_location where)
     {
         if (_failed) return *this;
@@ -1904,7 +1904,7 @@ namespace kor
 
         // Copy the payload rather than the pointer: the caller's storage is very often a
         // temporary, and nothing reaches the GPU until End().
-        const glm::u64 byteCount = size == WholeSize ? buffer->size() - offset : size;
+        const kor::u64 byteCount = size == WholeSize ? buffer->size() - offset : size;
         std::vector<std::byte> bytes(byteCount);
         if (data && byteCount) std::memcpy(bytes.data(), data, byteCount);
 
@@ -1917,7 +1917,7 @@ namespace kor
             });
     }
 
-    CommandBuffer& CommandBuffer::CopyBuffer(kor::ResourceRef<const Buffer> srcBuffer, kor::ResourceRef<const Buffer> dstBuffer, const glm::u64 size, const glm::u64 srcOffset, const glm::u64 dstOffset,
+    CommandBuffer& CommandBuffer::CopyBuffer(kor::ResourceRef<const Buffer> srcBuffer, kor::ResourceRef<const Buffer> dstBuffer, const kor::u64 size, const kor::u64 srcOffset, const kor::u64 dstOffset,
                                              const std::source_location where)
     {
         if (_failed) return *this;

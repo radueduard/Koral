@@ -24,7 +24,7 @@
 #include <koralGuiExtras.h>
 
 namespace {
-    constexpr glm::uvec2 Size { 480, 360 };
+    constexpr kor::UVec2 Size { 480, 360 };
 
     std::unique_ptr<kor::App> s_app;
     std::string s_reason = "no device";
@@ -53,7 +53,7 @@ namespace {
         GlowPass() : RenderPass("Glow") {}
         void Setup(kor::PassBuilder& b) override { b.Write(kor::FrameGraph::Screen, kor::Image::Usage::eTransferDst); }
         void Initialize(const kor::PassResources& r) override { _screen = r.ImageNamed(kor::FrameGraph::Screen); }
-        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, glm::vec4(0.f, 0.f, 0.f, 1.f)); }
+        void Record(kor::CommandBuffer& cb) const override { cb.ClearColorImage(_screen, kor::Vec4(0.f, 0.f, 0.f, 1.f)); }
         kor::Ref Settings() override { return settings; }
         void SettingsChanged() override { ++changes; }
         Glow settings;
@@ -154,7 +154,7 @@ namespace inspected {
     struct Light {
         std::string name = "lamp";
         float intensity = 1.f;
-        glm::vec3 color { 1.f };
+        kor::Vec3 color { 1.f };
         Mode mode = Mode::eOn;
         std::vector<int> tags { 1, 2 };
     };
@@ -200,7 +200,7 @@ TEST_F(GuiExtras, TheInspectorEditsAReflectedObjectAndFollowsIt) {
 
 TEST_F(GuiExtras, AViewportSaysItsSizeAndWhereThePointerIsInTheImage) {
     auto image = kor::Image::Builder{}.SetFormat(kor::Image::Format::eRGBA8_UNORM)
-        .SetUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eColorAttachment).SetExtent(glm::uvec2{ 240, 180 }).Build();
+        .SetUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eColorAttachment).SetExtent(kor::UVec2{ 240, 180 }).Build();
     ASSERT_TRUE(image.Valid());
     auto state = std::make_shared<kgui::ViewportState>();
     Show(kgui::Viewport(state));
@@ -229,7 +229,7 @@ TEST_F(GuiExtras, AViewportSaysItsSizeAndWhereThePointerIsInTheImage) {
     auto pointer = state->GizmoPointer();
     EXPECT_TRUE(pointer.down);
     EXPECT_TRUE(pointer.pressed);
-    EXPECT_EQ(pointer.viewport, glm::vec2(240.f, 180.f));
+    EXPECT_EQ(pointer.viewport, kor::Vec2(240.f, 180.f));
     EXPECT_FALSE(state->GizmoPointer().pressed) << "a press is heard once";
     input.FeedMouseButton(kor::MouseButton::eLeft, false);
     settle(); settle();
@@ -237,7 +237,7 @@ TEST_F(GuiExtras, AViewportSaysItsSizeAndWhereThePointerIsInTheImage) {
 
     // Contained: the image keeps its proportions, and the bars beside it are not over it.
     state->SetFit(kgui::ViewportFit::eContain);
-    image->Resize(glm::uvec3{ 120, 180, 1 });   // taller than the panel's shape: bars left and right
+    image->Resize(kor::UVec3{ 120, 180, 1 });   // taller than the panel's shape: bars left and right
     settle(); settle();
     input.FeedMousePosition({ 20.f, 180.f });
     settle(); settle();
@@ -318,7 +318,7 @@ TEST_F(GuiExtras, TheCameraPanelShowsBothKindsOfCameraAndTheirControllers) {
 
     // A camera following an image says so, and offers the way back.
     auto image = kor::Image::Builder{}.SetFormat(kor::Image::Format::eRGBA8_UNORM)
-        .SetUsage(kor::Image::Usage::eColorAttachment).SetExtent(glm::uvec2{ 320, 200 }).Build();
+        .SetUsage(kor::Image::Usage::eColorAttachment).SetExtent(kor::UVec2{ 320, 200 }).Build();
     perspective->FollowAspectOf(image);
     Wait();
     EXPECT_TRUE(Says("aspect follows an image"));

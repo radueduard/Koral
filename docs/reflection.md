@@ -6,8 +6,8 @@ carried across a hot reload with it, and a binding to another language reads the
 
 ```cpp
 struct Light {
-    glm::vec3 position;
-    glm::vec3 color {1.f};
+    kor::Vec3 position;
+    kor::Vec3 color {1.f};
     float intensity = 1.f;
     std::vector<std::string> tags;
 };
@@ -30,8 +30,8 @@ inline void KoralReflect(kor::TypeBuilder<Light>& type) {
 
 Enums are named with `KORAL_REFLECT_ENUM(Shape, eSphere, eBox)`, and saved by name.
 
-Built in, with nothing to write: `bool`, the integer and floating-point types, `std::string`, glm's
-vectors (float, int and uint), `glm::quat`, `glm::mat4`, and `std::vector` of anything reflectable.
+Built in, with nothing to write: `bool`, the integer and floating-point types, `std::string`, kor's
+vectors (float, int and uint), `kor::Quat`, `kor::Mat4`, and `std::vector` of anything reflectable.
 
 ## Reaching into objects
 

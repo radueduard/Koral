@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "kuiApi.h"
 #include "canvas.h"
@@ -107,7 +107,7 @@ namespace kui
         [[nodiscard]] const std::string& Text() const { return _text; }
         [[nodiscard]] const TextStyle& Style() const { return _style; }
         /** @brief Width of the widest line and height of all of them. */
-        [[nodiscard]] glm::vec2 Size() const { return _size; }
+        [[nodiscard]] kor::Vec2 Size() const { return _size; }
         /** @brief The width it was laid out to fill (infinite when not wrapping). */
         [[nodiscard]] float MaxWidth() const { return _maxWidth; }
         /** @brief Width of the text on one line with no wrapping: the most it could ever want. */
@@ -119,10 +119,10 @@ namespace kui
         [[nodiscard]] float FirstBaseline() const;
 
         /** @brief Top of the caret before the character at byte @p index (the end when past it), and the line's height. */
-        [[nodiscard]] glm::vec2 CaretPosition(std::size_t index) const;
+        [[nodiscard]] kor::Vec2 CaretPosition(std::size_t index) const;
         [[nodiscard]] float LineHeight() const;
         /** @brief The byte index of the caret position nearest @p point. */
-        [[nodiscard]] std::size_t IndexAt(glm::vec2 point) const;
+        [[nodiscard]] std::size_t IndexAt(kor::Vec2 point) const;
 
         struct Glyph {
             Rect rect;              ///< Where its quad goes, relative to the paragraph's top-left.
@@ -144,7 +144,7 @@ namespace kui
         TextStyle _style;
         TextAlign _align = TextAlign::eStart;
         float _maxWidth = std::numeric_limits<float>::infinity();
-        glm::vec2 _size {};
+        kor::Vec2 _size {};
         float _maxIntrinsic = 0.f, _minIntrinsic = 0.f;
         std::vector<Glyph> _glyphs;
         std::vector<Line> _lines;

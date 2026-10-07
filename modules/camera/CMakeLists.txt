@@ -35,17 +35,16 @@ target_compile_definitions(koral-camera PRIVATE KORAL_CAMERA_EXPORTS)
 # that links this module links Koral too, and inherits its include directories.
 target_link_libraries(koral-camera PUBLIC Koral)
 
-# Everything else is PRIVATE, exactly as for Koral itself. glm and spdlog do appear in
-# this module's public header, but a consumer gets them from Koral::Koral — in an
+# Everything else is PRIVATE, exactly as for Koral itself. spdlog does appear in
+# this module's public header, but a consumer gets it from Koral::Koral — in an
 # installed SDK through the vendored copies KoralConfig.cmake attaches to it. Naming
-# them PUBLIC here would put `glm::glm` in the exported link interface, where a
+# it PUBLIC here would put `spdlog::spdlog` in the exported link interface, where a
 # consumer's CMake has no such target and find_package(Koral) fails outright.
 #
 # No interface library is linked. The controller does ask whether an interface is using the pointer,
 # but through kor::Input::InterfaceWantsMouse — so a camera is no interface's client, and this module
 # has no interface of its own to draw. @see koralCameraPanel.h in koral-gui-extras
 target_link_libraries(koral-camera PRIVATE
-        glm::glm
         spdlog::spdlog
 )
 

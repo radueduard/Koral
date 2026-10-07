@@ -59,7 +59,7 @@
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "shaderValue.h"
@@ -116,11 +116,11 @@ namespace kor
         void Set(float value);
         void Set(std::int32_t value);
         void Set(std::uint32_t value);
-        void Set(const glm::vec2& value);
-        void Set(const glm::vec3& value);
-        void Set(const glm::vec4& value);
-        void Set(const glm::mat3& value);
-        void Set(const glm::mat4& value);
+        void Set(const kor::Vec2& value);
+        void Set(const kor::Vec3& value);
+        void Set(const kor::Vec4& value);
+        void Set(const kor::Mat3& value);
+        void Set(const kor::Mat4& value);
 
         /** @brief Why the last Set() was refused, if it was. */
         [[nodiscard]] const std::optional<Error>& Failure() const { return _error; }

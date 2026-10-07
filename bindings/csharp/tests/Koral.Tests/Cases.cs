@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using Koral.Scripting;
 using Buffer = Koral.Buffer;
@@ -9,7 +8,7 @@ namespace Koral.Tests;
 public sealed class Paint(Buffer readback) : RenderPass("Paint")
 {
     private Image? _screen;
-    public Vector4 Color = new(0, 0, 0, 1);
+    public Vec4 Color = new(0, 0, 0, 1);
 
     public override void Setup(PassBuilder builder) =>
         builder.Write(FrameGraph.Screen, Image.Usage.eTransferDst | Image.Usage.eTransferSrc).SideEffect();
@@ -50,7 +49,7 @@ public sealed class Painter : Scene
             .SetUsage(Buffer.Usage.eTransferDst)
             .SetType(Buffer.Type.eReadback)
             .Build();
-        Pass = Graph.Add(new Paint(Readback) { Color = Green ? new Vector4(0, 1, 0, 1) : new Vector4(1, 0, 0, 1) });
+        Pass = Graph.Add(new Paint(Readback) { Color = Green ? new Vec4(0, 1, 0, 1) : new Vec4(1, 0, 0, 1) });
         Input.BindAction("Jump", Key.eSpace, GamepadButton.eA);
         Window.SetTitle("painting");
     }
@@ -80,23 +79,23 @@ public sealed class Lines : Scene
 {
     public static int CameraCalls;
     public static WeakReference? Camera;
-    private readonly Matrix4x4 _projection = Matrix4x4.CreateOrthographic(4, 4, -1, 1);
+    private readonly Mat4 _projection = KMath.Orthographic(-2, 2, -2, 2, -1, 1);
 
     protected override void Initialize()
     {
         // Capturing the scene: a lambda that captures nothing is cached by the compiler, and never collected.
-        Func<Matrix4x4> camera = () => { ++CameraCalls; return _projection; };
+        Func<Mat4> camera = () => { ++CameraCalls; return _projection; };
         Camera = new WeakReference(camera);
         Graph.Add(new DebugDrawPass(SceneDebug, camera));
     }
 
     protected override void Update()
     {
-        Debug.Line(new Vector3(-1, 0, 0), new Vector3(1, 0, 0));
-        Debug.Box(-Vector3.One * 0.5f, Vector3.One * 0.5f, new DebugStyle { Color = new Vector4(0, 1, 0, 1), OnTop = true });
-        Debug.Sphere(Vector3.Zero, 1f, new DebugStyle { Duration = 1f });
-        Debug.Arrow(Vector3.Zero, Vector3.UnitY);
-        Debug.Axes(Matrix4x4.Identity);
+        Debug.Line(new Vec3(-1, 0, 0), new Vec3(1, 0, 0));
+        Debug.Box(-Vec3.One * 0.5f, Vec3.One * 0.5f, new DebugStyle { Color = new Vec4(0, 1, 0, 1), OnTop = true });
+        Debug.Sphere(Vec3.Zero, 1f, new DebugStyle { Duration = 1f });
+        Debug.Arrow(Vec3.Zero, Vec3.UnitY);
+        Debug.Axes(Mat4.Identity);
     }
 }
 
@@ -320,28 +319,27 @@ public static partial class Cases
         var scene = app.OpenOffscreen("Lines", Offscreen(32));
         var draw = scene.SceneDebug;
         draw.Clear();
-        draw.Box(Matrix4x4.Identity, new DebugStyle { Fill = new Vector4(1, 0, 0, 0.5f), Outline = false });
+        draw.Box(Mat4.Identity, new DebugStyle { Fill = new Vec4(1, 0, 0, 0.5f), Outline = false });
         Check.That(draw.TriangleCount == 12 && draw.LineCount == 0, $"a filled box without its outline ({draw.TriangleCount}, {draw.LineCount})");
-        draw.SpotLight(Vector3.Zero, -Vector3.UnitY, 5f, 0.5f);
+        draw.SpotLight(Vec3.Zero, -Vec3.UnitY, 5f, 0.5f);
         Check.That(draw.LineCount == 29, $"a spot light's cone ({draw.LineCount})");
 
-        // A camera at (0, 0, 5) looking at the origin: System.Numerics' row vectors are glm's columns.
-        var viewport = new Vector2(800, 600);
-        var viewProjection = Matrix4x4.CreateLookAt(new Vector3(0, 0, 5), Vector3.Zero, Vector3.UnitY)
-                           * Matrix4x4.CreatePerspectiveFieldOfView(MathF.PI / 3f, 800f / 600f, 0.1f, 100f);
-        Vector2 ToScreen(Vector3 p)
+        // A camera at (0, 0, 5) looking at the origin.
+        var viewport = new Vec2(800, 600);
+        var viewProjection = KMath.Perspective(MathF.PI / 3f, 800f / 600f, 0.1f, 100f) * KMath.LookAt(new Vec3(0, 0, 5), Vec3.Zero, Vec3.Up);
+        Vec2 ToScreen(Vec3 p)
         {
-            var clip = Vector4.Transform(new Vector4(p, 1f), viewProjection);
-            return new Vector2((clip.X / clip.W * 0.5f + 0.5f) * viewport.X, (clip.Y / clip.W * 0.5f + 0.5f) * viewport.Y);
+            var clip = viewProjection * new Vec4(p, 1f);
+            return new Vec2((clip.X / clip.W * 0.5f + 0.5f) * viewport.X, (clip.Y / clip.W * 0.5f + 0.5f) * viewport.Y);
         }
-        var center = ToScreen(Vector3.Zero);
-        var x = Vector2.Normalize(ToScreen(new Vector3(0.01f, 0, 0)) - center);
-        var transform = Matrix4x4.Identity;
+        var center = ToScreen(Vec3.Zero);
+        var x = KMath.Normalize(ToScreen(new Vec3(0.01f, 0, 0)) - center);
+        var transform = Mat4.Identity;
         draw.Gizmo(GizmoMode.eTranslate, ref transform, viewProjection, new GizmoPointer(center + x * 60f, viewport, true, true), id: 1);
         Check.That(draw.GizmoActive, "the X arrow is grabbed");
         var moved = draw.Gizmo(GizmoMode.eTranslate, ref transform, viewProjection, new GizmoPointer(center + x * 160f, viewport, true, false), id: 1);
-        Check.That(moved && transform.Translation.X > 0.5f && MathF.Abs(transform.Translation.Y) < 1e-4f,
-                   $"and dragged along X ({transform.Translation})");
+        Check.That(moved && transform.C3.X > 0.5f && MathF.Abs(transform.C3.Y) < 1e-4f,
+                   $"and dragged along X ({transform.C3})");
         draw.Gizmo(GizmoMode.eTranslate, ref transform, viewProjection, new GizmoPointer(null, viewport, false, false), id: 1);
         Check.That(!draw.GizmoActive, "and let go of");
         app.Close(scene);
@@ -409,7 +407,7 @@ public static partial class Cases
         {
             [Keep] public int Frames;
             public static int Version => 1;
-            protected override void Update() { Frames += 1; Debug.Line(Vector3.Zero, Vector3.One); }
+            protected override void Update() { Frames += 1; Debug.Line(Vec3.Zero, Vec3.One); }
         }
         """;
 
@@ -505,7 +503,7 @@ public static partial class Cases
             private Image? _screen;
             public override void Setup(PassBuilder builder) { Setups += 1; builder.Write(FrameGraph.Screen, Image.Usage.eTransferDst).SideEffect(); }
             public override void Initialize(PassResources resources) { Initializes += 1; _screen = resources.ImageNamed(FrameGraph.Screen); }
-            public override void Record(CommandBuffer commandBuffer) => commandBuffer.ClearColorImage(_screen!, new Vector4(1, 0, 0, 1));
+            public override void Record(CommandBuffer commandBuffer) => commandBuffer.ClearColorImage(_screen!, new Vec4(1, 0, 0, 1));
         }
         """;
 
@@ -549,7 +547,7 @@ public static partial class Cases
 
             var setups = Static(scene, "Paint", "Setups");
             var initializes = Static(scene, "Paint", "Initializes");
-            Edit("new Vector4(1, 0, 0, 1)", "new Vector4(0, 1, 0, 1)");
+            Edit("new Vec4(1, 0, 0, 1)", "new Vec4(0, 1, 0, 1)");
             Check.Equal(ReloadKind.InPlace, host.LastReload, "a pass's Record edit, in place");
             Frames(app, 1);
             Check.Equal(setups, Static(scene, "Paint", "Setups"), "Record's edit does not set the graph up again");

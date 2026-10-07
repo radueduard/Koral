@@ -28,7 +28,7 @@ namespace kor::vk
         _swapChain = &dynamic_cast<const vk::Surface&>(window.RenderSurface()).swapChain();
         _extent = _swapChain->extent();
         attachSwapChain();
-        _clearValues.clearColor.emplace_back(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f));
+        _clearValues.clearColor.emplace_back(kor::Vec4(0.0f, 0.0f, 0.0f, 0.0f));
         _clearValues.clearDepth = 1.0f;
         _clearValues.clearStencil = 0;
     }
@@ -50,7 +50,7 @@ namespace kor::vk
     Framebuffer::Framebuffer(const Framebuffer::Builder& builder) : kor::Framebuffer(builder) {}
     Framebuffer::~Framebuffer() = default;
 
-    void Framebuffer::DoResize(const glm::uvec2& newExtent)
+    void Framebuffer::DoResize(const kor::UVec2& newExtent)
     {
         // The base has already done the shared work (or skipped it, for the default framebuffer).
         if (_isDefault)

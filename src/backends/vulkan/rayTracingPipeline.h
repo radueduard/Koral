@@ -41,7 +41,7 @@ namespace kor::vk
         void Teardown() override;
 
     private:
-        void buildShaderBindingTable(glm::u32 raygenCount, glm::u32 missCount, glm::u32 hitCount, glm::u32 callableCount);
+        void buildShaderBindingTable(kor::u32 raygenCount, kor::u32 missCount, kor::u32 hitCount, kor::u32 callableCount);
 
         ::vk::PipelineLayout _pipelineLayout;
 

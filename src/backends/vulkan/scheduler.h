@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 #include <map>
 
 #include "device.h"
@@ -15,7 +15,7 @@ namespace kor::vk
 	class Frame final : public kor::Frame
 	{
 	public:
-		explicit Frame(glm::u32 imageIndex, const Queue& queue);
+		explicit Frame(kor::u32 imageIndex, const Queue& queue);
 		~Frame() override;
 
 		Frame(const Frame&) = delete;
@@ -84,7 +84,7 @@ namespace kor::vk
     	bool _drawnOnce = false;
     	// One per queue: every submission of a frame signals its queue's next value, which is what
     	// work on another queue waits for.
-    	std::map<glm::u32, kor::Timeline> _queueTimelines;
+    	std::map<kor::u32, kor::Timeline> _queueTimelines;
 
     public:
 	    void WaitIdle() const override;

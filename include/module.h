@@ -30,7 +30,7 @@
  * KORAL_DECLARE_MODULE(CameraModule)
  *
  * // in a scene, which links the module like any other library
- * _camera = kcam::PerspectiveCamera::Builder{}.SetFovY(glm::radians(70.f)).Build();
+ * _camera = kcam::PerspectiveCamera::Builder{}.SetFovY(kor::Radians(70.f)).Build();
  * @endcode
  *
  * @section module_loading How a module gets into the process
@@ -70,7 +70,7 @@
 #include <string_view>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "error.h"
@@ -137,7 +137,7 @@ namespace kor
         virtual void RenderOverlay(CommandBuffer& commandBuffer) {}
 
         /** @brief Called when the window's drawable area changed size, before Scene::OnResize. */
-        virtual void OnResize(glm::uvec2 extent) {}
+        virtual void OnResize(kor::UVec2 extent) {}
 
         /**
          * @brief Called once, before the module is destroyed and before the device goes away.
@@ -260,7 +260,7 @@ namespace kor
         static KORAL_API void LateUpdate();
         static KORAL_API void Render(CommandBuffer& commandBuffer);
         static KORAL_API void RenderOverlay(CommandBuffer& commandBuffer);
-        static KORAL_API void OnResize(glm::uvec2 extent);
+        static KORAL_API void OnResize(kor::UVec2 extent);
     };
 
     /**

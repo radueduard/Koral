@@ -12,7 +12,7 @@
 #include <vector>
 
 #include <filesystem>
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include "resource.h"
@@ -113,13 +113,13 @@ namespace kor {
          * OnResize. An OS window asks the platform, which may or may not agree; the resize then
          * arrives as the user's would.
          */
-        void Resize(glm::uvec2 extent);
+        void Resize(kor::UVec2 extent);
 
         /** @brief The underlying GLFW window handle, for code that has to talk to GLFW directly. Null offscreen. */
         [[nodiscard]] GLFWwindow* operator*() const { return _window; }
 
         /** @brief Current size of the drawable area in pixels, which is not the window's outer size on a scaled display. */
-        [[nodiscard]] glm::uvec2 Extent() const { return _extent; }
+        [[nodiscard]] kor::UVec2 Extent() const { return _extent; }
 
         /**
          * @brief Whether the window currently has no drawable area, i.e. it is minimized.
@@ -196,9 +196,9 @@ namespace kor {
          * @brief Where the window's drawable area starts on the desktop, in screen coordinates — (0, 0)
          *        where the platform does not say (Wayland) or for an offscreen window. @see CanBePositioned
          */
-        [[nodiscard]] glm::ivec2 Position() const;
+        [[nodiscard]] kor::IVec2 Position() const;
         /** @brief Moves the window. Nothing happens where the platform does not let a client place its windows. */
-        void SetPosition(glm::ivec2 position);
+        void SetPosition(kor::IVec2 position);
         /** @brief Brings the window to the front and gives it the keyboard, where the platform allows. */
         void Focus();
 
@@ -216,13 +216,13 @@ namespace kor {
          * @return Whether the platform has such a thing (X11). Where it has none nothing changes, and
          *         SetMousePassthrough is what there is.
          */
-        bool SetInputRegion(std::span<const glm::ivec4> rects);
+        bool SetInputRegion(std::span<const kor::IVec4> rects);
         /**
          * @brief Where the pointer is, relative to the window's drawable area, in pixels — wherever it
          *        is on the desktop, over this window or not, and whether or not the window lets it
          *        through. (0, 0) for an offscreen window.
          */
-        [[nodiscard]] glm::vec2 CursorPosition() const;
+        [[nodiscard]] kor::Vec2 CursorPosition() const;
         /**
          * @brief Pixels of the drawable area per screen coordinate: 2 on a Retina display (or a Wayland
          *        output scaled 2x), 1 where screen coordinates are pixels (Windows, X11) or offscreen.
@@ -253,7 +253,7 @@ namespace kor {
          *        system does not colour title bars (before Windows 11, which only goes dark or light;
          *        other platforms), and for an offscreen window, as much of it happens as can.
          */
-        void SetTitleBarColors(glm::vec3 background, glm::vec3 text) const;
+        void SetTitleBarColors(kor::Vec3 background, kor::Vec3 text) const;
 
         /**
          * @brief Takes the system's title bar away (true) so that the application draws its own: the
@@ -288,7 +288,7 @@ namespace kor {
         void RequestClose() const;
 
         /** @brief A monitor's place on the desktop, in screen coordinates. */
-        struct MonitorArea { glm::ivec2 position {}; glm::ivec2 size {}; };
+        struct MonitorArea { kor::IVec2 position {}; kor::IVec2 size {}; };
         /** @brief The monitor most of the window is on (the primary one for an offscreen window, or where windows cannot say where they are). */
         [[nodiscard]] MonitorArea Monitor() const;
         /** @brief The whole desktop: the smallest area that holds every monitor. */
@@ -300,7 +300,7 @@ namespace kor {
          *        it — which what a window was last told of the pointer is not. Nothing where the
          *        platform has no such thing to ask (anything but X11, for now).
          */
-        [[nodiscard]] static std::optional<glm::ivec2> DesktopCursor();
+        [[nodiscard]] static std::optional<kor::IVec2> DesktopCursor();
 
         /** @brief The text on the system's clipboard, as UTF-8: empty when it holds none, or there is no windowing system. */
         [[nodiscard]] static std::string ClipboardText();
@@ -349,7 +349,7 @@ namespace kor {
         std::shared_ptr<kor::Surface> _surface;
 
         std::string _title;
-        glm::uvec2 _extent;
+        kor::UVec2 _extent;
         bool _resizable;
         bool _fullscreen;
         bool _decorated;
@@ -359,7 +359,7 @@ namespace kor {
         mutable bool _customTitleBar = false;
         mutable bool _frameChanged = false;     ///< The frame is to be worked out again, after this frame.
         mutable int _frameGrip = -1;            ///< The edge the pointer is over, as kor::x11::Grip; -1 for none.
-        std::optional<std::vector<glm::ivec4>> _inputRegion;
+        std::optional<std::vector<kor::IVec4>> _inputRegion;
         bool _vsync;
         std::vector<Format> _formats;
 
@@ -374,7 +374,7 @@ namespace kor {
 
         bool _offscreen = false;
         Format _offscreenFormat = Format::eRGBA8_UNORM;
-        std::optional<glm::uvec2> _requestedExtent;
+        std::optional<kor::UVec2> _requestedExtent;
         kor::Resource<kor::Image> _offscreenColor;
         kor::Resource<kor::Image> _offscreenDepth;
     };
@@ -392,7 +392,7 @@ namespace kor {
      */
     struct WindowSettings {
         std::string title = "Koral";               ///< Text in the title bar.
-        glm::uvec2 extent = { 1280, 720 };          ///< Initial size of the drawable area, in pixels.
+        kor::UVec2 extent = { 1280, 720 };          ///< Initial size of the drawable area, in pixels.
         bool resizable = true;                      ///< Whether the user may resize it.
         bool fullscreen = false;                    ///< Whether to open fullscreen on the primary monitor.
         bool decorated = true;                      ///< Whether the OS draws a title bar and border.
@@ -404,7 +404,7 @@ namespace kor {
         bool vsync = true;                          ///< Whether presentation waits for the display's refresh.
         /// Where on the desktop to open it, in screen coordinates; centred on the primary monitor when
         /// not given. Ignored where the platform places windows itself. @see Window::CanBePositioned
-        std::optional<glm::ivec2> position;
+        std::optional<kor::IVec2> position;
         /**
          * The formats to present in, most wanted first; the first the display offers is used. The
          * default is plain 8-bit: a scene that writes sRGB-encoded values itself (a tone-mapping
@@ -423,7 +423,7 @@ namespace kor {
      */
     struct OffscreenSettings {
         std::string title = "Offscreen";            ///< What Window::Title() says; nothing shows it.
-        glm::uvec2 extent = { 1280, 720 };          ///< Initial size of the image, in pixels.
+        kor::UVec2 extent = { 1280, 720 };          ///< Initial size of the image, in pixels.
         /**
          * The image's format: eRGBA8_UNORM or eRGBA8_SRGB. An image is never BGRA, so a BGRA one is
          * taken as its RGBA counterpart.

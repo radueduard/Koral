@@ -96,10 +96,10 @@ namespace kor
              * place — and the mesh takes ownership, which is what a mesh built from data nothing
              * else refers to wants.
              */
-            Builder& SetVertexBuffer(glm::u32 binding, ResourceRef<Buffer> vertexBuffer);
+            Builder& SetVertexBuffer(kor::u32 binding, ResourceRef<Buffer> vertexBuffer);
 
             /** @brief Sets the vertex buffer for one binding and takes ownership of it. */
-            Builder& SetVertexBuffer(glm::u32 binding, Resource<Buffer>&& vertexBuffer);
+            Builder& SetVertexBuffer(kor::u32 binding, Resource<Buffer>&& vertexBuffer);
 
             /**
              * @brief Gives the mesh an index buffer, making it drawable with DrawIndexed.
@@ -158,13 +158,13 @@ namespace kor
         virtual ~Mesh() = default;
 
         /** @brief How many vertices the mesh holds, taken from the vertex buffers' size and stride. */
-        [[nodiscard]] glm::u64 VertexCount() const { return _vertexCount; }
+        [[nodiscard]] kor::u64 VertexCount() const { return _vertexCount; }
 
         /** @brief Whether the mesh has an index buffer, and so whether it can be drawn indexed. */
         [[nodiscard]] bool HasIndexBuffer() const { return _indexBuffer.has_value(); }
 
         /** @brief How many indices the mesh holds, or nullopt if it has no index buffer. */
-        [[nodiscard]] std::optional<glm::u32> IndexCount() const { return _indexCount; }
+        [[nodiscard]] std::optional<kor::u32> IndexCount() const { return _indexCount; }
 
         /** @brief The width of one index — typically ChannelType::eUShort or eUInt — or nullopt if there is no index buffer. */
         [[nodiscard]] std::optional<ChannelType> IndexType() const { return _indexType; }
@@ -254,14 +254,14 @@ namespace kor
             return ref;
         }
 
-        glm::u64 _vertexCount{};
+        kor::u64 _vertexCount{};
 
         /// What the mesh binds, one per binding of its layout. References, so that several meshes
         /// can be carved out of one set of buffers; _ownedBuffers holds the ones the mesh itself
         /// keeps alive.
         std::vector<kor::ResourceRef<Buffer>> _vertexBuffers = {};
 
-        std::optional<glm::u32> _indexCount = std::nullopt;
+        std::optional<kor::u32> _indexCount = std::nullopt;
         std::optional<kor::ResourceRef<Buffer>> _indexBuffer = std::nullopt;
         std::optional<ChannelType> _indexType = std::nullopt;
 
@@ -318,7 +318,7 @@ namespace kor
          *         generating geometry, for instance.
          */
         template<typename T>
-        static kor::Resource<Buffer> MakeBuffer(glm::u64 instanceCount, Flags<Buffer::Usage> usage)
+        static kor::Resource<Buffer> MakeBuffer(kor::u64 instanceCount, Flags<Buffer::Usage> usage)
         {
             const auto finalUsage = usage
                 | Buffer::Usage::eTransferDst
@@ -326,7 +326,7 @@ namespace kor
                 | Buffer::Usage::eStorage;
 
             return Buffer::Builder<T>()
-                .SetInstanceCount(static_cast<glm::i64>(instanceCount))
+                .SetInstanceCount(static_cast<kor::i64>(instanceCount))
                 .SetUsage(finalUsage)
                 .SetType(Buffer::Type::eDeviceLocal)
                 .Build();

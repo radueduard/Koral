@@ -10,7 +10,7 @@
 #include <tuple>
 #include <cstring>
 #include <stdexcept>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include <source_location>
@@ -66,8 +66,8 @@ namespace kor
              * @throws std::runtime_error if the accumulated constants exceed the internal buffer.
              */
             template<typename T> requires std::is_trivially_copyable_v<T>
-            Builder& SetSpecializationConstant(glm::u32 id, T value) {
-                const glm::u32 valueSize = sizeof(T);
+            Builder& SetSpecializationConstant(kor::u32 id, T value) {
+                const kor::u32 valueSize = sizeof(T);
                 if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
                     throw std::runtime_error("Exceeded maximum specialization constant data size");
                 }
@@ -87,11 +87,11 @@ namespace kor
              */
             [[nodiscard]] kor::Resource<ComputePipeline> Build(std::source_location where = std::source_location::current()) const;
 
-            std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> specConstantsMetadata {};
+            std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> specConstantsMetadata {};
             std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
 
         private:
-            glm::u32 _currentSpecConstantSize = 0;
+            kor::u32 _currentSpecConstantSize = 0;
         };
 
         ~ComputePipeline() override;
@@ -109,7 +109,7 @@ namespace kor
 
         std::optional<ResourceRef<const Shader>> _shader;
 
-        std::vector<std::tuple<glm::u32, glm::u32, glm::u32>> _specConstantsMetadata;
+        std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> _specConstantsMetadata;
         std::vector<std::byte> _specConstantsData;
     };
 }

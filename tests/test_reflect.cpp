@@ -12,7 +12,7 @@ namespace game {
     KORAL_REFLECT_ENUM(Shape, eSphere, eBox, eCapsule)
 
     struct Material {
-        glm::vec4 albedo { 1.f };
+        kor::Vec4 albedo { 1.f };
         float roughness = 0.5f;
     };
     KORAL_REFLECT(Material, albedo, roughness)
@@ -23,10 +23,10 @@ namespace game {
         std::int32_t layer = 0;
         std::uint64_t id = 0;
         double mass = 1.0;
-        glm::vec3 position { 0.f };
-        glm::quat rotation { 1.f, 0.f, 0.f, 0.f };
-        glm::ivec2 cell { 0 };
-        glm::mat4 transform { 1.f };
+        kor::Vec3 position { 0.f };
+        kor::Quat rotation { 1.f, 0.f, 0.f, 0.f };
+        kor::IVec2 cell { 0 };
+        kor::Mat4 transform { 1.f };
         Shape shape = Shape::eSphere;
         Material material;
         std::vector<Material> layers;
@@ -96,10 +96,10 @@ TEST(Reflect, AReferenceReachesFieldsAndElementsOfAnyObject) {
     kor::Ref ref(body);
     ref.Field("mass").As<double>() = 4.0;
     ref.Field("material").Field("roughness").As<float>() = 0.9f;
-    ref.Field("layers").At(1).Field("albedo").As<glm::vec4>() = glm::vec4(0.f, 1.f, 0.f, 1.f);
+    ref.Field("layers").At(1).Field("albedo").As<kor::Vec4>() = kor::Vec4(0.f, 1.f, 0.f, 1.f);
     EXPECT_EQ(body.mass, 4.0);
     EXPECT_EQ(body.material.roughness, 0.9f);
-    EXPECT_EQ(body.layers[1].albedo, glm::vec4(0.f, 1.f, 0.f, 1.f));
+    EXPECT_EQ(body.layers[1].albedo, kor::Vec4(0.f, 1.f, 0.f, 1.f));
     EXPECT_EQ(ref.Field("layers").Size(), 2u);
     ref.Field("tags").Resize(3);
     EXPECT_EQ(body.tags.size(), 3u);
@@ -125,12 +125,12 @@ TEST(Reflect, SavesAndLoadsEveryKindOfValueThroughJson) {
     body.id = 12345678901234ull;
     body.mass = 2.5;
     body.position = {1.f, 2.f, 3.f};
-    body.rotation = glm::quat(0.f, 1.f, 0.f, 0.f);
+    body.rotation = kor::Quat(1.f, 0.f, 0.f, 0.f);
     body.cell = {-4, 7};
-    body.transform[3] = glm::vec4(5.f, 6.f, 7.f, 1.f);
+    body.transform[3] = kor::Vec4(5.f, 6.f, 7.f, 1.f);
     body.shape = game::Shape::eCapsule;
     body.material.roughness = 0.25f;
-    body.layers = { {glm::vec4(0.5f), 0.1f}, {glm::vec4(0.2f), 0.9f} };
+    body.layers = { {kor::Vec4(0.5f), 0.1f}, {kor::Vec4(0.2f), 0.9f} };
     body.tags = {"crate", "wood"};
     body.cachedSpeed = 99.f;
 
@@ -146,10 +146,10 @@ TEST(Reflect, SavesAndLoadsEveryKindOfValueThroughJson) {
     EXPECT_EQ(loaded.layer, 3);
     EXPECT_EQ(loaded.id, 12345678901234ull);
     EXPECT_EQ(loaded.mass, 2.5);
-    EXPECT_EQ(loaded.position, glm::vec3(1.f, 2.f, 3.f));
-    EXPECT_EQ(loaded.rotation, glm::quat(0.f, 1.f, 0.f, 0.f));
-    EXPECT_EQ(loaded.cell, glm::ivec2(-4, 7));
-    EXPECT_EQ(loaded.transform[3], glm::vec4(5.f, 6.f, 7.f, 1.f));
+    EXPECT_EQ(loaded.position, kor::Vec3(1.f, 2.f, 3.f));
+    EXPECT_EQ(loaded.rotation, kor::Quat(1.f, 0.f, 0.f, 0.f));
+    EXPECT_EQ(loaded.cell, kor::IVec2(-4, 7));
+    EXPECT_EQ(loaded.transform[3], kor::Vec4(5.f, 6.f, 7.f, 1.f));
     EXPECT_EQ(loaded.shape, game::Shape::eCapsule);
     EXPECT_EQ(loaded.material.roughness, 0.25f);
     ASSERT_EQ(loaded.layers.size(), 2u);
@@ -167,7 +167,7 @@ TEST(Reflect, LoadingKeepsWhatTheJsonLeavesOutAndSkipsWhatTheTypeLacks) {
     EXPECT_EQ(body.name, "old");
     EXPECT_EQ(body.mass, 7.0) << "not in the JSON: unchanged";
     EXPECT_EQ(body.material.roughness, 1.f);
-    EXPECT_EQ(body.material.albedo, glm::vec4(1.f));
+    EXPECT_EQ(body.material.albedo, kor::Vec4(1.f));
 }
 
 TEST(Reflect, AValueOfTheWrongKindIsReportedByItsPath) {
@@ -184,9 +184,9 @@ TEST(Reflect, AValueOfTheWrongKindIsReportedByItsPath) {
 }
 
 TEST(Reflect, CopiesEveryFieldOfOneObjectIntoAnother) {
-    game::Material from{ glm::vec4(0.3f), 0.7f }, to;
+    game::Material from{ kor::Vec4(0.3f), 0.7f }, to;
     ASSERT_TRUE(kor::CopyFields(from, to));
-    EXPECT_EQ(to.albedo, glm::vec4(0.3f));
+    EXPECT_EQ(to.albedo, kor::Vec4(0.3f));
     EXPECT_EQ(to.roughness, 0.7f);
     game::Body body;
     EXPECT_FALSE(kor::CopyFields(from, body)) << "only between objects of one type";

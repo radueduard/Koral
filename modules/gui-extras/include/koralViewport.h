@@ -37,7 +37,7 @@
 #include <optional>
 #include <utility>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <debugDraw.h>
 #include <image.h>
@@ -71,7 +71,7 @@ namespace kgui
         [[nodiscard]] ViewportFit Fit() const { return _fit; }
 
         /** @brief The resolution the panel would like to be rendered at, in pixels. Zero until it is laid out. */
-        [[nodiscard]] glm::uvec2 Size() const { return _size; }
+        [[nodiscard]] kor::UVec2 Size() const { return _size; }
         /** @brief Whether Size changed since this was last asked: when to re-create a render target. */
         [[nodiscard]] bool TakeResized() { return std::exchange(_resized, false); }
         /** @brief Whether the pointer is over the image. What to gate camera and picking input on. */
@@ -79,7 +79,7 @@ namespace kgui
         /** @brief Whether the viewport was the last thing clicked: what keys that act on it ask. */
         [[nodiscard]] bool Focused() const { return _focused; }
         /** @brief The pointer in the image's own pixels, whatever the panel's size or the fit did; none when it is not over it. */
-        [[nodiscard]] std::optional<glm::vec2> PointerPosition() const;
+        [[nodiscard]] std::optional<kor::Vec2> PointerPosition() const;
         /** @brief Whether the left button went down over the image and is still down. */
         [[nodiscard]] bool Dragging() const { return _down; }
         /**
@@ -92,9 +92,9 @@ namespace kgui
         friend struct ViewportAccess;
         kor::ResourceRef<const kor::Image> _image;
         ViewportFit _fit = ViewportFit::eStretch;
-        glm::uvec2 _size { 0 };
-        glm::vec2 _box { 0.f };                 // the panel, in the interface's units
-        std::optional<glm::vec2> _pointer;      // in the same units, from the panel's top-left
+        kor::UVec2 _size { 0 };
+        kor::Vec2 _box { 0.f };                 // the panel, in the interface's units
+        std::optional<kor::Vec2> _pointer;      // in the same units, from the panel's top-left
         bool _resized = false, _hovered = false, _focused = false, _down = false;
         std::uint64_t _presses = 0, _pressesSeen = 0;
     };

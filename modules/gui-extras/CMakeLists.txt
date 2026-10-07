@@ -32,12 +32,11 @@ target_compile_definitions(koral-gui-extras PRIVATE KORAL_GUI_EXTRAS_EXPORTS)
 # koral-ui too — and Koral through it — and inherits their include directories.
 target_link_libraries(koral-gui-extras PUBLIC koral-ui Koral)
 
-# PRIVATE, exactly as for Koral itself: glm appears in this module's public headers, but a
+# PRIVATE, exactly as for Koral itself: spdlog appears in Koral's public headers, and a
 # consumer gets it from Koral::Koral — in an installed SDK through the vendored copies
-# KoralConfig.cmake attaches to it. Naming it PUBLIC here would put `glm::glm` in the exported
+# KoralConfig.cmake attaches to it. Naming it PUBLIC here would put `spdlog::spdlog` in the exported
 # link interface, where a consumer's CMake has no such target and find_package(Koral) fails.
 target_link_libraries(koral-gui-extras PRIVATE
-        glm::glm
         spdlog::spdlog
 )
 

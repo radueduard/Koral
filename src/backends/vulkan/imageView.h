@@ -35,6 +35,6 @@ namespace kor::vk
         void refreshIfStale() const;
 
         mutable std::vector<::vk::ImageView> _imageViews {};
-        mutable glm::u64 _imageGeneration = 0;
+        mutable kor::u64 _imageGeneration = 0;
     };
 }

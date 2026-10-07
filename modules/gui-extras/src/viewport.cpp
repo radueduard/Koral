@@ -17,22 +17,22 @@ namespace kgui
 {
     /** What the viewport widget writes into the state the scene reads. */
     struct ViewportAccess {
-        static void Box(ViewportState& s, const glm::vec2 box, const glm::vec2 pixels)
+        static void Box(ViewportState& s, const kor::Vec2 box, const kor::Vec2 pixels)
         {
             s._box = box;
-            const glm::uvec2 size { static_cast<glm::u32>(std::max(0.f, std::floor(pixels.x))),
-                                    static_cast<glm::u32>(std::max(0.f, std::floor(pixels.y))) };
+            const kor::UVec2 size { static_cast<kor::u32>(std::max(0.f, std::floor(pixels.x))),
+                                    static_cast<kor::u32>(std::max(0.f, std::floor(pixels.y))) };
             if (size != s._size && size.x > 0 && size.y > 0) s._resized = true;
             s._size = size;
         }
-        static void Hover(ViewportState& s, const std::optional<glm::vec2> at)
+        static void Hover(ViewportState& s, const std::optional<kor::Vec2> at)
         {
             s._hovered = at.has_value();
             if (at || !s._down) s._pointer = at;   // a drag that left the panel keeps its last place
         }
         static void Enter(ViewportState& s) { s._hovered = true; }
-        static void Move(ViewportState& s, const glm::vec2 at) { s._pointer = at; }
-        static void Press(ViewportState& s, const glm::vec2 at)
+        static void Move(ViewportState& s, const kor::Vec2 at) { s._pointer = at; }
+        static void Press(ViewportState& s, const kor::Vec2 at)
         {
             s._pointer = at;
             s._down = s._focused = true;
@@ -48,28 +48,28 @@ namespace kgui
 
     // ---- the state ---------------------------------------------------------------------------------------
 
-    std::optional<glm::vec2> ViewportState::PointerPosition() const
+    std::optional<kor::Vec2> ViewportState::PointerPosition() const
     {
         if (!_pointer || _box.x <= 0.f || _box.y <= 0.f) return std::nullopt;
         // Where the image is in the panel: all of it, or (contained) centred at its own proportions.
-        glm::vec2 origin { 0.f }, shown = _box;
-        const glm::vec2 extent = _image.Valid() ? glm::vec2(_image->Extent()) : glm::vec2(_size);
+        kor::Vec2 origin { 0.f }, shown = _box;
+        const kor::Vec2 extent = _image.Valid() ? kor::Vec2(_image->Extent()) : kor::Vec2(_size);
         if (_fit == ViewportFit::eContain && extent.x > 0.f && extent.y > 0.f) {
             const float scale = std::min(_box.x / extent.x, _box.y / extent.y);
             shown = extent * scale;
             origin = (_box - shown) * 0.5f;
         }
-        const glm::vec2 normalized = (*_pointer - origin) / shown;
+        const kor::Vec2 normalized = (*_pointer - origin) / shown;
         // Outside the image is not over it — unless a drag that began on it is still going.
         if (!_down && (normalized.x < 0.f || normalized.x > 1.f || normalized.y < 0.f || normalized.y > 1.f)) return std::nullopt;
-        return normalized * (extent.x > 0.f ? extent : glm::vec2(_size));
+        return normalized * (extent.x > 0.f ? extent : kor::Vec2(_size));
     }
 
     kor::GizmoPointer ViewportState::GizmoPointer()
     {
         kor::GizmoPointer pointer;
         pointer.position = PointerPosition();
-        const glm::vec2 extent = _image.Valid() ? glm::vec2(_image->Extent()) : glm::vec2(_size);
+        const kor::Vec2 extent = _image.Valid() ? kor::Vec2(_image->Extent()) : kor::Vec2(_size);
         pointer.viewport = extent;
         pointer.down = _down;
         pointer.pressed = _presses != _pressesSeen;
@@ -105,16 +105,16 @@ namespace kgui
 
                 const auto state = _state;
                 kui::GestureOptions pointer;
-                pointer.onHover = [state](const glm::vec2 at) { ViewportAccess::Hover(*state, at); };
+                pointer.onHover = [state](const kor::Vec2 at) { ViewportAccess::Hover(*state, at); };
                 pointer.onEnter = [state] { ViewportAccess::Enter(*state); };
                 pointer.onExit = [state] { ViewportAccess::Hover(*state, std::nullopt); };
-                pointer.onTapDown = [state](const glm::vec2 at) { ViewportAccess::Press(*state, at); };
+                pointer.onTapDown = [state](const kor::Vec2 at) { ViewportAccess::Press(*state, at); };
                 pointer.onTapUp = [state] { ViewportAccess::Release(*state); };
-                pointer.onPanStart = [state](const glm::vec2 at) { ViewportAccess::Move(*state, at); };
-                pointer.onPanUpdate = [state](glm::vec2, const glm::vec2 at) { ViewportAccess::Move(*state, at); };
+                pointer.onPanStart = [state](const kor::Vec2 at) { ViewportAccess::Move(*state, at); };
+                pointer.onPanUpdate = [state](kor::Vec2, const kor::Vec2 at) { ViewportAccess::Move(*state, at); };
                 pointer.onPanEnd = [state] { ViewportAccess::Release(*state); };
 
-                return kui::SizeObserver([state](const glm::vec2 size, const glm::vec2 pixels) { ViewportAccess::Box(*state, size, pixels); },
+                return kui::SizeObserver([state](const kor::Vec2 size, const kor::Vec2 pixels) { ViewportAccess::Box(*state, size, pixels); },
                                          kui::FractionallySizedBox(1.f, 1.f, kui::GestureDetector(std::move(pointer), std::move(content))));
             }
 
@@ -134,7 +134,7 @@ namespace kgui
         private:
             std::shared_ptr<ViewportState> _state;
             const void* _shown = nullptr;
-            glm::u64 _generation = 0;
+            kor::u64 _generation = 0;
             ViewportFit _fit = ViewportFit::eStretch;
         };
 
@@ -163,7 +163,7 @@ namespace kgui
                 kor::Window& window = _scene ? _scene->SceneWindow() : _view->Target();
                 _state->SetImage(_scene ? window.Image() : _view->Image());
                 // The size it would like, as a window being resized by hand would ask for it.
-                if (const glm::uvec2 size = _state->Size(); size.x > 0 && size.y > 0 && size != window.Extent()) {
+                if (const kor::UVec2 size = _state->Size(); size.x > 0 && size.y > 0 && size != window.Extent()) {
                     if (_scene) window.Resize(size);
                     else _view->Resize(size);
                 }

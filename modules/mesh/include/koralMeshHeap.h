@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <utility>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <context.h>
 #include <mesh.h>
@@ -25,7 +25,7 @@ namespace kmesh
 {
     /**
      * @brief Many meshes packed into one set of GPU buffers, suballocated in O(1).
-     * @tparam Streams The vertex attribute types, one per stream — e.g. MeshHeap<glm::vec3, glm::vec2>
+     * @tparam Streams The vertex attribute types, one per stream — e.g. MeshHeap<kor::Vec3, kor::Vec2>
      *         for positions and texture coordinates in separate buffers.
      *
      * A heap allocates its buffers once and hands out ranges within them, so hundreds of meshes
@@ -34,7 +34,7 @@ namespace kmesh
      * CommandBuffer::DrawSubMesh or an indirect draw built on the GPU.
      *
      * @code
-     * kmesh::MeshHeap<glm::vec3, glm::vec2> heap(vertexCapacity, indexCapacity);
+     * kmesh::MeshHeap<kor::Vec3, kor::Vec2> heap(vertexCapacity, indexCapacity);
      * auto allocation = heap.Create(positions, uvs, indices);
      * @endcode
      *
@@ -48,8 +48,8 @@ namespace kmesh
         /** @brief A range within one of the heap's buffers, in elements. */
         struct Identifier
         {
-            glm::u64 offset;    ///< First element of the range.
-            glm::u64 size;      ///< How many elements it covers.
+            kor::u64 offset;    ///< First element of the range.
+            kor::u64 size;      ///< How many elements it covers.
         };
 
         /**
@@ -119,15 +119,15 @@ namespace kmesh
          * The buffers are device-local and sized once; a heap does not grow, so size it for the
          * scene it will hold.
          */
-        MeshHeap(const glm::u64 vertexCapacity, const std::optional<glm::u64> indexCapacity)
+        MeshHeap(const kor::u64 vertexCapacity, const std::optional<kor::u64> indexCapacity)
             : _vertexAllocator(vertexCapacity)
             , _indexAllocator(indexCapacity
                 ? std::make_optional<TLSFAllocator>(*indexCapacity)
                 : std::nullopt)
         {
-            _vertexCount = static_cast<glm::u32>(vertexCapacity);
+            _vertexCount = static_cast<kor::u32>(vertexCapacity);
             if (indexCapacity.has_value())
-                _indexCount = static_cast<glm::u32>(*indexCapacity);
+                _indexCount = static_cast<kor::u32>(*indexCapacity);
 
             // Request eAccelerationStructureInput (implies device address) so a heap
             // suballocation can directly back a ray-tracing BLAS; the empty-buffer
@@ -147,7 +147,7 @@ namespace kmesh
                     kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eVertex) | rtInputUsage)), ...);
 
             if (indexCapacity.has_value()) {
-                AdoptIndexBuffer(MakeBuffer<glm::u32>(*indexCapacity,
+                AdoptIndexBuffer(MakeBuffer<kor::u32>(*indexCapacity,
                     kor::Flags<kor::Buffer::Usage>(kor::Buffer::Usage::eIndex) | rtInputUsage),
                     kor::ChannelType::eUInt);
             }
@@ -172,8 +172,8 @@ namespace kmesh
          * For geometry a shader will generate. Use Create() to reserve and upload in one step.
          */
         [[nodiscard]] std::optional<Allocation> AllocateMesh(
-            const glm::u64 numVertices,
-            const std::optional<glm::u64> numIndices = std::nullopt) const
+            const kor::u64 numVertices,
+            const std::optional<kor::u64> numIndices = std::nullopt) const
         {
             auto vertAlloc = _vertexAllocator.Allocate(numVertices);
             if (!vertAlloc)
@@ -213,13 +213,13 @@ namespace kmesh
          */
         [[nodiscard]] std::optional<Allocation> Create(
             std::span<const Streams>... streams,
-            const std::optional<std::span<const glm::u32>> &indices = std::nullopt) const
+            const std::optional<std::span<const kor::u32>> &indices = std::nullopt) const
         {
             // All streams must agree on vertex count
-            const std::array<glm::u64, sizeof...(Streams)> counts = {
-                static_cast<glm::u64>(streams.size())...
+            const std::array<kor::u64, sizeof...(Streams)> counts = {
+                static_cast<kor::u64>(streams.size())...
             };
-            const glm::u64 numVertices = counts[0];
+            const kor::u64 numVertices = counts[0];
             for (const auto c : counts)
             {
                 if (c != numVertices)
@@ -227,7 +227,7 @@ namespace kmesh
                         "MeshHeap::Create: all vertex streams must have the same element count");
             }
 
-            const std::optional<glm::u64> numIndices =
+            const std::optional<kor::u64> numIndices =
                 indices.has_value()
                     ? std::make_optional(indices->size())
                     : std::nullopt;
@@ -253,10 +253,10 @@ namespace kmesh
         }
 
         /** @brief How many vertices the heap can hold in total. */
-        [[nodiscard]] glm::u64 VertexCapacity() const { return _vertexAllocator.Capacity(); }
+        [[nodiscard]] kor::u64 VertexCapacity() const { return _vertexAllocator.Capacity(); }
 
         /** @brief How many indices the heap can hold, or 0 if it has no index buffer. */
-        [[nodiscard]] glm::u64 IndexCapacity()  const
+        [[nodiscard]] kor::u64 IndexCapacity()  const
         {
             return _indexAllocator ? _indexAllocator->Capacity() : 0;
         }
@@ -277,7 +277,7 @@ namespace kmesh
         // Upload each span into _vertexBuffers[I] at elementOffset
         template<std::size_t... I>
         void UploadStreams(
-            const glm::u64 elementOffset,
+            const kor::u64 elementOffset,
             std::span<const Streams>... streams,
             std::index_sequence<I...>) const
         {

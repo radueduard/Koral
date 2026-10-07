@@ -22,12 +22,12 @@ namespace kor::vk
 {
     namespace
     {
-        constexpr glm::u64 alignUp(const glm::u64 value, const glm::u64 alignment)
+        constexpr kor::u64 alignUp(const kor::u64 value, const kor::u64 alignment)
         {
             return (value + alignment - 1) & ~(alignment - 1);
         }
 
-        std::pair<::vk::Buffer, VmaAllocation> allocateDeviceBuffer(const glm::u64 size, const ::vk::BufferUsageFlags usage)
+        std::pair<::vk::Buffer, VmaAllocation> allocateDeviceBuffer(const kor::u64 size, const ::vk::BufferUsageFlags usage)
         {
             const auto bufferInfo = ::vk::BufferCreateInfo()
                 .setSize(size)
@@ -36,7 +36,7 @@ namespace kor::vk
             return Context::Allocator().AllocateBuffer(bufferInfo, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE);
         }
 
-        glm::u32 scratchAlignment()
+        kor::u32 scratchAlignment()
         {
             ::vk::PhysicalDeviceAccelerationStructurePropertiesKHR asProperties;
             ::vk::PhysicalDeviceProperties2 properties2;
@@ -78,7 +78,7 @@ namespace kor::vk
         // float3 position as the first attribute of its binding-0 vertex buffer.
         std::vector<::vk::AccelerationStructureGeometryKHR> geometries;
         std::vector<::vk::AccelerationStructureBuildRangeInfoKHR> rangeInfos;
-        std::vector<glm::u32> primitiveCounts;
+        std::vector<kor::u32> primitiveCounts;
 
         for (const auto& geometry : createInfo.geometries) {
             const auto& mesh = geometry.mesh;
@@ -88,8 +88,8 @@ namespace kor::vk
 
             // Take the position from the mesh's declared position attribute (its binding,
             // byte offset and format). Fall back to a float3 at the start of binding 0.
-            glm::u32 positionBinding = 0;
-            glm::u32 positionOffset = 0;
+            kor::u32 positionBinding = 0;
+            kor::u32 positionOffset = 0;
             ::vk::Format positionFormat = ::vk::Format::eR32G32B32Sfloat;
             if (mesh->PositionAttribute().has_value()) {
                 const auto& positionAttribute = mesh->PositionAttribute().value();
@@ -104,27 +104,27 @@ namespace kor::vk
             // The mesh's vertex count spans the whole buffer (the heap's capacity for a
             // MeshHeap), so it gives the stride; the geometry's range selects the subset
             // of vertices/indices that belong to this allocation.
-            const glm::u64 bufferVertexCount = mesh->VertexCount();
-            const glm::u64 vertexStride = vertexBuffer.size() / bufferVertexCount;
+            const kor::u64 bufferVertexCount = mesh->VertexCount();
+            const kor::u64 vertexStride = vertexBuffer.size() / bufferVertexCount;
 
-            const glm::u64 firstVertex = geometry.firstVertex;
-            const glm::u64 vertexCount = geometry.vertexCount != 0
+            const kor::u64 firstVertex = geometry.firstVertex;
+            const kor::u64 vertexCount = geometry.vertexCount != 0
                 ? geometry.vertexCount
                 : bufferVertexCount - firstVertex;
 
             const ChannelType indexType = mesh->IndexType().value();
-            const glm::u32 indexSize = SizeofChannelType(indexType);
-            const glm::u64 firstIndex = geometry.firstIndex;
-            const glm::u64 indexCount = geometry.indexCount != 0
+            const kor::u32 indexSize = SizeofChannelType(indexType);
+            const kor::u64 firstIndex = geometry.firstIndex;
+            const kor::u64 indexCount = geometry.indexCount != 0
                 ? geometry.indexCount
                 : mesh->IndexCount().value();
-            const glm::u32 triangleCount = static_cast<glm::u32>(indexCount / 3);
+            const kor::u32 triangleCount = static_cast<kor::u32>(indexCount / 3);
 
             const auto triangles = ::vk::AccelerationStructureGeometryTrianglesDataKHR()
                 .setVertexFormat(positionFormat)
                 .setVertexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(vertexBuffer.DeviceAddress() + positionOffset))
                 .setVertexStride(vertexStride)
-                .setMaxVertex(static_cast<glm::u32>(firstVertex + vertexCount - 1))
+                .setMaxVertex(static_cast<kor::u32>(firstVertex + vertexCount - 1))
                 .setIndexType(getVkIndexType(indexType))
                 .setIndexData(::vk::DeviceOrHostAddressConstKHR().setDeviceAddress(indexBuffer.DeviceAddress()));
 
@@ -138,8 +138,8 @@ namespace kor::vk
             // to each (heap-local) index so it lands on this allocation's vertices.
             rangeInfos.push_back(::vk::AccelerationStructureBuildRangeInfoKHR()
                 .setPrimitiveCount(triangleCount)
-                .setPrimitiveOffset(static_cast<glm::u32>(firstIndex * indexSize))
-                .setFirstVertex(static_cast<glm::u32>(firstVertex))
+                .setPrimitiveOffset(static_cast<kor::u32>(firstIndex * indexSize))
+                .setFirstVertex(static_cast<kor::u32>(firstVertex))
                 .setTransformOffset(0));
 
             primitiveCounts.push_back(triangleCount);
@@ -164,10 +164,10 @@ namespace kor::vk
         for (const auto& instance : createInfo.instances) {
             const auto& blas = dynamic_cast<const AccelerationStructure&>(*instance.blas);
 
-            // glm::mat4 is column-major; VkTransformMatrixKHR is a row-major 3x4 matrix.
+            // kor::Mat4 is column-major; VkTransformMatrixKHR is a row-major 3x4 matrix.
             ::vk::TransformMatrixKHR transform;
-            for (glm::u32 row = 0; row < 3; ++row) {
-                for (glm::u32 col = 0; col < 4; ++col) {
+            for (kor::u32 row = 0; row < 3; ++row) {
+                for (kor::u32 col = 0; col < 4; ++col) {
                     transform.matrix[row][col] = instance.transform[col][row];
                 }
             }
@@ -182,7 +182,7 @@ namespace kor::vk
         }
 
         // Upload the instance descriptions to a host-visible build-input buffer.
-        const glm::u64 instancesSize = vkInstances.size() * sizeof(::vk::AccelerationStructureInstanceKHR);
+        const kor::u64 instancesSize = vkInstances.size() * sizeof(::vk::AccelerationStructureInstanceKHR);
         const auto instanceBufferInfo = ::vk::BufferCreateInfo()
             .setSize(instancesSize)
             .setUsage(::vk::BufferUsageFlagBits::eAccelerationStructureBuildInputReadOnlyKHR
@@ -211,8 +211,8 @@ namespace kor::vk
                 .setFlags(::vk::GeometryFlagBitsKHR::eOpaque)
         };
 
-        const auto instanceCount = static_cast<glm::u32>(vkInstances.size());
-        const std::vector<glm::u32> primitiveCounts = { instanceCount };
+        const auto instanceCount = static_cast<kor::u32>(vkInstances.size());
+        const std::vector<kor::u32> primitiveCounts = { instanceCount };
         const std::vector<::vk::AccelerationStructureBuildRangeInfoKHR> rangeInfos = {
             ::vk::AccelerationStructureBuildRangeInfoKHR().setPrimitiveCount(instanceCount)
         };
@@ -235,7 +235,7 @@ namespace kor::vk
         ::vk::AccelerationStructureBuildGeometryInfoKHR buildInfo,
         const ::vk::AccelerationStructureBuildRangeInfoKHR* rangeInfos,
         const ::vk::AccelerationStructureBuildSizesInfoKHR& sizeInfo,
-        const std::vector<glm::u32>& primitiveCounts)
+        const std::vector<kor::u32>& primitiveCounts)
     {
         std::tie(_asBuffer, _asAllocation) = allocateDeviceBuffer(sizeInfo.accelerationStructureSize,
             ::vk::BufferUsageFlagBits::eAccelerationStructureStorageKHR | ::vk::BufferUsageFlagBits::eShaderDeviceAddress);
@@ -247,7 +247,7 @@ namespace kor::vk
         _handle = Context::Device()->createAccelerationStructureKHR(createInfo);
 
         // Scratch space. Over-allocate so the device address can be aligned up.
-        const glm::u64 alignment = scratchAlignment();
+        const kor::u64 alignment = scratchAlignment();
         auto [scratchBuffer, scratchAllocation] = allocateDeviceBuffer(sizeInfo.buildScratchSize + alignment,
             ::vk::BufferUsageFlagBits::eStorageBuffer | ::vk::BufferUsageFlagBits::eShaderDeviceAddress);
         const ::vk::DeviceAddress scratchAddress = alignUp(

@@ -15,7 +15,7 @@
 #include <type_traits>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <image.h>
 #include <resource.h>
@@ -74,19 +74,19 @@ namespace kui
 
         static constexpr Rect LTRB(const float l, const float t, const float r, const float b) { return { l, t, r, b }; }
         static constexpr Rect XYWH(const float x, const float y, const float w, const float h) { return { x, y, x + w, y + h }; }
-        static constexpr Rect FromSize(const glm::vec2 size) { return { 0.f, 0.f, size.x, size.y }; }
-        static constexpr Rect FromCenter(const glm::vec2 c, const float w, const float h) { return { c.x - w * .5f, c.y - h * .5f, c.x + w * .5f, c.y + h * .5f }; }
+        static constexpr Rect FromSize(const kor::Vec2 size) { return { 0.f, 0.f, size.x, size.y }; }
+        static constexpr Rect FromCenter(const kor::Vec2 c, const float w, const float h) { return { c.x - w * .5f, c.y - h * .5f, c.x + w * .5f, c.y + h * .5f }; }
 
         [[nodiscard]] constexpr float Width() const { return right - left; }
         [[nodiscard]] constexpr float Height() const { return bottom - top; }
-        [[nodiscard]] constexpr glm::vec2 Size() const { return { Width(), Height() }; }
-        [[nodiscard]] constexpr glm::vec2 TopLeft() const { return { left, top }; }
-        [[nodiscard]] constexpr glm::vec2 Center() const { return { (left + right) * .5f, (top + bottom) * .5f }; }
+        [[nodiscard]] constexpr kor::Vec2 Size() const { return { Width(), Height() }; }
+        [[nodiscard]] constexpr kor::Vec2 TopLeft() const { return { left, top }; }
+        [[nodiscard]] constexpr kor::Vec2 Center() const { return { (left + right) * .5f, (top + bottom) * .5f }; }
         [[nodiscard]] constexpr bool Empty() const { return !(right > left && bottom > top); }
-        [[nodiscard]] constexpr bool Contains(const glm::vec2 p) const { return p.x >= left && p.x < right && p.y >= top && p.y < bottom; }
+        [[nodiscard]] constexpr bool Contains(const kor::Vec2 p) const { return p.x >= left && p.x < right && p.y >= top && p.y < bottom; }
         [[nodiscard]] constexpr Rect Inflate(const float by) const { return { left - by, top - by, right + by, bottom + by }; }
         [[nodiscard]] constexpr Rect Deflate(const float by) const { return Inflate(-by); }
-        [[nodiscard]] constexpr Rect Shift(const glm::vec2 by) const { return { left + by.x, top + by.y, right + by.x, bottom + by.y }; }
+        [[nodiscard]] constexpr Rect Shift(const kor::Vec2 by) const { return { left + by.x, top + by.y, right + by.x, bottom + by.y }; }
         [[nodiscard]] Rect Intersect(const Rect& o) const;
         [[nodiscard]] Rect Union(const Rect& o) const;
         constexpr bool operator==(const Rect&) const = default;
@@ -117,13 +117,13 @@ namespace kui
         float a = 1.f, b = 0.f, c = 0.f, d = 1.f, tx = 0.f, ty = 0.f;
 
         static constexpr Transform Identity() { return {}; }
-        static constexpr Transform Translation(const glm::vec2 t) { return { 1.f, 0.f, 0.f, 1.f, t.x, t.y }; }
-        static constexpr Transform Scaling(const glm::vec2 s) { return { s.x, 0.f, 0.f, s.y, 0.f, 0.f }; }
+        static constexpr Transform Translation(const kor::Vec2 t) { return { 1.f, 0.f, 0.f, 1.f, t.x, t.y }; }
+        static constexpr Transform Scaling(const kor::Vec2 s) { return { s.x, 0.f, 0.f, s.y, 0.f, 0.f }; }
         /** @brief Clockwise on screen, since y grows downwards. */
         static Transform Rotation(float radians);
 
-        [[nodiscard]] constexpr glm::vec2 Apply(const glm::vec2 p) const { return { a * p.x + c * p.y + tx, b * p.x + d * p.y + ty }; }
-        [[nodiscard]] constexpr glm::vec2 ApplyVector(const glm::vec2 v) const { return { a * v.x + c * v.y, b * v.x + d * v.y }; }
+        [[nodiscard]] constexpr kor::Vec2 Apply(const kor::Vec2 p) const { return { a * p.x + c * p.y + tx, b * p.x + d * p.y + ty }; }
+        [[nodiscard]] constexpr kor::Vec2 ApplyVector(const kor::Vec2 v) const { return { a * v.x + c * v.y, b * v.x + d * v.y }; }
         [[nodiscard]] Transform Inverse() const;
         [[nodiscard]] constexpr bool IsTranslation() const { return a == 1.f && b == 0.f && c == 0.f && d == 1.f; }
         [[nodiscard]] constexpr bool IsIdentity() const { return IsTranslation() && tx == 0.f && ty == 0.f; }
@@ -155,16 +155,16 @@ namespace kui
     struct KUI_API Gradient {
         enum class Type : std::uint8_t { eLinear, eRadial, eSweep };
         Type type = Type::eLinear;
-        glm::vec2 start {};     ///< Linear: where offset 0 is. Radial and sweep: the centre.
-        glm::vec2 end {};       ///< Linear: where offset 1 is.
+        kor::Vec2 start {};     ///< Linear: where offset 0 is. Radial and sweep: the centre.
+        kor::Vec2 end {};       ///< Linear: where offset 1 is.
         float radius = 0.f;     ///< Radial: where offset 1 is.
         float angle = 0.f;      ///< Sweep: where offset 0 is, in radians clockwise from +x.
         std::vector<GradientStop> stops;
 
-        static Gradient Linear(glm::vec2 from, glm::vec2 to, std::vector<GradientStop> stops);
-        static Gradient Linear(glm::vec2 from, glm::vec2 to, Color a, Color b);
-        static Gradient Radial(glm::vec2 center, float radius, std::vector<GradientStop> stops);
-        static Gradient Sweep(glm::vec2 center, float angle, std::vector<GradientStop> stops);
+        static Gradient Linear(kor::Vec2 from, kor::Vec2 to, std::vector<GradientStop> stops);
+        static Gradient Linear(kor::Vec2 from, kor::Vec2 to, Color a, Color b);
+        static Gradient Radial(kor::Vec2 center, float radius, std::vector<GradientStop> stops);
+        static Gradient Sweep(kor::Vec2 center, float angle, std::vector<GradientStop> stops);
     };
 
     /** @brief How the ends of an open stroke are drawn. */
@@ -232,21 +232,21 @@ namespace kui
      */
     class KUI_API Path {
     public:
-        Path& MoveTo(glm::vec2 p);
-        Path& LineTo(glm::vec2 p);
-        Path& QuadTo(glm::vec2 control, glm::vec2 p);
-        Path& CubicTo(glm::vec2 control1, glm::vec2 control2, glm::vec2 p);
+        Path& MoveTo(kor::Vec2 p);
+        Path& LineTo(kor::Vec2 p);
+        Path& QuadTo(kor::Vec2 control, kor::Vec2 p);
+        Path& CubicTo(kor::Vec2 control1, kor::Vec2 control2, kor::Vec2 p);
         /** @brief An arc of the circle at @p center, from @p start sweeping @p sweep radians, joined by a line from where the path was. */
-        Path& ArcTo(glm::vec2 center, float radius, float start, float sweep);
+        Path& ArcTo(kor::Vec2 center, float radius, float start, float sweep);
         /** @brief A rounded corner: towards @p corner, turning along an arc of @p radius to head for @p to. */
-        Path& ArcTo(glm::vec2 corner, glm::vec2 to, float radius);
+        Path& ArcTo(kor::Vec2 corner, kor::Vec2 to, float radius);
         Path& Close();
 
         Path& AddRect(const Rect& rect);
         Path& AddRRect(const RRect& rrect);
-        Path& AddCircle(glm::vec2 center, float radius);
+        Path& AddCircle(kor::Vec2 center, float radius);
         Path& AddOval(const Rect& rect);
-        Path& AddPolygon(std::span<const glm::vec2> points, bool close = true);
+        Path& AddPolygon(std::span<const kor::Vec2> points, bool close = true);
 
         Path& SetFillRule(const FillRule rule) { _fillRule = rule; return *this; }
         [[nodiscard]] FillRule GetFillRule() const { return _fillRule; }
@@ -257,15 +257,15 @@ namespace kui
          * @brief The outline as polygons: each contour flattened so no point of a curve is further than
          *        @p tolerance from the line drawn for it.
          */
-        struct Contour { std::vector<glm::vec2> points; bool closed = false; };
+        struct Contour { std::vector<kor::Vec2> points; bool closed = false; };
         [[nodiscard]] std::vector<Contour> Flatten(float tolerance = 0.25f) const;
 
     private:
         enum class Verb : std::uint8_t { eMove, eLine, eQuad, eCubic, eClose };
         std::vector<Verb> _verbs;
-        std::vector<glm::vec2> _points;
+        std::vector<kor::Vec2> _points;
         FillRule _fillRule = FillRule::eNonZero;
-        glm::vec2 _start {}, _current {};
+        kor::Vec2 _start {}, _current {};
     };
 
     /** @brief How what is behind something is shown through it. @see Canvas::DrawBackdrop */
@@ -293,7 +293,7 @@ namespace kui
      *
      * @code
      * auto plasma = kui::ElementShader::Load("plasma.frag.glsl");
-     * struct Params { glm::vec4 from, to; float speed; float pad[3]; };   // std430, as the shader declares it
+     * struct Params { kor::Vec4 from, to; float speed; float pad[3]; };   // std430, as the shader declares it
      * canvas.DrawElement(plasma, kui::Rect::XYWH(10, 10, 200, 120), Params{...}, 12.f);  // 12: corner radius
      * @endcode
      */
@@ -409,8 +409,8 @@ namespace kui
         Canvas& Save();
         Canvas& Restore();
         [[nodiscard]] std::size_t SaveCount() const;
-        Canvas& Translate(glm::vec2 by);
-        Canvas& Scale(glm::vec2 by);
+        Canvas& Translate(kor::Vec2 by);
+        Canvas& Scale(kor::Vec2 by);
         Canvas& Scale(const float by) { return Scale({ by, by }); }
         /** @brief Clockwise on screen, in radians. */
         Canvas& Rotate(float radians);
@@ -438,26 +438,26 @@ namespace kui
         // -- shapes
         Canvas& DrawRect(const Rect& rect, const Paint& paint);
         Canvas& DrawRRect(const RRect& rrect, const Paint& paint);
-        Canvas& DrawCircle(glm::vec2 center, float radius, const Paint& paint);
+        Canvas& DrawCircle(kor::Vec2 center, float radius, const Paint& paint);
         Canvas& DrawOval(const Rect& rect, const Paint& paint);
         /**
          * @brief An arc of the circle at @p center, from @p start sweeping @p sweep radians clockwise.
          *        With @p useCenter it is a pie slice; without, only its stroke is drawn.
          */
-        Canvas& DrawArc(glm::vec2 center, float radius, float start, float sweep, bool useCenter, const Paint& paint);
+        Canvas& DrawArc(kor::Vec2 center, float radius, float start, float sweep, bool useCenter, const Paint& paint);
         /** @brief A line, drawn with the paint's stroke — or, when it has none, a hairline of its fill colour. */
-        Canvas& DrawLine(glm::vec2 from, glm::vec2 to, const Paint& paint);
-        Canvas& DrawTriangle(glm::vec2 a, glm::vec2 b, glm::vec2 c, const Paint& paint);
+        Canvas& DrawLine(kor::Vec2 from, kor::Vec2 to, const Paint& paint);
+        Canvas& DrawTriangle(kor::Vec2 a, kor::Vec2 b, kor::Vec2 c, const Paint& paint);
         /** @brief A quadratic curve, stroked. */
-        Canvas& DrawQuadraticBezier(glm::vec2 from, glm::vec2 control, glm::vec2 to, const Paint& paint);
+        Canvas& DrawQuadraticBezier(kor::Vec2 from, kor::Vec2 control, kor::Vec2 to, const Paint& paint);
         /** @brief A cubic curve, stroked. */
-        Canvas& DrawCubicBezier(glm::vec2 from, glm::vec2 control1, glm::vec2 control2, glm::vec2 to, const Paint& paint);
+        Canvas& DrawCubicBezier(kor::Vec2 from, kor::Vec2 control1, kor::Vec2 control2, kor::Vec2 to, const Paint& paint);
         /** @brief Points joined by straight lines, stroked. */
-        Canvas& DrawPolyline(std::span<const glm::vec2> points, const Paint& paint);
-        Canvas& DrawPolygon(std::span<const glm::vec2> points, const Paint& paint);
+        Canvas& DrawPolyline(std::span<const kor::Vec2> points, const Paint& paint);
+        Canvas& DrawPolygon(std::span<const kor::Vec2> points, const Paint& paint);
         Canvas& DrawPath(const Path& path, const Paint& paint);
         /** @brief The soft shadow a rounded rectangle casts: @p blur is the Gaussian's standard deviation. */
-        Canvas& DrawShadow(const RRect& rrect, Color color, float blur, glm::vec2 offset = {}, float spread = 0.f);
+        Canvas& DrawShadow(const RRect& rrect, Color color, float blur, kor::Vec2 offset = {}, float spread = 0.f);
         /**
          * @brief What is behind @p rrect — everything drawn into the target before it, the scene and the
          *        interface under it — shown through it as through frosted glass: blurred, tinted, and bent
@@ -474,9 +474,9 @@ namespace kui
         Canvas& DrawImage(const kor::ResourceRef<const kor::Image>& image, const Rect& destination,
                        const Rect& source = {}, Color tint = colors::White);
         /** @brief Laid-out text, its top-left at @p position. */
-        Canvas& DrawParagraph(const Paragraph& paragraph, glm::vec2 position);
+        Canvas& DrawParagraph(const Paragraph& paragraph, kor::Vec2 position);
         /** @brief One line of text, its top-left at @p position. Lays it out every call: keep a Paragraph for text drawn often. */
-        Canvas& DrawText(std::string_view text, glm::vec2 position, const TextStyle& style);
+        Canvas& DrawText(std::string_view text, kor::Vec2 position, const TextStyle& style);
 
         // -- elements and layers
         /** @brief An element: @p shader fills @p rect, given @p parameters (the shader's struct, std430). */
@@ -511,20 +511,20 @@ namespace kui
          * @endcode
          */
         Canvas& BeginPath();
-        Canvas& MoveTo(glm::vec2 point);
+        Canvas& MoveTo(kor::Vec2 point);
         /** @brief A straight line from where the pen is to @p point. */
-        Canvas& DrawLineTo(glm::vec2 point);
+        Canvas& DrawLineTo(kor::Vec2 point);
         /** @brief A quadratic curve to @p point, pulled towards @p control. */
-        Canvas& DrawQuadTo(glm::vec2 control, glm::vec2 point);
+        Canvas& DrawQuadTo(kor::Vec2 control, kor::Vec2 point);
         /** @brief A cubic curve to @p point, pulled towards @p control1 then @p control2. */
-        Canvas& DrawCubicTo(glm::vec2 control1, glm::vec2 control2, glm::vec2 point);
+        Canvas& DrawCubicTo(kor::Vec2 control1, kor::Vec2 control2, kor::Vec2 point);
         /** @brief An arc of the circle at @p center from @p start sweeping @p sweep radians, joined to the pen by a line. */
-        Canvas& DrawArcTo(glm::vec2 center, float radius, float start, float sweep);
+        Canvas& DrawArcTo(kor::Vec2 center, float radius, float start, float sweep);
         /**
          * @brief A rounded corner: a line towards @p corner that turns, along an arc of @p radius, to head
          *        for @p to — the pen stops where the arc meets that second line.
          */
-        Canvas& DrawArcTo(glm::vec2 corner, glm::vec2 to, float radius);
+        Canvas& DrawArcTo(kor::Vec2 corner, kor::Vec2 to, float radius);
         /** @brief A line back to where this part of the path started. */
         Canvas& ClosePath();
         /** @brief Fills the pen's path with @p paint's fill (its stroke is ignored). */

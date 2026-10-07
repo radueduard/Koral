@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <error.h>
 #include <image.h>
@@ -26,14 +26,14 @@ namespace kimg::detail
     struct ReadBack
     {
         std::vector<unsigned char> bytes;
-        glm::uvec3 extent { 1, 1, 1 };      ///< The region actually read, in texels.
+        kor::UVec3 extent { 1, 1, 1 };      ///< The region actually read, in texels.
     };
 
     /** @brief Shorthand for the errors this module reports, all of which name the file. */
     kor::Error fileError(const std::filesystem::path& path, std::string what);
 
     /** @brief The extent of one mip level of @p image. */
-    glm::uvec3 mipExtent(const kor::Image& image, glm::u32 mipLevel);
+    kor::UVec3 mipExtent(const kor::Image& image, kor::u32 mipLevel);
 
     /**
      * @brief Checks a subimage against the image it names part of.

@@ -38,11 +38,10 @@ target_compile_definitions(koral-model-import PRIVATE KORAL_MODEL_IMPORT_EXPORTS
 # koral-mesh here would take that choice away from every consumer.
 target_link_libraries(koral-model-import PUBLIC Koral)
 
-# Everything else is PRIVATE, exactly as for Koral itself — a consumer gets glm through Koral::Koral
+# Everything else is PRIVATE, exactly as for Koral itself — a consumer gets spdlog through Koral::Koral
 # (in an installed SDK, through the vendored copies KoralConfig.cmake attaches to it) and never sees
 # Assimp at all.
 target_link_libraries(koral-model-import PRIVATE
-        glm::glm
         spdlog::spdlog
         # Assimp, and only here: the engine no longer links it at all.
         assimp::assimp

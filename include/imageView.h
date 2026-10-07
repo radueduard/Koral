@@ -5,7 +5,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include <source_location>
@@ -104,10 +104,10 @@ namespace kor
         struct KORAL_API Builder : kor::Builder {
             kor::ResourceRef<const Image> image;        ///< The image being viewed.
             Type type = Type::e2D;                      ///< How it is seen.
-            glm::u32 baseMipLevel = 0;                  ///< First mip level included.
-            glm::u32 mipLevelCount = 1;                 ///< How many levels are included.
-            glm::u32 baseArrayLayer = 0;                ///< First array layer included.
-            glm::u32 arrayLayerCount = 1;               ///< How many layers are included.
+            kor::u32 baseMipLevel = 0;                  ///< First mip level included.
+            kor::u32 mipLevelCount = 1;                 ///< How many levels are included.
+            kor::u32 baseArrayLayer = 0;                ///< First array layer included.
+            kor::u32 arrayLayerCount = 1;               ///< How many layers are included.
             ComponentMapping componentMapping = {};     ///< Channel rewiring, identity by default.
 
             /** @param image The image to view. It must outlive the view. */
@@ -120,7 +120,7 @@ namespace kor
             }
 
             /** @brief Sets the first mip level the view covers, so a shader can be given one level of a chain. */
-            Builder& SetBaseMipLevel(glm::u32 baseMipLevel) {
+            Builder& SetBaseMipLevel(kor::u32 baseMipLevel) {
                 this->baseMipLevel = baseMipLevel;
                 return *this;
             }
@@ -131,19 +131,19 @@ namespace kor
              * A sampled texture wants the whole chain, or mip mapping has nothing to select from; a
              * render target wants exactly one.
              */
-            Builder& SetMipLevelCount(glm::u32 mipLevelCount) {
+            Builder& SetMipLevelCount(kor::u32 mipLevelCount) {
                 this->mipLevelCount = mipLevelCount;
                 return *this;
             }
 
             /** @brief Sets the first array layer the view covers. */
-            Builder& SetBaseArrayLayer(glm::u32 baseArrayLayer) {
+            Builder& SetBaseArrayLayer(kor::u32 baseArrayLayer) {
                 this->baseArrayLayer = baseArrayLayer;
                 return *this;
             }
 
             /** @brief Sets how many array layers the view covers. Six, with Type::eCube, makes a cube map. */
-            Builder& SetArrayLayerCount(glm::u32 arrayLayerCount) {
+            Builder& SetArrayLayerCount(kor::u32 arrayLayerCount) {
                 this->arrayLayerCount = arrayLayerCount;
                 return *this;
             }
@@ -168,13 +168,13 @@ namespace kor
         /** @brief How the image is seen through this view. */
         [[nodiscard]] Type ViewType() const { return _viewType; }
         /** @brief First mip level the view covers. */
-        [[nodiscard]] glm::u32 BaseMipLevel() const { return _baseMipLevel; }
+        [[nodiscard]] kor::u32 BaseMipLevel() const { return _baseMipLevel; }
         /** @brief How many mip levels the view covers. */
-        [[nodiscard]] glm::u32 MipLevelCount() const { return _mipLevelCount; }
+        [[nodiscard]] kor::u32 MipLevelCount() const { return _mipLevelCount; }
         /** @brief First array layer the view covers. */
-        [[nodiscard]] glm::u32 BaseArrayLayer() const { return _baseArrayLayer; }
+        [[nodiscard]] kor::u32 BaseArrayLayer() const { return _baseArrayLayer; }
         /** @brief How many array layers the view covers. */
-        [[nodiscard]] glm::u32 ArrayLayerCount() const { return _arrayLayerCount; }
+        [[nodiscard]] kor::u32 ArrayLayerCount() const { return _arrayLayerCount; }
         /** @brief The channel rewiring applied when sampling through this view. */
         [[nodiscard]] ComponentMapping Components() const { return _componentMapping; }
 
@@ -186,10 +186,10 @@ namespace kor
         kor::ResourceRef<const Image> _image;
         bool _isPerFrame = false;
         Type _viewType;
-        glm::u32 _baseMipLevel;
-        glm::u32 _mipLevelCount;
-        glm::u32 _baseArrayLayer;
-        glm::u32 _arrayLayerCount;
+        kor::u32 _baseMipLevel;
+        kor::u32 _mipLevelCount;
+        kor::u32 _baseArrayLayer;
+        kor::u32 _arrayLayerCount;
         ComponentMapping _componentMapping;
     };
 }

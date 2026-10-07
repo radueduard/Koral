@@ -20,7 +20,7 @@
 #include "dataRange.h"
 #include "error.h"
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "structs.h"
 #include "shaderValue.h"
@@ -248,10 +248,10 @@ namespace kor
         [[nodiscard]] bool SupportsTimers() const { return DoSupportsTimers(); }
 
         /** @brief The most scopes one recording may open. Beyond this BeginTimer fails the recording. */
-        static constexpr glm::u32 MaxTimerScopes = 256;
+        static constexpr kor::u32 MaxTimerScopes = 256;
 
         /** @brief How many commands the last completed recording emitted. */
-        [[nodiscard]] glm::u64 LastFrameCommandCount() const { return _lastFrameCommandCount; }
+        [[nodiscard]] kor::u64 LastFrameCommandCount() const { return _lastFrameCommandCount; }
 
         // ---- Error railway --------------------------------------------------------------------
 
@@ -434,7 +434,7 @@ namespace kor
          * @code
          * commandBuffer.BeginRendering();          // the screen
          * commandBuffer.BeginRendering(gBuffer);   // a framebuffer of your own
-         * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer).SetClearColor(0, glm::vec4{1.f}));
+         * commandBuffer.BeginRendering(kor::RenderInfo(gBuffer).SetClearColor(0, kor::Vec4{1.f}));
          * @endcode
          *
          * Its attachments are declared as used, so the transitions they need are emitted ahead of
@@ -461,7 +461,7 @@ namespace kor
          * Defaults to the whole window if a draw is recorded without one, so a scene drawing to the
          * screen may skip it entirely.
          */
-        CommandBuffer& SetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
+        CommandBuffer& SetViewport(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height);
 
         /**
          * @brief Sets the rectangle outside which fragments are discarded.
@@ -471,7 +471,7 @@ namespace kor
          * Like the viewport, defaults to the whole window when a draw is recorded without one.
          * Unlike the viewport it does not rescale anything — it only clips.
          */
-        CommandBuffer& SetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height);
+        CommandBuffer& SetScissor(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height);
 
         // ---- Dynamic state --------------------------------------------------------------------
         //
@@ -496,16 +496,16 @@ namespace kor
         CommandBuffer& SetDepthBias(float constantFactor, float clamp, float slopeFactor);
 
         /** @brief Sets the constant colour used by blend factors BlendFactor::eConstantColor and eOneMinusConstantColor. */
-        CommandBuffer& SetBlendConstants(glm::vec4 constants);
+        CommandBuffer& SetBlendConstants(kor::Vec4 constants);
 
         /** @brief Sets which bits of the stencil value and reference take part in the comparison. */
-        CommandBuffer& SetStencilCompareMask(StencilFace face, glm::u32 compareMask);
+        CommandBuffer& SetStencilCompareMask(StencilFace face, kor::u32 compareMask);
 
         /** @brief Sets which bits of the stencil buffer a stencil operation may write. */
-        CommandBuffer& SetStencilWriteMask(StencilFace face, glm::u32 writeMask);
+        CommandBuffer& SetStencilWriteMask(StencilFace face, kor::u32 writeMask);
 
         /** @brief Sets the value the stencil test compares against, and the value StencilOp::eReplace writes. */
-        CommandBuffer& SetStencilReference(StencilFace face, glm::u32 reference);
+        CommandBuffer& SetStencilReference(StencilFace face, kor::u32 reference);
 
         /** @brief Sets which polygon faces are discarded. An empty Flags draws both. */
         CommandBuffer& SetCullMode(Flags<CullMode> cullMode);
@@ -577,7 +577,7 @@ namespace kor
          * contain is also how the automatic barriers know what a draw is about to touch.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& BindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet,
+        CommandBuffer& BindDescriptorSet(kor::u32 index, ResourceRef<const DescriptorSet> descriptorSet,
                                          std::source_location where = std::source_location::current());
 
         /**
@@ -602,7 +602,7 @@ namespace kor
          *
          * A mesh bound after it takes back the bindings it has; the others keep this buffer.
          */
-        CommandBuffer& BindVertexBuffer(glm::u32 binding, ResourceRef<const Buffer> buffer, glm::u64 offset = 0,
+        CommandBuffer& BindVertexBuffer(kor::u32 binding, ResourceRef<const Buffer> buffer, kor::u64 offset = 0,
                                         std::source_location where = std::source_location::current());
 
         /**
@@ -620,7 +620,7 @@ namespace kor
          * gave it, with its offset and type taken from reflection — which is usually what you want.
          */
         template<typename T> requires std::is_trivially_copyable_v<T>
-        CommandBuffer& PushConstantBlock(const T& data, const glm::u32 offset = 0) {
+        CommandBuffer& PushConstantBlock(const T& data, const kor::u32 offset = 0) {
             return PushConstantBlock(&data, sizeof(T), offset);
         }
 
@@ -644,7 +644,7 @@ namespace kor
          *
          * @code
          * commandBuffer.PushConstant("model", modelMatrix)
-         *              .PushConstant("tint", glm::vec4{1, 0, 0, 1});
+         *              .PushConstant("tint", kor::Vec4{1, 0, 0, 1});
          * @endcode
          *
          * A name no stage declares, or a value of the wrong shape, fails the recording with
@@ -657,7 +657,7 @@ namespace kor
          * two sides never have to agree about padding. A `mat3` reserves three columns of four
          * floats in the shader and is nine tight floats in C++; an array of `vec3` strides sixteen
          * bytes per element and is twelve in C++. Both are written correctly from the obvious
-         * `glm::mat3` and `std::array<glm::vec3, N>` — the strides come from reflection.
+         * `kor::Mat3` and `std::array<kor::Vec3, N>` — the strides come from reflection.
          *
          * Nesting is flattened, so a struct whose C++ padding differs from the shader's is
          * addressed field by field rather than copied whole:
@@ -721,13 +721,13 @@ namespace kor
          * @param label Name shown in the debugger.
          * @param color Colour the debugger tints the region with.
          */
-        CommandBuffer& BeginDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
+        CommandBuffer& BeginDebugLabel(const std::string& label, kor::Vec4 color = { 1.f, 1.f, 1.f, 1.f });
 
         /** @brief Closes the innermost region opened by BeginDebugLabel. */
         CommandBuffer& EndDebugLabel();
 
         /** @brief Places a single named marker, without opening a region. */
-        CommandBuffer& InsertDebugLabel(const std::string& label, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f });
+        CommandBuffer& InsertDebugLabel(const std::string& label, kor::Vec4 color = { 1.f, 1.f, 1.f, 1.f });
 
         /**
          * @brief Records @p body inside a named region, closing it afterwards.
@@ -738,7 +738,7 @@ namespace kor
          * Preferred over the Begin/End pair, which can be left unbalanced.
          */
         template<typename Func> requires std::is_invocable_v<Func, CommandBuffer&>
-        CommandBuffer& DebugLabel(const std::string& label, Func&& body, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f }) {
+        CommandBuffer& DebugLabel(const std::string& label, Func&& body, kor::Vec4 color = { 1.f, 1.f, 1.f, 1.f }) {
             BeginDebugLabel(label, color);
             body(*this);
             EndDebugLabel();
@@ -754,7 +754,7 @@ namespace kor
          *        count is this multiplied by that.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& Dispatch(glm::u32 groupCountX = 1, glm::u32 groupCountY = 1, glm::u32 groupCountZ = 1,
+        CommandBuffer& Dispatch(kor::u32 groupCountX = 1, kor::u32 groupCountY = 1, kor::u32 groupCountZ = 1,
                                         std::source_location where = std::source_location::current());
 
         /**
@@ -765,7 +765,7 @@ namespace kor
          * Lets an earlier dispatch size a later one without a round trip to the CPU.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& DispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0,
+        CommandBuffer& DispatchIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset = 0,
                                         std::source_location where = std::source_location::current());
 
         /**
@@ -775,7 +775,7 @@ namespace kor
          * Fails on devices or backends without ray-tracing support.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& TraceRays(glm::u32 width = 1, glm::u32 height = 1, glm::u32 depth = 1,
+        CommandBuffer& TraceRays(kor::u32 width = 1, kor::u32 height = 1, kor::u32 depth = 1,
                                          std::source_location where = std::source_location::current());
 
         // ---- Draws ----------------------------------------------------------------------------
@@ -791,7 +791,7 @@ namespace kor
          * whole window first.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& Draw(glm::u64 vertexCount = WholeSize, glm::u32 instanceCount = 1, glm::u32 firstVertex = 0, glm::u32 firstInstance = 0,
+        CommandBuffer& Draw(kor::u64 vertexCount = WholeSize, kor::u32 instanceCount = 1, kor::u32 firstVertex = 0, kor::u32 firstInstance = 0,
                                     std::source_location where = std::source_location::current());
 
         /**
@@ -806,7 +806,7 @@ namespace kor
          * Needs a graphics pipeline and a mesh with an index buffer bound.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& DrawIndexed(glm::u64 indexCount = WholeSize, glm::u32 instanceCount = 1, glm::u32 firstIndex = 0, glm::i32 vertexOffset = 0, glm::u32 firstInstance = 0,
+        CommandBuffer& DrawIndexed(kor::u64 indexCount = WholeSize, kor::u32 instanceCount = 1, kor::u32 firstIndex = 0, kor::i32 vertexOffset = 0, kor::u32 firstInstance = 0,
                                            std::source_location where = std::source_location::current());
 
         /**
@@ -817,7 +817,7 @@ namespace kor
          *
          * The shorthand for the common case: BindMesh followed by DrawIndexed over the whole thing.
          */
-        CommandBuffer& DrawMesh(ResourceRef<const Mesh> mesh, glm::u32 instanceCount , glm::u32 baseInstance);
+        CommandBuffer& DrawMesh(ResourceRef<const Mesh> mesh, kor::u32 instanceCount , kor::u32 baseInstance);
 
         /**
          * @brief Binds a mesh and draws one contiguous run of its indices.
@@ -827,7 +827,7 @@ namespace kor
          *
          * How a model split into per-material sections is drawn a section at a time.
          */
-        CommandBuffer& DrawSubMesh(ResourceRef<const Mesh> mesh, glm::u32 baseIndex, glm::u32 indexCount);
+        CommandBuffer& DrawSubMesh(ResourceRef<const Mesh> mesh, kor::u32 baseIndex, kor::u32 indexCount);
 
         /**
          * @brief Launches the bound pipeline's mesh-shader workgroups.
@@ -836,7 +836,7 @@ namespace kor
          * Requires mesh-shader support.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& DrawMeshTasks(glm::u32 taskCountX = 1, glm::u32 taskCountY = 1, glm::u32 taskCountZ = 1,
+        CommandBuffer& DrawMeshTasks(kor::u32 taskCountX = 1, kor::u32 taskCountY = 1, kor::u32 taskCountZ = 1,
                                              std::source_location where = std::source_location::current());
 
         /**
@@ -850,7 +850,7 @@ namespace kor
          * the GPU, and the CPU never learns how much survived.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& DrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0,
+        CommandBuffer& DrawIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset = 0, kor::u32 drawCount = 1, kor::u32 stride = 0,
                                     std::source_location where = std::source_location::current());
 
         /**
@@ -861,7 +861,7 @@ namespace kor
          * @param stride Bytes between consecutive commands; 0 means they are tightly packed.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& DrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0,
+        CommandBuffer& DrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset = 0, kor::u32 drawCount = 1, kor::u32 stride = 0,
                                            std::source_location where = std::source_location::current());
 
         /**
@@ -872,7 +872,7 @@ namespace kor
          * @param stride Bytes between consecutive commands; 0 means they are tightly packed.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& DrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset = 0, glm::u32 drawCount = 1, glm::u32 stride = 0,
+        CommandBuffer& DrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset = 0, kor::u32 drawCount = 1, kor::u32 stride = 0,
                                              std::source_location where = std::source_location::current());
 
         // ---- Transfers ------------------------------------------------------------------------
@@ -884,7 +884,7 @@ namespace kor
          * @param size How many bytes to clear; the default runs to the end of the buffer.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& ClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset = 0, glm::u64 size = WholeSize,
+        CommandBuffer& ClearBuffer(ResourceRef<const Buffer> buffer, kor::u64 offset = 0, kor::u64 size = WholeSize,
                                    std::source_location where = std::source_location::current());
 
         /**
@@ -896,7 +896,7 @@ namespace kor
          * when that is what you are doing.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& ClearColorImage(ResourceRef<const Image> image, glm::vec4 color = { 0.f, 0.f, 0.f, 1.f },
+        CommandBuffer& ClearColorImage(ResourceRef<const Image> image, kor::Vec4 color = { 0.f, 0.f, 0.f, 1.f },
                                        std::source_location where = std::source_location::current());
 
         /**
@@ -910,8 +910,8 @@ namespace kor
          * command buffer itself. Larger uploads belong in Buffer::Write.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, const void* data, glm::u64 offset = 0,
-                                  glm::u64 size = WholeSize,
+        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, const void* data, kor::u64 offset = 0,
+                                  kor::u64 size = WholeSize,
                                   std::source_location where = std::source_location::current());
 
         /**
@@ -931,7 +931,7 @@ namespace kor
          */
         template <typename R, typename T = std::remove_cvref_t<std::ranges::range_value_t<R>>>
             requires RangeOf<R, T> && std::is_trivially_copyable_v<T>
-        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, R&& elements, const glm::u64 offset = 0,
+        CommandBuffer& FillBuffer(ResourceRef<const Buffer> buffer, R&& elements, const kor::u64 offset = 0,
                                   const std::source_location where = std::source_location::current())
         {
             const ContiguousCopy<T> contiguous(std::forward<R>(elements));
@@ -951,7 +951,7 @@ namespace kor
          * Fails the recording if the range would run past either buffer.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
          */
-        CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size = WholeSize, glm::u64 srcOffset = 0, glm::u64 dstOffset = 0,
+        CommandBuffer& CopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, kor::u64 size = WholeSize, kor::u64 srcOffset = 0, kor::u64 dstOffset = 0,
                                   std::source_location where = std::source_location::current());
 
         /**
@@ -1095,10 +1095,10 @@ namespace kor
          */
         template<typename... Args> requires (std::is_convertible_v<std::invoke_result_t<Args, CommandBuffer&>, void> && ...)
         CommandBuffer& Condition(
-            const std::function<glm::u8()>& condition,
+            const std::function<kor::u8()>& condition,
             Args... commands
         ) {
-            const glm::u8 cond = condition();
+            const kor::u8 cond = condition();
             const std::array<std::function<void(CommandBuffer&)>, sizeof...(Args)> commandArray = { commands... };
             commandArray[cond](*this);
             return *this;
@@ -1128,11 +1128,11 @@ namespace kor
             std::optional<kor::ResourceRef<const RayTracingPipeline>> boundRayTracingPipeline = std::nullopt;
             std::optional<kor::ResourceRef<const Mesh>> boundMesh = std::nullopt;
             /// Vertex buffers bound by themselves (BindVertexBuffer), by binding: what a draw reads besides the mesh.
-            std::map<glm::u32, kor::ResourceRef<const Buffer>> boundVertexBuffers;
+            std::map<kor::u32, kor::ResourceRef<const Buffer>> boundVertexBuffers;
 
-            std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundGraphicsDescriptorSets;
-            std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundComputeDescriptorSets;
-            std::map<glm::u32, kor::ResourceRef<const DescriptorSet>> boundRayTracingDescriptorSets;
+            std::map<kor::u32, kor::ResourceRef<const DescriptorSet>> boundGraphicsDescriptorSets;
+            std::map<kor::u32, kor::ResourceRef<const DescriptorSet>> boundComputeDescriptorSets;
+            std::map<kor::u32, kor::ResourceRef<const DescriptorSet>> boundRayTracingDescriptorSets;
 
             bool viewportSet = false;
             bool scissorSet = false;
@@ -1202,14 +1202,14 @@ namespace kor
             ResourceAccess access = ResourceAccess::eAllShaderRead;
 
             /// Image subresource range; nullopt means the whole image, matching ImageBarrier.
-            std::optional<glm::u32> baseMipLevel;
-            std::optional<glm::u32> levelCount;
-            std::optional<glm::u32> baseArrayLayer;
-            std::optional<glm::u32> layerCount;
+            std::optional<kor::u32> baseMipLevel;
+            std::optional<kor::u32> levelCount;
+            std::optional<kor::u32> baseArrayLayer;
+            std::optional<kor::u32> layerCount;
 
             /// Buffer range.
-            glm::u64 offset = 0;
-            glm::u64 size = WholeSize;
+            kor::u64 offset = 0;
+            kor::u64 size = WholeSize;
         };
 
         /// One parked command: what it will do, and what it will touch when it does.
@@ -1265,7 +1265,7 @@ namespace kor
          * The framebuffer the current pass renders into, which is the window's only when the pass
          * targets the screen. @see Draw
          */
-        [[nodiscard]] glm::uvec2 DefaultViewportExtent() const;
+        [[nodiscard]] kor::UVec2 DefaultViewportExtent() const;
 
         /**
          * @brief Gives a draw the whole target when it set no viewport or scissor of its own.
@@ -1337,9 +1337,9 @@ namespace kor
         /** @brief Records the bound mesh: the bindings it has are its again. */
         void StateBindMesh(const ResourceRef<const Mesh>& mesh);
         /** @brief Records a vertex buffer bound to one binding by itself. */
-        void StateBindVertexBuffer(glm::u32 binding, const ResourceRef<const Buffer>& buffer);
+        void StateBindVertexBuffer(kor::u32 binding, const ResourceRef<const Buffer>& buffer);
         /** @brief Records which descriptor set is bound at which index, for whichever pipeline type is bound. */
-        void StateBindDescriptorSet(glm::u32 index, const ResourceRef<const DescriptorSet>& descriptorSet);
+        void StateBindDescriptorSet(kor::u32 index, const ResourceRef<const DescriptorSet>& descriptorSet);
 
         // ---- Backend commands -----------------------------------------------------------------
         //
@@ -1363,14 +1363,14 @@ namespace kor
         // Dynamic state. The guard ("is a graphics pipeline bound?") and the tracking bit that
         // stops applyDynamicDefaults from stamping the pipeline's value over an explicit one are
         // the base's; these emit the command and nothing else.
-        virtual CommandBuffer& DoSetViewport(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
-        virtual CommandBuffer& DoSetScissor(glm::u32 x, glm::u32 y, glm::u32 width, glm::u32 height) = 0;
+        virtual CommandBuffer& DoSetViewport(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height) = 0;
+        virtual CommandBuffer& DoSetScissor(kor::u32 x, kor::u32 y, kor::u32 width, kor::u32 height) = 0;
         virtual CommandBuffer& DoSetLineWidth(float lineWidth) = 0;
         virtual CommandBuffer& DoSetDepthBias(float constantFactor, float clamp, float slopeFactor) = 0;
-        virtual CommandBuffer& DoSetBlendConstants(glm::vec4 constants) = 0;
-        virtual CommandBuffer& DoSetStencilCompareMask(StencilFace face, glm::u32 compareMask) = 0;
-        virtual CommandBuffer& DoSetStencilWriteMask(StencilFace face, glm::u32 writeMask) = 0;
-        virtual CommandBuffer& DoSetStencilReference(StencilFace face, glm::u32 reference) = 0;
+        virtual CommandBuffer& DoSetBlendConstants(kor::Vec4 constants) = 0;
+        virtual CommandBuffer& DoSetStencilCompareMask(StencilFace face, kor::u32 compareMask) = 0;
+        virtual CommandBuffer& DoSetStencilWriteMask(StencilFace face, kor::u32 writeMask) = 0;
+        virtual CommandBuffer& DoSetStencilReference(StencilFace face, kor::u32 reference) = 0;
         virtual CommandBuffer& DoSetCullMode(Flags<CullMode> cullMode) = 0;
         virtual CommandBuffer& DoSetFrontFace(FrontFace frontFace) = 0;
         virtual CommandBuffer& DoSetDepthTestEnable(bool enable) = 0;
@@ -1383,37 +1383,37 @@ namespace kor
         virtual CommandBuffer& DoSetPrimitiveRestartEnable(bool enable) = 0;
 
         /// Default to nothing: a backend without debug-marker support simply ignores labels.
-        virtual CommandBuffer& DoBeginDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
+        virtual CommandBuffer& DoBeginDebugLabel(const std::string& label, kor::Vec4 color) { return *this; }
         virtual CommandBuffer& DoEndDebugLabel() { return *this; }
-        virtual CommandBuffer& DoInsertDebugLabel(const std::string& label, glm::vec4 color) { return *this; }
+        virtual CommandBuffer& DoInsertDebugLabel(const std::string& label, kor::Vec4 color) { return *this; }
 
-        virtual CommandBuffer& DoDispatch(glm::u32 groupCountX, glm::u32 groupCountY, glm::u32 groupCountZ, std::source_location where) = 0;
+        virtual CommandBuffer& DoDispatch(kor::u32 groupCountX, kor::u32 groupCountY, kor::u32 groupCountZ, std::source_location where) = 0;
         /// Defaults to reporting ray tracing as unsupported, like doBindRayTracingPipeline.
-        virtual CommandBuffer& DoTraceRays(glm::u32 width, glm::u32 height, glm::u32 depth, std::source_location where);
+        virtual CommandBuffer& DoTraceRays(kor::u32 width, kor::u32 height, kor::u32 depth, std::source_location where);
         /// @param vertexCount Already resolved from the bound mesh when the caller left it defaulted.
-        virtual CommandBuffer& DoDraw(glm::u64 vertexCount, glm::u32 instanceCount, glm::u32 firstVertex, glm::u32 firstInstance, std::source_location where) = 0;
+        virtual CommandBuffer& DoDraw(kor::u64 vertexCount, kor::u32 instanceCount, kor::u32 firstVertex, kor::u32 firstInstance, std::source_location where) = 0;
         /// @param indexCount Already resolved from the bound mesh when the caller left it defaulted.
-        virtual CommandBuffer& DoDrawIndexed(glm::u64 indexCount, glm::u32 instanceCount, glm::u32 firstIndex, glm::i32 vertexOffset, glm::u32 firstInstance, std::source_location where) = 0;
-        virtual CommandBuffer& DoDrawMeshTasks(glm::u32 taskCountX, glm::u32 taskCountY, glm::u32 taskCountZ, std::source_location where) { return *this; }
+        virtual CommandBuffer& DoDrawIndexed(kor::u64 indexCount, kor::u32 instanceCount, kor::u32 firstIndex, kor::i32 vertexOffset, kor::u32 firstInstance, std::source_location where) = 0;
+        virtual CommandBuffer& DoDrawMeshTasks(kor::u32 taskCountX, kor::u32 taskCountY, kor::u32 taskCountZ, std::source_location where) { return *this; }
 
-        virtual CommandBuffer& DoPushConstantBlock(const void* data, glm::u32 size, glm::u32 offset) = 0;
+        virtual CommandBuffer& DoPushConstantBlock(const void* data, kor::u32 size, kor::u32 offset) = 0;
 
         virtual CommandBuffer& DoBindComputePipeline(ResourceRef<const ComputePipeline> pipeline) = 0;
         virtual CommandBuffer& DoBindGraphicsPipeline(ResourceRef<const GraphicsPipeline> pipeline) = 0;
         /// Defaults to reporting ray tracing as unsupported, like TraceRays.
         virtual CommandBuffer& DoBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
-        virtual CommandBuffer& DoBindDescriptorSet(glm::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
+        virtual CommandBuffer& DoBindDescriptorSet(kor::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
         virtual CommandBuffer& DoBindMesh(ResourceRef<const Mesh> mesh) = 0;
-        virtual CommandBuffer& DoBindVertexBuffer(glm::u32 binding, ResourceRef<const Buffer> buffer, glm::u64 offset) = 0;
+        virtual CommandBuffer& DoBindVertexBuffer(kor::u32 binding, ResourceRef<const Buffer> buffer, kor::u64 offset) = 0;
         virtual CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;
-        virtual CommandBuffer& DoDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset) = 0;
-        virtual CommandBuffer& DoDrawIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
-        virtual CommandBuffer& DoDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) = 0;
-        virtual CommandBuffer& DoDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, glm::u64 offset, glm::u32 drawCount, glm::u32 stride) { return *this; }
-        virtual CommandBuffer& DoClearBuffer(ResourceRef<const Buffer> buffer, glm::u64 offset, glm::u64 size) = 0;
-        virtual CommandBuffer& DoClearColorImage(ResourceRef<const Image> image, glm::vec4 color) = 0;
-        virtual CommandBuffer& DoFillBuffer(ResourceRef<const Buffer> buffer, const void* data, glm::u64 offset, glm::u64 size) = 0;
-        virtual CommandBuffer& DoCopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, glm::u64 size, glm::u64 srcOffset, glm::u64 dstOffset) = 0;
+        virtual CommandBuffer& DoDispatchIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset) = 0;
+        virtual CommandBuffer& DoDrawIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) = 0;
+        virtual CommandBuffer& DoDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) = 0;
+        virtual CommandBuffer& DoDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) { return *this; }
+        virtual CommandBuffer& DoClearBuffer(ResourceRef<const Buffer> buffer, kor::u64 offset, kor::u64 size) = 0;
+        virtual CommandBuffer& DoClearColorImage(ResourceRef<const Image> image, kor::Vec4 color) = 0;
+        virtual CommandBuffer& DoFillBuffer(ResourceRef<const Buffer> buffer, const void* data, kor::u64 offset, kor::u64 size) = 0;
+        virtual CommandBuffer& DoCopyBuffer(ResourceRef<const Buffer> srcBuffer, ResourceRef<const Buffer> dstBuffer, kor::u64 size, kor::u64 srcOffset, kor::u64 dstOffset) = 0;
         virtual CommandBuffer& DoGenerateMipmaps(ResourceRef<const Image> image);
         virtual CommandBuffer& DoCopyBufferToImage(ResourceRef<const Buffer> buffer, ResourceRef<const Image> image, kor::Copy copyInfo) = 0;
         virtual CommandBuffer& DoCopyImageToBuffer(ResourceRef<const Image> image, ResourceRef<const Buffer> buffer, kor::Copy copyInfo) = 0;
@@ -1435,7 +1435,7 @@ namespace kor
         /** One scope recorded by BeginTimer, awaiting the timestamps that will resolve it. */
         struct TimerScope {
             std::string label;
-            glm::u32 depth = 0;
+            kor::u32 depth = 0;
             /// Where BeginTimer was called, so that a scope left open is blamed on the line that
             /// opened it rather than on End(), which is only where it was noticed.
             std::source_location where;
@@ -1445,7 +1445,7 @@ namespace kor
         [[nodiscard]] virtual bool DoSupportsTimers() const { return false; }
 
         /** @brief Backend hook: write the timestamp for query slot @p queryIndex at this point in the stream. */
-        virtual void DoWriteTimerTimestamp(glm::u32 queryIndex) {}
+        virtual void DoWriteTimerTimestamp(kor::u32 queryIndex) {}
 
         /**
          * @brief Backend hook: read back the previous submission's timestamps, without blocking.
@@ -1454,7 +1454,7 @@ namespace kor
          * @return false if the GPU has not finished with them, in which case nothing is reported
          *         and the previous results stand.
          */
-        virtual bool DoReadTimerTimestamps(glm::u32 scopeCount, std::vector<double>& millisecondsOut) { return false; }
+        virtual bool DoReadTimerTimestamps(kor::u32 scopeCount, std::vector<double>& millisecondsOut) { return false; }
 
         /**
          * @brief Fetches the last submission's timestamps if the GPU has finished with them.
@@ -1479,17 +1479,17 @@ namespace kor
         void SubmitTimers();
 
         /** @brief How many scopes the recording being built has opened. Valid until SubmitTimers(). */
-        [[nodiscard]] glm::u32 TimerScopeCount() const { return static_cast<glm::u32>(_pendingTimers.size()); }
+        [[nodiscard]] kor::u32 TimerScopeCount() const { return static_cast<kor::u32>(_pendingTimers.size()); }
 
         std::vector<TimerScope> _pendingTimers;    ///< Scopes in the recording being built.
         std::vector<TimerScope> _submittedTimers;  ///< Scopes of the submission whose results are still on the GPU.
-        std::vector<glm::u32> _timerStack;         ///< Indices into _pendingTimers for the scopes currently open.
+        std::vector<kor::u32> _timerStack;         ///< Indices into _pendingTimers for the scopes currently open.
         std::vector<TimerResult> _timings;         ///< Last results that arrived; see Timings().
         std::function<void(const std::vector<TimerResult>&)> _onTimings;  ///< See OnTimings().
 
-        glm::u64 _lastFrameCommandCount = 0;
+        kor::u64 _lastFrameCommandCount = 0;
 
-        CommandBuffer& PushConstantBlock(const void* data, glm::u32 size, glm::u32 offset);
+        CommandBuffer& PushConstantBlock(const void* data, kor::u32 size, kor::u32 offset);
 
         /** @brief Whichever pipeline is bound, of the three kinds, or nullptr when none is. */
         [[nodiscard]] const Pipeline* BoundPipeline() const;
@@ -1498,7 +1498,7 @@ namespace kor
          * @brief Resolves @p name on the bound pipeline and writes @p data into the layout it declared.
          * @param shape What the value is, when the engine can tell; an unknown shape is copied raw.
          */
-        CommandBuffer& PushConstant(std::string_view name, const void* data, glm::u32 size,
+        CommandBuffer& PushConstant(std::string_view name, const void* data, kor::u32 size,
                                     ValueShape shape, std::source_location where);
     };
 

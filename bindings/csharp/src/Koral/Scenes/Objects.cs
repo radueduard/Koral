@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Koral.Native;
@@ -142,10 +141,10 @@ public sealed unsafe partial class Input
 
     public bool InterfaceWantsMouse => KoralNative.koral_input_interface_wants_mouse(Native).AsBool();
     public bool InterfaceWantsKeyboard => KoralNative.koral_input_interface_wants_keyboard(Native).AsBool();
-    public Vector2 MousePosition { get { Vector2 v; KoralNative.koral_input_mouse_position(Native, &v.X, &v.Y); return v; } }
-    public Vector2 MousePositionDelta { get { Vector2 v; KoralNative.koral_input_mouse_position_delta(Native, &v.X, &v.Y); return v; } }
-    public Vector2 MouseScrollDelta { get { Vector2 v; KoralNative.koral_input_mouse_scroll_delta(Native, &v.X, &v.Y); return v; } }
-    public Vector2 LastMousePosition { get { Vector2 v; KoralNative.koral_input_last_mouse_position(Native, &v.X, &v.Y); return v; } }
+    public Vec2 MousePosition { get { Vec2 v; KoralNative.koral_input_mouse_position(Native, &v.X, &v.Y); return v; } }
+    public Vec2 MousePositionDelta { get { Vec2 v; KoralNative.koral_input_mouse_position_delta(Native, &v.X, &v.Y); return v; } }
+    public Vec2 MouseScrollDelta { get { Vec2 v; KoralNative.koral_input_mouse_scroll_delta(Native, &v.X, &v.Y); return v; } }
+    public Vec2 LastMousePosition { get { Vec2 v; KoralNative.koral_input_last_mouse_position(Native, &v.X, &v.Y); return v; } }
     public void SetCursorMode(CursorMode mode) => KoralNative.koral_input_set_cursor_mode(Native, (uint)mode);
     public CursorMode CurrentCursorMode => (CursorMode)KoralNative.koral_input_current_cursor_mode(Native);
 
@@ -178,9 +177,9 @@ public sealed unsafe partial class Input
     public bool IsActionReleased(string action) => ActionState(action) == KeyState.eReleased;
     public float Axis(string axis) => KoralNative.koral_input_axis(Native, axis);
 
-    public Vector2 Axis2D(string x, string y)
+    public Vec2 Axis2D(string x, string y)
     {
-        Vector2 v;
+        Vec2 v;
         KoralNative.koral_input_axis_2d(Native, x, y, &v.X, &v.Y);
         return v;
     }
@@ -193,7 +192,7 @@ public sealed unsafe partial class Input
 
     public void FeedKey(Key key, bool down) => KoralNative.koral_input_feed_key(Native, (uint)key, KoralNative.Bool(down));
     public void FeedMouseButton(MouseButton button, bool down) => KoralNative.koral_input_feed_mouse_button(Native, (uint)button, KoralNative.Bool(down));
-    public void FeedMousePosition(Vector2 position) => KoralNative.koral_input_feed_mouse_position(Native, position.X, position.Y);
+    public void FeedMousePosition(Vec2 position) => KoralNative.koral_input_feed_mouse_position(Native, position.X, position.Y);
     /// <summary>Input::FeedText: text typed, as <see cref="TypedText"/> will hold it.</summary>
     public void FeedText(string text) => KoralNative.koral_input_feed_text(Native, text);
     public void FeedKeyRepeat(Key key) => KoralNative.koral_input_feed_key_repeat(Native, (uint)key);
@@ -201,8 +200,8 @@ public sealed unsafe partial class Input
     public string TypedText => KoralNative.Text(KoralNative.koral_input_typed_text(Native));
     /// <summary>Input::IsKeyRepeated: whether a held key repeated this frame.</summary>
     public bool IsKeyRepeated(Key key) => KoralNative.koral_input_is_key_repeated(Native, (uint)key).AsBool();
-    public void FeedMouseDelta(Vector2 delta) => KoralNative.koral_input_feed_mouse_delta(Native, delta.X, delta.Y);
-    public void FeedScroll(Vector2 delta) => KoralNative.koral_input_feed_scroll(Native, delta.X, delta.Y);
+    public void FeedMouseDelta(Vec2 delta) => KoralNative.koral_input_feed_mouse_delta(Native, delta.X, delta.Y);
+    public void FeedScroll(Vec2 delta) => KoralNative.koral_input_feed_scroll(Native, delta.X, delta.Y);
     public void FeedGamepadButton(GamepadButton button, bool down, int pad = 0) => KoralNative.koral_input_feed_gamepad_button(Native, (uint)button, KoralNative.Bool(down), pad);
     public void FeedGamepadAxis(GamepadAxis axis, float value, int pad = 0) => KoralNative.koral_input_feed_gamepad_axis(Native, (uint)axis, value, pad);
     public void ReleaseAll() => KoralNative.koral_input_release_all(Native);
@@ -232,13 +231,13 @@ public sealed class Time
 /// <summary>kor::DebugStyle (DebugDraw::Style): how a debug shape is drawn.</summary>
 public record struct DebugStyle()
 {
-    public Vector4 Color { get; init; } = Vector4.One;
+    public Vec4 Color { get; init; } = Vec4.One;
     /// <summary>Seconds of the scene's time to keep drawing it; 0 is this frame only.</summary>
     public float Duration { get; init; }
     /// <summary>Drawn over everything, rather than hidden by what is in front of it.</summary>
     public bool OnTop { get; init; }
     /// <summary>The colour to fill the shape with; alpha below 1 is see-through, and 0 (the default) no fill.</summary>
-    public Vector4 Fill { get; init; }
+    public Vec4 Fill { get; init; }
     /// <summary>Draws the outline; false for a shape that is only its fill.</summary>
     public bool Outline { get; init; } = true;
     /// <summary>How wide its lines are, in pixels, however near or far.</summary>
@@ -261,7 +260,7 @@ public record struct DebugStyle()
 /// <param name="Viewport">The image's size, in pixels.</param>
 /// <param name="Down">The button that drags a handle is down.</param>
 /// <param name="Pressed">...and went down this frame: what grabs a handle.</param>
-public record struct GizmoPointer(Vector2? Position, Vector2 Viewport, bool Down, bool Pressed)
+public record struct GizmoPointer(Vec2? Position, Vec2 Viewport, bool Down, bool Pressed)
 {
     internal unsafe KoralGizmoPointer Native
     {
@@ -295,72 +294,72 @@ public sealed unsafe class DebugDraw
 
     private static KoralDebugStyle S(DebugStyle? style) => (style ?? new DebugStyle()).Native;
 
-    public void Line(Vector3 from, Vector3 to, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_line(Native, (float*)&from, (float*)&to, &s); }
+    public void Line(Vec3 from, Vec3 to, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_line(Native, (float*)&from, (float*)&to, &s); }
     /// <summary>An axis-aligned box.</summary>
-    public void Box(Vector3 min, Vector3 max, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_box(Native, (float*)&min, (float*)&max, &s); }
+    public void Box(Vec3 min, Vec3 max, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_box(Native, (float*)&min, (float*)&max, &s); }
     /// <summary>The unit cube (-0.5 to 0.5) moved by <paramref name="transform"/>: a box in any orientation.</summary>
-    public void Box(Matrix4x4 transform, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_box_transform(Native, (float*)&transform, &s); }
-    public void Circle(Vector3 center, Vector3 normal, float radius, DebugStyle? style = null, int segments = 32)
+    public void Box(Mat4 transform, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_box_transform(Native, (float*)&transform, &s); }
+    public void Circle(Vec3 center, Vec3 normal, float radius, DebugStyle? style = null, int segments = 32)
     {
         var s = S(style);
         KoralNative.koral_debug_circle(Native, (float*)&center, (float*)&normal, radius, &s, segments);
     }
     /// <summary>Three circles, one per axis.</summary>
-    public void Sphere(Vector3 center, float radius, DebugStyle? style = null, int segments = 32) { var s = S(style); KoralNative.koral_debug_sphere(Native, (float*)&center, radius, &s, segments); }
-    public void Arrow(Vector3 from, Vector3 to, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_arrow(Native, (float*)&from, (float*)&to, &s); }
+    public void Sphere(Vec3 center, float radius, DebugStyle? style = null, int segments = 32) { var s = S(style); KoralNative.koral_debug_sphere(Native, (float*)&center, radius, &s, segments); }
+    public void Arrow(Vec3 from, Vec3 to, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_arrow(Native, (float*)&from, (float*)&to, &s); }
     /// <summary>A small cross: a point you can see.</summary>
-    public void Point(Vector3 position, float size = 0.1f, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_point(Native, (float*)&position, size, &s); }
+    public void Point(Vec3 position, float size = 0.1f, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_point(Native, (float*)&position, size, &s); }
     /// <summary><paramref name="transform"/>'s X, Y and Z axes, in red, green and blue.</summary>
-    public void Axes(Matrix4x4 transform, float size = 1f, float duration = 0f) => KoralNative.koral_debug_axes(Native, (float*)&transform, size, duration);
+    public void Axes(Mat4 transform, float size = 1f, float duration = 0f) => KoralNative.koral_debug_axes(Native, (float*)&transform, size, duration);
     /// <summary>A grid of <paramref name="cells"/> by <paramref name="cells"/> on the XZ plane.</summary>
-    public void Grid(Vector3 center, float size, int cells, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_grid(Native, (float*)&center, size, cells, &s); }
+    public void Grid(Vec3 center, float size, int cells, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_grid(Native, (float*)&center, size, cells, &s); }
     /// <summary>What a camera with <paramref name="viewProjection"/> sees: its frustum's twelve edges.</summary>
-    public void Frustum(Matrix4x4 viewProjection, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_frustum(Native, (float*)&viewProjection, &s); }
-    public void Triangle(Vector3 a, Vector3 b, Vector3 c, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_triangle(Native, (float*)&a, (float*)&b, (float*)&c, &s); }
+    public void Frustum(Mat4 viewProjection, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_frustum(Native, (float*)&viewProjection, &s); }
+    public void Triangle(Vec3 a, Vec3 b, Vec3 c, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_triangle(Native, (float*)&a, (float*)&b, (float*)&c, &s); }
     /// <summary>Four corners, in order around the edge.</summary>
-    public void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, DebugStyle? style = null)
+    public void Quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, DebugStyle? style = null)
     {
         var s = S(style);
         KoralNative.koral_debug_quad(Native, (float*)&a, (float*)&b, (float*)&c, (float*)&d, &s);
     }
     /// <summary>A rectangle of <paramref name="size"/> facing along <paramref name="normal"/>.</summary>
-    public void Plane(Vector3 center, Vector3 normal, Vector2 size, DebugStyle? style = null)
+    public void Plane(Vec3 center, Vec3 normal, Vec2 size, DebugStyle? style = null)
     {
         var s = S(style);
         KoralNative.koral_debug_plane(Native, (float*)&center, (float*)&normal, (float*)&size, &s);
     }
-    public void Cylinder(Vector3 from, Vector3 to, float radius, DebugStyle? style = null, int segments = 24)
+    public void Cylinder(Vec3 from, Vec3 to, float radius, DebugStyle? style = null, int segments = 24)
     {
         var s = S(style);
         KoralNative.koral_debug_cylinder(Native, (float*)&from, (float*)&to, radius, &s, segments);
     }
     /// <summary>A cone with its base's centre at <paramref name="baseCenter"/> and its point at <paramref name="tip"/>.</summary>
-    public void Cone(Vector3 baseCenter, Vector3 tip, float radius, DebugStyle? style = null, int segments = 24)
+    public void Cone(Vec3 baseCenter, Vec3 tip, float radius, DebugStyle? style = null, int segments = 24)
     {
         var s = S(style);
         KoralNative.koral_debug_cone(Native, (float*)&baseCenter, (float*)&tip, radius, &s, segments);
     }
-    public void Capsule(Vector3 from, Vector3 to, float radius, DebugStyle? style = null, int segments = 24)
+    public void Capsule(Vec3 from, Vec3 to, float radius, DebugStyle? style = null, int segments = 24)
     {
         var s = S(style);
         KoralNative.koral_debug_capsule(Native, (float*)&from, (float*)&to, radius, &s, segments);
     }
     /// <summary>A camera: the pyramid it sees through, <paramref name="size"/> deep, with a triangle on top for up.</summary>
-    public void Camera(Matrix4x4 view, Matrix4x4 projection, float size = 1f, DebugStyle? style = null)
+    public void Camera(Mat4 view, Mat4 projection, float size = 1f, DebugStyle? style = null)
     {
         var s = S(style);
         KoralNative.koral_debug_camera(Native, (float*)&view, (float*)&projection, size, &s);
     }
     /// <summary>A star where it is, and the sphere it reaches to (none when <paramref name="range"/> is 0: no limit).</summary>
-    public void PointLight(Vector3 position, float range, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_point_light(Native, (float*)&position, range, &s); }
+    public void PointLight(Vec3 position, float range, DebugStyle? style = null) { var s = S(style); KoralNative.koral_debug_point_light(Native, (float*)&position, range, &s); }
     /// <summary>The cone it lights; angles from the centre to the edge, in radians.</summary>
-    public void SpotLight(Vector3 position, Vector3 direction, float range, float outerAngle, float innerAngle = 0f, DebugStyle? style = null)
+    public void SpotLight(Vec3 position, Vec3 direction, float range, float outerAngle, float innerAngle = 0f, DebugStyle? style = null)
     {
         var s = S(style);
         KoralNative.koral_debug_spot_light(Native, (float*)&position, (float*)&direction, range, outerAngle, innerAngle, &s);
     }
     /// <summary>The sun: a disc at <paramref name="position"/> with its rays.</summary>
-    public void DirectionalLight(Vector3 position, Vector3 direction, float size = 1f, DebugStyle? style = null)
+    public void DirectionalLight(Vec3 position, Vec3 direction, float size = 1f, DebugStyle? style = null)
     {
         var s = S(style);
         KoralNative.koral_debug_directional_light(Native, (float*)&position, (float*)&direction, size, &s);
@@ -370,12 +369,12 @@ public sealed unsafe class DebugDraw
     /// kor::DebugDraw::Gizmo: handles on <paramref name="transform"/>, the one under <paramref name="pointer"/> dragged while
     /// its button is down. Call it every frame the thing is selected. Returns whether <paramref name="transform"/> changed.
     /// </summary>
-    public bool Gizmo(GizmoMode mode, ref Matrix4x4 transform, Matrix4x4 viewProjection, GizmoPointer pointer,
+    public bool Gizmo(GizmoMode mode, ref Mat4 transform, Mat4 viewProjection, GizmoPointer pointer,
                       GizmoOptions? options = null, ulong id = 0)
     {
         var p = pointer.Native;
         var o = (options ?? new GizmoOptions()).Native;
-        fixed (Matrix4x4* m = &transform)
+        fixed (Mat4* m = &transform)
             return KoralNative.koral_debug_gizmo(Native, (uint)mode, (float*)m, (float*)&viewProjection, &p, &o, id).AsBool();
     }
     /// <summary>A handle is being dragged.</summary>

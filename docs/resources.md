@@ -48,7 +48,7 @@ Reading and writing:
 auto albedo = kor::Image::Builder{}
     .SetType(kor::Image::Type::e2D)
     .SetFormat(kor::Image::Format::eRGBA8_SRGB)
-    .SetExtent(glm::uvec2{ 1024, 1024 })
+    .SetExtent(kor::UVec2{ 1024, 1024 })
     .SetMipLevels(11)                      // the full chain for 1024², generated from the data by SetData
     .SetUsage(kor::Image::Usage::eSampled | kor::Image::Usage::eTransferDst | kor::Image::Usage::eTransferSrc)
     .SetData(pixels)

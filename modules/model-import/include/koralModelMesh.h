@@ -40,7 +40,7 @@
 #include <utility>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <buffer.h>
 #include <context.h>
@@ -71,56 +71,56 @@ namespace kmdl
     // ---- Position -----------------------------------------------------------
     template<> struct ImporterAttributeTraits<kmesh::Position2> {
         static bool Available(const Importer::Mesh& m) { return !m.positions.empty(); }
-        static glm::vec2 Get(const Importer::Mesh& m, unsigned int v) { return { m.positions[v].x, m.positions[v].y }; }
+        static kor::Vec2 Get(const Importer::Mesh& m, unsigned int v) { return { m.positions[v].x, m.positions[v].y }; }
     };
     template<> struct ImporterAttributeTraits<kmesh::Position> {
         static bool Available(const Importer::Mesh& m) { return !m.positions.empty(); }
-        static glm::vec3 Get(const Importer::Mesh& m, unsigned int v) { return m.positions[v]; }
+        static kor::Vec3 Get(const Importer::Mesh& m, unsigned int v) { return m.positions[v]; }
     };
     template<> struct ImporterAttributeTraits<kmesh::Position4> {
         static bool Available(const Importer::Mesh& m) { return !m.positions.empty(); }
-        static glm::vec4 Get(const Importer::Mesh& m, unsigned int v) { return { m.positions[v], 1.f }; }
+        static kor::Vec4 Get(const Importer::Mesh& m, unsigned int v) { return { m.positions[v], 1.f }; }
     };
 
     // ---- Normal -------------------------------------------------------------
     template<> struct ImporterAttributeTraits<kmesh::Normal> {
         static bool Available(const Importer::Mesh& m) { return m.normals.has_value(); }
-        static glm::vec3 Get(const Importer::Mesh& m, unsigned int v) { return (*m.normals)[v]; }
+        static kor::Vec3 Get(const Importer::Mesh& m, unsigned int v) { return (*m.normals)[v]; }
     };
     template<> struct ImporterAttributeTraits<kmesh::Normal4> {
         static bool Available(const Importer::Mesh& m) { return m.normals.has_value(); }
-        static glm::vec4 Get(const Importer::Mesh& m, unsigned int v) { return { (*m.normals)[v], 0.f }; }
+        static kor::Vec4 Get(const Importer::Mesh& m, unsigned int v) { return { (*m.normals)[v], 0.f }; }
     };
 
     // ---- UV -----------------------------------------------------------------
     template<> struct ImporterAttributeTraits<kmesh::UV> {
         static bool Available(const Importer::Mesh& m) { return m.vertexUVs.contains(0u); }
-        static glm::vec2 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexUVs.at(0u)[v]; }
+        static kor::Vec2 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexUVs.at(0u)[v]; }
     };
     template<std::size_t Channel>
     struct ImporterAttributeTraits<kmesh::IndexedAttribute<kmesh::UV, Channel>> {
-        static bool Available(const Importer::Mesh& m) { return m.vertexUVs.contains(static_cast<glm::u32>(Channel)); }
-        static glm::vec2 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexUVs.at(static_cast<glm::u32>(Channel))[v]; }
+        static bool Available(const Importer::Mesh& m) { return m.vertexUVs.contains(static_cast<kor::u32>(Channel)); }
+        static kor::Vec2 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexUVs.at(static_cast<kor::u32>(Channel))[v]; }
     };
 
     // ---- Tangent / Bitangent ------------------------------------------------
     template<> struct ImporterAttributeTraits<kmesh::Tangent> {
         static bool Available(const Importer::Mesh& m) { return m.tangents.has_value(); }
-        static glm::vec3 Get(const Importer::Mesh& m, unsigned int v) { return (*m.tangents)[v]; }
+        static kor::Vec3 Get(const Importer::Mesh& m, unsigned int v) { return (*m.tangents)[v]; }
     };
     template<> struct ImporterAttributeTraits<kmesh::Bitangent> {
         static bool Available(const Importer::Mesh& m) { return m.bitangents.has_value(); }
-        static glm::vec3 Get(const Importer::Mesh& m, unsigned int v) { return (*m.bitangents)[v]; }
+        static kor::Vec3 Get(const Importer::Mesh& m, unsigned int v) { return (*m.bitangents)[v]; }
     };
     template<> struct ImporterAttributeTraits<kmesh::PackedTangent> {
         static bool Available(const Importer::Mesh& m) {
             return m.tangents.has_value() && m.bitangents.has_value() && m.normals.has_value();
         }
-        static glm::vec4 Get(const Importer::Mesh& m, unsigned int v) {
-            const glm::vec3& n = (*m.normals)[v];
-            const glm::vec3& t = (*m.tangents)[v];
-            const glm::vec3& b = (*m.bitangents)[v];
-            const float w = glm::dot(glm::cross(n, t), b) < 0.f ? -1.f : 1.f;
+        static kor::Vec4 Get(const Importer::Mesh& m, unsigned int v) {
+            const kor::Vec3& n = (*m.normals)[v];
+            const kor::Vec3& t = (*m.tangents)[v];
+            const kor::Vec3& b = (*m.bitangents)[v];
+            const float w = kor::Dot(kor::Cross(n, t), b) < 0.f ? -1.f : 1.f;
             return { t, w };
         }
     };
@@ -129,32 +129,32 @@ namespace kmdl
     // Note: Importer::Mesh stores colors as vec3 (RGB). Alpha defaults to 1.
     template<> struct ImporterAttributeTraits<kmesh::Color3> {
         static bool Available(const Importer::Mesh& m) { return m.vertexColors.contains(0u); }
-        static glm::vec3 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexColors.at(0u)[v]; }
+        static kor::Vec3 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexColors.at(0u)[v]; }
     };
     template<> struct ImporterAttributeTraits<kmesh::Color> {
         static bool Available(const Importer::Mesh& m) { return m.vertexColors.contains(0u); }
-        static glm::vec4 Get(const Importer::Mesh& m, unsigned int v) { return { m.vertexColors.at(0u)[v], 1.f }; }
+        static kor::Vec4 Get(const Importer::Mesh& m, unsigned int v) { return { m.vertexColors.at(0u)[v], 1.f }; }
     };
     template<std::size_t Channel>
     struct ImporterAttributeTraits<kmesh::IndexedAttribute<kmesh::Color3, Channel>> {
-        static bool Available(const Importer::Mesh& m) { return m.vertexColors.contains(static_cast<glm::u32>(Channel)); }
-        static glm::vec3 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexColors.at(static_cast<glm::u32>(Channel))[v]; }
+        static bool Available(const Importer::Mesh& m) { return m.vertexColors.contains(static_cast<kor::u32>(Channel)); }
+        static kor::Vec3 Get(const Importer::Mesh& m, unsigned int v) { return m.vertexColors.at(static_cast<kor::u32>(Channel))[v]; }
     };
     template<std::size_t Channel>
     struct ImporterAttributeTraits<kmesh::IndexedAttribute<kmesh::Color, Channel>> {
-        static bool Available(const Importer::Mesh& m) { return m.vertexColors.contains(static_cast<glm::u32>(Channel)); }
-        static glm::vec4 Get(const Importer::Mesh& m, unsigned int v) { return { m.vertexColors.at(static_cast<glm::u32>(Channel))[v], 1.f }; }
+        static bool Available(const Importer::Mesh& m) { return m.vertexColors.contains(static_cast<kor::u32>(Channel)); }
+        static kor::Vec4 Get(const Importer::Mesh& m, unsigned int v) { return { m.vertexColors.at(static_cast<kor::u32>(Channel))[v], 1.f }; }
     };
 
     // ---- Bones --------------------------------------------------------------
     // boneData = pair<vector<vec4> weights, vector<uvec4> ids>
     template<> struct ImporterAttributeTraits<kmesh::BoneWeights> {
         static bool Available(const Importer::Mesh& m) { return m.boneData.has_value(); }
-        static glm::vec4 Get(const Importer::Mesh& m, unsigned int v) { return m.boneData->first[v]; }
+        static kor::Vec4 Get(const Importer::Mesh& m, unsigned int v) { return m.boneData->first[v]; }
     };
     template<> struct ImporterAttributeTraits<kmesh::BoneIds> {
         static bool Available(const Importer::Mesh& m) { return m.boneData.has_value(); }
-        static glm::ivec4 Get(const Importer::Mesh& m, unsigned int v) { return static_cast<glm::ivec4>(m.boneData->second[v]); }
+        static kor::IVec4 Get(const Importer::Mesh& m, unsigned int v) { return static_cast<kor::IVec4>(m.boneData->second[v]); }
     };
 
     // =============================================================================
@@ -202,9 +202,9 @@ namespace kmdl
                 .Build();
         }
 
-        inline kor::Resource<kor::Buffer> UploadIndexBuffer(const std::vector<glm::u32>& indices)
+        inline kor::Resource<kor::Buffer> UploadIndexBuffer(const std::vector<kor::u32>& indices)
         {
-            return kor::Buffer::Builder<glm::u32>()
+            return kor::Buffer::Builder<kor::u32>()
                 .SetDataView(indices)
                 // See uploadVertexBuffer for why the transfer roles are named here.
                 .SetUsage(kor::Buffer::Usage::eIndex
@@ -234,7 +234,7 @@ namespace kmdl
         [&]<std::size_t... I>(std::index_sequence<I...>)
         {
             (builder.SetVertexBuffer(
-                static_cast<glm::u32>(I),
+                static_cast<kor::u32>(I),
                 importer_detail::UploadVertexBuffer(
                     importer_detail::BuildVertices<
                         std::tuple_element_t<I, typename MeshT::Streams>
@@ -267,9 +267,9 @@ namespace kmdl
             importer_detail::BuildVertices<Streams>(mesh)...
         };
 
-        std::optional<std::span<const glm::u32>> indexSpan;
+        std::optional<std::span<const kor::u32>> indexSpan;
         if (mesh.indices.has_value())
-            indexSpan = std::span<const glm::u32>(*mesh.indices);
+            indexSpan = std::span<const kor::u32>(*mesh.indices);
 
         return [&]<std::size_t... I>(std::index_sequence<I...>)
         {
@@ -296,9 +296,9 @@ namespace kmdl
             importer_detail::BuildVertices<Streams>(mesh)...
         };
 
-        std::optional<std::span<const glm::u32>> indexSpan;
+        std::optional<std::span<const kor::u32>> indexSpan;
         if (mesh.indices.has_value())
-            indexSpan = std::span<const glm::u32>(*mesh.indices);
+            indexSpan = std::span<const kor::u32>(*mesh.indices);
 
         kor::Context::SwitchToMainThread();
         auto allocation = [&]<std::size_t... I>(std::index_sequence<I...>)

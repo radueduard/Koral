@@ -96,13 +96,13 @@ namespace kui
          *        its bar and frame, when it has them. It follows its content when that changes size, and
          *        has no corner to resize it by.
          */
-        DockLayout& Float(std::string panel, glm::vec2 at = { 40.f, 40.f });
+        DockLayout& Float(std::string panel, kor::Vec2 at = { 40.f, 40.f });
 
         /**
          * @brief Floats @p panel outside the window, over the desktop, @p size big, where the dock space
          *        can (DockOptions::multiViewport); it floats inside the space where it cannot.
          */
-        DockLayout& PopOut(std::string panel, glm::vec2 size = { 480.f, 360.f });
+        DockLayout& PopOut(std::string panel, kor::Vec2 size = { 480.f, 360.f });
 
         /** @brief Takes @p panel away, button and all; it keeps its place for when it is opened again. */
         void Close(const std::string& panel);

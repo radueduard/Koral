@@ -58,8 +58,8 @@ namespace kui
                 else Scroll(0.f);
             }
 
-            [[nodiscard]] bool HitTestSelf(glm::vec2) const override { return true; }
-            [[nodiscard]] glm::vec2 ChildOrigin(const RenderObject& child) const override { return child.Offset() - Along(_scroll); }
+            [[nodiscard]] bool HitTestSelf(kor::Vec2) const override { return true; }
+            [[nodiscard]] kor::Vec2 ChildOrigin(const RenderObject& child) const override { return child.Offset() - Along(_scroll); }
 
             bool HandleEvent(const PointerEvent& event) override
             {
@@ -69,7 +69,7 @@ namespace kui
                 return Scroll(-delta * 48.f);
             }
 
-            void Paint(Canvas& canvas, const glm::vec2 offset) override
+            void Paint(Canvas& canvas, const kor::Vec2 offset) override
             {
                 // The items, drawn into the content layer at their places in the whole list — not where
                 // the scroll has them, which is the layer's business.
@@ -102,7 +102,7 @@ namespace kui
                     const float lo = Fixed() ? _config.extent : 0.f, hi = Fixed() ? _config.extent : Infinity;
                     if (vertical) item = { least, most, lo, hi }; else item = { lo, hi, least, most };
                     _children[i]->Layout(item);
-                    const glm::vec2 size = _children[i]->Size();
+                    const kor::Vec2 size = _children[i]->Size();
                     if (!crossBounded) cross = std::max(cross, vertical ? size.x : size.y);
                     const std::size_t index = _config.indices[i];
                     if (!Fixed() && index < _extents.size()) {
@@ -112,7 +112,7 @@ namespace kui
                 }
                 Measure();
                 const float main = mainBounded ? (vertical ? c.maxHeight : c.maxWidth) : Total();
-                SetSize(vertical ? glm::vec2(cross, main) : glm::vec2(main, cross));
+                SetSize(vertical ? kor::Vec2(cross, main) : kor::Vec2(main, cross));
                 // Placed by where the item is in the whole list. Not SetOffset: a child moving inside
                 // the content layer repaints the content, which this does every layout anyway.
                 for (std::size_t i = 0; i < _children.size() && i < _config.indices.size(); ++i)
@@ -130,7 +130,7 @@ namespace kui
 
             [[nodiscard]] bool Vertical() const { return _config.axis == Axis::eVertical; }
             [[nodiscard]] bool Fixed() const { return _config.extent > 0.f; }
-            [[nodiscard]] glm::vec2 Along(const float v) const { return Vertical() ? glm::vec2(0.f, v) : glm::vec2(v, 0.f); }
+            [[nodiscard]] kor::Vec2 Along(const float v) const { return Vertical() ? kor::Vec2(0.f, v) : kor::Vec2(v, 0.f); }
             [[nodiscard]] float Screen() const { return Vertical() ? Size().y : Size().x; }
 
             /** @brief Where each item starts, from how long each is: worked out again when one of them changed. */

@@ -36,10 +36,10 @@ namespace kimg
         };
 
         /** @brief How many mip levels an image of this size has, counting the full-size one. */
-        glm::u32 mipLevelsFor(const glm::uvec3 extent)
+        kor::u32 mipLevelsFor(const kor::UVec3 extent)
         {
-            glm::u32 levels = 1;
-            for (glm::u32 size = std::max(extent.x, extent.y); size > 1; size /= 2) ++levels;
+            kor::u32 levels = 1;
+            for (kor::u32 size = std::max(extent.x, extent.y); size > 1; size /= 2) ++levels;
             return levels;
         }
 
@@ -50,22 +50,22 @@ namespace kimg
          * the encoders quantise hard enough that a better kernel does not survive the trip, and this
          * one cannot ring or overshoot. Odd sizes take the texels that exist.
          */
-        CpuImage halve(const CpuImage& source, const glm::u32 channels)
+        CpuImage halve(const CpuImage& source, const kor::u32 channels)
         {
             CpuImage next;
             next.format = source.format;
             next.extent = { std::max(1u, source.extent.x / 2), std::max(1u, source.extent.y / 2), 1 };
             next.pixels.resize(static_cast<std::size_t>(next.extent.x) * next.extent.y * channels);
 
-            for (glm::u32 y = 0; y < next.extent.y; ++y) {
-                for (glm::u32 x = 0; x < next.extent.x; ++x) {
-                    for (glm::u32 c = 0; c < channels; ++c) {
-                        const auto at = [&](const glm::u32 sx, const glm::u32 sy) -> glm::u32 {
-                            const glm::u32 cx = std::min(sx, source.extent.x - 1);
-                            const glm::u32 cy = std::min(sy, source.extent.y - 1);
+            for (kor::u32 y = 0; y < next.extent.y; ++y) {
+                for (kor::u32 x = 0; x < next.extent.x; ++x) {
+                    for (kor::u32 c = 0; c < channels; ++c) {
+                        const auto at = [&](const kor::u32 sx, const kor::u32 sy) -> kor::u32 {
+                            const kor::u32 cx = std::min(sx, source.extent.x - 1);
+                            const kor::u32 cy = std::min(sy, source.extent.y - 1);
                             return source.pixels[(static_cast<std::size_t>(cy) * source.extent.x + cx) * channels + c];
                         };
-                        const glm::u32 sum = at(x * 2, y * 2) + at(x * 2 + 1, y * 2)
+                        const kor::u32 sum = at(x * 2, y * 2) + at(x * 2 + 1, y * 2)
                                            + at(x * 2, y * 2 + 1) + at(x * 2 + 1, y * 2 + 1);
                         next.pixels[(static_cast<std::size_t>(y) * next.extent.x + x) * channels + c] =
                             static_cast<unsigned char>((sum + 2) / 4);
@@ -76,7 +76,7 @@ namespace kimg
         }
 
         /** @brief The channel count of an 8-bit format, or nullopt when the format is not one. */
-        std::optional<glm::u32> eightBitChannels(const kor::Image::Format format)
+        std::optional<kor::u32> eightBitChannels(const kor::Image::Format format)
         {
             using F = kor::Image::Format;
             switch (format) {
@@ -93,7 +93,7 @@ namespace kimg
         }
 
         /** @brief The uncompressed VkFormat to record before the encoder replaces it. */
-        std::uint32_t sourceVkFormat(const glm::u32 channels, const bool srgb)
+        std::uint32_t sourceVkFormat(const kor::u32 channels, const bool srgb)
         {
             switch (channels) {
             case 1: return VK_FORMAT_R8_UNORM;
@@ -112,7 +112,7 @@ namespace kimg
                 params.structSize = sizeof(params);
                 params.blockDimension = KTX_PACK_ASTC_BLOCK_DIMENSION_4x4;
                 params.mode = KTX_PACK_ASTC_ENCODER_MODE_LDR;
-                params.qualityLevel = std::clamp<glm::u32>(options.quality, 1, KTX_PACK_ASTC_QUALITY_LEVEL_MAX);
+                params.qualityLevel = std::clamp<kor::u32>(options.quality, 1, KTX_PACK_ASTC_QUALITY_LEVEL_MAX);
                 params.normalMap = options.normalMap ? KTX_TRUE : KTX_FALSE;
                 params.perceptual = options.normalMap ? KTX_FALSE : KTX_TRUE;
                 params.threadCount = 0;   // libktx picks a sensible number
@@ -134,11 +134,11 @@ namespace kimg
                 if (options.codec == Codec::eUASTC) {
                     // UASTC has five discrete levels rather than a 1..255 scale, so the option is
                     // mapped onto them: 128 — the default — lands on KTX_PACK_UASTC_LEVEL_DEFAULT.
-                    const glm::u32 level = std::min<glm::u32>(
+                    const kor::u32 level = std::min<kor::u32>(
                         options.quality * (KTX_PACK_UASTC_MAX_LEVEL + 1) / 256, KTX_PACK_UASTC_MAX_LEVEL);
                     params.uastcFlags = level;
                 } else {
-                    params.qualityLevel = std::clamp<glm::u32>(options.quality, 1, 255);
+                    params.qualityLevel = std::clamp<kor::u32>(options.quality, 1, 255);
                 }
 
                 if (const auto result = ktxTexture2_CompressBasisEx(texture, &params); result != KTX_SUCCESS)

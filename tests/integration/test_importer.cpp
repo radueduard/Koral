@@ -51,7 +51,7 @@ TEST_F(GpuTest, ImporterLoadsGltfSceneMetadata) {
     const Importer::Mesh& mesh = scene.meshes.front();
     EXPECT_FALSE(mesh.positions.empty());
     if (mesh.indices.has_value()) {
-        for (const glm::u32 idx : *mesh.indices) {
+        for (const kor::u32 idx : *mesh.indices) {
             ASSERT_LT(idx, mesh.positions.size());
         }
     }
@@ -123,13 +123,13 @@ TEST_F(GpuTest, ImporterKeepsAGltfLightsColourAndIntensityApart) {
     };
     const auto lamp = find("lamp");
     EXPECT_EQ(lamp.type, Importer::Light::Type::ePoint);
-    EXPECT_EQ(lamp.color, glm::vec3(1.f, 0.5f, 0.25f)) << "a switched-off light keeps its colour";
+    EXPECT_EQ(lamp.color, kor::Vec3(1.f, 0.5f, 0.25f)) << "a switched-off light keeps its colour";
     EXPECT_EQ(lamp.intensity, 0.f);
-    EXPECT_EQ(lamp.position, glm::vec3(1.f, 2.f, 3.f));
+    EXPECT_EQ(lamp.position, kor::Vec3(1.f, 2.f, 3.f));
 
     const auto sun = find("sunNode");
     EXPECT_EQ(sun.type, Importer::Light::Type::eDirectional);
-    EXPECT_EQ(sun.color, glm::vec3(0.2f, 0.4f, 1.f)) << "the colour, without the intensity multiplied in";
+    EXPECT_EQ(sun.color, kor::Vec3(0.2f, 0.4f, 1.f)) << "the colour, without the intensity multiplied in";
     EXPECT_EQ(sun.intensity, 5.f);
     EXPECT_EQ(sun.range, 12.f);
 

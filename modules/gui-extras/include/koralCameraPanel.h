@@ -35,7 +35,7 @@
 #include <variant>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <input.h>
 #include <scene.h>
@@ -101,15 +101,15 @@ namespace kgui
                 rows.push_back(Labeled("position", DragFloats({camera.Position().x, camera.Position().y, camera.Position().z},
                     [&camera](const std::vector<float>& v) { camera.SetPosition({v[0], v[1], v[2]}); }, 0.1f)));
                 if constexpr (perspective) {
-                    rows.push_back(Labeled("fov", kui::DragValue(glm::degrees(camera.FovY()),
-                        [&camera](const float degrees) { camera.SetFovY(glm::radians(degrees)); },
+                    rows.push_back(Labeled("fov", kui::DragValue(kor::Degrees(camera.FovY()),
+                        [&camera](const float degrees) { camera.SetFovY(kor::Radians(degrees)); },
                         kui::DragValueOptions {}.SetRange(10.f, 140.f).SetDecimals(0).SetSpeed(0.5f))));
                     Aspect(camera, rows);
                     rows.push_back(Labeled("near / far", DragFloats({camera.ZNear(), camera.ZFar()}, [&camera](const std::vector<float>& v) {
                         if (v[0] > 0.f && v[1] > v[0]) camera.SetNearFar(v[0], v[1]);
                     }, 0.1f, 3, 0.001f, 100000.f)));
                 } else {
-                    const glm::vec4 bounds = camera.Bounds();
+                    const kor::Vec4 bounds = camera.Bounds();
                     rows.push_back(Labeled("l / r / b / t", DragFloats({bounds.x, bounds.y, bounds.z, bounds.w},
                         [&camera](const std::vector<float>& v) { camera.SetBounds(v[0], v[1], v[2], v[3]); }, 0.1f)));
                     rows.push_back(Labeled("near / far", DragFloats({camera.ZNear(), camera.ZFar()}, [&camera](const std::vector<float>& v) {
@@ -171,7 +171,7 @@ namespace kgui
                         kui::DragValueOptions {}.SetRange(1.f, 20.f).SetDecimals(1).SetSpeed(0.1f))));
                 }
                 if (controller.kind == kcam::Controller::Kind::eOrbit) {
-                    const glm::vec3 target = controller.orbitTarget;
+                    const kor::Vec3 target = controller.orbitTarget;
                     rows.push_back(Labeled("orbit target", DragFloats({target.x, target.y, target.z},
                         edit([](kcam::Controller& c, const std::vector<float>& v) { c.orbitTarget = {v[0], v[1], v[2]}; }), 0.1f)));
                 }

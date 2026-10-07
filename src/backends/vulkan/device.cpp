@@ -27,7 +27,7 @@
 #include "vulkanContext.h"
 
 namespace kor::vk {
-    Queue::Family::Family(const glm::u32 index, const ::vk::QueueFamilyProperties &properties) :
+    Queue::Family::Family(const kor::u32 index, const ::vk::QueueFamilyProperties &properties) :
         _index(index),
         _properties(properties) {
         _remainingQueues = properties.queueCount;
@@ -462,7 +462,7 @@ namespace kor::vk {
         return _asyncComputeQueue ? *_asyncComputeQueue : frame;
     }
 
-    std::vector<glm::u32> Device::sharedFamilies() const {
+    std::vector<kor::u32> Device::sharedFamilies() const {
         const Queue& async = requestAsyncComputeQueue();
         const Queue& frame = requestQueue(::vk::QueueFlagBits::eGraphics);
         if (async.getFamily().getIndex() == frame.getFamily().getIndex()) return {};

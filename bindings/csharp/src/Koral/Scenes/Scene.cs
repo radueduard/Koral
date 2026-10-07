@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Numerics;
 using Koral.Native;
 
 namespace Koral;
@@ -13,7 +12,7 @@ namespace Koral;
 /// <code>
 /// public sealed class Level : Scene
 /// {
-///     [Keep] private Vector3 _player;   // kept across a hot reload
+///     [Keep] private Vec3 _player;   // kept across a hot reload
 ///
 ///     protected override void Initialize()
 ///     {
@@ -226,10 +225,10 @@ public abstract unsafe partial class Scene : IResourceOwner
         public static bool InterfaceWantsKeyboard => Get().InterfaceWantsKeyboard;
         public static string TypedText => Get().TypedText;
         public static bool IsKeyRepeated(Key key) => Get().IsKeyRepeated(key);
-        public static Vector2 MousePosition => Get().MousePosition;
-        public static Vector2 MousePositionDelta => Get().MousePositionDelta;
-        public static Vector2 MouseScrollDelta => Get().MouseScrollDelta;
-        public static Vector2 LastMousePosition => Get().LastMousePosition;
+        public static Vec2 MousePosition => Get().MousePosition;
+        public static Vec2 MousePositionDelta => Get().MousePositionDelta;
+        public static Vec2 MouseScrollDelta => Get().MouseScrollDelta;
+        public static Vec2 LastMousePosition => Get().LastMousePosition;
         public static void SetCursorMode(Koral.Input.CursorMode mode) => Get().SetCursorMode(mode);
         public static Koral.Input.CursorMode CurrentCursorMode => Get().CurrentCursorMode;
         public static string Describe(Key key) => Koral.Input.Describe(key);
@@ -246,7 +245,7 @@ public abstract unsafe partial class Scene : IResourceOwner
         public static bool IsActionHeld(string action) => Get().IsActionHeld(action);
         public static bool IsActionReleased(string action) => Get().IsActionReleased(action);
         public static float Axis(string axis) => Get().Axis(axis);
-        public static Vector2 Axis2D(string x, string y) => Get().Axis2D(x, y);
+        public static Vec2 Axis2D(string x, string y) => Get().Axis2D(x, y);
     }
 
     /// <summary>kor::Scene::Debug: the current scene's debug lines.</summary>
@@ -259,35 +258,35 @@ public abstract unsafe partial class Scene : IResourceOwner
             return t_debug.Object;
         }
 
-        public static void Line(Vector3 from, Vector3 to, DebugStyle? style = null) => Get().Line(from, to, style);
-        public static void Box(Vector3 min, Vector3 max, DebugStyle? style = null) => Get().Box(min, max, style);
-        public static void Box(Matrix4x4 transform, DebugStyle? style = null) => Get().Box(transform, style);
-        public static void Circle(Vector3 center, Vector3 normal, float radius, DebugStyle? style = null) => Get().Circle(center, normal, radius, style);
-        public static void Sphere(Vector3 center, float radius, DebugStyle? style = null) => Get().Sphere(center, radius, style);
-        public static void Arrow(Vector3 from, Vector3 to, DebugStyle? style = null) => Get().Arrow(from, to, style);
-        public static void Point(Vector3 position, float size = 0.1f, DebugStyle? style = null) => Get().Point(position, size, style);
-        public static void Axes(Matrix4x4 transform, float size = 1f, float duration = 0f) => Get().Axes(transform, size, duration);
-        public static void Grid(Vector3 center, float size, int cells, DebugStyle? style = null) => Get().Grid(center, size, cells, style);
-        public static void Frustum(Matrix4x4 viewProjection, DebugStyle? style = null) => Get().Frustum(viewProjection, style);
-        public static void Triangle(Vector3 a, Vector3 b, Vector3 c, DebugStyle? style = null) => Get().Triangle(a, b, c, style);
-        public static void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, DebugStyle? style = null) => Get().Quad(a, b, c, d, style);
-        public static void Plane(Vector3 center, Vector3 normal, Vector2 size, DebugStyle? style = null) => Get().Plane(center, normal, size, style);
-        public static void Cylinder(Vector3 from, Vector3 to, float radius, DebugStyle? style = null) => Get().Cylinder(from, to, radius, style);
-        public static void Cone(Vector3 baseCenter, Vector3 tip, float radius, DebugStyle? style = null) => Get().Cone(baseCenter, tip, radius, style);
-        public static void Capsule(Vector3 from, Vector3 to, float radius, DebugStyle? style = null) => Get().Capsule(from, to, radius, style);
-        public static void Camera(Matrix4x4 view, Matrix4x4 projection, float size = 1f, DebugStyle? style = null) => Get().Camera(view, projection, size, style);
-        public static void PointLight(Vector3 position, float range, DebugStyle? style = null) => Get().PointLight(position, range, style);
-        public static void SpotLight(Vector3 position, Vector3 direction, float range, float outerAngle, float innerAngle = 0f, DebugStyle? style = null)
+        public static void Line(Vec3 from, Vec3 to, DebugStyle? style = null) => Get().Line(from, to, style);
+        public static void Box(Vec3 min, Vec3 max, DebugStyle? style = null) => Get().Box(min, max, style);
+        public static void Box(Mat4 transform, DebugStyle? style = null) => Get().Box(transform, style);
+        public static void Circle(Vec3 center, Vec3 normal, float radius, DebugStyle? style = null) => Get().Circle(center, normal, radius, style);
+        public static void Sphere(Vec3 center, float radius, DebugStyle? style = null) => Get().Sphere(center, radius, style);
+        public static void Arrow(Vec3 from, Vec3 to, DebugStyle? style = null) => Get().Arrow(from, to, style);
+        public static void Point(Vec3 position, float size = 0.1f, DebugStyle? style = null) => Get().Point(position, size, style);
+        public static void Axes(Mat4 transform, float size = 1f, float duration = 0f) => Get().Axes(transform, size, duration);
+        public static void Grid(Vec3 center, float size, int cells, DebugStyle? style = null) => Get().Grid(center, size, cells, style);
+        public static void Frustum(Mat4 viewProjection, DebugStyle? style = null) => Get().Frustum(viewProjection, style);
+        public static void Triangle(Vec3 a, Vec3 b, Vec3 c, DebugStyle? style = null) => Get().Triangle(a, b, c, style);
+        public static void Quad(Vec3 a, Vec3 b, Vec3 c, Vec3 d, DebugStyle? style = null) => Get().Quad(a, b, c, d, style);
+        public static void Plane(Vec3 center, Vec3 normal, Vec2 size, DebugStyle? style = null) => Get().Plane(center, normal, size, style);
+        public static void Cylinder(Vec3 from, Vec3 to, float radius, DebugStyle? style = null) => Get().Cylinder(from, to, radius, style);
+        public static void Cone(Vec3 baseCenter, Vec3 tip, float radius, DebugStyle? style = null) => Get().Cone(baseCenter, tip, radius, style);
+        public static void Capsule(Vec3 from, Vec3 to, float radius, DebugStyle? style = null) => Get().Capsule(from, to, radius, style);
+        public static void Camera(Mat4 view, Mat4 projection, float size = 1f, DebugStyle? style = null) => Get().Camera(view, projection, size, style);
+        public static void PointLight(Vec3 position, float range, DebugStyle? style = null) => Get().PointLight(position, range, style);
+        public static void SpotLight(Vec3 position, Vec3 direction, float range, float outerAngle, float innerAngle = 0f, DebugStyle? style = null)
             => Get().SpotLight(position, direction, range, outerAngle, innerAngle, style);
-        public static void DirectionalLight(Vector3 position, Vector3 direction, float size = 1f, DebugStyle? style = null)
+        public static void DirectionalLight(Vec3 position, Vec3 direction, float size = 1f, DebugStyle? style = null)
             => Get().DirectionalLight(position, direction, size, style);
 
         /// <summary>kor::Scene::Debug::Gizmo: a gizmo used with the scene's own mouse (its left button) over its window.</summary>
-        public static unsafe bool Gizmo(GizmoMode mode, ref Matrix4x4 transform, Matrix4x4 viewProjection, GizmoOptions? options = null, ulong id = 0)
+        public static unsafe bool Gizmo(GizmoMode mode, ref Mat4 transform, Mat4 viewProjection, GizmoOptions? options = null, ulong id = 0)
         {
             Get();   // the scene's, or the reason there is none
             var o = (options ?? new GizmoOptions()).Native;
-            fixed (Matrix4x4* m = &transform)
+            fixed (Mat4* m = &transform)
                 return KoralNative.koral_current_gizmo((uint)mode, (float*)m, (float*)&viewProjection, &o, id).AsBool();
         }
         public static bool GizmoActive => Get().GizmoActive;

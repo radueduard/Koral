@@ -7,7 +7,7 @@
 #include <optional>
 #include <source_location>
 
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 
@@ -53,11 +53,11 @@ namespace kor
         {
             kor::ResourceRef<const Buffer> buffer;          ///< The buffer being viewed.
             std::optional<Image::Format> format;            ///< How its bytes are read. Required.
-            glm::i64 offset = 0;                            ///< First byte the view covers.
+            kor::i64 offset = 0;                            ///< First byte the view covers.
             /// Bytes covered, or 0 for the rest of the buffer. Zero rather than kor::WholeSize
             /// because this is signed and a zero-byte view means nothing anyway — unlike a count
             /// of elements, where 0 is a real answer and needs to be distinguishable.
-            glm::i64 range = 0;
+            kor::i64 range = 0;
 
             /** @param buffer The buffer to view. It must outlive the view, and must carry Buffer::Usage::eTexel. */
             explicit Builder(kor::ResourceRef<const Buffer> buffer);
@@ -75,7 +75,7 @@ namespace kor
             }
 
             /** @brief Sets the first byte of the buffer the view covers. Must be a whole number of texels in. */
-            Builder& SetOffset(const glm::i64 offset)
+            Builder& SetOffset(const kor::i64 offset)
             {
                 this->offset = offset;
                 return *this;
@@ -87,7 +87,7 @@ namespace kor
              * Left at 0 it is the rest of the buffer, which is what a view of a whole buffer wants.
              * Either way it has to come out a whole number of texels.
              */
-            Builder& SetRange(const glm::i64 range)
+            Builder& SetRange(const kor::i64 range)
             {
                 this->range = range;
                 return *this;
@@ -107,11 +107,11 @@ namespace kor
         /** @brief What one texel is. */
         [[nodiscard]] Image::Format PixelFormat() const { return _format; }
         /** @brief First byte of the buffer the view covers. */
-        [[nodiscard]] glm::i64 Offset() const { return _offset; }
+        [[nodiscard]] kor::i64 Offset() const { return _offset; }
         /** @brief How many bytes the view covers. Resolved: a builder range of 0 reads back as the rest of the buffer. */
-        [[nodiscard]] glm::i64 Range() const { return _range; }
+        [[nodiscard]] kor::i64 Range() const { return _range; }
         /** @brief How many texels that range holds. */
-        [[nodiscard]] glm::u64 TexelCount() const { return _texelCount; }
+        [[nodiscard]] kor::u64 TexelCount() const { return _texelCount; }
 
         /** @brief Whether the view follows a per-frame buffer, and so has one instance per frame in flight. */
         [[nodiscard]] bool IsPerFrame() const { return _isPerFrame; }
@@ -121,9 +121,9 @@ namespace kor
 
         kor::ResourceRef<const Buffer> _buffer;
         Image::Format _format;
-        glm::i64 _offset;
-        glm::i64 _range;
-        glm::u64 _texelCount;
+        kor::i64 _offset;
+        kor::i64 _range;
+        kor::u64 _texelCount;
         bool _isPerFrame = false;
     };
 }

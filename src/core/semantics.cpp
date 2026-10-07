@@ -75,14 +75,14 @@ namespace kor
     void SemanticSlot::Set(const float value)          { Write(Scalar::eFloat, 1, 1, &value, sizeof(value)); }
     void SemanticSlot::Set(const std::int32_t value)   { Write(Scalar::eInt, 1, 1, &value, sizeof(value)); }
     void SemanticSlot::Set(const std::uint32_t value)  { Write(Scalar::eUInt, 1, 1, &value, sizeof(value)); }
-    void SemanticSlot::Set(const glm::vec2& value)     { Write(Scalar::eFloat, 2, 1, &value, sizeof(value)); }
-    void SemanticSlot::Set(const glm::vec3& value)     { Write(Scalar::eFloat, 3, 1, &value, sizeof(value)); }
-    void SemanticSlot::Set(const glm::vec4& value)     { Write(Scalar::eFloat, 4, 1, &value, sizeof(value)); }
-    void SemanticSlot::Set(const glm::mat4& value)     { Write(Scalar::eFloat, 4, 4, &value, sizeof(value)); }
+    void SemanticSlot::Set(const kor::Vec2& value)     { Write(Scalar::eFloat, 2, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const kor::Vec3& value)     { Write(Scalar::eFloat, 3, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const kor::Vec4& value)     { Write(Scalar::eFloat, 4, 1, &value, sizeof(value)); }
+    void SemanticSlot::Set(const kor::Mat4& value)     { Write(Scalar::eFloat, 4, 4, &value, sizeof(value)); }
 
-    void SemanticSlot::Set(const glm::mat3& value)
+    void SemanticSlot::Set(const kor::Mat3& value)
     {
-        // std140 pads each column of a mat3 out to 16 bytes, so the tight glm::mat3 cannot be
+        // std140 pads each column of a mat3 out to 16 bytes, so the tight kor::Mat3 cannot be
         // copied straight in. Expanded here rather than made the caller's problem.
         if (_scalar != Scalar::eFloat || _rows != 3 || _columns != 3)
         {
@@ -108,7 +108,7 @@ namespace kor
     struct SemanticBuffers::Block
     {
         std::vector<Shader::BlockMember> members;
-        glm::u32 size = 0;
+        kor::u32 size = 0;
         Resource<Buffer> buffer;
         std::vector<std::byte> staging;     ///< Assembled here, then compared before uploading.
         std::optional<Error> error;         ///< A mismatch, which poisons whatever binds it.
@@ -134,9 +134,9 @@ namespace kor
          * hash the same and share one buffer; renaming a field changes nothing, since the name is
          * only ever used to report a mistake.
          */
-        std::size_t shapeOf(const std::vector<Shader::BlockMember>& members, const glm::u32 blockSize)
+        std::size_t shapeOf(const std::vector<Shader::BlockMember>& members, const kor::u32 blockSize)
         {
-            std::size_t hash = std::hash<glm::u32>{}(blockSize);
+            std::size_t hash = std::hash<kor::u32>{}(blockSize);
             const auto mix = [&hash](const std::size_t value) {
                 hash ^= value + 0x9e3779b97f4a7c15ULL + (hash << 6) + (hash >> 2);
             };
@@ -212,7 +212,7 @@ namespace kor
         }
 
         block.buffer = Buffer::RawBuilder()
-            .SetRawSize(static_cast<glm::i64>(blockSize))
+            .SetRawSize(static_cast<kor::i64>(blockSize))
             .SetUsage(Buffer::Usage::eUniform)
             .SetIsPerFrame(true)
             .SetType(Buffer::Type::eDynamic)

@@ -14,7 +14,7 @@
 #include <span>
 #include <vector>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <OpenImageIO/typedesc.h>
 
@@ -49,7 +49,7 @@ namespace kimg::detail
 
     /** @brief Uploads one CPU-side buffer into one mip level of one array layer. */
     void uploadSlice(const kor::ResourceRef<const kor::Image>& image, std::span<const unsigned char> bytes,
-                     glm::uvec3 extent, glm::u32 layer, glm::u32 mip);
+                     kor::UVec3 extent, kor::u32 layer, kor::u32 mip);
 
     /**
      * @brief Finishes a freshly uploaded texture: optional mips, then a shader-readable layout.
@@ -73,15 +73,15 @@ namespace kimg::detail
     struct KtxImage
     {
         /** @brief One mip of one layer, as a range of the file's pixel data. */
-        struct Slice { glm::u32 mip; glm::u32 layer; std::size_t offset; std::size_t size; };
+        struct Slice { kor::u32 mip; kor::u32 layer; std::size_t offset; std::size_t size; };
 
         std::shared_ptr<void> texture;          ///< The ktxTexture, kept opaque so this header stays free of ktx.h.
         const unsigned char* data = nullptr;    ///< Its pixel data, owned by `texture`.
         kor::Image::Format format = kor::Image::Format::eRGBA8_UNORM;
         kor::Image::Type type = kor::Image::Type::e2D;
-        glm::uvec3 extent { 1, 1, 1 };
-        glm::u32 arrayLayers = 1;
-        glm::u32 fileMipLevels = 1;             ///< How many levels the file carries; 1 means it has none.
+        kor::UVec3 extent { 1, 1, 1 };
+        kor::u32 arrayLayers = 1;
+        kor::u32 fileMipLevels = 1;             ///< How many levels the file carries; 1 means it has none.
         std::vector<Slice> slices;              ///< One per mip per layer, in upload order.
     };
 

@@ -14,7 +14,7 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <glm/fwd.hpp>
+#include <kmath/matrix.h>
 
 #include <vulkan/vulkan.hpp>
 
@@ -33,19 +33,19 @@ namespace kor::vk {
         {
             friend class Queue;
         public:
-            explicit Family(glm::u32 index, const ::vk::QueueFamilyProperties &properties);
+            explicit Family(kor::u32 index, const ::vk::QueueFamilyProperties &properties);
             ~Family() = default;
 
-            [[nodiscard]] glm::u32 getIndex() const { return _index; }
+            [[nodiscard]] kor::u32 getIndex() const { return _index; }
             [[nodiscard]] const ::vk::QueueFamilyProperties& getProperties() const { return _properties; }
 
             [[nodiscard]] std::unique_ptr<Queue> RequestQueue();
             [[nodiscard]] std::unique_ptr<Queue> RequestPresentQueue(const kor::vk::Surface& surface);
 
         private:
-            glm::u32 _index;
+            kor::u32 _index;
             ::vk::QueueFamilyProperties _properties;
-            glm::u32 _remainingQueues = 0;
+            kor::u32 _remainingQueues = 0;
         };
 
         explicit Queue(Family& family);
@@ -54,16 +54,16 @@ namespace kor::vk {
         Queue(const Queue &) = delete;
         Queue &operator=(const Queue &) = delete;
 
-        [[nodiscard]] glm::u32 getIndex() const { return _index; }
+        [[nodiscard]] kor::u32 getIndex() const { return _index; }
         [[nodiscard]] const Family& getFamily() const { return _family; }
         [[nodiscard]] bool canPresent(const kor::vk::Surface& surface) const;
-        [[nodiscard]] glm::u32 getIdentifier() const { return _identifier; }
+        [[nodiscard]] kor::u32 getIdentifier() const { return _identifier; }
 
         void Submit(const SubmitInfo& submitInfo) const;
 
     private:
-        glm::u32 _identifier;
-        glm::u32 _index;
+        kor::u32 _identifier;
+        kor::u32 _index;
         Family& _family;
     };
 
@@ -113,7 +113,7 @@ namespace kor::vk {
         [[nodiscard]] const Queue& requestAsyncComputeQueue() const;
         // The two families a resource used by both queues is shared between, when the async compute
         // queue is of a family of its own; empty when it is not (and exclusive sharing is right).
-        [[nodiscard]] std::vector<glm::u32> sharedFamilies() const;
+        [[nodiscard]] std::vector<kor::u32> sharedFamilies() const;
         void freeQueues() const;
 
         // A command buffer with a pool of its own, from a free list. A pool may only be used by one
@@ -156,7 +156,7 @@ namespace kor::vk {
             kor::Timeline timeline;
             std::uint64_t submitted = 0;   // guarded by _queueMutex
         };
-        mutable std::map<glm::u32, Epoch> _epochs; // by queue identifier; guarded by _queueMutex
+        mutable std::map<kor::u32, Epoch> _epochs; // by queue identifier; guarded by _queueMutex
 
         struct PooledCommandBuffer {
             ::vk::CommandPool pool;
@@ -165,7 +165,7 @@ namespace kor::vk {
             ::vk::QueryPool timerPool;   // null where the queue cannot be timed
         };
         mutable std::mutex _poolMutex;
-        mutable std::map<glm::u32, std::vector<PooledCommandBuffer>> _freeCommandBuffers {}; // by queue identifier
+        mutable std::map<kor::u32, std::vector<PooledCommandBuffer>> _freeCommandBuffers {}; // by queue identifier
         mutable std::vector<::vk::CommandPool> _commandPools {};                             // every pool ever made
         bool _supportsRayTracing = false;
         bool _supportsFifoLatestReady = false;

@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <koralMesh.h>
 
@@ -16,7 +16,7 @@ using kor::ChannelType;
 namespace {
 
 // -----------------------------------------------------------------------------
-// VertexValueTraits: channel count + channel type for scalars and glm vectors.
+// VertexValueTraits: channel count + channel type for scalars and kor vectors.
 // -----------------------------------------------------------------------------
 TEST(MeshLayout, ValueTraitsScalar) {
     EXPECT_EQ(VertexValueTraits<float>::channelCount, 1u);
@@ -26,12 +26,12 @@ TEST(MeshLayout, ValueTraitsScalar) {
 }
 
 TEST(MeshLayout, ValueTraitsVectors) {
-    EXPECT_EQ(VertexValueTraits<glm::vec2>::channelCount, 2u);
-    EXPECT_EQ(VertexValueTraits<glm::vec3>::channelCount, 3u);
-    EXPECT_EQ(VertexValueTraits<glm::vec4>::channelCount, 4u);
-    EXPECT_EQ(VertexValueTraits<glm::vec3>::channelType, ChannelType::eFloat);
-    EXPECT_EQ(VertexValueTraits<glm::ivec4>::channelCount, 4u);
-    EXPECT_EQ(VertexValueTraits<glm::ivec4>::channelType, ChannelType::eInt);
+    EXPECT_EQ(VertexValueTraits<kor::Vec2>::channelCount, 2u);
+    EXPECT_EQ(VertexValueTraits<kor::Vec3>::channelCount, 3u);
+    EXPECT_EQ(VertexValueTraits<kor::Vec4>::channelCount, 4u);
+    EXPECT_EQ(VertexValueTraits<kor::Vec3>::channelType, ChannelType::eFloat);
+    EXPECT_EQ(VertexValueTraits<kor::IVec4>::channelCount, 4u);
+    EXPECT_EQ(VertexValueTraits<kor::IVec4>::channelType, ChannelType::eInt);
 }
 
 // -----------------------------------------------------------------------------
@@ -40,9 +40,9 @@ TEST(MeshLayout, ValueTraitsVectors) {
 // -----------------------------------------------------------------------------
 TEST(MeshLayout, Std430Alignment) {
     EXPECT_EQ(Std430AlignTraits<float>::alignment, sizeof(float));
-    EXPECT_EQ(Std430AlignTraits<glm::vec2>::alignment, 2 * sizeof(float));
-    EXPECT_EQ(Std430AlignTraits<glm::vec3>::alignment, 4 * sizeof(float));
-    EXPECT_EQ(Std430AlignTraits<glm::vec4>::alignment, 4 * sizeof(float));
+    EXPECT_EQ(Std430AlignTraits<kor::Vec2>::alignment, 2 * sizeof(float));
+    EXPECT_EQ(Std430AlignTraits<kor::Vec3>::alignment, 4 * sizeof(float));
+    EXPECT_EQ(Std430AlignTraits<kor::Vec4>::alignment, 4 * sizeof(float));
 }
 
 // -----------------------------------------------------------------------------
@@ -68,10 +68,10 @@ TEST(MeshLayout, ParamVertexStrideMatchesStorageSize) {
 }
 
 TEST(MeshLayout, ParamVertexConstructAndGet) {
-    PNU v(glm::vec3(1, 2, 3), glm::vec3(0, 1, 0), glm::vec2(0.5f, 0.25f));
-    EXPECT_EQ(v.Get<0>(), glm::vec3(1, 2, 3));
-    EXPECT_EQ(v.Get<1>(), glm::vec3(0, 1, 0));
-    EXPECT_EQ(v.Get<2>(), glm::vec2(0.5f, 0.25f));
+    PNU v(kor::Vec3(1, 2, 3), kor::Vec3(0, 1, 0), kor::Vec2(0.5f, 0.25f));
+    EXPECT_EQ(v.Get<0>(), kor::Vec3(1, 2, 3));
+    EXPECT_EQ(v.Get<1>(), kor::Vec3(0, 1, 0));
+    EXPECT_EQ(v.Get<2>(), kor::Vec2(0.5f, 0.25f));
 }
 
 // -----------------------------------------------------------------------------
@@ -121,12 +121,12 @@ TEST(MeshLayout, StreamsBecomeSeparateBindings) {
 }
 
 TEST(MeshLayout, BareValueStreamHasOneUnnamedAttribute) {
-    // A heap of plain glm::vec3 positions: one attribute, no semantic, so it can only be
+    // A heap of plain kor::Vec3 positions: one attribute, no semantic, so it can only be
     // matched by declaration order.
-    const auto layout = MakeVertexLayout<glm::vec3, glm::vec2>();
+    const auto layout = MakeVertexLayout<kor::Vec3, kor::Vec2>();
 
     ASSERT_EQ(layout.bindings.size(), 2u);
-    EXPECT_EQ(layout.bindings[0].stride, sizeof(glm::vec3));
+    EXPECT_EQ(layout.bindings[0].stride, sizeof(kor::Vec3));
     ASSERT_EQ(layout.attributes.size(), 2u);
     EXPECT_TRUE(layout.attributes[0].semantic.empty());
     EXPECT_EQ(layout.attributes[0].channelCount, 3u);

@@ -40,7 +40,7 @@
 #include <string>
 #include <string_view>
 
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include <error.h>
 #include <resource.h>
@@ -106,7 +106,7 @@ namespace kimg
          * Read by ETC1S as its quality level and by ASTC as its effort; UASTC has five discrete
          * levels and this is mapped onto them.
          */
-        glm::u32 quality = 128;
+        kor::u32 quality = 128;
 
         /**
          * @brief Whether to build a mip chain before encoding.

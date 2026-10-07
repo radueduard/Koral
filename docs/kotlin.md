@@ -227,8 +227,9 @@ The JVM has no structs to copy as they are, so data crosses in one of three ways
   or one of your own;
 - **as push constants:** a number, `7u`, a vector, a `Mat4` or an array.
 
-`Vec2`, `Vec3`, `Vec4`, `IVec*`, `UVec*` and `Mat4` are glm's types, as values. `Mat4` is column-major like
-glm's, and has `perspective` (Vulkan's depth range), `lookAt`, `translation`, `rotation` and `scale`.
+`Vec2`, `Vec3`, `Vec4`, `IVec*`, `UVec*`, `Mat3`, `Mat4` and `Quat` are kmath's types, as immutable values, and
+kmath's functions are top-level: `dot`, `normalize`, `perspective` (Vulkan's depth range), `lookAt`, `compose`,
+`Random`, `Noise`, `ease`, `Bulk`... — see [math](math.md).
 
 ## Compose
 

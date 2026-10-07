@@ -454,7 +454,7 @@ namespace kor
         forEach([&](Module& m) { m.RenderOverlay(commandBuffer); });
     }
 
-    void ModuleHost::OnResize(const glm::uvec2 extent)
+    void ModuleHost::OnResize(const kor::UVec2 extent)
     {
         forEach([extent](Module& m) { m.OnResize(extent); });
     }

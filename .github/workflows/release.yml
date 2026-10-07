@@ -460,7 +460,7 @@ jobs:
           fi
 
           # SDK: what you build against. Everything, including the headers, the CMake package and
-          # the vendored public dependencies (glm/spdlog/fmt) so a project needs no package
+          # the vendored public dependencies (spdlog/fmt) so a project needs no package
           # manager of its own.
           sdk="koral-sdk-${version}-${{ matrix.name }}"
           cp -r stage "$sdk"
@@ -536,9 +536,10 @@ jobs:
           #include "log.h"
           #include "gui.h"
           #include "structs.h"
+          #include "kmath.h"
           int main() {
               kor::log::info("ok");
-              const glm::vec3 v{1.f, 2.f, 3.f};
+              const kor::Vec3 v{1.f, 2.f, 3.f};
               const ImVec2 p{4.f, 5.f};
               std::printf("%.1f %.1f %s\n", v.x, p.y,
                           kor::shaderPath("doubleValues.comp.glsl").string().c_str());

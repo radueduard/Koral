@@ -14,7 +14,7 @@ namespace kui
     {
         return kui::DecoratedBox({ .borderWidth = width, .borderColor = color, .radius = radius }, *this);
     }
-    Widget Widget::Shadow(const Color color, const float blur, const glm::vec2 offset, const Radii radius) const
+    Widget Widget::Shadow(const Color color, const float blur, const kor::Vec2 offset, const Radii radius) const
     {
         return kui::DecoratedBox({ .radius = radius, .shadowColor = color, .shadowBlur = blur, .shadowOffset = offset }, *this);
     }
@@ -31,7 +31,7 @@ namespace kui
     Widget Widget::Positioned(const PositionedOptions& options) const { return kui::Positioned(options, *this); }
     Widget Widget::Opacity(const float opacity) const { return kui::Opacity(opacity, *this); }
     Widget Widget::Clip(const Radii radius) const { return kui::ClipRRect(radius, *this); }
-    Widget Widget::Offset(const glm::vec2 by) const { return kui::Translate(by, *this); }
+    Widget Widget::Offset(const kor::Vec2 by) const { return kui::Translate(by, *this); }
     Widget Widget::Scrollable(const Axis axis) const { return kui::ScrollView(*this, axis); }
     Widget Widget::RepaintBoundary() const { return kui::RepaintBoundary(*this); }
     Widget Widget::OnTap(std::function<void()> onTap) const
@@ -47,7 +47,7 @@ namespace kui
     {
         DropTargetOptions options;
         options.AcceptsType(std::move(type));
-        options.onDrop = [onDrop = std::move(onDrop)](const DragData& data, glm::vec2) { if (onDrop) onDrop(data); };
+        options.onDrop = [onDrop = std::move(onDrop)](const DragData& data, kor::Vec2) { if (onDrop) onDrop(data); };
         return kui::DropTarget(std::move(options), *this);
     }
     Widget Widget::DropTarget(DropTargetOptions options) const { return kui::DropTarget(std::move(options), *this); }

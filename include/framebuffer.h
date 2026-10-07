@@ -7,7 +7,7 @@
 #include <optional>
 #include <vector>
 #include <variant>
-#include <glm/glm.hpp>
+#include <kmath/matrix.h>
 
 #include "api.h"
 #include <source_location>
@@ -34,7 +34,7 @@ namespace kor
      *
      * @code
      * auto gbuffer = kor::Framebuffer::Builder{}
-     *     .addColorAttachment("albedo", albedoImage, glm::vec4{0, 0, 0, 1})
+     *     .addColorAttachment("albedo", albedoImage, kor::Vec4{0, 0, 0, 1})
      *     .addColorAttachment("normal", normalImage)
      *     .setDepthAttachment(depthImage, 1.f)
      *     .Build();
@@ -93,7 +93,7 @@ namespace kor
             /// One entry per colour attachment, appended by addColorAttachment and indexed the same way.
             std::vector<ClearColor> clearColor {};
             float clearDepth = 1.f;     ///< Depth clear value. 1.0 is the far plane under the usual depth range.
-            glm::i32 clearStencil = 0;  ///< Stencil clear value.
+            kor::i32 clearStencil = 0;  ///< Stencil clear value.
         };
 
         /**
@@ -108,7 +108,7 @@ namespace kor
             std::optional<Attachment> stencilAttachment = std::nullopt;
             ClearValues clearValues;
             std::optional<SampleCount> sampleCount = std::nullopt;
-            std::optional<glm::uvec2> extent = std::nullopt;
+            std::optional<kor::UVec2> extent = std::nullopt;
             ResolveMode resolveMode = ResolveMode::eNone;
 
             /**
@@ -144,7 +144,7 @@ namespace kor
                 std::string_view name {};       ///< Optional. What lets Framebuffer::ImageNamed find it again by name.
                 AttachmentSource view {};       ///< What is rendered into. An Image or an ImageView.
                 AttachmentSource resolve {};    ///< For a multisampled target, where its samples collapse as the pass ends.
-                ClearColor clear = glm::vec4{ 0.f, 0.f, 0.f, 1.f };   ///< What a clearing pass fills it with.
+                ClearColor clear = kor::Vec4{ 0.f, 0.f, 0.f, 1.f };   ///< What a clearing pass fills it with.
             };
 
             /** @brief A depth, stencil, or combined depth-stencil target. @see setDepth, setStencil, setDepthStencil */
@@ -154,7 +154,7 @@ namespace kor
                 AttachmentSource view {};       ///< What is rendered into.
                 AttachmentSource resolve {};    ///< Where its samples collapse, for a multisampled target.
                 float depth = 1.f;              ///< What the depth part is cleared to; 1.0 is the far plane.
-                glm::i32 stencil = 0;           ///< What the stencil part is cleared to.
+                kor::i32 stencil = 0;           ///< What the stencil part is cleared to.
             };
 
             /**
@@ -214,19 +214,19 @@ namespace kor
         static Resource<Framebuffer> CreateDefault(const Window& window);
 
         /** @brief How many colour targets it has. */
-        [[nodiscard]] glm::u32 ColorAttachmentCount() const;
+        [[nodiscard]] kor::u32 ColorAttachmentCount() const;
 
         /** @brief Its samples per pixel. A pipeline rendering into it must declare the same. */
         [[nodiscard]] SampleCount Samples() const;
 
         /** @brief Its size in pixels, which every attachment shares. */
-        [[nodiscard]] const glm::uvec2& Extent() const { return _extent; }
+        [[nodiscard]] const kor::UVec2& Extent() const { return _extent; }
 
         /** @brief The colour targets, in the order a fragment shader's output locations address them. */
         [[nodiscard]] const std::vector<Attachment>& ColorAttachments() const;
 
         /** @brief The view rendered into at colour attachment @p index, or an empty ref if there is none. */
-        [[nodiscard]] ResourceRef<const ImageView> ColorAttachment(glm::u32 index) const;
+        [[nodiscard]] ResourceRef<const ImageView> ColorAttachment(kor::u32 index) const;
 
         /** @brief Whether it has a depth target, and so whether depth testing is possible in the pass. */
         [[nodiscard]] bool HasDepthAttachment() const;
@@ -244,7 +244,7 @@ namespace kor
         [[nodiscard]] bool HasResolveAttachments() const;
 
         /** @brief The resolve target for colour attachment @p index, or an empty ref if it has none. */
-        [[nodiscard]] ResourceRef<const ImageView> ResolveAttachment(glm::u32 index) const;
+        [[nodiscard]] ResourceRef<const ImageView> ResolveAttachment(kor::u32 index) const;
 
         /**
          * @name Reaching the targets by name
@@ -277,7 +277,7 @@ namespace kor
         [[nodiscard]] ResourceRef<const Image> ImageNamed(std::string_view name) const;
 
         /** @brief The image behind colour attachment @p index, or an empty ref if there is none. */
-        [[nodiscard]] ResourceRef<const Image> ColorImage(glm::u32 index = 0) const;
+        [[nodiscard]] ResourceRef<const Image> ColorImage(kor::u32 index = 0) const;
 
         /** @brief The image behind the depth target, or an empty ref if there is none. */
         [[nodiscard]] ResourceRef<const Image> DepthImage() const;
@@ -287,13 +287,13 @@ namespace kor
         ///@}
 
         /** @brief What colour attachment @p index is cleared to. */
-        [[nodiscard]] const ClearColor& ClearColorAt(glm::u32 index) const;
+        [[nodiscard]] const ClearColor& ClearColorAt(kor::u32 index) const;
 
         /** @brief What the depth target is cleared to. */
         [[nodiscard]] float ClearDepth() const;
 
         /** @brief What the stencil target is cleared to. */
-        [[nodiscard]] glm::i32 ClearStencil() const;
+        [[nodiscard]] kor::i32 ClearStencil() const;
 
         /** @brief How samples are combined when resolving. */
         [[nodiscard]] ResolveMode ResolveMethod() const;
@@ -318,7 +318,7 @@ namespace kor
          * from Scene::OnResize, or from Update when it follows something else's size (a viewport's).
          * Do it between frames, which is where both of those are, and not from inside Render.
          */
-        void Resize(const glm::uvec2& newExtent);
+        void Resize(const kor::UVec2& newExtent);
 
     protected:
         /**
@@ -329,13 +329,13 @@ namespace kor
          * resize that gets past those guards, the default framebuffer's included: that is where a
          * backend re-points the default at the swap chain's new images.
          */
-        virtual void DoResize(const glm::uvec2& newExtent) {}
+        virtual void DoResize(const kor::UVec2& newExtent) {}
 
         bool _isDefault = false;
         Framebuffer() = default;
         explicit Framebuffer(const Builder& createInfo);
 
-        glm::uvec2 _extent = { 0, 0 };
+        kor::UVec2 _extent = { 0, 0 };
         std::vector<Attachment> _colorAttachments {};
         std::optional<Attachment> _depthAttachment = std::nullopt;
         std::optional<Attachment> _stencilAttachment = std::nullopt;

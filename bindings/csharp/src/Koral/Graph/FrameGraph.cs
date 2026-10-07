@@ -1,4 +1,3 @@
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Koral.Native;
@@ -167,7 +166,7 @@ public abstract class CpuPass(string name) : RenderPass(name)
 /// kor::DebugDrawPass: a <see cref="DebugDraw"/>'s lines, drawn into <paramref name="target"/> with the
 /// camera <paramref name="viewProjection"/> gives, read on the main thread each frame.
 /// </summary>
-public sealed unsafe class DebugDrawPass(DebugDraw draw, Func<Matrix4x4> viewProjection, string target = FrameGraph.Screen, string? depth = null)
+public sealed unsafe class DebugDrawPass(DebugDraw draw, Func<Mat4> viewProjection, string target = FrameGraph.Screen, string? depth = null)
     : RenderPass("DebugDraw")
 {
     public override void Setup(PassBuilder builder) { }
@@ -185,12 +184,12 @@ public sealed unsafe class DebugDrawPass(DebugDraw draw, Func<Matrix4x4> viewPro
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void Camera(float* matrix, void* user)
     {
-        var camera = (Func<Matrix4x4>)GCHandle.FromIntPtr((IntPtr)user).Target!;
-        try { *(Matrix4x4*)matrix = camera(); }
+        var camera = (Func<Mat4>)GCHandle.FromIntPtr((IntPtr)user).Target!;
+        try { *(Mat4*)matrix = camera(); }
         catch (Exception e)
         {
             Log.Error($"[DebugDraw] the camera threw {e}");
-            *(Matrix4x4*)matrix = Matrix4x4.Identity;
+            *(Mat4*)matrix = Mat4.Identity;
         }
     }
 
