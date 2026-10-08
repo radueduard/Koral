@@ -60,6 +60,14 @@ namespace kor
         if (api != API::eVulkan)
             return Fail(ErrorCode::eUnknownApi, "Unknown graphics API!");
 
+        // What no device can make, said here: handed on, an image with no usage is an assertion in the allocator,
+        // and one with no size an error from the driver that names neither.
+        if (!usage)
+            return Fail(ErrorCode::eInvalidArgument, "An image needs at least one usage: what it will be used as (eSampled, eStorage, "
+                                                     "eColorAttachment, eDepthStencilAttachment, eTransferSrc, eTransferDst).");
+        if (extent.x == 0 || extent.y == 0 || extent.z == 0)
+            return Fail(ErrorCode::eInvalidArgument, "An image is at least 1 each way, and this one is {} x {} x {}.", extent.x, extent.y, extent.z);
+
         // Construct and (optionally) upload inside Guard(): any backend exception becomes a
         // kor::Error, and a staging-buffer failure is re-thrown with its own cause attached.
         return Guard(ErrorCode::eBackend, [&]() -> std::unique_ptr<Image> {

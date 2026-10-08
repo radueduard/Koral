@@ -377,7 +377,8 @@ void koral_image_builder_set_type(KoralImageBuilder* b, const uint32_t v) { Set<
 void koral_image_builder_set_format(KoralImageBuilder* b, const uint32_t v) { Set<Image::Builder>(b, [&](auto& x) { x.SetFormat(static_cast<Image::Format>(v)); }); }
 void koral_image_builder_set_extent(KoralImageBuilder* b, const uint32_t x_, const uint32_t y, const uint32_t z)
 {
-    Set<Image::Builder>(b, [&](auto& x) { x.SetExtent(kor::UVec3(x_, y, z)); });
+    // A dimension it does not have is 1, as SetExtent(UVec2) leaves it: 0 there says "not this many", not "none".
+    Set<Image::Builder>(b, [&](auto& x) { x.SetExtent(kor::UVec3(x_, y == 0 ? 1u : y, z == 0 ? 1u : z)); });
 }
 void koral_image_builder_set_mip_levels(KoralImageBuilder* b, const uint32_t v) { Set<Image::Builder>(b, [&](auto& x) { x.SetMipLevels(v); }); }
 void koral_image_builder_set_array_layers(KoralImageBuilder* b, const uint32_t v) { Set<Image::Builder>(b, [&](auto& x) { x.SetArrayLayers(v); }); }

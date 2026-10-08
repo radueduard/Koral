@@ -1774,3 +1774,22 @@ TEST_F(GpuTest, AStandaloneDebugDrawShowsWhatItHoldsNow) {
     EXPECT_EQ(downColumn, 0) << "the first line is still drawn";
     EXPECT_GT(downRow, 0) << "the second line was never uploaded";
 }
+
+// An image no device can make is refused where it is asked for, with why. Handed on, one with no usage was an
+// assertion in the allocator — a crash — and one with no size an error from the driver that named neither.
+TEST_F(GpuTest, AnImageWithNoUsageOrNoSizeIsRefusedNotMade) {
+    const auto unused = kor::Image::Builder{}.SetFormat(kor::Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2{ 8, 8 })
+        .SetUsage(kor::Flags<kor::Image::Usage>()).Build();
+    ASSERT_TRUE(unused.Poisoned());
+    EXPECT_NE(unused.Failure()->message.find("at least one usage"), std::string::npos) << unused.Failure()->message;
+
+    const auto flat = kor::Image::Builder{}.SetFormat(kor::Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec3{ 8, 0, 1 })
+        .SetUsage(kor::Image::Usage::eSampled).Build();
+    ASSERT_TRUE(flat.Poisoned());
+    EXPECT_NE(flat.Failure()->message.find("8 x 0 x 1"), std::string::npos) << flat.Failure()->message;
+
+    // One with a single usage is an image like any other.
+    const auto source = kor::Image::Builder{}.SetFormat(kor::Image::Format::eRGBA8_UNORM).SetExtent(kor::UVec2{ 8, 8 })
+        .SetUsage(kor::Image::Usage::eTransferSrc).Build();
+    EXPECT_TRUE(source.Valid()) << (source.Failure() ? source.Failure()->message : "");
+}
