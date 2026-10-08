@@ -31,6 +31,14 @@ class Error(val code: ErrorCode, val message: String, val history: String) {
  * ([failure]), is logged once, and — for shaders and what is made from them — repairs itself when the file
  * is fixed. Passing a poisoned resource on to a builder or a command poisons that, naming it as the cause.
  */
+/**
+ * The Kotlin object for a KoralResource* that a module's own C interface returned — a buffer, an image, whatever
+ * kind the handle says it is; null for a null handle. Ask for the kind it is: one of another kind fails where it is
+ * first used as [T]. The handle is the object's from here on: borrowed, it is let go of when the object is closed
+ * or collected.
+ */
+fun <T : Resource> resourceFromHandle(native: MemorySegment): T? = Resource.wrap(native)
+
 abstract class Resource internal constructor(handle: MemorySegment) : AutoCloseable {
     private var handle: MemorySegment = handle
     /** Owned: closed by its owner, or by close(). Borrowed: let go of by the cleaner, from any thread. */

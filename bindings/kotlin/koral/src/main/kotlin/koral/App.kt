@@ -472,12 +472,20 @@ abstract class Scene : Owner() {
     }
 }
 
+/**
+ * A scene a C++ scene library made, opened by name ([App.open], [App.openOffscreen]): its members — its window,
+ * its input, its frame graph — and none of its hooks, which are the library's own and run there.
+ */
+class NativeScene internal constructor(handle: MemorySegment) : Scene() {
+    init { native = handle }
+}
+
 /** Kotlin scenes as kor::Scene callbacks: one upcall stub per hook, shared by every scene. */
 internal object SceneBridge {
     val live = ConcurrentHashMap<Long, Scene>()
 
-    fun of(native: MemorySegment): Scene = live[native.address()]
-        ?: throw KoralException("the scene opened is not a Kotlin scene of this application")
+    /** The Kotlin scene [native] is, or a face on one a C++ library made. */
+    fun of(native: MemorySegment): Scene = live[native.address()] ?: NativeScene(native)
 
     private val lookup = MethodHandles.lookup()
     private fun stub(name: String, descriptor: FunctionDescriptor): MemorySegment =

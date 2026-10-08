@@ -240,6 +240,9 @@ class ResourceSet internal constructor(internal var native: MemorySegment, priva
 
 /** kor::FrameGraph: a scene's frame, as passes, ordered and synchronised by what they read and write. */
 class FrameGraph internal constructor(internal val native: MemorySegment) {
+    /** Its KoralFrameGraph*: what a module's own C interface is given to find its side of a scene by. */
+    val nativeHandle: MemorySegment get() = native
+
     /** Adds [pass], and returns it. */
     fun <P : GraphPass> add(pass: P): P {
         check(pass.native == MemorySegment.NULL) { "the pass is already in a graph" }

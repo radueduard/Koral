@@ -53,6 +53,14 @@ and `~/.local/jdk`). With no JDK 25 on the machine, the first build downloads Ec
 Hub's own tools (its Toolchain window lists it, and .NET for C#, beside CMake and Ninja). It writes them, with where the SDK is, into a `gradle.properties` that git ignores.
 `App.launch` reads koral.json as the C++ runtime does, and opens its `scene` (or the first registered).
 
+## Scenes from a C++ library, and modules of your own
+
+`app.loadLibrary(path)` registers a C++ scene library's scenes, and `app.open(name)` opens one. What comes back
+is a `NativeScene`: the scene's window, input, time and frame graph, and none of its hooks, which run in the
+library. A module with a C interface of its own is given handles through `Resource.nativeHandle` and
+`FrameGraph.nativeHandle`, and turns a resource handle it gets back into a Kotlin object with
+`resourceFromHandle<Buffer>(handle)`.
+
 ## Using the SDK
 
 An SDK built with `-DKORAL_BUILD_KOTLIN=ON` carries the libraries as a Maven repository, `share/Koral/maven`.
