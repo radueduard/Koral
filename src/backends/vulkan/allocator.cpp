@@ -57,8 +57,7 @@ namespace kor::vk
             &allocation,
             nullptr
         ); result != VK_SUCCESS) {
-            std::cerr << "Failed to create buffer: " << ::vk::to_string(static_cast<::vk::Result>(result)) << std::endl;
-            throw std::runtime_error("Failed to allocate buffer");
+            throw std::runtime_error("Failed to allocate buffer: " + ::vk::to_string(static_cast<::vk::Result>(result)));
         }
 
 
@@ -87,8 +86,7 @@ namespace kor::vk
             &allocation,
             nullptr
         ); result != VK_SUCCESS) {
-            std::cerr << "Failed to create image: " << ::vk::to_string(static_cast<::vk::Result>(result)) << std::endl;
-            throw std::runtime_error("Failed to allocate image");
+            throw std::runtime_error("Failed to allocate image: " + ::vk::to_string(static_cast<::vk::Result>(result)));
         }
 
         return { image, allocation };

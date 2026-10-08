@@ -122,3 +122,28 @@ TEST(LogRepeat, ResetRestoresTheBudget) {
 }
 
 } // namespace
+
+// Code that tries what may well fail, and says so its own way, keeps it out of the log: an editor building a
+// half-made object after every change.
+TEST(LogRepeat, AQuietScopeKeepsItsThreadsFailuresOutOfTheLog) {
+    CapturedLog log;
+    kor::log::ResetRepeatCounts();
+    const auto before = kor::log::LastSequence();
+    {
+        const kor::log::Quiet quiet;
+        kor::log::Error("tried, and it did not work");
+        kor::log::Warn("nor did this");
+        {
+            const kor::log::Quiet nested;
+            kor::log::Error("tried, and it did not work");
+        }
+        kor::log::Error("still quiet after the inner scope");
+    }
+    EXPECT_EQ(log.count("did not work"), 0u);
+    EXPECT_EQ(log.count("still quiet"), 0u);
+    EXPECT_TRUE(kor::log::HistorySince(before).empty()) << "nor is it in the history a log panel shows";
+
+    // And it was not counted against the message either: said once outside, it shows.
+    kor::log::Error("tried, and it did not work");
+    EXPECT_EQ(log.count("did not work"), 1u);
+}

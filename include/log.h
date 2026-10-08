@@ -58,6 +58,22 @@ namespace kor::log {
      */
     [[nodiscard]] KORAL_API Repeat Track(const std::string& message);
 
+    /**
+     * @brief While one is alive, this thread's warnings and errors are neither shown nor recorded.
+     *
+     * For code that tries something it expects may fail and reports the failure its own way: an editor building
+     * a half-made object after every change keeps the reason with the object, and would otherwise fill the log
+     * with it at each keystroke. The failure itself is untouched: a builder still returns its poisoned
+     * resource, with why. Scopes nest.
+     */
+    class KORAL_API Quiet {
+    public:
+        Quiet();
+        ~Quiet();
+        Quiet(const Quiet&) = delete;
+        Quiet& operator=(const Quiet&) = delete;
+    };
+
     /** @brief Whether @p message should be shown at all. Equivalent to Track() != eSuppress. */
     [[nodiscard]] KORAL_API bool ShouldEmit(const std::string& message);
 

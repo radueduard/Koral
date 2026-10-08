@@ -27,6 +27,11 @@ eMissingShaderStage: compute shader 'shaders/blur.comp.glsl' is unusable.
     ERROR: 0:12: 'colour' : undeclared identifier
 ```
 
+Code that expects a build to fail and reports it another way keeps it out of the log with a
+`kor::log::Quiet` on the stack: while one is alive, that thread's warnings and errors are neither shown
+nor recorded. The poisoned resource still carries why. An editor building a half-made object after every
+change is the case it is for.
+
 ## Poisoned resources repair themselves
 
 A failure caused by something you can fix at runtime — a shader that does not compile — is not

@@ -32,8 +32,13 @@ namespace kor::log
         }
     }
 
+    namespace { thread_local int t_quiet = 0; }
+    Quiet::Quiet() { ++t_quiet; }
+    Quiet::~Quiet() { --t_quiet; }
+
     Repeat Track(const std::string& message)
     {
+        if (t_quiet > 0) return Repeat::eSuppress;
         auto& s = state();
         const std::scoped_lock lock(s.mutex);
 
