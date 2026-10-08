@@ -141,7 +141,10 @@ namespace kui
                     const Rect card = Rect::XYWH(node.position.x, node.position.y, _children[i]->Size().x, _children[i]->Size().y).Shift(Shift(node.id));
                     if (card.Inflate(PortRadius + 12.f).Intersect(seen).Empty()) continue;
                     canvas.DrawShadow({ card, 6.f }, colors::Black.WithAlpha(0.35f), 10.f, { 0.f, 3.f });
-                    PaintChild(*_children[i], canvas, Shift(node.id));
+                    // In the graph's own coordinates: the canvas is already where the view looks, so the child goes
+                    // where its card is and nowhere further (PaintChild would add the view's pan and zoom, and the
+                    // drag, a second time).
+                    PaintChildAt(*_children[i], canvas, card.TopLeft());
                     const bool picked = _pickedNodes.contains(node.id);
                     if (!node.error.empty() || picked)
                         canvas.DrawRRect({ card.Inflate(1.5f * pixel), 7.f }, Paint::Stroked(node.error.empty() ? t.primary : ErrorColor, 2.f * pixel));

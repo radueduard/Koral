@@ -1546,7 +1546,21 @@ namespace {
             Graph().Add<kui::UiPass>(ui);
         }
         void Update() override { ui.Update(); }
+        /** @brief The pixel at (@p x, @p y) of what was last drawn. The picture is read back from the first time this is asked. */
+        [[nodiscard]] kor::U8Vec4 At(const int x, const int y) {
+            const auto extent = SceneWindow().Extent();
+            if (!_readback.Valid()) {
+                _readback = kor::Buffer::RawBuilder{}.SetRawSize(extent.x * extent.y * 4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                    .SetType(kor::Buffer::Type::eReadback).Build();
+                Graph().Add<ReadPass>(kor::ResourceRef<const kor::Buffer>(_readback));
+                settle();
+                settle();
+            }
+            return _readback->Read<kor::U8Vec4>(extent.x * extent.y)[static_cast<std::size_t>(y) * extent.x + static_cast<std::size_t>(x)];
+        }
         kui::Ui ui;
+    private:
+        kor::Resource<kor::Buffer> _readback;
     };
 
     /** @brief A panel that fills its space, counts its taps in its own state, and says how big it is. */
@@ -2523,6 +2537,51 @@ TEST_F(NodeTest, DraggingANodeMovesEverythingPicked) {
     EXPECT_EQ(moved, (std::vector<std::string>{ "A", "B" }));
     EXPECT_NEAR(by.x, 30.f, 0.01f);
     EXPECT_NEAR(by.y, 10.f, 0.01f);
+}
+
+// What a node shows is drawn where the node is: under its outline, its ports and the pointer that moves it. It was
+// drawn with the view's pan and zoom, and a drag in hand, counted twice — so it left its own card behind as soon as
+// the view moved or the node was picked up.
+TEST_F(NodeTest, ANodesContentIsDrawnWhereTheNodeIs) {
+    const kui::Color mark = kui::Color::Hex(0xFF00FF);
+    kui::NodeGraph graph;
+    // Its body: a block of one colour, 140 by 40, under the title.
+    graph.nodes.push_back({ .id = "A", .title = "A", .position = { 20.f, 20.f }, .body = kui::SizedBox(140.f, 40.f).Background(mark) });
+    Show(kui::NodeEditor(graph));
+    const auto marked = [&](const float x, const float y) {
+        const auto p = scene->At(static_cast<int>(x), static_cast<int>(y));
+        return p.x > 200 && p.y < 60 && p.z > 200;
+    };
+    const kor::Vec2 body { 20.f + 70.f, 20.f + kui::nodes::TitleHeight + 20.f };   // the middle of the block
+    EXPECT_TRUE(marked(body.x, body.y)) << "at rest";
+
+    // Picked up by its title and held 40 across and 30 down: the block is there, and not as far again.
+    Move({ 60.f, 30.f });
+    Button(kor::MouseButton::eLeft, true);
+    for (int i = 1; i <= 4; ++i) Move({ 60.f + i * 10.f, 30.f + i * 7.5f });
+    settle();
+    EXPECT_TRUE(marked(body.x + 40.f, body.y + 30.f)) << "in hand, it is under the pointer that holds it";
+    EXPECT_FALSE(marked(body.x + 40.f + 75.f, body.y + 30.f + 45.f)) << "and nowhere beyond it";
+    EXPECT_FALSE(marked(body.x - 60.f, body.y - 10.f)) << "nor where it was picked up";
+    Button(kor::MouseButton::eLeft, false);   // nothing applies the move here: it is back where the graph says
+    settle();
+    EXPECT_TRUE(marked(body.x, body.y));
+
+    // The view dragged 100 across and 50 down with the right button: the block went with it, once.
+    Drag({ 300.f, 250.f }, { 400.f - 1.f, 300.f - 1.f }, kor::MouseButton::eRight);
+    settle();
+    const kor::Vec2 pan { 99.f, 49.f };
+    EXPECT_TRUE(marked(body.x + pan.x, body.y + pan.y)) << "panned, it is where its card is";
+    EXPECT_FALSE(marked(body.x + pan.x * 2.f, body.y + pan.y * 2.f + 25.f)) << "and not as far again";
+
+    // Zoomed in about the block's middle: it stays under the pointer, and is bigger about it.
+    Move(body + pan);
+    scene->SceneInput().FeedScroll({ 0.f, 1.f });
+    settle();
+    settle();
+    EXPECT_TRUE(marked(body.x + pan.x, body.y + pan.y));
+    EXPECT_TRUE(marked(body.x + pan.x + 75.f, body.y + pan.y)) << "its edge was 70 from its middle, and is further now";
+    EXPECT_FALSE(marked(body.x + pan.x + 110.f, body.y + pan.y)) << "but not by much";
 }
 
 TEST_F(NodeTest, ABoxPicksWhatItTouchesAndDeleteRemovesIt) {
