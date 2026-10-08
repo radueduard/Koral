@@ -719,6 +719,25 @@ typedef struct KoralPassResources KoralPassResources; /* borrowed: during initia
 #define KORAL_SCREEN "screen"
 
 /**
+ * kor::ResourceSet: images and buffers under one name, whose members change between frames. Made with
+ * koral_resource_set_new and freed with koral_resource_set_destroy (a graph that imported it keeps it as long as
+ * it needs it); the one koral_pass_resources_set_named hands out is the graph's, borrowed.
+ */
+typedef struct KoralResourceSet KoralResourceSet;
+KORAL_API KoralResourceSet* koral_resource_set_new(void);
+KORAL_API void koral_resource_set_destroy(KoralResourceSet* set);
+/** Add: an image or a buffer. */
+KORAL_API void koral_resource_set_add(KoralResourceSet* set, KoralResource* resource);
+KORAL_API void koral_resource_set_remove(KoralResourceSet* set, KoralResource* resource);
+KORAL_API void koral_resource_set_clear(KoralResourceSet* set);
+KORAL_API uint32_t koral_resource_set_image_count(KoralResourceSet* set);
+/** A borrowed handle onto its @p index th image: koral_resource_release frees the handle. */
+KORAL_API KoralImage* koral_resource_set_image(KoralResourceSet* set, uint32_t index);
+KORAL_API uint32_t koral_resource_set_buffer_count(KoralResourceSet* set);
+KORAL_API KoralBuffer* koral_resource_set_buffer(KoralResourceSet* set, uint32_t index);
+KORAL_API uint64_t koral_resource_set_generation(KoralResourceSet* set);
+
+/**
  * A kor::RenderPass (or, with `run`, a kor::CpuPass): each hook optional but `record` (`run`), which runs on
  * a worker thread alongside other passes. `destroy` frees `user`, once.
  */
@@ -746,6 +765,8 @@ typedef struct KoralBufferDesc { int64_t size; uint32_t usage, type; } KoralBuff
 KORAL_API KoralRenderPass* koral_graph_add(KoralFrameGraph* graph, const char* name, const KoralPassCallbacks* pass);
 KORAL_API void koral_graph_import_image(KoralFrameGraph* graph, const char* name, KoralImage* image);
 KORAL_API void koral_graph_import_buffer(KoralFrameGraph* graph, const char* name, KoralBuffer* buffer);
+/** ImportSet: @p set's members, whatever they are as passes record, under one name. The graph shares the set. */
+KORAL_API void koral_graph_import_set(KoralFrameGraph* graph, const char* name, KoralResourceSet* set);
 KORAL_API void koral_graph_invalidate(KoralFrameGraph* graph);
 KORAL_API bool koral_graph_empty(KoralFrameGraph* graph);
 /** Schedule, one entry at a time: the pass's name, level and whether it runs on the async queue. */
@@ -789,6 +810,8 @@ KORAL_API KoralBuffer* koral_pass_resources_writable_buffer_named(KoralPassResou
 KORAL_API void koral_pass_resources_extent(KoralPassResources* resources, const char* name, uint32_t* x, uint32_t* y);
 KORAL_API KoralImage* koral_pass_resources_previous_image_named(KoralPassResources* resources, const char* name);
 KORAL_API KoralBuffer* koral_pass_resources_previous_buffer_named(KoralPassResources* resources, const char* name);
+/** SetNamed: the set imported as @p name, borrowed, or null. */
+KORAL_API KoralResourceSet* koral_pass_resources_set_named(KoralPassResources* resources, const char* name);
 
 /* ==== the application and its scenes ======================================================================== */
 

@@ -260,6 +260,63 @@ public sealed unsafe class PassResources
 
     public Image? PreviousImageNamed(string name) => Resource.Wrap<Image>(KoralNative.koral_pass_resources_previous_image_named(_native, name));
     public Buffer? PreviousBufferNamed(string name) => Resource.Wrap<Buffer>(KoralNative.koral_pass_resources_previous_buffer_named(_native, name));
+    /// <summary>SetNamed(name): the set imported under <paramref name="name"/>, or null. Its members are read as the pass records.</summary>
+    public ResourceSet? SetNamed(string name)
+    {
+        var set = KoralNative.koral_pass_resources_set_named(_native, name);
+        return set == IntPtr.Zero ? null : new ResourceSet(set);
+    }
+}
+
+/// <summary>
+/// kor::ResourceSet: images and buffers under one name in a frame graph, whose members change between frames —
+/// what each of a pipeline's entities holds. Passes read and write it by its name; adding and taking out members
+/// rebuilds nothing.
+/// </summary>
+public sealed unsafe class ResourceSet : IDisposable
+{
+    internal IntPtr Native;
+    private readonly bool _owned;
+
+    public ResourceSet() { Native = KoralNative.koral_resource_set_new(); _owned = true; KoralNative.Check(); }
+    internal ResourceSet(IntPtr native) => Native = native;
+
+    public void Add(Image image) { KoralNative.koral_resource_set_add(Native, image.Handle); KoralNative.Check(); }
+    public void Add(Buffer buffer) { KoralNative.koral_resource_set_add(Native, buffer.Handle); KoralNative.Check(); }
+    public void Remove(Image image) => KoralNative.koral_resource_set_remove(Native, image.Handle);
+    public void Remove(Buffer buffer) => KoralNative.koral_resource_set_remove(Native, buffer.Handle);
+    public void Clear() => KoralNative.koral_resource_set_clear(Native);
+
+    public IReadOnlyList<Image> Images
+    {
+        get
+        {
+            var list = new List<Image>();
+            for (uint i = 0, n = KoralNative.koral_resource_set_image_count(Native); i < n; ++i)
+                if (Resource.Wrap<Image>(KoralNative.koral_resource_set_image(Native, i)) is { } image) list.Add(image);
+            return list;
+        }
+    }
+
+    public IReadOnlyList<Buffer> Buffers
+    {
+        get
+        {
+            var list = new List<Buffer>();
+            for (uint i = 0, n = KoralNative.koral_resource_set_buffer_count(Native); i < n; ++i)
+                if (Resource.Wrap<Buffer>(KoralNative.koral_resource_set_buffer(Native, i)) is { } buffer) list.Add(buffer);
+            return list;
+        }
+    }
+
+    /// <summary>Changes whenever the members do.</summary>
+    public ulong Generation => KoralNative.koral_resource_set_generation(Native);
+
+    public void Dispose()
+    {
+        if (_owned && Native != IntPtr.Zero) KoralNative.koral_resource_set_destroy(Native);
+        Native = IntPtr.Zero;
+    }
 }
 
 /// <summary>
@@ -287,6 +344,8 @@ public sealed unsafe class FrameGraph
 
     public void Import(string name, Image image) { KoralNative.koral_graph_import_image(Native, name, image.Handle); KoralNative.Check(); }
     public void Import(string name, Buffer buffer) { KoralNative.koral_graph_import_buffer(Native, name, buffer.Handle); KoralNative.Check(); }
+    /// <summary>ImportSet(name, set): its members, whatever they are as passes record, under one name.</summary>
+    public void ImportSet(string name, ResourceSet set) { KoralNative.koral_graph_import_set(Native, name, set.Native); KoralNative.Check(); }
     public void Invalidate() => KoralNative.koral_graph_invalidate(Native);
     /// <summary>empty().</summary>
     public bool IsEmpty => KoralNative.koral_graph_empty(Native).AsBool();

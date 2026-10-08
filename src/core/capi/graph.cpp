@@ -4,11 +4,30 @@
 
 #include "capi.h"
 
+#include <mutex>
+#include <unordered_map>
+
 #include "debugDraw.h"
 #include "frameGraph.h"
 
 using namespace kor;
 using namespace kor::capi;
+
+// ---- resource sets ------------------------------------------------------------------------------------------
+// A KoralResourceSet is the ResourceSet itself. The ones made here are owned here, by a share each — which is
+// what a graph that imports one shares — so the one a pass looks up and the one its maker holds are one pointer.
+
+namespace
+{
+    std::mutex& SetsMutex() { static std::mutex m; return m; }
+    std::unordered_map<ResourceSet*, std::shared_ptr<ResourceSet>>& OwnedSets() { static std::unordered_map<ResourceSet*, std::shared_ptr<ResourceSet>> sets; return sets; }
+
+    ResourceSet& SetOf(KoralResourceSet* set)
+    {
+        if (!set) throw std::runtime_error("no resource set was given");
+        return *reinterpret_cast<ResourceSet*>(set);
+    }
+}
 
 namespace
 {
@@ -121,6 +140,19 @@ void koral_graph_import_image(KoralFrameGraph* g, const char* name, KoralImage* 
 void koral_graph_import_buffer(KoralFrameGraph* g, const char* name, KoralBuffer* buffer)
 {
     GuardedVoid([&] { GraphOf(g).Import(name ? name : "", RefOf<Buffer>(buffer)); });
+}
+void koral_graph_import_set(KoralFrameGraph* g, const char* name, KoralResourceSet* set)
+{
+    GuardedVoid([&] {
+        std::shared_ptr<ResourceSet> shared;
+        {
+            std::scoped_lock lock(SetsMutex());
+            const auto it = OwnedSets().find(reinterpret_cast<ResourceSet*>(set));
+            if (it == OwnedSets().end()) throw std::runtime_error("only a set made with koral_resource_set_new can be imported");
+            shared = it->second;
+        }
+        GraphOf(g).ImportSet(name ? name : "", std::move(shared));
+    });
 }
 void koral_graph_invalidate(KoralFrameGraph* g) { GuardedVoid([&] { GraphOf(g).Invalidate(); }); }
 bool koral_graph_empty(KoralFrameGraph* g) { return Guarded([&] { return GraphOf(g).empty(); }, true); }
@@ -267,6 +299,69 @@ KoralBuffer* koral_pass_resources_previous_buffer_named(KoralPassResources* r, c
 {
     return Guarded([&] { return Borrow(ResourcesOf(r).PreviousBufferNamed(name ? name : "")); }, static_cast<KoralResource*>(nullptr));
 }
+KoralResourceSet* koral_pass_resources_set_named(KoralPassResources* r, const char* name)
+{
+    return Guarded([&] {
+        return reinterpret_cast<KoralResourceSet*>(const_cast<ResourceSet*>(ResourcesOf(r).SetNamed(name ? name : "")));
+    }, static_cast<KoralResourceSet*>(nullptr));
+}
+
+KoralResourceSet* koral_resource_set_new(void)
+{
+    return Guarded([] {
+        auto set = std::make_shared<ResourceSet>();
+        std::scoped_lock lock(SetsMutex());
+        auto* raw = set.get();
+        OwnedSets().emplace(raw, std::move(set));
+        return reinterpret_cast<KoralResourceSet*>(raw);
+    }, static_cast<KoralResourceSet*>(nullptr));
+}
+void koral_resource_set_destroy(KoralResourceSet* set)
+{
+    std::scoped_lock lock(SetsMutex());
+    OwnedSets().erase(reinterpret_cast<ResourceSet*>(set));
+}
+void koral_resource_set_add(KoralResourceSet* set, KoralResource* resource)
+{
+    GuardedVoid([&] {
+        if (!resource) throw std::runtime_error("no resource was given");
+        if (resource->Kind() == KORAL_RESOURCE_IMAGE) SetOf(set).Add(RefOf<Image>(resource));
+        else if (resource->Kind() == KORAL_RESOURCE_BUFFER) SetOf(set).Add(RefOf<Buffer>(resource));
+        else throw std::runtime_error("a resource set holds images and buffers");
+    });
+}
+void koral_resource_set_remove(KoralResourceSet* set, KoralResource* resource)
+{
+    GuardedVoid([&] {
+        if (!resource) return;
+        if (resource->Kind() == KORAL_RESOURCE_IMAGE) SetOf(set).Remove(RefOf<Image>(resource).Get());
+        else if (resource->Kind() == KORAL_RESOURCE_BUFFER) SetOf(set).Remove(RefOf<Buffer>(resource).Get());
+    });
+}
+void koral_resource_set_clear(KoralResourceSet* set) { GuardedVoid([&] { SetOf(set).Clear(); }); }
+uint32_t koral_resource_set_image_count(KoralResourceSet* set)
+{
+    return Guarded([&] { return static_cast<uint32_t>(SetOf(set).Images().size()); }, 0u);
+}
+KoralImage* koral_resource_set_image(KoralResourceSet* set, const uint32_t index)
+{
+    return Guarded([&] {
+        const auto& images = SetOf(set).Images();
+        return index < images.size() ? Borrow(images[index]) : nullptr;
+    }, static_cast<KoralResource*>(nullptr));
+}
+uint32_t koral_resource_set_buffer_count(KoralResourceSet* set)
+{
+    return Guarded([&] { return static_cast<uint32_t>(SetOf(set).Buffers().size()); }, 0u);
+}
+KoralBuffer* koral_resource_set_buffer(KoralResourceSet* set, const uint32_t index)
+{
+    return Guarded([&] {
+        const auto& buffers = SetOf(set).Buffers();
+        return index < buffers.size() ? Borrow(buffers[index]) : nullptr;
+    }, static_cast<KoralResource*>(nullptr));
+}
+uint64_t koral_resource_set_generation(KoralResourceSet* set) { return Guarded([&] { return SetOf(set).Generation(); }, uint64_t { 0 }); }
 
 KoralRenderPass* koral_graph_add_debug_draw_pass(KoralFrameGraph* graph, KoralDebugDraw* draw, void (*viewProjection)(float out[16], void* user),
                                                  void* user, void (*destroy)(void* user), const char* target, const char* depth)

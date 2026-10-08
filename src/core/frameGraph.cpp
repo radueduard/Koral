@@ -214,6 +214,53 @@ namespace kor {
         return it->second;
     }
 
+    const ResourceSet* PassResources::SetNamed(const std::string_view name) const {
+        const auto it = _graph._importedSets.find(name);
+        if (it == _graph._importedSets.end()) {
+            log::Error("[frame graph] no set imported as '{}'", name);
+            return nullptr;
+        }
+        return it->second.get();
+    }
+
+    // ---- resource sets ----------------------------------------------------------------------------
+
+    bool ResourceSet::Mutable(const std::string_view what) const {
+        if (_recording.load() == 0) return true;
+        log::Error("[frame graph] {} a resource set while passes record with it: ignored. Change it between frames.", what);
+        return false;
+    }
+
+    void ResourceSet::Add(ResourceRef<const Image> image) {
+        if (!Mutable("Adding to")) return;
+        _images.push_back(std::move(image));
+        ++_generation;
+    }
+
+    void ResourceSet::Add(ResourceRef<const Buffer> buffer) {
+        if (!Mutable("Adding to")) return;
+        _buffers.push_back(std::move(buffer));
+        ++_generation;
+    }
+
+    void ResourceSet::Remove(const Image* image) {
+        if (!Mutable("Removing from")) return;
+        if (std::erase_if(_images, [image](const auto& member) { return member.Get() == image; })) ++_generation;
+    }
+
+    void ResourceSet::Remove(const Buffer* buffer) {
+        if (!Mutable("Removing from")) return;
+        if (std::erase_if(_buffers, [buffer](const auto& member) { return member.Get() == buffer; })) ++_generation;
+    }
+
+    void ResourceSet::Clear() {
+        if (!Mutable("Clearing")) return;
+        if (_images.empty() && _buffers.empty()) return;
+        _images.clear();
+        _buffers.clear();
+        ++_generation;
+    }
+
     kor::UVec2 PassResources::Extent(const std::string_view name) const {
         const auto img = ImageNamed(name);
         return img.Alive() ? kor::UVec2(img->Extent()) : kor::UVec2(0);
@@ -336,6 +383,21 @@ namespace kor {
         _importedImages.insert_or_assign(std::move(name), std::move(image));
     }
 
+    void FrameGraph::ImportSet(std::string name, std::shared_ptr<ResourceSet> set) {
+        if (!Mutable(std::format("Importing the set '{}'", name))) return;
+        if (_importedImages.contains(name) || _importedBuffers.contains(name)) {
+            log::Error("[frame graph] '{}' is imported already, as one resource: a set needs a name of its own", name);
+            return;
+        }
+        // Only which set the name means is the graph's business; what is in it is read as passes record.
+        const auto it = _importedSets.find(name);
+        if (it == _importedSets.end() || it->second != set) {
+            _dirty = true;
+            _importIds[name] = _nextId++;
+        }
+        _importedSets.insert_or_assign(std::move(name), std::move(set));
+    }
+
     void FrameGraph::Import(std::string name, ResourceRef<const Buffer> buffer) {
         if (!Mutable(std::format("Importing '{}'", name))) return;
         const auto it = _importedBuffers.find(name);
@@ -393,6 +455,14 @@ namespace kor {
             // Two queue families: what an async pass imports has to have been made shared between them.
             if (d.decl.async && Context::AsyncComputeIsSeparateFamily()) {
                 for (const auto& use : d.decl.uses) {
+                    // What joins a set later may not have been made for both: a pass using one stays put.
+                    if (_importedSets.contains(use.resource)) {
+                        if (_demoted.insert(d.decl.name).second)
+                            log::Warn("[frame graph] pass '{}' uses the set '{}', whose members need not be shared across "
+                                      "queues, so it runs on the graphics queue", d.decl.name, use.resource);
+                        d.decl.async = false;
+                        break;
+                    }
                     bool unshared = false;
                     if (const auto image = _importedImages.find(use.resource); image != _importedImages.end())
                         unshared = image->second.Valid() && !image->second->IsSharedAcrossQueues();
@@ -412,6 +482,7 @@ namespace kor {
         std::set<std::string> imported{std::string(Screen)};
         for (const auto& name : _importedImages | std::views::keys) imported.insert(name);
         for (const auto& name : _importedBuffers | std::views::keys) imported.insert(name);
+        for (const auto& name : _importedSets | std::views::keys) imported.insert(name);
 
         const auto compiled = graph::compile(decls, imported);
         if (!compiled) {
@@ -827,6 +898,7 @@ namespace kor {
         std::vector<double> recordMs(_order.size(), 0.0);
         const auto recordStart = Clock::now();
         _recording = true;
+        for (const auto& set : _importedSets | std::views::values) if (set) ++set->_recording;
         {
             std::vector<Task<void>> tasks;
             tasks.reserve(_order.size());
@@ -841,6 +913,7 @@ namespace kor {
             all.Wait();
             if (const auto result = all.Take(); !result) log::Error("[frame graph] a pass failed to run: {}", result.error());
         }
+        for (const auto& set : _importedSets | std::views::values) if (set) --set->_recording;
         _recording = false;
         const double recordWall = millisecondsSince(recordStart);
 

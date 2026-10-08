@@ -34,7 +34,9 @@ import koral.Mat4
 import koral.Mesh
 import koral.OffscreenSettings
 import koral.PassBuilder
+import koral.PassResources
 import koral.RenderPass
+import koral.ResourceSet
 import koral.Sampler
 import koral.SamplerAddressMode
 import koral.Scene
@@ -178,6 +180,64 @@ class ResourcesTest {
 
         val typo = ComputePipeline.Builder().setComputeShader(shader).setBinding("dtaa", 0, 0).build()
         assertFalse(typo.isValid, "a name the shader does not declare fails the build")
+    }
+
+    /** Each entity's image: written by one pass, read back by another, through a set whose members change. */
+    class EntityImages : Scene() {
+        val set = ResourceSet()
+        val entities = mutableListOf<Pair<Image, Buffer>>()
+        var initializations = 0
+
+        override fun initialize() {
+            graph.importSet("entity images", set)
+            graph.add(object : RenderPass("Read entities") {    // added first: only the set's name puts the writer ahead
+                override fun setup(builder: PassBuilder) { builder.read("entity images").sideEffect() }
+                override fun initialize(resources: PassResources) {
+                    initializations++
+                    assertEquals(set.generation, resources.setNamed("entity images")!!.generation, "the set it finds is the one imported")
+                }
+                override fun record(commands: CommandBuffer) { for ((image, readback) in entities) commands.copyImageToBuffer(image, readback) }
+            })
+            graph.add(object : RenderPass("Write entities") {
+                override fun setup(builder: PassBuilder) { builder.write("entity images") }
+                override fun initialize(resources: PassResources) { initializations++ }
+                override fun record(commands: CommandBuffer) {
+                    entities.forEachIndexed { i, (image, _) -> commands.clearColorImage(image, (i + 1).toFloat(), 0f, 0f) }
+                }
+            })
+        }
+
+        fun addEntity() {
+            val image = Image.Builder().setFormat(ImageFormat.eR32_SFLOAT).setExtent(UVec2(1, 1))
+                .setUsage(ImageUsage.eTransferDst, ImageUsage.eTransferSrc).build()
+            val readback = Buffer.Builder().setSize(4).setUsage(BufferUsage.eTransferDst).setType(BufferType.eReadback).build()
+            set.add(image)
+            entities += image to readback
+        }
+
+        fun removeEntity(index: Int) {
+            set.remove(entities[index].first)
+            entities.removeAt(index)
+        }
+    }
+
+    @Test
+    fun resourceSetsChangeBetweenFrames() = headlessApp().use { app ->
+        val scene = app.openOffscreen("EntityImages", EntityImages(), OffscreenSettings(width = 8, height = 8)) as EntityImages
+        repeat(3) { scene.addEntity() }
+        app.frame()
+        CommandBuffer.singleTimeCommand { }.waitBlocking()
+        scene.entities.forEachIndexed { i, (_, readback) -> assertEquals((i + 1).toFloat(), readback.readFloats(1)[0], "entity $i") }
+        assertEquals(3, scene.set.images.size, "its members")
+
+        scene.removeEntity(0)
+        scene.addEntity()
+        app.frames(2)
+        CommandBuffer.singleTimeCommand { }.waitBlocking()
+        scene.entities.forEachIndexed { i, (_, readback) -> assertEquals((i + 1).toFloat(), readback.readFloats(1)[0], "entity $i, after some came and went") }
+        assertEquals(2, scene.initializations, "each pass was set up once")
+        app.close(scene)
+        scene.set.close()
     }
 
     @Test

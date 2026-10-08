@@ -204,6 +204,38 @@ class PassResources internal constructor(private val native: MemorySegment) {
     fun extent(name: String): UVec2 = twoInts({ x, y -> KoralNative.koral_pass_resources_extent(native, name, x, y) }, ::UVec2)
     fun previousImageNamed(name: String): Image? = Resource.wrap(KoralNative.koral_pass_resources_previous_image_named(native, name))
     fun previousBufferNamed(name: String): Buffer? = Resource.wrap(KoralNative.koral_pass_resources_previous_buffer_named(native, name))
+    /** SetNamed: the set imported under [name], or null. Its members are read as the pass records. */
+    fun setNamed(name: String): ResourceSet? =
+        KoralNative.koral_pass_resources_set_named(native, name).takeIf { it != MemorySegment.NULL }?.let { ResourceSet(it, owned = false) }
+}
+
+/**
+ * kor::ResourceSet: images and buffers under one name in a frame graph, whose members change between frames —
+ * what each of a pipeline's entities holds. Passes read and write it by its name; adding and taking out members
+ * rebuilds nothing.
+ */
+class ResourceSet internal constructor(internal var native: MemorySegment, private val owned: Boolean) : AutoCloseable {
+    constructor() : this(KoralNative.koral_resource_set_new(), owned = true) { checkLastError() }
+
+    fun add(image: Image) { KoralNative.koral_resource_set_add(native, image.native); checkLastError() }
+    fun add(buffer: Buffer) { KoralNative.koral_resource_set_add(native, buffer.native); checkLastError() }
+    fun remove(image: Image) = KoralNative.koral_resource_set_remove(native, image.native)
+    fun remove(buffer: Buffer) = KoralNative.koral_resource_set_remove(native, buffer.native)
+    fun clear() = KoralNative.koral_resource_set_clear(native)
+
+    val images: List<Image> get() = (0 until KoralNative.koral_resource_set_image_count(native)).mapNotNull {
+        Resource.wrap<Image>(KoralNative.koral_resource_set_image(native, it))
+    }
+    val buffers: List<Buffer> get() = (0 until KoralNative.koral_resource_set_buffer_count(native)).mapNotNull {
+        Resource.wrap<Buffer>(KoralNative.koral_resource_set_buffer(native, it))
+    }
+    /** Changes whenever the members do. */
+    val generation: Long get() = KoralNative.koral_resource_set_generation(native)
+
+    override fun close() {
+        if (owned && native != MemorySegment.NULL) KoralNative.koral_resource_set_destroy(native)
+        native = MemorySegment.NULL
+    }
 }
 
 /** kor::FrameGraph: a scene's frame, as passes, ordered and synchronised by what they read and write. */
@@ -218,6 +250,8 @@ class FrameGraph internal constructor(internal val native: MemorySegment) {
     /** Import: a resource of one's own, under [name], for passes to read and write. */
     fun import(name: String, image: Image) { KoralNative.koral_graph_import_image(native, name, image.native); checkLastError() }
     fun import(name: String, buffer: Buffer) { KoralNative.koral_graph_import_buffer(native, name, buffer.native); checkLastError() }
+    /** ImportSet: [set]'s members, whatever they are as passes record, under one name. */
+    fun importSet(name: String, set: ResourceSet) { KoralNative.koral_graph_import_set(native, name, set.native); checkLastError() }
     /** Compiles the graph again before the next frame. */
     fun invalidate() = KoralNative.koral_graph_invalidate(native)
     val isEmpty: Boolean get() = KoralNative.koral_graph_empty(native)

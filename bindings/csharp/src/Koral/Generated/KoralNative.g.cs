@@ -695,9 +695,20 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_cmd_copy_buffer_to_image(IntPtr commands, IntPtr buffer, IntPtr image, KoralCopy* copy);
     [LibraryImport(Library)] internal static partial void koral_cmd_copy_image_to_buffer(IntPtr commands, IntPtr image, IntPtr buffer, KoralCopy* copy);
     [LibraryImport(Library)] internal static partial void koral_cmd_run(IntPtr commands, delegate* unmanaged[Cdecl]<IntPtr, void*, void> command, void* user);
+    [LibraryImport(Library)] internal static partial IntPtr koral_resource_set_new();
+    [LibraryImport(Library)] internal static partial void koral_resource_set_destroy(IntPtr set);
+    [LibraryImport(Library)] internal static partial void koral_resource_set_add(IntPtr set, IntPtr resource);
+    [LibraryImport(Library)] internal static partial void koral_resource_set_remove(IntPtr set, IntPtr resource);
+    [LibraryImport(Library)] internal static partial void koral_resource_set_clear(IntPtr set);
+    [LibraryImport(Library)] internal static partial uint koral_resource_set_image_count(IntPtr set);
+    [LibraryImport(Library)] internal static partial IntPtr koral_resource_set_image(IntPtr set, uint index);
+    [LibraryImport(Library)] internal static partial uint koral_resource_set_buffer_count(IntPtr set);
+    [LibraryImport(Library)] internal static partial IntPtr koral_resource_set_buffer(IntPtr set, uint index);
+    [LibraryImport(Library)] internal static partial ulong koral_resource_set_generation(IntPtr set);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr koral_graph_add(IntPtr graph, string? name, KoralPassCallbacks* pass);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_graph_import_image(IntPtr graph, string? name, IntPtr image);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_graph_import_buffer(IntPtr graph, string? name, IntPtr buffer);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_graph_import_set(IntPtr graph, string? name, IntPtr set);
     [LibraryImport(Library)] internal static partial void koral_graph_invalidate(IntPtr graph);
     [LibraryImport(Library)] internal static partial byte koral_graph_empty(IntPtr graph);
     [LibraryImport(Library)] internal static partial uint koral_graph_schedule_count(IntPtr graph);
@@ -731,6 +742,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_pass_resources_extent(IntPtr resources, string? name, uint* x, uint* y);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr koral_pass_resources_previous_image_named(IntPtr resources, string? name);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr koral_pass_resources_previous_buffer_named(IntPtr resources, string? name);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr koral_pass_resources_set_named(IntPtr resources, string? name);
     [LibraryImport(Library)] internal static partial KoralAppSettings koral_app_settings_default();
     [LibraryImport(Library)] internal static partial KoralWindowSettings koral_window_settings_default();
     [LibraryImport(Library)] internal static partial KoralOffscreenSettings koral_offscreen_settings_default();

@@ -51,6 +51,26 @@ in anything else. Resources the graph makes share memory when they are never in 
 (`SetAliasing(false)` turns that off; `Memory()` says what it saved); `ImageNamed(name)` keeps one to
 itself, for a screenshot, a debug view or another scene to read.
 
+### Resource sets
+
+A group of resources whose members change while the graph runs, such as the image each of a pipeline's
+entities holds, is imported under one name as a `kor::ResourceSet`:
+
+```cpp
+auto entityImages = std::make_shared<kor::ResourceSet>();
+Graph().ImportSet("entity images", entityImages);
+entityImages->Add(image);            // between frames, as entities come and go
+
+// A pass: Write("entity images") in Setup, then in Record:
+for (const auto& image : resources.SetNamed("entity images")->Images()) cb.ClearColorImage(image, color);
+```
+
+Passes read and write the set by its name, so it orders them like any resource. Adding and taking out
+members changes neither the order nor any pass's `Initialize`: passes read the members as they record, and
+each member gets its barriers from the commands that use it. A set changes between frames, on the graph's
+thread. A change while passes record is refused. With async compute on a queue family of its own, a pass
+using a set runs on the graphics queue. C has `koral_resource_set_*`, C# and Kotlin `ResourceSet`.
+
 The graph's windows (`DrawMenuItems`, `DrawGUI`) show the schedule, what was culled or skipped, the
 memory, and each pass's CPU and GPU time.
 

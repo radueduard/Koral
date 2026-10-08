@@ -159,6 +159,53 @@ namespace kor {
         Impl& _impl;
     };
 
+    /**
+     * @brief A named group of resources the graph does not own, whose members change while it runs: the
+     *        images and buffers each of a pipeline's entities holds.
+     *
+     * Imported under one name (FrameGraph::ImportSet), it is read and written by that name like any other
+     * resource, and orders passes the same way: a pass that writes it runs before one that reads it. A pass
+     * finds its members when it records (PassResources::SetNamed), so adding and removing them rebuilds
+     * nothing — not the order, not any pass's Initialize. The barriers each member needs come from the
+     * commands that use it, as for every resource.
+     *
+     * Changed between frames, from the thread the graph runs on; a change while passes record is refused.
+     * With async compute on a queue family of its own, a pass using a set runs on the graphics queue: what
+     * joins the set later need not have been made for both families.
+     *
+     * @code
+     * auto entityImages = std::make_shared<kor::ResourceSet>();
+     * graph.ImportSet("entity images", entityImages);
+     * // each frame, as entities come and go:
+     * entityImages->Add(image);
+     * // in a pass: b.Write("entity images") in Setup, and in Record:
+     * for (const auto& image : resources.SetNamed("entity images")->Images()) cb.ClearColorImage(image, color);
+     * @endcode
+     */
+    class KORAL_API ResourceSet {
+    public:
+        void Add(ResourceRef<const Image> image);
+        void Add(ResourceRef<const Buffer> buffer);
+        /** @brief Takes out every member that is @p image (or @p buffer). */
+        void Remove(const Image* image);
+        void Remove(const Buffer* buffer);
+        void Clear();
+
+        [[nodiscard]] const std::vector<ResourceRef<const Image>>& Images() const { return _images; }
+        [[nodiscard]] const std::vector<ResourceRef<const Buffer>>& Buffers() const { return _buffers; }
+        [[nodiscard]] std::size_t Size() const { return _images.size() + _buffers.size(); }
+        /** @brief Changes whenever the members do: for a pass that caches what it made of them. */
+        [[nodiscard]] kor::u64 Generation() const { return _generation; }
+
+    private:
+        friend class FrameGraph;
+        [[nodiscard]] bool Mutable(std::string_view what) const;
+        std::vector<ResourceRef<const Image>> _images;
+        std::vector<ResourceRef<const Buffer>> _buffers;
+        kor::u64 _generation = 0;
+        std::atomic<int> _recording = 0;   ///< Graphs recording passes with it now.
+    };
+
     /** @brief Looks the graph's resources up by name, from RenderPass::Initialize on. */
     class KORAL_API PassResources {
     public:
@@ -174,6 +221,8 @@ namespace kor {
         /** @brief Where last frame's @p name is kept, for a pass that declared PassBuilder::ReadPrevious. */
         [[nodiscard]] ResourceRef<const Image> PreviousImageNamed(std::string_view name) const;
         [[nodiscard]] ResourceRef<const Buffer> PreviousBufferNamed(std::string_view name) const;
+        /** @brief The set imported as @p name (FrameGraph::ImportSet), or null. Its members are read as the pass records. */
+        [[nodiscard]] const ResourceSet* SetNamed(std::string_view name) const;
 
     private:
         friend class FrameGraph;
@@ -348,6 +397,11 @@ namespace kor {
         /** @brief Makes a resource the graph does not own available to passes under a name. */
         void Import(std::string name, ResourceRef<const Image> image);
         void Import(std::string name, ResourceRef<const Buffer> buffer);
+        /**
+         * @brief Makes a group of resources whose members change at run time available to passes under one
+         *        name. @see ResourceSet
+         */
+        void ImportSet(std::string name, std::shared_ptr<ResourceSet> set);
 
         /**
          * @brief Works the graph out again before the next frame: Setup, allocation, and Initialize
@@ -487,6 +541,7 @@ namespace kor {
         std::map<std::string, ResourceRef<const Buffer>, std::less<>> _buffers;
         std::map<std::string, ResourceRef<const Image>, std::less<>> _importedImages;
         std::map<std::string, ResourceRef<const Buffer>, std::less<>> _importedBuffers;
+        std::map<std::string, std::shared_ptr<ResourceSet>, std::less<>> _importedSets;
 
         // ---- allocation -----------------------------------------------------------------------------
         // What was allocated, keyed by what it was allocated as, so a rebuild reuses whatever it still

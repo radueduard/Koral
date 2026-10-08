@@ -977,12 +977,34 @@ object KoralNative {
     fun koral_cmd_copy_image_to_buffer(commands: MemorySegment, image: MemorySegment, buffer: MemorySegment, copy: MemorySegment): Unit { h_koral_cmd_copy_image_to_buffer.invokeExact(commands, image, buffer, copy) }
     private val h_koral_cmd_run by lazy { handle("koral_cmd_run", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
     fun koral_cmd_run(commands: MemorySegment, command: MemorySegment, user: MemorySegment): Unit { h_koral_cmd_run.invokeExact(commands, command, user) }
+    private val h_koral_resource_set_new by lazy { handle("koral_resource_set_new", FunctionDescriptor.of(ADDRESS)) }
+    fun koral_resource_set_new(): MemorySegment = h_koral_resource_set_new.invokeExact() as MemorySegment
+    private val h_koral_resource_set_destroy by lazy { handle("koral_resource_set_destroy", FunctionDescriptor.ofVoid(ADDRESS)) }
+    fun koral_resource_set_destroy(set: MemorySegment): Unit { h_koral_resource_set_destroy.invokeExact(set) }
+    private val h_koral_resource_set_add by lazy { handle("koral_resource_set_add", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)) }
+    fun koral_resource_set_add(set: MemorySegment, resource: MemorySegment): Unit { h_koral_resource_set_add.invokeExact(set, resource) }
+    private val h_koral_resource_set_remove by lazy { handle("koral_resource_set_remove", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)) }
+    fun koral_resource_set_remove(set: MemorySegment, resource: MemorySegment): Unit { h_koral_resource_set_remove.invokeExact(set, resource) }
+    private val h_koral_resource_set_clear by lazy { handle("koral_resource_set_clear", FunctionDescriptor.ofVoid(ADDRESS)) }
+    fun koral_resource_set_clear(set: MemorySegment): Unit { h_koral_resource_set_clear.invokeExact(set) }
+    private val h_koral_resource_set_image_count by lazy { handle("koral_resource_set_image_count", FunctionDescriptor.of(JAVA_INT, ADDRESS)) }
+    fun koral_resource_set_image_count(set: MemorySegment): Int = h_koral_resource_set_image_count.invokeExact(set) as Int
+    private val h_koral_resource_set_image by lazy { handle("koral_resource_set_image", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT)) }
+    fun koral_resource_set_image(set: MemorySegment, index: Int): MemorySegment = h_koral_resource_set_image.invokeExact(set, index) as MemorySegment
+    private val h_koral_resource_set_buffer_count by lazy { handle("koral_resource_set_buffer_count", FunctionDescriptor.of(JAVA_INT, ADDRESS)) }
+    fun koral_resource_set_buffer_count(set: MemorySegment): Int = h_koral_resource_set_buffer_count.invokeExact(set) as Int
+    private val h_koral_resource_set_buffer by lazy { handle("koral_resource_set_buffer", FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_INT)) }
+    fun koral_resource_set_buffer(set: MemorySegment, index: Int): MemorySegment = h_koral_resource_set_buffer.invokeExact(set, index) as MemorySegment
+    private val h_koral_resource_set_generation by lazy { handle("koral_resource_set_generation", FunctionDescriptor.of(JAVA_LONG, ADDRESS)) }
+    fun koral_resource_set_generation(set: MemorySegment): Long = h_koral_resource_set_generation.invokeExact(set) as Long
     private val h_koral_graph_add by lazy { handle("koral_graph_add", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS, ADDRESS)) }
     fun koral_graph_add(graph: MemorySegment, name: String?, pass: MemorySegment): MemorySegment = Arena.ofConfined().use { a -> h_koral_graph_add.invokeExact(graph, Native.cString(a, name), pass) as MemorySegment }
     private val h_koral_graph_import_image by lazy { handle("koral_graph_import_image", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
     fun koral_graph_import_image(graph: MemorySegment, name: String?, image: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_graph_import_image.invokeExact(graph, Native.cString(a, name), image); Unit } }
     private val h_koral_graph_import_buffer by lazy { handle("koral_graph_import_buffer", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
     fun koral_graph_import_buffer(graph: MemorySegment, name: String?, buffer: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_graph_import_buffer.invokeExact(graph, Native.cString(a, name), buffer); Unit } }
+    private val h_koral_graph_import_set by lazy { handle("koral_graph_import_set", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_graph_import_set(graph: MemorySegment, name: String?, set: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_graph_import_set.invokeExact(graph, Native.cString(a, name), set); Unit } }
     private val h_koral_graph_invalidate by lazy { handle("koral_graph_invalidate", FunctionDescriptor.ofVoid(ADDRESS)) }
     fun koral_graph_invalidate(graph: MemorySegment): Unit { h_koral_graph_invalidate.invokeExact(graph) }
     private val h_koral_graph_empty by lazy { handle("koral_graph_empty", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS)) }
@@ -1049,6 +1071,8 @@ object KoralNative {
     fun koral_pass_resources_previous_image_named(resources: MemorySegment, name: String?): MemorySegment = Arena.ofConfined().use { a -> h_koral_pass_resources_previous_image_named.invokeExact(resources, Native.cString(a, name)) as MemorySegment }
     private val h_koral_pass_resources_previous_buffer_named by lazy { handle("koral_pass_resources_previous_buffer_named", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS)) }
     fun koral_pass_resources_previous_buffer_named(resources: MemorySegment, name: String?): MemorySegment = Arena.ofConfined().use { a -> h_koral_pass_resources_previous_buffer_named.invokeExact(resources, Native.cString(a, name)) as MemorySegment }
+    private val h_koral_pass_resources_set_named by lazy { handle("koral_pass_resources_set_named", FunctionDescriptor.of(ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_pass_resources_set_named(resources: MemorySegment, name: String?): MemorySegment = Arena.ofConfined().use { a -> h_koral_pass_resources_set_named.invokeExact(resources, Native.cString(a, name)) as MemorySegment }
     private val h_koral_app_settings_default by lazy { handle("koral_app_settings_default", FunctionDescriptor.of(KoralLayouts.KoralAppSettings)) }
     fun koral_app_settings_default(allocator: SegmentAllocator): MemorySegment = h_koral_app_settings_default.invokeExact(allocator) as MemorySegment
     private val h_koral_window_settings_default by lazy { handle("koral_window_settings_default", FunctionDescriptor.of(KoralLayouts.KoralWindowSettings)) }

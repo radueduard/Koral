@@ -331,6 +331,82 @@ public static partial class Cases
         }
     }
 
+    /// <summary>Each entity's image: written by one pass, read back by another, through a set whose members change.</summary>
+    public sealed class EntityImages : Scene
+    {
+        public readonly ResourceSet Set = new();
+        public readonly List<(Image Image, Buffer Readback)> Entities = [];
+        public int Initializations;
+
+        protected override void Initialize()
+        {
+            Graph.ImportSet("entity images", Set);
+            Graph.Add(new Read(this));    // added first: only the set's name puts the writer ahead
+            Graph.Add(new Write(this));
+        }
+
+        public void AddEntity()
+        {
+            var image = new Image.Builder().SetFormat(Image.Format.eR32_SFLOAT).SetExtent(new UVec2(1, 1))
+                .SetUsage(Image.Usage.eTransferDst | Image.Usage.eTransferSrc).Build();
+            var readback = new Buffer.Builder<float>().SetInstanceCount(1).SetUsage(Buffer.Usage.eTransferDst).SetType(Buffer.Type.eReadback).Build();
+            Set.Add(image);
+            Entities.Add((image, readback));
+        }
+
+        public void RemoveEntity(int index)
+        {
+            Set.Remove(Entities[index].Image);
+            Entities.RemoveAt(index);
+        }
+
+        private sealed class Write(EntityImages scene) : RenderPass("Write entities")
+        {
+            public override void Setup(PassBuilder builder) => builder.Write("entity images");
+            public override void Initialize(PassResources resources) => scene.Initializations += 1;
+            public override void Record(CommandBuffer commandBuffer)
+            {
+                for (var i = 0; i < scene.Entities.Count; ++i) commandBuffer.ClearColorImage(scene.Entities[i].Image, new Vec4(i + 1));
+            }
+        }
+
+        private sealed class Read(EntityImages scene) : RenderPass("Read entities")
+        {
+            public override void Setup(PassBuilder builder) => builder.Read("entity images").SideEffect();
+            public override void Initialize(PassResources resources)
+            {
+                scene.Initializations += 1;
+                Check.Equal(scene.Set.Generation, resources.SetNamed("entity images")!.Generation, "the set it finds is the one imported");
+            }
+            public override void Record(CommandBuffer commandBuffer)
+            {
+                foreach (var (image, readback) in scene.Entities) commandBuffer.CopyImageToBuffer(image, readback);
+            }
+        }
+    }
+
+    /// <summary>A resource set: passes ordered by its name, members that change between frames, nothing set up again.</summary>
+    public static void ResourceSetsChangeBetweenFrames()
+    {
+        using var app = Check.HeadlessApp();
+        var scene = (EntityImages)app.OpenOffscreen("EntityImages", new EntityImages(), Offscreen(8));
+        for (var i = 0; i < 3; ++i) scene.AddEntity();
+        app.Frame();
+        CommandBuffer.SingleTimeCommand(_ => { }, CommandBuffer.Usage.eGraphics).Wait();
+        for (var i = 0; i < 3; ++i) Check.Equal((float)(i + 1), scene.Entities[i].Readback.Read<float>()[0], $"entity {i}");
+        Check.Equal(3, scene.Set.Images.Count, "its members");
+
+        scene.RemoveEntity(0);
+        scene.AddEntity();
+        app.Frame();
+        app.Frame();
+        CommandBuffer.SingleTimeCommand(_ => { }, CommandBuffer.Usage.eGraphics).Wait();
+        for (var i = 0; i < 3; ++i) Check.Equal((float)(i + 1), scene.Entities[i].Readback.Read<float>()[0], $"entity {i}, after some came and went");
+        Check.Equal(2, scene.Initializations, "each pass was set up once");
+        app.Close(scene);
+        scene.Set.Dispose();
+    }
+
     /// <summary>An await in a hook resumes on the application's thread, with its scene current again.</summary>
     public static void AwaitResumesInItsScene()
     {

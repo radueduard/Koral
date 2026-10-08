@@ -1057,6 +1057,87 @@ TEST_F(VkWindowTest, AFrameGraphDoesNotShareWhatAnAsyncPassUses) {
     EXPECT_EQ(after.readback->Read<float>(1).front(), 5.f);
 }
 
+// A pass whose resources come from a set that changes as the graph runs — the images each entity holds. The set's
+// name orders the passes like any resource's; adding and taking out members rebuilds nothing, and every member is
+// synchronised by the commands that use it.
+TEST_F(VkWindowTest, AResourceSetOrdersPassesAndChangesWithoutRebuildingTheGraph) {
+    auto& scene = VkEnvironment::scene();
+    const auto since = kor::log::LastSequence();
+    kor::FrameGraph graph;
+    auto set = std::make_shared<kor::ResourceSet>();
+    graph.ImportSet("entity images", set);
+
+    // An entity: a one-texel image, and where what it holds is read back to. Changed only between frames.
+    struct Entities {
+        std::vector<kor::Resource<kor::Image>> images;
+        std::map<const kor::Image*, kor::Resource<kor::Buffer>> readbacks;
+    };
+    auto entities = std::make_shared<Entities>();
+    const auto add = [&] {
+        auto image = kor::Image::Builder{}.SetFormat(kor::Image::Format::eR32_SFLOAT).SetExtent(kor::UVec2(1, 1))
+            .SetUsage(kor::Image::Usage::eTransferDst | kor::Image::Usage::eTransferSrc).Build();
+        entities->readbacks.emplace(image.Get(), makeReadback());
+        set->Add(kor::ResourceRef<const kor::Image>(image));
+        entities->images.push_back(std::move(image));
+    };
+    const auto remove = [&](const std::size_t index) {
+        set->Remove(entities->images[index].Get());
+        entities->readbacks.erase(entities->images[index].Get());
+        entities->images.erase(entities->images.begin() + static_cast<std::ptrdiff_t>(index));
+    };
+
+    // Added reader first: nothing but the set's name puts the writer ahead of it.
+    auto& read = graph.Add<LambdaPass>("Read entities");
+    auto& write = graph.Add<LambdaPass>("Write entities");
+    auto members = std::make_shared<const kor::ResourceSet*>(nullptr);
+    write.setup = [](kor::PassBuilder& b) { b.Write("entity images"); };
+    write.initialize = [members](const kor::PassResources& r) { *members = r.SetNamed("entity images"); };
+    write.record = [members, set](kor::CommandBuffer& cb) {
+        const auto& images = (*members)->Images();
+        for (std::size_t i = 0; i < images.size(); ++i) cb.ClearColorImage(images[i], kor::Vec4(static_cast<float>(i + 1)));
+        set->Clear();   // refused: the set may not change while passes record with it
+    };
+    read.setup = [](kor::PassBuilder& b) { b.Read("entity images").SideEffect(); };
+    read.initialize = [members](const kor::PassResources& r) { *members = r.SetNamed("entity images"); };
+    read.record = [members, entities](kor::CommandBuffer& cb) {
+        for (const auto& image : (*members)->Images())
+            cb.CopyImageToBuffer(image, kor::ResourceRef<const kor::Buffer>(entities->readbacks.at(image.Get())),
+                                 kor::Copy{ .imageExtent = kor::IVec3(1, 1, 1) });
+    };
+
+    const auto expectEachHoldsItsPlace = [&](const char* when) {
+        for (std::size_t i = 0; i < entities->images.size(); ++i)
+            EXPECT_EQ(entities->readbacks.at(entities->images[i].Get())->Read<float>(1).front(), static_cast<float>(i + 1))
+                << "entity " << i << ", " << when;
+    };
+
+    for (int i = 0; i < 3; ++i) add();
+    drawGraphFrame(scene, graph);
+    ASSERT_EQ(graph.Schedule().size(), 2u);
+    EXPECT_EQ(graph.Schedule()[0].name, "Write entities");
+    EXPECT_EQ(graph.Schedule()[1].name, "Read entities");
+    EXPECT_EQ(set->Size(), 3u) << "a change while the passes recorded went through";
+    expectEachHoldsItsPlace("at first");
+
+    // Entities come and go between frames: the passes see the new members, and nothing is set up again.
+    const auto generation = set->Generation();
+    remove(0);
+    add();
+    add();
+    EXPECT_NE(set->Generation(), generation);
+    drawGraphFrame(scene, graph);
+    drawGraphFrame(scene, graph);
+    EXPECT_EQ(set->Size(), 4u);
+    expectEachHoldsItsPlace("after some came and went");
+    EXPECT_EQ(write.initializations, 1);
+    EXPECT_EQ(read.initializations, 1);
+
+    for (const auto& record : kor::log::HistorySince(since)) {
+        EXPECT_EQ(record.message.find("VUID"), std::string::npos) << record.message;
+        EXPECT_EQ(record.message.find("SYNC-HAZARD"), std::string::npos) << record.message;
+    }
+}
+
 // A command buffer handed to Execute on the async queue: work after it waits for the token it
 // returned, and the token is its own — ready once the GPU has run it.
 TEST_F(VkWindowTest, AnAsyncComputeCommandBufferIsWaitedForByTheTokenItReturns) {
