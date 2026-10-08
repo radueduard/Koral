@@ -70,7 +70,7 @@ namespace kor
         };
 
         /** @brief Collects the shaders a ray-tracing pipeline is assembled from. */
-        struct KORAL_API Builder : kor::Builder
+        struct KORAL_API Builder : kor::Builder, PipelineSettings<Builder>
         {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.

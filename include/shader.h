@@ -263,6 +263,38 @@ namespace kor
         };
 
         /**
+         * @brief A specialization constant the shader declares: a value baked in when a pipeline is built.
+         *
+         * What a pipeline builder's SetSpecializationConstant(name, value) finds by name, and what lets
+         * a tool list a shader's constants without reading its source.
+         */
+        struct KORAL_API SpecializationConstant {
+            kor::u32 id = 0;            ///< Its constant_id: what Vulkan identifies it by.
+            std::string name;           ///< Its name in the source.
+            kor::u8 scalar = 5;         ///< ValueScalar, as a plain byte: float, int, uint, bool, double, or 5 for anything else.
+            kor::u32 size = 4;          ///< Bytes a value of it takes in a pipeline's specialization data (a bool takes 4).
+            kor::u64 defaultValue = 0;  ///< The value the shader gives it, its bits in the low @ref size bytes.
+
+            auto operator<=>(const SpecializationConstant& other) const = default;
+        };
+
+        /** @brief Where a pipeline puts one of a shader's descriptors: which set, and which binding in it. */
+        struct KORAL_API BindingSlot {
+            kor::u32 set = 0;
+            kor::u32 binding = 0;
+            auto operator<=>(const BindingSlot& other) const = default;
+        };
+
+        /**
+         * @brief Descriptors moved to other sets and bindings, by name: what a pipeline builder's SetBinding collects.
+         *
+         * A name is a descriptor's own, or its block's type name for a block declared without an
+         * instance name. What the shader's source said, if anything, is overridden; descriptors not
+         * named stay where the compiler put them.
+         */
+        using BindingAssignment = std::map<std::string, BindingSlot, std::less<>>;
+
+        /**
          * @brief Everything a shader's interface consists of, reflected out of the compiled SPIR-V.
          *
          * What a pipeline uses to build its descriptor set layouts and push-constant ranges, so
@@ -274,6 +306,7 @@ namespace kor
             std::set<InputOutput> outputs;                      ///< Stage outputs, by location.
             std::map<kor::u32, DescriptorSet> descriptorSets;   ///< Declared sets, keyed by set number.
             std::map<kor::u32, PushConstant> pushConstants;     ///< Declared push-constant blocks, keyed by offset.
+            std::map<kor::u32, SpecializationConstant> specializationConstants;   ///< Declared specialization constants, by constant id.
         };
 
         /**
@@ -471,6 +504,28 @@ namespace kor
         /** @brief The shader's reflected interface: its sets, push constants and stage inputs and outputs. */
         const MemoryLayout& BlockLayout() const { return _memoryLayout; }
 
+        /** @brief The compiled SPIR-V, as the compiler numbered its descriptors. */
+        [[nodiscard]] const std::vector<kor::u32>& Spirv() const { return _spirvCode; }
+
+        /** @brief Whether the shader declares a descriptor so named (or a block of that type name). */
+        [[nodiscard]] bool DeclaresDescriptor(std::string_view name) const;
+
+        /**
+         * @brief The interface as it is with descriptors moved by @p assignment.
+         * @return The reflected layout with each named descriptor at its new set and binding, or an
+         *         eDescriptorConflict naming the two descriptors that would share one. A name this
+         *         shader does not declare is not an error here: a pipeline's assignment covers all of
+         *         its stages, and it is the pipeline that checks every name is declared by one of them.
+         */
+        [[nodiscard]] Result<MemoryLayout> LayoutWith(const BindingAssignment& assignment) const;
+
+        /**
+         * @brief The SPIR-V with descriptors moved by @p assignment: their DescriptorSet and Binding
+         *        decorations rewritten. The shader itself is unchanged, so one compile serves every
+         *        pipeline that numbers its descriptors differently.
+         */
+        [[nodiscard]] std::vector<kor::u32> SpirvWith(const BindingAssignment& assignment) const;
+
         /**
          * @brief Whether this shader reaches buffers through raw device addresses.
          *
@@ -538,6 +593,9 @@ namespace kor
         /// Slang calls the parameter rarely survives into the SPIR-V. GLSL's inputs are annotated
         /// like its block members are and arrive through _fieldSemantics instead. @see vertexLayout.h
         std::map<kor::u32, FieldSemantic> _inputSemantics;
+
+        /// Descriptor name (and block type name) -> the SPIR-V variables so named: what SpirvWith rewrites.
+        std::map<std::string, std::vector<kor::u32>, std::less<>> _descriptorVariables;
         bool _usesDeviceAddresses = false;
 
         // Opaque hot-reload watch state (its concrete type lives in core/shader.cpp). Held here

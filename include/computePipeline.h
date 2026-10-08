@@ -44,7 +44,7 @@ namespace kor
     class KORAL_API ComputePipeline : public Pipeline {
     public:
         /** @brief Collects the shader a compute pipeline is compiled from. */
-        struct KORAL_API Builder : kor::Builder {
+        struct KORAL_API Builder : kor::Builder, PipelineSettings<Builder> {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
@@ -53,29 +53,6 @@ namespace kor
 
             /** @brief Sets the compute shader. Required. */
             Builder& SetComputeShader(ResourceRef<const Shader> computeShader);
-
-            /**
-             * @brief Bakes a specialization constant into the shader.
-             * @tparam T The constant's type; must be trivially copyable.
-             * @param id The constant id the shader declares.
-             * @param value The value compiled in.
-             *
-             * Commonly used to fix a workgroup size or a feature switch at build time, so the
-             * compiler can fold branches and unroll loops it otherwise could not.
-             *
-             * @throws std::runtime_error if the accumulated constants exceed the internal buffer.
-             */
-            template<typename T> requires std::is_trivially_copyable_v<T>
-            Builder& SetSpecializationConstant(kor::u32 id, T value) {
-                const kor::u32 valueSize = sizeof(T);
-                if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
-                    throw std::runtime_error("Exceeded maximum specialization constant data size");
-                }
-                specConstantsMetadata.emplace_back(id, _currentSpecConstantSize, valueSize);
-                std::memcpy(specConstantsData.data() + _currentSpecConstantSize, &value, valueSize);
-                _currentSpecConstantSize += valueSize;
-                return *this;
-            }
 
             /** @brief One build attempt. Internal: prefer Build(). */
             [[nodiscard]] Result<std::unique_ptr<ComputePipeline>> Create() const;
@@ -87,11 +64,6 @@ namespace kor
              */
             [[nodiscard]] kor::Resource<ComputePipeline> Build(std::source_location where = std::source_location::current()) const;
 
-            std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> specConstantsMetadata {};
-            std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
-
-        private:
-            kor::u32 _currentSpecConstantSize = 0;
         };
 
         ~ComputePipeline() override;
@@ -109,7 +81,5 @@ namespace kor
 
         std::optional<ResourceRef<const Shader>> _shader;
 
-        std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> _specConstantsMetadata;
-        std::vector<std::byte> _specConstantsData;
     };
 }

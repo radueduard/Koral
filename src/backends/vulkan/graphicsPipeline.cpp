@@ -10,6 +10,7 @@
 #include "descriptorSetLayout.h"
 #include "device.h"
 #include "shader.h"
+#include "shaderModules.h"
 #include "vulkanContext.h"
 #include "commandBuffer.h"
 #include "framebuffer.h"
@@ -35,6 +36,7 @@ namespace kor::vk
 
     void GraphicsPipeline::Setup()
     {
+        ShaderModules modules(_bindings);
         std::vector<::vk::Format> colorAttachmentFormats;
         for (const auto& format : _framebuffer->ColorAttachments()) {
             colorAttachmentFormats.push_back(dynamic_cast<const Image&>(*format.view->SourceImage()).getFormat());
@@ -78,59 +80,59 @@ namespace kor::vk
 
         std::vector<::vk::PipelineShaderStageCreateInfo> shaderStages = {};
         if (_vertexShader.has_value()) {
-            const auto& shader = dynamic_cast<const vk::Shader&>(**_vertexShader);
+            const auto shader = modules.For(**_vertexShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eVertex)
-                                      .setModule(*shader)
+                                      .setModule(shader)
                                       .setPName("main"));
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eVertex;
         }
         if (_tessellationState.has_value())
         {
-            const auto& controlShader = dynamic_cast<const vk::Shader&>(*_tessellationState->controlShader);
+            const auto controlShader = modules.For(*_tessellationState->controlShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTessellationControl)
-                                      .setModule(*controlShader)
+                                      .setModule(controlShader)
                                       .setPName("main"));
-            const auto& evalShader = dynamic_cast<const vk::Shader&>(*_tessellationState->evalShader);
+            const auto evalShader = modules.For(*_tessellationState->evalShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTessellationEvaluation)
-                                      .setModule(*evalShader)
+                                      .setModule(evalShader)
                                       .setPName("main"));
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eTessellationControl | ::vk::ShaderStageFlagBits::eTessellationEvaluation;
         }
         if (_geometryShader.has_value()) {
-            const auto& shader = dynamic_cast<const vk::Shader&>(**_geometryShader);
+            const auto shader = modules.For(**_geometryShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eGeometry)
-                                      .setModule(*shader)
+                                      .setModule(shader)
                                       .setPName("main"));
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eGeometry;
         }
         if (_fragmentShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(**_fragmentShader);
+            const auto shader = modules.For(**_fragmentShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eFragment)
-                                      .setModule(*shader)
+                                      .setModule(shader)
                                       .setPName("main"));
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eFragment;
         }
         if (_taskShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(**_taskShader);
+            const auto shader = modules.For(**_taskShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eTaskEXT)
-                                      .setModule(*shader)
+                                      .setModule(shader)
                                       .setPName("main"));
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eTaskEXT;
         }
         if (_meshShader.has_value())
         {
-            const auto& shader = dynamic_cast<const vk::Shader&>(**_meshShader);
+            const auto shader = modules.For(**_meshShader);
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                                       .setStage(::vk::ShaderStageFlagBits::eMeshEXT)
-                                      .setModule(*shader)
+                                      .setModule(shader)
                                       .setPName("main"));
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eMeshEXT;
         }

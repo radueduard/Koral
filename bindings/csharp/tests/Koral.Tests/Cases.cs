@@ -282,6 +282,55 @@ public static partial class Cases
         }
     }
 
+    private const string UnboundShader = """
+        #version 450
+        layout(local_size_x = 4) in;
+        layout(constant_id = 0) const uint factor = 3;
+        layout(std430) buffer Data { uint values[]; } data;
+        layout(push_constant) uniform Push { uint add; } push;
+        void main() { data.values[gl_GlobalInvocationID.x] = gl_GlobalInvocationID.x * factor + push.add; }
+        """;
+
+    /// <summary>A shader with no bindings, reflected; a pipeline that numbers its descriptor itself and sets a constant by name.</summary>
+    public static void PipelinesNumberTheirShadersDescriptors()
+    {
+        using var app = Check.HeadlessApp();
+        var directory = Directory.CreateTempSubdirectory("koral-bindings-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "unbound.comp");
+            File.WriteAllText(path, UnboundShader);
+            var shader = new Shader.Builder().SetPath(path).SetStage(Shader.Stage.eCompute).Build();
+            Check.That(shader.Valid, $"a shader with no bindings: {shader.Failure}");
+            Check.That(shader.Parameters.Any(p => p.Name == "data" && p.Type == DescriptorType.eStorageBuffer), "its buffer, reflected");
+            Check.That(shader.PushConstants.Any(p => p.Name == "add"), "its push constant, reflected");
+            var constant = shader.SpecializationConstants.Single();
+            Check.That(constant is { Name: "factor", Id: 0, DefaultValue: 3 }, $"its specialization constant, reflected: {constant}");
+
+            var pipeline = new ComputePipeline.Builder()
+                .SetComputeShader(shader)
+                .SetBinding("data", 2, 5)
+                .SetSpecializationConstant("factor", 10u)
+                .Build();
+            Check.That(pipeline.Valid, $"a pipeline that moves it: {pipeline.Failure}");
+            Check.Equal(5u, pipeline.SetLayout(2).FindBinding("data"), "where the pipeline put it");
+
+            var values = new Buffer.Builder<uint>().SetInstanceCount(4).SetType(Buffer.Type.eDynamic).Build();
+            var set = new DescriptorSet.Builder(pipeline, 2).Write("data", values).Build();
+            CommandBuffer.SingleTimeCommand(cb => cb.BindComputePipeline(pipeline).BindDescriptorSet(2, set).PushConstant("add", 7u).Dispatch(),
+                                            CommandBuffer.Usage.eCompute).Wait();
+            var read = values.Read<uint>();
+            Check.That(read.SequenceEqual([7u, 17u, 27u, 37u]), $"the shader wrote them through it: [{string.Join(", ", read)}]");
+
+            var typo = new ComputePipeline.Builder().SetComputeShader(shader).SetBinding("dtaa", 0, 0).Build();
+            Check.That(!typo.Valid, "a name the shader does not declare fails the build");
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     /// <summary>An await in a hook resumes on the application's thread, with its scene current again.</summary>
     public static void AwaitResumesInItsScene()
     {

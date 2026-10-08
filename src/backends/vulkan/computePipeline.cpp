@@ -10,6 +10,7 @@
 #include "descriptorSetLayout.h"
 #include "device.h"
 #include "shader.h"
+#include "shaderModules.h"
 #include "vulkanContext.h"
 
 namespace kor::vk
@@ -26,7 +27,7 @@ namespace kor::vk
 
     void ComputePipeline::Setup()
     {
-        const auto& shader = dynamic_cast<const Shader&>(**_shader);
+        ShaderModules modules(_bindings);
 
         std::vector<::vk::DescriptorSetLayout> setLayouts = {};
         for (const auto& layout : _setLayouts | std::views::values) {
@@ -61,7 +62,7 @@ namespace kor::vk
 
         const auto stageCreateInfo = ::vk::PipelineShaderStageCreateInfo()
                                      .setStage(::vk::ShaderStageFlagBits::eCompute)
-                                     .setModule(*shader)
+                                     .setModule(modules.For(**_shader))
                                      .setPSpecializationInfo(_specConstantsMetadata.empty() ? nullptr : &specializationInfo)
                                      .setPName("main");
 

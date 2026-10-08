@@ -3,6 +3,7 @@
 //
 
 #include <cstring>
+#include <ranges>
 #include <span>
 
 #include "capi.h"
@@ -541,6 +542,62 @@ void koral_shader_add_search_path(const char* directory, const bool front)
     GuardedVoid([&] { Shader::AddSearchPath(directory ? directory : "", front); });
 }
 
+namespace {
+    // The reflection, in a fixed order: descriptors by set and binding, push-constant fields by block and
+    // place, specialization constants by id.
+    std::vector<std::tuple<kor::u32, kor::u32, const Shader::Descriptor*>> Parameters(const Shader& shader)
+    {
+        std::vector<std::tuple<kor::u32, kor::u32, const Shader::Descriptor*>> out;
+        for (const auto& [set, description] : shader.BlockLayout().descriptorSets)
+            for (const auto& [binding, descriptor] : description.descriptors) out.emplace_back(set, binding, &descriptor);
+        return out;
+    }
+    std::vector<const Shader::PushConstantField*> PushFields(const Shader& shader)
+    {
+        std::vector<const Shader::PushConstantField*> out;
+        for (const auto& block : shader.BlockLayout().pushConstants | std::views::values)
+            for (const auto& field : block.members) out.push_back(&field);
+        return out;
+    }
+}
+size_t koral_shader_parameter_count(KoralShader* r) { return Guarded([&] { return Parameters(Get<Shader>(r)).size(); }, size_t { 0 }); }
+bool koral_shader_parameter(KoralShader* r, const size_t index, KoralShaderParameter* out)
+{
+    return Guarded([&] {
+        const auto all = Parameters(Get<Shader>(r));
+        if (!out || index >= all.size()) return false;
+        const auto& [set, binding, d] = all[index];
+        *out = KoralShaderParameter { d->name.c_str(), d->blockName.c_str(), static_cast<uint32_t>(d->type), d->count, set, binding,
+                                      static_cast<uint32_t>(d->access), static_cast<uint32_t>(d->shape), d->active };
+        return true;
+    }, false);
+}
+size_t koral_shader_push_constant_count(KoralShader* r) { return Guarded([&] { return PushFields(Get<Shader>(r)).size(); }, size_t { 0 }); }
+bool koral_shader_push_constant(KoralShader* r, const size_t index, KoralShaderPushConstant* out)
+{
+    return Guarded([&] {
+        const auto all = PushFields(Get<Shader>(r));
+        if (!out || index >= all.size()) return false;
+        const auto& f = *all[index];
+        *out = KoralShaderPushConstant { f.name.c_str(), f.offset, f.size, f.scalar, f.rows, f.columns, f.count, f.aggregate };
+        return true;
+    }, false);
+}
+size_t koral_shader_specialization_constant_count(KoralShader* r)
+{
+    return Guarded([&] { return Get<Shader>(r).BlockLayout().specializationConstants.size(); }, size_t { 0 });
+}
+bool koral_shader_specialization_constant(KoralShader* r, const size_t index, KoralShaderSpecializationConstant* out)
+{
+    return Guarded([&] {
+        const auto& all = Get<Shader>(r).BlockLayout().specializationConstants;
+        if (!out || index >= all.size()) return false;
+        const auto& c = std::next(all.begin(), static_cast<std::ptrdiff_t>(index))->second;
+        *out = KoralShaderSpecializationConstant { c.name.c_str(), c.id, c.scalar, c.size, c.defaultValue };
+        return true;
+    }, false);
+}
+
 // ---- pipelines -------------------------------------------------------------------------------------------------------
 
 } // extern "C"
@@ -615,12 +672,18 @@ namespace
     }
 
     template<typename B>
-    void SpecializationConstant(B& builder, const uint32_t id, const void* value, const uint32_t bytes)
+    void SpecializationConstant(B& builder, const char* name, const uint32_t id, const void* value, const uint32_t bytes)
     {
         if (!value) throw std::runtime_error("a specialization constant needs a value");
-        if (bytes == 4) { std::uint32_t v; std::memcpy(&v, value, 4); builder.SetSpecializationConstant(id, v); }
-        else if (bytes == 8) { std::uint64_t v; std::memcpy(&v, value, 8); builder.SetSpecializationConstant(id, v); }
-        else throw std::runtime_error("a specialization constant is 4 or 8 bytes");
+        if (bytes != 4 && bytes != 8) throw std::runtime_error("a specialization constant is 4 or 8 bytes");
+        std::vector<std::byte> data(bytes);
+        std::memcpy(data.data(), value, bytes);
+        builder.SetSpecializationConstantBytes(name ? name : "", id, std::move(data));
+    }
+    template<typename B>
+    void SpecializationConstant(B& builder, const uint32_t id, const void* value, const uint32_t bytes)
+    {
+        SpecializationConstant(builder, nullptr, id, value, bytes);
     }
 }
 
@@ -675,6 +738,14 @@ void koral_graphics_pipeline_builder_set_specialization_constant(KoralGraphicsPi
 {
     Set<GraphicsPipeline::Builder>(b, [&](auto& x) { SpecializationConstant(x, id, v, n); });
 }
+void koral_graphics_pipeline_builder_set_specialization_constant_named(KoralGraphicsPipelineBuilder* b, const char* name, const void* v, const uint32_t n)
+{
+    Set<GraphicsPipeline::Builder>(b, [&](auto& x) { SpecializationConstant(x, name, 0, v, n); });
+}
+void koral_graphics_pipeline_builder_set_binding(KoralGraphicsPipelineBuilder* b, const char* name, const uint32_t set, const uint32_t binding)
+{
+    Set<GraphicsPipeline::Builder>(b, [&](auto& x) { x.SetBinding(name ? name : "", set, binding); });
+}
 KoralGraphicsPipeline* koral_graphics_pipeline_builder_build(KoralGraphicsPipelineBuilder* b)
 {
     return Build<GraphicsPipeline::Builder>(b, [](auto& x) { return x.Build(); });
@@ -688,6 +759,14 @@ void koral_compute_pipeline_builder_set_compute_shader(KoralComputePipelineBuild
 void koral_compute_pipeline_builder_set_specialization_constant(KoralComputePipelineBuilder* b, const uint32_t id, const void* v, const uint32_t n)
 {
     Set<ComputePipeline::Builder>(b, [&](auto& x) { SpecializationConstant(x, id, v, n); });
+}
+void koral_compute_pipeline_builder_set_specialization_constant_named(KoralComputePipelineBuilder* b, const char* name, const void* v, const uint32_t n)
+{
+    Set<ComputePipeline::Builder>(b, [&](auto& x) { SpecializationConstant(x, name, 0, v, n); });
+}
+void koral_compute_pipeline_builder_set_binding(KoralComputePipelineBuilder* b, const char* name, const uint32_t set, const uint32_t binding)
+{
+    Set<ComputePipeline::Builder>(b, [&](auto& x) { x.SetBinding(name ? name : "", set, binding); });
 }
 KoralComputePipeline* koral_compute_pipeline_builder_build(KoralComputePipelineBuilder* b)
 {
@@ -721,6 +800,18 @@ void koral_ray_tracing_pipeline_builder_add_callable_shader(KoralRayTracingPipel
 void koral_ray_tracing_pipeline_builder_set_max_recursion_depth(KoralRayTracingPipelineBuilder* b, const uint32_t d)
 {
     Set<RayTracingPipeline::Builder>(b, [&](auto& x) { x.SetMaxRecursionDepth(d); });
+}
+void koral_ray_tracing_pipeline_builder_set_specialization_constant(KoralRayTracingPipelineBuilder* b, const uint32_t id, const void* v, const uint32_t n)
+{
+    Set<RayTracingPipeline::Builder>(b, [&](auto& x) { SpecializationConstant(x, id, v, n); });
+}
+void koral_ray_tracing_pipeline_builder_set_specialization_constant_named(KoralRayTracingPipelineBuilder* b, const char* name, const void* v, const uint32_t n)
+{
+    Set<RayTracingPipeline::Builder>(b, [&](auto& x) { SpecializationConstant(x, name, 0, v, n); });
+}
+void koral_ray_tracing_pipeline_builder_set_binding(KoralRayTracingPipelineBuilder* b, const char* name, const uint32_t set, const uint32_t binding)
+{
+    Set<RayTracingPipeline::Builder>(b, [&](auto& x) { x.SetBinding(name ? name : "", set, binding); });
 }
 KoralRayTracingPipeline* koral_ray_tracing_pipeline_builder_build(KoralRayTracingPipelineBuilder* b)
 {

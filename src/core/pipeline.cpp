@@ -6,6 +6,7 @@
 
 #include <format>
 #include <map>
+#include <algorithm>
 #include <ranges>
 #include <unordered_map>
 
@@ -55,8 +56,8 @@ namespace kor
         // Merges one shader's descriptors into `merged`: a (set, binding) several stages declare is
         // one binding, reached by all of them.
         template<typename Conflict>
-        void mergeDescriptors(const Shader& shader, MergedSets& merged, const Conflict& conflict) {
-            for (const auto& [setIndex, setDescription] : shader.BlockLayout().descriptorSets)
+        void mergeDescriptors(const Shader::MemoryLayout& layout, MergedSets& merged, const Conflict& conflict) {
+            for (const auto& [setIndex, setDescription] : layout.descriptorSets)
             {
                 for (const auto& [binding, descriptor] : setDescription.descriptors)
                 {
@@ -122,7 +123,7 @@ namespace kor
                 conflict(ErrorCode::eInvalidArgument, "FromShaders was given a shader that is missing or failed to build.");
                 continue;
             }
-            mergeDescriptors(*shader, merged, conflict);
+            mergeDescriptors(shader->BlockLayout(), merged, conflict);
         }
         if (!failure && !merged.contains(set))
             conflict(ErrorCode::eInvalidArgument, std::format("None of the shaders declares descriptor set {}.", set));
@@ -154,10 +155,20 @@ namespace kor
         // the first declaration it sees, which is exactly the case the name merge below has to
         // examine: two stages declaring different blocks at one offset.
         std::vector<const Shader::PushConstant*> declaredPushConstants;
+        // Every name the pipeline moves has to be one of its shaders' descriptors: a typo would
+        // otherwise leave the descriptor where the compiler put it, and the layout quietly different.
+        for (const auto& name : _bindings | std::views::keys) {
+            if (std::ranges::none_of(shaders, [&](const auto& shader) { return shader->DeclaresDescriptor(name); }))
+                conflict(ErrorCode::eInvalidArgument, std::format(
+                    "SetBinding names '{}', which no shader of this pipeline declares as a descriptor.", name));
+        }
+
         for (const auto& shader : shaders)
         {
             const auto& memoryLayout = shader->BlockLayout();
-            mergeDescriptors(*shader, mergedSetLayouts, conflict);
+            const auto moved = shader->LayoutWith(_bindings);
+            if (!moved) { conflict(moved.error().code, moved.error().message); continue; }
+            mergeDescriptors(*moved, mergedSetLayouts, conflict);
             for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
             {
                 declaredPushConstants.push_back(&pushConstant);
@@ -167,6 +178,14 @@ namespace kor
                     mergedPushConstants[offset] = pushConstant;
                 }
             }
+        }
+
+        // Vulkan numbers a pipeline layout's sets by their place in it, so a pipeline using sets 0 and 2
+        // needs a set 1 too: an empty one. Without it, set 2 was taken as set 1.
+        if (!mergedSetLayouts.empty()) {
+            kor::u32 highest = 0;
+            for (const auto set : mergedSetLayouts | std::views::keys) highest = std::max(highest, set);
+            for (kor::u32 set = 0; set < highest; ++set) mergedSetLayouts.try_emplace(set);
         }
 
         _usesDeviceAddresses = false;
@@ -287,6 +306,47 @@ namespace kor
                     .count = member.count, .arrayStride = member.arrayStride,
                     .matrixStride = member.matrixStride, .aggregate = member.aggregate });
             }
+        }
+
+        // The specialization constants, as Vulkan takes them. One given by name is found among what the
+        // stages declare; a bool is a VkBool32 there, whatever size it was given as.
+        _specConstantsMetadata.clear();
+        _specConstantsData.clear();
+        std::map<kor::u32, std::vector<std::byte>> constants;
+        const auto declared = [&](const auto& matches) -> const Shader::SpecializationConstant* {
+            for (const auto& shader : shaders)
+                for (const auto& constant : shader->BlockLayout().specializationConstants | std::views::values)
+                    if (matches(constant)) return &constant;
+            return nullptr;
+        };
+        for (const auto& value : _specializationValues) {
+            const Shader::SpecializationConstant* constant = value.name.empty()
+                ? declared([&](const auto& c) { return c.id == value.id; })
+                : declared([&](const auto& c) { return c.name == value.name; });
+            if (!value.name.empty() && !constant) {
+                conflict(ErrorCode::eInvalidArgument, std::format(
+                    "SetSpecializationConstant names '{}', which no shader of this pipeline declares.", value.name));
+                continue;
+            }
+            std::vector<std::byte> bytes = value.bytes;
+            if (constant) {
+                if (constant->scalar == 3 && bytes.size() < 4) {
+                    bool on = false;
+                    for (const auto b : bytes) on = on || b != std::byte{ 0 };
+                    bytes.assign(4, std::byte{ 0 });
+                    bytes[0] = std::byte{ on ? std::uint8_t(1) : std::uint8_t(0) };
+                } else if (bytes.size() != constant->size) {
+                    conflict(ErrorCode::eInvalidArgument, std::format(
+                        "Specialization constant '{}' (id {}) is {} bytes in the shader, and was given {}.",
+                        constant->name, constant->id, constant->size, bytes.size()));
+                    continue;
+                }
+            }
+            constants[constant ? constant->id : value.id] = std::move(bytes);
+        }
+        for (const auto& [id, bytes] : constants) {
+            _specConstantsMetadata.emplace_back(id, static_cast<kor::u32>(_specConstantsData.size()), static_cast<kor::u32>(bytes.size()));
+            _specConstantsData.insert(_specConstantsData.end(), bytes.begin(), bytes.end());
         }
 
         if (failure) return std::unexpected(*failure);

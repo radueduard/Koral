@@ -12,6 +12,7 @@ add_executable(koral_integration_tests
         test_image_roundtrip.cpp
         test_offscreen_render.cpp
         test_indirect_draw.cpp
+        test_pipeline_bindings.cpp
         test_vulkan_coverage.cpp
         test_raytracing.cpp
         test_importer.cpp
@@ -41,6 +42,9 @@ target_link_libraries(koral_integration_tests PRIVATE
         Vulkan::Vulkan
         glfw
 )
+
+# Shaders only the tests use, kept out of the ones Koral ships.
+target_compile_definitions(koral_integration_tests PRIVATE KORAL_TEST_SHADERS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 
 target_include_directories(koral_integration_tests PRIVATE
         ${CMAKE_SOURCE_DIR}/include

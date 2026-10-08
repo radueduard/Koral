@@ -84,6 +84,11 @@ internal class Fields(val segment: MemorySegment, private val layout: StructLayo
     fun readLong(field: String): Long = segment.get(ValueLayout.JAVA_LONG, offset(field))
     fun readFloat(field: String, index: Int = 0): Float = segment.get(ValueLayout.JAVA_FLOAT, offset(field) + index * 4L)
     fun readBool(field: String): Boolean = segment.get(ValueLayout.JAVA_BOOLEAN, offset(field))
+    /** A `const char*` field, as a String ("" for null). */
+    fun readString(field: String): String {
+        val pointer = segment.get(ValueLayout.ADDRESS, offset(field))
+        return if (pointer == MemorySegment.NULL) "" else pointer.reinterpret(Long.MAX_VALUE).getString(0)
+    }
 }
 
 /** Reads the two uint32/float outputs a C function writes through pointers. */

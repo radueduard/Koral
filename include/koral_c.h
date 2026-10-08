@@ -272,6 +272,44 @@ KORAL_API uint32_t koral_shader_language(KoralShader* shader);
 KORAL_API const char* koral_shader_source_path(KoralShader* shader);
 KORAL_API void koral_shader_add_search_path(const char* directory, bool front);
 
+/* What reflection says of a shader. Strings point into the shader's own reflection: valid until it is reloaded or destroyed. */
+
+/** One descriptor the shader declares (kor::Shader::Descriptor), and where the compiler put it. */
+typedef struct KoralShaderParameter {
+    const char* name;                  /* as in the source; empty for a block declared without an instance name */
+    const char* block_name;            /* the block's type name, for a uniform or storage buffer; otherwise empty */
+    uint32_t type;                     /* kor::DescriptorType */
+    uint32_t count;                    /* array elements, or 1 */
+    uint32_t set, binding;             /* where the compiler put it; a pipeline may put it elsewhere (set_binding) */
+    uint32_t access;                   /* kor::Shader::AccessKind: 0 read, 1 write, 2 both */
+    uint32_t shape;                    /* kor::ImageShape, for an image */
+    bool active;                       /* whether the entry point reaches it */
+} KoralShaderParameter;
+/** One field of a push-constant block (kor::Shader::PushConstantField), flattened: `model`, `material.albedo`, `weights[2]`. */
+typedef struct KoralShaderPushConstant {
+    const char* name;
+    uint32_t offset, size;             /* within the pipeline's push-constant range */
+    uint32_t scalar;                   /* 0 float, 1 int, 2 uint, 3 bool, 4 double, 5 anything else */
+    uint32_t rows, columns, count;     /* vector components or matrix rows; matrix columns; array elements */
+    bool aggregate;                    /* a struct or a whole array: written only as raw bytes */
+} KoralShaderPushConstant;
+/** A specialization constant (kor::Shader::SpecializationConstant). */
+typedef struct KoralShaderSpecializationConstant {
+    const char* name;
+    uint32_t id;                       /* its constant_id */
+    uint32_t scalar;                   /* as KoralShaderPushConstant's */
+    uint32_t size;                     /* bytes in specialization data: a bool takes 4 */
+    uint64_t default_value;            /* its bits, in the low size bytes */
+} KoralShaderSpecializationConstant;
+
+KORAL_API size_t koral_shader_parameter_count(KoralShader* shader);
+/** Writes the @p index th descriptor into @p out; false when there is no such. */
+KORAL_API bool koral_shader_parameter(KoralShader* shader, size_t index, KoralShaderParameter* out);
+KORAL_API size_t koral_shader_push_constant_count(KoralShader* shader);
+KORAL_API bool koral_shader_push_constant(KoralShader* shader, size_t index, KoralShaderPushConstant* out);
+KORAL_API size_t koral_shader_specialization_constant_count(KoralShader* shader);
+KORAL_API bool koral_shader_specialization_constant(KoralShader* shader, size_t index, KoralShaderSpecializationConstant* out);
+
 /* ---- pipelines ---------------------------------------------------------------------------------------- */
 
 /** kor::InputAssemblyState, kor::RasterizationState, kor::MultisampleState, kor::DepthStencilState and
@@ -348,12 +386,22 @@ KORAL_API void koral_graphics_pipeline_builder_set_framebuffer(KoralGraphicsPipe
 /** SetSpecializationConstant(id, value): a 4- or 8-byte value. */
 KORAL_API void koral_graphics_pipeline_builder_set_specialization_constant(KoralGraphicsPipelineBuilder* builder, uint32_t id,
                                                                             const void* value, uint32_t bytes);
+/** SetSpecializationConstant(name, value), by the name its shader gave it: a 4- or 8-byte value. */
+KORAL_API void koral_graphics_pipeline_builder_set_specialization_constant_named(KoralGraphicsPipelineBuilder* builder, const char* name,
+                                                                                  const void* value, uint32_t bytes);
+/** SetBinding(name, set, binding): puts the descriptor @p name there, whatever its shader said. */
+KORAL_API void koral_graphics_pipeline_builder_set_binding(KoralGraphicsPipelineBuilder* builder, const char* name, uint32_t set,
+                                                            uint32_t binding);
 KORAL_API KoralGraphicsPipeline* koral_graphics_pipeline_builder_build(KoralGraphicsPipelineBuilder* builder);
 
 KORAL_API KoralComputePipelineBuilder* koral_compute_pipeline_builder_new(void);
 KORAL_API void koral_compute_pipeline_builder_set_compute_shader(KoralComputePipelineBuilder* builder, KoralShader* shader);
 KORAL_API void koral_compute_pipeline_builder_set_specialization_constant(KoralComputePipelineBuilder* builder, uint32_t id,
                                                                            const void* value, uint32_t bytes);
+KORAL_API void koral_compute_pipeline_builder_set_specialization_constant_named(KoralComputePipelineBuilder* builder, const char* name,
+                                                                                 const void* value, uint32_t bytes);
+KORAL_API void koral_compute_pipeline_builder_set_binding(KoralComputePipelineBuilder* builder, const char* name, uint32_t set,
+                                                           uint32_t binding);
 KORAL_API KoralComputePipeline* koral_compute_pipeline_builder_build(KoralComputePipelineBuilder* builder);
 
 KORAL_API KoralRayTracingPipelineBuilder* koral_ray_tracing_pipeline_builder_new(void);
@@ -364,6 +412,12 @@ KORAL_API void koral_ray_tracing_pipeline_builder_add_hit_group(KoralRayTracingP
                                                                  KoralShader* any_hit, KoralShader* intersection);
 KORAL_API void koral_ray_tracing_pipeline_builder_add_callable_shader(KoralRayTracingPipelineBuilder* builder, KoralShader* shader);
 KORAL_API void koral_ray_tracing_pipeline_builder_set_max_recursion_depth(KoralRayTracingPipelineBuilder* builder, uint32_t depth);
+KORAL_API void koral_ray_tracing_pipeline_builder_set_specialization_constant(KoralRayTracingPipelineBuilder* builder, uint32_t id,
+                                                                               const void* value, uint32_t bytes);
+KORAL_API void koral_ray_tracing_pipeline_builder_set_specialization_constant_named(KoralRayTracingPipelineBuilder* builder, const char* name,
+                                                                                     const void* value, uint32_t bytes);
+KORAL_API void koral_ray_tracing_pipeline_builder_set_binding(KoralRayTracingPipelineBuilder* builder, const char* name, uint32_t set,
+                                                               uint32_t binding);
 KORAL_API KoralRayTracingPipeline* koral_ray_tracing_pipeline_builder_build(KoralRayTracingPipelineBuilder* builder);
 KORAL_API uint32_t koral_ray_tracing_pipeline_max_recursion_depth(KoralRayTracingPipeline* pipeline);
 

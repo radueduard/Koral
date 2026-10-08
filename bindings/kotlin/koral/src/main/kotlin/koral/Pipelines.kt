@@ -75,6 +75,15 @@ class GraphicsPipeline internal constructor(native: MemorySegment) : Pipeline(na
                 KoralNative.koral_graphics_pipeline_builder_set_specialization_constant(native, id, v, v.byteSize().toInt())
             }
         }
+        /** SetSpecializationConstant(name, value), by the name its shader gave it: an Int, Float, Boolean, Long or Double. */
+        fun setSpecializationConstant(name: String, value: Any) = apply {
+            Arena.ofConfined().use { a ->
+                val v = specialization(a, value)
+                KoralNative.koral_graphics_pipeline_builder_set_specialization_constant_named(native, name, v, v.byteSize().toInt())
+            }
+        }
+        /** SetBinding(name, set, binding): puts the descriptor there, whatever its shader said. */
+        fun setBinding(name: String, set: Int, binding: Int) = apply { KoralNative.koral_graphics_pipeline_builder_set_binding(native, name, set, binding) }
         fun build(): GraphicsPipeline = built(KoralNative.koral_graphics_pipeline_builder_build(native), "building a graphics pipeline")
     }
 }
@@ -90,6 +99,15 @@ class ComputePipeline internal constructor(native: MemorySegment) : Pipeline(nat
                 KoralNative.koral_compute_pipeline_builder_set_specialization_constant(native, id, v, v.byteSize().toInt())
             }
         }
+        /** SetSpecializationConstant(name, value), by the name its shader gave it: an Int, Float, Boolean, Long or Double. */
+        fun setSpecializationConstant(name: String, value: Any) = apply {
+            Arena.ofConfined().use { a ->
+                val v = specialization(a, value)
+                KoralNative.koral_compute_pipeline_builder_set_specialization_constant_named(native, name, v, v.byteSize().toInt())
+            }
+        }
+        /** SetBinding(name, set, binding): puts the descriptor there, whatever its shader said. */
+        fun setBinding(name: String, set: Int, binding: Int) = apply { KoralNative.koral_compute_pipeline_builder_set_binding(native, name, set, binding) }
         fun build(): ComputePipeline = built(KoralNative.koral_compute_pipeline_builder_build(native), "building a compute pipeline")
     }
 }
@@ -109,6 +127,22 @@ class RayTracingPipeline internal constructor(native: MemorySegment) : Pipeline(
         }
         fun addCallableShader(shader: Shader) = apply { KoralNative.koral_ray_tracing_pipeline_builder_add_callable_shader(native, shader.native) }
         fun setMaxRecursionDepth(depth: Int) = apply { KoralNative.koral_ray_tracing_pipeline_builder_set_max_recursion_depth(native, depth) }
+        /** SetSpecializationConstant(id, value): an Int, Float, Boolean, Long or Double. */
+        fun setSpecializationConstant(id: Int, value: Any) = apply {
+            Arena.ofConfined().use { a ->
+                val v = specialization(a, value)
+                KoralNative.koral_ray_tracing_pipeline_builder_set_specialization_constant(native, id, v, v.byteSize().toInt())
+            }
+        }
+        /** SetSpecializationConstant(name, value), by the name its shader gave it. */
+        fun setSpecializationConstant(name: String, value: Any) = apply {
+            Arena.ofConfined().use { a ->
+                val v = specialization(a, value)
+                KoralNative.koral_ray_tracing_pipeline_builder_set_specialization_constant_named(native, name, v, v.byteSize().toInt())
+            }
+        }
+        /** SetBinding(name, set, binding): puts the descriptor there, whatever its shader said. */
+        fun setBinding(name: String, set: Int, binding: Int) = apply { KoralNative.koral_ray_tracing_pipeline_builder_set_binding(native, name, set, binding) }
         fun build(): RayTracingPipeline = built(KoralNative.koral_ray_tracing_pipeline_builder_build(native), "building a ray-tracing pipeline")
     }
 

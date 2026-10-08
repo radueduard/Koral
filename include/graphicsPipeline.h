@@ -111,7 +111,7 @@ namespace kor
     {
     public:
         /** @brief Collects the shaders and state a graphics pipeline is compiled from. */
-        struct KORAL_API Builder : kor::Builder {
+        struct KORAL_API Builder : kor::Builder, PipelineSettings<Builder> {
             // Repairable: its inputs are a source file (shaders) or lifetime-tracked shader refs
             // (pipelines), so a failure here can be fixed at runtime and retried. See Builder::Recoverable.
             static constexpr bool Recoverable = true;
@@ -198,34 +198,6 @@ namespace kor
              */
             Builder& SetFramebuffer(kor::ResourceRef<const Framebuffer> framebuffer);
 
-            /**
-             * @brief Bakes a specialization constant into every shader stage of this pipeline.
-             * @tparam T The constant's type; must be trivially copyable.
-             * @param id The constant id the shader declares.
-             * @param value The value compiled in.
-             *
-             * The shader is compiled with the value as a literal, so branches on it fold away and
-             * loops over it can unroll — the way to specialise one shader into several pipelines
-             * without duplicating its source. Stages that declare no constant with this id ignore
-             * it, so one value can be shared across stages.
-             *
-             * @throws std::runtime_error if the accumulated constants exceed the internal buffer.
-             */
-            template<typename T> requires std::is_trivially_copyable_v<T>
-            Builder& SetSpecializationConstant(kor::u32 id, T value) {
-                const kor::u32 valueSize = sizeof(T);
-                if (_currentSpecConstantSize + valueSize > specConstantsData.size()) {
-                    throw std::runtime_error("Exceeded maximum specialization constant data size");
-                }
-                specConstantsMetadata.emplace_back(id, _currentSpecConstantSize, valueSize);
-                std::memcpy(specConstantsData.data() + _currentSpecConstantSize, &value, valueSize);
-                _currentSpecConstantSize += valueSize;
-                return *this;
-            }
-
-            std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> specConstantsMetadata {};
-            std::vector<std::byte> specConstantsData = std::vector<std::byte>(64, static_cast<std::byte>(0));
-
             /** @brief One build attempt. Internal: prefer Build(). */
             [[nodiscard]] Result<std::unique_ptr<GraphicsPipeline>> Create() const;
 
@@ -235,9 +207,6 @@ namespace kor
              *         or the state is inconsistent, and repaired automatically when the shader is fixed.
              */
             [[nodiscard]] kor::Resource<GraphicsPipeline> Build(std::source_location where = std::source_location::current()) const;
-
-        private:
-            kor::u32 _currentSpecConstantSize = 0;
         };
 
         /** @brief Virtual destructor for polymorphic ownership. */
@@ -292,7 +261,5 @@ namespace kor
         std::optional<std::vector<VertexInputAttributeDescription>> _vertexAttributeDescriptions;
         std::optional<std::vector<VertexInputBindingDescription>> _vertexBindingDescriptions;
 
-        std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> _specConstantsMetadata;
-        std::vector<std::byte> _specConstantsData;
     };
 }

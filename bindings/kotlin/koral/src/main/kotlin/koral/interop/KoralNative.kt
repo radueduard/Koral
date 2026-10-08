@@ -14,6 +14,37 @@ import java.lang.invoke.MethodHandle
 
 /** The C structs' layouts, with C's padding. */
 object KoralLayouts {
+    val KoralShaderParameter: StructLayout = MemoryLayout.structLayout(
+        ADDRESS.withName("name"),
+        ADDRESS.withName("block_name"),
+        JAVA_INT.withName("type"),
+        JAVA_INT.withName("count"),
+        JAVA_INT.withName("set"),
+        JAVA_INT.withName("binding"),
+        JAVA_INT.withName("access"),
+        JAVA_INT.withName("shape"),
+        JAVA_BOOLEAN.withName("active"),
+        MemoryLayout.paddingLayout(7),
+    )
+    val KoralShaderPushConstant: StructLayout = MemoryLayout.structLayout(
+        ADDRESS.withName("name"),
+        JAVA_INT.withName("offset"),
+        JAVA_INT.withName("size"),
+        JAVA_INT.withName("scalar"),
+        JAVA_INT.withName("rows"),
+        JAVA_INT.withName("columns"),
+        JAVA_INT.withName("count"),
+        JAVA_BOOLEAN.withName("aggregate"),
+        MemoryLayout.paddingLayout(7),
+    )
+    val KoralShaderSpecializationConstant: StructLayout = MemoryLayout.structLayout(
+        ADDRESS.withName("name"),
+        JAVA_INT.withName("id"),
+        JAVA_INT.withName("scalar"),
+        JAVA_INT.withName("size"),
+        MemoryLayout.paddingLayout(4),
+        JAVA_LONG.withName("default_value"),
+    )
     val KoralInputAssemblyState: StructLayout = MemoryLayout.structLayout(
         JAVA_INT.withName("topology"),
         JAVA_BOOLEAN.withName("primitive_restart_enable"),
@@ -564,6 +595,18 @@ object KoralNative {
     fun koral_shader_source_path(shader: MemorySegment): String = Native.kString(h_koral_shader_source_path.invokeExact(shader) as MemorySegment)
     private val h_koral_shader_add_search_path by lazy { handle("koral_shader_add_search_path", FunctionDescriptor.ofVoid(ADDRESS, JAVA_BOOLEAN)) }
     fun koral_shader_add_search_path(directory: String?, front: Boolean): Unit { Arena.ofConfined().use { a -> h_koral_shader_add_search_path.invokeExact(Native.cString(a, directory), front); Unit } }
+    private val h_koral_shader_parameter_count by lazy { handle("koral_shader_parameter_count", FunctionDescriptor.of(JAVA_LONG, ADDRESS)) }
+    fun koral_shader_parameter_count(shader: MemorySegment): Long = h_koral_shader_parameter_count.invokeExact(shader) as Long
+    private val h_koral_shader_parameter by lazy { handle("koral_shader_parameter", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS, JAVA_LONG, ADDRESS)) }
+    fun koral_shader_parameter(shader: MemorySegment, index: Long, out: MemorySegment): Boolean = h_koral_shader_parameter.invokeExact(shader, index, out) as Boolean
+    private val h_koral_shader_push_constant_count by lazy { handle("koral_shader_push_constant_count", FunctionDescriptor.of(JAVA_LONG, ADDRESS)) }
+    fun koral_shader_push_constant_count(shader: MemorySegment): Long = h_koral_shader_push_constant_count.invokeExact(shader) as Long
+    private val h_koral_shader_push_constant by lazy { handle("koral_shader_push_constant", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS, JAVA_LONG, ADDRESS)) }
+    fun koral_shader_push_constant(shader: MemorySegment, index: Long, out: MemorySegment): Boolean = h_koral_shader_push_constant.invokeExact(shader, index, out) as Boolean
+    private val h_koral_shader_specialization_constant_count by lazy { handle("koral_shader_specialization_constant_count", FunctionDescriptor.of(JAVA_LONG, ADDRESS)) }
+    fun koral_shader_specialization_constant_count(shader: MemorySegment): Long = h_koral_shader_specialization_constant_count.invokeExact(shader) as Long
+    private val h_koral_shader_specialization_constant by lazy { handle("koral_shader_specialization_constant", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS, JAVA_LONG, ADDRESS)) }
+    fun koral_shader_specialization_constant(shader: MemorySegment, index: Long, out: MemorySegment): Boolean = h_koral_shader_specialization_constant.invokeExact(shader, index, out) as Boolean
     private val h_koral_graphics_pipeline_builder_new by lazy { handle("koral_graphics_pipeline_builder_new", FunctionDescriptor.of(ADDRESS)) }
     fun koral_graphics_pipeline_builder_new(): MemorySegment = h_koral_graphics_pipeline_builder_new.invokeExact() as MemorySegment
     private val h_koral_graphics_pipeline_builder_set_vertex_shader by lazy { handle("koral_graphics_pipeline_builder_set_vertex_shader", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
@@ -592,6 +635,10 @@ object KoralNative {
     fun koral_graphics_pipeline_builder_set_framebuffer(builder: MemorySegment, framebuffer: MemorySegment): Unit { h_koral_graphics_pipeline_builder_set_framebuffer.invokeExact(builder, framebuffer) }
     private val h_koral_graphics_pipeline_builder_set_specialization_constant by lazy { handle("koral_graphics_pipeline_builder_set_specialization_constant", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, ADDRESS, JAVA_INT)) }
     fun koral_graphics_pipeline_builder_set_specialization_constant(builder: MemorySegment, id: Int, value: MemorySegment, bytes: Int): Unit { h_koral_graphics_pipeline_builder_set_specialization_constant.invokeExact(builder, id, value, bytes) }
+    private val h_koral_graphics_pipeline_builder_set_specialization_constant_named by lazy { handle("koral_graphics_pipeline_builder_set_specialization_constant_named", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_INT)) }
+    fun koral_graphics_pipeline_builder_set_specialization_constant_named(builder: MemorySegment, name: String?, value: MemorySegment, bytes: Int): Unit { Arena.ofConfined().use { a -> h_koral_graphics_pipeline_builder_set_specialization_constant_named.invokeExact(builder, Native.cString(a, name), value, bytes); Unit } }
+    private val h_koral_graphics_pipeline_builder_set_binding by lazy { handle("koral_graphics_pipeline_builder_set_binding", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)) }
+    fun koral_graphics_pipeline_builder_set_binding(builder: MemorySegment, name: String?, set: Int, binding: Int): Unit { Arena.ofConfined().use { a -> h_koral_graphics_pipeline_builder_set_binding.invokeExact(builder, Native.cString(a, name), set, binding); Unit } }
     private val h_koral_graphics_pipeline_builder_build by lazy { handle("koral_graphics_pipeline_builder_build", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_graphics_pipeline_builder_build(builder: MemorySegment): MemorySegment = h_koral_graphics_pipeline_builder_build.invokeExact(builder) as MemorySegment
     private val h_koral_compute_pipeline_builder_new by lazy { handle("koral_compute_pipeline_builder_new", FunctionDescriptor.of(ADDRESS)) }
@@ -600,6 +647,10 @@ object KoralNative {
     fun koral_compute_pipeline_builder_set_compute_shader(builder: MemorySegment, shader: MemorySegment): Unit { h_koral_compute_pipeline_builder_set_compute_shader.invokeExact(builder, shader) }
     private val h_koral_compute_pipeline_builder_set_specialization_constant by lazy { handle("koral_compute_pipeline_builder_set_specialization_constant", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, ADDRESS, JAVA_INT)) }
     fun koral_compute_pipeline_builder_set_specialization_constant(builder: MemorySegment, id: Int, value: MemorySegment, bytes: Int): Unit { h_koral_compute_pipeline_builder_set_specialization_constant.invokeExact(builder, id, value, bytes) }
+    private val h_koral_compute_pipeline_builder_set_specialization_constant_named by lazy { handle("koral_compute_pipeline_builder_set_specialization_constant_named", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_INT)) }
+    fun koral_compute_pipeline_builder_set_specialization_constant_named(builder: MemorySegment, name: String?, value: MemorySegment, bytes: Int): Unit { Arena.ofConfined().use { a -> h_koral_compute_pipeline_builder_set_specialization_constant_named.invokeExact(builder, Native.cString(a, name), value, bytes); Unit } }
+    private val h_koral_compute_pipeline_builder_set_binding by lazy { handle("koral_compute_pipeline_builder_set_binding", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)) }
+    fun koral_compute_pipeline_builder_set_binding(builder: MemorySegment, name: String?, set: Int, binding: Int): Unit { Arena.ofConfined().use { a -> h_koral_compute_pipeline_builder_set_binding.invokeExact(builder, Native.cString(a, name), set, binding); Unit } }
     private val h_koral_compute_pipeline_builder_build by lazy { handle("koral_compute_pipeline_builder_build", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_compute_pipeline_builder_build(builder: MemorySegment): MemorySegment = h_koral_compute_pipeline_builder_build.invokeExact(builder) as MemorySegment
     private val h_koral_ray_tracing_pipeline_builder_new by lazy { handle("koral_ray_tracing_pipeline_builder_new", FunctionDescriptor.of(ADDRESS)) }
@@ -614,6 +665,12 @@ object KoralNative {
     fun koral_ray_tracing_pipeline_builder_add_callable_shader(builder: MemorySegment, shader: MemorySegment): Unit { h_koral_ray_tracing_pipeline_builder_add_callable_shader.invokeExact(builder, shader) }
     private val h_koral_ray_tracing_pipeline_builder_set_max_recursion_depth by lazy { handle("koral_ray_tracing_pipeline_builder_set_max_recursion_depth", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT)) }
     fun koral_ray_tracing_pipeline_builder_set_max_recursion_depth(builder: MemorySegment, depth: Int): Unit { h_koral_ray_tracing_pipeline_builder_set_max_recursion_depth.invokeExact(builder, depth) }
+    private val h_koral_ray_tracing_pipeline_builder_set_specialization_constant by lazy { handle("koral_ray_tracing_pipeline_builder_set_specialization_constant", FunctionDescriptor.ofVoid(ADDRESS, JAVA_INT, ADDRESS, JAVA_INT)) }
+    fun koral_ray_tracing_pipeline_builder_set_specialization_constant(builder: MemorySegment, id: Int, value: MemorySegment, bytes: Int): Unit { h_koral_ray_tracing_pipeline_builder_set_specialization_constant.invokeExact(builder, id, value, bytes) }
+    private val h_koral_ray_tracing_pipeline_builder_set_specialization_constant_named by lazy { handle("koral_ray_tracing_pipeline_builder_set_specialization_constant_named", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_INT)) }
+    fun koral_ray_tracing_pipeline_builder_set_specialization_constant_named(builder: MemorySegment, name: String?, value: MemorySegment, bytes: Int): Unit { Arena.ofConfined().use { a -> h_koral_ray_tracing_pipeline_builder_set_specialization_constant_named.invokeExact(builder, Native.cString(a, name), value, bytes); Unit } }
+    private val h_koral_ray_tracing_pipeline_builder_set_binding by lazy { handle("koral_ray_tracing_pipeline_builder_set_binding", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)) }
+    fun koral_ray_tracing_pipeline_builder_set_binding(builder: MemorySegment, name: String?, set: Int, binding: Int): Unit { Arena.ofConfined().use { a -> h_koral_ray_tracing_pipeline_builder_set_binding.invokeExact(builder, Native.cString(a, name), set, binding); Unit } }
     private val h_koral_ray_tracing_pipeline_builder_build by lazy { handle("koral_ray_tracing_pipeline_builder_build", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_ray_tracing_pipeline_builder_build(builder: MemorySegment): MemorySegment = h_koral_ray_tracing_pipeline_builder_build.invokeExact(builder) as MemorySegment
     private val h_koral_ray_tracing_pipeline_max_recursion_depth by lazy { handle("koral_ray_tracing_pipeline_max_recursion_depth", FunctionDescriptor.of(JAVA_INT, ADDRESS)) }

@@ -82,6 +82,7 @@ namespace kor
           _callableShaders(createInfo.callableShaders),
           _maxRecursionDepth(createInfo.maxRecursionDepth)
     {
+        TakeSettings(createInfo);
         if (auto v = Validate(); !v) throw BackendException(v.error());
 
         for (const auto& shader : CollectShaders()) SubscribeReload(shader);

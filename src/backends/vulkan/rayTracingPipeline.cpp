@@ -14,6 +14,7 @@
 #include "physicalDevice.h"
 #include "runtime.h"
 #include "shader.h"
+#include "shaderModules.h"
 #include "vk_enum_conversions.h"
 #include "vulkanContext.h"
 
@@ -90,12 +91,21 @@ namespace kor::vk
         std::vector<::vk::PipelineShaderStageCreateInfo> shaderStages;
         std::vector<::vk::RayTracingShaderGroupCreateInfoKHR> shaderGroups;
 
+        ShaderModules modules(_bindings);
+        std::vector<::vk::SpecializationMapEntry> specializationMapEntries;
+        for (const auto& [id, offset, size] : _specConstantsMetadata)
+            specializationMapEntries.emplace_back(::vk::SpecializationMapEntry().setConstantID(id).setOffset(offset).setSize(size));
+        const auto specializationInfo = ::vk::SpecializationInfo()
+            .setMapEntries(specializationMapEntries)
+            .setDataSize(_specConstantsData.size())
+            .setPData(_specConstantsData.data());
+
         auto addStage = [&](const ResourceRef<const kor::Shader>& shaderRef, const ::vk::ShaderStageFlagBits stage) {
-            const auto& shader = dynamic_cast<const vk::Shader&>(*shaderRef);
             const auto index = static_cast<kor::u32>(shaderStages.size());
             shaderStages.push_back(::vk::PipelineShaderStageCreateInfo()
                 .setStage(stage)
-                .setModule(*shader)
+                .setModule(modules.For(*shaderRef))
+                .setPSpecializationInfo(_specConstantsMetadata.empty() ? nullptr : &specializationInfo)
                 .setPName("main"));
             return index;
         };

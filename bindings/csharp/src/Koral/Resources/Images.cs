@@ -249,4 +249,66 @@ public sealed unsafe partial class Shader : Resource
     public string SourcePath { get { var v = KoralNative.Text(KoralNative.koral_shader_source_path(Handle)); KoralNative.Check(); return v; } }
 
     public static void AddSearchPath(string directory, bool front = false) => KoralNative.koral_shader_add_search_path(directory, KoralNative.Bool(front));
+
+    /// <summary>A descriptor the shader declares, and where the compiler put it (kor::Shader::Descriptor).</summary>
+    public sealed record Parameter(string Name, string BlockName, DescriptorType Type, uint Count, uint Set, uint Binding, AccessKind Access,
+                                   ImageShape Shape, bool Active);
+    /// <summary>One field of a push-constant block, flattened: <c>model</c>, <c>material.albedo</c> (kor::Shader::PushConstantField).</summary>
+    public sealed record PushConstantField(string Name, uint Offset, uint Size, uint Scalar, uint Rows, uint Columns, uint Count, bool Aggregate);
+    /// <summary>A specialization constant: its id, its name, and the bits of the value the shader gives it.</summary>
+    public sealed record SpecializationConstant(string Name, uint Id, uint Scalar, uint Size, ulong DefaultValue);
+
+    private static string Utf8(IntPtr text) => Marshal.PtrToStringUTF8(text) ?? "";
+
+    /// <summary>Every descriptor the shader declares, by set and binding.</summary>
+    public IReadOnlyList<Parameter> Parameters
+    {
+        get
+        {
+            var list = new List<Parameter>();
+            for (nuint i = 0, n = KoralNative.koral_shader_parameter_count(Handle); i < n; ++i)
+            {
+                KoralShaderParameter p;
+                if (KoralNative.koral_shader_parameter(Handle, i, &p) == 0) break;
+                list.Add(new Parameter(Utf8(p.name), Utf8(p.block_name), (DescriptorType)p.type, p.count, p.set, p.binding,
+                                       (AccessKind)p.access, (ImageShape)p.shape, p.active != 0));
+            }
+            KoralNative.Check();
+            return list;
+        }
+    }
+
+    /// <summary>Every field of its push-constant blocks.</summary>
+    public IReadOnlyList<PushConstantField> PushConstants
+    {
+        get
+        {
+            var list = new List<PushConstantField>();
+            for (nuint i = 0, n = KoralNative.koral_shader_push_constant_count(Handle); i < n; ++i)
+            {
+                KoralShaderPushConstant p;
+                if (KoralNative.koral_shader_push_constant(Handle, i, &p) == 0) break;
+                list.Add(new PushConstantField(Utf8(p.name), p.offset, p.size, p.scalar, p.rows, p.columns, p.count, p.aggregate != 0));
+            }
+            KoralNative.Check();
+            return list;
+        }
+    }
+
+    /// <summary>Its specialization constants, by id.</summary>
+    public IReadOnlyList<SpecializationConstant> SpecializationConstants
+    {
+        get
+        {
+            var list = new List<SpecializationConstant>();
+            for (nuint i = 0, n = KoralNative.koral_shader_specialization_constant_count(Handle); i < n; ++i)
+            {
+                KoralShaderSpecializationConstant c;
+                if (KoralNative.koral_shader_specialization_constant(Handle, i, &c) == 0) break;
+                list.Add(new SpecializationConstant(Utf8(c.name), c.id, c.scalar, c.size, c.default_value));
+            }
+            KoralNative.Check();
+            return list;
+        }
+    }
 }

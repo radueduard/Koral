@@ -16,6 +16,7 @@
 #include <cstring>
 #include <iterator>
 #include <optional>
+#include <ranges>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -95,7 +96,10 @@ namespace kor {
         // module as the path so one set of rules covers both spellings.
         if (b.path.empty() && !b.module.empty()) b.path = b.module;
 
-        if (!b.langExplicit && !b.path.empty()) b.lang = langFromFilename(b.path);
+        // A module and an entry point are Slang's way of naming a shader: a module named without a
+        // file extension is a Slang module, whatever the language would otherwise be guessed as.
+        if (!b.langExplicit && !b.path.empty())
+            b.lang = !b.module.empty() && !b.path.has_extension() ? Lang::eSlang : langFromFilename(b.path);
 
         // A Slang module is resolved by name, so it keeps the bare stem; every other language
         // needs a real file, resolved against the shader search roots.
@@ -417,6 +421,9 @@ namespace kor {
         shader->setEnvInput(glslang::EShSourceGlsl, eShStage, glslang::EShClientVulkan, 450);
         shader->setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_3);
         shader->setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_6);
+        // A descriptor needs no layout(binding) of its own: it is numbered for it, and whoever builds a
+        // pipeline from it may number it again (Shader::BindingAssignment). Those that have one keep it.
+        shader->setAutoMapBindings(true);
 
         constexpr auto messages = static_cast<EShMessages>(EShMsgSpvRules | EShMsgVulkanRules | EShMsgDefault | EShMsgDebugInfo | EShMsgEnhanced);
 
@@ -448,6 +455,17 @@ namespace kor {
         	throw BackendException(Error{
         		.code = ErrorCode::eShaderCompileFailed,
         		.message = std::format("GLSL linking failed for '{}':\n{}", _path.string(), info),
+        	});
+        }
+
+        // Where the automatic binding numbers are actually given out: setAutoMapBindings alone only asks.
+        if (!program->mapIO()) {
+        	std::string info = program->getInfoLog();
+        	delete program;
+        	delete shader;
+        	throw BackendException(Error{
+        		.code = ErrorCode::eShaderCompileFailed,
+        		.message = std::format("GLSL bindings could not be numbered for '{}':\n{}", _path.string(), info),
         	});
         }
 
@@ -1007,7 +1025,113 @@ namespace kor {
 			memoryLayout.pushConstants.emplace(offset, std::move(pushConstantBlock));
 		} // push constants
 
+    	// Specialization constants: by name, for a pipeline to set and a tool to list.
+    	for (const auto& constant : module.get_specialization_constants()) {
+    		const auto& value = module.get_constant(constant.id);
+    		const auto& type = module.get_type(value.constant_type);
+    		SpecializationConstant reflected;
+    		reflected.id = constant.constant_id;
+    		reflected.name = module.get_name(constant.id);
+    		switch (type.basetype) {
+    		case spirv_cross::SPIRType::Float:   reflected.scalar = 0; break;
+    		case spirv_cross::SPIRType::Int:     reflected.scalar = 1; break;
+    		case spirv_cross::SPIRType::UInt:    reflected.scalar = 2; break;
+    		case spirv_cross::SPIRType::Boolean: reflected.scalar = 3; break;
+    		case spirv_cross::SPIRType::Double:  reflected.scalar = 4; break;
+    		default:                             reflected.scalar = 5; break;
+    		}
+    		// A bool is a VkBool32 in specialization data; everything else is as wide as its type.
+    		reflected.size = type.basetype == spirv_cross::SPIRType::Boolean ? 4u : std::max(type.width / 8u, 1u);
+    		reflected.defaultValue = reflected.size == 8 ? value.scalar_u64() : value.scalar();
+    		memoryLayout.specializationConstants.emplace(reflected.id, std::move(reflected));
+    	}
+
+    	// Which SPIR-V variables each descriptor is, by its name and by its block's type name: what
+    	// SpirvWith rewrites the decorations of.
+    	_descriptorVariables.clear();
+    	const auto recordVariables = [&](const auto& list, const bool block) {
+    		for (const auto& resource : list) {
+    			if (const auto& name = module.get_name(resource.id); !name.empty()) _descriptorVariables[name].push_back(resource.id);
+    			if (block) {
+    				if (const auto& type = module.get_name(resource.base_type_id); !type.empty()) _descriptorVariables[type].push_back(resource.id);
+    			}
+    		}
+    	};
+    	recordVariables(resources.separate_samplers, false);
+    	recordVariables(resources.separate_images, false);
+    	recordVariables(resources.sampled_images, false);
+    	recordVariables(resources.storage_images, false);
+    	recordVariables(resources.uniform_buffers, true);
+    	recordVariables(resources.storage_buffers, true);
+    	recordVariables(resources.acceleration_structures, false);
+
     	_memoryLayout = memoryLayout;
+    }
+
+    bool Shader::DeclaresDescriptor(const std::string_view name) const
+    {
+    	return _descriptorVariables.contains(name);
+    }
+
+    Result<Shader::MemoryLayout> Shader::LayoutWith(const BindingAssignment& assignment) const
+    {
+    	MemoryLayout moved = _memoryLayout;
+    	if (assignment.empty()) return moved;
+    	moved.descriptorSets.clear();
+    	for (const auto& [set, description] : _memoryLayout.descriptorSets) {
+    		for (const auto& [binding, descriptor] : description.descriptors) {
+    			BindingSlot slot { set, binding };
+    			if (const auto byName = assignment.find(descriptor.name); !descriptor.name.empty() && byName != assignment.end()) slot = byName->second;
+    			else if (const auto byBlock = assignment.find(descriptor.blockName); !descriptor.blockName.empty() && byBlock != assignment.end()) slot = byBlock->second;
+
+    			auto& target = moved.descriptorSets[slot.set].descriptors;
+    			if (const auto taken = target.find(slot.binding); taken != target.end()) {
+    				return std::unexpected(Error{ .code = ErrorCode::eDescriptorConflict, .message = std::format(
+    					"'{}' and '{}' of {} would both be at set {}, binding {}: give each a binding of its own.",
+    					taken->second.name.empty() ? taken->second.blockName : taken->second.name,
+    					descriptor.name.empty() ? descriptor.blockName : descriptor.name,
+    					_path.filename().string(), slot.set, slot.binding) });
+    			}
+    			target.emplace(slot.binding, descriptor);
+    		}
+    	}
+    	return moved;
+    }
+
+    std::vector<kor::u32> Shader::SpirvWith(const BindingAssignment& assignment) const
+    {
+    	std::vector<kor::u32> spirv = _spirvCode;
+    	if (assignment.empty() || spirv.size() < 5) return spirv;
+
+    	// Variable id -> where it goes. A descriptor's own name wins over its block's type name.
+    	std::unordered_map<kor::u32, BindingSlot> moves;
+    	for (const auto& [set, description] : _memoryLayout.descriptorSets) {
+    		for (const auto& descriptor : description.descriptors | std::views::values) {
+    			const BindingSlot* slot = nullptr;
+    			std::string_view key;
+    			if (const auto it = assignment.find(descriptor.name); !descriptor.name.empty() && it != assignment.end()) { slot = &it->second; key = descriptor.name; }
+    			else if (const auto block = assignment.find(descriptor.blockName); !descriptor.blockName.empty() && block != assignment.end()) { slot = &block->second; key = descriptor.blockName; }
+    			if (!slot) continue;
+    			if (const auto variables = _descriptorVariables.find(key); variables != _descriptorVariables.end())
+    				for (const auto id : variables->second) moves[id] = *slot;
+    		}
+    	}
+
+    	// OpDecorate %target DescriptorSet|Binding <literal>, rewritten in place. Every compiler Koral
+    	// takes shaders from decorates every descriptor with both, whether or not its source said.
+    	constexpr kor::u32 OpDecorate = 71, DecorationBinding = 33, DecorationDescriptorSet = 34;
+    	for (std::size_t i = 5; i < spirv.size();) {
+    		const kor::u32 words = spirv[i] >> 16, opcode = spirv[i] & 0xFFFFu;
+    		if (words == 0) break;
+    		if (opcode == OpDecorate && words >= 4) {
+    			if (const auto move = moves.find(spirv[i + 1]); move != moves.end()) {
+    				if (spirv[i + 2] == DecorationDescriptorSet) spirv[i + 3] = move->second.set;
+    				else if (spirv[i + 2] == DecorationBinding) spirv[i + 3] = move->second.binding;
+    			}
+    		}
+    		i += words;
+    	}
+    	return spirv;
     }
 
     void Shader::OnReload()

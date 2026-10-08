@@ -177,10 +177,9 @@ namespace kor
         _depthStencilState(createInfo.depthStencilState),
         _colorBlendState(createInfo.colorBlendState),
         _vertexAttributeDescriptions(createInfo.vertexAttributeDescriptions),
-        _vertexBindingDescriptions(createInfo.vertexBindingDescriptions),
-        _specConstantsMetadata(createInfo.specConstantsMetadata),
-        _specConstantsData(createInfo.specConstantsData)
+        _vertexBindingDescriptions(createInfo.vertexBindingDescriptions)
     {
+        TakeSettings(createInfo);
         if (auto v = Validate(); !v) throw BackendException(v.error());
 
         if (_vertexShader.has_value()) SubscribeReload(*_vertexShader);

@@ -15,8 +15,12 @@
 #pragma once
 #include <map>
 #include <memory>
+#include <cstring>
 #include <span>
+#include <string>
+#include <type_traits>
 #include <unordered_map>
+#include <vector>
 #include <kmath/matrix.h>
 
 #include "api.h"
@@ -27,6 +31,86 @@
 namespace kor
 {
     class CommandBuffer;
+
+    /** @brief A specialization constant given to a pipeline builder: by its constant id, or by the name its shader gave it. */
+    struct KORAL_API SpecializationValue {
+        std::string name;               ///< Empty when given by id.
+        kor::u32 id = 0;                ///< The constant id, when given by id.
+        std::vector<std::byte> bytes;   ///< The value.
+    };
+
+    /**
+     * @brief What every pipeline builder takes besides its shaders and its fixed state: where its
+     *        descriptors go, and the values of its specialization constants.
+     *
+     * @code
+     * ComputePipeline::Builder{}
+     *     .SetComputeShader(blur)
+     *     .SetBinding("source", 0, 0)                   // set 0, binding 0, whatever the shader said
+     *     .SetBinding("target", 1, 0)
+     *     .SetSpecializationConstant("radius", 4)       // by the name the shader gave it
+     *     .Build();
+     * @endcode
+     */
+    template<typename Derived>
+    struct PipelineSettings {
+        Shader::BindingAssignment bindings;                         ///< Descriptors moved, by name. @see SetBinding
+        std::vector<SpecializationValue> specializationConstants;   ///< In the order given; a later one for the same constant wins.
+
+        /**
+         * @brief Puts the descriptor @p name at @p set, @p binding, overriding what its shader said.
+         *
+         * @p name is the descriptor's name in the source, or its block's type name for a block declared
+         * without an instance name. A shader needs no bindings of its own for this: the pipeline numbers
+         * its descriptors, in the SPIR-V it is built from, and the shader itself is untouched — one shader
+         * serves pipelines that number it differently. A name no stage declares fails the build; two
+         * descriptors put in one place fail it too.
+         */
+        Derived& SetBinding(std::string name, const kor::u32 set, const kor::u32 binding) {
+            bindings[std::move(name)] = Shader::BindingSlot { set, binding };
+            return static_cast<Derived&>(*this);
+        }
+
+        /** @brief SetBinding for each of @p assignment. */
+        Derived& SetBindings(const Shader::BindingAssignment& assignment) {
+            for (const auto& [name, slot] : assignment) bindings[name] = slot;
+            return static_cast<Derived&>(*this);
+        }
+
+        /**
+         * @brief Bakes a specialization constant into the pipeline, by the constant id its shader declares.
+         * @tparam T The constant's type; trivially copyable, and as wide as the shader's (a bool may be a bool).
+         *
+         * The shader is compiled with the value as a literal, so branches on it fold away and loops over
+         * it can unroll. Stages that declare no constant with this id ignore it.
+         */
+        template<typename T> requires std::is_trivially_copyable_v<T>
+        Derived& SetSpecializationConstant(const kor::u32 id, const T value) {
+            specializationConstants.push_back({ {}, id, BytesOf(value) });
+            return static_cast<Derived&>(*this);
+        }
+
+        /** @brief Bakes a specialization constant into the pipeline, by the name its shader gave it. Fails the build if no stage declares it. */
+        template<typename T> requires std::is_trivially_copyable_v<T>
+        Derived& SetSpecializationConstant(std::string_view name, const T value) {
+            specializationConstants.push_back({ std::string(name), 0, BytesOf(value) });
+            return static_cast<Derived&>(*this);
+        }
+
+        /** @brief A specialization constant's value as raw bytes, by id or (when @p name is not empty) by name. */
+        Derived& SetSpecializationConstantBytes(std::string name, const kor::u32 id, std::vector<std::byte> bytes) {
+            specializationConstants.push_back({ std::move(name), id, std::move(bytes) });
+            return static_cast<Derived&>(*this);
+        }
+
+    private:
+        template<typename T>
+        static std::vector<std::byte> BytesOf(const T& value) {
+            std::vector<std::byte> bytes(sizeof(T));
+            std::memcpy(bytes.data(), &value, sizeof(T));
+            return bytes;
+        }
+    };
 
     /**
      * @brief What every pipeline type has in common: its shaders' interface, and hot reload.
@@ -129,16 +213,28 @@ namespace kor
          */
         [[nodiscard]] bool UsesDeviceAddresses() const { return _usesDeviceAddresses; }
 
+        /** @brief Where this pipeline puts its shaders' descriptors, beyond where they put themselves. @see PipelineSettings::SetBinding */
+        [[nodiscard]] const Shader::BindingAssignment& Bindings() const { return _bindings; }
+
     protected:
         Pipeline() = default;
+
+        /** @brief Takes a builder's bindings and specialization constants. */
+        template<typename B>
+        void TakeSettings(const PipelineSettings<B>& settings) {
+            _bindings = settings.bindings;
+            _specializationValues = settings.specializationConstants;
+        }
 
         /**
          * @brief Rebuild @ref _setLayouts and @ref _pushConstantRanges from a set of shaders.
          * @return Empty on success, or the first conflict found — a binding two stages declare
          *         differently, or a push constant they place differently.
          *
-         * Merges the memory layouts of @p shaders: descriptors sharing a (set, binding)
-         * are unioned across stages, conflicting declarations are reported.
+         * Merges the memory layouts of @p shaders — as moved by the pipeline's bindings — descriptors
+         * sharing a (set, binding) are unioned across stages, and conflicting declarations are
+         * reported. Resolves the specialization constants too, by name against what the shaders
+         * declare, into @ref _specConstantsMetadata and @ref _specConstantsData.
          *
          * @param shaders Shaders making up this pipeline.
          * @return true if the merged layout is consistent, false on a descriptor conflict.
@@ -177,5 +273,11 @@ namespace kor
         /// The same ranges' fields, flattened by name and unioned across stages. @see findPushConstant
         std::map<std::string, PushConstantMember, std::less<>> _pushConstants;
         bool _usesDeviceAddresses = false;
+
+        Shader::BindingAssignment _bindings;
+        std::vector<SpecializationValue> _specializationValues;
+        /// The specialization constants as Vulkan takes them: (constant id, offset, size) into the data.
+        std::vector<std::tuple<kor::u32, kor::u32, kor::u32>> _specConstantsMetadata;
+        std::vector<std::byte> _specConstantsData;
     };
 }

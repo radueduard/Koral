@@ -13,31 +13,32 @@ namespace kor::vk
 {
     DescriptorSetLayout::DescriptorSetLayout(const Builder& builder): kor::DescriptorSetLayout(builder)
     {
-        auto flags = std::vector<::vk::DescriptorBindingFlags>(_bindings.size());
+        // One entry a binding, in the same order in both arrays. The numbers need not run 0, 1, 2: a
+        // pipeline may put a descriptor at binding 3 of a set with nothing else in it.
+        std::vector<::vk::DescriptorBindingFlags> flags;
+        std::vector<::vk::DescriptorSetLayoutBinding> bindings;
+        flags.reserve(_bindings.size());
+        bindings.reserve(_bindings.size());
         bool anyUpdateAfterBind = false;
-        for (size_t i = 0; i < _bindings.size(); i++) {
-            // if the count is unknown at pipeline creation time, we need to set the variable descriptor count flag
-            flags[i] = ::vk::DescriptorBindingFlags();
-            if (_bindings[i].count == 0) {
-                flags[i] |= ::vk::DescriptorBindingFlagBits::eVariableDescriptorCount
+        for (const auto& [binding, description] : _bindings) {
+            // A count unknown when the pipeline is made (0) is a variable-count, partly bound array.
+            auto flag = ::vk::DescriptorBindingFlags();
+            if (description.count == 0) {
+                flag |= ::vk::DescriptorBindingFlagBits::eVariableDescriptorCount
                     | ::vk::DescriptorBindingFlagBits::ePartiallyBound
                     | ::vk::DescriptorBindingFlagBits::eUpdateAfterBind;
                 anyUpdateAfterBind = true;
             }
-        }
-
-        const auto descriptorSetLayoutBindingCreateInfo = ::vk::DescriptorSetLayoutBindingFlagsCreateInfo()
-            .setBindingCount(static_cast<uint32_t>(_bindings.size()))
-            .setBindingFlags(flags);
-
-        std::vector<::vk::DescriptorSetLayoutBinding> bindings(_bindings.size());
-        for (const auto& [binding, description] : _bindings) {
-            bindings[binding] = ::vk::DescriptorSetLayoutBinding()
+            flags.push_back(flag);
+            bindings.push_back(::vk::DescriptorSetLayoutBinding()
                 .setBinding(binding)
                 .setDescriptorType(getVkDescriptorType(description.type))
                 .setDescriptorCount(description.count == 0 ? 256 : description.count)
-                .setStageFlags(::vk::ShaderStageFlagBits::eAll);
+                .setStageFlags(::vk::ShaderStageFlagBits::eAll));
         }
+
+        const auto descriptorSetLayoutBindingCreateInfo = ::vk::DescriptorSetLayoutBindingFlagsCreateInfo()
+            .setBindingFlags(flags);
 
         const auto layoutCreateInfo = ::vk::DescriptorSetLayoutCreateInfo()
             .setBindings(bindings)

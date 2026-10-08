@@ -27,6 +27,13 @@ public abstract class Pipeline : Resource
         if (sizeof(T) != 4 && sizeof(T) != 8) throw new ArgumentException("a specialization constant is 4 or 8 bytes");
         set(builder, id, &value, (uint)sizeof(T));
     }
+
+    private protected static unsafe void SpecializationConstant<T>(IntPtr builder, string name, T value,
+                                                                   delegate*<IntPtr, string, void*, uint, void> set) where T : unmanaged
+    {
+        if (sizeof(T) != 4 && sizeof(T) != 8) throw new ArgumentException("a specialization constant is 4 or 8 bytes");
+        set(builder, name, &value, (uint)sizeof(T));
+    }
 }
 
 /// <summary>kor::GraphicsPipeline: vertex to fragment, rebuilt when one of its shaders is edited.</summary>
@@ -132,7 +139,22 @@ public sealed unsafe class GraphicsPipeline : Pipeline
             return this;
         }
 
+        /// <summary>SetSpecializationConstant(name, value): by the name its shader gave it.</summary>
+        public Builder SetSpecializationConstant<T>(string name, T value) where T : unmanaged
+        {
+            SpecializationConstant(Native, name, value, &SetNamed);
+            return this;
+        }
+
+        /// <summary>SetBinding(name, set, binding): puts the descriptor there, whatever its shader said.</summary>
+        public Builder SetBinding(string name, uint set, uint binding)
+        {
+            KoralNative.koral_graphics_pipeline_builder_set_binding(Native, name, set, binding);
+            return this;
+        }
+
         private static void SetConstant(IntPtr b, uint id, void* v, uint n) => KoralNative.koral_graphics_pipeline_builder_set_specialization_constant(b, id, v, n);
+        private static void SetNamed(IntPtr b, string name, void* v, uint n) => KoralNative.koral_graphics_pipeline_builder_set_specialization_constant_named(b, name, v, n);
 
         public GraphicsPipeline Build() => Built<GraphicsPipeline>(KoralNative.koral_graphics_pipeline_builder_build(Native));
     }
@@ -158,14 +180,29 @@ public sealed unsafe class ComputePipeline : Pipeline
             return this;
         }
 
+        /// <summary>SetSpecializationConstant(name, value): by the name its shader gave it.</summary>
+        public Builder SetSpecializationConstant<T>(string name, T value) where T : unmanaged
+        {
+            SpecializationConstant(Native, name, value, &SetNamed);
+            return this;
+        }
+
+        /// <summary>SetBinding(name, set, binding): puts the descriptor there, whatever its shader said.</summary>
+        public Builder SetBinding(string name, uint set, uint binding)
+        {
+            KoralNative.koral_compute_pipeline_builder_set_binding(Native, name, set, binding);
+            return this;
+        }
+
         private static void SetConstant(IntPtr b, uint id, void* v, uint n) => KoralNative.koral_compute_pipeline_builder_set_specialization_constant(b, id, v, n);
+        private static void SetNamed(IntPtr b, string name, void* v, uint n) => KoralNative.koral_compute_pipeline_builder_set_specialization_constant_named(b, name, v, n);
 
         public ComputePipeline Build() => Built<ComputePipeline>(KoralNative.koral_compute_pipeline_builder_build(Native));
     }
 }
 
 /// <summary>kor::RayTracingPipeline.</summary>
-public sealed class RayTracingPipeline : Pipeline
+public sealed unsafe class RayTracingPipeline : Pipeline
 {
     internal RayTracingPipeline(IntPtr native) : base(native) { }
 
@@ -185,6 +222,13 @@ public sealed class RayTracingPipeline : Pipeline
         }
         public Builder AddCallableShader(Shader shader) { KoralNative.koral_ray_tracing_pipeline_builder_add_callable_shader(Native, shader.Handle); return this; }
         public Builder SetMaxRecursionDepth(uint depth) { KoralNative.koral_ray_tracing_pipeline_builder_set_max_recursion_depth(Native, depth); return this; }
+        public Builder SetSpecializationConstant<T>(uint id, T value) where T : unmanaged { SpecializationConstant(Native, id, value, &SetConstant); return this; }
+        /// <summary>SetSpecializationConstant(name, value): by the name its shader gave it.</summary>
+        public Builder SetSpecializationConstant<T>(string name, T value) where T : unmanaged { SpecializationConstant(Native, name, value, &SetNamed); return this; }
+        /// <summary>SetBinding(name, set, binding): puts the descriptor there, whatever its shader said.</summary>
+        public Builder SetBinding(string name, uint set, uint binding) { KoralNative.koral_ray_tracing_pipeline_builder_set_binding(Native, name, set, binding); return this; }
+        private static void SetConstant(IntPtr b, uint id, void* v, uint n) => KoralNative.koral_ray_tracing_pipeline_builder_set_specialization_constant(b, id, v, n);
+        private static void SetNamed(IntPtr b, string name, void* v, uint n) => KoralNative.koral_ray_tracing_pipeline_builder_set_specialization_constant_named(b, name, v, n);
         public RayTracingPipeline Build() => Built<RayTracingPipeline>(KoralNative.koral_ray_tracing_pipeline_builder_build(Native));
     }
 

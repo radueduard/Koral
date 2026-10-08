@@ -76,10 +76,9 @@ namespace kor
     }
 
     ComputePipeline::ComputePipeline(const Builder& createInfo)
-        : _shader(createInfo.computeShader),
-          _specConstantsMetadata(createInfo.specConstantsMetadata),
-          _specConstantsData(createInfo.specConstantsData)
+        : _shader(createInfo.computeShader)
     {
+        TakeSettings(createInfo);
         if (auto v = Validate(); !v) throw BackendException(v.error());
 
         if (_shader.has_value()) SubscribeReload(*_shader);

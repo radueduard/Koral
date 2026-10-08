@@ -3,6 +3,7 @@ package koral
 import java.lang.foreign.Arena
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
+import koral.interop.KoralLayouts
 import koral.interop.KoralNative
 
 /** Reads three uint32s a C function writes through pointers. */
@@ -194,6 +195,45 @@ class Shader internal constructor(native: MemorySegment) : Resource(native) {
     val stage: ShaderStage get() = ShaderStage.of(KoralNative.koral_shader_shader_stage(native))
     val language: ShaderLang get() = ShaderLang.of(KoralNative.koral_shader_language(native))
     val sourcePath: String get() = KoralNative.koral_shader_source_path(native)
+
+    /** A descriptor the shader declares, and where the compiler put it (kor::Shader::Descriptor). */
+    data class Parameter(val name: String, val blockName: String, val type: DescriptorType, val count: Int, val set: Int, val binding: Int,
+                         val access: ShaderAccessKind, val shape: ImageShape, val active: Boolean)
+    /** One field of a push-constant block, flattened: `model`, `material.albedo` (kor::Shader::PushConstantField). */
+    data class PushConstantField(val name: String, val offset: Int, val size: Int, val scalar: Int, val rows: Int, val columns: Int,
+                                 val count: Int, val aggregate: Boolean)
+    /** A specialization constant: its id, its name, and the bits of the value the shader gives it. */
+    data class SpecializationConstant(val name: String, val id: Int, val scalar: Int, val size: Int, val defaultValue: Long)
+
+    /** Every descriptor the shader declares, by set and binding. */
+    val parameters: List<Parameter> get() = Arena.ofConfined().use { a ->
+        val f = Fields(a, KoralLayouts.KoralShaderParameter)
+        (0 until KoralNative.koral_shader_parameter_count(native)).mapNotNull { i ->
+            if (!KoralNative.koral_shader_parameter(native, i, f.segment)) null
+            else Parameter(f.readString("name"), f.readString("block_name"), DescriptorType.of(f.readInt("type")), f.readInt("count"),
+                           f.readInt("set"), f.readInt("binding"), ShaderAccessKind.of(f.readInt("access")), ImageShape.of(f.readInt("shape")),
+                           f.readBool("active"))
+        }
+    }
+
+    /** Every field of its push-constant blocks. */
+    val pushConstants: List<PushConstantField> get() = Arena.ofConfined().use { a ->
+        val f = Fields(a, KoralLayouts.KoralShaderPushConstant)
+        (0 until KoralNative.koral_shader_push_constant_count(native)).mapNotNull { i ->
+            if (!KoralNative.koral_shader_push_constant(native, i, f.segment)) null
+            else PushConstantField(f.readString("name"), f.readInt("offset"), f.readInt("size"), f.readInt("scalar"), f.readInt("rows"),
+                                   f.readInt("columns"), f.readInt("count"), f.readBool("aggregate"))
+        }
+    }
+
+    /** Its specialization constants, by id. */
+    val specializationConstants: List<SpecializationConstant> get() = Arena.ofConfined().use { a ->
+        val f = Fields(a, KoralLayouts.KoralShaderSpecializationConstant)
+        (0 until KoralNative.koral_shader_specialization_constant_count(native)).mapNotNull { i ->
+            if (!KoralNative.koral_shader_specialization_constant(native, i, f.segment)) null
+            else SpecializationConstant(f.readString("name"), f.readInt("id"), f.readInt("scalar"), f.readInt("size"), f.readLong("default_value"))
+        }
+    }
 
     companion object {
         /** Where shader paths are looked for, after (or, with [front], before) those already known. */

@@ -15,6 +15,7 @@ import koral.Debug
 import koral.DebugDrawPass
 import koral.DebugStyle
 import koral.DescriptorSet
+import koral.DescriptorType
 import koral.ErrorCode
 import koral.Filter
 import koral.FrameGraph
@@ -145,6 +146,38 @@ class ResourcesTest {
             errors += it.errors
         }.waitBlocking()
         assertTrue(errors.size == 1 && "add" in errors[0], "a push constant of the wrong type is kept as an error: $errors")
+    }
+
+    @Test
+    fun pipelinesNumberTheirShadersDescriptors() = headlessApp().use {
+        val path = shaderFile("unbound.comp", """
+            #version 450
+            layout(local_size_x = 4) in;
+            layout(constant_id = 0) const uint factor = 3;
+            layout(std430) buffer Data { uint values[]; } data;
+            layout(push_constant) uniform Push { uint add; } push;
+            void main() { data.values[gl_GlobalInvocationID.x] = gl_GlobalInvocationID.x * factor + push.add; }
+        """)
+        val shader = Shader.Builder().setPath(path).setStage(ShaderStage.eCompute).build()
+        assertTrue(shader.isValid, "a shader with no bindings: ${shader.failure}")
+        assertTrue(shader.parameters.any { it.name == "data" && it.type == DescriptorType.eStorageBuffer }, "its buffer, reflected")
+        assertTrue(shader.pushConstants.any { it.name == "add" }, "its push constant, reflected")
+        val constant = shader.specializationConstants.single()
+        assertEquals(Shader.SpecializationConstant("factor", 0, 2, 4, 3L), constant, "its specialization constant, reflected")
+
+        val pipeline = ComputePipeline.Builder().setComputeShader(shader).setBinding("data", 2, 5).setSpecializationConstant("factor", 10).build()
+        assertTrue(pipeline.isValid, "a pipeline that moves it: ${pipeline.failure}")
+        assertEquals(5, pipeline.setLayout(2).findBinding("data"), "where the pipeline put it")
+
+        val values = Buffer.Builder().setInstanceCount(4, GpuLayout.Int).setType(BufferType.eDynamic).build()
+        val set = DescriptorSet.Builder(pipeline, 2).write("data", values).build()
+        CommandBuffer.singleTimeCommand(CommandBufferUsage.eCompute) {
+            it.bindComputePipeline(pipeline).bindDescriptorSet(2, set).pushConstant("add", 7u).dispatch()
+        }.waitBlocking()
+        assertEquals(listOf(7, 17, 27, 37), values.readInts().toList(), "the shader wrote them through it")
+
+        val typo = ComputePipeline.Builder().setComputeShader(shader).setBinding("dtaa", 0, 0).build()
+        assertFalse(typo.isValid, "a name the shader does not declare fails the build")
     }
 
     @Test
