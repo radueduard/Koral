@@ -11,6 +11,7 @@ add_executable(koral_integration_tests
         test_buffer_memory_cost.cpp
         test_image_roundtrip.cpp
         test_offscreen_render.cpp
+        test_indirect_draw.cpp
         test_vulkan_coverage.cpp
         test_raytracing.cpp
         test_importer.cpp

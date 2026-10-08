@@ -587,6 +587,8 @@ if(KORAL_BUILD_KOTLIN)
 endif()
 file(STRINGS ${CMAKE_SOURCE_DIR}/include/sceneLibrary.h KORAL_SCENE_ABI_LINE REGEX "#define KORAL_SCENE_ABI_VERSION")
 string(REGEX MATCH "[0-9]+" KORAL_SCENE_ABI_VERSION "${KORAL_SCENE_ABI_LINE}")
+# providedPorts: the vcpkg ports a project gets through Koral::Koral (the vendored ones below), so the Hub
+# keeps them out of a project's own libraries. glm and imgui were among them before v2.
 file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
   \"schemaVersion\": 1,
   \"version\": \"${PROJECT_VERSION}\",
@@ -594,7 +596,8 @@ file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
   \"apis\": [\"Vulkan\"],
   \"sceneAbiVersion\": ${KORAL_SCENE_ABI_VERSION},
   \"features\": [\"sceneTable\", \"offscreenScenes\", \"views\", \"hotReload\", \"stateReload\", \"cApi\",
-               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\", \"math\", \"networking\"${KORAL_CAPABILITY_EXTRA}]
+               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\", \"math\", \"networking\"${KORAL_CAPABILITY_EXTRA}],
+  \"providedPorts\": [\"spdlog\", \"fmt\"]
 }
 ")
 install(FILES ${CMAKE_BINARY_DIR}/capabilities.json DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral)

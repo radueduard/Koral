@@ -865,6 +865,40 @@ namespace kor
                                            std::source_location where = std::source_location::current());
 
         /**
+         * @brief Draws with the parameters read from a buffer, as many as another buffer says.
+         * @param indirectBuffer Buffer holding IndirectDrawCommand structures.
+         * @param offset Byte offset the first one starts at.
+         * @param countBuffer Buffer holding the number of draws to execute, a kor::u32.
+         * @param countOffset Byte offset of that number; a multiple of 4.
+         * @param maxDrawCount The most draws it runs, whatever the count says.
+         * @param stride Bytes between consecutive commands; 0 means they are tightly packed.
+         *
+         * Where DrawIndirect still needs the CPU to know how many draws there are, here a culling
+         * compute shader writes the count too (an atomic add per surviving object). Needs
+         * kor::Feature::eDrawIndirectCount: ask for it with KORAL_REQUIRE_FEATURES.
+         * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
+         */
+        CommandBuffer& DrawIndirectCount(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, ResourceRef<const Buffer> countBuffer,
+                                         kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride = 0,
+                                         std::source_location where = std::source_location::current());
+
+        /**
+         * @brief Indexed draw with the parameters read from a buffer, as many as another buffer says.
+         * @param indirectBuffer Buffer holding IndirectDrawIndexedCommand structures.
+         * @param offset Byte offset the first one starts at.
+         * @param countBuffer Buffer holding the number of draws to execute, a kor::u32.
+         * @param countOffset Byte offset of that number; a multiple of 4.
+         * @param maxDrawCount The most draws it runs, whatever the count says.
+         * @param stride Bytes between consecutive commands; 0 means they are tightly packed.
+         *
+         * The GPU-driven renderer's draw: see DrawIndirectCount. Needs kor::Feature::eDrawIndirectCount.
+         * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
+         */
+        CommandBuffer& DrawIndexedIndirectCount(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, ResourceRef<const Buffer> countBuffer,
+                                                kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride = 0,
+                                                std::source_location where = std::source_location::current());
+
+        /**
          * @brief Mesh-task draw with the parameters read from a buffer.
          * @param indirectBuffer Buffer holding one or more IndirectDrawMeshTasksCommand structures.
          * @param offset Byte offset the first one starts at.
@@ -1243,6 +1277,11 @@ namespace kor
                                std::function<void()> emit, bool transitions = false,
                                bool dereferencesDeviceAddresses = false);
 
+        /** @brief The shared half of DrawIndirectCount and DrawIndexedIndirectCount, once the pipeline (and mesh) are checked. */
+        CommandBuffer& EnqueueIndirectCount(const char* name, std::source_location where, ResourceRef<const Buffer> indirectBuffer,
+                                            kor::u64 offset, ResourceRef<const Buffer> countBuffer, kor::u64 countOffset,
+                                            kor::u32 maxDrawCount, kor::u32 stride, kor::u32 commandSize, bool indexed);
+
         /**
          * @brief Whether any of @p uses needs a transfer usage its resource was not created with.
          * @return The error to record, or nullopt when every transfer role is covered.
@@ -1410,6 +1449,10 @@ namespace kor
         virtual CommandBuffer& DoDrawIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) = 0;
         virtual CommandBuffer& DoDrawIndexedIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) = 0;
         virtual CommandBuffer& DoDrawMeshTasksIndirect(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) { return *this; }
+        virtual CommandBuffer& DoDrawIndirectCount(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, ResourceRef<const Buffer> countBuffer,
+                                                   kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride) = 0;
+        virtual CommandBuffer& DoDrawIndexedIndirectCount(ResourceRef<const Buffer> indirectBuffer, kor::u64 offset, ResourceRef<const Buffer> countBuffer,
+                                                          kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride) = 0;
         virtual CommandBuffer& DoClearBuffer(ResourceRef<const Buffer> buffer, kor::u64 offset, kor::u64 size) = 0;
         virtual CommandBuffer& DoClearColorImage(ResourceRef<const Image> image, kor::Vec4 color) = 0;
         virtual CommandBuffer& DoFillBuffer(ResourceRef<const Buffer> buffer, const void* data, kor::u64 offset, kor::u64 size) = 0;

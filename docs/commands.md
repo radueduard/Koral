@@ -58,6 +58,23 @@ A command buffer submitted after one that was resolved against it (ended first, 
 
 Recording itself is free to happen on any thread, each command buffer on one thread at a time.
 
+## Draws the GPU decides
+
+`DrawIndirect`, `DrawIndexedIndirect` and `DrawMeshTasksIndirect` read their parameters from a buffer
+(`IndirectDrawCommand` and its siblings in `structs.h`), so a compute shader can cull and build the draw list.
+A stride of 0 means the commands are packed. With `kor::Feature::eDrawIndirectCount` (ask for it with
+`KORAL_REQUIRE_FEATURES`), `DrawIndirectCount` and `DrawIndexedIndirectCount` also read *how many* to draw from
+a buffer, at most `maxDrawCount`. The culling shader counts survivors with an atomic add, and the CPU never
+learns the number:
+
+```cpp
+cb.BindGraphicsPipeline(pipeline).BindMesh(mesh)
+  .DrawIndexedIndirectCount(commands, 0, visibleCount, 0, maxObjects);
+```
+
+Both buffers are read as indirect buffers, and the barrier after the compute pass that wrote them is inserted
+for you.
+
 ## One-off work
 
 `CommandBuffer::SingleTimeCommand(record)` records, submits and returns a `Token`. `Upload(record)` does the same,

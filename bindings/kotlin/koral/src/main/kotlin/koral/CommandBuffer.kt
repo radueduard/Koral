@@ -203,6 +203,14 @@ class CommandBuffer internal constructor(native: MemorySegment, private val owne
     fun drawIndexedIndirect(buffer: Buffer, offset: Long = 0, drawCount: Int = 1, stride: Int = 0) = apply {
         KoralNative.koral_cmd_draw_indexed_indirect(n, buffer.native, offset, drawCount, stride)
     }
+    /** Draws as many of [buffer]'s commands as the uint in [count] says, at most [maxDrawCount]. Needs [Feature.eDrawIndirectCount]. */
+    fun drawIndirectCount(buffer: Buffer, offset: Long, count: Buffer, countOffset: Long, maxDrawCount: Int, stride: Int = 0) = apply {
+        KoralNative.koral_cmd_draw_indirect_count(n, buffer.native, offset, count.native, countOffset, maxDrawCount, stride)
+    }
+    /** Indexed [drawIndirectCount]. */
+    fun drawIndexedIndirectCount(buffer: Buffer, offset: Long, count: Buffer, countOffset: Long, maxDrawCount: Int, stride: Int = 0) = apply {
+        KoralNative.koral_cmd_draw_indexed_indirect_count(n, buffer.native, offset, count.native, countOffset, maxDrawCount, stride)
+    }
     fun drawMeshTasksIndirect(buffer: Buffer, offset: Long = 0, drawCount: Int = 1, stride: Int = 0) = apply {
         KoralNative.koral_cmd_draw_mesh_tasks_indirect(n, buffer.native, offset, drawCount, stride)
     }

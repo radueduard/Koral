@@ -4,6 +4,7 @@
 //
 
 #include "debugDraw.h"
+#include "context.h"
 
 #include <algorithm>
 #include <array>
@@ -103,6 +104,7 @@ namespace kor
         }
         solid.center = (min + max) * 0.5f;
         _solids.push_back(solid);
+        _changed = true;
     }
 
     // ---- lines ------------------------------------------------------------------------------------
@@ -110,6 +112,7 @@ namespace kor
     void DebugDraw::Line(const kor::Vec3 from, const kor::Vec3 to, const Style& style)
     {
         _lines.push_back({from, to, style.color, style.duration, style.onTop, std::max(style.lineWidth, 1.f)});
+        _changed = true;
     }
 
     void DebugDraw::Arrow(const kor::Vec3 from, const kor::Vec3 to, const Style& style)
@@ -851,6 +854,7 @@ namespace kor
         _lines.clear();
         _solidVertices.clear();
         _solids.clear();
+        _changed = true;
     }
 
     void DebugDraw::NextFrame(const float frameTime)
@@ -889,6 +893,7 @@ namespace kor
             return false;
         });
         _solidVertices = std::move(kept);
+        _changed = true;
     }
 
     // ---- drawing ----------------------------------------------------------------------------------
@@ -908,9 +913,12 @@ namespace kor
     void DebugDraw::Prepare(const ResourceRef<const Framebuffer>& target, const kor::Mat4& viewProjection)
     {
         // The shapes, once a frame however many passes draw them, in the order they are drawn: opaque
-        // fills, lines, see-through fills back to front, then what goes on top of everything.
-        if (_uploaded != _frame) {
+        // fills, lines, see-through fills back to front, then what goes on top of everything. And again
+        // whenever they changed since: a DebugDraw of its own, cleared and drawn again without NextFrame,
+        // would otherwise show its first frame's shapes for ever.
+        if (_uploaded != _frame || _changed) {
             _uploaded = _frame;
+            _changed = false;
             std::vector<Vertex> vertices;
             vertices.reserve(_lines.size() * 2 + _solidVertices.size());
 
@@ -949,13 +957,16 @@ namespace kor
                 _counts[batch] = static_cast<std::uint32_t>(vertices.size() - before);
             }
 
-            if (vertices.size() > _capacity) {
+            // A copy per frame in flight where there are frames — a scheduler on this thread. Without one (a
+            // headless device, its work waited for), there is nothing for a copy to be per, and one is all there is.
+            const bool perFrame = Context::HasScheduler();
+            if (vertices.size() > _capacity || (_buffer.Valid() && (_buffer->CopyCount() > 1) != perFrame)) {
                 _capacity = std::max<std::size_t>(vertices.size() * 2, 1024);
                 _buffer = Buffer::RawBuilder{}
                     .SetRawSize(static_cast<kor::i64>(_capacity * sizeof(Vertex)))
                     .SetUsage(Buffer::Usage::eStorage)
                     .SetType(Buffer::Type::eDynamic)
-                    .SetIsPerFrame(true)
+                    .SetIsPerFrame(perFrame)
                     .Build();
                 _buffer.SetName("debug shapes");
             }

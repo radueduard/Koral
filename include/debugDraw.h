@@ -293,6 +293,7 @@ namespace kor
         std::size_t _capacity = 0;          // in vertices
         std::array<std::uint32_t, eBatchCount> _counts {};
         std::uint64_t _frame = 0, _uploaded = ~std::uint64_t(0);
+        bool _changed = true;   ///< Shapes added or gone since the GPU's copy was made.
         std::map<std::string, Target> _targets;   // by the target's formats
 
         std::optional<GizmoDrag> _drag;

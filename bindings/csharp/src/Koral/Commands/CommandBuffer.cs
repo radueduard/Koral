@@ -305,6 +305,10 @@ public sealed unsafe partial class CommandBuffer : IDisposable
     public CommandBuffer DrawMeshTasks(uint taskCountX = 1, uint taskCountY = 1, uint taskCountZ = 1) { KoralNative.koral_cmd_draw_mesh_tasks(N, taskCountX, taskCountY, taskCountZ); return this; }
     public CommandBuffer DrawIndirect(Buffer indirectBuffer, ulong offset = 0, uint drawCount = 1, uint stride = 0) { KoralNative.koral_cmd_draw_indirect(N, indirectBuffer.Handle, offset, drawCount, stride); return this; }
     public CommandBuffer DrawIndexedIndirect(Buffer indirectBuffer, ulong offset = 0, uint drawCount = 1, uint stride = 0) { KoralNative.koral_cmd_draw_indexed_indirect(N, indirectBuffer.Handle, offset, drawCount, stride); return this; }
+    /// <summary>Draws as many of <paramref name="indirectBuffer"/>'s commands as the uint in <paramref name="count"/> says, at most <paramref name="maxDrawCount"/>. Needs <see cref="Feature.eDrawIndirectCount"/>.</summary>
+    public CommandBuffer DrawIndirectCount(Buffer indirectBuffer, ulong offset, Buffer count, ulong countOffset, uint maxDrawCount, uint stride = 0) { KoralNative.koral_cmd_draw_indirect_count(N, indirectBuffer.Handle, offset, count.Handle, countOffset, maxDrawCount, stride); return this; }
+    /// <summary>Indexed <see cref="DrawIndirectCount"/>.</summary>
+    public CommandBuffer DrawIndexedIndirectCount(Buffer indirectBuffer, ulong offset, Buffer count, ulong countOffset, uint maxDrawCount, uint stride = 0) { KoralNative.koral_cmd_draw_indexed_indirect_count(N, indirectBuffer.Handle, offset, count.Handle, countOffset, maxDrawCount, stride); return this; }
     public CommandBuffer DrawMeshTasksIndirect(Buffer indirectBuffer, ulong offset = 0, uint drawCount = 1, uint stride = 0) { KoralNative.koral_cmd_draw_mesh_tasks_indirect(N, indirectBuffer.Handle, offset, drawCount, stride); return this; }
 
     // ---- transfers --------------------------------------------------------------------------------------------

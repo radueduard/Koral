@@ -67,6 +67,10 @@ namespace kor::vk
         kor::CommandBuffer& DoDrawMeshTasks(kor::u32 taskCountX, kor::u32 taskCountY, kor::u32 taskCountZ, std::source_location where) override;
         kor::CommandBuffer& DoDrawIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) override;
         kor::CommandBuffer& DoDrawIndexedIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) override;
+        kor::CommandBuffer& DoDrawIndirectCount(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::ResourceRef<const kor::Buffer> countBuffer,
+                                                kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride) override;
+        kor::CommandBuffer& DoDrawIndexedIndirectCount(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::ResourceRef<const kor::Buffer> countBuffer,
+                                                       kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride) override;
         kor::CommandBuffer& DoDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) override;
 
         kor::CommandBuffer& DoClearBuffer(kor::ResourceRef<const kor::Buffer> buffer, kor::u64 offset, kor::u64 size) override;

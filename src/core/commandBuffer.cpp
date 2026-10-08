@@ -18,6 +18,8 @@
 #include "../backends/vulkan/commandBuffer.h"
 
 #include "buffer.h"
+#include "context.h"
+#include "deviceFeatures.h"
 #include "image.h"
 #include "imageView.h"
 #include "mesh.h"
@@ -1798,6 +1800,22 @@ namespace kor
             [this, index, descriptorSet] { DoBindDescriptorSet(index, descriptorSet); });
     }
 
+    namespace {
+        /**
+         * The stride an indirect draw hands the GPU: 0 means tightly packed, which Vulkan spells as the size of
+         * one command — 0 itself is only allowed while a single draw is read. @p checked is false where nothing
+         * steps by it (one draw from a count-less command).
+         */
+        std::expected<kor::u32, std::string> IndirectStride(const kor::u32 stride, const kor::u32 size, const bool checked)
+        {
+            if (stride == 0) return size;
+            if (checked && (stride % 4 != 0 || stride < size))
+                return std::unexpected(std::format("An indirect stride of {} bytes does not step from one {}-byte command to the next: "
+                                                   "it must be a multiple of 4 and at least the command's size (or 0, for packed).", stride, size));
+            return stride;
+        }
+    }
+
     CommandBuffer& CommandBuffer::DispatchIndirect(kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset,
                                                    const std::source_location where)
     {
@@ -1820,6 +1838,9 @@ namespace kor
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (Reject(indirectBuffer, "indirect buffer")) return *this;
+        const auto resolved = IndirectStride(stride, sizeof(IndirectDrawCommand), drawCount > 1);
+        if (!resolved) return RecordError(ErrorCode::eInvalidArgument, resolved.error());
+        const kor::u32 step = *resolved;
 
         if (!_state.viewportSet)
             SetViewport(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
@@ -1829,7 +1850,7 @@ namespace kor
         auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return Enqueue("DrawIndirect", where, std::move(uses), PassEdge::eNone,
-            [this, indirectBuffer, offset, drawCount, stride] { DoDrawIndirect(indirectBuffer, offset, drawCount, stride); },
+            [this, indirectBuffer, offset, drawCount, step] { DoDrawIndirect(indirectBuffer, offset, drawCount, step); },
             /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
@@ -1842,6 +1863,9 @@ namespace kor
         if (!_state.boundMesh.has_value())
             return RecordError(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
         if (Reject(indirectBuffer, "indirect buffer")) return *this;
+        const auto resolved = IndirectStride(stride, sizeof(IndirectDrawIndexedCommand), drawCount > 1);
+        if (!resolved) return RecordError(ErrorCode::eInvalidArgument, resolved.error());
+        const kor::u32 step = *resolved;
 
         if (!_state.viewportSet)
             SetViewport(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
@@ -1851,7 +1875,65 @@ namespace kor
         auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return Enqueue("DrawIndexedIndirect", where, std::move(uses), PassEdge::eNone,
-            [this, indirectBuffer, offset, drawCount, stride] { DoDrawIndexedIndirect(indirectBuffer, offset, drawCount, stride); },
+            [this, indirectBuffer, offset, drawCount, step] { DoDrawIndexedIndirect(indirectBuffer, offset, drawCount, step); },
+            /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
+    }
+
+    CommandBuffer& CommandBuffer::DrawIndirectCount(kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset,
+                                                    kor::ResourceRef<const Buffer> countBuffer, const kor::u64 countOffset,
+                                                    const kor::u32 maxDrawCount, const kor::u32 stride, const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (!_state.boundGraphicsPipeline.has_value())
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+        return EnqueueIndirectCount("DrawIndirectCount", where, std::move(indirectBuffer), offset, std::move(countBuffer), countOffset,
+                                    maxDrawCount, stride, sizeof(IndirectDrawCommand), false);
+    }
+
+    CommandBuffer& CommandBuffer::DrawIndexedIndirectCount(kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset,
+                                                           kor::ResourceRef<const Buffer> countBuffer, const kor::u64 countOffset,
+                                                           const kor::u32 maxDrawCount, const kor::u32 stride, const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (!_state.boundGraphicsPipeline.has_value())
+            return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
+        if (!_state.boundMesh.has_value())
+            return RecordError(ErrorCode::eNoMeshBound, "Cannot draw indexed without a mesh bound.");
+        return EnqueueIndirectCount("DrawIndexedIndirectCount", where, std::move(indirectBuffer), offset, std::move(countBuffer), countOffset,
+                                    maxDrawCount, stride, sizeof(IndirectDrawIndexedCommand), true);
+    }
+
+    CommandBuffer& CommandBuffer::EnqueueIndirectCount(const char* name, const std::source_location where,
+                                                       kor::ResourceRef<const Buffer> indirectBuffer, const kor::u64 offset,
+                                                       kor::ResourceRef<const Buffer> countBuffer, const kor::u64 countOffset,
+                                                       const kor::u32 maxDrawCount, const kor::u32 stride, const kor::u32 commandSize,
+                                                       const bool indexed)
+    {
+        if (!Context::Supports(Feature::eDrawIndirectCount))
+            return RecordError(ErrorCode::eInvalidArgument,
+                std::format("{} needs kor::Feature::eDrawIndirectCount, which the device was made without: ask for it with "
+                            "KORAL_REQUIRE_FEATURES (or koral.json's \"features\").", name));
+        if (Reject(indirectBuffer, "indirect buffer") || Reject(countBuffer, "count buffer")) return *this;
+        if (countOffset % 4 != 0)
+            return RecordError(ErrorCode::eInvalidArgument, std::format("{}: the count's offset, {}, is not a multiple of 4.", name, countOffset));
+        // A count read from a buffer can be anything, so the stride is always stepped by.
+        const auto resolved = IndirectStride(stride, commandSize, true);
+        if (!resolved) return RecordError(ErrorCode::eInvalidArgument, resolved.error());
+        const kor::u32 step = *resolved;
+
+        if (!_state.viewportSet)
+            SetViewport(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
+        if (!_state.scissorSet)
+            SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
+
+        auto uses = UsesForBoundResources(true);
+        uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
+        uses.push_back(ResourceUse{ .buffer = countBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = countOffset });
+        return Enqueue(name, where, std::move(uses), PassEdge::eNone,
+            [this, indirectBuffer, offset, countBuffer, countOffset, maxDrawCount, step, indexed] {
+                if (indexed) DoDrawIndexedIndirectCount(indirectBuffer, offset, countBuffer, countOffset, maxDrawCount, step);
+                else DoDrawIndirectCount(indirectBuffer, offset, countBuffer, countOffset, maxDrawCount, step);
+            },
             /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 
@@ -1862,6 +1944,9 @@ namespace kor
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw without a graphics pipeline bound.");
         if (Reject(indirectBuffer, "indirect buffer")) return *this;
+        const auto resolved = IndirectStride(stride, sizeof(IndirectDrawMeshTasksCommand), drawCount > 1);
+        if (!resolved) return RecordError(ErrorCode::eInvalidArgument, resolved.error());
+        const kor::u32 step = *resolved;
 
         if (!_state.viewportSet)
             SetViewport(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
@@ -1871,7 +1956,7 @@ namespace kor
         auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return Enqueue("DrawMeshTasksIndirect", where, std::move(uses), PassEdge::eNone,
-            [this, indirectBuffer, offset, drawCount, stride] { DoDrawMeshTasksIndirect(indirectBuffer, offset, drawCount, stride); },
+            [this, indirectBuffer, offset, drawCount, step] { DoDrawMeshTasksIndirect(indirectBuffer, offset, drawCount, step); },
             /*transitions=*/false, BoundPipelineUsesDeviceAddresses());
     }
 

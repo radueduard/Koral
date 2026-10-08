@@ -199,7 +199,8 @@ namespace kor
              * says it wants exactly these roles and no others — and which also switches off the
              * size deduction, since a caller naming an exact set has already said what it wants.
              * So a buffer that names any role has to name every role it needs, the transfers
-             * included. Leave SetUsage() alone entirely to keep the set above.
+             * included — except the copy that uploads a device-local buffer's initial data, which
+             * is the builder's own. Leave SetUsage() alone entirely to keep the set above.
              */
             /// Mutable because Create() resolves the size-dependent role into it, and Create() is
             /// const — the same reason DescriptorSet::Builder resolves its writes that way.
@@ -257,7 +258,8 @@ namespace kor
              * not the permissive default above, not the transfer usages setIsPerFrame added, and
              * not the deduced eUniform — naming an exact set is taken as having said what you
              * want. So include the transfers you need, or a later copy or readback fails naming
-             * the flag that is missing.
+             * the flag that is missing. (The one exception is the copy that delivers a device-local
+             * buffer's initial data: the builder adds eTransferDst for that itself.)
              */
             RawBuilder& SetUsage(const Flags<Usage> usage) {
                 if (_usageTouched) {
@@ -408,6 +410,10 @@ namespace kor
 
             /** @brief One build attempt, including the upload of any initial data. Internal: prefer Build(). */
             [[nodiscard]] Result<std::unique_ptr<Buffer>> Create() const override {
+                // Device-local memory is filled by a copy into it, the builder's own transfer and not a role the
+                // caller named: without it, an exact SetUsage that left eTransferDst out built a buffer whose data
+                // never arrived.
+                if (!DataView().empty() && _type == Type::eDeviceLocal) _usage |= Usage::eTransferDst;
                 auto created = RawBuilder::Create();
                 if (!created) return created;
                 std::unique_ptr<Buffer> buffer = std::move(*created);

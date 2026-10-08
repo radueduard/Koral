@@ -629,6 +629,8 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_cmd_draw_mesh_tasks(IntPtr commands, uint x, uint y, uint z);
     [LibraryImport(Library)] internal static partial void koral_cmd_draw_indirect(IntPtr commands, IntPtr buffer, ulong offset, uint draw_count, uint stride);
     [LibraryImport(Library)] internal static partial void koral_cmd_draw_indexed_indirect(IntPtr commands, IntPtr buffer, ulong offset, uint draw_count, uint stride);
+    [LibraryImport(Library)] internal static partial void koral_cmd_draw_indirect_count(IntPtr commands, IntPtr buffer, ulong offset, IntPtr count, ulong count_offset, uint max_draw_count, uint stride);
+    [LibraryImport(Library)] internal static partial void koral_cmd_draw_indexed_indirect_count(IntPtr commands, IntPtr buffer, ulong offset, IntPtr count, ulong count_offset, uint max_draw_count, uint stride);
     [LibraryImport(Library)] internal static partial void koral_cmd_draw_mesh_tasks_indirect(IntPtr commands, IntPtr buffer, ulong offset, uint draw_count, uint stride);
     [LibraryImport(Library)] internal static partial void koral_cmd_clear_buffer(IntPtr commands, IntPtr buffer, ulong offset, ulong size);
     [LibraryImport(Library)] internal static partial void koral_cmd_clear_color_image(IntPtr commands, IntPtr image, float* color);

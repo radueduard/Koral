@@ -626,6 +626,12 @@ KORAL_API void koral_cmd_draw_indirect(KoralCommandBuffer* commands, KoralBuffer
                                         uint32_t stride);
 KORAL_API void koral_cmd_draw_indexed_indirect(KoralCommandBuffer* commands, KoralBuffer* buffer, uint64_t offset,
                                                 uint32_t draw_count, uint32_t stride);
+/** Draws as many of @p buffer's commands as the uint32 at @p count_offset in @p count says, at most @p max_draw_count.
+ *  Needs the kor::Feature::eDrawIndirectCount bit (0x8000) in required_features. */
+KORAL_API void koral_cmd_draw_indirect_count(KoralCommandBuffer* commands, KoralBuffer* buffer, uint64_t offset, KoralBuffer* count,
+                                              uint64_t count_offset, uint32_t max_draw_count, uint32_t stride);
+KORAL_API void koral_cmd_draw_indexed_indirect_count(KoralCommandBuffer* commands, KoralBuffer* buffer, uint64_t offset, KoralBuffer* count,
+                                                      uint64_t count_offset, uint32_t max_draw_count, uint32_t stride);
 KORAL_API void koral_cmd_draw_mesh_tasks_indirect(KoralCommandBuffer* commands, KoralBuffer* buffer, uint64_t offset,
                                                    uint32_t draw_count, uint32_t stride);
 KORAL_API void koral_cmd_clear_buffer(KoralCommandBuffer* commands, KoralBuffer* buffer, uint64_t offset, uint64_t size);

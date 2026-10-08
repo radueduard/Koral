@@ -628,6 +628,26 @@ namespace kor::vk
         return *this;
     }
 
+    kor::CommandBuffer& CommandBuffer::DoDrawIndirectCount(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::ResourceRef<const kor::Buffer> countBuffer,
+                                                           kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride) {
+        if (_failed) return *this;
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
+        const auto& vkCount = dynamic_cast<const kor::vk::Buffer&>(*countBuffer);
+        ApplyDynamicDefaults();
+        _handle.drawIndirectCount(*vkBuffer, offset, *vkCount, countOffset, maxDrawCount, stride);
+        return *this;
+    }
+
+    kor::CommandBuffer& CommandBuffer::DoDrawIndexedIndirectCount(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::ResourceRef<const kor::Buffer> countBuffer,
+                                                                  kor::u64 countOffset, kor::u32 maxDrawCount, kor::u32 stride) {
+        if (_failed) return *this;
+        const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);
+        const auto& vkCount = dynamic_cast<const kor::vk::Buffer&>(*countBuffer);
+        ApplyDynamicDefaults();
+        _handle.drawIndexedIndirectCount(*vkBuffer, offset, *vkCount, countOffset, maxDrawCount, stride);
+        return *this;
+    }
+
     kor::CommandBuffer & CommandBuffer::DoDrawMeshTasksIndirect(kor::ResourceRef<const kor::Buffer> indirectBuffer, kor::u64 offset, kor::u32 drawCount, kor::u32 stride) {
         if (_failed) return *this;
         const auto& vkBuffer = dynamic_cast<const kor::vk::Buffer&>(*indirectBuffer);

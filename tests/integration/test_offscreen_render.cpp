@@ -29,6 +29,7 @@
 #include "sampler.h"
 #include "descriptor.h"
 #include "descriptorSet.h"
+#include "debugDraw.h"
 
 using kor::Buffer;
 using kor::CommandBuffer;
@@ -1723,4 +1724,53 @@ TEST_F(GpuTest, AMatrixVertexInputIsFedAnInstanceAtATime) {
     const auto at = [&](const std::uint32_t x, const std::uint32_t y) { return out[y * kW + x]; };
     EXPECT_EQ(at(2, 8), Pixel(255, 0, 0, 255)) << "the first instance: the left half, red";
     EXPECT_EQ(at(13, 8), Pixel(0, 0, 255, 255)) << "the second: the right half, blue";
+}
+
+// A DebugDraw of its own — not a scene's, so no App moves it on a frame — cleared and drawn again shows what
+// it holds now. It once uploaded its shapes only when the frame number changed, which nothing but the App
+// advances: such a DebugDraw showed its first frame's shapes for ever.
+TEST_F(GpuTest, AStandaloneDebugDrawShowsWhatItHoldsNow) {
+    auto color = Image::Builder{}
+                     .SetType(Image::Type::e2D)
+                     .SetFormat(Image::Format::eRGBA8_UNORM)
+                     .SetExtent(kor::UVec2{kW, kH})
+                     .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc)
+                     .Build();
+    auto colorView = ImageView::Builder(color).Build();
+    auto framebuffer = Framebuffer::Builder{}
+                           .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
+                           .Build();
+    auto readback = Buffer::RawBuilder{}
+                        .SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
+                        .SetUsage(Buffer::Usage::eTransferDst)
+                        .SetType(Buffer::Type::eReadback)
+                        .Build();
+
+    kor::DebugDraw draw;
+    // How many lit texels there are down column 1 and along row 1, after rendering what the DebugDraw holds.
+    const auto render = [&] {
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+            cb.BeginRendering(framebuffer);   // only to clear it: Render draws over what the target holds
+            cb.EndRendering();
+            draw.Render(cb, kor::Mat4(1.f), framebuffer);
+        }, CommandBuffer::Usage::eGraphics).Wait();
+        CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) { cb.CopyImageToBuffer(color, readback); },
+                                         CommandBuffer::Usage::eTransfer).Wait();
+        const auto pixels = readback->Read<Pixel>();
+        int column = 0, row = 0;
+        for (std::uint32_t i = 0; i < kH; ++i) column += pixels[i * kW + 1].x > 0;
+        for (std::uint32_t i = 0; i < kW; ++i) row += pixels[1 * kW + i].x > 0;
+        return std::pair { column, row };
+    };
+
+    draw.Line({ -1.f, 0.f, 0.5f }, { 1.f, 0.f, 0.5f });   // across the middle
+    const auto [acrossColumn, acrossRow] = render();
+    EXPECT_GT(acrossColumn, 0);
+    EXPECT_EQ(acrossRow, 0);
+
+    draw.Clear();
+    draw.Line({ 0.f, -1.f, 0.5f }, { 0.f, 1.f, 0.5f });   // down the middle, in the same "frame"
+    const auto [downColumn, downRow] = render();
+    EXPECT_EQ(downColumn, 0) << "the first line is still drawn";
+    EXPECT_GT(downRow, 0) << "the second line was never uploaded";
 }

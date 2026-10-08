@@ -285,6 +285,14 @@ void koral_cmd_draw_sub_mesh(KoralCommandBuffer* c, KoralMesh* m, const uint32_t
 void koral_cmd_draw_mesh_tasks(KoralCommandBuffer* c, const uint32_t x_, const uint32_t y, const uint32_t z) { Record(c, [&](auto& x) { x.DrawMeshTasks(x_, y, z); }); }
 void koral_cmd_draw_indirect(KoralCommandBuffer* c, KoralBuffer* b, const uint64_t o, const uint32_t n, const uint32_t s) { Record(c, [&](auto& x) { x.DrawIndirect(RefOf<Buffer>(b), o, n, s); }); }
 void koral_cmd_draw_indexed_indirect(KoralCommandBuffer* c, KoralBuffer* b, const uint64_t o, const uint32_t n, const uint32_t s) { Record(c, [&](auto& x) { x.DrawIndexedIndirect(RefOf<Buffer>(b), o, n, s); }); }
+void koral_cmd_draw_indirect_count(KoralCommandBuffer* c, KoralBuffer* b, const uint64_t o, KoralBuffer* n, const uint64_t no, const uint32_t m, const uint32_t s)
+{
+    Record(c, [&](auto& x) { x.DrawIndirectCount(RefOf<Buffer>(b), o, RefOf<Buffer>(n), no, m, s); });
+}
+void koral_cmd_draw_indexed_indirect_count(KoralCommandBuffer* c, KoralBuffer* b, const uint64_t o, KoralBuffer* n, const uint64_t no, const uint32_t m, const uint32_t s)
+{
+    Record(c, [&](auto& x) { x.DrawIndexedIndirectCount(RefOf<Buffer>(b), o, RefOf<Buffer>(n), no, m, s); });
+}
 void koral_cmd_draw_mesh_tasks_indirect(KoralCommandBuffer* c, KoralBuffer* b, const uint64_t o, const uint32_t n, const uint32_t s) { Record(c, [&](auto& x) { x.DrawMeshTasksIndirect(RefOf<Buffer>(b), o, n, s); }); }
 void koral_cmd_clear_buffer(KoralCommandBuffer* c, KoralBuffer* b, const uint64_t o, const uint64_t n) { Record(c, [&](auto& x) { x.ClearBuffer(RefOf<Buffer>(b), o, n); }); }
 void koral_cmd_clear_color_image(KoralCommandBuffer* c, KoralImage* i, const float color[4]) { Record(c, [&](auto& x) { x.ClearColorImage(RefOf<Image>(i), Vec4Of(color)); }); }
