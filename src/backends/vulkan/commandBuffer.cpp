@@ -269,6 +269,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetLineWidth(const float lineWidth)
     {
         return defer("SetLineWidth", [=, this] {
+            StateSetDynamic(kor::DynamicState::eLineWidth);
             _handle.setLineWidth(lineWidth);
         });
     }
@@ -276,6 +277,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetDepthBias(const float constantFactor, const float clamp, const float slopeFactor)
     {
         return defer("SetDepthBias", [=, this] {
+            StateSetDynamic(kor::DynamicState::eDepthBias);
             _handle.setDepthBias(constantFactor, clamp, slopeFactor);
         });
     }
@@ -283,6 +285,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetBlendConstants(const kor::Vec4 constants)
     {
         return defer("SetBlendConstants", [=, this] {
+            StateSetDynamic(kor::DynamicState::eBlendConstants);
             const float bc[4] = { constants.x, constants.y, constants.z, constants.w };
             _handle.setBlendConstants(bc);
         });
@@ -291,6 +294,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetStencilCompareMask(const StencilFace face, const kor::u32 compareMask)
     {
         return defer("SetStencilCompareMask", [=, this] {
+            StateSetDynamic(kor::DynamicState::eStencilCompareMask);
             _handle.setStencilCompareMask(getVkStencilFace(face), compareMask);
         });
     }
@@ -298,6 +302,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetStencilWriteMask(const StencilFace face, const kor::u32 writeMask)
     {
         return defer("SetStencilWriteMask", [=, this] {
+            StateSetDynamic(kor::DynamicState::eStencilWriteMask);
             _handle.setStencilWriteMask(getVkStencilFace(face), writeMask);
         });
     }
@@ -305,6 +310,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetStencilReference(const StencilFace face, const kor::u32 reference)
     {
         return defer("SetStencilReference", [=, this] {
+            StateSetDynamic(kor::DynamicState::eStencilReference);
             _handle.setStencilReference(getVkStencilFace(face), reference);
         });
     }
@@ -312,6 +318,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetCullMode(const Flags<CullMode> cullMode)
     {
         return defer("SetCullMode", [=, this] {
+            StateSetDynamic(kor::DynamicState::eCullMode);
             _handle.setCullMode(getVkCullMode(cullMode));
         });
     }
@@ -319,6 +326,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetFrontFace(const FrontFace frontFace)
     {
         return defer("SetFrontFace", [=, this] {
+            StateSetDynamic(kor::DynamicState::eFrontFace);
             // Winding is canonical (Vulkan) too, so this is a plain pass-through.
             _handle.setFrontFace(getVkFrontFace(frontFace));
         });
@@ -327,6 +335,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetDepthTestEnable(const bool enable)
     {
         return defer("SetDepthTestEnable", [=, this] {
+            StateSetDynamic(kor::DynamicState::eDepthTestEnable);
             _handle.setDepthTestEnable(enable);
         });
     }
@@ -334,6 +343,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetDepthWriteEnable(const bool enable)
     {
         return defer("SetDepthWriteEnable", [=, this] {
+            StateSetDynamic(kor::DynamicState::eDepthWriteEnable);
             _handle.setDepthWriteEnable(enable);
         });
     }
@@ -341,6 +351,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetDepthCompareOp(const CompareOp compareOp)
     {
         return defer("SetDepthCompareOp", [=, this] {
+            StateSetDynamic(kor::DynamicState::eDepthCompareOp);
             _handle.setDepthCompareOp(getVkCompareOp(compareOp));
         });
     }
@@ -348,6 +359,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetStencilTestEnable(const bool enable)
     {
         return defer("SetStencilTestEnable", [=, this] {
+            StateSetDynamic(kor::DynamicState::eStencilTestEnable);
             _handle.setStencilTestEnable(enable);
         });
     }
@@ -355,6 +367,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetStencilOp(const StencilFace face, const StencilOp failOp, const StencilOp passOp, const StencilOp depthFailOp, const CompareOp compareOp)
     {
         return defer("SetStencilOp", [=, this] {
+            StateSetDynamic(kor::DynamicState::eStencilOp);
             _handle.setStencilOp(getVkStencilFace(face), getVkStencilOp(failOp), getVkStencilOp(passOp), getVkStencilOp(depthFailOp), getVkCompareOp(compareOp));
         });
     }
@@ -362,6 +375,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetDepthBiasEnable(const bool enable)
     {
         return defer("SetDepthBiasEnable", [=, this] {
+            StateSetDynamic(kor::DynamicState::eDepthBiasEnable);
             _handle.setDepthBiasEnable(enable);
         });
     }
@@ -369,6 +383,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetRasterizerDiscardEnable(const bool enable)
     {
         return defer("SetRasterizerDiscardEnable", [=, this] {
+            StateSetDynamic(kor::DynamicState::eRasterizerDiscardEnable);
             _handle.setRasterizerDiscardEnable(enable);
         });
     }
@@ -376,6 +391,7 @@ namespace kor::vk
     kor::CommandBuffer& CommandBuffer::DoSetPrimitiveRestartEnable(const bool enable)
     {
         return defer("SetPrimitiveRestartEnable", [=, this] {
+            StateSetDynamic(kor::DynamicState::ePrimitiveRestartEnable);
             _handle.setPrimitiveRestartEnable(enable);
         });
     }

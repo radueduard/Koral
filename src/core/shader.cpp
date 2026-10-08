@@ -583,6 +583,10 @@ namespace kor {
 	    	case spv::ExecutionModelGLCompute: return Shader::Stage::eCompute;
 	    	case spv::ExecutionModelMeshNV: return Shader::Stage::eMesh;
 	    	case spv::ExecutionModelTaskNV: return Shader::Stage::eTask;
+	    	// What a mesh shader is compiled to today: the EXT extension's models, which are not
+	    	// the NV ones under another name as the ray tracing models are.
+	    	case spv::ExecutionModelMeshEXT: return Shader::Stage::eMesh;
+	    	case spv::ExecutionModelTaskEXT: return Shader::Stage::eTask;
 	    	case spv::ExecutionModelRayGenerationNV: return Shader::Stage::eRaygen;
 	    	case spv::ExecutionModelIntersectionNV: return Shader::Stage::eIntersection;
 	    	case spv::ExecutionModelAnyHitNV: return Shader::Stage::eAnyHit;

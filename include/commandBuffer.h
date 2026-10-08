@@ -1385,6 +1385,12 @@ namespace kor
         void StateBindRayTracingPipeline(const ResourceRef<const RayTracingPipeline>& pipeline);
         /** @brief Records the bound mesh: the bindings it has are its again. */
         void StateBindMesh(const ResourceRef<const Mesh>& mesh);
+        /**
+         * @brief Notes that a dynamic state holds a value the caller gave. For a backend that replays
+         *        its records: the mirrored state is rewound before the replay, so the setter has to say
+         *        so again there, or the draw that follows puts the pipeline's default over it.
+         */
+        void StateSetDynamic(const DynamicState state) { _state.dynamicStateSet |= state; }
         /** @brief Records a vertex buffer bound to one binding by itself. */
         void StateBindVertexBuffer(kor::u32 binding, const ResourceRef<const Buffer>& buffer);
         /** @brief Records which descriptor set is bound at which index, for whichever pipeline type is bound. */

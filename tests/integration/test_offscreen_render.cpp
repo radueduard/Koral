@@ -202,6 +202,62 @@ TEST_F(GpuTest, ScissorAndDynamicStateClipDraw) {
     }
 }
 
+// A dynamic state set to something other than what the pipeline says has to reach the draw. The
+// draw applies the pipeline's own value for every state nobody set, and the Vulkan backend
+// decides that while it replays its records: a setter that only noted itself at record time was
+// taken for not having been called, and the default went over what it set.
+TEST_F(GpuTest, ADynamicStateSetAfterTheBindIsWhatTheDrawUses) {
+    Image::Builder ib;
+    ib.SetType(Image::Type::e2D)
+      .SetFormat(Image::Format::eRGBA8_UNORM)
+      .SetExtent(kor::UVec2{kW, kH})
+      .SetUsage(Image::Usage::eColorAttachment | Image::Usage::eTransferSrc);
+    auto colorImage = ib.Build();
+
+    auto colorView = ImageView::Builder(colorImage).Build();
+    auto framebuffer =
+        Framebuffer::Builder{}
+            .AddColor({ .view = colorView, .clear = kor::Vec4{0.f, 0.f, 0.f, 1.f} })
+            .Build();
+
+    const ResourceRef<const Shader> vert =
+        Shader::Builder{}.SetLang<Shader::Lang::eGLSL>().SetStage(Shader::Stage::eVertex)
+            .SetPath(kor::ShaderPath("flatTriangle.vert.glsl")).GetOrBuild("test.flatTriangle.vert");
+    const ResourceRef<const Shader> frag =
+        Shader::Builder{}.SetLang<Shader::Lang::eGLSL>().SetStage(Shader::Stage::eFragment)
+            .SetPath(kor::ShaderPath("flatTriangle.frag.glsl")).GetOrBuild("test.flatTriangle.frag");
+
+    auto pipeline =
+        GraphicsPipeline::Builder{}
+            .SetVertexShader(vert)
+            .SetFragmentShader(frag)
+            .SetFramebuffer(framebuffer)
+            .Build();
+
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BeginRendering(framebuffer);
+        cb.BindGraphicsPipeline(pipeline);
+        cb.SetViewport(0, 0, kW, kH);
+        cb.SetScissor(0, 0, kW, kH);
+        cb.SetRasterizerDiscardEnable(true);   // the pipeline says false: nothing may be drawn
+        cb.Draw(3);
+        cb.EndRendering();
+    }, CommandBuffer::Usage::eGraphics).Wait();
+
+    Buffer::RawBuilder rb;
+    rb.SetRawSize(static_cast<kor::i64>(kW) * kH * sizeof(Pixel))
+      .SetUsage(Buffer::Usage::eTransferDst)
+      .SetType(Buffer::Type::eReadback);
+    auto readback = rb.Build();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.CopyImageToBuffer(colorImage, readback);
+    }, CommandBuffer::Usage::eTransfer).Wait();
+
+    const std::vector<Pixel> out = readback->Read<Pixel>();
+    ASSERT_EQ(out.size(), static_cast<std::size_t>(kW) * kH);
+    for (std::size_t i = 0; i < out.size(); ++i) EXPECT_EQ(out[i].y, 0) << "texel " << i << " was drawn, with the rasterizer discarding";
+}
+
 // Render into a color+depth framebuffer with an explicit color-blend attachment
 // state and depth testing enabled. This drives the graphics-pipeline branches for
 // the depth attachment format, the explicit (non-default) blend attachment loop,

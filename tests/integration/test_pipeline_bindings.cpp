@@ -118,6 +118,16 @@ TEST_F(GpuTest, AShaderWithoutBindingsReflectsItsParametersAndConstants) {
     EXPECT_NE(std::ranges::find(pushed, "bias"), pushed.end());
 }
 
+// A mesh shader compiles to the EXT execution model, which is not the NV one under another name:
+// taken for an unknown stage, no mesh shader written in Slang could be loaded at all.
+TEST_F(GpuTest, AMeshShaderIsKnownForOne) {
+    AddTestShaders();
+    const auto shader = Shader::Builder{}.SetEntryPoint("meshlet", "meshMain").GetOrBuild();
+    ASSERT_TRUE(shader.Valid()) << shader.Failure()->History();
+    EXPECT_EQ(shader->ShaderStage(), Shader::Stage::eMesh);
+    EXPECT_EQ(shader->BlockLayout().localSize, (std::array<kor::u32, 3> { 1, 1, 1 })) << "a mesh shader has a work group too";
+}
+
 TEST_F(GpuTest, GlslWithoutBindingsCompilesAndReflects) {
     AddTestShaders();
     const auto shader = Shader::Builder{}.SetPath("unbound.comp.glsl").GetOrBuild();
