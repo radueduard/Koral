@@ -13,6 +13,7 @@ add_executable(koral_integration_tests
         test_offscreen_render.cpp
         test_indirect_draw.cpp
         test_pipeline_bindings.cpp
+        test_builder_descriptions.cpp
         test_vulkan_coverage.cpp
         test_raytracing.cpp
         test_importer.cpp

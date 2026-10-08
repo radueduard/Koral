@@ -147,4 +147,6 @@ add_test(NAME CApi.MathFromC COMMAND koral_math_c_test)
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     add_test(NAME Math.GeneratedCodeIsCurrent COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/kmath/generate.py" --check)
+    # The builder descriptions (builderDescriptions.h, builders.json) come from the C interface through scripts/builders.
+    add_test(NAME Builders.GeneratedCodeIsCurrent COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/builders/generate.py" --check)
 endif()

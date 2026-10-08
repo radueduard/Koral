@@ -601,6 +601,8 @@ file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
 }
 ")
 install(FILES ${CMAKE_BINARY_DIR}/capabilities.json DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral)
+# Every builder, described for tools: what kor::builders (builderDescriptions.h) has, as JSON.
+install(FILES ${CMAKE_SOURCE_DIR}/src/core/builders/builders.json DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral)
 # Code compiled into Koral under its own licence, which travels with the library (Apache 2.0 asks it to).
 install(FILES ${CMAKE_SOURCE_DIR}/src/third_party/material-color-utilities/LICENSE
         DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/licenses/material-color-utilities)
