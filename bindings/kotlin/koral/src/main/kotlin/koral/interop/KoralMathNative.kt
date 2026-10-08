@@ -29,6 +29,21 @@ object KoralMathLayouts {
         JAVA_FLOAT.withName("z"),
         JAVA_FLOAT.withName("w"),
     )
+    val KoralDVec2: StructLayout = MemoryLayout.structLayout(
+        JAVA_DOUBLE.withName("x"),
+        JAVA_DOUBLE.withName("y"),
+    )
+    val KoralDVec3: StructLayout = MemoryLayout.structLayout(
+        JAVA_DOUBLE.withName("x"),
+        JAVA_DOUBLE.withName("y"),
+        JAVA_DOUBLE.withName("z"),
+    )
+    val KoralDVec4: StructLayout = MemoryLayout.structLayout(
+        JAVA_DOUBLE.withName("x"),
+        JAVA_DOUBLE.withName("y"),
+        JAVA_DOUBLE.withName("z"),
+        JAVA_DOUBLE.withName("w"),
+    )
     val KoralIVec2: StructLayout = MemoryLayout.structLayout(
         JAVA_INT.withName("x"),
         JAVA_INT.withName("y"),
@@ -59,17 +74,145 @@ object KoralMathLayouts {
         JAVA_INT.withName("z"),
         JAVA_INT.withName("w"),
     )
+    val KoralBVec2: StructLayout = MemoryLayout.structLayout(
+        JAVA_BOOLEAN.withName("x"),
+        JAVA_BOOLEAN.withName("y"),
+    )
+    val KoralBVec3: StructLayout = MemoryLayout.structLayout(
+        JAVA_BOOLEAN.withName("x"),
+        JAVA_BOOLEAN.withName("y"),
+        JAVA_BOOLEAN.withName("z"),
+    )
+    val KoralBVec4: StructLayout = MemoryLayout.structLayout(
+        JAVA_BOOLEAN.withName("x"),
+        JAVA_BOOLEAN.withName("y"),
+        JAVA_BOOLEAN.withName("z"),
+        JAVA_BOOLEAN.withName("w"),
+    )
+    val KoralMat2: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(4, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat2x3: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(6, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat2x4: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(8, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat3x2: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(6, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat3: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(9, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat3x4: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(12, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat4x2: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(8, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat4x3: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(12, JAVA_FLOAT).withName("m"),
+    )
+    val KoralMat4: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(16, JAVA_FLOAT).withName("m"),
+    )
+    val KoralDMat2: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(4, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat2x3: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(6, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat2x4: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(8, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat3x2: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(6, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat3: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(9, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat3x4: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(12, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat4x2: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(8, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat4x3: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(12, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralDMat4: StructLayout = MemoryLayout.structLayout(
+        MemoryLayout.sequenceLayout(16, JAVA_DOUBLE).withName("m"),
+    )
+    val KoralHct: StructLayout = MemoryLayout.structLayout(
+        JAVA_FLOAT.withName("hue"),
+        JAVA_FLOAT.withName("chroma"),
+        JAVA_FLOAT.withName("tone"),
+    )
+    val KoralTonalPalette: StructLayout = MemoryLayout.structLayout(
+        JAVA_FLOAT.withName("hue"),
+        JAVA_FLOAT.withName("chroma"),
+    )
+    val KoralMaterialScheme: StructLayout = MemoryLayout.structLayout(
+        KoralVec4.withName("primary_palette_key_color"),
+        KoralVec4.withName("secondary_palette_key_color"),
+        KoralVec4.withName("tertiary_palette_key_color"),
+        KoralVec4.withName("neutral_palette_key_color"),
+        KoralVec4.withName("neutral_variant_palette_key_color"),
+        KoralVec4.withName("background"),
+        KoralVec4.withName("on_background"),
+        KoralVec4.withName("surface"),
+        KoralVec4.withName("surface_dim"),
+        KoralVec4.withName("surface_bright"),
+        KoralVec4.withName("surface_container_lowest"),
+        KoralVec4.withName("surface_container_low"),
+        KoralVec4.withName("surface_container"),
+        KoralVec4.withName("surface_container_high"),
+        KoralVec4.withName("surface_container_highest"),
+        KoralVec4.withName("on_surface"),
+        KoralVec4.withName("surface_variant"),
+        KoralVec4.withName("on_surface_variant"),
+        KoralVec4.withName("inverse_surface"),
+        KoralVec4.withName("inverse_on_surface"),
+        KoralVec4.withName("outline"),
+        KoralVec4.withName("outline_variant"),
+        KoralVec4.withName("shadow"),
+        KoralVec4.withName("scrim"),
+        KoralVec4.withName("surface_tint"),
+        KoralVec4.withName("primary"),
+        KoralVec4.withName("on_primary"),
+        KoralVec4.withName("primary_container"),
+        KoralVec4.withName("on_primary_container"),
+        KoralVec4.withName("inverse_primary"),
+        KoralVec4.withName("secondary"),
+        KoralVec4.withName("on_secondary"),
+        KoralVec4.withName("secondary_container"),
+        KoralVec4.withName("on_secondary_container"),
+        KoralVec4.withName("tertiary"),
+        KoralVec4.withName("on_tertiary"),
+        KoralVec4.withName("tertiary_container"),
+        KoralVec4.withName("on_tertiary_container"),
+        KoralVec4.withName("error"),
+        KoralVec4.withName("on_error"),
+        KoralVec4.withName("error_container"),
+        KoralVec4.withName("on_error_container"),
+        KoralVec4.withName("primary_fixed"),
+        KoralVec4.withName("primary_fixed_dim"),
+        KoralVec4.withName("on_primary_fixed"),
+        KoralVec4.withName("on_primary_fixed_variant"),
+        KoralVec4.withName("secondary_fixed"),
+        KoralVec4.withName("secondary_fixed_dim"),
+        KoralVec4.withName("on_secondary_fixed"),
+        KoralVec4.withName("on_secondary_fixed_variant"),
+        KoralVec4.withName("tertiary_fixed"),
+        KoralVec4.withName("tertiary_fixed_dim"),
+        KoralVec4.withName("on_tertiary_fixed"),
+        KoralVec4.withName("on_tertiary_fixed_variant"),
+    )
     val KoralQuat: StructLayout = MemoryLayout.structLayout(
         JAVA_FLOAT.withName("x"),
         JAVA_FLOAT.withName("y"),
         JAVA_FLOAT.withName("z"),
         JAVA_FLOAT.withName("w"),
-    )
-    val KoralMat3: StructLayout = MemoryLayout.structLayout(
-        MemoryLayout.sequenceLayout(9, JAVA_FLOAT).withName("m"),
-    )
-    val KoralMat4: StructLayout = MemoryLayout.structLayout(
-        MemoryLayout.sequenceLayout(16, JAVA_FLOAT).withName("m"),
     )
     val KoralTransform: StructLayout = MemoryLayout.structLayout(
         KoralVec3.withName("position"),
@@ -138,30 +281,3324 @@ object KoralMathNative {
         return Native.linker.downcallHandle(symbol, descriptor)
     }
 
+    private val h_koral_float_radians by lazy { handle("koral_float_radians", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_radians(degrees: Float): Float = h_koral_float_radians.invokeExact(degrees) as Float
+    private val h_koral_vec2_radians by lazy { handle("koral_vec2_radians", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_radians(allocator: SegmentAllocator, degrees: MemorySegment): MemorySegment = h_koral_vec2_radians.invokeExact(allocator, degrees) as MemorySegment
+    private val h_koral_vec3_radians by lazy { handle("koral_vec3_radians", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_radians(allocator: SegmentAllocator, degrees: MemorySegment): MemorySegment = h_koral_vec3_radians.invokeExact(allocator, degrees) as MemorySegment
+    private val h_koral_vec4_radians by lazy { handle("koral_vec4_radians", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_radians(allocator: SegmentAllocator, degrees: MemorySegment): MemorySegment = h_koral_vec4_radians.invokeExact(allocator, degrees) as MemorySegment
+    private val h_koral_double_radians by lazy { handle("koral_double_radians", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_radians(degrees: Double): Double = h_koral_double_radians.invokeExact(degrees) as Double
+    private val h_koral_dvec2_radians by lazy { handle("koral_dvec2_radians", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_radians(allocator: SegmentAllocator, degrees: MemorySegment): MemorySegment = h_koral_dvec2_radians.invokeExact(allocator, degrees) as MemorySegment
+    private val h_koral_dvec3_radians by lazy { handle("koral_dvec3_radians", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_radians(allocator: SegmentAllocator, degrees: MemorySegment): MemorySegment = h_koral_dvec3_radians.invokeExact(allocator, degrees) as MemorySegment
+    private val h_koral_dvec4_radians by lazy { handle("koral_dvec4_radians", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_radians(allocator: SegmentAllocator, degrees: MemorySegment): MemorySegment = h_koral_dvec4_radians.invokeExact(allocator, degrees) as MemorySegment
+    private val h_koral_float_degrees by lazy { handle("koral_float_degrees", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_degrees(radians: Float): Float = h_koral_float_degrees.invokeExact(radians) as Float
+    private val h_koral_vec2_degrees by lazy { handle("koral_vec2_degrees", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_degrees(allocator: SegmentAllocator, radians: MemorySegment): MemorySegment = h_koral_vec2_degrees.invokeExact(allocator, radians) as MemorySegment
+    private val h_koral_vec3_degrees by lazy { handle("koral_vec3_degrees", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_degrees(allocator: SegmentAllocator, radians: MemorySegment): MemorySegment = h_koral_vec3_degrees.invokeExact(allocator, radians) as MemorySegment
+    private val h_koral_vec4_degrees by lazy { handle("koral_vec4_degrees", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_degrees(allocator: SegmentAllocator, radians: MemorySegment): MemorySegment = h_koral_vec4_degrees.invokeExact(allocator, radians) as MemorySegment
+    private val h_koral_double_degrees by lazy { handle("koral_double_degrees", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_degrees(radians: Double): Double = h_koral_double_degrees.invokeExact(radians) as Double
+    private val h_koral_dvec2_degrees by lazy { handle("koral_dvec2_degrees", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_degrees(allocator: SegmentAllocator, radians: MemorySegment): MemorySegment = h_koral_dvec2_degrees.invokeExact(allocator, radians) as MemorySegment
+    private val h_koral_dvec3_degrees by lazy { handle("koral_dvec3_degrees", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_degrees(allocator: SegmentAllocator, radians: MemorySegment): MemorySegment = h_koral_dvec3_degrees.invokeExact(allocator, radians) as MemorySegment
+    private val h_koral_dvec4_degrees by lazy { handle("koral_dvec4_degrees", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_degrees(allocator: SegmentAllocator, radians: MemorySegment): MemorySegment = h_koral_dvec4_degrees.invokeExact(allocator, radians) as MemorySegment
+    private val h_koral_float_sin by lazy { handle("koral_float_sin", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_sin(v: Float): Float = h_koral_float_sin.invokeExact(v) as Float
+    private val h_koral_vec2_sin by lazy { handle("koral_vec2_sin", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_sin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_sin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_sin by lazy { handle("koral_vec3_sin", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_sin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_sin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_sin by lazy { handle("koral_vec4_sin", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_sin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_sin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_sin by lazy { handle("koral_double_sin", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_sin(v: Double): Double = h_koral_double_sin.invokeExact(v) as Double
+    private val h_koral_dvec2_sin by lazy { handle("koral_dvec2_sin", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_sin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_sin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_sin by lazy { handle("koral_dvec3_sin", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_sin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_sin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_sin by lazy { handle("koral_dvec4_sin", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_sin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_sin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_cos by lazy { handle("koral_float_cos", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_cos(v: Float): Float = h_koral_float_cos.invokeExact(v) as Float
+    private val h_koral_vec2_cos by lazy { handle("koral_vec2_cos", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_cos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_cos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_cos by lazy { handle("koral_vec3_cos", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_cos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_cos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_cos by lazy { handle("koral_vec4_cos", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_cos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_cos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_cos by lazy { handle("koral_double_cos", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_cos(v: Double): Double = h_koral_double_cos.invokeExact(v) as Double
+    private val h_koral_dvec2_cos by lazy { handle("koral_dvec2_cos", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_cos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_cos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_cos by lazy { handle("koral_dvec3_cos", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_cos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_cos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_cos by lazy { handle("koral_dvec4_cos", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_cos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_cos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_tan by lazy { handle("koral_float_tan", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_tan(v: Float): Float = h_koral_float_tan.invokeExact(v) as Float
+    private val h_koral_vec2_tan by lazy { handle("koral_vec2_tan", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_tan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_tan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_tan by lazy { handle("koral_vec3_tan", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_tan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_tan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_tan by lazy { handle("koral_vec4_tan", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_tan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_tan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_tan by lazy { handle("koral_double_tan", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_tan(v: Double): Double = h_koral_double_tan.invokeExact(v) as Double
+    private val h_koral_dvec2_tan by lazy { handle("koral_dvec2_tan", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_tan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_tan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_tan by lazy { handle("koral_dvec3_tan", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_tan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_tan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_tan by lazy { handle("koral_dvec4_tan", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_tan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_tan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_asin by lazy { handle("koral_float_asin", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_asin(v: Float): Float = h_koral_float_asin.invokeExact(v) as Float
+    private val h_koral_vec2_asin by lazy { handle("koral_vec2_asin", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_asin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_asin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_asin by lazy { handle("koral_vec3_asin", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_asin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_asin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_asin by lazy { handle("koral_vec4_asin", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_asin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_asin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_asin by lazy { handle("koral_double_asin", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_asin(v: Double): Double = h_koral_double_asin.invokeExact(v) as Double
+    private val h_koral_dvec2_asin by lazy { handle("koral_dvec2_asin", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_asin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_asin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_asin by lazy { handle("koral_dvec3_asin", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_asin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_asin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_asin by lazy { handle("koral_dvec4_asin", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_asin(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_asin.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_acos by lazy { handle("koral_float_acos", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_acos(v: Float): Float = h_koral_float_acos.invokeExact(v) as Float
+    private val h_koral_vec2_acos by lazy { handle("koral_vec2_acos", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_acos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_acos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_acos by lazy { handle("koral_vec3_acos", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_acos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_acos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_acos by lazy { handle("koral_vec4_acos", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_acos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_acos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_acos by lazy { handle("koral_double_acos", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_acos(v: Double): Double = h_koral_double_acos.invokeExact(v) as Double
+    private val h_koral_dvec2_acos by lazy { handle("koral_dvec2_acos", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_acos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_acos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_acos by lazy { handle("koral_dvec3_acos", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_acos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_acos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_acos by lazy { handle("koral_dvec4_acos", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_acos(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_acos.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_atan by lazy { handle("koral_float_atan", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_atan(v: Float): Float = h_koral_float_atan.invokeExact(v) as Float
+    private val h_koral_vec2_atan by lazy { handle("koral_vec2_atan", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_atan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_atan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_atan by lazy { handle("koral_vec3_atan", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_atan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_atan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_atan by lazy { handle("koral_vec4_atan", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_atan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_atan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_atan by lazy { handle("koral_double_atan", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_atan(v: Double): Double = h_koral_double_atan.invokeExact(v) as Double
+    private val h_koral_dvec2_atan by lazy { handle("koral_dvec2_atan", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_atan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_atan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_atan by lazy { handle("koral_dvec3_atan", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_atan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_atan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_atan by lazy { handle("koral_dvec4_atan", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_atan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_atan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_sinh by lazy { handle("koral_float_sinh", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_sinh(v: Float): Float = h_koral_float_sinh.invokeExact(v) as Float
+    private val h_koral_vec2_sinh by lazy { handle("koral_vec2_sinh", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_sinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_sinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_sinh by lazy { handle("koral_vec3_sinh", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_sinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_sinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_sinh by lazy { handle("koral_vec4_sinh", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_sinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_sinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_sinh by lazy { handle("koral_double_sinh", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_sinh(v: Double): Double = h_koral_double_sinh.invokeExact(v) as Double
+    private val h_koral_dvec2_sinh by lazy { handle("koral_dvec2_sinh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_sinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_sinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_sinh by lazy { handle("koral_dvec3_sinh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_sinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_sinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_sinh by lazy { handle("koral_dvec4_sinh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_sinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_sinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_cosh by lazy { handle("koral_float_cosh", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_cosh(v: Float): Float = h_koral_float_cosh.invokeExact(v) as Float
+    private val h_koral_vec2_cosh by lazy { handle("koral_vec2_cosh", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_cosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_cosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_cosh by lazy { handle("koral_vec3_cosh", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_cosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_cosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_cosh by lazy { handle("koral_vec4_cosh", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_cosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_cosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_cosh by lazy { handle("koral_double_cosh", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_cosh(v: Double): Double = h_koral_double_cosh.invokeExact(v) as Double
+    private val h_koral_dvec2_cosh by lazy { handle("koral_dvec2_cosh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_cosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_cosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_cosh by lazy { handle("koral_dvec3_cosh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_cosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_cosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_cosh by lazy { handle("koral_dvec4_cosh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_cosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_cosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_tanh by lazy { handle("koral_float_tanh", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_tanh(v: Float): Float = h_koral_float_tanh.invokeExact(v) as Float
+    private val h_koral_vec2_tanh by lazy { handle("koral_vec2_tanh", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_tanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_tanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_tanh by lazy { handle("koral_vec3_tanh", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_tanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_tanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_tanh by lazy { handle("koral_vec4_tanh", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_tanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_tanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_tanh by lazy { handle("koral_double_tanh", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_tanh(v: Double): Double = h_koral_double_tanh.invokeExact(v) as Double
+    private val h_koral_dvec2_tanh by lazy { handle("koral_dvec2_tanh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_tanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_tanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_tanh by lazy { handle("koral_dvec3_tanh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_tanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_tanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_tanh by lazy { handle("koral_dvec4_tanh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_tanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_tanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_asinh by lazy { handle("koral_float_asinh", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_asinh(v: Float): Float = h_koral_float_asinh.invokeExact(v) as Float
+    private val h_koral_vec2_asinh by lazy { handle("koral_vec2_asinh", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_asinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_asinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_asinh by lazy { handle("koral_vec3_asinh", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_asinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_asinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_asinh by lazy { handle("koral_vec4_asinh", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_asinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_asinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_asinh by lazy { handle("koral_double_asinh", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_asinh(v: Double): Double = h_koral_double_asinh.invokeExact(v) as Double
+    private val h_koral_dvec2_asinh by lazy { handle("koral_dvec2_asinh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_asinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_asinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_asinh by lazy { handle("koral_dvec3_asinh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_asinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_asinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_asinh by lazy { handle("koral_dvec4_asinh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_asinh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_asinh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_acosh by lazy { handle("koral_float_acosh", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_acosh(v: Float): Float = h_koral_float_acosh.invokeExact(v) as Float
+    private val h_koral_vec2_acosh by lazy { handle("koral_vec2_acosh", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_acosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_acosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_acosh by lazy { handle("koral_vec3_acosh", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_acosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_acosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_acosh by lazy { handle("koral_vec4_acosh", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_acosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_acosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_acosh by lazy { handle("koral_double_acosh", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_acosh(v: Double): Double = h_koral_double_acosh.invokeExact(v) as Double
+    private val h_koral_dvec2_acosh by lazy { handle("koral_dvec2_acosh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_acosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_acosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_acosh by lazy { handle("koral_dvec3_acosh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_acosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_acosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_acosh by lazy { handle("koral_dvec4_acosh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_acosh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_acosh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_atanh by lazy { handle("koral_float_atanh", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_atanh(v: Float): Float = h_koral_float_atanh.invokeExact(v) as Float
+    private val h_koral_vec2_atanh by lazy { handle("koral_vec2_atanh", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_atanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_atanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_atanh by lazy { handle("koral_vec3_atanh", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_atanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_atanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_atanh by lazy { handle("koral_vec4_atanh", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_atanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_atanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_atanh by lazy { handle("koral_double_atanh", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_atanh(v: Double): Double = h_koral_double_atanh.invokeExact(v) as Double
+    private val h_koral_dvec2_atanh by lazy { handle("koral_dvec2_atanh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_atanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_atanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_atanh by lazy { handle("koral_dvec3_atanh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_atanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_atanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_atanh by lazy { handle("koral_dvec4_atanh", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_atanh(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_atanh.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_atan2 by lazy { handle("koral_float_atan2", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_atan2(y: Float, x: Float): Float = h_koral_float_atan2.invokeExact(y, x) as Float
+    private val h_koral_vec2_atan2 by lazy { handle("koral_vec2_atan2", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_atan2(allocator: SegmentAllocator, y: MemorySegment, x: MemorySegment): MemorySegment = h_koral_vec2_atan2.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_vec2_atan2_s by lazy { handle("koral_vec2_atan2_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_atan2_s(allocator: SegmentAllocator, y: MemorySegment, x: Float): MemorySegment = h_koral_vec2_atan2_s.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_vec3_atan2 by lazy { handle("koral_vec3_atan2", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_atan2(allocator: SegmentAllocator, y: MemorySegment, x: MemorySegment): MemorySegment = h_koral_vec3_atan2.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_vec3_atan2_s by lazy { handle("koral_vec3_atan2_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_atan2_s(allocator: SegmentAllocator, y: MemorySegment, x: Float): MemorySegment = h_koral_vec3_atan2_s.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_vec4_atan2 by lazy { handle("koral_vec4_atan2", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_atan2(allocator: SegmentAllocator, y: MemorySegment, x: MemorySegment): MemorySegment = h_koral_vec4_atan2.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_vec4_atan2_s by lazy { handle("koral_vec4_atan2_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_atan2_s(allocator: SegmentAllocator, y: MemorySegment, x: Float): MemorySegment = h_koral_vec4_atan2_s.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_double_atan2 by lazy { handle("koral_double_atan2", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_atan2(y: Double, x: Double): Double = h_koral_double_atan2.invokeExact(y, x) as Double
+    private val h_koral_dvec2_atan2 by lazy { handle("koral_dvec2_atan2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_atan2(allocator: SegmentAllocator, y: MemorySegment, x: MemorySegment): MemorySegment = h_koral_dvec2_atan2.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_dvec2_atan2_s by lazy { handle("koral_dvec2_atan2_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_atan2_s(allocator: SegmentAllocator, y: MemorySegment, x: Double): MemorySegment = h_koral_dvec2_atan2_s.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_dvec3_atan2 by lazy { handle("koral_dvec3_atan2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_atan2(allocator: SegmentAllocator, y: MemorySegment, x: MemorySegment): MemorySegment = h_koral_dvec3_atan2.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_dvec3_atan2_s by lazy { handle("koral_dvec3_atan2_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_atan2_s(allocator: SegmentAllocator, y: MemorySegment, x: Double): MemorySegment = h_koral_dvec3_atan2_s.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_dvec4_atan2 by lazy { handle("koral_dvec4_atan2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_atan2(allocator: SegmentAllocator, y: MemorySegment, x: MemorySegment): MemorySegment = h_koral_dvec4_atan2.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_dvec4_atan2_s by lazy { handle("koral_dvec4_atan2_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_atan2_s(allocator: SegmentAllocator, y: MemorySegment, x: Double): MemorySegment = h_koral_dvec4_atan2_s.invokeExact(allocator, y, x) as MemorySegment
+    private val h_koral_float_pow by lazy { handle("koral_float_pow", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_pow(v: Float, e: Float): Float = h_koral_float_pow.invokeExact(v, e) as Float
+    private val h_koral_vec2_pow by lazy { handle("koral_vec2_pow", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_pow(allocator: SegmentAllocator, v: MemorySegment, e: MemorySegment): MemorySegment = h_koral_vec2_pow.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_vec2_pow_s by lazy { handle("koral_vec2_pow_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_pow_s(allocator: SegmentAllocator, v: MemorySegment, e: Float): MemorySegment = h_koral_vec2_pow_s.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_vec3_pow by lazy { handle("koral_vec3_pow", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_pow(allocator: SegmentAllocator, v: MemorySegment, e: MemorySegment): MemorySegment = h_koral_vec3_pow.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_vec3_pow_s by lazy { handle("koral_vec3_pow_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_pow_s(allocator: SegmentAllocator, v: MemorySegment, e: Float): MemorySegment = h_koral_vec3_pow_s.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_vec4_pow by lazy { handle("koral_vec4_pow", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_pow(allocator: SegmentAllocator, v: MemorySegment, e: MemorySegment): MemorySegment = h_koral_vec4_pow.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_vec4_pow_s by lazy { handle("koral_vec4_pow_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_pow_s(allocator: SegmentAllocator, v: MemorySegment, e: Float): MemorySegment = h_koral_vec4_pow_s.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_double_pow by lazy { handle("koral_double_pow", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_pow(v: Double, e: Double): Double = h_koral_double_pow.invokeExact(v, e) as Double
+    private val h_koral_dvec2_pow by lazy { handle("koral_dvec2_pow", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_pow(allocator: SegmentAllocator, v: MemorySegment, e: MemorySegment): MemorySegment = h_koral_dvec2_pow.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_dvec2_pow_s by lazy { handle("koral_dvec2_pow_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_pow_s(allocator: SegmentAllocator, v: MemorySegment, e: Double): MemorySegment = h_koral_dvec2_pow_s.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_dvec3_pow by lazy { handle("koral_dvec3_pow", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_pow(allocator: SegmentAllocator, v: MemorySegment, e: MemorySegment): MemorySegment = h_koral_dvec3_pow.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_dvec3_pow_s by lazy { handle("koral_dvec3_pow_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_pow_s(allocator: SegmentAllocator, v: MemorySegment, e: Double): MemorySegment = h_koral_dvec3_pow_s.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_dvec4_pow by lazy { handle("koral_dvec4_pow", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_pow(allocator: SegmentAllocator, v: MemorySegment, e: MemorySegment): MemorySegment = h_koral_dvec4_pow.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_dvec4_pow_s by lazy { handle("koral_dvec4_pow_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_pow_s(allocator: SegmentAllocator, v: MemorySegment, e: Double): MemorySegment = h_koral_dvec4_pow_s.invokeExact(allocator, v, e) as MemorySegment
+    private val h_koral_float_exp by lazy { handle("koral_float_exp", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_exp(v: Float): Float = h_koral_float_exp.invokeExact(v) as Float
+    private val h_koral_vec2_exp by lazy { handle("koral_vec2_exp", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_exp(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_exp.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_exp by lazy { handle("koral_vec3_exp", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_exp(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_exp.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_exp by lazy { handle("koral_vec4_exp", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_exp(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_exp.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_exp by lazy { handle("koral_double_exp", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_exp(v: Double): Double = h_koral_double_exp.invokeExact(v) as Double
+    private val h_koral_dvec2_exp by lazy { handle("koral_dvec2_exp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_exp(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_exp.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_exp by lazy { handle("koral_dvec3_exp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_exp(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_exp.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_exp by lazy { handle("koral_dvec4_exp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_exp(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_exp.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_log by lazy { handle("koral_float_log", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_log(v: Float): Float = h_koral_float_log.invokeExact(v) as Float
+    private val h_koral_vec2_log by lazy { handle("koral_vec2_log", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_log(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_log.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_log by lazy { handle("koral_vec3_log", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_log(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_log.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_log by lazy { handle("koral_vec4_log", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_log(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_log.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_log by lazy { handle("koral_double_log", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_log(v: Double): Double = h_koral_double_log.invokeExact(v) as Double
+    private val h_koral_dvec2_log by lazy { handle("koral_dvec2_log", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_log(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_log.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_log by lazy { handle("koral_dvec3_log", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_log(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_log.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_log by lazy { handle("koral_dvec4_log", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_log(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_log.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_exp2 by lazy { handle("koral_float_exp2", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_exp2(v: Float): Float = h_koral_float_exp2.invokeExact(v) as Float
+    private val h_koral_vec2_exp2 by lazy { handle("koral_vec2_exp2", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_exp2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_exp2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_exp2 by lazy { handle("koral_vec3_exp2", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_exp2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_exp2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_exp2 by lazy { handle("koral_vec4_exp2", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_exp2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_exp2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_exp2 by lazy { handle("koral_double_exp2", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_exp2(v: Double): Double = h_koral_double_exp2.invokeExact(v) as Double
+    private val h_koral_dvec2_exp2 by lazy { handle("koral_dvec2_exp2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_exp2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_exp2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_exp2 by lazy { handle("koral_dvec3_exp2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_exp2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_exp2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_exp2 by lazy { handle("koral_dvec4_exp2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_exp2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_exp2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_log2 by lazy { handle("koral_float_log2", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_log2(v: Float): Float = h_koral_float_log2.invokeExact(v) as Float
+    private val h_koral_vec2_log2 by lazy { handle("koral_vec2_log2", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_log2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_log2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_log2 by lazy { handle("koral_vec3_log2", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_log2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_log2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_log2 by lazy { handle("koral_vec4_log2", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_log2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_log2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_log2 by lazy { handle("koral_double_log2", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_log2(v: Double): Double = h_koral_double_log2.invokeExact(v) as Double
+    private val h_koral_dvec2_log2 by lazy { handle("koral_dvec2_log2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_log2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_log2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_log2 by lazy { handle("koral_dvec3_log2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_log2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_log2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_log2 by lazy { handle("koral_dvec4_log2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_log2(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_log2.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_sqrt by lazy { handle("koral_float_sqrt", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_sqrt(v: Float): Float = h_koral_float_sqrt.invokeExact(v) as Float
+    private val h_koral_vec2_sqrt by lazy { handle("koral_vec2_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_sqrt by lazy { handle("koral_vec3_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_sqrt by lazy { handle("koral_vec4_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_sqrt by lazy { handle("koral_double_sqrt", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_sqrt(v: Double): Double = h_koral_double_sqrt.invokeExact(v) as Double
+    private val h_koral_dvec2_sqrt by lazy { handle("koral_dvec2_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_sqrt by lazy { handle("koral_dvec3_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_sqrt by lazy { handle("koral_dvec4_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_inverse_sqrt by lazy { handle("koral_float_inverse_sqrt", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_inverse_sqrt(v: Float): Float = h_koral_float_inverse_sqrt.invokeExact(v) as Float
+    private val h_koral_vec2_inverse_sqrt by lazy { handle("koral_vec2_inverse_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_inverse_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_inverse_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_inverse_sqrt by lazy { handle("koral_vec3_inverse_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_inverse_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_inverse_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_inverse_sqrt by lazy { handle("koral_vec4_inverse_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_inverse_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_inverse_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_inverse_sqrt by lazy { handle("koral_double_inverse_sqrt", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_inverse_sqrt(v: Double): Double = h_koral_double_inverse_sqrt.invokeExact(v) as Double
+    private val h_koral_dvec2_inverse_sqrt by lazy { handle("koral_dvec2_inverse_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_inverse_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_inverse_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_inverse_sqrt by lazy { handle("koral_dvec3_inverse_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_inverse_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_inverse_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_inverse_sqrt by lazy { handle("koral_dvec4_inverse_sqrt", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_inverse_sqrt(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_inverse_sqrt.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_min by lazy { handle("koral_float_min", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_min(a: Float, b: Float): Float = h_koral_float_min.invokeExact(a, b) as Float
+    private val h_koral_vec2_min by lazy { handle("koral_vec2_min", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_min_s by lazy { handle("koral_vec2_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Float): MemorySegment = h_koral_vec2_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_min by lazy { handle("koral_vec3_min", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_min_s by lazy { handle("koral_vec3_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Float): MemorySegment = h_koral_vec3_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_min by lazy { handle("koral_vec4_min", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_min_s by lazy { handle("koral_vec4_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Float): MemorySegment = h_koral_vec4_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_double_min by lazy { handle("koral_double_min", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_min(a: Double, b: Double): Double = h_koral_double_min.invokeExact(a, b) as Double
+    private val h_koral_dvec2_min by lazy { handle("koral_dvec2_min", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_min_s by lazy { handle("koral_dvec2_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Double): MemorySegment = h_koral_dvec2_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_min by lazy { handle("koral_dvec3_min", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_min_s by lazy { handle("koral_dvec3_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Double): MemorySegment = h_koral_dvec3_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_min by lazy { handle("koral_dvec4_min", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_min_s by lazy { handle("koral_dvec4_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Double): MemorySegment = h_koral_dvec4_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_int_min by lazy { handle("koral_int_min", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_min(a: Int, b: Int): Int = h_koral_int_min.invokeExact(a, b) as Int
+    private val h_koral_ivec2_min by lazy { handle("koral_ivec2_min", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_min_s by lazy { handle("koral_ivec2_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT)) }
+    fun koral_ivec2_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_ivec2_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_min by lazy { handle("koral_ivec3_min", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_min_s by lazy { handle("koral_ivec3_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT)) }
+    fun koral_ivec3_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_ivec3_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_min by lazy { handle("koral_ivec4_min", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_min_s by lazy { handle("koral_ivec4_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT)) }
+    fun koral_ivec4_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_ivec4_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uint_min by lazy { handle("koral_uint_min", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_min(a: Int, b: Int): Int = h_koral_uint_min.invokeExact(a, b) as Int
+    private val h_koral_uvec2_min by lazy { handle("koral_uvec2_min", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_min_s by lazy { handle("koral_uvec2_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT)) }
+    fun koral_uvec2_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_uvec2_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_min by lazy { handle("koral_uvec3_min", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_min_s by lazy { handle("koral_uvec3_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT)) }
+    fun koral_uvec3_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_uvec3_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_min by lazy { handle("koral_uvec4_min", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_min(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_min.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_min_s by lazy { handle("koral_uvec4_min_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT)) }
+    fun koral_uvec4_min_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_uvec4_min_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_float_max by lazy { handle("koral_float_max", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_max(a: Float, b: Float): Float = h_koral_float_max.invokeExact(a, b) as Float
+    private val h_koral_vec2_max by lazy { handle("koral_vec2_max", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_max_s by lazy { handle("koral_vec2_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Float): MemorySegment = h_koral_vec2_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_max by lazy { handle("koral_vec3_max", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_max_s by lazy { handle("koral_vec3_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Float): MemorySegment = h_koral_vec3_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_max by lazy { handle("koral_vec4_max", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_max_s by lazy { handle("koral_vec4_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Float): MemorySegment = h_koral_vec4_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_double_max by lazy { handle("koral_double_max", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_max(a: Double, b: Double): Double = h_koral_double_max.invokeExact(a, b) as Double
+    private val h_koral_dvec2_max by lazy { handle("koral_dvec2_max", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_max_s by lazy { handle("koral_dvec2_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Double): MemorySegment = h_koral_dvec2_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_max by lazy { handle("koral_dvec3_max", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_max_s by lazy { handle("koral_dvec3_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Double): MemorySegment = h_koral_dvec3_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_max by lazy { handle("koral_dvec4_max", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_max_s by lazy { handle("koral_dvec4_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Double): MemorySegment = h_koral_dvec4_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_int_max by lazy { handle("koral_int_max", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_max(a: Int, b: Int): Int = h_koral_int_max.invokeExact(a, b) as Int
+    private val h_koral_ivec2_max by lazy { handle("koral_ivec2_max", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_max_s by lazy { handle("koral_ivec2_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT)) }
+    fun koral_ivec2_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_ivec2_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_max by lazy { handle("koral_ivec3_max", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_max_s by lazy { handle("koral_ivec3_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT)) }
+    fun koral_ivec3_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_ivec3_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_max by lazy { handle("koral_ivec4_max", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_max_s by lazy { handle("koral_ivec4_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT)) }
+    fun koral_ivec4_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_ivec4_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uint_max by lazy { handle("koral_uint_max", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_max(a: Int, b: Int): Int = h_koral_uint_max.invokeExact(a, b) as Int
+    private val h_koral_uvec2_max by lazy { handle("koral_uvec2_max", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_max_s by lazy { handle("koral_uvec2_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT)) }
+    fun koral_uvec2_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_uvec2_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_max by lazy { handle("koral_uvec3_max", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_max_s by lazy { handle("koral_uvec3_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT)) }
+    fun koral_uvec3_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_uvec3_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_max by lazy { handle("koral_uvec4_max", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_max(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_max.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_max_s by lazy { handle("koral_uvec4_max_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT)) }
+    fun koral_uvec4_max_s(allocator: SegmentAllocator, a: MemorySegment, b: Int): MemorySegment = h_koral_uvec4_max_s.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_float_clamp by lazy { handle("koral_float_clamp", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_clamp(v: Float, lo: Float, hi: Float): Float = h_koral_float_clamp.invokeExact(v, lo, hi) as Float
+    private val h_koral_vec2_clamp by lazy { handle("koral_vec2_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_vec2_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_vec2_clamp_s by lazy { handle("koral_vec2_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_vec2_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Float, hi: Float): MemorySegment = h_koral_vec2_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_vec3_clamp by lazy { handle("koral_vec3_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_vec3_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_vec3_clamp_s by lazy { handle("koral_vec3_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_vec3_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Float, hi: Float): MemorySegment = h_koral_vec3_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_vec4_clamp by lazy { handle("koral_vec4_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_vec4_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_vec4_clamp_s by lazy { handle("koral_vec4_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_vec4_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Float, hi: Float): MemorySegment = h_koral_vec4_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_double_clamp by lazy { handle("koral_double_clamp", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_clamp(v: Double, lo: Double, hi: Double): Double = h_koral_double_clamp.invokeExact(v, lo, hi) as Double
+    private val h_koral_dvec2_clamp by lazy { handle("koral_dvec2_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_dvec2_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_dvec2_clamp_s by lazy { handle("koral_dvec2_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_dvec2_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Double, hi: Double): MemorySegment = h_koral_dvec2_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_dvec3_clamp by lazy { handle("koral_dvec3_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_dvec3_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_dvec3_clamp_s by lazy { handle("koral_dvec3_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_dvec3_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Double, hi: Double): MemorySegment = h_koral_dvec3_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_dvec4_clamp by lazy { handle("koral_dvec4_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_dvec4_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_dvec4_clamp_s by lazy { handle("koral_dvec4_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_dvec4_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Double, hi: Double): MemorySegment = h_koral_dvec4_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_int_clamp by lazy { handle("koral_int_clamp", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_clamp(v: Int, lo: Int, hi: Int): Int = h_koral_int_clamp.invokeExact(v, lo, hi) as Int
+    private val h_koral_ivec2_clamp by lazy { handle("koral_ivec2_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_ivec2_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_ivec2_clamp_s by lazy { handle("koral_ivec2_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec2_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Int, hi: Int): MemorySegment = h_koral_ivec2_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_ivec3_clamp by lazy { handle("koral_ivec3_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_ivec3_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_ivec3_clamp_s by lazy { handle("koral_ivec3_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec3_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Int, hi: Int): MemorySegment = h_koral_ivec3_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_ivec4_clamp by lazy { handle("koral_ivec4_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_ivec4_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_ivec4_clamp_s by lazy { handle("koral_ivec4_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec4_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Int, hi: Int): MemorySegment = h_koral_ivec4_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_uint_clamp by lazy { handle("koral_uint_clamp", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_clamp(v: Int, lo: Int, hi: Int): Int = h_koral_uint_clamp.invokeExact(v, lo, hi) as Int
+    private val h_koral_uvec2_clamp by lazy { handle("koral_uvec2_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_uvec2_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_uvec2_clamp_s by lazy { handle("koral_uvec2_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec2_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Int, hi: Int): MemorySegment = h_koral_uvec2_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_uvec3_clamp by lazy { handle("koral_uvec3_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_uvec3_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_uvec3_clamp_s by lazy { handle("koral_uvec3_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec3_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Int, hi: Int): MemorySegment = h_koral_uvec3_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_uvec4_clamp by lazy { handle("koral_uvec4_clamp", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_clamp(allocator: SegmentAllocator, v: MemorySegment, lo: MemorySegment, hi: MemorySegment): MemorySegment = h_koral_uvec4_clamp.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_uvec4_clamp_s by lazy { handle("koral_uvec4_clamp_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec4_clamp_s(allocator: SegmentAllocator, v: MemorySegment, lo: Int, hi: Int): MemorySegment = h_koral_uvec4_clamp_s.invokeExact(allocator, v, lo, hi) as MemorySegment
+    private val h_koral_float_saturate by lazy { handle("koral_float_saturate", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_saturate(v: Float): Float = h_koral_float_saturate.invokeExact(v) as Float
+    private val h_koral_vec2_saturate by lazy { handle("koral_vec2_saturate", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_saturate(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_saturate.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_saturate by lazy { handle("koral_vec3_saturate", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_saturate(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_saturate.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_saturate by lazy { handle("koral_vec4_saturate", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_saturate(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_saturate.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_saturate by lazy { handle("koral_double_saturate", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_saturate(v: Double): Double = h_koral_double_saturate.invokeExact(v) as Double
+    private val h_koral_dvec2_saturate by lazy { handle("koral_dvec2_saturate", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_saturate(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_saturate.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_saturate by lazy { handle("koral_dvec3_saturate", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_saturate(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_saturate.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_saturate by lazy { handle("koral_dvec4_saturate", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_saturate(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_saturate.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_abs by lazy { handle("koral_float_abs", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_abs(v: Float): Float = h_koral_float_abs.invokeExact(v) as Float
+    private val h_koral_vec2_abs by lazy { handle("koral_vec2_abs", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_abs by lazy { handle("koral_vec3_abs", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_abs by lazy { handle("koral_vec4_abs", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_abs by lazy { handle("koral_double_abs", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_abs(v: Double): Double = h_koral_double_abs.invokeExact(v) as Double
+    private val h_koral_dvec2_abs by lazy { handle("koral_dvec2_abs", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_abs by lazy { handle("koral_dvec3_abs", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_abs by lazy { handle("koral_dvec4_abs", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_abs by lazy { handle("koral_int_abs", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_abs(v: Int): Int = h_koral_int_abs.invokeExact(v) as Int
+    private val h_koral_ivec2_abs by lazy { handle("koral_ivec2_abs", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_abs by lazy { handle("koral_ivec3_abs", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_abs by lazy { handle("koral_ivec4_abs", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_abs by lazy { handle("koral_uint_abs", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_abs(v: Int): Int = h_koral_uint_abs.invokeExact(v) as Int
+    private val h_koral_uvec2_abs by lazy { handle("koral_uvec2_abs", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_abs by lazy { handle("koral_uvec3_abs", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_abs by lazy { handle("koral_uvec4_abs", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_abs(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_abs.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_sign by lazy { handle("koral_float_sign", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_sign(v: Float): Float = h_koral_float_sign.invokeExact(v) as Float
+    private val h_koral_vec2_sign by lazy { handle("koral_vec2_sign", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_sign by lazy { handle("koral_vec3_sign", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_sign by lazy { handle("koral_vec4_sign", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_sign by lazy { handle("koral_double_sign", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_sign(v: Double): Double = h_koral_double_sign.invokeExact(v) as Double
+    private val h_koral_dvec2_sign by lazy { handle("koral_dvec2_sign", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_sign by lazy { handle("koral_dvec3_sign", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_sign by lazy { handle("koral_dvec4_sign", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_sign by lazy { handle("koral_int_sign", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_sign(v: Int): Int = h_koral_int_sign.invokeExact(v) as Int
+    private val h_koral_ivec2_sign by lazy { handle("koral_ivec2_sign", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_sign by lazy { handle("koral_ivec3_sign", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_sign by lazy { handle("koral_ivec4_sign", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_sign by lazy { handle("koral_uint_sign", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_sign(v: Int): Int = h_koral_uint_sign.invokeExact(v) as Int
+    private val h_koral_uvec2_sign by lazy { handle("koral_uvec2_sign", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_sign by lazy { handle("koral_uvec3_sign", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_sign by lazy { handle("koral_uvec4_sign", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_sign(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_sign.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_floor by lazy { handle("koral_float_floor", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_floor(v: Float): Float = h_koral_float_floor.invokeExact(v) as Float
+    private val h_koral_vec2_floor by lazy { handle("koral_vec2_floor", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_floor(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_floor.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_floor by lazy { handle("koral_vec3_floor", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_floor(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_floor.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_floor by lazy { handle("koral_vec4_floor", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_floor(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_floor.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_floor by lazy { handle("koral_double_floor", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_floor(v: Double): Double = h_koral_double_floor.invokeExact(v) as Double
+    private val h_koral_dvec2_floor by lazy { handle("koral_dvec2_floor", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_floor(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_floor.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_floor by lazy { handle("koral_dvec3_floor", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_floor(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_floor.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_floor by lazy { handle("koral_dvec4_floor", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_floor(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_floor.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_ceil by lazy { handle("koral_float_ceil", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_ceil(v: Float): Float = h_koral_float_ceil.invokeExact(v) as Float
+    private val h_koral_vec2_ceil by lazy { handle("koral_vec2_ceil", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_ceil(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_ceil.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_ceil by lazy { handle("koral_vec3_ceil", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_ceil(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_ceil.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_ceil by lazy { handle("koral_vec4_ceil", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_ceil(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_ceil.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_ceil by lazy { handle("koral_double_ceil", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_ceil(v: Double): Double = h_koral_double_ceil.invokeExact(v) as Double
+    private val h_koral_dvec2_ceil by lazy { handle("koral_dvec2_ceil", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_ceil(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_ceil.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_ceil by lazy { handle("koral_dvec3_ceil", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_ceil(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_ceil.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_ceil by lazy { handle("koral_dvec4_ceil", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_ceil(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_ceil.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_trunc by lazy { handle("koral_float_trunc", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_trunc(v: Float): Float = h_koral_float_trunc.invokeExact(v) as Float
+    private val h_koral_vec2_trunc by lazy { handle("koral_vec2_trunc", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_trunc(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_trunc.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_trunc by lazy { handle("koral_vec3_trunc", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_trunc(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_trunc.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_trunc by lazy { handle("koral_vec4_trunc", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_trunc(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_trunc.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_trunc by lazy { handle("koral_double_trunc", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_trunc(v: Double): Double = h_koral_double_trunc.invokeExact(v) as Double
+    private val h_koral_dvec2_trunc by lazy { handle("koral_dvec2_trunc", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_trunc(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_trunc.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_trunc by lazy { handle("koral_dvec3_trunc", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_trunc(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_trunc.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_trunc by lazy { handle("koral_dvec4_trunc", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_trunc(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_trunc.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_round by lazy { handle("koral_float_round", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_round(v: Float): Float = h_koral_float_round.invokeExact(v) as Float
+    private val h_koral_vec2_round by lazy { handle("koral_vec2_round", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_round(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_round.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_round by lazy { handle("koral_vec3_round", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_round(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_round.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_round by lazy { handle("koral_vec4_round", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_round(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_round.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_round by lazy { handle("koral_double_round", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_round(v: Double): Double = h_koral_double_round.invokeExact(v) as Double
+    private val h_koral_dvec2_round by lazy { handle("koral_dvec2_round", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_round(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_round.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_round by lazy { handle("koral_dvec3_round", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_round(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_round.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_round by lazy { handle("koral_dvec4_round", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_round(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_round.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_round_even by lazy { handle("koral_float_round_even", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_round_even(v: Float): Float = h_koral_float_round_even.invokeExact(v) as Float
+    private val h_koral_vec2_round_even by lazy { handle("koral_vec2_round_even", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_round_even(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_round_even.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_round_even by lazy { handle("koral_vec3_round_even", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_round_even(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_round_even.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_round_even by lazy { handle("koral_vec4_round_even", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_round_even(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_round_even.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_round_even by lazy { handle("koral_double_round_even", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_round_even(v: Double): Double = h_koral_double_round_even.invokeExact(v) as Double
+    private val h_koral_dvec2_round_even by lazy { handle("koral_dvec2_round_even", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_round_even(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_round_even.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_round_even by lazy { handle("koral_dvec3_round_even", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_round_even(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_round_even.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_round_even by lazy { handle("koral_dvec4_round_even", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_round_even(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_round_even.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_fract by lazy { handle("koral_float_fract", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_fract(v: Float): Float = h_koral_float_fract.invokeExact(v) as Float
+    private val h_koral_vec2_fract by lazy { handle("koral_vec2_fract", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_fract(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_fract.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_fract by lazy { handle("koral_vec3_fract", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_fract(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_fract.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_fract by lazy { handle("koral_vec4_fract", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_fract(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_fract.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_fract by lazy { handle("koral_double_fract", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_fract(v: Double): Double = h_koral_double_fract.invokeExact(v) as Double
+    private val h_koral_dvec2_fract by lazy { handle("koral_dvec2_fract", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_fract(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_fract.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_fract by lazy { handle("koral_dvec3_fract", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_fract(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_fract.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_fract by lazy { handle("koral_dvec4_fract", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_fract(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_fract.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_mod by lazy { handle("koral_float_mod", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_mod(v: Float, m: Float): Float = h_koral_float_mod.invokeExact(v, m) as Float
+    private val h_koral_vec2_mod by lazy { handle("koral_vec2_mod", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec2_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_vec2_mod_s by lazy { handle("koral_vec2_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Float): MemorySegment = h_koral_vec2_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_vec3_mod by lazy { handle("koral_vec3_mod", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec3_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_vec3_mod_s by lazy { handle("koral_vec3_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Float): MemorySegment = h_koral_vec3_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_vec4_mod by lazy { handle("koral_vec4_mod", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec4_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_vec4_mod_s by lazy { handle("koral_vec4_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Float): MemorySegment = h_koral_vec4_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_double_mod by lazy { handle("koral_double_mod", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_mod(v: Double, m: Double): Double = h_koral_double_mod.invokeExact(v, m) as Double
+    private val h_koral_dvec2_mod by lazy { handle("koral_dvec2_mod", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec2_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dvec2_mod_s by lazy { handle("koral_dvec2_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Double): MemorySegment = h_koral_dvec2_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dvec3_mod by lazy { handle("koral_dvec3_mod", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec3_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dvec3_mod_s by lazy { handle("koral_dvec3_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Double): MemorySegment = h_koral_dvec3_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dvec4_mod by lazy { handle("koral_dvec4_mod", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec4_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dvec4_mod_s by lazy { handle("koral_dvec4_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Double): MemorySegment = h_koral_dvec4_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_int_mod by lazy { handle("koral_int_mod", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_mod(v: Int, m: Int): Int = h_koral_int_mod.invokeExact(v, m) as Int
+    private val h_koral_ivec2_mod by lazy { handle("koral_ivec2_mod", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_ivec2_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_ivec2_mod_s by lazy { handle("koral_ivec2_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT)) }
+    fun koral_ivec2_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Int): MemorySegment = h_koral_ivec2_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_ivec3_mod by lazy { handle("koral_ivec3_mod", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_ivec3_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_ivec3_mod_s by lazy { handle("koral_ivec3_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT)) }
+    fun koral_ivec3_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Int): MemorySegment = h_koral_ivec3_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_ivec4_mod by lazy { handle("koral_ivec4_mod", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_ivec4_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_ivec4_mod_s by lazy { handle("koral_ivec4_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT)) }
+    fun koral_ivec4_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Int): MemorySegment = h_koral_ivec4_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_uint_mod by lazy { handle("koral_uint_mod", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_mod(v: Int, m: Int): Int = h_koral_uint_mod.invokeExact(v, m) as Int
+    private val h_koral_uvec2_mod by lazy { handle("koral_uvec2_mod", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_uvec2_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_uvec2_mod_s by lazy { handle("koral_uvec2_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT)) }
+    fun koral_uvec2_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Int): MemorySegment = h_koral_uvec2_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_uvec3_mod by lazy { handle("koral_uvec3_mod", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_uvec3_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_uvec3_mod_s by lazy { handle("koral_uvec3_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT)) }
+    fun koral_uvec3_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Int): MemorySegment = h_koral_uvec3_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_uvec4_mod by lazy { handle("koral_uvec4_mod", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_mod(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_uvec4_mod.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_uvec4_mod_s by lazy { handle("koral_uvec4_mod_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT)) }
+    fun koral_uvec4_mod_s(allocator: SegmentAllocator, v: MemorySegment, m: Int): MemorySegment = h_koral_uvec4_mod_s.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_float_modf by lazy { handle("koral_float_modf", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, ADDRESS)) }
+    fun koral_float_modf(v: Float, whole: MemorySegment): Float = h_koral_float_modf.invokeExact(v, whole) as Float
+    private val h_koral_vec2_modf by lazy { handle("koral_vec2_modf", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, ADDRESS)) }
+    fun koral_vec2_modf(allocator: SegmentAllocator, v: MemorySegment, whole: MemorySegment): MemorySegment = h_koral_vec2_modf.invokeExact(allocator, v, whole) as MemorySegment
+    private val h_koral_vec3_modf by lazy { handle("koral_vec3_modf", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, ADDRESS)) }
+    fun koral_vec3_modf(allocator: SegmentAllocator, v: MemorySegment, whole: MemorySegment): MemorySegment = h_koral_vec3_modf.invokeExact(allocator, v, whole) as MemorySegment
+    private val h_koral_vec4_modf by lazy { handle("koral_vec4_modf", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, ADDRESS)) }
+    fun koral_vec4_modf(allocator: SegmentAllocator, v: MemorySegment, whole: MemorySegment): MemorySegment = h_koral_vec4_modf.invokeExact(allocator, v, whole) as MemorySegment
+    private val h_koral_double_modf by lazy { handle("koral_double_modf", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, ADDRESS)) }
+    fun koral_double_modf(v: Double, whole: MemorySegment): Double = h_koral_double_modf.invokeExact(v, whole) as Double
+    private val h_koral_dvec2_modf by lazy { handle("koral_dvec2_modf", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, ADDRESS)) }
+    fun koral_dvec2_modf(allocator: SegmentAllocator, v: MemorySegment, whole: MemorySegment): MemorySegment = h_koral_dvec2_modf.invokeExact(allocator, v, whole) as MemorySegment
+    private val h_koral_dvec3_modf by lazy { handle("koral_dvec3_modf", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, ADDRESS)) }
+    fun koral_dvec3_modf(allocator: SegmentAllocator, v: MemorySegment, whole: MemorySegment): MemorySegment = h_koral_dvec3_modf.invokeExact(allocator, v, whole) as MemorySegment
+    private val h_koral_dvec4_modf by lazy { handle("koral_dvec4_modf", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, ADDRESS)) }
+    fun koral_dvec4_modf(allocator: SegmentAllocator, v: MemorySegment, whole: MemorySegment): MemorySegment = h_koral_dvec4_modf.invokeExact(allocator, v, whole) as MemorySegment
+    private val h_koral_float_mix by lazy { handle("koral_float_mix", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_mix(a: Float, b: Float, t: Float): Float = h_koral_float_mix.invokeExact(a, b, t) as Float
+    private val h_koral_vec2_mix by lazy { handle("koral_vec2_mix", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_mix(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_vec2_mix.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec2_mix_s by lazy { handle("koral_vec2_mix_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_mix_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_vec2_mix_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec3_mix by lazy { handle("koral_vec3_mix", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_mix(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_vec3_mix.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec3_mix_s by lazy { handle("koral_vec3_mix_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_mix_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_vec3_mix_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec4_mix by lazy { handle("koral_vec4_mix", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_mix(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_vec4_mix.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec4_mix_s by lazy { handle("koral_vec4_mix_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_mix_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_vec4_mix_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_double_mix by lazy { handle("koral_double_mix", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_mix(a: Double, b: Double, t: Double): Double = h_koral_double_mix.invokeExact(a, b, t) as Double
+    private val h_koral_dvec2_mix by lazy { handle("koral_dvec2_mix", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_mix(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_dvec2_mix.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec2_mix_s by lazy { handle("koral_dvec2_mix_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_mix_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Double): MemorySegment = h_koral_dvec2_mix_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec3_mix by lazy { handle("koral_dvec3_mix", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_mix(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_dvec3_mix.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec3_mix_s by lazy { handle("koral_dvec3_mix_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_mix_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Double): MemorySegment = h_koral_dvec3_mix_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec4_mix by lazy { handle("koral_dvec4_mix", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_mix(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_dvec4_mix.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec4_mix_s by lazy { handle("koral_dvec4_mix_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_mix_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Double): MemorySegment = h_koral_dvec4_mix_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_float_lerp by lazy { handle("koral_float_lerp", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_lerp(a: Float, b: Float, t: Float): Float = h_koral_float_lerp.invokeExact(a, b, t) as Float
+    private val h_koral_vec2_lerp by lazy { handle("koral_vec2_lerp", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_lerp(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_vec2_lerp.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec2_lerp_s by lazy { handle("koral_vec2_lerp_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_lerp_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_vec2_lerp_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec3_lerp by lazy { handle("koral_vec3_lerp", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_lerp(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_vec3_lerp.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec3_lerp_s by lazy { handle("koral_vec3_lerp_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_lerp_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_vec3_lerp_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec4_lerp by lazy { handle("koral_vec4_lerp", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_lerp(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_vec4_lerp.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_vec4_lerp_s by lazy { handle("koral_vec4_lerp_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_lerp_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_vec4_lerp_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_double_lerp by lazy { handle("koral_double_lerp", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_lerp(a: Double, b: Double, t: Double): Double = h_koral_double_lerp.invokeExact(a, b, t) as Double
+    private val h_koral_dvec2_lerp by lazy { handle("koral_dvec2_lerp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_lerp(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_dvec2_lerp.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec2_lerp_s by lazy { handle("koral_dvec2_lerp_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_lerp_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Double): MemorySegment = h_koral_dvec2_lerp_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec3_lerp by lazy { handle("koral_dvec3_lerp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_lerp(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_dvec3_lerp.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec3_lerp_s by lazy { handle("koral_dvec3_lerp_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_lerp_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Double): MemorySegment = h_koral_dvec3_lerp_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec4_lerp by lazy { handle("koral_dvec4_lerp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_lerp(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: MemorySegment): MemorySegment = h_koral_dvec4_lerp.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_dvec4_lerp_s by lazy { handle("koral_dvec4_lerp_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_lerp_s(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Double): MemorySegment = h_koral_dvec4_lerp_s.invokeExact(allocator, a, b, t) as MemorySegment
+    private val h_koral_float_step by lazy { handle("koral_float_step", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_step(edge: Float, v: Float): Float = h_koral_float_step.invokeExact(edge, v) as Float
+    private val h_koral_vec2_step by lazy { handle("koral_vec2_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_step(allocator: SegmentAllocator, edge: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec2_step.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_vec2_step_s by lazy { handle("koral_vec2_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_step_s(allocator: SegmentAllocator, edge: Float, v: MemorySegment): MemorySegment = h_koral_vec2_step_s.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_vec3_step by lazy { handle("koral_vec3_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_step(allocator: SegmentAllocator, edge: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec3_step.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_vec3_step_s by lazy { handle("koral_vec3_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_step_s(allocator: SegmentAllocator, edge: Float, v: MemorySegment): MemorySegment = h_koral_vec3_step_s.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_vec4_step by lazy { handle("koral_vec4_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_step(allocator: SegmentAllocator, edge: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec4_step.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_vec4_step_s by lazy { handle("koral_vec4_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_step_s(allocator: SegmentAllocator, edge: Float, v: MemorySegment): MemorySegment = h_koral_vec4_step_s.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_double_step by lazy { handle("koral_double_step", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_step(edge: Double, v: Double): Double = h_koral_double_step.invokeExact(edge, v) as Double
+    private val h_koral_dvec2_step by lazy { handle("koral_dvec2_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_step(allocator: SegmentAllocator, edge: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec2_step.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_dvec2_step_s by lazy { handle("koral_dvec2_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_step_s(allocator: SegmentAllocator, edge: Double, v: MemorySegment): MemorySegment = h_koral_dvec2_step_s.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_dvec3_step by lazy { handle("koral_dvec3_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_step(allocator: SegmentAllocator, edge: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec3_step.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_dvec3_step_s by lazy { handle("koral_dvec3_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_step_s(allocator: SegmentAllocator, edge: Double, v: MemorySegment): MemorySegment = h_koral_dvec3_step_s.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_dvec4_step by lazy { handle("koral_dvec4_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_step(allocator: SegmentAllocator, edge: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec4_step.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_dvec4_step_s by lazy { handle("koral_dvec4_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_step_s(allocator: SegmentAllocator, edge: Double, v: MemorySegment): MemorySegment = h_koral_dvec4_step_s.invokeExact(allocator, edge, v) as MemorySegment
+    private val h_koral_float_smooth_step by lazy { handle("koral_float_smooth_step", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_smooth_step(edge0: Float, edge1: Float, v: Float): Float = h_koral_float_smooth_step.invokeExact(edge0, edge1, v) as Float
+    private val h_koral_vec2_smooth_step by lazy { handle("koral_vec2_smooth_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_smooth_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec2_smooth_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec2_smooth_step_s by lazy { handle("koral_vec2_smooth_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, JAVA_FLOAT, JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_smooth_step_s(allocator: SegmentAllocator, edge0: Float, edge1: Float, v: MemorySegment): MemorySegment = h_koral_vec2_smooth_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec3_smooth_step by lazy { handle("koral_vec3_smooth_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_smooth_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec3_smooth_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec3_smooth_step_s by lazy { handle("koral_vec3_smooth_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, JAVA_FLOAT, JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_smooth_step_s(allocator: SegmentAllocator, edge0: Float, edge1: Float, v: MemorySegment): MemorySegment = h_koral_vec3_smooth_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec4_smooth_step by lazy { handle("koral_vec4_smooth_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_smooth_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec4_smooth_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec4_smooth_step_s by lazy { handle("koral_vec4_smooth_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_FLOAT, JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_smooth_step_s(allocator: SegmentAllocator, edge0: Float, edge1: Float, v: MemorySegment): MemorySegment = h_koral_vec4_smooth_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_double_smooth_step by lazy { handle("koral_double_smooth_step", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_smooth_step(edge0: Double, edge1: Double, v: Double): Double = h_koral_double_smooth_step.invokeExact(edge0, edge1, v) as Double
+    private val h_koral_dvec2_smooth_step by lazy { handle("koral_dvec2_smooth_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_smooth_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec2_smooth_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec2_smooth_step_s by lazy { handle("koral_dvec2_smooth_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, JAVA_DOUBLE, JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_smooth_step_s(allocator: SegmentAllocator, edge0: Double, edge1: Double, v: MemorySegment): MemorySegment = h_koral_dvec2_smooth_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec3_smooth_step by lazy { handle("koral_dvec3_smooth_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_smooth_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec3_smooth_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec3_smooth_step_s by lazy { handle("koral_dvec3_smooth_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, JAVA_DOUBLE, JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_smooth_step_s(allocator: SegmentAllocator, edge0: Double, edge1: Double, v: MemorySegment): MemorySegment = h_koral_dvec3_smooth_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec4_smooth_step by lazy { handle("koral_dvec4_smooth_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_smooth_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec4_smooth_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec4_smooth_step_s by lazy { handle("koral_dvec4_smooth_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, JAVA_DOUBLE, JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_smooth_step_s(allocator: SegmentAllocator, edge0: Double, edge1: Double, v: MemorySegment): MemorySegment = h_koral_dvec4_smooth_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_float_smoother_step by lazy { handle("koral_float_smoother_step", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_smoother_step(edge0: Float, edge1: Float, v: Float): Float = h_koral_float_smoother_step.invokeExact(edge0, edge1, v) as Float
+    private val h_koral_vec2_smoother_step by lazy { handle("koral_vec2_smoother_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_smoother_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec2_smoother_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec2_smoother_step_s by lazy { handle("koral_vec2_smoother_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, JAVA_FLOAT, JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_smoother_step_s(allocator: SegmentAllocator, edge0: Float, edge1: Float, v: MemorySegment): MemorySegment = h_koral_vec2_smoother_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec3_smoother_step by lazy { handle("koral_vec3_smoother_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_smoother_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec3_smoother_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec3_smoother_step_s by lazy { handle("koral_vec3_smoother_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, JAVA_FLOAT, JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_smoother_step_s(allocator: SegmentAllocator, edge0: Float, edge1: Float, v: MemorySegment): MemorySegment = h_koral_vec3_smoother_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec4_smoother_step by lazy { handle("koral_vec4_smoother_step", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_smoother_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_vec4_smoother_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_vec4_smoother_step_s by lazy { handle("koral_vec4_smoother_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_FLOAT, JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_smoother_step_s(allocator: SegmentAllocator, edge0: Float, edge1: Float, v: MemorySegment): MemorySegment = h_koral_vec4_smoother_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_double_smoother_step by lazy { handle("koral_double_smoother_step", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_smoother_step(edge0: Double, edge1: Double, v: Double): Double = h_koral_double_smoother_step.invokeExact(edge0, edge1, v) as Double
+    private val h_koral_dvec2_smoother_step by lazy { handle("koral_dvec2_smoother_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_smoother_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec2_smoother_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec2_smoother_step_s by lazy { handle("koral_dvec2_smoother_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, JAVA_DOUBLE, JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_smoother_step_s(allocator: SegmentAllocator, edge0: Double, edge1: Double, v: MemorySegment): MemorySegment = h_koral_dvec2_smoother_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec3_smoother_step by lazy { handle("koral_dvec3_smoother_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_smoother_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec3_smoother_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec3_smoother_step_s by lazy { handle("koral_dvec3_smoother_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, JAVA_DOUBLE, JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_smoother_step_s(allocator: SegmentAllocator, edge0: Double, edge1: Double, v: MemorySegment): MemorySegment = h_koral_dvec3_smoother_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec4_smoother_step by lazy { handle("koral_dvec4_smoother_step", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_smoother_step(allocator: SegmentAllocator, edge0: MemorySegment, edge1: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dvec4_smoother_step.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_dvec4_smoother_step_s by lazy { handle("koral_dvec4_smoother_step_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, JAVA_DOUBLE, JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_smoother_step_s(allocator: SegmentAllocator, edge0: Double, edge1: Double, v: MemorySegment): MemorySegment = h_koral_dvec4_smoother_step_s.invokeExact(allocator, edge0, edge1, v) as MemorySegment
+    private val h_koral_float_inverse_lerp by lazy { handle("koral_float_inverse_lerp", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_inverse_lerp(a: Float, b: Float, v: Float): Float = h_koral_float_inverse_lerp.invokeExact(a, b, v) as Float
+    private val h_koral_double_inverse_lerp by lazy { handle("koral_double_inverse_lerp", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_inverse_lerp(a: Double, b: Double, v: Double): Double = h_koral_double_inverse_lerp.invokeExact(a, b, v) as Double
+    private val h_koral_float_remap by lazy { handle("koral_float_remap", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_remap(v: Float, inMin: Float, inMax: Float, outMin: Float, outMax: Float): Float = h_koral_float_remap.invokeExact(v, inMin, inMax, outMin, outMax) as Float
+    private val h_koral_double_remap by lazy { handle("koral_double_remap", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_remap(v: Double, inMin: Double, inMax: Double, outMin: Double, outMax: Double): Double = h_koral_double_remap.invokeExact(v, inMin, inMax, outMin, outMax) as Double
+    private val h_koral_float_is_nan by lazy { handle("koral_float_is_nan", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_FLOAT)) }
+    fun koral_float_is_nan(v: Float): Boolean = h_koral_float_is_nan.invokeExact(v) as Boolean
+    private val h_koral_vec2_is_nan by lazy { handle("koral_vec2_is_nan", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_is_nan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_is_nan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_is_nan by lazy { handle("koral_vec3_is_nan", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_is_nan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_is_nan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_is_nan by lazy { handle("koral_vec4_is_nan", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_is_nan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_is_nan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_is_nan by lazy { handle("koral_double_is_nan", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_DOUBLE)) }
+    fun koral_double_is_nan(v: Double): Boolean = h_koral_double_is_nan.invokeExact(v) as Boolean
+    private val h_koral_dvec2_is_nan by lazy { handle("koral_dvec2_is_nan", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_is_nan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_is_nan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_is_nan by lazy { handle("koral_dvec3_is_nan", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_is_nan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_is_nan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_is_nan by lazy { handle("koral_dvec4_is_nan", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_is_nan(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_is_nan.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_is_inf by lazy { handle("koral_float_is_inf", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_FLOAT)) }
+    fun koral_float_is_inf(v: Float): Boolean = h_koral_float_is_inf.invokeExact(v) as Boolean
+    private val h_koral_vec2_is_inf by lazy { handle("koral_vec2_is_inf", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_is_inf(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_is_inf.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_is_inf by lazy { handle("koral_vec3_is_inf", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_is_inf(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_is_inf.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_is_inf by lazy { handle("koral_vec4_is_inf", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_is_inf(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_is_inf.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_is_inf by lazy { handle("koral_double_is_inf", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_DOUBLE)) }
+    fun koral_double_is_inf(v: Double): Boolean = h_koral_double_is_inf.invokeExact(v) as Boolean
+    private val h_koral_dvec2_is_inf by lazy { handle("koral_dvec2_is_inf", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_is_inf(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_is_inf.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_is_inf by lazy { handle("koral_dvec3_is_inf", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_is_inf(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_is_inf.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_is_inf by lazy { handle("koral_dvec4_is_inf", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_is_inf(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_is_inf.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_is_finite by lazy { handle("koral_float_is_finite", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_FLOAT)) }
+    fun koral_float_is_finite(v: Float): Boolean = h_koral_float_is_finite.invokeExact(v) as Boolean
+    private val h_koral_vec2_is_finite by lazy { handle("koral_vec2_is_finite", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_is_finite(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_is_finite.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_is_finite by lazy { handle("koral_vec3_is_finite", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_is_finite(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_is_finite.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_is_finite by lazy { handle("koral_vec4_is_finite", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_is_finite(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_is_finite.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_double_is_finite by lazy { handle("koral_double_is_finite", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_DOUBLE)) }
+    fun koral_double_is_finite(v: Double): Boolean = h_koral_double_is_finite.invokeExact(v) as Boolean
+    private val h_koral_dvec2_is_finite by lazy { handle("koral_dvec2_is_finite", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_is_finite(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_is_finite.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_is_finite by lazy { handle("koral_dvec3_is_finite", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_is_finite(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_is_finite.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_is_finite by lazy { handle("koral_dvec4_is_finite", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_is_finite(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_is_finite.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_fma by lazy { handle("koral_float_fma", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_fma(a: Float, b: Float, c: Float): Float = h_koral_float_fma.invokeExact(a, b, c) as Float
+    private val h_koral_vec2_fma by lazy { handle("koral_vec2_fma", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_fma(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_vec2_fma.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_vec3_fma by lazy { handle("koral_vec3_fma", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_fma(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_vec3_fma.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_vec4_fma by lazy { handle("koral_vec4_fma", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_fma(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_vec4_fma.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_double_fma by lazy { handle("koral_double_fma", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_fma(a: Double, b: Double, c: Double): Double = h_koral_double_fma.invokeExact(a, b, c) as Double
+    private val h_koral_dvec2_fma by lazy { handle("koral_dvec2_fma", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_fma(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_dvec2_fma.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_dvec3_fma by lazy { handle("koral_dvec3_fma", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_fma(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_dvec3_fma.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_dvec4_fma by lazy { handle("koral_dvec4_fma", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_fma(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_dvec4_fma.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_float_frexp by lazy { handle("koral_float_frexp", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, ADDRESS)) }
+    fun koral_float_frexp(v: Float, exponent: MemorySegment): Float = h_koral_float_frexp.invokeExact(v, exponent) as Float
+    private val h_koral_vec2_frexp by lazy { handle("koral_vec2_frexp", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, ADDRESS)) }
+    fun koral_vec2_frexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_vec2_frexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_vec3_frexp by lazy { handle("koral_vec3_frexp", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, ADDRESS)) }
+    fun koral_vec3_frexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_vec3_frexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_vec4_frexp by lazy { handle("koral_vec4_frexp", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, ADDRESS)) }
+    fun koral_vec4_frexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_vec4_frexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_double_frexp by lazy { handle("koral_double_frexp", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, ADDRESS)) }
+    fun koral_double_frexp(v: Double, exponent: MemorySegment): Double = h_koral_double_frexp.invokeExact(v, exponent) as Double
+    private val h_koral_dvec2_frexp by lazy { handle("koral_dvec2_frexp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, ADDRESS)) }
+    fun koral_dvec2_frexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_dvec2_frexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_dvec3_frexp by lazy { handle("koral_dvec3_frexp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, ADDRESS)) }
+    fun koral_dvec3_frexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_dvec3_frexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_dvec4_frexp by lazy { handle("koral_dvec4_frexp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, ADDRESS)) }
+    fun koral_dvec4_frexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_dvec4_frexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_float_ldexp by lazy { handle("koral_float_ldexp", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_INT)) }
+    fun koral_float_ldexp(v: Float, exponent: Int): Float = h_koral_float_ldexp.invokeExact(v, exponent) as Float
+    private val h_koral_vec2_ldexp by lazy { handle("koral_vec2_ldexp", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_vec2_ldexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_vec2_ldexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_vec3_ldexp by lazy { handle("koral_vec3_ldexp", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_vec3_ldexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_vec3_ldexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_vec4_ldexp by lazy { handle("koral_vec4_ldexp", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_vec4_ldexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_vec4_ldexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_double_ldexp by lazy { handle("koral_double_ldexp", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_INT)) }
+    fun koral_double_ldexp(v: Double, exponent: Int): Double = h_koral_double_ldexp.invokeExact(v, exponent) as Double
+    private val h_koral_dvec2_ldexp by lazy { handle("koral_dvec2_ldexp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_dvec2_ldexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_dvec2_ldexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_dvec3_ldexp by lazy { handle("koral_dvec3_ldexp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_dvec3_ldexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_dvec3_ldexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_dvec4_ldexp by lazy { handle("koral_dvec4_ldexp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_dvec4_ldexp(allocator: SegmentAllocator, v: MemorySegment, exponent: MemorySegment): MemorySegment = h_koral_dvec4_ldexp.invokeExact(allocator, v, exponent) as MemorySegment
+    private val h_koral_float_float_bits_to_int by lazy { handle("koral_float_float_bits_to_int", FunctionDescriptor.of(JAVA_INT, JAVA_FLOAT)) }
+    fun koral_float_float_bits_to_int(v: Float): Int = h_koral_float_float_bits_to_int.invokeExact(v) as Int
+    private val h_koral_vec2_float_bits_to_int by lazy { handle("koral_vec2_float_bits_to_int", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_float_bits_to_int(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_float_bits_to_int.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_float_bits_to_int by lazy { handle("koral_vec3_float_bits_to_int", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_float_bits_to_int(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_float_bits_to_int.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_float_bits_to_int by lazy { handle("koral_vec4_float_bits_to_int", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_float_bits_to_int(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_float_bits_to_int.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_float_bits_to_uint by lazy { handle("koral_float_float_bits_to_uint", FunctionDescriptor.of(JAVA_INT, JAVA_FLOAT)) }
+    fun koral_float_float_bits_to_uint(v: Float): Int = h_koral_float_float_bits_to_uint.invokeExact(v) as Int
+    private val h_koral_vec2_float_bits_to_uint by lazy { handle("koral_vec2_float_bits_to_uint", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_float_bits_to_uint(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_float_bits_to_uint.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_float_bits_to_uint by lazy { handle("koral_vec3_float_bits_to_uint", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_float_bits_to_uint(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_float_bits_to_uint.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_float_bits_to_uint by lazy { handle("koral_vec4_float_bits_to_uint", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_float_bits_to_uint(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_float_bits_to_uint.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_int_bits_to_float by lazy { handle("koral_int_int_bits_to_float", FunctionDescriptor.of(JAVA_FLOAT, JAVA_INT)) }
+    fun koral_int_int_bits_to_float(v: Int): Float = h_koral_int_int_bits_to_float.invokeExact(v) as Float
+    private val h_koral_ivec2_int_bits_to_float by lazy { handle("koral_ivec2_int_bits_to_float", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_int_bits_to_float(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_int_bits_to_float.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_int_bits_to_float by lazy { handle("koral_ivec3_int_bits_to_float", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_int_bits_to_float(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_int_bits_to_float.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_int_bits_to_float by lazy { handle("koral_ivec4_int_bits_to_float", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_int_bits_to_float(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_int_bits_to_float.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_uint_bits_to_float by lazy { handle("koral_uint_uint_bits_to_float", FunctionDescriptor.of(JAVA_FLOAT, JAVA_INT)) }
+    fun koral_uint_uint_bits_to_float(v: Int): Float = h_koral_uint_uint_bits_to_float.invokeExact(v) as Float
+    private val h_koral_uvec2_uint_bits_to_float by lazy { handle("koral_uvec2_uint_bits_to_float", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_uint_bits_to_float(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_uint_bits_to_float.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_uint_bits_to_float by lazy { handle("koral_uvec3_uint_bits_to_float", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_uint_bits_to_float(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_uint_bits_to_float.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_uint_bits_to_float by lazy { handle("koral_uvec4_uint_bits_to_float", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_uint_bits_to_float(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_uint_bits_to_float.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec2_dot by lazy { handle("koral_vec2_dot", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_dot(a: MemorySegment, b: MemorySegment): Float = h_koral_vec2_dot.invokeExact(a, b) as Float
+    private val h_koral_dvec2_dot by lazy { handle("koral_dvec2_dot", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_dot(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec2_dot.invokeExact(a, b) as Double
+    private val h_koral_ivec2_dot by lazy { handle("koral_ivec2_dot", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_dot(a: MemorySegment, b: MemorySegment): Int = h_koral_ivec2_dot.invokeExact(a, b) as Int
+    private val h_koral_uvec2_dot by lazy { handle("koral_uvec2_dot", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_dot(a: MemorySegment, b: MemorySegment): Int = h_koral_uvec2_dot.invokeExact(a, b) as Int
+    private val h_koral_vec3_dot by lazy { handle("koral_vec3_dot", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_dot(a: MemorySegment, b: MemorySegment): Float = h_koral_vec3_dot.invokeExact(a, b) as Float
+    private val h_koral_dvec3_dot by lazy { handle("koral_dvec3_dot", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_dot(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec3_dot.invokeExact(a, b) as Double
+    private val h_koral_ivec3_dot by lazy { handle("koral_ivec3_dot", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_dot(a: MemorySegment, b: MemorySegment): Int = h_koral_ivec3_dot.invokeExact(a, b) as Int
+    private val h_koral_uvec3_dot by lazy { handle("koral_uvec3_dot", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_dot(a: MemorySegment, b: MemorySegment): Int = h_koral_uvec3_dot.invokeExact(a, b) as Int
+    private val h_koral_vec4_dot by lazy { handle("koral_vec4_dot", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_dot(a: MemorySegment, b: MemorySegment): Float = h_koral_vec4_dot.invokeExact(a, b) as Float
+    private val h_koral_dvec4_dot by lazy { handle("koral_dvec4_dot", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_dot(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec4_dot.invokeExact(a, b) as Double
+    private val h_koral_ivec4_dot by lazy { handle("koral_ivec4_dot", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_dot(a: MemorySegment, b: MemorySegment): Int = h_koral_ivec4_dot.invokeExact(a, b) as Int
+    private val h_koral_uvec4_dot by lazy { handle("koral_uvec4_dot", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_dot(a: MemorySegment, b: MemorySegment): Int = h_koral_uvec4_dot.invokeExact(a, b) as Int
+    private val h_koral_vec3_cross by lazy { handle("koral_vec3_cross", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_cross(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_cross.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_cross by lazy { handle("koral_dvec3_cross", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_cross(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_cross.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_cross by lazy { handle("koral_ivec3_cross", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_cross(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_cross.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_cross by lazy { handle("koral_vec2_cross", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_cross(a: MemorySegment, b: MemorySegment): Float = h_koral_vec2_cross.invokeExact(a, b) as Float
+    private val h_koral_dvec2_cross by lazy { handle("koral_dvec2_cross", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_cross(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec2_cross.invokeExact(a, b) as Double
+    private val h_koral_ivec2_cross by lazy { handle("koral_ivec2_cross", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_cross(a: MemorySegment, b: MemorySegment): Int = h_koral_ivec2_cross.invokeExact(a, b) as Int
+    private val h_koral_vec2_length by lazy { handle("koral_vec2_length", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_length(v: MemorySegment): Float = h_koral_vec2_length.invokeExact(v) as Float
+    private val h_koral_vec3_length by lazy { handle("koral_vec3_length", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_length(v: MemorySegment): Float = h_koral_vec3_length.invokeExact(v) as Float
+    private val h_koral_vec4_length by lazy { handle("koral_vec4_length", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_length(v: MemorySegment): Float = h_koral_vec4_length.invokeExact(v) as Float
+    private val h_koral_dvec2_length by lazy { handle("koral_dvec2_length", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_length(v: MemorySegment): Double = h_koral_dvec2_length.invokeExact(v) as Double
+    private val h_koral_dvec3_length by lazy { handle("koral_dvec3_length", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_length(v: MemorySegment): Double = h_koral_dvec3_length.invokeExact(v) as Double
+    private val h_koral_dvec4_length by lazy { handle("koral_dvec4_length", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_length(v: MemorySegment): Double = h_koral_dvec4_length.invokeExact(v) as Double
+    private val h_koral_vec2_length2 by lazy { handle("koral_vec2_length2", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_length2(v: MemorySegment): Float = h_koral_vec2_length2.invokeExact(v) as Float
+    private val h_koral_vec3_length2 by lazy { handle("koral_vec3_length2", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_length2(v: MemorySegment): Float = h_koral_vec3_length2.invokeExact(v) as Float
+    private val h_koral_vec4_length2 by lazy { handle("koral_vec4_length2", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_length2(v: MemorySegment): Float = h_koral_vec4_length2.invokeExact(v) as Float
+    private val h_koral_dvec2_length2 by lazy { handle("koral_dvec2_length2", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_length2(v: MemorySegment): Double = h_koral_dvec2_length2.invokeExact(v) as Double
+    private val h_koral_dvec3_length2 by lazy { handle("koral_dvec3_length2", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_length2(v: MemorySegment): Double = h_koral_dvec3_length2.invokeExact(v) as Double
+    private val h_koral_dvec4_length2 by lazy { handle("koral_dvec4_length2", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_length2(v: MemorySegment): Double = h_koral_dvec4_length2.invokeExact(v) as Double
+    private val h_koral_ivec2_length2 by lazy { handle("koral_ivec2_length2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_length2(v: MemorySegment): Int = h_koral_ivec2_length2.invokeExact(v) as Int
+    private val h_koral_ivec3_length2 by lazy { handle("koral_ivec3_length2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_length2(v: MemorySegment): Int = h_koral_ivec3_length2.invokeExact(v) as Int
+    private val h_koral_ivec4_length2 by lazy { handle("koral_ivec4_length2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_length2(v: MemorySegment): Int = h_koral_ivec4_length2.invokeExact(v) as Int
+    private val h_koral_uvec2_length2 by lazy { handle("koral_uvec2_length2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_length2(v: MemorySegment): Int = h_koral_uvec2_length2.invokeExact(v) as Int
+    private val h_koral_uvec3_length2 by lazy { handle("koral_uvec3_length2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_length2(v: MemorySegment): Int = h_koral_uvec3_length2.invokeExact(v) as Int
+    private val h_koral_uvec4_length2 by lazy { handle("koral_uvec4_length2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_length2(v: MemorySegment): Int = h_koral_uvec4_length2.invokeExact(v) as Int
+    private val h_koral_vec2_distance by lazy { handle("koral_vec2_distance", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_distance(a: MemorySegment, b: MemorySegment): Float = h_koral_vec2_distance.invokeExact(a, b) as Float
+    private val h_koral_vec3_distance by lazy { handle("koral_vec3_distance", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_distance(a: MemorySegment, b: MemorySegment): Float = h_koral_vec3_distance.invokeExact(a, b) as Float
+    private val h_koral_vec4_distance by lazy { handle("koral_vec4_distance", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_distance(a: MemorySegment, b: MemorySegment): Float = h_koral_vec4_distance.invokeExact(a, b) as Float
+    private val h_koral_dvec2_distance by lazy { handle("koral_dvec2_distance", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_distance(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec2_distance.invokeExact(a, b) as Double
+    private val h_koral_dvec3_distance by lazy { handle("koral_dvec3_distance", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_distance(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec3_distance.invokeExact(a, b) as Double
+    private val h_koral_dvec4_distance by lazy { handle("koral_dvec4_distance", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_distance(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec4_distance.invokeExact(a, b) as Double
+    private val h_koral_vec2_distance2 by lazy { handle("koral_vec2_distance2", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_distance2(a: MemorySegment, b: MemorySegment): Float = h_koral_vec2_distance2.invokeExact(a, b) as Float
+    private val h_koral_vec3_distance2 by lazy { handle("koral_vec3_distance2", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_distance2(a: MemorySegment, b: MemorySegment): Float = h_koral_vec3_distance2.invokeExact(a, b) as Float
+    private val h_koral_vec4_distance2 by lazy { handle("koral_vec4_distance2", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_distance2(a: MemorySegment, b: MemorySegment): Float = h_koral_vec4_distance2.invokeExact(a, b) as Float
+    private val h_koral_dvec2_distance2 by lazy { handle("koral_dvec2_distance2", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_distance2(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec2_distance2.invokeExact(a, b) as Double
+    private val h_koral_dvec3_distance2 by lazy { handle("koral_dvec3_distance2", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_distance2(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec3_distance2.invokeExact(a, b) as Double
+    private val h_koral_dvec4_distance2 by lazy { handle("koral_dvec4_distance2", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_distance2(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec4_distance2.invokeExact(a, b) as Double
+    private val h_koral_ivec2_distance2 by lazy { handle("koral_ivec2_distance2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_distance2(a: MemorySegment, b: MemorySegment): Int = h_koral_ivec2_distance2.invokeExact(a, b) as Int
+    private val h_koral_ivec3_distance2 by lazy { handle("koral_ivec3_distance2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_distance2(a: MemorySegment, b: MemorySegment): Int = h_koral_ivec3_distance2.invokeExact(a, b) as Int
+    private val h_koral_ivec4_distance2 by lazy { handle("koral_ivec4_distance2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_distance2(a: MemorySegment, b: MemorySegment): Int = h_koral_ivec4_distance2.invokeExact(a, b) as Int
+    private val h_koral_uvec2_distance2 by lazy { handle("koral_uvec2_distance2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_distance2(a: MemorySegment, b: MemorySegment): Int = h_koral_uvec2_distance2.invokeExact(a, b) as Int
+    private val h_koral_uvec3_distance2 by lazy { handle("koral_uvec3_distance2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_distance2(a: MemorySegment, b: MemorySegment): Int = h_koral_uvec3_distance2.invokeExact(a, b) as Int
+    private val h_koral_uvec4_distance2 by lazy { handle("koral_uvec4_distance2", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_distance2(a: MemorySegment, b: MemorySegment): Int = h_koral_uvec4_distance2.invokeExact(a, b) as Int
+    private val h_koral_vec2_normalize by lazy { handle("koral_vec2_normalize", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_normalize(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec2_normalize.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec3_normalize by lazy { handle("koral_vec3_normalize", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_normalize(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_normalize.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec4_normalize by lazy { handle("koral_vec4_normalize", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_normalize(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec4_normalize.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec2_normalize by lazy { handle("koral_dvec2_normalize", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_normalize(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec2_normalize.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_normalize by lazy { handle("koral_dvec3_normalize", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_normalize(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_normalize.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec4_normalize by lazy { handle("koral_dvec4_normalize", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_normalize(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec4_normalize.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec2_face_forward by lazy { handle("koral_vec2_face_forward", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_face_forward(allocator: SegmentAllocator, n: MemorySegment, i: MemorySegment, nRef: MemorySegment): MemorySegment = h_koral_vec2_face_forward.invokeExact(allocator, n, i, nRef) as MemorySegment
+    private val h_koral_vec3_face_forward by lazy { handle("koral_vec3_face_forward", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_face_forward(allocator: SegmentAllocator, n: MemorySegment, i: MemorySegment, nRef: MemorySegment): MemorySegment = h_koral_vec3_face_forward.invokeExact(allocator, n, i, nRef) as MemorySegment
+    private val h_koral_vec4_face_forward by lazy { handle("koral_vec4_face_forward", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_face_forward(allocator: SegmentAllocator, n: MemorySegment, i: MemorySegment, nRef: MemorySegment): MemorySegment = h_koral_vec4_face_forward.invokeExact(allocator, n, i, nRef) as MemorySegment
+    private val h_koral_dvec2_face_forward by lazy { handle("koral_dvec2_face_forward", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_face_forward(allocator: SegmentAllocator, n: MemorySegment, i: MemorySegment, nRef: MemorySegment): MemorySegment = h_koral_dvec2_face_forward.invokeExact(allocator, n, i, nRef) as MemorySegment
+    private val h_koral_dvec3_face_forward by lazy { handle("koral_dvec3_face_forward", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_face_forward(allocator: SegmentAllocator, n: MemorySegment, i: MemorySegment, nRef: MemorySegment): MemorySegment = h_koral_dvec3_face_forward.invokeExact(allocator, n, i, nRef) as MemorySegment
+    private val h_koral_dvec4_face_forward by lazy { handle("koral_dvec4_face_forward", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_face_forward(allocator: SegmentAllocator, n: MemorySegment, i: MemorySegment, nRef: MemorySegment): MemorySegment = h_koral_dvec4_face_forward.invokeExact(allocator, n, i, nRef) as MemorySegment
+    private val h_koral_vec2_reflect by lazy { handle("koral_vec2_reflect", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_reflect(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment): MemorySegment = h_koral_vec2_reflect.invokeExact(allocator, i, n) as MemorySegment
+    private val h_koral_vec3_reflect by lazy { handle("koral_vec3_reflect", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_reflect(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment): MemorySegment = h_koral_vec3_reflect.invokeExact(allocator, i, n) as MemorySegment
+    private val h_koral_vec4_reflect by lazy { handle("koral_vec4_reflect", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_reflect(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment): MemorySegment = h_koral_vec4_reflect.invokeExact(allocator, i, n) as MemorySegment
+    private val h_koral_dvec2_reflect by lazy { handle("koral_dvec2_reflect", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_reflect(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment): MemorySegment = h_koral_dvec2_reflect.invokeExact(allocator, i, n) as MemorySegment
+    private val h_koral_dvec3_reflect by lazy { handle("koral_dvec3_reflect", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_reflect(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment): MemorySegment = h_koral_dvec3_reflect.invokeExact(allocator, i, n) as MemorySegment
+    private val h_koral_dvec4_reflect by lazy { handle("koral_dvec4_reflect", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_reflect(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment): MemorySegment = h_koral_dvec4_reflect.invokeExact(allocator, i, n) as MemorySegment
+    private val h_koral_vec2_refract by lazy { handle("koral_vec2_refract", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_refract(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment, eta: Float): MemorySegment = h_koral_vec2_refract.invokeExact(allocator, i, n, eta) as MemorySegment
+    private val h_koral_vec3_refract by lazy { handle("koral_vec3_refract", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_refract(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment, eta: Float): MemorySegment = h_koral_vec3_refract.invokeExact(allocator, i, n, eta) as MemorySegment
+    private val h_koral_vec4_refract by lazy { handle("koral_vec4_refract", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_refract(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment, eta: Float): MemorySegment = h_koral_vec4_refract.invokeExact(allocator, i, n, eta) as MemorySegment
+    private val h_koral_dvec2_refract by lazy { handle("koral_dvec2_refract", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_refract(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment, eta: Double): MemorySegment = h_koral_dvec2_refract.invokeExact(allocator, i, n, eta) as MemorySegment
+    private val h_koral_dvec3_refract by lazy { handle("koral_dvec3_refract", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_refract(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment, eta: Double): MemorySegment = h_koral_dvec3_refract.invokeExact(allocator, i, n, eta) as MemorySegment
+    private val h_koral_dvec4_refract by lazy { handle("koral_dvec4_refract", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_refract(allocator: SegmentAllocator, i: MemorySegment, n: MemorySegment, eta: Double): MemorySegment = h_koral_dvec4_refract.invokeExact(allocator, i, n, eta) as MemorySegment
+    private val h_koral_vec2_l1_norm by lazy { handle("koral_vec2_l1_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_l1_norm(v: MemorySegment): Float = h_koral_vec2_l1_norm.invokeExact(v) as Float
+    private val h_koral_dvec2_l1_norm by lazy { handle("koral_dvec2_l1_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_l1_norm(v: MemorySegment): Double = h_koral_dvec2_l1_norm.invokeExact(v) as Double
+    private val h_koral_ivec2_l1_norm by lazy { handle("koral_ivec2_l1_norm", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_l1_norm(v: MemorySegment): Int = h_koral_ivec2_l1_norm.invokeExact(v) as Int
+    private val h_koral_uvec2_l1_norm by lazy { handle("koral_uvec2_l1_norm", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_l1_norm(v: MemorySegment): Int = h_koral_uvec2_l1_norm.invokeExact(v) as Int
+    private val h_koral_vec3_l1_norm by lazy { handle("koral_vec3_l1_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_l1_norm(v: MemorySegment): Float = h_koral_vec3_l1_norm.invokeExact(v) as Float
+    private val h_koral_dvec3_l1_norm by lazy { handle("koral_dvec3_l1_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_l1_norm(v: MemorySegment): Double = h_koral_dvec3_l1_norm.invokeExact(v) as Double
+    private val h_koral_ivec3_l1_norm by lazy { handle("koral_ivec3_l1_norm", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_l1_norm(v: MemorySegment): Int = h_koral_ivec3_l1_norm.invokeExact(v) as Int
+    private val h_koral_uvec3_l1_norm by lazy { handle("koral_uvec3_l1_norm", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_l1_norm(v: MemorySegment): Int = h_koral_uvec3_l1_norm.invokeExact(v) as Int
+    private val h_koral_vec4_l1_norm by lazy { handle("koral_vec4_l1_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_l1_norm(v: MemorySegment): Float = h_koral_vec4_l1_norm.invokeExact(v) as Float
+    private val h_koral_dvec4_l1_norm by lazy { handle("koral_dvec4_l1_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_l1_norm(v: MemorySegment): Double = h_koral_dvec4_l1_norm.invokeExact(v) as Double
+    private val h_koral_ivec4_l1_norm by lazy { handle("koral_ivec4_l1_norm", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_l1_norm(v: MemorySegment): Int = h_koral_ivec4_l1_norm.invokeExact(v) as Int
+    private val h_koral_uvec4_l1_norm by lazy { handle("koral_uvec4_l1_norm", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_l1_norm(v: MemorySegment): Int = h_koral_uvec4_l1_norm.invokeExact(v) as Int
+    private val h_koral_vec2_l2_norm by lazy { handle("koral_vec2_l2_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_l2_norm(v: MemorySegment): Float = h_koral_vec2_l2_norm.invokeExact(v) as Float
+    private val h_koral_vec3_l2_norm by lazy { handle("koral_vec3_l2_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_l2_norm(v: MemorySegment): Float = h_koral_vec3_l2_norm.invokeExact(v) as Float
+    private val h_koral_vec4_l2_norm by lazy { handle("koral_vec4_l2_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_l2_norm(v: MemorySegment): Float = h_koral_vec4_l2_norm.invokeExact(v) as Float
+    private val h_koral_dvec2_l2_norm by lazy { handle("koral_dvec2_l2_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_l2_norm(v: MemorySegment): Double = h_koral_dvec2_l2_norm.invokeExact(v) as Double
+    private val h_koral_dvec3_l2_norm by lazy { handle("koral_dvec3_l2_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_l2_norm(v: MemorySegment): Double = h_koral_dvec3_l2_norm.invokeExact(v) as Double
+    private val h_koral_dvec4_l2_norm by lazy { handle("koral_dvec4_l2_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_l2_norm(v: MemorySegment): Double = h_koral_dvec4_l2_norm.invokeExact(v) as Double
+    private val h_koral_vec2_lx_norm by lazy { handle("koral_vec2_lx_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_lx_norm(v: MemorySegment, p: Float): Float = h_koral_vec2_lx_norm.invokeExact(v, p) as Float
+    private val h_koral_dvec2_lx_norm by lazy { handle("koral_dvec2_lx_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_lx_norm(v: MemorySegment, p: Double): Double = h_koral_dvec2_lx_norm.invokeExact(v, p) as Double
+    private val h_koral_vec3_lx_norm by lazy { handle("koral_vec3_lx_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_lx_norm(v: MemorySegment, p: Float): Float = h_koral_vec3_lx_norm.invokeExact(v, p) as Float
+    private val h_koral_dvec3_lx_norm by lazy { handle("koral_dvec3_lx_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_lx_norm(v: MemorySegment, p: Double): Double = h_koral_dvec3_lx_norm.invokeExact(v, p) as Double
+    private val h_koral_vec4_lx_norm by lazy { handle("koral_vec4_lx_norm", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_lx_norm(v: MemorySegment, p: Float): Float = h_koral_vec4_lx_norm.invokeExact(v, p) as Float
+    private val h_koral_dvec4_lx_norm by lazy { handle("koral_dvec4_lx_norm", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_lx_norm(v: MemorySegment, p: Double): Double = h_koral_dvec4_lx_norm.invokeExact(v, p) as Double
+    private val h_koral_vec2_less_than by lazy { handle("koral_vec2_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_less_than by lazy { handle("koral_dvec2_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_less_than by lazy { handle("koral_ivec2_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_less_than by lazy { handle("koral_uvec2_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_less_than by lazy { handle("koral_vec3_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_less_than by lazy { handle("koral_dvec3_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_less_than by lazy { handle("koral_ivec3_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_less_than by lazy { handle("koral_uvec3_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_less_than by lazy { handle("koral_vec4_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_less_than by lazy { handle("koral_dvec4_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_less_than by lazy { handle("koral_ivec4_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_less_than by lazy { handle("koral_uvec4_less_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_less_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_less_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_less_than_equal by lazy { handle("koral_vec2_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_less_than_equal by lazy { handle("koral_dvec2_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_less_than_equal by lazy { handle("koral_ivec2_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_less_than_equal by lazy { handle("koral_uvec2_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_less_than_equal by lazy { handle("koral_vec3_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_less_than_equal by lazy { handle("koral_dvec3_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_less_than_equal by lazy { handle("koral_ivec3_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_less_than_equal by lazy { handle("koral_uvec3_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_less_than_equal by lazy { handle("koral_vec4_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_less_than_equal by lazy { handle("koral_dvec4_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_less_than_equal by lazy { handle("koral_ivec4_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_less_than_equal by lazy { handle("koral_uvec4_less_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_less_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_less_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_greater_than by lazy { handle("koral_vec2_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_greater_than by lazy { handle("koral_dvec2_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_greater_than by lazy { handle("koral_ivec2_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_greater_than by lazy { handle("koral_uvec2_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_greater_than by lazy { handle("koral_vec3_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_greater_than by lazy { handle("koral_dvec3_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_greater_than by lazy { handle("koral_ivec3_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_greater_than by lazy { handle("koral_uvec3_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_greater_than by lazy { handle("koral_vec4_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_greater_than by lazy { handle("koral_dvec4_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_greater_than by lazy { handle("koral_ivec4_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_greater_than by lazy { handle("koral_uvec4_greater_than", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_greater_than(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_greater_than.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_greater_than_equal by lazy { handle("koral_vec2_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_greater_than_equal by lazy { handle("koral_dvec2_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_greater_than_equal by lazy { handle("koral_ivec2_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_greater_than_equal by lazy { handle("koral_uvec2_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_greater_than_equal by lazy { handle("koral_vec3_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_greater_than_equal by lazy { handle("koral_dvec3_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_greater_than_equal by lazy { handle("koral_ivec3_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_greater_than_equal by lazy { handle("koral_uvec3_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_greater_than_equal by lazy { handle("koral_vec4_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_greater_than_equal by lazy { handle("koral_dvec4_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_greater_than_equal by lazy { handle("koral_ivec4_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_greater_than_equal by lazy { handle("koral_uvec4_greater_than_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_greater_than_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_greater_than_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_equal by lazy { handle("koral_vec2_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_equal by lazy { handle("koral_dvec2_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_equal by lazy { handle("koral_ivec2_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_equal by lazy { handle("koral_uvec2_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_bvec2_equal by lazy { handle("koral_bvec2_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2)) }
+    fun koral_bvec2_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_bvec2_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_equal by lazy { handle("koral_vec3_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_equal by lazy { handle("koral_dvec3_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_equal by lazy { handle("koral_ivec3_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_equal by lazy { handle("koral_uvec3_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_bvec3_equal by lazy { handle("koral_bvec3_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3)) }
+    fun koral_bvec3_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_bvec3_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_equal by lazy { handle("koral_vec4_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_equal by lazy { handle("koral_dvec4_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_equal by lazy { handle("koral_ivec4_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_equal by lazy { handle("koral_uvec4_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_bvec4_equal by lazy { handle("koral_bvec4_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4)) }
+    fun koral_bvec4_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_bvec4_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec2_not_equal by lazy { handle("koral_vec2_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec2_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec2_not_equal by lazy { handle("koral_dvec2_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec2_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec2_not_equal by lazy { handle("koral_ivec2_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec2_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec2_not_equal by lazy { handle("koral_uvec2_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec2_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_bvec2_not_equal by lazy { handle("koral_bvec2_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2)) }
+    fun koral_bvec2_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_bvec2_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec3_not_equal by lazy { handle("koral_vec3_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec3_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec3_not_equal by lazy { handle("koral_dvec3_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec3_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec3_not_equal by lazy { handle("koral_ivec3_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec3_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec3_not_equal by lazy { handle("koral_uvec3_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec3_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_bvec3_not_equal by lazy { handle("koral_bvec3_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3)) }
+    fun koral_bvec3_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_bvec3_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_vec4_not_equal by lazy { handle("koral_vec4_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_vec4_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dvec4_not_equal by lazy { handle("koral_dvec4_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dvec4_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_ivec4_not_equal by lazy { handle("koral_ivec4_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_ivec4_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_uvec4_not_equal by lazy { handle("koral_uvec4_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_uvec4_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_bvec4_not_equal by lazy { handle("koral_bvec4_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4)) }
+    fun koral_bvec4_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_bvec4_not_equal.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_bvec2_any by lazy { handle("koral_bvec2_any", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralBVec2)) }
+    fun koral_bvec2_any(v: MemorySegment): Boolean = h_koral_bvec2_any.invokeExact(v) as Boolean
+    private val h_koral_bvec3_any by lazy { handle("koral_bvec3_any", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralBVec3)) }
+    fun koral_bvec3_any(v: MemorySegment): Boolean = h_koral_bvec3_any.invokeExact(v) as Boolean
+    private val h_koral_bvec4_any by lazy { handle("koral_bvec4_any", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralBVec4)) }
+    fun koral_bvec4_any(v: MemorySegment): Boolean = h_koral_bvec4_any.invokeExact(v) as Boolean
+    private val h_koral_bvec2_all by lazy { handle("koral_bvec2_all", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralBVec2)) }
+    fun koral_bvec2_all(v: MemorySegment): Boolean = h_koral_bvec2_all.invokeExact(v) as Boolean
+    private val h_koral_bvec3_all by lazy { handle("koral_bvec3_all", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralBVec3)) }
+    fun koral_bvec3_all(v: MemorySegment): Boolean = h_koral_bvec3_all.invokeExact(v) as Boolean
+    private val h_koral_bvec4_all by lazy { handle("koral_bvec4_all", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralBVec4)) }
+    fun koral_bvec4_all(v: MemorySegment): Boolean = h_koral_bvec4_all.invokeExact(v) as Boolean
+    private val h_koral_bvec2_not by lazy { handle("koral_bvec2_not", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2)) }
+    fun koral_bvec2_not(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_bvec2_not.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_bvec3_not by lazy { handle("koral_bvec3_not", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3)) }
+    fun koral_bvec3_not(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_bvec3_not.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_bvec4_not by lazy { handle("koral_bvec4_not", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4)) }
+    fun koral_bvec4_not(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_bvec4_not.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_vec2_select by lazy { handle("koral_vec2_select", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_vec2_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_dvec2_select by lazy { handle("koral_dvec2_select", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_dvec2_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_ivec2_select by lazy { handle("koral_ivec2_select", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_ivec2_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_uvec2_select by lazy { handle("koral_uvec2_select", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_uvec2_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_bvec2_select by lazy { handle("koral_bvec2_select", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralBVec2)) }
+    fun koral_bvec2_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_bvec2_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_vec3_select by lazy { handle("koral_vec3_select", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_vec3_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_dvec3_select by lazy { handle("koral_dvec3_select", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_dvec3_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_ivec3_select by lazy { handle("koral_ivec3_select", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_ivec3_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_uvec3_select by lazy { handle("koral_uvec3_select", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_uvec3_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_bvec3_select by lazy { handle("koral_bvec3_select", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralBVec3)) }
+    fun koral_bvec3_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_bvec3_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_vec4_select by lazy { handle("koral_vec4_select", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_vec4_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_dvec4_select by lazy { handle("koral_dvec4_select", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_dvec4_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_ivec4_select by lazy { handle("koral_ivec4_select", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_ivec4_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_uvec4_select by lazy { handle("koral_uvec4_select", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_uvec4_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_bvec4_select by lazy { handle("koral_bvec4_select", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralBVec4)) }
+    fun koral_bvec4_select(allocator: SegmentAllocator, mask: MemorySegment, ifTrue: MemorySegment, ifFalse: MemorySegment): MemorySegment = h_koral_bvec4_select.invokeExact(allocator, mask, ifTrue, ifFalse) as MemorySegment
+    private val h_koral_float_epsilon_equal by lazy { handle("koral_float_epsilon_equal", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_epsilon_equal(a: Float, b: Float, epsilon: Float): Boolean = h_koral_float_epsilon_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_double_epsilon_equal by lazy { handle("koral_double_epsilon_equal", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_epsilon_equal(a: Double, b: Double, epsilon: Double): Boolean = h_koral_double_epsilon_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_float_epsilon_not_equal by lazy { handle("koral_float_epsilon_not_equal", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_epsilon_not_equal(a: Float, b: Float, epsilon: Float): Boolean = h_koral_float_epsilon_not_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_double_epsilon_not_equal by lazy { handle("koral_double_epsilon_not_equal", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_epsilon_not_equal(a: Double, b: Double, epsilon: Double): Boolean = h_koral_double_epsilon_not_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_vec2_epsilon_equal by lazy { handle("koral_vec2_epsilon_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_epsilon_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Float): MemorySegment = h_koral_vec2_epsilon_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_dvec2_epsilon_equal by lazy { handle("koral_dvec2_epsilon_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_epsilon_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Double): MemorySegment = h_koral_dvec2_epsilon_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_vec3_epsilon_equal by lazy { handle("koral_vec3_epsilon_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_epsilon_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Float): MemorySegment = h_koral_vec3_epsilon_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_dvec3_epsilon_equal by lazy { handle("koral_dvec3_epsilon_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_epsilon_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Double): MemorySegment = h_koral_dvec3_epsilon_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_vec4_epsilon_equal by lazy { handle("koral_vec4_epsilon_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_epsilon_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Float): MemorySegment = h_koral_vec4_epsilon_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_dvec4_epsilon_equal by lazy { handle("koral_dvec4_epsilon_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_epsilon_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Double): MemorySegment = h_koral_dvec4_epsilon_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_vec2_epsilon_not_equal by lazy { handle("koral_vec2_epsilon_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_epsilon_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Float): MemorySegment = h_koral_vec2_epsilon_not_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_vec3_epsilon_not_equal by lazy { handle("koral_vec3_epsilon_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_epsilon_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Float): MemorySegment = h_koral_vec3_epsilon_not_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_vec4_epsilon_not_equal by lazy { handle("koral_vec4_epsilon_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_epsilon_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Float): MemorySegment = h_koral_vec4_epsilon_not_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_dvec2_epsilon_not_equal by lazy { handle("koral_dvec2_epsilon_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_epsilon_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Double): MemorySegment = h_koral_dvec2_epsilon_not_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_dvec3_epsilon_not_equal by lazy { handle("koral_dvec3_epsilon_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_epsilon_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Double): MemorySegment = h_koral_dvec3_epsilon_not_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_dvec4_epsilon_not_equal by lazy { handle("koral_dvec4_epsilon_not_equal", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_epsilon_not_equal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, epsilon: Double): MemorySegment = h_koral_dvec4_epsilon_not_equal.invokeExact(allocator, a, b, epsilon) as MemorySegment
+    private val h_koral_float_approx_equal by lazy { handle("koral_float_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_approx_equal(a: Float, b: Float, epsilon: Float): Boolean = h_koral_float_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_double_approx_equal by lazy { handle("koral_double_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_approx_equal(a: Double, b: Double, epsilon: Double): Boolean = h_koral_double_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_vec2_approx_equal by lazy { handle("koral_vec2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_vec2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_vec3_approx_equal by lazy { handle("koral_vec3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_vec3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_vec4_approx_equal by lazy { handle("koral_vec4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_vec4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dvec2_approx_equal by lazy { handle("koral_dvec2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dvec2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dvec3_approx_equal by lazy { handle("koral_dvec3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dvec3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dvec4_approx_equal by lazy { handle("koral_dvec4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dvec4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_int_bit_count by lazy { handle("koral_int_bit_count", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_bit_count(v: Int): Int = h_koral_int_bit_count.invokeExact(v) as Int
+    private val h_koral_ivec2_bit_count by lazy { handle("koral_ivec2_bit_count", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_bit_count(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_bit_count.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_bit_count by lazy { handle("koral_ivec3_bit_count", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_bit_count(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_bit_count.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_bit_count by lazy { handle("koral_ivec4_bit_count", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_bit_count(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_bit_count.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_bit_count by lazy { handle("koral_uint_bit_count", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_bit_count(v: Int): Int = h_koral_uint_bit_count.invokeExact(v) as Int
+    private val h_koral_uvec2_bit_count by lazy { handle("koral_uvec2_bit_count", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_bit_count(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_bit_count.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_bit_count by lazy { handle("koral_uvec3_bit_count", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_bit_count(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_bit_count.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_bit_count by lazy { handle("koral_uvec4_bit_count", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_bit_count(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_bit_count.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_find_lsb by lazy { handle("koral_int_find_lsb", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_find_lsb(v: Int): Int = h_koral_int_find_lsb.invokeExact(v) as Int
+    private val h_koral_ivec2_find_lsb by lazy { handle("koral_ivec2_find_lsb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_find_lsb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_find_lsb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_find_lsb by lazy { handle("koral_ivec3_find_lsb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_find_lsb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_find_lsb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_find_lsb by lazy { handle("koral_ivec4_find_lsb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_find_lsb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_find_lsb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_find_lsb by lazy { handle("koral_uint_find_lsb", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_find_lsb(v: Int): Int = h_koral_uint_find_lsb.invokeExact(v) as Int
+    private val h_koral_uvec2_find_lsb by lazy { handle("koral_uvec2_find_lsb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_find_lsb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_find_lsb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_find_lsb by lazy { handle("koral_uvec3_find_lsb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_find_lsb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_find_lsb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_find_lsb by lazy { handle("koral_uvec4_find_lsb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_find_lsb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_find_lsb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_find_msb by lazy { handle("koral_int_find_msb", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_find_msb(v: Int): Int = h_koral_int_find_msb.invokeExact(v) as Int
+    private val h_koral_ivec2_find_msb by lazy { handle("koral_ivec2_find_msb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_find_msb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_find_msb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_find_msb by lazy { handle("koral_ivec3_find_msb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_find_msb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_find_msb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_find_msb by lazy { handle("koral_ivec4_find_msb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_find_msb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_find_msb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_find_msb by lazy { handle("koral_uint_find_msb", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_find_msb(v: Int): Int = h_koral_uint_find_msb.invokeExact(v) as Int
+    private val h_koral_uvec2_find_msb by lazy { handle("koral_uvec2_find_msb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_find_msb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_find_msb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_find_msb by lazy { handle("koral_uvec3_find_msb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_find_msb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_find_msb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_find_msb by lazy { handle("koral_uvec4_find_msb", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_find_msb(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_find_msb.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_bitfield_extract by lazy { handle("koral_int_bitfield_extract", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_bitfield_extract(v: Int, offset: Int, bits: Int): Int = h_koral_int_bitfield_extract.invokeExact(v, offset, bits) as Int
+    private val h_koral_ivec2_bitfield_extract by lazy { handle("koral_ivec2_bitfield_extract", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec2_bitfield_extract(allocator: SegmentAllocator, v: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_ivec2_bitfield_extract.invokeExact(allocator, v, offset, bits) as MemorySegment
+    private val h_koral_ivec3_bitfield_extract by lazy { handle("koral_ivec3_bitfield_extract", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec3_bitfield_extract(allocator: SegmentAllocator, v: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_ivec3_bitfield_extract.invokeExact(allocator, v, offset, bits) as MemorySegment
+    private val h_koral_ivec4_bitfield_extract by lazy { handle("koral_ivec4_bitfield_extract", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec4_bitfield_extract(allocator: SegmentAllocator, v: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_ivec4_bitfield_extract.invokeExact(allocator, v, offset, bits) as MemorySegment
+    private val h_koral_uint_bitfield_extract by lazy { handle("koral_uint_bitfield_extract", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_bitfield_extract(v: Int, offset: Int, bits: Int): Int = h_koral_uint_bitfield_extract.invokeExact(v, offset, bits) as Int
+    private val h_koral_uvec2_bitfield_extract by lazy { handle("koral_uvec2_bitfield_extract", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec2_bitfield_extract(allocator: SegmentAllocator, v: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_uvec2_bitfield_extract.invokeExact(allocator, v, offset, bits) as MemorySegment
+    private val h_koral_uvec3_bitfield_extract by lazy { handle("koral_uvec3_bitfield_extract", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec3_bitfield_extract(allocator: SegmentAllocator, v: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_uvec3_bitfield_extract.invokeExact(allocator, v, offset, bits) as MemorySegment
+    private val h_koral_uvec4_bitfield_extract by lazy { handle("koral_uvec4_bitfield_extract", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec4_bitfield_extract(allocator: SegmentAllocator, v: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_uvec4_bitfield_extract.invokeExact(allocator, v, offset, bits) as MemorySegment
+    private val h_koral_int_bitfield_insert by lazy { handle("koral_int_bitfield_insert", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_bitfield_insert(base: Int, insert: Int, offset: Int, bits: Int): Int = h_koral_int_bitfield_insert.invokeExact(base, insert, offset, bits) as Int
+    private val h_koral_ivec2_bitfield_insert by lazy { handle("koral_ivec2_bitfield_insert", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec2_bitfield_insert(allocator: SegmentAllocator, base: MemorySegment, insert: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_ivec2_bitfield_insert.invokeExact(allocator, base, insert, offset, bits) as MemorySegment
+    private val h_koral_ivec3_bitfield_insert by lazy { handle("koral_ivec3_bitfield_insert", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec3_bitfield_insert(allocator: SegmentAllocator, base: MemorySegment, insert: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_ivec3_bitfield_insert.invokeExact(allocator, base, insert, offset, bits) as MemorySegment
+    private val h_koral_ivec4_bitfield_insert by lazy { handle("koral_ivec4_bitfield_insert", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_ivec4_bitfield_insert(allocator: SegmentAllocator, base: MemorySegment, insert: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_ivec4_bitfield_insert.invokeExact(allocator, base, insert, offset, bits) as MemorySegment
+    private val h_koral_uint_bitfield_insert by lazy { handle("koral_uint_bitfield_insert", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_bitfield_insert(base: Int, insert: Int, offset: Int, bits: Int): Int = h_koral_uint_bitfield_insert.invokeExact(base, insert, offset, bits) as Int
+    private val h_koral_uvec2_bitfield_insert by lazy { handle("koral_uvec2_bitfield_insert", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec2_bitfield_insert(allocator: SegmentAllocator, base: MemorySegment, insert: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_uvec2_bitfield_insert.invokeExact(allocator, base, insert, offset, bits) as MemorySegment
+    private val h_koral_uvec3_bitfield_insert by lazy { handle("koral_uvec3_bitfield_insert", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec3_bitfield_insert(allocator: SegmentAllocator, base: MemorySegment, insert: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_uvec3_bitfield_insert.invokeExact(allocator, base, insert, offset, bits) as MemorySegment
+    private val h_koral_uvec4_bitfield_insert by lazy { handle("koral_uvec4_bitfield_insert", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_uvec4_bitfield_insert(allocator: SegmentAllocator, base: MemorySegment, insert: MemorySegment, offset: Int, bits: Int): MemorySegment = h_koral_uvec4_bitfield_insert.invokeExact(allocator, base, insert, offset, bits) as MemorySegment
+    private val h_koral_int_bitfield_reverse by lazy { handle("koral_int_bitfield_reverse", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_bitfield_reverse(v: Int): Int = h_koral_int_bitfield_reverse.invokeExact(v) as Int
+    private val h_koral_ivec2_bitfield_reverse by lazy { handle("koral_ivec2_bitfield_reverse", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_bitfield_reverse(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_bitfield_reverse.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_bitfield_reverse by lazy { handle("koral_ivec3_bitfield_reverse", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_bitfield_reverse(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_bitfield_reverse.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_bitfield_reverse by lazy { handle("koral_ivec4_bitfield_reverse", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_bitfield_reverse(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_bitfield_reverse.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_bitfield_reverse by lazy { handle("koral_uint_bitfield_reverse", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_bitfield_reverse(v: Int): Int = h_koral_uint_bitfield_reverse.invokeExact(v) as Int
+    private val h_koral_uvec2_bitfield_reverse by lazy { handle("koral_uvec2_bitfield_reverse", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_bitfield_reverse(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_bitfield_reverse.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_bitfield_reverse by lazy { handle("koral_uvec3_bitfield_reverse", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_bitfield_reverse(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_bitfield_reverse.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_bitfield_reverse by lazy { handle("koral_uvec4_bitfield_reverse", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_bitfield_reverse(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_bitfield_reverse.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_uadd_carry by lazy { handle("koral_uint_uadd_carry", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS)) }
+    fun koral_uint_uadd_carry(x: Int, y: Int, carry: MemorySegment): Int = h_koral_uint_uadd_carry.invokeExact(x, y, carry) as Int
+    private val h_koral_uvec2_uadd_carry by lazy { handle("koral_uvec2_uadd_carry", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, ADDRESS)) }
+    fun koral_uvec2_uadd_carry(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment, carry: MemorySegment): MemorySegment = h_koral_uvec2_uadd_carry.invokeExact(allocator, x, y, carry) as MemorySegment
+    private val h_koral_uvec3_uadd_carry by lazy { handle("koral_uvec3_uadd_carry", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, ADDRESS)) }
+    fun koral_uvec3_uadd_carry(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment, carry: MemorySegment): MemorySegment = h_koral_uvec3_uadd_carry.invokeExact(allocator, x, y, carry) as MemorySegment
+    private val h_koral_uvec4_uadd_carry by lazy { handle("koral_uvec4_uadd_carry", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, ADDRESS)) }
+    fun koral_uvec4_uadd_carry(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment, carry: MemorySegment): MemorySegment = h_koral_uvec4_uadd_carry.invokeExact(allocator, x, y, carry) as MemorySegment
+    private val h_koral_uint_usub_borrow by lazy { handle("koral_uint_usub_borrow", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS)) }
+    fun koral_uint_usub_borrow(x: Int, y: Int, borrow: MemorySegment): Int = h_koral_uint_usub_borrow.invokeExact(x, y, borrow) as Int
+    private val h_koral_uvec2_usub_borrow by lazy { handle("koral_uvec2_usub_borrow", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, ADDRESS)) }
+    fun koral_uvec2_usub_borrow(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment, borrow: MemorySegment): MemorySegment = h_koral_uvec2_usub_borrow.invokeExact(allocator, x, y, borrow) as MemorySegment
+    private val h_koral_uvec3_usub_borrow by lazy { handle("koral_uvec3_usub_borrow", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, ADDRESS)) }
+    fun koral_uvec3_usub_borrow(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment, borrow: MemorySegment): MemorySegment = h_koral_uvec3_usub_borrow.invokeExact(allocator, x, y, borrow) as MemorySegment
+    private val h_koral_uvec4_usub_borrow by lazy { handle("koral_uvec4_usub_borrow", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, ADDRESS)) }
+    fun koral_uvec4_usub_borrow(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment, borrow: MemorySegment): MemorySegment = h_koral_uvec4_usub_borrow.invokeExact(allocator, x, y, borrow) as MemorySegment
+    private val h_koral_uint_umul_extended by lazy { handle("koral_uint_umul_extended", FunctionDescriptor.ofVoid(JAVA_INT, JAVA_INT, ADDRESS, ADDRESS)) }
+    fun koral_uint_umul_extended(x: Int, y: Int, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_uint_umul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_uvec2_umul_extended by lazy { handle("koral_uvec2_umul_extended", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, ADDRESS, ADDRESS)) }
+    fun koral_uvec2_umul_extended(x: MemorySegment, y: MemorySegment, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_uvec2_umul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_uvec3_umul_extended by lazy { handle("koral_uvec3_umul_extended", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, ADDRESS, ADDRESS)) }
+    fun koral_uvec3_umul_extended(x: MemorySegment, y: MemorySegment, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_uvec3_umul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_uvec4_umul_extended by lazy { handle("koral_uvec4_umul_extended", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, ADDRESS, ADDRESS)) }
+    fun koral_uvec4_umul_extended(x: MemorySegment, y: MemorySegment, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_uvec4_umul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_int_imul_extended by lazy { handle("koral_int_imul_extended", FunctionDescriptor.ofVoid(JAVA_INT, JAVA_INT, ADDRESS, ADDRESS)) }
+    fun koral_int_imul_extended(x: Int, y: Int, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_int_imul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_ivec2_imul_extended by lazy { handle("koral_ivec2_imul_extended", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, ADDRESS, ADDRESS)) }
+    fun koral_ivec2_imul_extended(x: MemorySegment, y: MemorySegment, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_ivec2_imul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_ivec3_imul_extended by lazy { handle("koral_ivec3_imul_extended", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, ADDRESS, ADDRESS)) }
+    fun koral_ivec3_imul_extended(x: MemorySegment, y: MemorySegment, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_ivec3_imul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_ivec4_imul_extended by lazy { handle("koral_ivec4_imul_extended", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, ADDRESS, ADDRESS)) }
+    fun koral_ivec4_imul_extended(x: MemorySegment, y: MemorySegment, msb: MemorySegment, lsb: MemorySegment): Unit { h_koral_ivec4_imul_extended.invokeExact(x, y, msb, lsb) }
+    private val h_koral_int_is_power_of_two by lazy { handle("koral_int_is_power_of_two", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_INT)) }
+    fun koral_int_is_power_of_two(v: Int): Boolean = h_koral_int_is_power_of_two.invokeExact(v) as Boolean
+    private val h_koral_ivec2_is_power_of_two by lazy { handle("koral_ivec2_is_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_is_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_is_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_is_power_of_two by lazy { handle("koral_ivec3_is_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_is_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_is_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_is_power_of_two by lazy { handle("koral_ivec4_is_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_is_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_is_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_is_power_of_two by lazy { handle("koral_uint_is_power_of_two", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_INT)) }
+    fun koral_uint_is_power_of_two(v: Int): Boolean = h_koral_uint_is_power_of_two.invokeExact(v) as Boolean
+    private val h_koral_uvec2_is_power_of_two by lazy { handle("koral_uvec2_is_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_is_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_is_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_is_power_of_two by lazy { handle("koral_uvec3_is_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_is_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_is_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_is_power_of_two by lazy { handle("koral_uvec4_is_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_is_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_is_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_ceil_power_of_two by lazy { handle("koral_int_ceil_power_of_two", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_ceil_power_of_two(v: Int): Int = h_koral_int_ceil_power_of_two.invokeExact(v) as Int
+    private val h_koral_ivec2_ceil_power_of_two by lazy { handle("koral_ivec2_ceil_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_ceil_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_ceil_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_ceil_power_of_two by lazy { handle("koral_ivec3_ceil_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_ceil_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_ceil_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_ceil_power_of_two by lazy { handle("koral_ivec4_ceil_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_ceil_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_ceil_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_ceil_power_of_two by lazy { handle("koral_uint_ceil_power_of_two", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_ceil_power_of_two(v: Int): Int = h_koral_uint_ceil_power_of_two.invokeExact(v) as Int
+    private val h_koral_uvec2_ceil_power_of_two by lazy { handle("koral_uvec2_ceil_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_ceil_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_ceil_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_ceil_power_of_two by lazy { handle("koral_uvec3_ceil_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_ceil_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_ceil_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_ceil_power_of_two by lazy { handle("koral_uvec4_ceil_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_ceil_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_ceil_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_floor_power_of_two by lazy { handle("koral_int_floor_power_of_two", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_floor_power_of_two(v: Int): Int = h_koral_int_floor_power_of_two.invokeExact(v) as Int
+    private val h_koral_ivec2_floor_power_of_two by lazy { handle("koral_ivec2_floor_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_floor_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_floor_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_floor_power_of_two by lazy { handle("koral_ivec3_floor_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_floor_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_floor_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_floor_power_of_two by lazy { handle("koral_ivec4_floor_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_floor_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_floor_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_floor_power_of_two by lazy { handle("koral_uint_floor_power_of_two", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_floor_power_of_two(v: Int): Int = h_koral_uint_floor_power_of_two.invokeExact(v) as Int
+    private val h_koral_uvec2_floor_power_of_two by lazy { handle("koral_uvec2_floor_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_floor_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_floor_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_floor_power_of_two by lazy { handle("koral_uvec3_floor_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_floor_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_floor_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_floor_power_of_two by lazy { handle("koral_uvec4_floor_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_floor_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_floor_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_round_power_of_two by lazy { handle("koral_int_round_power_of_two", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_int_round_power_of_two(v: Int): Int = h_koral_int_round_power_of_two.invokeExact(v) as Int
+    private val h_koral_ivec2_round_power_of_two by lazy { handle("koral_ivec2_round_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_round_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec2_round_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec3_round_power_of_two by lazy { handle("koral_ivec3_round_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_round_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec3_round_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_ivec4_round_power_of_two by lazy { handle("koral_ivec4_round_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_round_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_ivec4_round_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uint_round_power_of_two by lazy { handle("koral_uint_round_power_of_two", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_uint_round_power_of_two(v: Int): Int = h_koral_uint_round_power_of_two.invokeExact(v) as Int
+    private val h_koral_uvec2_round_power_of_two by lazy { handle("koral_uvec2_round_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_round_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec2_round_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec3_round_power_of_two by lazy { handle("koral_uvec3_round_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_round_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec3_round_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_uvec4_round_power_of_two by lazy { handle("koral_uvec4_round_power_of_two", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_round_power_of_two(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_uvec4_round_power_of_two.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_int_is_multiple by lazy { handle("koral_int_is_multiple", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_INT, JAVA_INT)) }
+    fun koral_int_is_multiple(v: Int, multiple: Int): Boolean = h_koral_int_is_multiple.invokeExact(v, multiple) as Boolean
+    private val h_koral_ivec2_is_multiple by lazy { handle("koral_ivec2_is_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_is_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec2_is_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec2_is_multiple_s by lazy { handle("koral_ivec2_is_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralIVec2, JAVA_INT)) }
+    fun koral_ivec2_is_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec2_is_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_is_multiple by lazy { handle("koral_ivec3_is_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_is_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec3_is_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_is_multiple_s by lazy { handle("koral_ivec3_is_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralIVec3, JAVA_INT)) }
+    fun koral_ivec3_is_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec3_is_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_is_multiple by lazy { handle("koral_ivec4_is_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_is_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec4_is_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_is_multiple_s by lazy { handle("koral_ivec4_is_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralIVec4, JAVA_INT)) }
+    fun koral_ivec4_is_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec4_is_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uint_is_multiple by lazy { handle("koral_uint_is_multiple", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_is_multiple(v: Int, multiple: Int): Boolean = h_koral_uint_is_multiple.invokeExact(v, multiple) as Boolean
+    private val h_koral_uvec2_is_multiple by lazy { handle("koral_uvec2_is_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_is_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec2_is_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec2_is_multiple_s by lazy { handle("koral_uvec2_is_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralBVec2, KoralMathLayouts.KoralUVec2, JAVA_INT)) }
+    fun koral_uvec2_is_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec2_is_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_is_multiple by lazy { handle("koral_uvec3_is_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_is_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec3_is_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_is_multiple_s by lazy { handle("koral_uvec3_is_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralBVec3, KoralMathLayouts.KoralUVec3, JAVA_INT)) }
+    fun koral_uvec3_is_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec3_is_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_is_multiple by lazy { handle("koral_uvec4_is_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_is_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec4_is_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_is_multiple_s by lazy { handle("koral_uvec4_is_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralBVec4, KoralMathLayouts.KoralUVec4, JAVA_INT)) }
+    fun koral_uvec4_is_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec4_is_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_float_ceil_multiple by lazy { handle("koral_float_ceil_multiple", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_ceil_multiple(v: Float, multiple: Float): Float = h_koral_float_ceil_multiple.invokeExact(v, multiple) as Float
+    private val h_koral_vec2_ceil_multiple by lazy { handle("koral_vec2_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec2_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec2_ceil_multiple_s by lazy { handle("koral_vec2_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec2_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec3_ceil_multiple by lazy { handle("koral_vec3_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec3_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec3_ceil_multiple_s by lazy { handle("koral_vec3_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec3_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec4_ceil_multiple by lazy { handle("koral_vec4_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec4_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec4_ceil_multiple_s by lazy { handle("koral_vec4_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec4_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_double_ceil_multiple by lazy { handle("koral_double_ceil_multiple", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_ceil_multiple(v: Double, multiple: Double): Double = h_koral_double_ceil_multiple.invokeExact(v, multiple) as Double
+    private val h_koral_dvec2_ceil_multiple by lazy { handle("koral_dvec2_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec2_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec2_ceil_multiple_s by lazy { handle("koral_dvec2_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec2_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec3_ceil_multiple by lazy { handle("koral_dvec3_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec3_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec3_ceil_multiple_s by lazy { handle("koral_dvec3_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec3_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec4_ceil_multiple by lazy { handle("koral_dvec4_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec4_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec4_ceil_multiple_s by lazy { handle("koral_dvec4_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec4_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_int_ceil_multiple by lazy { handle("koral_int_ceil_multiple", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_ceil_multiple(v: Int, multiple: Int): Int = h_koral_int_ceil_multiple.invokeExact(v, multiple) as Int
+    private val h_koral_ivec2_ceil_multiple by lazy { handle("koral_ivec2_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec2_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec2_ceil_multiple_s by lazy { handle("koral_ivec2_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT)) }
+    fun koral_ivec2_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec2_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_ceil_multiple by lazy { handle("koral_ivec3_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec3_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_ceil_multiple_s by lazy { handle("koral_ivec3_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT)) }
+    fun koral_ivec3_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec3_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_ceil_multiple by lazy { handle("koral_ivec4_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec4_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_ceil_multiple_s by lazy { handle("koral_ivec4_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT)) }
+    fun koral_ivec4_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec4_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uint_ceil_multiple by lazy { handle("koral_uint_ceil_multiple", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_ceil_multiple(v: Int, multiple: Int): Int = h_koral_uint_ceil_multiple.invokeExact(v, multiple) as Int
+    private val h_koral_uvec2_ceil_multiple by lazy { handle("koral_uvec2_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec2_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec2_ceil_multiple_s by lazy { handle("koral_uvec2_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT)) }
+    fun koral_uvec2_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec2_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_ceil_multiple by lazy { handle("koral_uvec3_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec3_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_ceil_multiple_s by lazy { handle("koral_uvec3_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT)) }
+    fun koral_uvec3_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec3_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_ceil_multiple by lazy { handle("koral_uvec4_ceil_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_ceil_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec4_ceil_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_ceil_multiple_s by lazy { handle("koral_uvec4_ceil_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT)) }
+    fun koral_uvec4_ceil_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec4_ceil_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_float_floor_multiple by lazy { handle("koral_float_floor_multiple", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_floor_multiple(v: Float, multiple: Float): Float = h_koral_float_floor_multiple.invokeExact(v, multiple) as Float
+    private val h_koral_vec2_floor_multiple by lazy { handle("koral_vec2_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec2_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec2_floor_multiple_s by lazy { handle("koral_vec2_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec2_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec3_floor_multiple by lazy { handle("koral_vec3_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec3_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec3_floor_multiple_s by lazy { handle("koral_vec3_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec3_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec4_floor_multiple by lazy { handle("koral_vec4_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec4_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec4_floor_multiple_s by lazy { handle("koral_vec4_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec4_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_double_floor_multiple by lazy { handle("koral_double_floor_multiple", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_floor_multiple(v: Double, multiple: Double): Double = h_koral_double_floor_multiple.invokeExact(v, multiple) as Double
+    private val h_koral_dvec2_floor_multiple by lazy { handle("koral_dvec2_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec2_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec2_floor_multiple_s by lazy { handle("koral_dvec2_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec2_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec3_floor_multiple by lazy { handle("koral_dvec3_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec3_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec3_floor_multiple_s by lazy { handle("koral_dvec3_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec3_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec4_floor_multiple by lazy { handle("koral_dvec4_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec4_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec4_floor_multiple_s by lazy { handle("koral_dvec4_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec4_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_int_floor_multiple by lazy { handle("koral_int_floor_multiple", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_floor_multiple(v: Int, multiple: Int): Int = h_koral_int_floor_multiple.invokeExact(v, multiple) as Int
+    private val h_koral_ivec2_floor_multiple by lazy { handle("koral_ivec2_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec2_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec2_floor_multiple_s by lazy { handle("koral_ivec2_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT)) }
+    fun koral_ivec2_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec2_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_floor_multiple by lazy { handle("koral_ivec3_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec3_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_floor_multiple_s by lazy { handle("koral_ivec3_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT)) }
+    fun koral_ivec3_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec3_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_floor_multiple by lazy { handle("koral_ivec4_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec4_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_floor_multiple_s by lazy { handle("koral_ivec4_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT)) }
+    fun koral_ivec4_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec4_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uint_floor_multiple by lazy { handle("koral_uint_floor_multiple", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_floor_multiple(v: Int, multiple: Int): Int = h_koral_uint_floor_multiple.invokeExact(v, multiple) as Int
+    private val h_koral_uvec2_floor_multiple by lazy { handle("koral_uvec2_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec2_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec2_floor_multiple_s by lazy { handle("koral_uvec2_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT)) }
+    fun koral_uvec2_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec2_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_floor_multiple by lazy { handle("koral_uvec3_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec3_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_floor_multiple_s by lazy { handle("koral_uvec3_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT)) }
+    fun koral_uvec3_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec3_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_floor_multiple by lazy { handle("koral_uvec4_floor_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_floor_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec4_floor_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_floor_multiple_s by lazy { handle("koral_uvec4_floor_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT)) }
+    fun koral_uvec4_floor_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec4_floor_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_float_round_multiple by lazy { handle("koral_float_round_multiple", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_round_multiple(v: Float, multiple: Float): Float = h_koral_float_round_multiple.invokeExact(v, multiple) as Float
+    private val h_koral_vec2_round_multiple by lazy { handle("koral_vec2_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec2_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec2_round_multiple_s by lazy { handle("koral_vec2_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec2_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec3_round_multiple by lazy { handle("koral_vec3_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec3_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec3_round_multiple_s by lazy { handle("koral_vec3_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec3_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec4_round_multiple by lazy { handle("koral_vec4_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_vec4_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_vec4_round_multiple_s by lazy { handle("koral_vec4_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Float): MemorySegment = h_koral_vec4_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_double_round_multiple by lazy { handle("koral_double_round_multiple", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_round_multiple(v: Double, multiple: Double): Double = h_koral_double_round_multiple.invokeExact(v, multiple) as Double
+    private val h_koral_dvec2_round_multiple by lazy { handle("koral_dvec2_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec2_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec2_round_multiple_s by lazy { handle("koral_dvec2_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec2_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec3_round_multiple by lazy { handle("koral_dvec3_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec3_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec3_round_multiple_s by lazy { handle("koral_dvec3_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec3_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec4_round_multiple by lazy { handle("koral_dvec4_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_dvec4_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_dvec4_round_multiple_s by lazy { handle("koral_dvec4_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Double): MemorySegment = h_koral_dvec4_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_int_round_multiple by lazy { handle("koral_int_round_multiple", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_round_multiple(v: Int, multiple: Int): Int = h_koral_int_round_multiple.invokeExact(v, multiple) as Int
+    private val h_koral_ivec2_round_multiple by lazy { handle("koral_ivec2_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec2_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec2_round_multiple_s by lazy { handle("koral_ivec2_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec2, KoralMathLayouts.KoralIVec2, JAVA_INT)) }
+    fun koral_ivec2_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec2_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_round_multiple by lazy { handle("koral_ivec3_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec3_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec3_round_multiple_s by lazy { handle("koral_ivec3_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec3, KoralMathLayouts.KoralIVec3, JAVA_INT)) }
+    fun koral_ivec3_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec3_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_round_multiple by lazy { handle("koral_ivec4_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_ivec4_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_ivec4_round_multiple_s by lazy { handle("koral_ivec4_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralIVec4, KoralMathLayouts.KoralIVec4, JAVA_INT)) }
+    fun koral_ivec4_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_ivec4_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uint_round_multiple by lazy { handle("koral_uint_round_multiple", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_round_multiple(v: Int, multiple: Int): Int = h_koral_uint_round_multiple.invokeExact(v, multiple) as Int
+    private val h_koral_uvec2_round_multiple by lazy { handle("koral_uvec2_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec2_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec2_round_multiple_s by lazy { handle("koral_uvec2_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, KoralMathLayouts.KoralUVec2, JAVA_INT)) }
+    fun koral_uvec2_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec2_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_round_multiple by lazy { handle("koral_uvec3_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec3_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec3_round_multiple_s by lazy { handle("koral_uvec3_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec3, KoralMathLayouts.KoralUVec3, JAVA_INT)) }
+    fun koral_uvec3_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec3_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_round_multiple by lazy { handle("koral_uvec4_round_multiple", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_round_multiple(allocator: SegmentAllocator, v: MemorySegment, multiple: MemorySegment): MemorySegment = h_koral_uvec4_round_multiple.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uvec4_round_multiple_s by lazy { handle("koral_uvec4_round_multiple_s", FunctionDescriptor.of(KoralMathLayouts.KoralUVec4, KoralMathLayouts.KoralUVec4, JAVA_INT)) }
+    fun koral_uvec4_round_multiple_s(allocator: SegmentAllocator, v: MemorySegment, multiple: Int): MemorySegment = h_koral_uvec4_round_multiple_s.invokeExact(allocator, v, multiple) as MemorySegment
+    private val h_koral_uint_align_up by lazy { handle("koral_uint_align_up", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_align_up(v: Int, alignment: Int): Int = h_koral_uint_align_up.invokeExact(v, alignment) as Int
+    private val h_koral_int_divide_round_up by lazy { handle("koral_int_divide_round_up", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_int_divide_round_up(a: Int, b: Int): Int = h_koral_int_divide_round_up.invokeExact(a, b) as Int
+    private val h_koral_uint_divide_round_up by lazy { handle("koral_uint_divide_round_up", FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT)) }
+    fun koral_uint_divide_round_up(a: Int, b: Int): Int = h_koral_uint_divide_round_up.invokeExact(a, b) as Int
+    private val h_koral_float_to_half by lazy { handle("koral_float_to_half", FunctionDescriptor.of(JAVA_SHORT, JAVA_FLOAT)) }
+    fun koral_float_to_half(value: Float): Short = h_koral_float_to_half.invokeExact(value) as Short
+    private val h_koral_half_to_float by lazy { handle("koral_half_to_float", FunctionDescriptor.of(JAVA_FLOAT, JAVA_SHORT)) }
+    fun koral_half_to_float(half: Short): Float = h_koral_half_to_float.invokeExact(half) as Float
+    private val h_koral_pack_unorm4x8 by lazy { handle("koral_pack_unorm4x8", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_pack_unorm4x8(v: MemorySegment): Int = h_koral_pack_unorm4x8.invokeExact(v) as Int
+    private val h_koral_unpack_unorm4x8 by lazy { handle("koral_unpack_unorm4x8", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_INT)) }
+    fun koral_unpack_unorm4x8(allocator: SegmentAllocator, p: Int): MemorySegment = h_koral_unpack_unorm4x8.invokeExact(allocator, p) as MemorySegment
+    private val h_koral_pack_snorm4x8 by lazy { handle("koral_pack_snorm4x8", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_pack_snorm4x8(v: MemorySegment): Int = h_koral_pack_snorm4x8.invokeExact(v) as Int
+    private val h_koral_unpack_snorm4x8 by lazy { handle("koral_unpack_snorm4x8", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_INT)) }
+    fun koral_unpack_snorm4x8(allocator: SegmentAllocator, p: Int): MemorySegment = h_koral_unpack_snorm4x8.invokeExact(allocator, p) as MemorySegment
+    private val h_koral_pack_unorm2x16 by lazy { handle("koral_pack_unorm2x16", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_pack_unorm2x16(v: MemorySegment): Int = h_koral_pack_unorm2x16.invokeExact(v) as Int
+    private val h_koral_unpack_unorm2x16 by lazy { handle("koral_unpack_unorm2x16", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, JAVA_INT)) }
+    fun koral_unpack_unorm2x16(allocator: SegmentAllocator, p: Int): MemorySegment = h_koral_unpack_unorm2x16.invokeExact(allocator, p) as MemorySegment
+    private val h_koral_pack_snorm2x16 by lazy { handle("koral_pack_snorm2x16", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_pack_snorm2x16(v: MemorySegment): Int = h_koral_pack_snorm2x16.invokeExact(v) as Int
+    private val h_koral_unpack_snorm2x16 by lazy { handle("koral_unpack_snorm2x16", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, JAVA_INT)) }
+    fun koral_unpack_snorm2x16(allocator: SegmentAllocator, p: Int): MemorySegment = h_koral_unpack_snorm2x16.invokeExact(allocator, p) as MemorySegment
+    private val h_koral_pack_half2x16 by lazy { handle("koral_pack_half2x16", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_pack_half2x16(v: MemorySegment): Int = h_koral_pack_half2x16.invokeExact(v) as Int
+    private val h_koral_unpack_half2x16 by lazy { handle("koral_unpack_half2x16", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, JAVA_INT)) }
+    fun koral_unpack_half2x16(allocator: SegmentAllocator, p: Int): MemorySegment = h_koral_unpack_half2x16.invokeExact(allocator, p) as MemorySegment
+    private val h_koral_pack_double2x32 by lazy { handle("koral_pack_double2x32", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralUVec2)) }
+    fun koral_pack_double2x32(v: MemorySegment): Double = h_koral_pack_double2x32.invokeExact(v) as Double
+    private val h_koral_unpack_double2x32 by lazy { handle("koral_unpack_double2x32", FunctionDescriptor.of(KoralMathLayouts.KoralUVec2, JAVA_DOUBLE)) }
+    fun koral_unpack_double2x32(allocator: SegmentAllocator, d: Double): MemorySegment = h_koral_unpack_double2x32.invokeExact(allocator, d) as MemorySegment
+    private val h_koral_vec2_comp_min by lazy { handle("koral_vec2_comp_min", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_comp_min(v: MemorySegment): Float = h_koral_vec2_comp_min.invokeExact(v) as Float
+    private val h_koral_dvec2_comp_min by lazy { handle("koral_dvec2_comp_min", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_comp_min(v: MemorySegment): Double = h_koral_dvec2_comp_min.invokeExact(v) as Double
+    private val h_koral_ivec2_comp_min by lazy { handle("koral_ivec2_comp_min", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_comp_min(v: MemorySegment): Int = h_koral_ivec2_comp_min.invokeExact(v) as Int
+    private val h_koral_uvec2_comp_min by lazy { handle("koral_uvec2_comp_min", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_comp_min(v: MemorySegment): Int = h_koral_uvec2_comp_min.invokeExact(v) as Int
+    private val h_koral_vec3_comp_min by lazy { handle("koral_vec3_comp_min", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_comp_min(v: MemorySegment): Float = h_koral_vec3_comp_min.invokeExact(v) as Float
+    private val h_koral_dvec3_comp_min by lazy { handle("koral_dvec3_comp_min", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_comp_min(v: MemorySegment): Double = h_koral_dvec3_comp_min.invokeExact(v) as Double
+    private val h_koral_ivec3_comp_min by lazy { handle("koral_ivec3_comp_min", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_comp_min(v: MemorySegment): Int = h_koral_ivec3_comp_min.invokeExact(v) as Int
+    private val h_koral_uvec3_comp_min by lazy { handle("koral_uvec3_comp_min", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_comp_min(v: MemorySegment): Int = h_koral_uvec3_comp_min.invokeExact(v) as Int
+    private val h_koral_vec4_comp_min by lazy { handle("koral_vec4_comp_min", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_comp_min(v: MemorySegment): Float = h_koral_vec4_comp_min.invokeExact(v) as Float
+    private val h_koral_dvec4_comp_min by lazy { handle("koral_dvec4_comp_min", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_comp_min(v: MemorySegment): Double = h_koral_dvec4_comp_min.invokeExact(v) as Double
+    private val h_koral_ivec4_comp_min by lazy { handle("koral_ivec4_comp_min", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_comp_min(v: MemorySegment): Int = h_koral_ivec4_comp_min.invokeExact(v) as Int
+    private val h_koral_uvec4_comp_min by lazy { handle("koral_uvec4_comp_min", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_comp_min(v: MemorySegment): Int = h_koral_uvec4_comp_min.invokeExact(v) as Int
+    private val h_koral_vec2_comp_max by lazy { handle("koral_vec2_comp_max", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_comp_max(v: MemorySegment): Float = h_koral_vec2_comp_max.invokeExact(v) as Float
+    private val h_koral_dvec2_comp_max by lazy { handle("koral_dvec2_comp_max", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_comp_max(v: MemorySegment): Double = h_koral_dvec2_comp_max.invokeExact(v) as Double
+    private val h_koral_ivec2_comp_max by lazy { handle("koral_ivec2_comp_max", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_comp_max(v: MemorySegment): Int = h_koral_ivec2_comp_max.invokeExact(v) as Int
+    private val h_koral_uvec2_comp_max by lazy { handle("koral_uvec2_comp_max", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_comp_max(v: MemorySegment): Int = h_koral_uvec2_comp_max.invokeExact(v) as Int
+    private val h_koral_vec3_comp_max by lazy { handle("koral_vec3_comp_max", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_comp_max(v: MemorySegment): Float = h_koral_vec3_comp_max.invokeExact(v) as Float
+    private val h_koral_dvec3_comp_max by lazy { handle("koral_dvec3_comp_max", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_comp_max(v: MemorySegment): Double = h_koral_dvec3_comp_max.invokeExact(v) as Double
+    private val h_koral_ivec3_comp_max by lazy { handle("koral_ivec3_comp_max", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_comp_max(v: MemorySegment): Int = h_koral_ivec3_comp_max.invokeExact(v) as Int
+    private val h_koral_uvec3_comp_max by lazy { handle("koral_uvec3_comp_max", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_comp_max(v: MemorySegment): Int = h_koral_uvec3_comp_max.invokeExact(v) as Int
+    private val h_koral_vec4_comp_max by lazy { handle("koral_vec4_comp_max", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_comp_max(v: MemorySegment): Float = h_koral_vec4_comp_max.invokeExact(v) as Float
+    private val h_koral_dvec4_comp_max by lazy { handle("koral_dvec4_comp_max", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_comp_max(v: MemorySegment): Double = h_koral_dvec4_comp_max.invokeExact(v) as Double
+    private val h_koral_ivec4_comp_max by lazy { handle("koral_ivec4_comp_max", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_comp_max(v: MemorySegment): Int = h_koral_ivec4_comp_max.invokeExact(v) as Int
+    private val h_koral_uvec4_comp_max by lazy { handle("koral_uvec4_comp_max", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_comp_max(v: MemorySegment): Int = h_koral_uvec4_comp_max.invokeExact(v) as Int
+    private val h_koral_vec2_comp_add by lazy { handle("koral_vec2_comp_add", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_comp_add(v: MemorySegment): Float = h_koral_vec2_comp_add.invokeExact(v) as Float
+    private val h_koral_dvec2_comp_add by lazy { handle("koral_dvec2_comp_add", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_comp_add(v: MemorySegment): Double = h_koral_dvec2_comp_add.invokeExact(v) as Double
+    private val h_koral_ivec2_comp_add by lazy { handle("koral_ivec2_comp_add", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_comp_add(v: MemorySegment): Int = h_koral_ivec2_comp_add.invokeExact(v) as Int
+    private val h_koral_uvec2_comp_add by lazy { handle("koral_uvec2_comp_add", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_comp_add(v: MemorySegment): Int = h_koral_uvec2_comp_add.invokeExact(v) as Int
+    private val h_koral_vec3_comp_add by lazy { handle("koral_vec3_comp_add", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_comp_add(v: MemorySegment): Float = h_koral_vec3_comp_add.invokeExact(v) as Float
+    private val h_koral_dvec3_comp_add by lazy { handle("koral_dvec3_comp_add", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_comp_add(v: MemorySegment): Double = h_koral_dvec3_comp_add.invokeExact(v) as Double
+    private val h_koral_ivec3_comp_add by lazy { handle("koral_ivec3_comp_add", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_comp_add(v: MemorySegment): Int = h_koral_ivec3_comp_add.invokeExact(v) as Int
+    private val h_koral_uvec3_comp_add by lazy { handle("koral_uvec3_comp_add", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_comp_add(v: MemorySegment): Int = h_koral_uvec3_comp_add.invokeExact(v) as Int
+    private val h_koral_vec4_comp_add by lazy { handle("koral_vec4_comp_add", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_comp_add(v: MemorySegment): Float = h_koral_vec4_comp_add.invokeExact(v) as Float
+    private val h_koral_dvec4_comp_add by lazy { handle("koral_dvec4_comp_add", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_comp_add(v: MemorySegment): Double = h_koral_dvec4_comp_add.invokeExact(v) as Double
+    private val h_koral_ivec4_comp_add by lazy { handle("koral_ivec4_comp_add", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_comp_add(v: MemorySegment): Int = h_koral_ivec4_comp_add.invokeExact(v) as Int
+    private val h_koral_uvec4_comp_add by lazy { handle("koral_uvec4_comp_add", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_comp_add(v: MemorySegment): Int = h_koral_uvec4_comp_add.invokeExact(v) as Int
+    private val h_koral_vec2_comp_mul by lazy { handle("koral_vec2_comp_mul", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_comp_mul(v: MemorySegment): Float = h_koral_vec2_comp_mul.invokeExact(v) as Float
+    private val h_koral_dvec2_comp_mul by lazy { handle("koral_dvec2_comp_mul", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_comp_mul(v: MemorySegment): Double = h_koral_dvec2_comp_mul.invokeExact(v) as Double
+    private val h_koral_ivec2_comp_mul by lazy { handle("koral_ivec2_comp_mul", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec2)) }
+    fun koral_ivec2_comp_mul(v: MemorySegment): Int = h_koral_ivec2_comp_mul.invokeExact(v) as Int
+    private val h_koral_uvec2_comp_mul by lazy { handle("koral_uvec2_comp_mul", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec2)) }
+    fun koral_uvec2_comp_mul(v: MemorySegment): Int = h_koral_uvec2_comp_mul.invokeExact(v) as Int
+    private val h_koral_vec3_comp_mul by lazy { handle("koral_vec3_comp_mul", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_comp_mul(v: MemorySegment): Float = h_koral_vec3_comp_mul.invokeExact(v) as Float
+    private val h_koral_dvec3_comp_mul by lazy { handle("koral_dvec3_comp_mul", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_comp_mul(v: MemorySegment): Double = h_koral_dvec3_comp_mul.invokeExact(v) as Double
+    private val h_koral_ivec3_comp_mul by lazy { handle("koral_ivec3_comp_mul", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec3)) }
+    fun koral_ivec3_comp_mul(v: MemorySegment): Int = h_koral_ivec3_comp_mul.invokeExact(v) as Int
+    private val h_koral_uvec3_comp_mul by lazy { handle("koral_uvec3_comp_mul", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec3)) }
+    fun koral_uvec3_comp_mul(v: MemorySegment): Int = h_koral_uvec3_comp_mul.invokeExact(v) as Int
+    private val h_koral_vec4_comp_mul by lazy { handle("koral_vec4_comp_mul", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_comp_mul(v: MemorySegment): Float = h_koral_vec4_comp_mul.invokeExact(v) as Float
+    private val h_koral_dvec4_comp_mul by lazy { handle("koral_dvec4_comp_mul", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_comp_mul(v: MemorySegment): Double = h_koral_dvec4_comp_mul.invokeExact(v) as Double
+    private val h_koral_ivec4_comp_mul by lazy { handle("koral_ivec4_comp_mul", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralIVec4)) }
+    fun koral_ivec4_comp_mul(v: MemorySegment): Int = h_koral_ivec4_comp_mul.invokeExact(v) as Int
+    private val h_koral_uvec4_comp_mul by lazy { handle("koral_uvec4_comp_mul", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralUVec4)) }
+    fun koral_uvec4_comp_mul(v: MemorySegment): Int = h_koral_uvec4_comp_mul.invokeExact(v) as Int
+    private val h_koral_vec2_angle by lazy { handle("koral_vec2_angle", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_angle(a: MemorySegment, b: MemorySegment): Float = h_koral_vec2_angle.invokeExact(a, b) as Float
+    private val h_koral_vec3_angle by lazy { handle("koral_vec3_angle", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_angle(a: MemorySegment, b: MemorySegment): Float = h_koral_vec3_angle.invokeExact(a, b) as Float
+    private val h_koral_vec4_angle by lazy { handle("koral_vec4_angle", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_angle(a: MemorySegment, b: MemorySegment): Float = h_koral_vec4_angle.invokeExact(a, b) as Float
+    private val h_koral_dvec2_angle by lazy { handle("koral_dvec2_angle", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_angle(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec2_angle.invokeExact(a, b) as Double
+    private val h_koral_dvec3_angle by lazy { handle("koral_dvec3_angle", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_angle(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec3_angle.invokeExact(a, b) as Double
+    private val h_koral_dvec4_angle by lazy { handle("koral_dvec4_angle", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_angle(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec4_angle.invokeExact(a, b) as Double
+    private val h_koral_vec2_oriented_angle by lazy { handle("koral_vec2_oriented_angle", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_oriented_angle(a: MemorySegment, b: MemorySegment): Float = h_koral_vec2_oriented_angle.invokeExact(a, b) as Float
+    private val h_koral_dvec2_oriented_angle by lazy { handle("koral_dvec2_oriented_angle", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_oriented_angle(a: MemorySegment, b: MemorySegment): Double = h_koral_dvec2_oriented_angle.invokeExact(a, b) as Double
+    private val h_koral_vec3_oriented_angle by lazy { handle("koral_vec3_oriented_angle", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_oriented_angle(a: MemorySegment, b: MemorySegment, axis: MemorySegment): Float = h_koral_vec3_oriented_angle.invokeExact(a, b, axis) as Float
+    private val h_koral_dvec3_oriented_angle by lazy { handle("koral_dvec3_oriented_angle", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_oriented_angle(a: MemorySegment, b: MemorySegment, axis: MemorySegment): Double = h_koral_dvec3_oriented_angle.invokeExact(a, b, axis) as Double
+    private val h_koral_vec2_proj by lazy { handle("koral_vec2_proj", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_proj(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_vec2_proj.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_vec3_proj by lazy { handle("koral_vec3_proj", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_proj(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_vec3_proj.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_vec4_proj by lazy { handle("koral_vec4_proj", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_proj(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_vec4_proj.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_dvec2_proj by lazy { handle("koral_dvec2_proj", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_proj(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_dvec2_proj.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_dvec3_proj by lazy { handle("koral_dvec3_proj", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_proj(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_dvec3_proj.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_dvec4_proj by lazy { handle("koral_dvec4_proj", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_proj(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_dvec4_proj.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_vec2_perp by lazy { handle("koral_vec2_perp", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_perp(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_vec2_perp.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_vec3_perp by lazy { handle("koral_vec3_perp", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_perp(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_vec3_perp.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_vec4_perp by lazy { handle("koral_vec4_perp", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_perp(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_vec4_perp.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_dvec2_perp by lazy { handle("koral_dvec2_perp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_perp(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_dvec2_perp.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_dvec3_perp by lazy { handle("koral_dvec3_perp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_perp(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_dvec3_perp.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_dvec4_perp by lazy { handle("koral_dvec4_perp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_perp(allocator: SegmentAllocator, x: MemorySegment, direction: MemorySegment): MemorySegment = h_koral_dvec4_perp.invokeExact(allocator, x, direction) as MemorySegment
+    private val h_koral_vec2_orthonormalize by lazy { handle("koral_vec2_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_orthonormalize(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment): MemorySegment = h_koral_vec2_orthonormalize.invokeExact(allocator, x, y) as MemorySegment
+    private val h_koral_vec3_orthonormalize by lazy { handle("koral_vec3_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_orthonormalize(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment): MemorySegment = h_koral_vec3_orthonormalize.invokeExact(allocator, x, y) as MemorySegment
+    private val h_koral_vec4_orthonormalize by lazy { handle("koral_vec4_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_orthonormalize(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment): MemorySegment = h_koral_vec4_orthonormalize.invokeExact(allocator, x, y) as MemorySegment
+    private val h_koral_dvec2_orthonormalize by lazy { handle("koral_dvec2_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_orthonormalize(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment): MemorySegment = h_koral_dvec2_orthonormalize.invokeExact(allocator, x, y) as MemorySegment
+    private val h_koral_dvec3_orthonormalize by lazy { handle("koral_dvec3_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_orthonormalize(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment): MemorySegment = h_koral_dvec3_orthonormalize.invokeExact(allocator, x, y) as MemorySegment
+    private val h_koral_dvec4_orthonormalize by lazy { handle("koral_dvec4_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_orthonormalize(allocator: SegmentAllocator, x: MemorySegment, y: MemorySegment): MemorySegment = h_koral_dvec4_orthonormalize.invokeExact(allocator, x, y) as MemorySegment
+    private val h_koral_vec3_triangle_normal by lazy { handle("koral_vec3_triangle_normal", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_triangle_normal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_vec3_triangle_normal.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_dvec3_triangle_normal by lazy { handle("koral_dvec3_triangle_normal", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_triangle_normal(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, c: MemorySegment): MemorySegment = h_koral_dvec3_triangle_normal.invokeExact(allocator, a, b, c) as MemorySegment
+    private val h_koral_vec3_polar by lazy { handle("koral_vec3_polar", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_polar(allocator: SegmentAllocator, euclidean: MemorySegment): MemorySegment = h_koral_vec3_polar.invokeExact(allocator, euclidean) as MemorySegment
+    private val h_koral_dvec3_polar by lazy { handle("koral_dvec3_polar", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_polar(allocator: SegmentAllocator, euclidean: MemorySegment): MemorySegment = h_koral_dvec3_polar.invokeExact(allocator, euclidean) as MemorySegment
+    private val h_koral_vec2_euclidean by lazy { handle("koral_vec2_euclidean", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_euclidean(allocator: SegmentAllocator, polar: MemorySegment): MemorySegment = h_koral_vec2_euclidean.invokeExact(allocator, polar) as MemorySegment
+    private val h_koral_dvec2_euclidean by lazy { handle("koral_dvec2_euclidean", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_euclidean(allocator: SegmentAllocator, polar: MemorySegment): MemorySegment = h_koral_dvec2_euclidean.invokeExact(allocator, polar) as MemorySegment
+    private val h_koral_vec2_rotate by lazy { handle("koral_vec2_rotate", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_rotate(allocator: SegmentAllocator, v: MemorySegment, angle: Float): MemorySegment = h_koral_vec2_rotate.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_dvec2_rotate by lazy { handle("koral_dvec2_rotate", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_rotate(allocator: SegmentAllocator, v: MemorySegment, angle: Double): MemorySegment = h_koral_dvec2_rotate.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_vec3_rotate_x by lazy { handle("koral_vec3_rotate_x", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_rotate_x(allocator: SegmentAllocator, v: MemorySegment, angle: Float): MemorySegment = h_koral_vec3_rotate_x.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_dvec3_rotate_x by lazy { handle("koral_dvec3_rotate_x", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_rotate_x(allocator: SegmentAllocator, v: MemorySegment, angle: Double): MemorySegment = h_koral_dvec3_rotate_x.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_vec3_rotate_y by lazy { handle("koral_vec3_rotate_y", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_rotate_y(allocator: SegmentAllocator, v: MemorySegment, angle: Float): MemorySegment = h_koral_vec3_rotate_y.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_dvec3_rotate_y by lazy { handle("koral_dvec3_rotate_y", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_rotate_y(allocator: SegmentAllocator, v: MemorySegment, angle: Double): MemorySegment = h_koral_dvec3_rotate_y.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_vec3_rotate_z by lazy { handle("koral_vec3_rotate_z", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_rotate_z(allocator: SegmentAllocator, v: MemorySegment, angle: Float): MemorySegment = h_koral_vec3_rotate_z.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_dvec3_rotate_z by lazy { handle("koral_dvec3_rotate_z", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_rotate_z(allocator: SegmentAllocator, v: MemorySegment, angle: Double): MemorySegment = h_koral_dvec3_rotate_z.invokeExact(allocator, v, angle) as MemorySegment
+    private val h_koral_vec2_normalize_or by lazy { handle("koral_vec2_normalize_or", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_vec2_normalize_or(allocator: SegmentAllocator, v: MemorySegment, fallback: MemorySegment): MemorySegment = h_koral_vec2_normalize_or.invokeExact(allocator, v, fallback) as MemorySegment
+    private val h_koral_vec3_normalize_or by lazy { handle("koral_vec3_normalize_or", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_normalize_or(allocator: SegmentAllocator, v: MemorySegment, fallback: MemorySegment): MemorySegment = h_koral_vec3_normalize_or.invokeExact(allocator, v, fallback) as MemorySegment
+    private val h_koral_vec4_normalize_or by lazy { handle("koral_vec4_normalize_or", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_vec4_normalize_or(allocator: SegmentAllocator, v: MemorySegment, fallback: MemorySegment): MemorySegment = h_koral_vec4_normalize_or.invokeExact(allocator, v, fallback) as MemorySegment
+    private val h_koral_dvec2_normalize_or by lazy { handle("koral_dvec2_normalize_or", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dvec2_normalize_or(allocator: SegmentAllocator, v: MemorySegment, fallback: MemorySegment): MemorySegment = h_koral_dvec2_normalize_or.invokeExact(allocator, v, fallback) as MemorySegment
+    private val h_koral_dvec3_normalize_or by lazy { handle("koral_dvec3_normalize_or", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_normalize_or(allocator: SegmentAllocator, v: MemorySegment, fallback: MemorySegment): MemorySegment = h_koral_dvec3_normalize_or.invokeExact(allocator, v, fallback) as MemorySegment
+    private val h_koral_dvec4_normalize_or by lazy { handle("koral_dvec4_normalize_or", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dvec4_normalize_or(allocator: SegmentAllocator, v: MemorySegment, fallback: MemorySegment): MemorySegment = h_koral_dvec4_normalize_or.invokeExact(allocator, v, fallback) as MemorySegment
+    private val h_koral_vec2_clamp_length by lazy { handle("koral_vec2_clamp_length", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_clamp_length(allocator: SegmentAllocator, v: MemorySegment, maxLength: Float): MemorySegment = h_koral_vec2_clamp_length.invokeExact(allocator, v, maxLength) as MemorySegment
+    private val h_koral_vec3_clamp_length by lazy { handle("koral_vec3_clamp_length", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_clamp_length(allocator: SegmentAllocator, v: MemorySegment, maxLength: Float): MemorySegment = h_koral_vec3_clamp_length.invokeExact(allocator, v, maxLength) as MemorySegment
+    private val h_koral_vec4_clamp_length by lazy { handle("koral_vec4_clamp_length", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_clamp_length(allocator: SegmentAllocator, v: MemorySegment, maxLength: Float): MemorySegment = h_koral_vec4_clamp_length.invokeExact(allocator, v, maxLength) as MemorySegment
+    private val h_koral_dvec2_clamp_length by lazy { handle("koral_dvec2_clamp_length", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_clamp_length(allocator: SegmentAllocator, v: MemorySegment, maxLength: Double): MemorySegment = h_koral_dvec2_clamp_length.invokeExact(allocator, v, maxLength) as MemorySegment
+    private val h_koral_dvec3_clamp_length by lazy { handle("koral_dvec3_clamp_length", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_clamp_length(allocator: SegmentAllocator, v: MemorySegment, maxLength: Double): MemorySegment = h_koral_dvec3_clamp_length.invokeExact(allocator, v, maxLength) as MemorySegment
+    private val h_koral_dvec4_clamp_length by lazy { handle("koral_dvec4_clamp_length", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_clamp_length(allocator: SegmentAllocator, v: MemorySegment, maxLength: Double): MemorySegment = h_koral_dvec4_clamp_length.invokeExact(allocator, v, maxLength) as MemorySegment
+    private val h_koral_vec3_any_perpendicular by lazy { handle("koral_vec3_any_perpendicular", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_any_perpendicular(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_vec3_any_perpendicular.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dvec3_any_perpendicular by lazy { handle("koral_dvec3_any_perpendicular", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dvec3_any_perpendicular(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dvec3_any_perpendicular.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_float_move_towards by lazy { handle("koral_float_move_towards", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_move_towards(current: Float, target: Float, maxDelta: Float): Float = h_koral_float_move_towards.invokeExact(current, target, maxDelta) as Float
+    private val h_koral_double_move_towards by lazy { handle("koral_double_move_towards", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_move_towards(current: Double, target: Double, maxDelta: Double): Double = h_koral_double_move_towards.invokeExact(current, target, maxDelta) as Double
+    private val h_koral_vec2_move_towards by lazy { handle("koral_vec2_move_towards", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, JAVA_FLOAT)) }
+    fun koral_vec2_move_towards(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, maxDistance: Float): MemorySegment = h_koral_vec2_move_towards.invokeExact(allocator, current, target, maxDistance) as MemorySegment
+    private val h_koral_vec3_move_towards by lazy { handle("koral_vec3_move_towards", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
+    fun koral_vec3_move_towards(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, maxDistance: Float): MemorySegment = h_koral_vec3_move_towards.invokeExact(allocator, current, target, maxDistance) as MemorySegment
+    private val h_koral_vec4_move_towards by lazy { handle("koral_vec4_move_towards", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, JAVA_FLOAT)) }
+    fun koral_vec4_move_towards(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, maxDistance: Float): MemorySegment = h_koral_vec4_move_towards.invokeExact(allocator, current, target, maxDistance) as MemorySegment
+    private val h_koral_dvec2_move_towards by lazy { handle("koral_dvec2_move_towards", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, JAVA_DOUBLE)) }
+    fun koral_dvec2_move_towards(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, maxDistance: Double): MemorySegment = h_koral_dvec2_move_towards.invokeExact(allocator, current, target, maxDistance) as MemorySegment
+    private val h_koral_dvec3_move_towards by lazy { handle("koral_dvec3_move_towards", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, JAVA_DOUBLE)) }
+    fun koral_dvec3_move_towards(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, maxDistance: Double): MemorySegment = h_koral_dvec3_move_towards.invokeExact(allocator, current, target, maxDistance) as MemorySegment
+    private val h_koral_dvec4_move_towards by lazy { handle("koral_dvec4_move_towards", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, JAVA_DOUBLE)) }
+    fun koral_dvec4_move_towards(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, maxDistance: Double): MemorySegment = h_koral_dvec4_move_towards.invokeExact(allocator, current, target, maxDistance) as MemorySegment
+    private val h_koral_float_delta_angle by lazy { handle("koral_float_delta_angle", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_delta_angle(fromAngle: Float, toAngle: Float): Float = h_koral_float_delta_angle.invokeExact(fromAngle, toAngle) as Float
+    private val h_koral_double_delta_angle by lazy { handle("koral_double_delta_angle", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_delta_angle(fromAngle: Double, toAngle: Double): Double = h_koral_double_delta_angle.invokeExact(fromAngle, toAngle) as Double
+    private val h_koral_float_wrap_angle by lazy { handle("koral_float_wrap_angle", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_wrap_angle(radians: Float): Float = h_koral_float_wrap_angle.invokeExact(radians) as Float
+    private val h_koral_double_wrap_angle by lazy { handle("koral_double_wrap_angle", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_wrap_angle(radians: Double): Double = h_koral_double_wrap_angle.invokeExact(radians) as Double
+    private val h_koral_float_smooth_damp by lazy { handle("koral_float_smooth_damp", FunctionDescriptor.of(JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, ADDRESS, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_float_smooth_damp(current: Float, target: Float, velocity: MemorySegment, smoothTime: Float, deltaTime: Float, maxSpeed: Float): Float = h_koral_float_smooth_damp.invokeExact(current, target, velocity, smoothTime, deltaTime, maxSpeed) as Float
+    private val h_koral_double_smooth_damp by lazy { handle("koral_double_smooth_damp", FunctionDescriptor.of(JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE, ADDRESS, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_double_smooth_damp(current: Double, target: Double, velocity: MemorySegment, smoothTime: Double, deltaTime: Double, maxSpeed: Double): Double = h_koral_double_smooth_damp.invokeExact(current, target, velocity, smoothTime, deltaTime, maxSpeed) as Double
+    private val h_koral_vec2_smooth_damp by lazy { handle("koral_vec2_smooth_damp", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, ADDRESS, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_vec2_smooth_damp(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, velocity: MemorySegment, smoothTime: Float, deltaTime: Float, maxSpeed: Float): MemorySegment = h_koral_vec2_smooth_damp.invokeExact(allocator, current, target, velocity, smoothTime, deltaTime, maxSpeed) as MemorySegment
+    private val h_koral_vec3_smooth_damp by lazy { handle("koral_vec3_smooth_damp", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, ADDRESS, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_vec3_smooth_damp(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, velocity: MemorySegment, smoothTime: Float, deltaTime: Float, maxSpeed: Float): MemorySegment = h_koral_vec3_smooth_damp.invokeExact(allocator, current, target, velocity, smoothTime, deltaTime, maxSpeed) as MemorySegment
+    private val h_koral_vec4_smooth_damp by lazy { handle("koral_vec4_smooth_damp", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, ADDRESS, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_vec4_smooth_damp(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, velocity: MemorySegment, smoothTime: Float, deltaTime: Float, maxSpeed: Float): MemorySegment = h_koral_vec4_smooth_damp.invokeExact(allocator, current, target, velocity, smoothTime, deltaTime, maxSpeed) as MemorySegment
+    private val h_koral_dvec2_smooth_damp by lazy { handle("koral_dvec2_smooth_damp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, ADDRESS, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_dvec2_smooth_damp(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, velocity: MemorySegment, smoothTime: Double, deltaTime: Double, maxSpeed: Double): MemorySegment = h_koral_dvec2_smooth_damp.invokeExact(allocator, current, target, velocity, smoothTime, deltaTime, maxSpeed) as MemorySegment
+    private val h_koral_dvec3_smooth_damp by lazy { handle("koral_dvec3_smooth_damp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, ADDRESS, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_dvec3_smooth_damp(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, velocity: MemorySegment, smoothTime: Double, deltaTime: Double, maxSpeed: Double): MemorySegment = h_koral_dvec3_smooth_damp.invokeExact(allocator, current, target, velocity, smoothTime, deltaTime, maxSpeed) as MemorySegment
+    private val h_koral_dvec4_smooth_damp by lazy { handle("koral_dvec4_smooth_damp", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, ADDRESS, JAVA_DOUBLE, JAVA_DOUBLE, JAVA_DOUBLE)) }
+    fun koral_dvec4_smooth_damp(allocator: SegmentAllocator, current: MemorySegment, target: MemorySegment, velocity: MemorySegment, smoothTime: Double, deltaTime: Double, maxSpeed: Double): MemorySegment = h_koral_dvec4_smooth_damp.invokeExact(allocator, current, target, velocity, smoothTime, deltaTime, maxSpeed) as MemorySegment
+    private val h_koral_mat2_identity by lazy { handle("koral_mat2_identity", FunctionDescriptor.of(KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_identity(allocator: SegmentAllocator): MemorySegment = h_koral_mat2_identity.invokeExact(allocator) as MemorySegment
+    private val h_koral_mat2_determinant by lazy { handle("koral_mat2_determinant", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_determinant(m: MemorySegment): Float = h_koral_mat2_determinant.invokeExact(m) as Float
+    private val h_koral_mat2_inverse by lazy { handle("koral_mat2_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_inverse.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_diagonal by lazy { handle("koral_mat2_diagonal", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2_diagonal(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_mat2_diagonal.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_mat2_mul by lazy { handle("koral_mat2_mul", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_mul(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2_mul.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2_mul_mat3x2 by lazy { handle("koral_mat2_mul_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat2_mul_mat3x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2_mul_mat3x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2_mul_mat4x2 by lazy { handle("koral_mat2_mul_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat2_mul_mat4x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2_mul_mat4x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2_mul_vec2 by lazy { handle("koral_mat2_mul_vec2", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2_mul_vec2(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat2_mul_vec2.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec2_mul_mat2 by lazy { handle("koral_vec2_mul_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat2)) }
+    fun koral_vec2_mul_mat2(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec2_mul_mat2.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat2_add by lazy { handle("koral_mat2_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2_sub by lazy { handle("koral_mat2_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2_negate by lazy { handle("koral_mat2_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_mul_s by lazy { handle("koral_mat2_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, JAVA_FLOAT)) }
+    fun koral_mat2_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat2_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat2_div_s by lazy { handle("koral_mat2_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, JAVA_FLOAT)) }
+    fun koral_mat2_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat2_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat2_eq by lazy { handle("koral_mat2_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat2_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat2_transpose by lazy { handle("koral_mat2_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_matrix_comp_mult by lazy { handle("koral_mat2_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2_outer_product by lazy { handle("koral_mat2_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat2_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat2_row by lazy { handle("koral_mat2_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat2, JAVA_INT)) }
+    fun koral_mat2_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat2_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat2_column by lazy { handle("koral_mat2_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat2, JAVA_INT)) }
+    fun koral_mat2_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat2_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat2_set_row by lazy { handle("koral_mat2_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat2_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat2_set_column by lazy { handle("koral_mat2_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat2_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat2_approx_equal by lazy { handle("koral_mat2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2, JAVA_FLOAT)) }
+    fun koral_mat2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat2_from_mat2x3 by lazy { handle("koral_mat2_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_mat2x4 by lazy { handle("koral_mat2_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_mat3x2 by lazy { handle("koral_mat2_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat2_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_mat3 by lazy { handle("koral_mat2_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat2_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_mat3x4 by lazy { handle("koral_mat2_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat2_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_mat4x2 by lazy { handle("koral_mat2_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat2_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_mat4x3 by lazy { handle("koral_mat2_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat2_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_mat4 by lazy { handle("koral_mat2_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat2_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2_from_dmat2 by lazy { handle("koral_mat2_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_mat2_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_mul_mat2 by lazy { handle("koral_mat2x3_mul_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2x3_mul_mat2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x3_mul_mat2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x3_mul_mat3x2 by lazy { handle("koral_mat2x3_mul_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat2x3_mul_mat3x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x3_mul_mat3x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x3_mul_mat4x2 by lazy { handle("koral_mat2x3_mul_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat2x3_mul_mat4x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x3_mul_mat4x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x3_mul_vec2 by lazy { handle("koral_mat2x3_mul_vec2", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2x3_mul_vec2(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat2x3_mul_vec2.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec3_mul_mat2x3 by lazy { handle("koral_vec3_mul_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_vec3_mul_mat2x3(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec3_mul_mat2x3.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat2x3_add by lazy { handle("koral_mat2x3_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2x3_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x3_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x3_sub by lazy { handle("koral_mat2x3_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2x3_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x3_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x3_negate by lazy { handle("koral_mat2x3_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2x3_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_mul_s by lazy { handle("koral_mat2x3_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, JAVA_FLOAT)) }
+    fun koral_mat2x3_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat2x3_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat2x3_div_s by lazy { handle("koral_mat2x3_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, JAVA_FLOAT)) }
+    fun koral_mat2x3_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat2x3_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat2x3_eq by lazy { handle("koral_mat2x3_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2x3_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat2x3_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat2x3_transpose by lazy { handle("koral_mat2x3_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2x3_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_matrix_comp_mult by lazy { handle("koral_mat2x3_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2x3_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x3_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x3_outer_product by lazy { handle("koral_mat2x3_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2x3_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat2x3_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat2x3_row by lazy { handle("koral_mat2x3_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat2x3, JAVA_INT)) }
+    fun koral_mat2x3_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat2x3_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat2x3_column by lazy { handle("koral_mat2x3_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat2x3, JAVA_INT)) }
+    fun koral_mat2x3_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat2x3_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat2x3_set_row by lazy { handle("koral_mat2x3_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2x3_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat2x3_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat2x3_set_column by lazy { handle("koral_mat2x3_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat2x3_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat2x3_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat2x3_approx_equal by lazy { handle("koral_mat2x3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x3, JAVA_FLOAT)) }
+    fun koral_mat2x3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat2x3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat2x3_from_mat2 by lazy { handle("koral_mat2x3_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2x3_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_mat2x4 by lazy { handle("koral_mat2x3_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2x3_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_mat3x2 by lazy { handle("koral_mat2x3_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat2x3_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_mat3 by lazy { handle("koral_mat2x3_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat2x3_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_mat3x4 by lazy { handle("koral_mat2x3_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat2x3_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_mat4x2 by lazy { handle("koral_mat2x3_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat2x3_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_mat4x3 by lazy { handle("koral_mat2x3_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat2x3_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_mat4 by lazy { handle("koral_mat2x3_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat2x3_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x3_from_dmat2x3 by lazy { handle("koral_mat2x3_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_mat2x3_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x3_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_mul_mat2 by lazy { handle("koral_mat2x4_mul_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2x4_mul_mat2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x4_mul_mat2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x4_mul_mat3x2 by lazy { handle("koral_mat2x4_mul_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat2x4_mul_mat3x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x4_mul_mat3x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x4_mul_mat4x2 by lazy { handle("koral_mat2x4_mul_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat2x4_mul_mat4x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x4_mul_mat4x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x4_mul_vec2 by lazy { handle("koral_mat2x4_mul_vec2", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2x4_mul_vec2(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat2x4_mul_vec2.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec4_mul_mat2x4 by lazy { handle("koral_vec4_mul_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_vec4_mul_mat2x4(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec4_mul_mat2x4.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat2x4_add by lazy { handle("koral_mat2x4_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2x4_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x4_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x4_sub by lazy { handle("koral_mat2x4_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2x4_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x4_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x4_negate by lazy { handle("koral_mat2x4_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2x4_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_mul_s by lazy { handle("koral_mat2x4_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, JAVA_FLOAT)) }
+    fun koral_mat2x4_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat2x4_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat2x4_div_s by lazy { handle("koral_mat2x4_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, JAVA_FLOAT)) }
+    fun koral_mat2x4_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat2x4_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat2x4_eq by lazy { handle("koral_mat2x4_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2x4_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat2x4_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat2x4_transpose by lazy { handle("koral_mat2x4_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2x4_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_matrix_comp_mult by lazy { handle("koral_mat2x4_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat2x4_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat2x4_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat2x4_outer_product by lazy { handle("koral_mat2x4_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2x4_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat2x4_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat2x4_row by lazy { handle("koral_mat2x4_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat2x4, JAVA_INT)) }
+    fun koral_mat2x4_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat2x4_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat2x4_column by lazy { handle("koral_mat2x4_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat2x4, JAVA_INT)) }
+    fun koral_mat2x4_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat2x4_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat2x4_set_row by lazy { handle("koral_mat2x4_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat2x4_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat2x4_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat2x4_set_column by lazy { handle("koral_mat2x4_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat2x4_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat2x4_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat2x4_approx_equal by lazy { handle("koral_mat2x4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x4, JAVA_FLOAT)) }
+    fun koral_mat2x4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat2x4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat2x4_from_mat2 by lazy { handle("koral_mat2x4_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat2x4_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_mat2x3 by lazy { handle("koral_mat2x4_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat2x4_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_mat3x2 by lazy { handle("koral_mat2x4_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat2x4_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_mat3 by lazy { handle("koral_mat2x4_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat2x4_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_mat3x4 by lazy { handle("koral_mat2x4_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat2x4_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_mat4x2 by lazy { handle("koral_mat2x4_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat2x4_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_mat4x3 by lazy { handle("koral_mat2x4_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat2x4_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_mat4 by lazy { handle("koral_mat2x4_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat2x4_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat2x4_from_dmat2x4 by lazy { handle("koral_mat2x4_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_mat2x4_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat2x4_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_mul_mat2x3 by lazy { handle("koral_mat3x2_mul_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat3x2_mul_mat2x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x2_mul_mat2x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x2_mul_mat3 by lazy { handle("koral_mat3x2_mul_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3x2_mul_mat3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x2_mul_mat3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x2_mul_mat4x3 by lazy { handle("koral_mat3x2_mul_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat3x2_mul_mat4x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x2_mul_mat4x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x2_mul_vec3 by lazy { handle("koral_mat3x2_mul_vec3", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3x2_mul_vec3(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat3x2_mul_vec3.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec2_mul_mat3x2 by lazy { handle("koral_vec2_mul_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_vec2_mul_mat3x2(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec2_mul_mat3x2.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat3x2_add by lazy { handle("koral_mat3x2_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3x2_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x2_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x2_sub by lazy { handle("koral_mat3x2_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3x2_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x2_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x2_negate by lazy { handle("koral_mat3x2_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3x2_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_mul_s by lazy { handle("koral_mat3x2_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, JAVA_FLOAT)) }
+    fun koral_mat3x2_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat3x2_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat3x2_div_s by lazy { handle("koral_mat3x2_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, JAVA_FLOAT)) }
+    fun koral_mat3x2_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat3x2_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat3x2_eq by lazy { handle("koral_mat3x2_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3x2_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat3x2_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat3x2_transpose by lazy { handle("koral_mat3x2_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3x2_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_matrix_comp_mult by lazy { handle("koral_mat3x2_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3x2_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x2_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x2_outer_product by lazy { handle("koral_mat3x2_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3x2_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat3x2_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat3x2_row by lazy { handle("koral_mat3x2_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat3x2, JAVA_INT)) }
+    fun koral_mat3x2_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat3x2_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat3x2_column by lazy { handle("koral_mat3x2_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat3x2, JAVA_INT)) }
+    fun koral_mat3x2_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat3x2_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat3x2_set_row by lazy { handle("koral_mat3x2_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3x2_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat3x2_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat3x2_set_column by lazy { handle("koral_mat3x2_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat3x2_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat3x2_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat3x2_approx_equal by lazy { handle("koral_mat3x2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x2, JAVA_FLOAT)) }
+    fun koral_mat3x2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat3x2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat3x2_from_mat2 by lazy { handle("koral_mat3x2_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat3x2_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_mat2x3 by lazy { handle("koral_mat3x2_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat3x2_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_mat2x4 by lazy { handle("koral_mat3x2_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat3x2_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_mat3 by lazy { handle("koral_mat3x2_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3x2_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_mat3x4 by lazy { handle("koral_mat3x2_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3x2_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_mat4x2 by lazy { handle("koral_mat3x2_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat3x2_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_mat4x3 by lazy { handle("koral_mat3x2_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat3x2_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_mat4 by lazy { handle("koral_mat3x2_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat3x2_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x2_from_dmat3x2 by lazy { handle("koral_mat3x2_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_mat3x2_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x2_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_identity by lazy { handle("koral_mat3_identity", FunctionDescriptor.of(KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_identity(allocator: SegmentAllocator): MemorySegment = h_koral_mat3_identity.invokeExact(allocator) as MemorySegment
+    private val h_koral_mat3_determinant by lazy { handle("koral_mat3_determinant", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_determinant(m: MemorySegment): Float = h_koral_mat3_determinant.invokeExact(m) as Float
+    private val h_koral_mat3_inverse by lazy { handle("koral_mat3_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_inverse.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_diagonal by lazy { handle("koral_mat3_diagonal", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3_diagonal(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_mat3_diagonal.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_mat3_mul_mat2x3 by lazy { handle("koral_mat3_mul_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat3_mul_mat2x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3_mul_mat2x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3_mul by lazy { handle("koral_mat3_mul", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_mul(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3_mul.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3_mul_mat4x3 by lazy { handle("koral_mat3_mul_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat3_mul_mat4x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3_mul_mat4x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3_mul_vec3 by lazy { handle("koral_mat3_mul_vec3", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3_mul_vec3(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat3_mul_vec3.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec3_mul_mat3 by lazy { handle("koral_vec3_mul_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat3)) }
+    fun koral_vec3_mul_mat3(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec3_mul_mat3.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat3_add by lazy { handle("koral_mat3_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3_sub by lazy { handle("koral_mat3_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3_negate by lazy { handle("koral_mat3_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_mul_s by lazy { handle("koral_mat3_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, JAVA_FLOAT)) }
+    fun koral_mat3_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat3_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat3_div_s by lazy { handle("koral_mat3_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, JAVA_FLOAT)) }
+    fun koral_mat3_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat3_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat3_eq by lazy { handle("koral_mat3_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat3_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat3_transpose by lazy { handle("koral_mat3_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_matrix_comp_mult by lazy { handle("koral_mat3_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3_outer_product by lazy { handle("koral_mat3_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat3_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat3_row by lazy { handle("koral_mat3_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat3, JAVA_INT)) }
+    fun koral_mat3_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat3_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat3_column by lazy { handle("koral_mat3_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat3, JAVA_INT)) }
+    fun koral_mat3_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat3_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat3_set_row by lazy { handle("koral_mat3_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat3_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat3_set_column by lazy { handle("koral_mat3_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat3_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat3_approx_equal by lazy { handle("koral_mat3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, JAVA_FLOAT)) }
+    fun koral_mat3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat3_from_mat2 by lazy { handle("koral_mat3_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat3_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_mat2x3 by lazy { handle("koral_mat3_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat3_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_mat2x4 by lazy { handle("koral_mat3_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat3_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_mat3x2 by lazy { handle("koral_mat3_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_mat3x4 by lazy { handle("koral_mat3_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_mat4x2 by lazy { handle("koral_mat3_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat3_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_mat4x3 by lazy { handle("koral_mat3_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat3_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_mat4 by lazy { handle("koral_mat3_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat3_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3_from_dmat3 by lazy { handle("koral_mat3_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_mat3_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_mul_mat2x3 by lazy { handle("koral_mat3x4_mul_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat3x4_mul_mat2x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x4_mul_mat2x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x4_mul_mat3 by lazy { handle("koral_mat3x4_mul_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3x4_mul_mat3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x4_mul_mat3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x4_mul_mat4x3 by lazy { handle("koral_mat3x4_mul_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat3x4_mul_mat4x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x4_mul_mat4x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x4_mul_vec3 by lazy { handle("koral_mat3x4_mul_vec3", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3x4_mul_vec3(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat3x4_mul_vec3.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec4_mul_mat3x4 by lazy { handle("koral_vec4_mul_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_vec4_mul_mat3x4(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec4_mul_mat3x4.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat3x4_add by lazy { handle("koral_mat3x4_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3x4_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x4_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x4_sub by lazy { handle("koral_mat3x4_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3x4_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x4_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x4_negate by lazy { handle("koral_mat3x4_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3x4_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_mul_s by lazy { handle("koral_mat3x4_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, JAVA_FLOAT)) }
+    fun koral_mat3x4_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat3x4_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat3x4_div_s by lazy { handle("koral_mat3x4_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, JAVA_FLOAT)) }
+    fun koral_mat3x4_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat3x4_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat3x4_eq by lazy { handle("koral_mat3x4_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3x4_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat3x4_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat3x4_transpose by lazy { handle("koral_mat3x4_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3x4_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_matrix_comp_mult by lazy { handle("koral_mat3x4_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat3x4_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3x4_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat3x4_outer_product by lazy { handle("koral_mat3x4_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3x4_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat3x4_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat3x4_row by lazy { handle("koral_mat3x4_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat3x4, JAVA_INT)) }
+    fun koral_mat3x4_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat3x4_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat3x4_column by lazy { handle("koral_mat3x4_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat3x4, JAVA_INT)) }
+    fun koral_mat3x4_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat3x4_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat3x4_set_row by lazy { handle("koral_mat3x4_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat3x4_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat3x4_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat3x4_set_column by lazy { handle("koral_mat3x4_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat3x4_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat3x4_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat3x4_approx_equal by lazy { handle("koral_mat3x4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x4, JAVA_FLOAT)) }
+    fun koral_mat3x4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat3x4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat3x4_from_mat2 by lazy { handle("koral_mat3x4_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat3x4_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_mat2x3 by lazy { handle("koral_mat3x4_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat3x4_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_mat2x4 by lazy { handle("koral_mat3x4_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat3x4_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_mat3x2 by lazy { handle("koral_mat3x4_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat3x4_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_mat3 by lazy { handle("koral_mat3x4_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3x4_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_mat4x2 by lazy { handle("koral_mat3x4_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat3x4_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_mat4x3 by lazy { handle("koral_mat3x4_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat3x4_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_mat4 by lazy { handle("koral_mat3x4_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat3x4_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat3x4_from_dmat3x4 by lazy { handle("koral_mat3x4_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_mat3x4_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3x4_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_mul_mat2x4 by lazy { handle("koral_mat4x2_mul_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat4x2_mul_mat2x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x2_mul_mat2x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x2_mul_mat3x4 by lazy { handle("koral_mat4x2_mul_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x2, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat4x2_mul_mat3x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x2_mul_mat3x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x2_mul_mat4 by lazy { handle("koral_mat4x2_mul_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4x2_mul_mat4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x2_mul_mat4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x2_mul_vec4 by lazy { handle("koral_mat4x2_mul_vec4", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4x2_mul_vec4(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat4x2_mul_vec4.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec2_mul_mat4x2 by lazy { handle("koral_vec2_mul_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_vec2_mul_mat4x2(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec2_mul_mat4x2.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat4x2_add by lazy { handle("koral_mat4x2_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4x2_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x2_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x2_sub by lazy { handle("koral_mat4x2_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4x2_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x2_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x2_negate by lazy { handle("koral_mat4x2_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4x2_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_mul_s by lazy { handle("koral_mat4x2_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, JAVA_FLOAT)) }
+    fun koral_mat4x2_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat4x2_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat4x2_div_s by lazy { handle("koral_mat4x2_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, JAVA_FLOAT)) }
+    fun koral_mat4x2_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat4x2_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat4x2_eq by lazy { handle("koral_mat4x2_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4x2_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat4x2_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat4x2_transpose by lazy { handle("koral_mat4x2_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4x2_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_matrix_comp_mult by lazy { handle("koral_mat4x2_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4x2_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x2_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x2_outer_product by lazy { handle("koral_mat4x2_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4x2_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat4x2_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat4x2_row by lazy { handle("koral_mat4x2_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat4x2, JAVA_INT)) }
+    fun koral_mat4x2_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat4x2_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat4x2_column by lazy { handle("koral_mat4x2_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralMat4x2, JAVA_INT)) }
+    fun koral_mat4x2_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat4x2_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat4x2_set_row by lazy { handle("koral_mat4x2_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4x2_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat4x2_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat4x2_set_column by lazy { handle("koral_mat4x2_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, JAVA_INT, KoralMathLayouts.KoralVec2)) }
+    fun koral_mat4x2_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat4x2_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat4x2_approx_equal by lazy { handle("koral_mat4x2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x2, JAVA_FLOAT)) }
+    fun koral_mat4x2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat4x2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat4x2_from_mat2 by lazy { handle("koral_mat4x2_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat4x2_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_mat2x3 by lazy { handle("koral_mat4x2_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat4x2_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_mat2x4 by lazy { handle("koral_mat4x2_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat4x2_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_mat3x2 by lazy { handle("koral_mat4x2_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat4x2_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_mat3 by lazy { handle("koral_mat4x2_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat4x2_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_mat3x4 by lazy { handle("koral_mat4x2_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat4x2_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_mat4x3 by lazy { handle("koral_mat4x2_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4x2_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_mat4 by lazy { handle("koral_mat4x2_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4x2_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x2_from_dmat4x2 by lazy { handle("koral_mat4x2_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_mat4x2_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x2_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_mul_mat2x4 by lazy { handle("koral_mat4x3_mul_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x3, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat4x3_mul_mat2x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x3_mul_mat2x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x3_mul_mat3x4 by lazy { handle("koral_mat4x3_mul_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat4x3_mul_mat3x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x3_mul_mat3x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x3_mul_mat4 by lazy { handle("koral_mat4x3_mul_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4x3_mul_mat4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x3_mul_mat4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x3_mul_vec4 by lazy { handle("koral_mat4x3_mul_vec4", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4x3_mul_vec4(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat4x3_mul_vec4.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_vec3_mul_mat4x3 by lazy { handle("koral_vec3_mul_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_vec3_mul_mat4x3(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec3_mul_mat4x3.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat4x3_add by lazy { handle("koral_mat4x3_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4x3_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x3_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x3_sub by lazy { handle("koral_mat4x3_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4x3_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x3_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x3_negate by lazy { handle("koral_mat4x3_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4x3_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_mul_s by lazy { handle("koral_mat4x3_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, JAVA_FLOAT)) }
+    fun koral_mat4x3_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat4x3_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat4x3_div_s by lazy { handle("koral_mat4x3_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, JAVA_FLOAT)) }
+    fun koral_mat4x3_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat4x3_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat4x3_eq by lazy { handle("koral_mat4x3_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4x3_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat4x3_eq.invokeExact(a, b) as Boolean
+    private val h_koral_mat4x3_transpose by lazy { handle("koral_mat4x3_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4x3_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_matrix_comp_mult by lazy { handle("koral_mat4x3_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4x3_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4x3_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4x3_outer_product by lazy { handle("koral_mat4x3_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4x3_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat4x3_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat4x3_row by lazy { handle("koral_mat4x3_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat4x3, JAVA_INT)) }
+    fun koral_mat4x3_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat4x3_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat4x3_column by lazy { handle("koral_mat4x3_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4x3, JAVA_INT)) }
+    fun koral_mat4x3_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat4x3_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat4x3_set_row by lazy { handle("koral_mat4x3_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4x3_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat4x3_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat4x3_set_column by lazy { handle("koral_mat4x3_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_mat4x3_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat4x3_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat4x3_approx_equal by lazy { handle("koral_mat4x3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x3, JAVA_FLOAT)) }
+    fun koral_mat4x3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat4x3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat4x3_from_mat2 by lazy { handle("koral_mat4x3_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat4x3_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_mat2x3 by lazy { handle("koral_mat4x3_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat4x3_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_mat2x4 by lazy { handle("koral_mat4x3_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat4x3_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_mat3x2 by lazy { handle("koral_mat4x3_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat4x3_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_mat3 by lazy { handle("koral_mat4x3_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat4x3_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_mat3x4 by lazy { handle("koral_mat4x3_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat4x3_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_mat4x2 by lazy { handle("koral_mat4x3_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4x3_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_mat4 by lazy { handle("koral_mat4x3_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4x3_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4x3_from_dmat4x3 by lazy { handle("koral_mat4x3_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4x3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_mat4x3_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4x3_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
     private val h_koral_mat4_identity by lazy { handle("koral_mat4_identity", FunctionDescriptor.of(KoralMathLayouts.KoralMat4)) }
     fun koral_mat4_identity(allocator: SegmentAllocator): MemorySegment = h_koral_mat4_identity.invokeExact(allocator) as MemorySegment
+    private val h_koral_mat4_determinant by lazy { handle("koral_mat4_determinant", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4_determinant(m: MemorySegment): Float = h_koral_mat4_determinant.invokeExact(m) as Float
+    private val h_koral_mat4_inverse by lazy { handle("koral_mat4_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_inverse.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_diagonal by lazy { handle("koral_mat4_diagonal", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4_diagonal(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_mat4_diagonal.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_mat4_mul_mat2x4 by lazy { handle("koral_mat4_mul_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat2x4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat4_mul_mat2x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4_mul_mat2x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4_mul_mat3x4 by lazy { handle("koral_mat4_mul_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat3x4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat4_mul_mat3x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4_mul_mat3x4.invokeExact(allocator, a, b) as MemorySegment
     private val h_koral_mat4_mul by lazy { handle("koral_mat4_mul", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
     fun koral_mat4_mul(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4_mul.invokeExact(allocator, a, b) as MemorySegment
     private val h_koral_mat4_mul_vec4 by lazy { handle("koral_mat4_mul_vec4", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec4)) }
     fun koral_mat4_mul_vec4(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat4_mul_vec4.invokeExact(allocator, m, v) as MemorySegment
-    private val h_koral_mat4_inverse by lazy { handle("koral_mat4_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
-    fun koral_mat4_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_inverse.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_vec4_mul_mat4 by lazy { handle("koral_vec4_mul_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat4)) }
+    fun koral_vec4_mul_mat4(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_vec4_mul_mat4.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_mat4_add by lazy { handle("koral_mat4_add", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4_sub by lazy { handle("koral_mat4_sub", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4_negate by lazy { handle("koral_mat4_negate", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_mul_s by lazy { handle("koral_mat4_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, JAVA_FLOAT)) }
+    fun koral_mat4_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat4_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat4_div_s by lazy { handle("koral_mat4_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, JAVA_FLOAT)) }
+    fun koral_mat4_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Float): MemorySegment = h_koral_mat4_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_mat4_eq by lazy { handle("koral_mat4_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_mat4_eq.invokeExact(a, b) as Boolean
     private val h_koral_mat4_transpose by lazy { handle("koral_mat4_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
     fun koral_mat4_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_transpose.invokeExact(allocator, m) as MemorySegment
-    private val h_koral_mat4_determinant by lazy { handle("koral_mat4_determinant", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralMat4)) }
-    fun koral_mat4_determinant(m: MemorySegment): Float = h_koral_mat4_determinant.invokeExact(m) as Float
+    private val h_koral_mat4_matrix_comp_mult by lazy { handle("koral_mat4_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4)) }
+    fun koral_mat4_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat4_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_mat4_outer_product by lazy { handle("koral_mat4_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_mat4_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_mat4_row by lazy { handle("koral_mat4_row", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat4, JAVA_INT)) }
+    fun koral_mat4_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_mat4_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_mat4_column by lazy { handle("koral_mat4_column", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralMat4, JAVA_INT)) }
+    fun koral_mat4_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_mat4_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_mat4_set_row by lazy { handle("koral_mat4_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_mat4_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_mat4_set_column by lazy { handle("koral_mat4_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, JAVA_INT, KoralMathLayouts.KoralVec4)) }
+    fun koral_mat4_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_mat4_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_mat4_approx_equal by lazy { handle("koral_mat4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, JAVA_FLOAT)) }
+    fun koral_mat4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Float): Boolean = h_koral_mat4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_mat4_from_mat2 by lazy { handle("koral_mat4_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat2)) }
+    fun koral_mat4_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_mat2x3 by lazy { handle("koral_mat4_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_mat4_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_mat2x4 by lazy { handle("koral_mat4_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_mat4_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_mat3x2 by lazy { handle("koral_mat4_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_mat4_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_mat3 by lazy { handle("koral_mat4_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat4_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_mat3x4 by lazy { handle("koral_mat4_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_mat4_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_mat4x2 by lazy { handle("koral_mat4_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_mat4_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_mat4x3 by lazy { handle("koral_mat4_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_mat4_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_mat4_from_dmat4 by lazy { handle("koral_mat4_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_mat4_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat4_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_identity by lazy { handle("koral_dmat2_identity", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_identity(allocator: SegmentAllocator): MemorySegment = h_koral_dmat2_identity.invokeExact(allocator) as MemorySegment
+    private val h_koral_dmat2_determinant by lazy { handle("koral_dmat2_determinant", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_determinant(m: MemorySegment): Double = h_koral_dmat2_determinant.invokeExact(m) as Double
+    private val h_koral_dmat2_inverse by lazy { handle("koral_dmat2_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_inverse.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_diagonal by lazy { handle("koral_dmat2_diagonal", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2_diagonal(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dmat2_diagonal.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dmat2_mul by lazy { handle("koral_dmat2_mul", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_mul(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2_mul.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2_mul_dmat3x2 by lazy { handle("koral_dmat2_mul_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat2_mul_dmat3x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2_mul_dmat3x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2_mul_dmat4x2 by lazy { handle("koral_dmat2_mul_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat2_mul_dmat4x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2_mul_dmat4x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2_mul_dvec2 by lazy { handle("koral_dmat2_mul_dvec2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2_mul_dvec2(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat2_mul_dvec2.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec2_mul_dmat2 by lazy { handle("koral_dvec2_mul_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dvec2_mul_dmat2(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec2_mul_dmat2.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat2_add by lazy { handle("koral_dmat2_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2_sub by lazy { handle("koral_dmat2_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2_negate by lazy { handle("koral_dmat2_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_mul_s by lazy { handle("koral_dmat2_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, JAVA_DOUBLE)) }
+    fun koral_dmat2_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat2_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat2_div_s by lazy { handle("koral_dmat2_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, JAVA_DOUBLE)) }
+    fun koral_dmat2_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat2_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat2_eq by lazy { handle("koral_dmat2_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat2_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat2_transpose by lazy { handle("koral_dmat2_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_matrix_comp_mult by lazy { handle("koral_dmat2_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2_outer_product by lazy { handle("koral_dmat2_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat2_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat2_row by lazy { handle("koral_dmat2_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat2, JAVA_INT)) }
+    fun koral_dmat2_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat2_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat2_column by lazy { handle("koral_dmat2_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat2, JAVA_INT)) }
+    fun koral_dmat2_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat2_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat2_set_row by lazy { handle("koral_dmat2_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, JAVA_INT, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat2_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat2_set_column by lazy { handle("koral_dmat2_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, JAVA_INT, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat2_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat2_approx_equal by lazy { handle("koral_dmat2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2, JAVA_DOUBLE)) }
+    fun koral_dmat2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat2_from_mat2 by lazy { handle("koral_dmat2_from_mat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralMat2)) }
+    fun koral_dmat2_from_mat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_mat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat2x3 by lazy { handle("koral_dmat2_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat2x4 by lazy { handle("koral_dmat2_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat3x2 by lazy { handle("koral_dmat2_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat2_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat3 by lazy { handle("koral_dmat2_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat2_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat3x4 by lazy { handle("koral_dmat2_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat2_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat4x2 by lazy { handle("koral_dmat2_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat2_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat4x3 by lazy { handle("koral_dmat2_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat2_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2_from_dmat4 by lazy { handle("koral_dmat2_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat2_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_mul_dmat2 by lazy { handle("koral_dmat2x3_mul_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2x3_mul_dmat2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x3_mul_dmat2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x3_mul_dmat3x2 by lazy { handle("koral_dmat2x3_mul_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat2x3_mul_dmat3x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x3_mul_dmat3x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x3_mul_dmat4x2 by lazy { handle("koral_dmat2x3_mul_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat2x3_mul_dmat4x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x3_mul_dmat4x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x3_mul_dvec2 by lazy { handle("koral_dmat2x3_mul_dvec2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2x3_mul_dvec2(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat2x3_mul_dvec2.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec3_mul_dmat2x3 by lazy { handle("koral_dvec3_mul_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dvec3_mul_dmat2x3(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec3_mul_dmat2x3.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat2x3_add by lazy { handle("koral_dmat2x3_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2x3_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x3_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x3_sub by lazy { handle("koral_dmat2x3_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2x3_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x3_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x3_negate by lazy { handle("koral_dmat2x3_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2x3_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_mul_s by lazy { handle("koral_dmat2x3_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, JAVA_DOUBLE)) }
+    fun koral_dmat2x3_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat2x3_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat2x3_div_s by lazy { handle("koral_dmat2x3_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, JAVA_DOUBLE)) }
+    fun koral_dmat2x3_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat2x3_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat2x3_eq by lazy { handle("koral_dmat2x3_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2x3_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat2x3_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat2x3_transpose by lazy { handle("koral_dmat2x3_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2x3_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_matrix_comp_mult by lazy { handle("koral_dmat2x3_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2x3_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x3_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x3_outer_product by lazy { handle("koral_dmat2x3_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2x3_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat2x3_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat2x3_row by lazy { handle("koral_dmat2x3_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat2x3, JAVA_INT)) }
+    fun koral_dmat2x3_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat2x3_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat2x3_column by lazy { handle("koral_dmat2x3_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat2x3, JAVA_INT)) }
+    fun koral_dmat2x3_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat2x3_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat2x3_set_row by lazy { handle("koral_dmat2x3_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, JAVA_INT, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2x3_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat2x3_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat2x3_set_column by lazy { handle("koral_dmat2x3_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, JAVA_INT, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat2x3_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat2x3_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat2x3_approx_equal by lazy { handle("koral_dmat2x3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x3, JAVA_DOUBLE)) }
+    fun koral_dmat2x3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat2x3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat2x3_from_mat2x3 by lazy { handle("koral_dmat2x3_from_mat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralMat2x3)) }
+    fun koral_dmat2x3_from_mat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_mat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat2 by lazy { handle("koral_dmat2x3_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2x3_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat2x4 by lazy { handle("koral_dmat2x3_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2x3_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat3x2 by lazy { handle("koral_dmat2x3_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat2x3_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat3 by lazy { handle("koral_dmat2x3_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat2x3_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat3x4 by lazy { handle("koral_dmat2x3_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat2x3_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat4x2 by lazy { handle("koral_dmat2x3_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat2x3_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat4x3 by lazy { handle("koral_dmat2x3_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat2x3_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x3_from_dmat4 by lazy { handle("koral_dmat2x3_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat2x3_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x3_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_mul_dmat2 by lazy { handle("koral_dmat2x4_mul_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2x4_mul_dmat2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x4_mul_dmat2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x4_mul_dmat3x2 by lazy { handle("koral_dmat2x4_mul_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat2x4_mul_dmat3x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x4_mul_dmat3x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x4_mul_dmat4x2 by lazy { handle("koral_dmat2x4_mul_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat2x4_mul_dmat4x2(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x4_mul_dmat4x2.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x4_mul_dvec2 by lazy { handle("koral_dmat2x4_mul_dvec2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2x4_mul_dvec2(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat2x4_mul_dvec2.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec4_mul_dmat2x4 by lazy { handle("koral_dvec4_mul_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dvec4_mul_dmat2x4(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec4_mul_dmat2x4.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat2x4_add by lazy { handle("koral_dmat2x4_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2x4_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x4_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x4_sub by lazy { handle("koral_dmat2x4_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2x4_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x4_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x4_negate by lazy { handle("koral_dmat2x4_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2x4_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_mul_s by lazy { handle("koral_dmat2x4_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, JAVA_DOUBLE)) }
+    fun koral_dmat2x4_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat2x4_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat2x4_div_s by lazy { handle("koral_dmat2x4_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, JAVA_DOUBLE)) }
+    fun koral_dmat2x4_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat2x4_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat2x4_eq by lazy { handle("koral_dmat2x4_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2x4_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat2x4_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat2x4_transpose by lazy { handle("koral_dmat2x4_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2x4_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_matrix_comp_mult by lazy { handle("koral_dmat2x4_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat2x4_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat2x4_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat2x4_outer_product by lazy { handle("koral_dmat2x4_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2x4_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat2x4_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat2x4_row by lazy { handle("koral_dmat2x4_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat2x4, JAVA_INT)) }
+    fun koral_dmat2x4_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat2x4_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat2x4_column by lazy { handle("koral_dmat2x4_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat2x4, JAVA_INT)) }
+    fun koral_dmat2x4_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat2x4_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat2x4_set_row by lazy { handle("koral_dmat2x4_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, JAVA_INT, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat2x4_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat2x4_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat2x4_set_column by lazy { handle("koral_dmat2x4_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, JAVA_INT, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat2x4_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat2x4_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat2x4_approx_equal by lazy { handle("koral_dmat2x4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x4, JAVA_DOUBLE)) }
+    fun koral_dmat2x4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat2x4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat2x4_from_mat2x4 by lazy { handle("koral_dmat2x4_from_mat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralMat2x4)) }
+    fun koral_dmat2x4_from_mat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_mat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat2 by lazy { handle("koral_dmat2x4_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat2x4_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat2x3 by lazy { handle("koral_dmat2x4_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat2x4_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat3x2 by lazy { handle("koral_dmat2x4_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat2x4_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat3 by lazy { handle("koral_dmat2x4_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat2x4_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat3x4 by lazy { handle("koral_dmat2x4_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat2x4_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat4x2 by lazy { handle("koral_dmat2x4_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat2x4_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat4x3 by lazy { handle("koral_dmat2x4_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat2x4_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat2x4_from_dmat4 by lazy { handle("koral_dmat2x4_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat2x4_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat2x4_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_mul_dmat2x3 by lazy { handle("koral_dmat3x2_mul_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat3x2_mul_dmat2x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x2_mul_dmat2x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x2_mul_dmat3 by lazy { handle("koral_dmat3x2_mul_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3x2_mul_dmat3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x2_mul_dmat3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x2_mul_dmat4x3 by lazy { handle("koral_dmat3x2_mul_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat3x2_mul_dmat4x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x2_mul_dmat4x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x2_mul_dvec3 by lazy { handle("koral_dmat3x2_mul_dvec3", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3x2_mul_dvec3(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat3x2_mul_dvec3.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec2_mul_dmat3x2 by lazy { handle("koral_dvec2_mul_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dvec2_mul_dmat3x2(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec2_mul_dmat3x2.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat3x2_add by lazy { handle("koral_dmat3x2_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3x2_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x2_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x2_sub by lazy { handle("koral_dmat3x2_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3x2_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x2_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x2_negate by lazy { handle("koral_dmat3x2_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3x2_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_mul_s by lazy { handle("koral_dmat3x2_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, JAVA_DOUBLE)) }
+    fun koral_dmat3x2_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat3x2_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat3x2_div_s by lazy { handle("koral_dmat3x2_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, JAVA_DOUBLE)) }
+    fun koral_dmat3x2_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat3x2_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat3x2_eq by lazy { handle("koral_dmat3x2_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3x2_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat3x2_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat3x2_transpose by lazy { handle("koral_dmat3x2_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3x2_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_matrix_comp_mult by lazy { handle("koral_dmat3x2_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3x2_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x2_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x2_outer_product by lazy { handle("koral_dmat3x2_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3x2_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat3x2_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat3x2_row by lazy { handle("koral_dmat3x2_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat3x2, JAVA_INT)) }
+    fun koral_dmat3x2_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat3x2_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat3x2_column by lazy { handle("koral_dmat3x2_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat3x2, JAVA_INT)) }
+    fun koral_dmat3x2_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat3x2_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat3x2_set_row by lazy { handle("koral_dmat3x2_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, JAVA_INT, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3x2_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat3x2_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat3x2_set_column by lazy { handle("koral_dmat3x2_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, JAVA_INT, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat3x2_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat3x2_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat3x2_approx_equal by lazy { handle("koral_dmat3x2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x2, JAVA_DOUBLE)) }
+    fun koral_dmat3x2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat3x2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat3x2_from_mat3x2 by lazy { handle("koral_dmat3x2_from_mat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralMat3x2)) }
+    fun koral_dmat3x2_from_mat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_mat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat2 by lazy { handle("koral_dmat3x2_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat3x2_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat2x3 by lazy { handle("koral_dmat3x2_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat3x2_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat2x4 by lazy { handle("koral_dmat3x2_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat3x2_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat3 by lazy { handle("koral_dmat3x2_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3x2_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat3x4 by lazy { handle("koral_dmat3x2_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3x2_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat4x2 by lazy { handle("koral_dmat3x2_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat3x2_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat4x3 by lazy { handle("koral_dmat3x2_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat3x2_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x2_from_dmat4 by lazy { handle("koral_dmat3x2_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat3x2_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x2_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_identity by lazy { handle("koral_dmat3_identity", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_identity(allocator: SegmentAllocator): MemorySegment = h_koral_dmat3_identity.invokeExact(allocator) as MemorySegment
+    private val h_koral_dmat3_determinant by lazy { handle("koral_dmat3_determinant", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_determinant(m: MemorySegment): Double = h_koral_dmat3_determinant.invokeExact(m) as Double
+    private val h_koral_dmat3_inverse by lazy { handle("koral_dmat3_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_inverse.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_diagonal by lazy { handle("koral_dmat3_diagonal", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3_diagonal(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dmat3_diagonal.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dmat3_mul_dmat2x3 by lazy { handle("koral_dmat3_mul_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat3_mul_dmat2x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3_mul_dmat2x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3_mul by lazy { handle("koral_dmat3_mul", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_mul(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3_mul.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3_mul_dmat4x3 by lazy { handle("koral_dmat3_mul_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat3_mul_dmat4x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3_mul_dmat4x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3_mul_dvec3 by lazy { handle("koral_dmat3_mul_dvec3", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3_mul_dvec3(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat3_mul_dvec3.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec3_mul_dmat3 by lazy { handle("koral_dvec3_mul_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dvec3_mul_dmat3(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec3_mul_dmat3.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat3_add by lazy { handle("koral_dmat3_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3_sub by lazy { handle("koral_dmat3_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3_negate by lazy { handle("koral_dmat3_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_mul_s by lazy { handle("koral_dmat3_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, JAVA_DOUBLE)) }
+    fun koral_dmat3_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat3_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat3_div_s by lazy { handle("koral_dmat3_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, JAVA_DOUBLE)) }
+    fun koral_dmat3_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat3_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat3_eq by lazy { handle("koral_dmat3_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat3_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat3_transpose by lazy { handle("koral_dmat3_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_matrix_comp_mult by lazy { handle("koral_dmat3_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3_outer_product by lazy { handle("koral_dmat3_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat3_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat3_row by lazy { handle("koral_dmat3_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat3, JAVA_INT)) }
+    fun koral_dmat3_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat3_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat3_column by lazy { handle("koral_dmat3_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat3, JAVA_INT)) }
+    fun koral_dmat3_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat3_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat3_set_row by lazy { handle("koral_dmat3_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, JAVA_INT, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat3_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat3_set_column by lazy { handle("koral_dmat3_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, JAVA_INT, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat3_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat3_approx_equal by lazy { handle("koral_dmat3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3, JAVA_DOUBLE)) }
+    fun koral_dmat3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat3_from_mat3 by lazy { handle("koral_dmat3_from_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_dmat3_from_mat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_mat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat2 by lazy { handle("koral_dmat3_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat3_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat2x3 by lazy { handle("koral_dmat3_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat3_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat2x4 by lazy { handle("koral_dmat3_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat3_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat3x2 by lazy { handle("koral_dmat3_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat3x4 by lazy { handle("koral_dmat3_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat4x2 by lazy { handle("koral_dmat3_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat3_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat4x3 by lazy { handle("koral_dmat3_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat3_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3_from_dmat4 by lazy { handle("koral_dmat3_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat3_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_mul_dmat2x3 by lazy { handle("koral_dmat3x4_mul_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat3x4_mul_dmat2x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x4_mul_dmat2x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x4_mul_dmat3 by lazy { handle("koral_dmat3x4_mul_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3x4_mul_dmat3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x4_mul_dmat3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x4_mul_dmat4x3 by lazy { handle("koral_dmat3x4_mul_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat3x4_mul_dmat4x3(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x4_mul_dmat4x3.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x4_mul_dvec3 by lazy { handle("koral_dmat3x4_mul_dvec3", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3x4_mul_dvec3(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat3x4_mul_dvec3.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec4_mul_dmat3x4 by lazy { handle("koral_dvec4_mul_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dvec4_mul_dmat3x4(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec4_mul_dmat3x4.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat3x4_add by lazy { handle("koral_dmat3x4_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3x4_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x4_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x4_sub by lazy { handle("koral_dmat3x4_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3x4_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x4_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x4_negate by lazy { handle("koral_dmat3x4_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3x4_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_mul_s by lazy { handle("koral_dmat3x4_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, JAVA_DOUBLE)) }
+    fun koral_dmat3x4_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat3x4_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat3x4_div_s by lazy { handle("koral_dmat3x4_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, JAVA_DOUBLE)) }
+    fun koral_dmat3x4_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat3x4_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat3x4_eq by lazy { handle("koral_dmat3x4_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3x4_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat3x4_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat3x4_transpose by lazy { handle("koral_dmat3x4_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3x4_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_matrix_comp_mult by lazy { handle("koral_dmat3x4_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat3x4_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat3x4_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat3x4_outer_product by lazy { handle("koral_dmat3x4_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3x4_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat3x4_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat3x4_row by lazy { handle("koral_dmat3x4_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat3x4, JAVA_INT)) }
+    fun koral_dmat3x4_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat3x4_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat3x4_column by lazy { handle("koral_dmat3x4_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat3x4, JAVA_INT)) }
+    fun koral_dmat3x4_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat3x4_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat3x4_set_row by lazy { handle("koral_dmat3x4_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, JAVA_INT, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat3x4_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat3x4_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat3x4_set_column by lazy { handle("koral_dmat3x4_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, JAVA_INT, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat3x4_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat3x4_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat3x4_approx_equal by lazy { handle("koral_dmat3x4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x4, JAVA_DOUBLE)) }
+    fun koral_dmat3x4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat3x4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat3x4_from_mat3x4 by lazy { handle("koral_dmat3x4_from_mat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralMat3x4)) }
+    fun koral_dmat3x4_from_mat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_mat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat2 by lazy { handle("koral_dmat3x4_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat3x4_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat2x3 by lazy { handle("koral_dmat3x4_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat3x4_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat2x4 by lazy { handle("koral_dmat3x4_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat3x4_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat3x2 by lazy { handle("koral_dmat3x4_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat3x4_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat3 by lazy { handle("koral_dmat3x4_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3x4_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat4x2 by lazy { handle("koral_dmat3x4_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat3x4_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat4x3 by lazy { handle("koral_dmat3x4_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat3x4_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat3x4_from_dmat4 by lazy { handle("koral_dmat3x4_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat3x4_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3x4_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_mul_dmat2x4 by lazy { handle("koral_dmat4x2_mul_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat4x2_mul_dmat2x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x2_mul_dmat2x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x2_mul_dmat3x4 by lazy { handle("koral_dmat4x2_mul_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x2, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat4x2_mul_dmat3x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x2_mul_dmat3x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x2_mul_dmat4 by lazy { handle("koral_dmat4x2_mul_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4x2_mul_dmat4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x2_mul_dmat4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x2_mul_dvec4 by lazy { handle("koral_dmat4x2_mul_dvec4", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4x2_mul_dvec4(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat4x2_mul_dvec4.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec2_mul_dmat4x2 by lazy { handle("koral_dvec2_mul_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dvec2_mul_dmat4x2(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec2_mul_dmat4x2.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat4x2_add by lazy { handle("koral_dmat4x2_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4x2_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x2_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x2_sub by lazy { handle("koral_dmat4x2_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4x2_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x2_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x2_negate by lazy { handle("koral_dmat4x2_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4x2_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_mul_s by lazy { handle("koral_dmat4x2_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, JAVA_DOUBLE)) }
+    fun koral_dmat4x2_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat4x2_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat4x2_div_s by lazy { handle("koral_dmat4x2_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, JAVA_DOUBLE)) }
+    fun koral_dmat4x2_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat4x2_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat4x2_eq by lazy { handle("koral_dmat4x2_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4x2_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat4x2_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat4x2_transpose by lazy { handle("koral_dmat4x2_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4x2_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_matrix_comp_mult by lazy { handle("koral_dmat4x2_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4x2_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x2_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x2_outer_product by lazy { handle("koral_dmat4x2_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4x2_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat4x2_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat4x2_row by lazy { handle("koral_dmat4x2_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat4x2, JAVA_INT)) }
+    fun koral_dmat4x2_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat4x2_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat4x2_column by lazy { handle("koral_dmat4x2_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec2, KoralMathLayouts.KoralDMat4x2, JAVA_INT)) }
+    fun koral_dmat4x2_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat4x2_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat4x2_set_row by lazy { handle("koral_dmat4x2_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, JAVA_INT, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4x2_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat4x2_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat4x2_set_column by lazy { handle("koral_dmat4x2_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, JAVA_INT, KoralMathLayouts.KoralDVec2)) }
+    fun koral_dmat4x2_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat4x2_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat4x2_approx_equal by lazy { handle("koral_dmat4x2_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x2, JAVA_DOUBLE)) }
+    fun koral_dmat4x2_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat4x2_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat4x2_from_mat4x2 by lazy { handle("koral_dmat4x2_from_mat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralMat4x2)) }
+    fun koral_dmat4x2_from_mat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_mat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat2 by lazy { handle("koral_dmat4x2_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat4x2_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat2x3 by lazy { handle("koral_dmat4x2_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat4x2_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat2x4 by lazy { handle("koral_dmat4x2_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat4x2_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat3x2 by lazy { handle("koral_dmat4x2_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat4x2_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat3 by lazy { handle("koral_dmat4x2_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat4x2_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat3x4 by lazy { handle("koral_dmat4x2_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat4x2_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat4x3 by lazy { handle("koral_dmat4x2_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4x2_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x2_from_dmat4 by lazy { handle("koral_dmat4x2_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x2, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4x2_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x2_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_mul_dmat2x4 by lazy { handle("koral_dmat4x3_mul_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x3, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat4x3_mul_dmat2x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x3_mul_dmat2x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x3_mul_dmat3x4 by lazy { handle("koral_dmat4x3_mul_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat4x3_mul_dmat3x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x3_mul_dmat3x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x3_mul_dmat4 by lazy { handle("koral_dmat4x3_mul_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4x3_mul_dmat4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x3_mul_dmat4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x3_mul_dvec4 by lazy { handle("koral_dmat4x3_mul_dvec4", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4x3_mul_dvec4(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat4x3_mul_dvec4.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec3_mul_dmat4x3 by lazy { handle("koral_dvec3_mul_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dvec3_mul_dmat4x3(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec3_mul_dmat4x3.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat4x3_add by lazy { handle("koral_dmat4x3_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4x3_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x3_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x3_sub by lazy { handle("koral_dmat4x3_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4x3_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x3_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x3_negate by lazy { handle("koral_dmat4x3_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4x3_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_mul_s by lazy { handle("koral_dmat4x3_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, JAVA_DOUBLE)) }
+    fun koral_dmat4x3_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat4x3_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat4x3_div_s by lazy { handle("koral_dmat4x3_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, JAVA_DOUBLE)) }
+    fun koral_dmat4x3_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat4x3_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat4x3_eq by lazy { handle("koral_dmat4x3_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4x3_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat4x3_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat4x3_transpose by lazy { handle("koral_dmat4x3_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4x3_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_matrix_comp_mult by lazy { handle("koral_dmat4x3_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4x3_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4x3_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4x3_outer_product by lazy { handle("koral_dmat4x3_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4x3_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat4x3_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat4x3_row by lazy { handle("koral_dmat4x3_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat4x3, JAVA_INT)) }
+    fun koral_dmat4x3_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat4x3_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat4x3_column by lazy { handle("koral_dmat4x3_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec3, KoralMathLayouts.KoralDMat4x3, JAVA_INT)) }
+    fun koral_dmat4x3_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat4x3_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat4x3_set_row by lazy { handle("koral_dmat4x3_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, JAVA_INT, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4x3_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat4x3_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat4x3_set_column by lazy { handle("koral_dmat4x3_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, JAVA_INT, KoralMathLayouts.KoralDVec3)) }
+    fun koral_dmat4x3_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat4x3_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat4x3_approx_equal by lazy { handle("koral_dmat4x3_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x3, JAVA_DOUBLE)) }
+    fun koral_dmat4x3_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat4x3_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat4x3_from_mat4x3 by lazy { handle("koral_dmat4x3_from_mat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralMat4x3)) }
+    fun koral_dmat4x3_from_mat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_mat4x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat2 by lazy { handle("koral_dmat4x3_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat4x3_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat2x3 by lazy { handle("koral_dmat4x3_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat4x3_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat2x4 by lazy { handle("koral_dmat4x3_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat4x3_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat3x2 by lazy { handle("koral_dmat4x3_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat4x3_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat3 by lazy { handle("koral_dmat4x3_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat4x3_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat3x4 by lazy { handle("koral_dmat4x3_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat4x3_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat4x2 by lazy { handle("koral_dmat4x3_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4x3_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4x3_from_dmat4 by lazy { handle("koral_dmat4x3_from_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4x3, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4x3_from_dmat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4x3_from_dmat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_identity by lazy { handle("koral_dmat4_identity", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_identity(allocator: SegmentAllocator): MemorySegment = h_koral_dmat4_identity.invokeExact(allocator) as MemorySegment
+    private val h_koral_dmat4_determinant by lazy { handle("koral_dmat4_determinant", FunctionDescriptor.of(JAVA_DOUBLE, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_determinant(m: MemorySegment): Double = h_koral_dmat4_determinant.invokeExact(m) as Double
+    private val h_koral_dmat4_inverse by lazy { handle("koral_dmat4_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_inverse.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_diagonal by lazy { handle("koral_dmat4_diagonal", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4_diagonal(allocator: SegmentAllocator, v: MemorySegment): MemorySegment = h_koral_dmat4_diagonal.invokeExact(allocator, v) as MemorySegment
+    private val h_koral_dmat4_mul_dmat2x4 by lazy { handle("koral_dmat4_mul_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat2x4, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat4_mul_dmat2x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4_mul_dmat2x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4_mul_dmat3x4 by lazy { handle("koral_dmat4_mul_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3x4, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat4_mul_dmat3x4(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4_mul_dmat3x4.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4_mul by lazy { handle("koral_dmat4_mul", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_mul(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4_mul.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4_mul_dvec4 by lazy { handle("koral_dmat4_mul_dvec4", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4_mul_dvec4(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_dmat4_mul_dvec4.invokeExact(allocator, m, v) as MemorySegment
+    private val h_koral_dvec4_mul_dmat4 by lazy { handle("koral_dvec4_mul_dmat4", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dvec4_mul_dmat4(allocator: SegmentAllocator, v: MemorySegment, m: MemorySegment): MemorySegment = h_koral_dvec4_mul_dmat4.invokeExact(allocator, v, m) as MemorySegment
+    private val h_koral_dmat4_add by lazy { handle("koral_dmat4_add", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_add(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4_add.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4_sub by lazy { handle("koral_dmat4_sub", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_sub(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4_sub.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4_negate by lazy { handle("koral_dmat4_negate", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_negate(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_negate.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_mul_s by lazy { handle("koral_dmat4_mul_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, JAVA_DOUBLE)) }
+    fun koral_dmat4_mul_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat4_mul_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat4_div_s by lazy { handle("koral_dmat4_div_s", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, JAVA_DOUBLE)) }
+    fun koral_dmat4_div_s(allocator: SegmentAllocator, m: MemorySegment, s: Double): MemorySegment = h_koral_dmat4_div_s.invokeExact(allocator, m, s) as MemorySegment
+    private val h_koral_dmat4_eq by lazy { handle("koral_dmat4_eq", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_eq(a: MemorySegment, b: MemorySegment): Boolean = h_koral_dmat4_eq.invokeExact(a, b) as Boolean
+    private val h_koral_dmat4_transpose by lazy { handle("koral_dmat4_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_transpose.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_matrix_comp_mult by lazy { handle("koral_dmat4_matrix_comp_mult", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_matrix_comp_mult(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_dmat4_matrix_comp_mult.invokeExact(allocator, a, b) as MemorySegment
+    private val h_koral_dmat4_outer_product by lazy { handle("koral_dmat4_outer_product", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4_outer_product(allocator: SegmentAllocator, column: MemorySegment, row: MemorySegment): MemorySegment = h_koral_dmat4_outer_product.invokeExact(allocator, column, row) as MemorySegment
+    private val h_koral_dmat4_row by lazy { handle("koral_dmat4_row", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat4, JAVA_INT)) }
+    fun koral_dmat4_row(allocator: SegmentAllocator, m: MemorySegment, r: Int): MemorySegment = h_koral_dmat4_row.invokeExact(allocator, m, r) as MemorySegment
+    private val h_koral_dmat4_column by lazy { handle("koral_dmat4_column", FunctionDescriptor.of(KoralMathLayouts.KoralDVec4, KoralMathLayouts.KoralDMat4, JAVA_INT)) }
+    fun koral_dmat4_column(allocator: SegmentAllocator, m: MemorySegment, c: Int): MemorySegment = h_koral_dmat4_column.invokeExact(allocator, m, c) as MemorySegment
+    private val h_koral_dmat4_set_row by lazy { handle("koral_dmat4_set_row", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, JAVA_INT, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4_set_row(allocator: SegmentAllocator, m: MemorySegment, r: Int, value: MemorySegment): MemorySegment = h_koral_dmat4_set_row.invokeExact(allocator, m, r, value) as MemorySegment
+    private val h_koral_dmat4_set_column by lazy { handle("koral_dmat4_set_column", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, JAVA_INT, KoralMathLayouts.KoralDVec4)) }
+    fun koral_dmat4_set_column(allocator: SegmentAllocator, m: MemorySegment, c: Int, value: MemorySegment): MemorySegment = h_koral_dmat4_set_column.invokeExact(allocator, m, c, value) as MemorySegment
+    private val h_koral_dmat4_approx_equal by lazy { handle("koral_dmat4_approx_equal", FunctionDescriptor.of(JAVA_BOOLEAN, KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4, JAVA_DOUBLE)) }
+    fun koral_dmat4_approx_equal(a: MemorySegment, b: MemorySegment, epsilon: Double): Boolean = h_koral_dmat4_approx_equal.invokeExact(a, b, epsilon) as Boolean
+    private val h_koral_dmat4_from_mat4 by lazy { handle("koral_dmat4_from_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralMat4)) }
+    fun koral_dmat4_from_mat4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_mat4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat2 by lazy { handle("koral_dmat4_from_dmat2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat2)) }
+    fun koral_dmat4_from_dmat2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat2x3 by lazy { handle("koral_dmat4_from_dmat2x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat2x3)) }
+    fun koral_dmat4_from_dmat2x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat2x3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat2x4 by lazy { handle("koral_dmat4_from_dmat2x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat2x4)) }
+    fun koral_dmat4_from_dmat2x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat2x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat3x2 by lazy { handle("koral_dmat4_from_dmat3x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat3x2)) }
+    fun koral_dmat4_from_dmat3x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat3x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat3 by lazy { handle("koral_dmat4_from_dmat3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat4_from_dmat3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat3.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat3x4 by lazy { handle("koral_dmat4_from_dmat3x4", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat3x4)) }
+    fun koral_dmat4_from_dmat3x4(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat3x4.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat4x2 by lazy { handle("koral_dmat4_from_dmat4x2", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4x2)) }
+    fun koral_dmat4_from_dmat4x2(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat4x2.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_from_dmat4x3 by lazy { handle("koral_dmat4_from_dmat4x3", FunctionDescriptor.of(KoralMathLayouts.KoralDMat4, KoralMathLayouts.KoralDMat4x3)) }
+    fun koral_dmat4_from_dmat4x3(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat4_from_dmat4x3.invokeExact(allocator, m) as MemorySegment
     private val h_koral_mat4_normal_matrix by lazy { handle("koral_mat4_normal_matrix", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat4)) }
     fun koral_mat4_normal_matrix(allocator: SegmentAllocator, model: MemorySegment): MemorySegment = h_koral_mat4_normal_matrix.invokeExact(allocator, model) as MemorySegment
-    private val h_koral_mat3_mul by lazy { handle("koral_mat3_mul", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
-    fun koral_mat3_mul(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment): MemorySegment = h_koral_mat3_mul.invokeExact(allocator, a, b) as MemorySegment
-    private val h_koral_mat3_mul_vec3 by lazy { handle("koral_mat3_mul_vec3", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralVec3)) }
-    fun koral_mat3_mul_vec3(allocator: SegmentAllocator, m: MemorySegment, v: MemorySegment): MemorySegment = h_koral_mat3_mul_vec3.invokeExact(allocator, m, v) as MemorySegment
-    private val h_koral_mat3_inverse by lazy { handle("koral_mat3_inverse", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
-    fun koral_mat3_inverse(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_inverse.invokeExact(allocator, m) as MemorySegment
-    private val h_koral_mat3_transpose by lazy { handle("koral_mat3_transpose", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
-    fun koral_mat3_transpose(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_transpose.invokeExact(allocator, m) as MemorySegment
-    private val h_koral_mat3_determinant by lazy { handle("koral_mat3_determinant", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralMat3)) }
-    fun koral_mat3_determinant(m: MemorySegment): Float = h_koral_mat3_determinant.invokeExact(m) as Float
+    private val h_koral_mat3_orthonormalize by lazy { handle("koral_mat3_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralMat3)) }
+    fun koral_mat3_orthonormalize(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_mat3_orthonormalize.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_dmat4_normal_matrix by lazy { handle("koral_dmat4_normal_matrix", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat4)) }
+    fun koral_dmat4_normal_matrix(allocator: SegmentAllocator, model: MemorySegment): MemorySegment = h_koral_dmat4_normal_matrix.invokeExact(allocator, model) as MemorySegment
+    private val h_koral_dmat3_orthonormalize by lazy { handle("koral_dmat3_orthonormalize", FunctionDescriptor.of(KoralMathLayouts.KoralDMat3, KoralMathLayouts.KoralDMat3)) }
+    fun koral_dmat3_orthonormalize(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_dmat3_orthonormalize.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_xy by lazy { handle("koral_euler_angle_xy", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_xy(allocator: SegmentAllocator, first: Float, second: Float): MemorySegment = h_koral_euler_angle_xy.invokeExact(allocator, first, second) as MemorySegment
+    private val h_koral_euler_angle_xz by lazy { handle("koral_euler_angle_xz", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_xz(allocator: SegmentAllocator, first: Float, second: Float): MemorySegment = h_koral_euler_angle_xz.invokeExact(allocator, first, second) as MemorySegment
+    private val h_koral_euler_angle_yx by lazy { handle("koral_euler_angle_yx", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_yx(allocator: SegmentAllocator, first: Float, second: Float): MemorySegment = h_koral_euler_angle_yx.invokeExact(allocator, first, second) as MemorySegment
+    private val h_koral_euler_angle_yz by lazy { handle("koral_euler_angle_yz", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_yz(allocator: SegmentAllocator, first: Float, second: Float): MemorySegment = h_koral_euler_angle_yz.invokeExact(allocator, first, second) as MemorySegment
+    private val h_koral_euler_angle_zx by lazy { handle("koral_euler_angle_zx", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_zx(allocator: SegmentAllocator, first: Float, second: Float): MemorySegment = h_koral_euler_angle_zx.invokeExact(allocator, first, second) as MemorySegment
+    private val h_koral_euler_angle_zy by lazy { handle("koral_euler_angle_zy", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_zy(allocator: SegmentAllocator, first: Float, second: Float): MemorySegment = h_koral_euler_angle_zy.invokeExact(allocator, first, second) as MemorySegment
+    private val h_koral_euler_angle_xyz by lazy { handle("koral_euler_angle_xyz", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_xyz(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_xyz.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_xyz by lazy { handle("koral_extract_euler_angle_xyz", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_xyz(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_xyz.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_xzy by lazy { handle("koral_euler_angle_xzy", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_xzy(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_xzy.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_xzy by lazy { handle("koral_extract_euler_angle_xzy", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_xzy(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_xzy.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_yxz by lazy { handle("koral_euler_angle_yxz", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_yxz(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_yxz.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_yxz by lazy { handle("koral_extract_euler_angle_yxz", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_yxz(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_yxz.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_yzx by lazy { handle("koral_euler_angle_yzx", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_yzx(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_yzx.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_yzx by lazy { handle("koral_extract_euler_angle_yzx", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_yzx(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_yzx.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_zxy by lazy { handle("koral_euler_angle_zxy", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_zxy(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_zxy.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_zxy by lazy { handle("koral_extract_euler_angle_zxy", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_zxy(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_zxy.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_zyx by lazy { handle("koral_euler_angle_zyx", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_zyx(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_zyx.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_zyx by lazy { handle("koral_extract_euler_angle_zyx", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_zyx(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_zyx.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_xyx by lazy { handle("koral_euler_angle_xyx", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_xyx(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_xyx.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_xyx by lazy { handle("koral_extract_euler_angle_xyx", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_xyx(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_xyx.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_xzx by lazy { handle("koral_euler_angle_xzx", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_xzx(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_xzx.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_xzx by lazy { handle("koral_extract_euler_angle_xzx", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_xzx(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_xzx.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_yxy by lazy { handle("koral_euler_angle_yxy", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_yxy(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_yxy.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_yxy by lazy { handle("koral_extract_euler_angle_yxy", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_yxy(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_yxy.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_yzy by lazy { handle("koral_euler_angle_yzy", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_yzy(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_yzy.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_yzy by lazy { handle("koral_extract_euler_angle_yzy", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_yzy(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_yzy.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_zxz by lazy { handle("koral_euler_angle_zxz", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_zxz(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_zxz.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_zxz by lazy { handle("koral_extract_euler_angle_zxz", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_zxz(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_zxz.invokeExact(allocator, m) as MemorySegment
+    private val h_koral_euler_angle_zyz by lazy { handle("koral_euler_angle_zyz", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_euler_angle_zyz(allocator: SegmentAllocator, first: Float, second: Float, third: Float): MemorySegment = h_koral_euler_angle_zyz.invokeExact(allocator, first, second, third) as MemorySegment
+    private val h_koral_extract_euler_angle_zyz by lazy { handle("koral_extract_euler_angle_zyz", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angle_zyz(allocator: SegmentAllocator, m: MemorySegment): MemorySegment = h_koral_extract_euler_angle_zyz.invokeExact(allocator, m) as MemorySegment
     private val h_koral_translation by lazy { handle("koral_translation", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec3)) }
     fun koral_translation(allocator: SegmentAllocator, by: MemorySegment): MemorySegment = h_koral_translation.invokeExact(allocator, by) as MemorySegment
     private val h_koral_scaling by lazy { handle("koral_scaling", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec3)) }
@@ -182,12 +3619,42 @@ object KoralMathNative {
     fun koral_scale(allocator: SegmentAllocator, m: MemorySegment, by: MemorySegment): MemorySegment = h_koral_scale.invokeExact(allocator, m, by) as MemorySegment
     private val h_koral_look_at by lazy { handle("koral_look_at", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
     fun koral_look_at(allocator: SegmentAllocator, eye: MemorySegment, target: MemorySegment, up: MemorySegment): MemorySegment = h_koral_look_at.invokeExact(allocator, eye, target, up) as MemorySegment
-    private val h_koral_perspective by lazy { handle("koral_perspective", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
-    fun koral_perspective(allocator: SegmentAllocator, fov_y: Float, aspect: Float, near_plane: Float, far_plane: Float): MemorySegment = h_koral_perspective.invokeExact(allocator, fov_y, aspect, near_plane, far_plane) as MemorySegment
+    private val h_koral_perspective by lazy { handle("koral_perspective", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT)) }
+    fun koral_perspective(allocator: SegmentAllocator, fov_y: Float, aspect: Float, near_plane: Float, far_plane: Float, clip: Int): MemorySegment = h_koral_perspective.invokeExact(allocator, fov_y, aspect, near_plane, far_plane, clip) as MemorySegment
+    private val h_koral_perspective_fov by lazy { handle("koral_perspective_fov", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT)) }
+    fun koral_perspective_fov(allocator: SegmentAllocator, fov: Float, width: Float, height: Float, near_plane: Float, far_plane: Float, clip: Int): MemorySegment = h_koral_perspective_fov.invokeExact(allocator, fov, width, height, near_plane, far_plane, clip) as MemorySegment
+    private val h_koral_infinite_perspective by lazy { handle("koral_infinite_perspective", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT)) }
+    fun koral_infinite_perspective(allocator: SegmentAllocator, fov_y: Float, aspect: Float, near_plane: Float, clip: Int): MemorySegment = h_koral_infinite_perspective.invokeExact(allocator, fov_y, aspect, near_plane, clip) as MemorySegment
+    private val h_koral_frustum_projection by lazy { handle("koral_frustum_projection", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT)) }
+    fun koral_frustum_projection(allocator: SegmentAllocator, left: Float, right: Float, bottom: Float, top: Float, near_plane: Float, far_plane: Float, clip: Int): MemorySegment = h_koral_frustum_projection.invokeExact(allocator, left, right, bottom, top, near_plane, far_plane, clip) as MemorySegment
     private val h_koral_perspective_reversed_z by lazy { handle("koral_perspective_reversed_z", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
     fun koral_perspective_reversed_z(allocator: SegmentAllocator, fov_y: Float, aspect: Float, near_plane: Float, far_plane: Float): MemorySegment = h_koral_perspective_reversed_z.invokeExact(allocator, fov_y, aspect, near_plane, far_plane) as MemorySegment
-    private val h_koral_orthographic by lazy { handle("koral_orthographic", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
-    fun koral_orthographic(allocator: SegmentAllocator, left: Float, right: Float, bottom: Float, top: Float, near_plane: Float, far_plane: Float): MemorySegment = h_koral_orthographic.invokeExact(allocator, left, right, bottom, top, near_plane, far_plane) as MemorySegment
+    private val h_koral_orthographic by lazy { handle("koral_orthographic", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_INT)) }
+    fun koral_orthographic(allocator: SegmentAllocator, left: Float, right: Float, bottom: Float, top: Float, near_plane: Float, far_plane: Float, clip: Int): MemorySegment = h_koral_orthographic.invokeExact(allocator, left, right, bottom, top, near_plane, far_plane, clip) as MemorySegment
+    private val h_koral_orthographic_2d by lazy { handle("koral_orthographic_2d", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_orthographic_2d(allocator: SegmentAllocator, left: Float, right: Float, bottom: Float, top: Float): MemorySegment = h_koral_orthographic_2d.invokeExact(allocator, left, right, bottom, top) as MemorySegment
+    private val h_koral_look_at_lh by lazy { handle("koral_look_at_lh", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3)) }
+    fun koral_look_at_lh(allocator: SegmentAllocator, eye: MemorySegment, target: MemorySegment, up: MemorySegment): MemorySegment = h_koral_look_at_lh.invokeExact(allocator, eye, target, up) as MemorySegment
+    private val h_koral_project by lazy { handle("koral_project", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec4, JAVA_INT)) }
+    fun koral_project(allocator: SegmentAllocator, `object`: MemorySegment, model: MemorySegment, projection: MemorySegment, viewport: MemorySegment, clip: Int): MemorySegment = h_koral_project.invokeExact(allocator, `object`, model, projection, viewport, clip) as MemorySegment
+    private val h_koral_unproject by lazy { handle("koral_unproject", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec4, JAVA_INT)) }
+    fun koral_unproject(allocator: SegmentAllocator, window: MemorySegment, model: MemorySegment, projection: MemorySegment, viewport: MemorySegment, clip: Int): MemorySegment = h_koral_unproject.invokeExact(allocator, window, model, projection, viewport, clip) as MemorySegment
+    private val h_koral_pick_matrix by lazy { handle("koral_pick_matrix", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec2, KoralMathLayouts.KoralVec4)) }
+    fun koral_pick_matrix(allocator: SegmentAllocator, center: MemorySegment, size: MemorySegment, viewport: MemorySegment): MemorySegment = h_koral_pick_matrix.invokeExact(allocator, center, size, viewport) as MemorySegment
+    private val h_koral_euler_angle_x by lazy { handle("koral_euler_angle_x", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT)) }
+    fun koral_euler_angle_x(allocator: SegmentAllocator, angle: Float): MemorySegment = h_koral_euler_angle_x.invokeExact(allocator, angle) as MemorySegment
+    private val h_koral_euler_angle_y by lazy { handle("koral_euler_angle_y", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT)) }
+    fun koral_euler_angle_y(allocator: SegmentAllocator, angle: Float): MemorySegment = h_koral_euler_angle_y.invokeExact(allocator, angle) as MemorySegment
+    private val h_koral_euler_angle_z by lazy { handle("koral_euler_angle_z", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT)) }
+    fun koral_euler_angle_z(allocator: SegmentAllocator, angle: Float): MemorySegment = h_koral_euler_angle_z.invokeExact(allocator, angle) as MemorySegment
+    private val h_koral_euler_angles by lazy { handle("koral_euler_angles", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_euler_angles(allocator: SegmentAllocator, order: Int, angles: MemorySegment): MemorySegment = h_koral_euler_angles.invokeExact(allocator, order, angles) as MemorySegment
+    private val h_koral_extract_euler_angles by lazy { handle("koral_extract_euler_angles", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, JAVA_INT, KoralMathLayouts.KoralMat4)) }
+    fun koral_extract_euler_angles(allocator: SegmentAllocator, order: Int, m: MemorySegment): MemorySegment = h_koral_extract_euler_angles.invokeExact(allocator, order, m) as MemorySegment
+    private val h_koral_yaw_pitch_roll by lazy { handle("koral_yaw_pitch_roll", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, JAVA_FLOAT, JAVA_FLOAT, JAVA_FLOAT)) }
+    fun koral_yaw_pitch_roll(allocator: SegmentAllocator, yaw: Float, pitch: Float, roll: Float): MemorySegment = h_koral_yaw_pitch_roll.invokeExact(allocator, yaw, pitch, roll) as MemorySegment
+    private val h_koral_quat_from_euler_order by lazy { handle("koral_quat_from_euler_order", FunctionDescriptor.of(KoralMathLayouts.KoralQuat, JAVA_INT, KoralMathLayouts.KoralVec3)) }
+    fun koral_quat_from_euler_order(allocator: SegmentAllocator, order: Int, angles: MemorySegment): MemorySegment = h_koral_quat_from_euler_order.invokeExact(allocator, order, angles) as MemorySegment
     private val h_koral_transform_point by lazy { handle("koral_transform_point", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec3)) }
     fun koral_transform_point(allocator: SegmentAllocator, m: MemorySegment, p: MemorySegment): MemorySegment = h_koral_transform_point.invokeExact(allocator, m, p) as MemorySegment
     private val h_koral_transform_point_projective by lazy { handle("koral_transform_point_projective", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralVec3)) }
@@ -224,6 +3691,18 @@ object KoralMathNative {
     fun koral_quat_axis(allocator: SegmentAllocator, q: MemorySegment): MemorySegment = h_koral_quat_axis.invokeExact(allocator, q) as MemorySegment
     private val h_koral_quat_euler_angles by lazy { handle("koral_quat_euler_angles", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralQuat)) }
     fun koral_quat_euler_angles(allocator: SegmentAllocator, q: MemorySegment): MemorySegment = h_koral_quat_euler_angles.invokeExact(allocator, q) as MemorySegment
+    private val h_koral_quat_pitch by lazy { handle("koral_quat_pitch", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralQuat)) }
+    fun koral_quat_pitch(q: MemorySegment): Float = h_koral_quat_pitch.invokeExact(q) as Float
+    private val h_koral_quat_yaw by lazy { handle("koral_quat_yaw", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralQuat)) }
+    fun koral_quat_yaw(q: MemorySegment): Float = h_koral_quat_yaw.invokeExact(q) as Float
+    private val h_koral_quat_roll by lazy { handle("koral_quat_roll", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralQuat)) }
+    fun koral_quat_roll(q: MemorySegment): Float = h_koral_quat_roll.invokeExact(q) as Float
+    private val h_koral_quat_rotate_axis by lazy { handle("koral_quat_rotate_axis", FunctionDescriptor.of(KoralMathLayouts.KoralQuat, KoralMathLayouts.KoralQuat, JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_quat_rotate_axis(allocator: SegmentAllocator, q: MemorySegment, angle: Float, axis: MemorySegment): MemorySegment = h_koral_quat_rotate_axis.invokeExact(allocator, q, angle, axis) as MemorySegment
+    private val h_koral_vec3_rotate by lazy { handle("koral_vec3_rotate", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, KoralMathLayouts.KoralVec3, JAVA_FLOAT, KoralMathLayouts.KoralVec3)) }
+    fun koral_vec3_rotate(allocator: SegmentAllocator, v: MemorySegment, angle: Float, axis: MemorySegment): MemorySegment = h_koral_vec3_rotate.invokeExact(allocator, v, angle, axis) as MemorySegment
+    private val h_koral_quat_lerp by lazy { handle("koral_quat_lerp", FunctionDescriptor.of(KoralMathLayouts.KoralQuat, KoralMathLayouts.KoralQuat, KoralMathLayouts.KoralQuat, JAVA_FLOAT)) }
+    fun koral_quat_lerp(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_quat_lerp.invokeExact(allocator, a, b, t) as MemorySegment
     private val h_koral_quat_to_mat3 by lazy { handle("koral_quat_to_mat3", FunctionDescriptor.of(KoralMathLayouts.KoralMat3, KoralMathLayouts.KoralQuat)) }
     fun koral_quat_to_mat3(allocator: SegmentAllocator, q: MemorySegment): MemorySegment = h_koral_quat_to_mat3.invokeExact(allocator, q) as MemorySegment
     private val h_koral_quat_to_mat4 by lazy { handle("koral_quat_to_mat4", FunctionDescriptor.of(KoralMathLayouts.KoralMat4, KoralMathLayouts.KoralQuat)) }
@@ -440,22 +3919,30 @@ object KoralMathNative {
     fun koral_mix_oklab(allocator: SegmentAllocator, a: MemorySegment, b: MemorySegment, t: Float): MemorySegment = h_koral_mix_oklab.invokeExact(allocator, a, b, t) as MemorySegment
     private val h_koral_color_temperature by lazy { handle("koral_color_temperature", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, JAVA_FLOAT)) }
     fun koral_color_temperature(allocator: SegmentAllocator, kelvin: Float): MemorySegment = h_koral_color_temperature.invokeExact(allocator, kelvin) as MemorySegment
-    private val h_koral_pack_unorm4x8 by lazy { handle("koral_pack_unorm4x8", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec4)) }
-    fun koral_pack_unorm4x8(c: MemorySegment): Int = h_koral_pack_unorm4x8.invokeExact(c) as Int
-    private val h_koral_unpack_unorm4x8 by lazy { handle("koral_unpack_unorm4x8", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_INT)) }
-    fun koral_unpack_unorm4x8(allocator: SegmentAllocator, packed: Int): MemorySegment = h_koral_unpack_unorm4x8.invokeExact(allocator, packed) as MemorySegment
-    private val h_koral_float_to_half by lazy { handle("koral_float_to_half", FunctionDescriptor.of(JAVA_SHORT, JAVA_FLOAT)) }
-    fun koral_float_to_half(value: Float): Short = h_koral_float_to_half.invokeExact(value) as Short
-    private val h_koral_half_to_float by lazy { handle("koral_half_to_float", FunctionDescriptor.of(JAVA_FLOAT, JAVA_SHORT)) }
-    fun koral_half_to_float(half: Short): Float = h_koral_half_to_float.invokeExact(half) as Float
-    private val h_koral_pack_half2x16 by lazy { handle("koral_pack_half2x16", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec2)) }
-    fun koral_pack_half2x16(v: MemorySegment): Int = h_koral_pack_half2x16.invokeExact(v) as Int
-    private val h_koral_unpack_half2x16 by lazy { handle("koral_unpack_half2x16", FunctionDescriptor.of(KoralMathLayouts.KoralVec2, JAVA_INT)) }
-    fun koral_unpack_half2x16(allocator: SegmentAllocator, packed: Int): MemorySegment = h_koral_unpack_half2x16.invokeExact(allocator, packed) as MemorySegment
     private val h_koral_pack_octahedral by lazy { handle("koral_pack_octahedral", FunctionDescriptor.of(JAVA_INT, KoralMathLayouts.KoralVec3)) }
     fun koral_pack_octahedral(n: MemorySegment): Int = h_koral_pack_octahedral.invokeExact(n) as Int
     private val h_koral_unpack_octahedral by lazy { handle("koral_unpack_octahedral", FunctionDescriptor.of(KoralMathLayouts.KoralVec3, JAVA_INT)) }
     fun koral_unpack_octahedral(allocator: SegmentAllocator, packed: Int): MemorySegment = h_koral_unpack_octahedral.invokeExact(allocator, packed) as MemorySegment
+    private val h_koral_material_color by lazy { handle("koral_material_color", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_material_color(allocator: SegmentAllocator, hue: Int, shade: Int): MemorySegment = h_koral_material_color.invokeExact(allocator, hue, shade) as MemorySegment
+    private val h_koral_material_accent by lazy { handle("koral_material_accent", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, JAVA_INT, JAVA_INT)) }
+    fun koral_material_accent(allocator: SegmentAllocator, hue: Int, shade: Int): MemorySegment = h_koral_material_accent.invokeExact(allocator, hue, shade) as MemorySegment
+    private val h_koral_hct_from_color by lazy { handle("koral_hct_from_color", FunctionDescriptor.of(KoralMathLayouts.KoralHct, KoralMathLayouts.KoralVec4)) }
+    fun koral_hct_from_color(allocator: SegmentAllocator, srgb: MemorySegment): MemorySegment = h_koral_hct_from_color.invokeExact(allocator, srgb) as MemorySegment
+    private val h_koral_hct_to_color by lazy { handle("koral_hct_to_color", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralHct)) }
+    fun koral_hct_to_color(allocator: SegmentAllocator, hct: MemorySegment): MemorySegment = h_koral_hct_to_color.invokeExact(allocator, hct) as MemorySegment
+    private val h_koral_tonal_palette_from_color by lazy { handle("koral_tonal_palette_from_color", FunctionDescriptor.of(KoralMathLayouts.KoralTonalPalette, KoralMathLayouts.KoralVec4)) }
+    fun koral_tonal_palette_from_color(allocator: SegmentAllocator, srgb: MemorySegment): MemorySegment = h_koral_tonal_palette_from_color.invokeExact(allocator, srgb) as MemorySegment
+    private val h_koral_tonal_palette_tone by lazy { handle("koral_tonal_palette_tone", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralTonalPalette, JAVA_FLOAT)) }
+    fun koral_tonal_palette_tone(allocator: SegmentAllocator, palette: MemorySegment, tone: Float): MemorySegment = h_koral_tonal_palette_tone.invokeExact(allocator, palette, tone) as MemorySegment
+    private val h_koral_material_scheme_from_seed by lazy { handle("koral_material_scheme_from_seed", FunctionDescriptor.of(KoralMathLayouts.KoralMaterialScheme, KoralMathLayouts.KoralVec4, JAVA_BOOLEAN, JAVA_INT, JAVA_FLOAT)) }
+    fun koral_material_scheme_from_seed(allocator: SegmentAllocator, seed: MemorySegment, dark: Boolean, variant: Int, contrast: Float): MemorySegment = h_koral_material_scheme_from_seed.invokeExact(allocator, seed, dark, variant, contrast) as MemorySegment
+    private val h_koral_seed_colors by lazy { handle("koral_seed_colors", FunctionDescriptor.of(JAVA_LONG, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG)) }
+    fun koral_seed_colors(rgba8: MemorySegment, pixel_count: Long, seeds: MemorySegment, max: Long): Long = h_koral_seed_colors.invokeExact(rgba8, pixel_count, seeds, max) as Long
+    private val h_koral_harmonize by lazy { handle("koral_harmonize", FunctionDescriptor.of(KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_harmonize(allocator: SegmentAllocator, design: MemorySegment, key: MemorySegment): MemorySegment = h_koral_harmonize.invokeExact(allocator, design, key) as MemorySegment
+    private val h_koral_contrast_ratio by lazy { handle("koral_contrast_ratio", FunctionDescriptor.of(JAVA_FLOAT, KoralMathLayouts.KoralVec4, KoralMathLayouts.KoralVec4)) }
+    fun koral_contrast_ratio(a: MemorySegment, b: MemorySegment): Float = h_koral_contrast_ratio.invokeExact(a, b) as Float
     private val h_koral_bulk_transform_points by lazy { handle("koral_bulk_transform_points", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralMat4, ADDRESS, ADDRESS, JAVA_LONG)) }
     fun koral_bulk_transform_points(m: MemorySegment, points: MemorySegment, out: MemorySegment, count: Long): Unit { h_koral_bulk_transform_points.invokeExact(m, points, out, count) }
     private val h_koral_bulk_transform_directions by lazy { handle("koral_bulk_transform_directions", FunctionDescriptor.ofVoid(KoralMathLayouts.KoralMat4, ADDRESS, ADDRESS, JAVA_LONG)) }

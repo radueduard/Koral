@@ -48,7 +48,7 @@ The rules are few, and they apply everywhere:
 | C++ | C# |
 |---|---|
 | `kor::Image::Builder{}.SetFormat(f).Build()` | `new Image.Builder().SetFormat(f).Build()` |
-| `kor::Buffer::Builder<Vertex>{}.SetData(v)` | `new Buffer.Builder<Vertex>().SetData(v)` |
+| `kor::Buffer::Builder<Vertex>{}.SetData(v)` | `new Buffer.Builder<Vertex>().SetData(v)` — any unmanaged struct, as is; or `new Buffer.RawBuilder().SetData(values, GpuPacking.Std430)` for classes, records and a shader's std430/std140 layout (`ReadAs<T>`, `WriteValues`, `Gpu.Bytes` to match) |
 | `kor::Resource<kor::Image>`, `kor::ResourceRef<const kor::Image>` | `Image`: a C# reference already is a handle |
 | `image->Extent()` | `image.Extent`: an accessor with nothing to pass is a property |
 | `commandBuffer.BindMesh(m).Draw()` | `commandBuffer.BindMesh(m).Draw()` |

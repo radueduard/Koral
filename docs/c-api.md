@@ -62,11 +62,24 @@ int main(void) {
 - **Threads.** Everything runs on the thread that created the application, except a pass's `record`
   callback and the command-buffer calls made from it, which run on a worker thread alongside other passes.
 
+## Mathematics
+
+`koral_math_c.h` is kmath ([Mathematics](math.md)) for C: every type a plain struct with the C++ type's bytes,
+passed by value (`KoralVec3`, `KoralMat4`, `KoralQuat`, `KoralAabb`, ...), vector arithmetic `static inline`
+(`koral_vec3_add`), the rest exported (`koral_quat_angle_axis`, `koral_raycast_aabb`, `koral_noise_simplex3`,
+`koral_bulk_cull_aabbs`). It is also what the C# and Kotlin math is tested against, value for value.
+
 ## Modules
 
 A module's C interface follows the same conventions in a header of its own: koral-ui's is
-`koralUI_c.h` ([Interfaces with koral-ui](ui.md#from-c)). It reports its failures through
-`koral_last_error()`, by way of `koral_set_last_error`.
+`koralUI_c.h` ([Interfaces with koral-ui](ui.md#from-c)), koral-net's `koralNet_c.h`
+([Networking](networking.md)). They report their failures through `koral_last_error()`, by way of
+`koral_set_last_error`.
+
+koral-net's operations that wait return a `KnetOp*` at once, with the caller's `KoralToken*` signalled when
+it has finished; the `knet_op_*` getters then give what it made (or `knet_op_failed`/`knet_op_error` why not).
+Destroying an unfinished op cancels it. They resume off the main thread, so waiting on the token by blocking is
+safe on any thread.
 
 ## For a runtime of one's own
 

@@ -15,6 +15,7 @@ fun srgbToLinear(c: Vec4) = Vec4(srgbToLinear(c.xyz), c.w)
 fun linearToSrgb(c: Vec4) = Vec4(linearToSrgb(c.xyz), c.w)
 
 /** 0xRRGGBB as an opaque colour, channels in [0, 1]. */
+fun colorFromHex(rgb: UInt) = colorFromHex(rgb.toInt())
 fun colorFromHex(rgb: Int) = Vec4(((rgb shr 16) and 0xff) / 255f, ((rgb shr 8) and 0xff) / 255f, (rgb and 0xff) / 255f, 1f)
 /** 0xRRGGBBAA. */
 fun colorFromHexA(rgba: Int) = colorFromHex(rgba ushr 8).copy(w = (rgba and 0xff) / 255f)
@@ -23,8 +24,8 @@ fun luminance(linear: Vec3) = dot(linear, Vec3(0.2126f, 0.7152f, 0.0722f))
 
 /** RGB to hue (a full turn is 1), saturation, value. */
 fun rgbToHsv(c: Vec3): Vec3 {
-    val max = maxComponent(c)
-    val min = minComponent(c)
+    val max = compMax(c)
+    val min = compMin(c)
     val d = max - min
     var h = 0f
     if (d > 0f) {
@@ -43,8 +44,8 @@ fun hsvToRgb(hsv: Vec3): Vec3 {
     return when (i % 6) { 0 -> Vec3(v, t, p); 1 -> Vec3(q, v, p); 2 -> Vec3(p, v, t); 3 -> Vec3(p, q, v); 4 -> Vec3(t, p, v); else -> Vec3(v, p, q) }
 }
 fun rgbToHsl(c: Vec3): Vec3 {
-    val max = maxComponent(c)
-    val min = minComponent(c)
+    val max = compMax(c)
+    val min = compMin(c)
     val l = (max + min) * 0.5f
     val d = max - min
     if (d == 0f) return Vec3(0f, 0f, l)
@@ -103,57 +104,9 @@ fun colorTemperature(kelvin: Float): Vec3 {
         b = 255f
     }
     val linear = srgbToLinear(clamp(Vec3(r, g, b) / 255f, 0f, 1f))
-    return linear / maxOf(maxComponent(linear), 1e-6f)
+    return linear / maxOf(compMax(linear), 1e-6f)
 }
 
-/** Four [0, 1] floats into RGBA8, R in the lowest byte (as an Int with the uint's bits). */
-fun packUnorm4x8(c: Vec4): Int {
-    var packed = 0
-    for (i in 0 until 4) packed = packed or ((saturate(c[i]) * 255f + 0.5f).toInt() shl (8 * i))
-    return packed
-}
-fun unpackUnorm4x8(packed: Int) = Vec4((packed and 0xff) / 255f, ((packed shr 8) and 0xff) / 255f, ((packed shr 16) and 0xff) / 255f, ((packed ushr 24) and 0xff) / 255f)
-
-/** IEEE half precision, round to nearest even (as a Short with the half's bits). */
-fun floatToHalf(value: Float): Short {
-    val bits = value.toRawBits()
-    val sign = (bits ushr 16) and 0x8000
-    val exponent = (bits ushr 23) and 0xff
-    var mantissa = bits and 0x7fffff
-    if (exponent == 0xff) return (sign or 0x7c00 or (if (mantissa != 0) 0x200 else 0)).toShort()
-    val e = exponent - 127 + 15
-    if (e >= 31) return (sign or 0x7c00).toShort()
-    if (e <= 0) {
-        if (e < -10) return sign.toShort()
-        mantissa = mantissa or 0x800000
-        val shift = 14 - e
-        var half = mantissa ushr shift
-        val rem = mantissa and ((1 shl shift) - 1)
-        val halfway = 1 shl (shift - 1)
-        if (rem > halfway || (rem == halfway && (half and 1) != 0)) ++half
-        return (sign or half).toShort()
-    }
-    var h = (e shl 10) or (mantissa ushr 13)
-    val r = mantissa and 0x1fff
-    if (r > 0x1000 || (r == 0x1000 && (h and 1) != 0)) ++h
-    return (sign or h).toShort()
-}
-fun halfToFloat(half: Short): Float {
-    val hb = half.toInt() and 0xffff
-    val sign = (hb and 0x8000) shl 16
-    val exponent = (hb shr 10) and 0x1f
-    var mantissa = hb and 0x3ff
-    if (exponent == 0) {
-        if (mantissa == 0) return Float.fromBits(sign)
-        var e = -1
-        do { ++e; mantissa = mantissa shl 1 } while ((mantissa and 0x400) == 0)
-        return Float.fromBits(sign or ((127 - 15 - e) shl 23) or ((mantissa and 0x3ff) shl 13))
-    }
-    if (exponent == 31) return Float.fromBits(sign or 0x7f800000 or (mantissa shl 13))
-    return Float.fromBits(sign or ((exponent + 127 - 15) shl 23) or (mantissa shl 13))
-}
-fun packHalf2x16(v: Vec2) = (floatToHalf(v.x).toInt() and 0xffff) or (floatToHalf(v.y).toInt() shl 16)
-fun unpackHalf2x16(packed: Int) = Vec2(halfToFloat(packed.toShort()), halfToFloat((packed ushr 16).toShort()))
 /** A unit normal in two snorm16s (octahedral mapping). */
 fun packOctahedral(n: Vec3): Int {
     var p = Vec2(n.x, n.y) * (1f / (kotlin.math.abs(n.x) + kotlin.math.abs(n.y) + kotlin.math.abs(n.z)))

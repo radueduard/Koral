@@ -6,31 +6,54 @@ import java.lang.foreign.ValueLayout
 import koral.interop.KoralNative
 
 /**
- * How a value of type T sits in GPU memory: its size, and how it is written and read. What gives a buffer
- * typed contents — the JVM has no structs to copy as they are.
+ * How a value of type T sits in GPU memory: its size and alignment, and how it is written and read. What gives
+ * a buffer typed contents — the JVM has no structs to copy as they are.
+ *
+ * Usually derived for you: anything that takes buffer data takes a vector, a matrix, a data class, or a list
+ * or array of them, and lays it out with [of]. Write one by hand only for a layout no class describes:
  *
  * ```
  * data class Vertex(val position: Vec3, val color: Vec3)
- * val VertexLayout = GpuLayout<Vertex>(24,
- *     write = { s, at, v -> s.putVec3(at, v.position); s.putVec3(at + 12, v.color) },
- *     read = { s, at -> Vertex(s.getVec3(at), s.getVec3(at + 12)) })
+ * Buffer.Builder().setData(vertices)                       // derived: 24 bytes each, as the C++ struct
+ *
+ * val Packed = GpuLayout<Vertex>(16,                       // by hand: colour packed into 4 bytes
+ *     write = { s, at, v -> s.putVec3(at, v.position); s.set(ValueLayout.JAVA_INT, at + 12, packUnorm4x8(Vec4(v.color, 1f))) })
  * ```
  */
-class GpuLayout<T>(val size: Long, val write: (MemorySegment, Long, T) -> Unit, val read: ((MemorySegment, Long) -> T)? = null) {
+class GpuLayout<T>(val size: Long, val write: (MemorySegment, Long, T) -> Unit, val read: ((MemorySegment, Long) -> T)? = null,
+                   val alignment: Long = 4) {
+    /** How far apart consecutive values sit in an array: the size, rounded up to the alignment. */
+    val stride: Long get() = (size + alignment - 1) / alignment * alignment
+
     /** [values], laid out one after another in [arena]. */
     fun pack(arena: Arena, values: List<T>): MemorySegment {
-        val segment = arena.allocate(maxOf(1L, size * values.size), 16)
-        values.forEachIndexed { i, v -> write(segment, i * size, v) }
+        val segment = arena.allocate(maxOf(1L, stride * values.size), 16)
+        values.forEachIndexed { i, v -> write(segment, i * stride, v) }
         return segment
     }
 
     /** [count] values read from [segment]. */
     fun unpack(segment: MemorySegment, count: Int): List<T> {
         val reader = read ?: throw KoralException("this GpuLayout cannot read")
-        return List(count) { reader(segment, it * size) }
+        return List(count) { reader(segment, it * stride) }
+    }
+
+    /** [values] as bytes. */
+    fun toBytes(values: List<T>): ByteArray = Arena.ofConfined().use { a -> pack(a, values).asSlice(0, stride * values.size).toArray(ValueLayout.JAVA_BYTE) }
+    /** The values in [bytes]. */
+    fun fromBytes(bytes: ByteArray): List<T> = Arena.ofConfined().use { a ->
+        unpack(a.allocateFrom(ValueLayout.JAVA_BYTE, *bytes), (bytes.size / stride).toInt())
     }
 
     companion object {
+        /**
+         * The layout of [type], derived: a number, a vector, a quaternion or a matrix as Koral's own; an enum as its
+         * value; any other class (a data class, typically) as its fields in declaration order, each at its alignment
+         * under [packing] — [GpuPacking.C] by default, the same bytes as the same struct in C++ and C#. Values are
+         * read back through the constructor that takes every field. Derived once per class.
+         */
+        fun <T : Any> of(type: kotlin.reflect.KClass<T>, packing: GpuPacking = GpuPacking.C): GpuLayout<T> = AutoLayouts.of(type.java, packing)
+
         val Float = GpuLayout<Float>(4, { s, at, v -> s.set(ValueLayout.JAVA_FLOAT, at, v) }, { s, at -> s.get(ValueLayout.JAVA_FLOAT, at) })
         val Int = GpuLayout<Int>(4, { s, at, v -> s.set(ValueLayout.JAVA_INT, at, v) }, { s, at -> s.get(ValueLayout.JAVA_INT, at) })
         val Vec2 = GpuLayout<Vec2>(8, { s, at, v -> s.putVec2(at, v) }, { s, at -> s.getVec2(at) })
@@ -55,29 +78,20 @@ fun MemorySegment.getMat4(at: Long) = Mat4(FloatArray(16) { get(ValueLayout.JAVA
 internal fun bits(values: Array<out BufferUsage>) = values.fold(0) { acc, v -> acc or v.value }
 internal fun bits(values: Array<out ImageUsage>) = values.fold(0) { acc, v -> acc or v.value }
 
-/** Bytes of [data], in [arena]. */
-internal fun segmentOf(arena: Arena, data: Any): MemorySegment = when (data) {
-    is MemorySegment -> data
-    is ByteArray -> arena.allocateFrom(ValueLayout.JAVA_BYTE, *data)
-    is FloatArray -> arena.allocateFrom(ValueLayout.JAVA_FLOAT, *data)
-    is IntArray -> arena.allocateFrom(ValueLayout.JAVA_INT, *data)
-    is ShortArray -> arena.allocateFrom(ValueLayout.JAVA_SHORT, *data)
-    is LongArray -> arena.allocateFrom(ValueLayout.JAVA_LONG, *data)
-    is DoubleArray -> arena.allocateFrom(ValueLayout.JAVA_DOUBLE, *data)
-    else -> throw IllegalArgumentException("${data.javaClass.simpleName} is not memory: give a primitive array, a MemorySegment, or a list with its GpuLayout")
-}
 
 /**
  * kor::Buffer: memory the GPU reads and writes.
  *
  * ```
+ * data class Vertex(val position: Vec3, val uv: Vec2)
  * val vertices = Buffer.Builder()
- *     .setData(floatArrayOf(0f, 0.5f, -0.5f, -0.5f, 0.5f, -0.5f))
+ *     .setData(listOf(Vertex(Vec3(0f, 0.5f, 0f), Vec2(0.5f, 0f)), ...))   // or floatArrayOf(...), listOf(Vec3...)
  *     .setUsage(BufferUsage.eVertex, BufferUsage.eStorage)
  *     .setType(BufferType.eDeviceLocal)
  *     .build()
  *
- * uniforms.map { it.write(camera.toArray()) }   // released at the end of the block
+ * uniforms.map { it.write(Camera(view, projection), packing = GpuPacking.Std140) }   // released at the end of the block
+ * val back: List<Vertex> = vertices.readAs<Vertex>()
  * ```
  *
  * Offsets and counts are in bytes, except where a function takes typed values: then they count those.
@@ -88,16 +102,20 @@ class Buffer internal constructor(native: MemorySegment) : Resource(native) {
         /** Its size in bytes. */
         fun setSize(bytes: Long) = apply { KoralNative.koral_buffer_builder_set_instance_count(native, bytes) }
         /** Room for [count] values of [layout]. */
-        fun <T> setInstanceCount(count: Long, layout: GpuLayout<T>) = setSize(count * layout.size)
-        /** Its contents, copied now — a primitive array or a MemorySegment; its size follows them. */
-        fun setData(data: Any) = apply {
+        fun <T> setInstanceCount(count: Long, layout: GpuLayout<T>) = setSize(count * layout.stride)
+        /**
+         * Its contents, copied now; its size follows them. [data] is a primitive (or unsigned) array, a ByteBuffer or a
+         * MemorySegment, as it is; or a vector, matrix, data class — or a list or array of them — laid out with
+         * [packing] (see [GpuLayout.of]).
+         */
+        fun setData(data: Any, packing: GpuPacking = GpuPacking.C) = apply {
             Arena.ofConfined().use { a ->
-                val s = segmentOf(a, data)
+                val s = segmentOf(a, data, packing)
                 KoralNative.koral_buffer_builder_set_data(native, s, s.byteSize())
             }
         }
         /** [values], each laid out by [layout]. */
-        fun <T> setData(values: List<T>, layout: GpuLayout<T>) = apply { Arena.ofConfined().use { a -> setData(layout.pack(a, values)) } }
+        fun <T> setData(values: List<T>, layout: GpuLayout<T>) = apply { Arena.ofConfined().use { a -> setData(layout.pack(a, values).asSlice(0, layout.stride * values.size)) } }
         fun setUsage(vararg usage: BufferUsage) = apply { KoralNative.koral_buffer_builder_set_usage(native, bits(usage)) }
         fun setType(type: BufferType) = apply { KoralNative.koral_buffer_builder_set_type(native, type.value) }
         fun setIsPerFrame(value: Boolean) = apply { KoralNative.koral_buffer_builder_set_is_per_frame(native, value) }
@@ -142,21 +160,21 @@ class Buffer internal constructor(native: MemorySegment) : Resource(native) {
     /** [count] values of [layout], from the [offset]th (-1: the rest). */
     fun <T> read(layout: GpuLayout<T>, count: Int = -1, offset: Long = 0): List<T> =
         Arena.ofConfined().use { a ->
-            val count = if (count < 0) ((size / layout.size) - offset).toInt() else count
-            val into = a.allocate(maxOf(1L, count * layout.size), 16)
-            checked(KoralNative.koral_buffer_read(native, into, count * layout.size, offset * layout.size), "reading a buffer")
+            val count = if (count < 0) ((size / layout.stride) - offset).toInt() else count
+            val into = a.allocate(maxOf(1L, count * layout.stride), 16)
+            checked(KoralNative.koral_buffer_read(native, into, count * layout.stride, offset * layout.stride), "reading a buffer")
             layout.unpack(into, count)
         }
 
-    /** Writes [data] — a primitive array or a MemorySegment — at byte [offset]. */
-    fun write(data: Any, offset: Long = 0) = Arena.ofConfined().use { a ->
-        val s = segmentOf(a, data)
+    /** Writes [data] — anything [Builder.setData] takes — at byte [offset]. */
+    fun write(data: Any, offset: Long = 0, packing: GpuPacking = GpuPacking.C) = Arena.ofConfined().use { a ->
+        val s = segmentOf(a, data, packing)
         checked(KoralNative.koral_buffer_write(native, s, s.byteSize(), offset), "writing a buffer")
     }
 
     /** Writes [values] of [layout], from the [offset]th. */
     fun <T> write(values: List<T>, layout: GpuLayout<T>, offset: Long = 0) =
-        Arena.ofConfined().use { a -> write(layout.pack(a, values), offset * layout.size) }
+        Arena.ofConfined().use { a -> write(layout.pack(a, values).asSlice(0, layout.stride * values.size), offset * layout.stride) }
 
     /**
      * ReadAsync: [read] without making the CPU wait for the GPU — the copy out is started, and this resumes,
@@ -183,8 +201,8 @@ class Buffer internal constructor(native: MemorySegment) : Resource(native) {
 
     /** [readAsync], as values of [layout]. */
     suspend fun <T> readAsync(layout: GpuLayout<T>, count: Int = -1, offset: Long = 0): List<T> {
-        @Suppress("NAME_SHADOWING") val count = if (count < 0) ((size / layout.size) - offset).toInt() else count
-        val bytes = readAsync(count * layout.size, offset * layout.size)
+        @Suppress("NAME_SHADOWING") val count = if (count < 0) ((size / layout.stride) - offset).toInt() else count
+        val bytes = readAsync(count * layout.stride, offset * layout.stride)
         return Arena.ofConfined().use { a -> layout.unpack(a.allocateFrom(ValueLayout.JAVA_BYTE, *bytes), count) }
     }
 
@@ -212,16 +230,17 @@ class Buffer internal constructor(native: MemorySegment) : Resource(native) {
         /** The mapped memory: read it, or (mutable) write it directly — for this frame's copy only. */
         val segment: MemorySegment = KoralNative.koral_mapping_data(handle).reinterpret(size)
 
-        fun write(data: Any, offset: Long = 0) {
+        /** Writes [data] — anything [Builder.setData] takes — at byte [offset]. */
+        fun write(data: Any, offset: Long = 0, packing: GpuPacking = GpuPacking.C) {
             check(mutable) { "a const mapping cannot be written" }
             Arena.ofConfined().use { a ->
-                val s = segmentOf(a, data)
+                val s = segmentOf(a, data, packing)
                 checked(KoralNative.koral_mapping_write(live(), s, s.byteSize(), offset), "writing a mapping")
             }
         }
 
         fun <T> write(values: List<T>, layout: GpuLayout<T>, offset: Long = 0) =
-            Arena.ofConfined().use { a -> write(layout.pack(a, values), offset * layout.size) }
+            Arena.ofConfined().use { a -> write(layout.pack(a, values).asSlice(0, layout.stride * values.size), offset * layout.stride) }
 
         fun flush(offset: Long = 0, bytes: Long = size - offset) =
             checked(KoralNative.koral_mapping_flush(live(), offset, bytes), "flushing a mapping")

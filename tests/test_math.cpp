@@ -36,11 +36,12 @@ TEST(Math, VectorBasics) {
     EXPECT_TRUE(ApproxEqual(Normalize(Vec3(0.f, 0.f, 9.f)), Vec3::UnitZ()));
     EXPECT_TRUE(ApproxEqual(Reflect(Vec3(1.f, -1.f, 0.f), Vec3::UnitY()), Vec3(1.f, 1.f, 0.f)));
     EXPECT_NEAR(Angle(Vec3::UnitX(), Vec3::UnitY()), HalfPi<float>, 1e-6f);
-    EXPECT_NEAR(SignedAngle(Vec3::UnitX(), Vec3::UnitY(), Vec3::UnitZ()), HalfPi<float>, 1e-6f);
-    EXPECT_NEAR(SignedAngle(Vec3::UnitY(), Vec3::UnitX(), Vec3::UnitZ()), -HalfPi<float>, 1e-6f);
+    EXPECT_NEAR(OrientedAngle(Vec3::UnitX(), Vec3::UnitY(), Vec3::UnitZ()), HalfPi<float>, 1e-6f);
+    EXPECT_NEAR(OrientedAngle(Vec3::UnitY(), Vec3::UnitX(), Vec3::UnitZ()), -HalfPi<float>, 1e-6f);
 
     Vec3 n{0.f, 2.f, 0.f}, t{1.f, 1.f, 0.f};
-    OrthoNormalize(n, t);
+    n = Normalize(n);
+    t = Orthonormalize(t, n);
     EXPECT_NEAR(Dot(n, t), 0.f, 1e-6f);
     EXPECT_NEAR(Length(t), 1.f, 1e-6f);
 
@@ -53,7 +54,7 @@ TEST(Math, VectorBasics) {
 
 TEST(Math, Scalars) {
     static_assert(Mod(-1.f, 3.f) == 2.f && Mod(-1, 3) == 2 && Mod(7, 3) == 1);
-    static_assert(NextPowerOfTwo(17u) == 32u && NextPowerOfTwo(32u) == 32u && IsPowerOfTwo(64u));
+    static_assert(CeilPowerOfTwo(17u) == 32u && CeilPowerOfTwo(32u) == 32u && IsPowerOfTwo(64u));
     static_assert(AlignUp(13u, 8u) == 16u && DivideRoundUp(13, 8) == 2);
     static_assert(Remap(5.f, 0.f, 10.f, 100.f, 200.f) == 150.f);
     static_assert(SmoothStep(0.f, 1.f, 0.5f) == 0.5f);
@@ -327,7 +328,7 @@ TEST(Math, Random) {
         const i32 k = r.NextInt(-3, 4);
         ASSERT_GE(k, -3);
         ASSERT_LT(k, 4);
-        ASSERT_LE(LengthSquared(r.InsideUnitSphere()), 1.f);
+        ASSERT_LE(Length2(r.InsideUnitSphere()), 1.f);
         ASSERT_NEAR(Length(r.OnUnitSphere()), 1.f, 1e-5f);
         ASSERT_NEAR(Length(r.Rotation()), 1.f, 1e-5f);
     }
@@ -447,4 +448,174 @@ TEST(Math, Color) {
         const Vec3 normal = r.OnUnitSphere();
         ASSERT_GT(Dot(UnpackOctahedral(PackOctahedral(normal)), normal), 0.99999f) << normal;
     }
+}
+
+TEST(Math, GlslChapters) {
+    // Swizzles read any 2-4 components, repeats allowed.
+    constexpr Vec4 v{1.f, 2.f, 3.f, 4.f};
+    static_assert(v.ZYX() == Vec3(3.f, 2.f, 1.f) && v.XX() == Vec2(1.f, 1.f) && v.WZYX() == Vec4(4.f, 3.f, 2.f, 1.f));
+
+    // Trigonometric / exponential / common work on scalars and component-wise on vectors.
+    EXPECT_TRUE(ApproxEqual(Sin(Vec2(0.f, HalfPi<float>)), Vec2(0.f, 1.f)));
+    EXPECT_TRUE(ApproxEqual(Degrees(Radians(Vec3(10.f, 20.f, 30.f))), Vec3(10.f, 20.f, 30.f), 1e-4f));
+    EXPECT_TRUE(ApproxEqual(Pow(Vec2(2.f, 3.f), Vec2(3.f, 2.f)), Vec2(8.f, 9.f)));
+    EXPECT_TRUE(ApproxEqual(InverseSqrt(Vec2(4.f, 16.f)), Vec2(0.5f, 0.25f)));
+    EXPECT_EQ(Floor(Vec2(-0.5f, 1.5f)), Vec2(-1.f, 1.f));
+    EXPECT_EQ(Fract(1.25f), 0.25f);
+    EXPECT_EQ(Mix(Vec2(0.f), Vec2(10.f, 20.f), 0.5f), Vec2(5.f, 10.f));
+    EXPECT_EQ(Step(Vec2(0.5f), Vec2(0.f, 1.f)), Vec2(0.f, 1.f));
+    EXPECT_EQ(Clamp(IVec3(-5, 5, 50), 0, 10), IVec3(0, 5, 10));
+
+    // Relational returns bool vectors.
+    EXPECT_TRUE(All(LessThan(Vec3(1.f), Vec3(2.f))));
+    EXPECT_TRUE(Any(Equal(IVec2(1, 2), IVec2(0, 2))));
+    EXPECT_FALSE(All(Not(BVec2(true, false))));
+
+    // Integer and component-wise.
+    static_assert(BitCount(0b1011u) == 3 && FindLSB(8) == 3 && FindMSB(8) == 3 && FindLSB(0) == -1);
+    static_assert(BitfieldExtract(0xABCDu, 4, 8) == 0xBCu && BitfieldReverse(1u) == 0x80000000u);
+    static_assert(CompAdd(IVec3(1, 2, 3)) == 6 && CompMul(IVec3(1, 2, 3)) == 6 && CompMax(IVec3(1, 9, 3)) == 9);
+    static_assert(CeilMultiple(17, 8) == 24 && FloorPowerOfTwo(17u) == 16u && RoundPowerOfTwo(23u) == 16u);
+    u32 carry = 0;
+    EXPECT_EQ(UaddCarry(0xffffffffu, 2u, carry), 1u);
+    EXPECT_EQ(carry, 1u);
+
+    // Packing round trips.
+    EXPECT_TRUE(ApproxEqual(UnpackSnorm2x16(PackSnorm2x16(Vec2(-0.5f, 0.25f))), Vec2(-0.5f, 0.25f), 1e-4f));
+    EXPECT_TRUE(ApproxEqual(UnpackUnorm4x8(PackUnorm4x8(Vec4(0.f, 1.f, 0.5f, 0.25f))), Vec4(0.f, 1.f, 0.5f, 0.25f), 3e-3f));
+    EXPECT_EQ(UnpackHalf2x16(PackHalf2x16(Vec2(1.5f, -2.f))), Vec2(1.5f, -2.f));
+    EXPECT_EQ(UnpackDouble2x32(PackDouble2x32(UVec2(1u, 2u))), UVec2(1u, 2u));
+}
+
+TEST(Math, MatrixShapes) {
+    const Mat2x3 a(Vec3(1.f, 2.f, 3.f), Vec3(4.f, 5.f, 6.f));   // 2 columns, 3 rows
+    const Mat3x2 t = Transpose(a);
+    EXPECT_EQ(Row(a, 1), Vec2(2.f, 5.f));
+    EXPECT_EQ(Column(t, 2), Vec2(3.f, 6.f));
+    const Mat3 p = a * t;
+    EXPECT_EQ(p[0][0], 1.f * 1.f + 4.f * 4.f);
+    EXPECT_EQ(OuterProduct(Vec3(1.f, 2.f, 3.f), Vec2(1.f, 10.f))[1], Vec3(10.f, 20.f, 30.f));
+    EXPECT_EQ(MatrixCompMult(Mat2(2.f), Mat2(3.f))[0][0], 6.f);
+    EXPECT_EQ(Diagonal(Vec3(4.f)), Mat3(4.f));
+    const Mat3 o = Orthonormalize(Mat3(Vec3(2.f, 0.f, 0.f), Vec3(1.f, 1.f, 0.f), Vec3(1.f, 1.f, 1.f)));
+    EXPECT_TRUE(ApproxEqual(Transpose(o) * o, Mat3(1.f), 1e-5f));
+}
+
+TEST(Math, Projections) {
+    // Each convention maps the near and far planes onto its own depth range, and looks down its own axis.
+    for (const ClipSpace clip : {ClipSpace::eRightHandedZeroToOne, ClipSpace::eRightHandedNegativeOneToOne,
+                                 ClipSpace::eLeftHandedZeroToOne, ClipSpace::eLeftHandedNegativeOneToOne}) {
+        const bool lh = clip == ClipSpace::eLeftHandedZeroToOne || clip == ClipSpace::eLeftHandedNegativeOneToOne;
+        const float lo = (clip == ClipSpace::eRightHandedZeroToOne || clip == ClipSpace::eLeftHandedZeroToOne) ? 0.f : -1.f;
+        const float forward = lh ? 1.f : -1.f;
+        const auto depth = [&](const Mat4& m, float d) { const Vec4 c = m * Vec4(0.f, 0.f, forward * d, 1.f); return c.z / c.w; };
+        for (const Mat4& m : {Perspective(1.f, 1.5f, 0.5f, 100.f, clip), PerspectiveFov(1.f, 300.f, 200.f, 0.5f, 100.f, clip),
+                              FrustumProjection(-1.f, 2.f, -1.f, 1.f, 0.5f, 100.f, clip), Orthographic(-1.f, 1.f, -1.f, 1.f, 0.5f, 100.f, clip)}) {
+            EXPECT_NEAR(depth(m, 0.5f), lo, 1e-5f);
+            EXPECT_NEAR(depth(m, 100.f), 1.f, 1e-4f);
+        }
+        EXPECT_NEAR(depth(InfinitePerspective(1.f, 1.5f, 0.5f, clip), 0.5f), lo, 1e-5f);
+        EXPECT_NEAR(depth(InfinitePerspective(1.f, 1.5f, 0.5f, clip), 1e7f), 1.f, 1e-4f);
+    }
+    EXPECT_TRUE(ApproxEqual(Perspective(1.f, 1.5f, 0.5f, 100.f), PerspectiveFov(1.f, 300.f, 200.f, 0.5f, 100.f), 1e-5f));
+    EXPECT_TRUE(ApproxEqual(Perspective(1.f, 1.f, 0.5f, 100.f),
+                            FrustumProjection(-0.5f * std::tan(0.5f), 0.5f * std::tan(0.5f), -0.5f * std::tan(0.5f), 0.5f * std::tan(0.5f), 0.5f, 100.f), 1e-5f));
+
+    // LookAtLH looks down +Z: the target lands in front, on the axis.
+    const Vec4 seen = LookAtLH(Vec3(1.f, 2.f, 3.f), Vec3(1.f, 2.f, 10.f)) * Vec4(1.f, 2.f, 10.f, 1.f);
+    EXPECT_TRUE(ApproxEqual(Vec3(seen), Vec3(0.f, 0.f, 7.f), 1e-5f));
+
+    // Project and UnProject invert each other; the window position matches the hand computation.
+    const Vec4 viewport{10.f, 20.f, 800.f, 600.f};
+    const Mat4 model = SomeAffine(), proj = Perspective(1.f, 800.f / 600.f, 0.1f, 50.f) * LookAt(Vec3(0.f, 0.f, 10.f), Vec3(0.f));
+    const Vec3 point{0.3f, -0.2f, 0.5f};
+    const Vec3 window = Project(point, model, proj, viewport);
+    EXPECT_TRUE(ApproxEqual(UnProject(window, model, proj, viewport), point, 1e-4f));
+    const Vec4 clipped = proj * (model * Vec4(point, 1.f));
+    EXPECT_NEAR(window.x, (clipped.x / clipped.w * 0.5f + 0.5f) * 800.f + 10.f, 1e-3f);
+
+    // PickMatrix blows the picked pixel region up to the whole clip square.
+    const Mat4 pick = PickMatrix(Vec2(410.f, 320.f), Vec2(4.f, 4.f), viewport);
+    EXPECT_TRUE(ApproxEqual(Vec2(pick * Vec4(0.f, 0.f, 0.f, 1.f)), Vec2(0.f), 1e-5f));
+    EXPECT_TRUE(ApproxEqual(Vec2(pick * Vec4(4.f / 800.f, 0.f, 0.f, 1.f)), Vec2(1.f, 0.f), 1e-5f));
+}
+
+TEST(Math, EulerAngles) {
+    EXPECT_TRUE(ApproxEqual(EulerAngleX(0.4f), Rotation(0.4f, Vec3::UnitX()), 1e-6f));
+    EXPECT_TRUE(ApproxEqual(EulerAngleY(0.4f), Rotation(0.4f, Vec3::UnitY()), 1e-6f));
+    EXPECT_TRUE(ApproxEqual(EulerAngleZ(0.4f), Rotation(0.4f, Vec3::UnitZ()), 1e-6f));
+    EXPECT_TRUE(ApproxEqual(EulerAngleXY(0.3f, 0.5f), EulerAngleX(0.3f) * EulerAngleY(0.5f), 1e-6f));
+    EXPECT_TRUE(ApproxEqual(YawPitchRoll(0.3f, 0.5f, 0.7f), EulerAngleY(0.3f) * EulerAngleX(0.5f) * EulerAngleZ(0.7f), 1e-6f));
+
+    // Every order round-trips, quaternions agree, and gimbal lock still rebuilds the same rotation.
+    for (int o = 0; o < 12; ++o) {
+        const auto order = static_cast<EulerOrder>(o);
+        const bool proper = o >= 6;
+        for (const Vec3 angles : {Vec3(0.3f, 0.5f, -0.7f), Vec3(-2.f, 1.f, 2.5f), Vec3(0.4f, proper ? 0.f : HalfPi<float>, 0.f)}) {
+            const Mat4 m = EulerAngles(order, angles);
+            EXPECT_TRUE(ApproxEqual(EulerAngles(order, ExtractEulerAngles(order, m)), m, 1e-4f)) << "order " << o << " " << std::format("{}", angles);
+            EXPECT_TRUE(ApproxEqual(ToMat4(QuatFromEuler(order, angles)), m, 1e-5f)) << "order " << o;
+        }
+        if (!proper) {
+            const Vec3 a{0.3f, 0.5f, -0.7f};
+            EXPECT_TRUE(ApproxEqual(ExtractEulerAngles(order, EulerAngles(order, a)), a, 1e-5f)) << "order " << o;
+        }
+    }
+
+    const Quat q = Quat::FromEuler(Vec3(0.2f, 0.3f, 0.4f));
+    EXPECT_NEAR(Pitch(q), EulerAngles(q).x, 1e-6f);
+    EXPECT_NEAR(Yaw(q), EulerAngles(q).y, 1e-6f);
+    EXPECT_NEAR(Roll(q), EulerAngles(q).z, 1e-6f);
+    EXPECT_TRUE(ApproxEqual(Rotate(Quat::Identity(), 0.5f, Vec3::UnitY()), Quat::AngleAxis(0.5f, Vec3::UnitY())));
+    EXPECT_TRUE(ApproxEqual(Rotate(Vec3::UnitX(), HalfPi<float>, Vec3::UnitZ()), Vec3::UnitY(), 1e-6f));
+}
+
+TEST(Math, MaterialPalette) {
+    // The guidelines' values (as Flutter's colors.dart has them).
+    static_assert(material::Red500 == ColorFromHex(0xF44336) && material::TealA400 == ColorFromHex(0x1DE9B6) && material::BlueGrey900 == ColorFromHex(0x263238));
+    EXPECT_EQ(MaterialColor(MaterialHue::eIndigo), ColorFromHex(0x3F51B5));
+    EXPECT_EQ(MaterialColor(MaterialHue::eIndigo, 520), ColorFromHex(0x3F51B5));   // the nearest shade
+    EXPECT_EQ(MaterialColor(MaterialHue::eAmber, 50), ColorFromHex(0xFFF8E1));
+    EXPECT_EQ(MaterialAccent(MaterialHue::eRed, 700), ColorFromHex(0xD50000));
+    EXPECT_EQ(MaterialAccent(MaterialHue::eGrey, 100), MaterialColor(MaterialHue::eGrey, 100));   // no accents: the plain shade
+}
+
+TEST(Math, Material3) {
+    // Google's own expectations (material-color-utilities' tones_test, scheme_monochrome_test, score_test).
+    const TonalPalette blue = TonalPalette::FromColor(ColorFromHex(0x0000FF));
+    EXPECT_EQ(blue.Tone(100.f), ColorFromHex(0xFFFFFF));
+    EXPECT_EQ(blue.Tone(90.f), ColorFromHex(0xE0E0FF));
+    EXPECT_EQ(blue.Tone(40.f), ColorFromHex(0x343DFF));
+
+    const Hct hct = Hct::FromColor(ColorFromHex(0x0000FF));
+    EXPECT_NEAR(hct.hue, 282.788f, 0.01f);
+    EXPECT_NEAR(hct.chroma, 87.230f, 0.01f);
+    EXPECT_NEAR(hct.tone, 32.302f, 0.01f);
+    EXPECT_EQ(hct.ToColor(), ColorFromHex(0x0000FF));
+
+    const auto tone = [](const Vec4& c) { return Hct::FromColor(c).tone; };
+    const MaterialScheme dark = MaterialScheme::FromSeed(ColorFromHex(0x0000FF), true, SchemeVariant::eMonochrome);
+    EXPECT_NEAR(tone(dark.primary), 100.f, 1.f);
+    EXPECT_NEAR(tone(dark.onPrimary), 10.f, 1.f);
+    const MaterialScheme light = MaterialScheme::FromSeed(ColorFromHex(0x0000FF), false, SchemeVariant::eMonochrome);
+    EXPECT_NEAR(tone(light.primary), 0.f, 1.f);
+    EXPECT_NEAR(tone(light.onPrimary), 90.f, 1.f);
+
+    // Every variant gives text that reads on its container, light and dark.
+    for (int v = 0; v <= int(SchemeVariant::eFruitSalad); ++v)
+        for (const bool d : {false, true}) {
+            const MaterialScheme s = MaterialScheme::FromSeed(ColorFromHex(0x6750A4), d, SchemeVariant(v));
+            EXPECT_GE(ContrastRatio(s.onPrimary, s.primary), 4.5f) << v << d;
+            EXPECT_GE(ContrastRatio(s.onSurface, s.surface), 4.5f) << v << d;
+        }
+
+    // Seeds from an image: red outnumbered by grey still wins on chroma; nothing colourful (all white) gives Google blue.
+    std::vector<u8> pixels;
+    for (int i = 0; i < 100; ++i) pixels.insert(pixels.end(), {128, 128, 128, 255});
+    for (int i = 0; i < 20; ++i) pixels.insert(pixels.end(), {255, 0, 0, 255});
+    const auto seeds = SeedColors(pixels);
+    ASSERT_FALSE(seeds.empty());
+    EXPECT_EQ(seeds[0], ColorFromHex(0xFF0000));
+    EXPECT_EQ(SeedColors(std::vector<u8>(4 * 64, 255)).front(), ColorFromHex(0x4285F4));
+    EXPECT_NEAR(ContrastRatio(ColorFromHex(0x000000), ColorFromHex(0xFFFFFF)), 21.f, 0.01f);
 }

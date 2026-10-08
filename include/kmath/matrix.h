@@ -55,13 +55,24 @@ namespace kor {
         static constexpr Mat Zero() { return Mat(T(0)); }
     };
 
-    using Mat2 = Mat<float, 2, 2>;
-    using Mat3 = Mat<float, 3, 3>;
-    using Mat4 = Mat<float, 4, 4>;
-    /// An affine transform without its constant last row: 3 rows, 4 columns (Vulkan's VkTransformMatrixKHR is its transpose).
-    using Mat4x3 = Mat<float, 4, 3>;
-    using DMat3 = Mat<double, 3, 3>;
-    using DMat4 = Mat<double, 4, 4>;
+    // glm's names: MatCxR has C columns of R rows. Mat4x3, say, is an affine transform without its constant last
+    // row (Vulkan's VkTransformMatrixKHR is its transpose).
+#define KOR_MAT_ALIASES(Prefix, T)                  \
+    using Prefix##Mat2 = Mat<T, 2, 2>;              \
+    using Prefix##Mat3 = Mat<T, 3, 3>;              \
+    using Prefix##Mat4 = Mat<T, 4, 4>;              \
+    using Prefix##Mat2x2 = Mat<T, 2, 2>;            \
+    using Prefix##Mat2x3 = Mat<T, 2, 3>;            \
+    using Prefix##Mat2x4 = Mat<T, 2, 4>;            \
+    using Prefix##Mat3x2 = Mat<T, 3, 2>;            \
+    using Prefix##Mat3x3 = Mat<T, 3, 3>;            \
+    using Prefix##Mat3x4 = Mat<T, 3, 4>;            \
+    using Prefix##Mat4x2 = Mat<T, 4, 2>;            \
+    using Prefix##Mat4x3 = Mat<T, 4, 3>;            \
+    using Prefix##Mat4x4 = Mat<T, 4, 4>;
+    KOR_MAT_ALIASES(, float)
+    KOR_MAT_ALIASES(D, double)
+#undef KOR_MAT_ALIASES
 
     static_assert(sizeof(Mat4) == 64 && sizeof(Mat3) == 36);
     static_assert(std::is_trivially_copyable_v<Mat4>);
@@ -94,6 +105,14 @@ namespace kor {
         return m;
     }
     template<Scalar T, int C, int R> constexpr Mat<T, C, R> operator*(std::type_identity_t<T> s, const Mat<T, C, R>& a) { return a * s; }
+    template<Scalar T, int C, int R> constexpr Mat<T, C, R> operator/(const Mat<T, C, R>& a, std::type_identity_t<T> s) {
+        Mat<T, C, R> m(T(0));
+        for (int c = 0; c < C; ++c) m[c] = a[c] / s;
+        return m;
+    }
+    template<Scalar T, int C, int R> constexpr Mat<T, C, R>& operator+=(Mat<T, C, R>& a, const Mat<T, C, R>& b) { return a = a + b; }
+    template<Scalar T, int C, int R> constexpr Mat<T, C, R>& operator-=(Mat<T, C, R>& a, const Mat<T, C, R>& b) { return a = a - b; }
+    template<Scalar T, int C, int R> constexpr Mat<T, C, R>& operator*=(Mat<T, C, R>& a, std::type_identity_t<T> s) { return a = a * s; }
 
     /// Matrix times column vector.
     template<Scalar T, int C, int R> constexpr Vec<T, R> operator*(const Mat<T, C, R>& m, const Vec<T, C>& v) {
@@ -188,6 +207,51 @@ namespace kor {
     /// The matrix that transforms normals for `model`: the inverse transpose of its upper 3x3.
     template<std::floating_point T> constexpr Mat<T, 3, 3> NormalMatrix(const Mat<T, 4, 4>& model) {
         return Transpose(Inverse(Mat<T, 3, 3>(model)));
+    }
+
+    /// a and b multiplied element by element (GLSL's matrixCompMult).
+    template<Scalar T, int C, int R> constexpr Mat<T, C, R> MatrixCompMult(const Mat<T, C, R>& a, const Mat<T, C, R>& b) {
+        Mat<T, C, R> m(T(0));
+        for (int c = 0; c < C; ++c) m[c] = a[c] * b[c];
+        return m;
+    }
+    /// column * rowᵀ: a matrix of C columns (row's size) of R rows (column's size).
+    template<Scalar T, int R, int C> constexpr Mat<T, C, R> OuterProduct(const Vec<T, R>& column, const Vec<T, C>& row) {
+        Mat<T, C, R> m(T(0));
+        for (int c = 0; c < C; ++c) m[c] = column * row[c];
+        return m;
+    }
+    /// Row r, and column c (glm's gtc/matrix_access).
+    template<Scalar T, int C, int R> constexpr Vec<T, C> Row(const Mat<T, C, R>& m, int r) { return m.Row(r); }
+    template<Scalar T, int C, int R> constexpr Vec<T, R> Column(const Mat<T, C, R>& m, int c) { return m[c]; }
+    /// m with row r replaced.
+    template<Scalar T, int C, int R> constexpr Mat<T, C, R> Row(Mat<T, C, R> m, int r, const Vec<T, C>& value) {
+        for (int c = 0; c < C; ++c) m[c][r] = value[c];
+        return m;
+    }
+    /// m with column c replaced.
+    template<Scalar T, int C, int R> constexpr Mat<T, C, R> Column(Mat<T, C, R> m, int c, const Vec<T, R>& value) {
+        m[c] = value;
+        return m;
+    }
+    /// v on the diagonal, zero elsewhere.
+    template<Scalar T, int N> constexpr Mat<T, N, N> Diagonal(const Vec<T, N>& v) {
+        Mat<T, N, N> m(T(0));
+        for (int i = 0; i < N; ++i) m[i][i] = v[i];
+        return m;
+    }
+    /// A rotation matrix with its columns made orthonormal again (after drift): glm's gtx/orthonormalize.
+    template<std::floating_point T> Mat<T, 3, 3> Orthonormalize(const Mat<T, 3, 3>& m) {
+        Mat<T, 3, 3> r = m;
+        r[0] = Normalize(r[0]);
+        T d0 = Dot(r[0], r[1]);
+        r[1] -= r[0] * d0;
+        r[1] = Normalize(r[1]);
+        const T d1 = Dot(r[1], r[2]);
+        d0 = Dot(r[0], r[2]);
+        r[2] -= r[0] * d0 + r[1] * d1;
+        r[2] = Normalize(r[2]);
+        return r;
     }
 
     template<std::floating_point T, int C, int R>

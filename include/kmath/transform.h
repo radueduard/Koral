@@ -63,6 +63,43 @@ namespace kor {
 
     // ---- cameras ----------------------------------------------------------------------------------------
 
+    /**
+     * The conventions a projection is built for (glm's RH_ZO, RH_NO, LH_ZO, LH_NO): which way the camera looks
+     * (right-handed: down -Z; left-handed: down +Z) and the clip depth range (0..1 as Vulkan, D3D and Metal;
+     * -1..1 as OpenGL). Koral's is the default everywhere.
+     */
+    enum class ClipSpace : u8 {
+        eRightHandedZeroToOne,
+        eRightHandedNegativeOneToOne,
+        eLeftHandedZeroToOne,
+        eLeftHandedNegativeOneToOne,
+    };
+    namespace detail {
+        constexpr bool LeftHanded(ClipSpace c) { return c == ClipSpace::eLeftHandedZeroToOne || c == ClipSpace::eLeftHandedNegativeOneToOne; }
+        constexpr bool ZeroToOne(ClipSpace c) { return c == ClipSpace::eRightHandedZeroToOne || c == ClipSpace::eLeftHandedZeroToOne; }
+        /// The depth row of a perspective: what far and near map to.
+        template<class T> constexpr void PerspectiveDepth(Mat<T, 4, 4>& m, T near, T far, ClipSpace clip) {
+            m[2][3] = LeftHanded(clip) ? T(1) : T(-1);
+            if (ZeroToOne(clip)) {
+                m[2][2] = LeftHanded(clip) ? far / (far - near) : far / (near - far);
+                m[3][2] = -(far * near) / (far - near);
+            } else {
+                m[2][2] = LeftHanded(clip) ? (far + near) / (far - near) : -(far + near) / (far - near);
+                m[3][2] = -(T(2) * far * near) / (far - near);
+            }
+        }
+    }
+
+    /// A left-handed view matrix: the camera looks down +Z.
+    template<std::floating_point T> Mat<T, 4, 4> LookAtLH(const Vec<T, 3>& eye, const Vec<T, 3>& target, const Vec<T, 3>& up = Vec<T, 3>::Up()) {
+        const Vec<T, 3> f = Normalize(target - eye), s = Normalize(Cross(up, f)), u = Cross(f, s);
+        Mat<T, 4, 4> m;
+        m[0] = {s.x, u.x, f.x, T(0)};
+        m[1] = {s.y, u.y, f.y, T(0)};
+        m[2] = {s.z, u.z, f.z, T(0)};
+        m[3] = {-Dot(s, eye), -Dot(u, eye), -Dot(f, eye), T(1)};
+        return m;
+    }
     /// A right-handed view matrix: the camera at `eye` looking at `target`.
     template<std::floating_point T> Mat<T, 4, 4> LookAt(const Vec<T, 3>& eye, const Vec<T, 3>& target, const Vec<T, 3>& up = Vec<T, 3>::Up()) {
         const Vec<T, 3> f = Normalize(target - eye), s = Normalize(Cross(f, up)), u = Cross(s, f);
@@ -73,15 +110,47 @@ namespace kor {
         m[3] = {-Dot(s, eye), -Dot(u, eye), Dot(f, eye), T(1)};
         return m;
     }
-    /// Perspective projection, vertical field of view in radians, depth 0 at `near` to 1 at `far`.
-    template<std::floating_point T> Mat<T, 4, 4> Perspective(T fovY, T aspect, T near, T far) {
+    /// LookAt by its right-handed name.
+    template<std::floating_point T> Mat<T, 4, 4> LookAtRH(const Vec<T, 3>& eye, const Vec<T, 3>& target, const Vec<T, 3>& up = Vec<T, 3>::Up()) {
+        return LookAt(eye, target, up);
+    }
+    /// Perspective projection, vertical field of view in radians; by default depth 0 at `near` to 1 at `far`.
+    template<std::floating_point T> Mat<T, 4, 4> Perspective(T fovY, T aspect, T near, T far, ClipSpace clip = ClipSpace::eRightHandedZeroToOne) {
         const T f = T(1) / std::tan(fovY * T(0.5));
         Mat<T, 4, 4> m(T(0));
         m[0][0] = f / aspect;
         m[1][1] = f;
-        m[2][2] = far / (near - far);
-        m[2][3] = T(-1);
-        m[3][2] = -(far * near) / (far - near);
+        detail::PerspectiveDepth(m, near, far, clip);
+        return m;
+    }
+    /// Perspective from a field of view and the viewport's size in pixels.
+    template<std::floating_point T> Mat<T, 4, 4> PerspectiveFov(T fov, T width, T height, T near, T far, ClipSpace clip = ClipSpace::eRightHandedZeroToOne) {
+        const T h = std::cos(T(0.5) * fov) / std::sin(T(0.5) * fov);
+        Mat<T, 4, 4> m(T(0));
+        m[0][0] = h * height / width;
+        m[1][1] = h;
+        detail::PerspectiveDepth(m, near, far, clip);
+        return m;
+    }
+    /// Perspective with no far plane: depth reaches 1 (or the range's top) only at infinity.
+    template<std::floating_point T> Mat<T, 4, 4> InfinitePerspective(T fovY, T aspect, T near, ClipSpace clip = ClipSpace::eRightHandedZeroToOne) {
+        const T range = std::tan(fovY * T(0.5)) * near;
+        Mat<T, 4, 4> m(T(0));
+        m[0][0] = (T(2) * near) / (range * aspect * T(2));
+        m[1][1] = (T(2) * near) / (range * T(2));
+        m[2][2] = m[2][3] = detail::LeftHanded(clip) ? T(1) : T(-1);
+        m[3][2] = detail::ZeroToOne(clip) ? -near : T(-2) * near;
+        return m;
+    }
+    /// An off-centre perspective (glm::frustum; Frustum is the shape in geometry.h): the view volume of the near-plane rectangle [left, right] x [bottom, top].
+    template<std::floating_point T> Mat<T, 4, 4> FrustumProjection(T left, T right, T bottom, T top, T near, T far, ClipSpace clip = ClipSpace::eRightHandedZeroToOne) {
+        Mat<T, 4, 4> m(T(0));
+        m[0][0] = (T(2) * near) / (right - left);
+        m[1][1] = (T(2) * near) / (top - bottom);
+        const T side = detail::LeftHanded(clip) ? T(-1) : T(1);
+        m[2][0] = side * (right + left) / (right - left);
+        m[2][1] = side * (top + bottom) / (top - bottom);
+        detail::PerspectiveDepth(m, near, far, clip);
         return m;
     }
     /// Perspective with reversed depth (1 at near, 0 at far) — far better depth precision with a float
@@ -100,16 +169,74 @@ namespace kor {
         }
         return m;
     }
-    /// Orthographic projection of the box [left, right] x [bottom, top] x [-near, -far], depth 0 to 1.
-    template<std::floating_point T> constexpr Mat<T, 4, 4> Orthographic(T left, T right, T bottom, T top, T near, T far) {
+    /// Orthographic projection of the box [left, right] x [bottom, top] x [near, far] in front of the camera;
+    /// by default depth 0 at near to 1 at far.
+    template<std::floating_point T> constexpr Mat<T, 4, 4> Orthographic(T left, T right, T bottom, T top, T near, T far,
+                                                                       ClipSpace clip = ClipSpace::eRightHandedZeroToOne) {
         Mat<T, 4, 4> m;
         m[0][0] = T(2) / (right - left);
         m[1][1] = T(2) / (top - bottom);
-        m[2][2] = T(-1) / (far - near);
         m[3][0] = -(right + left) / (right - left);
         m[3][1] = -(top + bottom) / (top - bottom);
-        m[3][2] = -near / (far - near);
+        const T sign = detail::LeftHanded(clip) ? T(1) : T(-1);
+        if (detail::ZeroToOne(clip)) {
+            m[2][2] = sign / (far - near);
+            m[3][2] = -near / (far - near);
+        } else {
+            m[2][2] = sign * T(2) / (far - near);
+            m[3][2] = -(far + near) / (far - near);
+        }
         return m;
+    }
+    /// A 2D orthographic projection: x and y only, z passed through negated (glm's four-argument ortho).
+    template<std::floating_point T> constexpr Mat<T, 4, 4> Orthographic(T left, T right, T bottom, T top) {
+        Mat<T, 4, 4> m;
+        m[0][0] = T(2) / (right - left);
+        m[1][1] = T(2) / (top - bottom);
+        m[2][2] = T(-1);
+        m[3][0] = -(right + left) / (right - left);
+        m[3][1] = -(top + bottom) / (top - bottom);
+        return m;
+    }
+
+    /// Where `object` lands in window coordinates (x, y in pixels of `viewport` = (x, y, width, height); z the depth).
+    template<std::floating_point T>
+    Vec<T, 3> Project(const Vec<T, 3>& object, const Mat<T, 4, 4>& model, const Mat<T, 4, 4>& projection, const Vec<T, 4>& viewport,
+                      ClipSpace clip = ClipSpace::eRightHandedZeroToOne) {
+        Vec<T, 4> v = projection * (model * Vec<T, 4>(object, T(1)));
+        v /= v.w;
+        if (detail::ZeroToOne(clip)) {
+            v.x = v.x * T(0.5) + T(0.5);
+            v.y = v.y * T(0.5) + T(0.5);
+        } else {
+            v = v * T(0.5) + T(0.5);
+        }
+        return {v.x * viewport.z + viewport.x, v.y * viewport.w + viewport.y, v.z};
+    }
+    /// The inverse of Project: the point in object space under window coordinates `window`.
+    template<std::floating_point T>
+    Vec<T, 3> UnProject(const Vec<T, 3>& window, const Mat<T, 4, 4>& model, const Mat<T, 4, 4>& projection, const Vec<T, 4>& viewport,
+                        ClipSpace clip = ClipSpace::eRightHandedZeroToOne) {
+        const Mat<T, 4, 4> inverse = Inverse(projection * model);
+        Vec<T, 4> v(window, T(1));
+        v.x = (v.x - viewport.x) / viewport.z;
+        v.y = (v.y - viewport.y) / viewport.w;
+        if (detail::ZeroToOne(clip)) {
+            v.x = v.x * T(2) - T(1);
+            v.y = v.y * T(2) - T(1);
+        } else {
+            v = v * T(2) - T(1);
+        }
+        Vec<T, 4> object = inverse * v;
+        object /= object.w;
+        return Vec<T, 3>(object);
+    }
+    /// A matrix that narrows a projection to the `size`-pixel region around `center` of `viewport`: for picking.
+    template<std::floating_point T> Mat<T, 4, 4> PickMatrix(const Vec<T, 2>& center, const Vec<T, 2>& size, const Vec<T, 4>& viewport) {
+        Mat<T, 4, 4> m;
+        if (!(size.x > T(0) && size.y > T(0))) return m;
+        const Vec<T, 3> t((viewport.z - T(2) * (center.x - viewport.x)) / size.x, (viewport.w - T(2) * (center.y - viewport.y)) / size.y, T(0));
+        return Scale(Translate(m, t), Vec<T, 3>(viewport.z / size.x, viewport.w / size.y, T(1)));
     }
 
     // ---- applying a matrix ------------------------------------------------------------------------------

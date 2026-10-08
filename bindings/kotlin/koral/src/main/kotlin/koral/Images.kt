@@ -36,13 +36,16 @@ class Image internal constructor(native: MemorySegment) : Resource(native) {
         fun setFormat(format: ImageFormat) = apply { KoralNative.koral_image_builder_set_format(native, format.value) }
         /** The same extent in every dimension. */
         fun setExtent(extent: Int) = apply { KoralNative.koral_image_builder_set_extent(native, extent, extent, extent) }
-        fun setExtent(extent: UVec2) = apply { KoralNative.koral_image_builder_set_extent(native, extent.x, extent.y, 1) }
-        fun setExtent(extent: UVec3) = apply { KoralNative.koral_image_builder_set_extent(native, extent.x, extent.y, extent.z) }
+        fun setExtent(extent: UVec2) = apply { KoralNative.koral_image_builder_set_extent(native, extent.x.toInt(), extent.y.toInt(), 1) }
+        fun setExtent(extent: UVec3) = apply { KoralNative.koral_image_builder_set_extent(native, extent.x.toInt(), extent.y.toInt(), extent.z.toInt()) }
         fun setMipLevels(mipLevels: Int) = apply { KoralNative.koral_image_builder_set_mip_levels(native, mipLevels) }
         fun setArrayLayers(arrayLayers: Int) = apply { KoralNative.koral_image_builder_set_array_layers(native, arrayLayers) }
         fun setSampleCount(sampleCount: SampleCount) = apply { KoralNative.koral_image_builder_set_sample_count(native, sampleCount.value) }
         fun setUsage(vararg usage: ImageUsage) = apply { KoralNative.koral_image_builder_set_usage(native, bits(usage)) }
-        /** Its pixels — a primitive array or a MemorySegment — copied now (and the transfer usages added, as in C++). */
+        /**
+         * Its pixels, copied now (and the transfer usages added, as in C++): a primitive array, a MemorySegment, or
+         * anything else [Buffer.Builder.setData] takes — a list of U8Vec4-like data classes, of Vec4s for a float format.
+         */
         fun setData(pixels: Any) = apply {
             Arena.ofConfined().use { a ->
                 val s = segmentOf(a, pixels)
@@ -53,7 +56,7 @@ class Image internal constructor(native: MemorySegment) : Resource(native) {
     }
 
     fun resize(extent: UVec3) {
-        KoralNative.koral_image_resize(native, extent.x, extent.y, extent.z)
+        KoralNative.koral_image_resize(native, extent.x.toInt(), extent.y.toInt(), extent.z.toInt())
         checkLastError()
     }
 
@@ -84,7 +87,7 @@ class Image internal constructor(native: MemorySegment) : Resource(native) {
         fun blockExtent(format: ImageFormat): UVec2 = twoInts({ x, y -> KoralNative.koral_image_block_extent(format.value, x, y) }, ::UVec2)
         fun blockSize(format: ImageFormat): Int = KoralNative.koral_image_block_size(format.value)
         fun sizeOfRegion(format: ImageFormat, extent: UVec3, layerCount: Int = 1): Long =
-            KoralNative.koral_image_size_of_region(format.value, extent.x, extent.y, extent.z, layerCount)
+            KoralNative.koral_image_size_of_region(format.value, extent.x.toInt(), extent.y.toInt(), extent.z.toInt(), layerCount)
         /** kor::IsDepthStencilFormat. */
         fun isDepthStencilFormat(format: ImageFormat): Boolean = KoralNative.koral_is_depth_stencil_format(format.value)
         /** kor::IsStencilFormat. */

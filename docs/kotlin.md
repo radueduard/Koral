@@ -221,11 +221,26 @@ There is everything C# has: buffers, images, views, samplers, buffer views, shad
 descriptor sets, framebuffers, meshes, acceleration structures, every command, and the frame graph with
 created and imported resources, previous-frame reads, async compute, `CpuPass` and `DebugDrawPass`.
 
-The JVM has no structs to copy as they are, so data crosses in one of three ways:
-- **as primitive arrays** (`FloatArray`, `IntArray`, `ByteArray`...) or a `MemorySegment`;
-- **as a list with its `GpuLayout`**, which says how one value is written: `GpuLayout.Vec4`, `GpuLayout.Mat4`,
-  or one of your own;
-- **as push constants:** a number, `7u`, a vector, a `Mat4` or an array.
+Anything that takes buffer data — `Buffer.Builder.setData`, `Buffer.write`, a mapping's `write`,
+`Image.Builder.setData`, `Mesh.makeBuffer`, `pushConstantBlock` — takes it in any of these forms:
+- a primitive or unsigned array (`FloatArray`, `UIntArray`...), a `ByteBuffer` or a `MemorySegment`, as it is;
+- a vector, quaternion or matrix, a data class, an enum — or a `List`/`Array` of any of them. Its layout is
+  derived from the class (`GpuLayout.of`): fields in declaration order, each at its alignment, nested classes too.
+
+```kotlin
+data class Vertex(val position: Vec3, val uv: Vec2, val color: UInt)
+val mesh = Buffer.Builder().setData(vertices).setUsage(BufferUsage.eVertex).build()      // 24 bytes each
+val particles = Buffer.Builder().setData(list, GpuPacking.Std430)...                     // a shader's storage block
+uniforms.map { it.write(Camera(viewProjection, eye), packing = GpuPacking.Std140) }
+val back: List<Vertex> = mesh.readAs<Vertex>()
+```
+
+`GpuPacking.C`, the default, gives the same bytes as the same struct in C++ and C# (a `Vec3` is 12 bytes, aligned
+to 4) — what vertex buffers want. `Std430` lays a class out as a shader's storage block (`vec3`s aligned to 16, a
+float tucked after one) and `Std140` as a uniform block. `gpuBytes(data)` / `fromGpuBytes<T>(bytes)` convert
+without a buffer; `List<Vec3>.toFloatArray()` and `FloatArray.toVec3List()` (and their kin) convert vectors.
+A hand-written `GpuLayout` is still there for a layout no class describes. Push constants by name
+(`pushConstant("tint", v)`) take a number, `7u`, a vector, a `Mat4` or an array, checked against the shader.
 
 `Vec2`, `Vec3`, `Vec4`, `IVec*`, `UVec*`, `Mat3`, `Mat4` and `Quat` are kmath's types, as immutable values, and
 kmath's functions are top-level: `dot`, `normalize`, `perspective` (Vulkan's depth range), `lookAt`, `compose`,

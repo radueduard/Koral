@@ -28,7 +28,7 @@ data class Plane(val normal: Vec3 = Vec3.Up, val distance: Float = 0f) {
 
 /** kor::Sphere. */
 data class Sphere(val center: Vec3 = Vec3.Zero, val radius: Float = 0f) {
-    fun contains(p: Vec3) = distanceSquared(center, p) <= radius * radius
+    fun contains(p: Vec3) = distance2(center, p) <= radius * radius
     companion object {
         /** A sphere around all the points (Ritter's). */
         fun fromPoints(points: List<Vec3>): Sphere {
@@ -36,7 +36,7 @@ data class Sphere(val center: Vec3 = Vec3.Zero, val radius: Float = 0f) {
             fun farthest(from: Vec3): Vec3 {
                 var best = points[0]
                 var bestSq = -1f
-                for (p in points) { val sq = distanceSquared(from, p); if (sq > bestSq) { bestSq = sq; best = p } }
+                for (p in points) { val sq = distance2(from, p); if (sq > bestSq) { bestSq = sq; best = p } }
                 return best
             }
             val a = farthest(points[0])
@@ -62,7 +62,7 @@ data class Aabb(val min: Vec3 = Vec3(Float.POSITIVE_INFINITY), val max: Vec3 = V
     val center: Vec3 get() = (min + max) * 0.5f
     val size: Vec3 get() = max - min
     val halfExtents: Vec3 get() = (max - min) * 0.5f
-    val volume: Float get() = if (valid) product(size) else 0f
+    val volume: Float get() = if (valid) compMul(size) else 0f
     val surfaceArea: Float get() = if (!valid) 0f else size.let { 2f * (it.x * it.y + it.y * it.z + it.z * it.x) }
     /** Corner [i] of 8: bit 0 picks max.x, bit 1 max.y, bit 2 max.z. */
     fun corner(i: Int) = Vec3(if (i and 1 != 0) max.x else min.x, if (i and 2 != 0) max.y else min.y, if (i and 4 != 0) max.z else min.z)
@@ -264,8 +264,8 @@ fun raycast(ray: Ray, tri: Triangle, maxDistance: Float = Float.POSITIVE_INFINIT
 
 fun overlaps(a: Aabb, b: Aabb) = a.min.x <= b.max.x && a.min.y <= b.max.y && a.min.z <= b.max.z && b.min.x <= a.max.x && b.min.y <= a.max.y && b.min.z <= a.max.z
 fun overlaps(a: Aabb2, b: Aabb2) = a.min.x <= b.max.x && b.min.x <= a.max.x && a.min.y <= b.max.y && b.min.y <= a.max.y
-fun overlaps(a: Sphere, b: Sphere): Boolean { val r = a.radius + b.radius; return distanceSquared(a.center, b.center) <= r * r }
-fun overlaps(box: Aabb, sphere: Sphere) = distanceSquared(closestPoint(box, sphere.center), sphere.center) <= sphere.radius * sphere.radius
+fun overlaps(a: Sphere, b: Sphere): Boolean { val r = a.radius + b.radius; return distance2(a.center, b.center) <= r * r }
+fun overlaps(box: Aabb, sphere: Sphere) = distance2(closestPoint(box, sphere.center), sphere.center) <= sphere.radius * sphere.radius
 fun overlaps(sphere: Sphere, box: Aabb) = overlaps(box, sphere)
 fun overlaps(frustum: Frustum, box: Aabb) = frustum.classify(box) != Containment.Outside
 fun overlaps(frustum: Frustum, sphere: Sphere) = frustum.classify(sphere) != Containment.Outside

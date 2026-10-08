@@ -49,7 +49,7 @@ namespace kor {
         Vec3 center{};
         float radius = 0.f;
 
-        constexpr bool Contains(const Vec3& p) const { return DistanceSquared(center, p) <= radius * radius; }
+        constexpr bool Contains(const Vec3& p) const { return Distance2(center, p) <= radius * radius; }
         /// A sphere around all the points (Ritter's: within ~5% of the smallest; empty span gives radius 0).
         KORAL_API static Sphere FromPoints(std::span<const Vec3> points);
     };
@@ -68,7 +68,7 @@ namespace kor {
         constexpr Vec3 Center() const { return (min + max) * 0.5f; }
         constexpr Vec3 Size() const { return max - min; }
         constexpr Vec3 HalfExtents() const { return (max - min) * 0.5f; }
-        constexpr float Volume() const { return Valid() ? Product(Size()) : 0.f; }
+        constexpr float Volume() const { return Valid() ? CompMul(Size()) : 0.f; }
         constexpr float SurfaceArea() const {
             if (!Valid()) return 0.f;
             const Vec3 s = Size();
@@ -131,7 +131,7 @@ namespace kor {
         constexpr bool Valid() const { return min.x <= max.x && min.y <= max.y; }
         constexpr Vec2 Size() const { return max - min; }
         constexpr Vec2 Center() const { return (min + max) * 0.5f; }
-        constexpr float Area() const { return Valid() ? Product(Size()) : 0.f; }
+        constexpr float Area() const { return Valid() ? CompMul(Size()) : 0.f; }
         constexpr bool Contains(const Vec2& p) const { return p.x >= min.x && p.y >= min.y && p.x <= max.x && p.y <= max.y; }
         constexpr bool Contains(const Aabb2& r) const { return r.min.x >= min.x && r.min.y >= min.y && r.max.x <= max.x && r.max.y <= max.y; }
         constexpr Aabb2& Expand(const Vec2& p) { min = kor::Min(min, p); max = kor::Max(max, p); return *this; }
@@ -180,7 +180,7 @@ namespace kor {
 
     constexpr bool Overlaps(const Aabb& a, const Aabb& b) { return All(LessThanEqual(a.min, b.max)) && All(LessThanEqual(b.min, a.max)); }
     constexpr bool Overlaps(const Aabb2& a, const Aabb2& b) { return a.min.x <= b.max.x && b.min.x <= a.max.x && a.min.y <= b.max.y && b.min.y <= a.max.y; }
-    constexpr bool Overlaps(const Sphere& a, const Sphere& b) { const float r = a.radius + b.radius; return DistanceSquared(a.center, b.center) <= r * r; }
+    constexpr bool Overlaps(const Sphere& a, const Sphere& b) { const float r = a.radius + b.radius; return Distance2(a.center, b.center) <= r * r; }
     KORAL_API bool Overlaps(const Aabb& box, const Sphere& sphere);
     inline bool Overlaps(const Sphere& sphere, const Aabb& box) { return Overlaps(box, sphere); }
     /// Separating-axis test over the 15 candidate axes.

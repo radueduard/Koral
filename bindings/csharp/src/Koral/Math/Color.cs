@@ -21,7 +21,7 @@ public static partial class KMath
     /// <summary>RGB to hue (a full turn is 1), saturation, value.</summary>
     public static Vec3 RgbToHsv(Vec3 c)
     {
-        float max = MaxComponent(c), min = MinComponent(c), d = max - min, h = 0f;
+        float max = CompMax(c), min = CompMin(c), d = max - min, h = 0f;
         if (d > 0f)
         {
             if (max == c.X) h = (c.Y - c.Z) / d + (c.Y < c.Z ? 6f : 0f);
@@ -44,7 +44,7 @@ public static partial class KMath
     }
     public static Vec3 RgbToHsl(Vec3 c)
     {
-        float max = MaxComponent(c), min = MinComponent(c), l = (max + min) * 0.5f, d = max - min;
+        float max = CompMax(c), min = CompMin(c), l = (max + min) * 0.5f, d = max - min;
         if (d == 0f) return new Vec3(0f, 0f, l);
         float s = l > 0.5f ? d / (2f - max - min) : d / (max + min);
         float h;
@@ -106,57 +106,9 @@ public static partial class KMath
             b = 255f;
         }
         Vec3 linear = SrgbToLinear(Clamp(new Vec3(r, g, b) / 255f, 0f, 1f));
-        return linear / Max(MaxComponent(linear), 1e-6f);
+        return linear / Max(CompMax(linear), 1e-6f);
     }
 
-    /// <summary>Four [0, 1] floats into RGBA8, R in the lowest byte.</summary>
-    public static uint PackUnorm4x8(Vec4 c)
-    {
-        uint packed = 0;
-        for (int i = 0; i < 4; ++i) packed |= (uint)(Saturate(c[i]) * 255f + 0.5f) << (8 * i);
-        return packed;
-    }
-    public static Vec4 UnpackUnorm4x8(uint packed) =>
-        new((packed & 0xff) / 255f, ((packed >> 8) & 0xff) / 255f, ((packed >> 16) & 0xff) / 255f, ((packed >> 24) & 0xff) / 255f);
-
-    /// <summary>IEEE half precision, round to nearest even.</summary>
-    public static ushort FloatToHalf(float value)
-    {
-        uint bits = BitConverter.SingleToUInt32Bits(value);
-        uint sign = (bits >> 16) & 0x8000u, exponent = (bits >> 23) & 0xffu, mantissa = bits & 0x7fffffu;
-        if (exponent == 0xffu) return (ushort)(sign | 0x7c00u | (mantissa != 0 ? 0x200u : 0u));
-        int e = (int)exponent - 127 + 15;
-        if (e >= 31) return (ushort)(sign | 0x7c00u);
-        if (e <= 0)
-        {
-            if (e < -10) return (ushort)sign;
-            mantissa |= 0x800000u;
-            int shift = 14 - e;
-            uint half = mantissa >> shift;
-            uint rem = mantissa & ((1u << shift) - 1u), halfway = 1u << (shift - 1);
-            if (rem > halfway || (rem == halfway && (half & 1u) != 0)) ++half;
-            return (ushort)(sign | half);
-        }
-        uint h = ((uint)e << 10) | (mantissa >> 13);
-        uint r = mantissa & 0x1fffu;
-        if (r > 0x1000u || (r == 0x1000u && (h & 1u) != 0)) ++h;
-        return (ushort)(sign | h);
-    }
-    public static float HalfToFloat(ushort half)
-    {
-        uint sign = (uint)(half & 0x8000) << 16, exponent = (uint)(half >> 10) & 0x1fu, mantissa = (uint)half & 0x3ffu;
-        if (exponent == 0)
-        {
-            if (mantissa == 0) return BitConverter.UInt32BitsToSingle(sign);
-            int e = -1;
-            do { ++e; mantissa <<= 1; } while ((mantissa & 0x400u) == 0);
-            return BitConverter.UInt32BitsToSingle(sign | ((uint)(127 - 15 - e) << 23) | ((mantissa & 0x3ffu) << 13));
-        }
-        if (exponent == 31) return BitConverter.UInt32BitsToSingle(sign | 0x7f800000u | (mantissa << 13));
-        return BitConverter.UInt32BitsToSingle(sign | ((exponent + 127 - 15) << 23) | (mantissa << 13));
-    }
-    public static uint PackHalf2x16(Vec2 v) => FloatToHalf(v.X) | ((uint)FloatToHalf(v.Y) << 16);
-    public static Vec2 UnpackHalf2x16(uint packed) => new(HalfToFloat((ushort)packed), HalfToFloat((ushort)(packed >> 16)));
     /// <summary>A unit normal in two snorm16s (octahedral mapping).</summary>
     public static uint PackOctahedral(Vec3 n)
     {

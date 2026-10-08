@@ -236,12 +236,21 @@ file(GLOB_RECURSE SOURCE_FILES
 
 add_library(${PROJECT_NAME} SHARED ${SOURCE_FILES})
 
+# Google's material-color-utilities (Apache 2.0): Material 3's colour science behind kmath/material.h,
+# compiled in privately. Its own sources include each other as "cpp/...".
+file(GLOB_RECURSE KORAL_MCU_SOURCES src/third_party/material-color-utilities/cpp/*.cc)
+target_sources(${PROJECT_NAME} PRIVATE ${KORAL_MCU_SOURCES})
+target_include_directories(${PROJECT_NAME} PRIVATE src/third_party/material-color-utilities)
+if(NOT MSVC)
+    set_source_files_properties(${KORAL_MCU_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+endif()
+
 # kmath's noise, bulk operations and random numbers promise the same bits as their C# and Kotlin ports and
 # as the one-at-a-time functions. A fused multiply-add rounds once where those round twice, so the compiler
 # must not form any (GCC and Clang do by default wherever the target has FMA — every ARM64 machine).
 if(NOT MSVC)
     set_source_files_properties(src/core/math/noise.cpp src/core/math/bulk.cpp src/core/math/random.cpp
-            src/core/math/interp.cpp src/core/math/geometry.cpp src/core/capi/math.cpp
+            src/core/math/interp.cpp src/core/math/geometry.cpp src/core/capi/math.cpp src/core/capi/math_glsl.cpp
             PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
@@ -585,10 +594,13 @@ file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
   \"apis\": [\"Vulkan\"],
   \"sceneAbiVersion\": ${KORAL_SCENE_ABI_VERSION},
   \"features\": [\"sceneTable\", \"offscreenScenes\", \"views\", \"hotReload\", \"stateReload\", \"cApi\",
-               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\"${KORAL_CAPABILITY_EXTRA}]
+               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\", \"math\", \"networking\"${KORAL_CAPABILITY_EXTRA}]
 }
 ")
 install(FILES ${CMAKE_BINARY_DIR}/capabilities.json DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral)
+# Code compiled into Koral under its own licence, which travels with the library (Apache 2.0 asks it to).
+install(FILES ${CMAKE_SOURCE_DIR}/src/third_party/material-color-utilities/LICENSE
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/Koral/licenses/material-color-utilities)
 
 # Koral's own shaders and assets, into the layout src/core/paths.cpp looks for
 # (<libdir>/../share/Koral/<kind>). Shipping the binary without these gives a library that
@@ -1065,7 +1077,7 @@ if(KORAL_BUILD_MODULES)
     add_dependencies(stage
             koral-camera koral-gui-extras koral-mesh
             koral-image-import koral-image-export koral-image-compress koral-model-import
-            koral-ui)
+            koral-ui koral-net)
 endif()
 
 # ---------------------------------------------------------------------------

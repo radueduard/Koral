@@ -23,7 +23,7 @@ class Window internal constructor(internal val native: MemorySegment) {
     val isOffscreen: Boolean get() = KoralNative.koral_window_is_offscreen(native)
     /** An offscreen window's image (what it draws into), or null. */
     val image: Image? get() = Resource.wrap(KoralNative.koral_window_image(native))
-    fun resize(extent: UVec2) = KoralNative.koral_window_resize(native, extent.x, extent.y)
+    fun resize(extent: UVec2) = KoralNative.koral_window_resize(native, extent.x.toInt(), extent.y.toInt())
     fun resize(width: Int, height: Int) = KoralNative.koral_window_resize(native, width, height)
     val extent: UVec2 get() = twoInts({ x, y -> KoralNative.koral_window_extent(native, x, y) }, ::UVec2)
     val isPaused: Boolean get() = KoralNative.koral_window_is_paused(native)
@@ -344,7 +344,7 @@ class View internal constructor(internal val native: MemorySegment) {
     val graph: FrameGraph get() = FrameGraph(KoralNative.koral_view_graph(native))
     val target: Window get() = Window(KoralNative.koral_view_target(native))
     val image: Image? get() = Resource.wrap(KoralNative.koral_view_image(native))
-    fun resize(extent: UVec2) = KoralNative.koral_view_resize(native, extent.x, extent.y)
+    fun resize(extent: UVec2) = KoralNative.koral_view_resize(native, extent.x.toInt(), extent.y.toInt())
     var enabled: Boolean
         get() = KoralNative.koral_view_enabled(native)
         set(value) = KoralNative.koral_view_set_enabled(native, value)

@@ -140,9 +140,10 @@ class CommandBuffer internal constructor(native: MemorySegment, private val owne
     fun bindVertexBuffer(binding: Int, buffer: Buffer, offset: Long = 0) = apply { KoralNative.koral_cmd_bind_vertex_buffer(n, binding, buffer.native, offset) }
 
     /** PushConstantBlock: [data] (a primitive array or a MemorySegment) at byte [offset] of the push-constant block. */
-    fun pushConstantBlock(data: Any, offset: Int = 0) = apply {
+    /** The push constant block's bytes from [offset]: anything Buffer.Builder.setData takes — a data class mirroring the block, typically. */
+    fun pushConstantBlock(data: Any, offset: Int = 0, packing: GpuPacking = GpuPacking.C) = apply {
         Arena.ofConfined().use { a ->
-            val s = segmentOf(a, data)
+            val s = segmentOf(a, data, packing)
             KoralNative.koral_cmd_push_constant_block(n, s, s.byteSize().toInt(), offset)
         }
     }
@@ -313,9 +314,9 @@ data class ValueShape(val scalar: ValueScalar, val rows: Int = 1, val columns: I
                 is IVec2 -> ints(value.x, value.y) to ValueShape(ValueScalar.eInt, 2)
                 is IVec3 -> ints(value.x, value.y, value.z) to ValueShape(ValueScalar.eInt, 3)
                 is IVec4 -> ints(value.x, value.y, value.z, value.w) to ValueShape(ValueScalar.eInt, 4)
-                is UVec2 -> ints(value.x, value.y) to ValueShape(ValueScalar.eUInt, 2)
-                is UVec3 -> ints(value.x, value.y, value.z) to ValueShape(ValueScalar.eUInt, 3)
-                is UVec4 -> ints(value.x, value.y, value.z, value.w) to ValueShape(ValueScalar.eUInt, 4)
+                is UVec2 -> ints(value.x.toInt(), value.y.toInt()) to ValueShape(ValueScalar.eUInt, 2)
+                is UVec3 -> ints(value.x.toInt(), value.y.toInt(), value.z.toInt()) to ValueShape(ValueScalar.eUInt, 3)
+                is UVec4 -> ints(value.x.toInt(), value.y.toInt(), value.z.toInt(), value.w.toInt()) to ValueShape(ValueScalar.eUInt, 4)
                 is FloatArray -> floats(*value) to ValueShape(ValueScalar.eFloat, count = value.size)
                 is IntArray -> ints(*value) to ValueShape(ValueScalar.eInt, count = value.size)
                 is UIntArray -> ints(*value.toIntArray()) to ValueShape(ValueScalar.eUInt, count = value.size)

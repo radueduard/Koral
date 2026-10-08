@@ -84,6 +84,7 @@ object Native {
     }
 
     val koralUi: SymbolLookup by lazy { module("koral-ui", "KORAL_UI_LIBRARY") }
+    val koralNet: SymbolLookup by lazy { module("koral-net", "KORAL_NET_LIBRARY") }
 
     /** A C string for @p text in @p arena; null for null. */
     fun cString(arena: Arena, text: String?): MemorySegment = if (text == null) MemorySegment.NULL else arena.allocateFrom(text)

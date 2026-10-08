@@ -123,6 +123,17 @@ namespace kor {
         const T s2 = T(1) - q.w * q.w;
         return s2 <= T(0) ? Vec<T, 3>::UnitZ() : q.XYZ() * (T(1) / std::sqrt(s2));
     }
+    /// Rotation about X, from EulerAngles.
+    template<std::floating_point T> T Pitch(const QuatT<T>& q) {
+        const T py = T(2) * (q.y * q.z + q.w * q.x), px = q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z;
+        return (Abs(px) < T(1e-7) && Abs(py) < T(1e-7)) ? T(2) * std::atan2(q.x, q.w) : std::atan2(py, px);
+    }
+    /// Rotation about Y.
+    template<std::floating_point T> T Yaw(const QuatT<T>& q) { return std::asin(Clamp(T(-2) * (q.x * q.z - q.w * q.y), T(-1), T(1))); }
+    /// Rotation about Z.
+    template<std::floating_point T> T Roll(const QuatT<T>& q) {
+        return std::atan2(T(2) * (q.x * q.y + q.w * q.z), q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z);
+    }
     /// (pitch, yaw, roll) in radians, as glm::eulerAngles returned them.
     template<std::floating_point T> Vec<T, 3> EulerAngles(const QuatT<T>& q) {
         const T py = T(2) * (q.y * q.z + q.w * q.x), px = q.w * q.w - q.x * q.x - q.y * q.y + q.z * q.z;
@@ -153,6 +164,14 @@ namespace kor {
         const T angle = std::acos(cosTheta);
         return (a * std::sin((T(1) - t) * angle) + b * std::sin(t * angle)) * (T(1) / std::sin(angle));
     }
+    /// q followed by `angle` radians about `axis` in q's frame: glm::rotate(q, angle, axis), q * AngleAxis(angle, axis).
+    template<std::floating_point T> QuatT<T> Rotate(const QuatT<T>& q, T angle, const Vec<T, 3>& axis) { return q * QuatT<T>::AngleAxis(angle, axis); }
+    /// v turned `angle` radians about `axis` (glm's rotate_vector).
+    template<std::floating_point T> Vec<T, 3> Rotate(const Vec<T, 3>& v, T angle, const Vec<T, 3>& axis) { return QuatT<T>::AngleAxis(angle, axis) * v; }
+    /// Component-wise interpolation, not normalised (glm::lerp of quaternions): Slerp or Nlerp for rotations.
+    template<std::floating_point T> constexpr QuatT<T> Lerp(const QuatT<T>& a, const QuatT<T>& b, T t) { return a + (b - a) * t; }
+    /// glm::mix of quaternions: spherical, along the shorter arc.
+    template<std::floating_point T> QuatT<T> Mix(const QuatT<T>& a, const QuatT<T>& b, T t) { return Slerp(a, b, t); }
     /// Rotates `from` toward `to` by at most `maxRadians`.
     template<std::floating_point T> QuatT<T> RotateTowards(const QuatT<T>& from, const QuatT<T>& to, T maxRadians) {
         const T angle = T(2) * std::acos(Clamp(Abs(Dot(from, to)), T(0), T(1)));

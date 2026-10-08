@@ -8,6 +8,7 @@
 // Convert with SrgbToLinear before shading, and let an *_SRGB render target (or LinearToSrgb) convert back.
 
 #include "vector.h"
+#include "packing.h"
 
 #include <bit>
 
@@ -37,7 +38,7 @@ namespace kor {
 
     /// RGB to hue, saturation, value; hue in [0, 1) (a full turn), all channels in [0, 1].
     constexpr Vec3 RgbToHsv(const Vec3& c) {
-        const float max = MaxComponent(c), min = MinComponent(c), d = max - min;
+        const float max = CompMax(c), min = CompMin(c), d = max - min;
         float h = 0.f;
         if (d > 0.f) {
             if (max == c.x) h = (c.y - c.z) / d + (c.y < c.z ? 6.f : 0.f);
@@ -62,7 +63,7 @@ namespace kor {
     }
     /// RGB to hue, saturation, lightness; hue in [0, 1).
     constexpr Vec3 RgbToHsl(const Vec3& c) {
-        const float max = MaxComponent(c), min = MinComponent(c), l = (max + min) * 0.5f, d = max - min;
+        const float max = CompMax(c), min = CompMin(c), l = (max + min) * 0.5f, d = max - min;
         if (d == 0.f) return {0.f, 0.f, l};
         const float s = l > 0.5f ? d / (2.f - max - min) : d / (max + min);
         float h;
@@ -122,66 +123,17 @@ namespace kor {
             b = 255.f;
         }
         const Vec3 linear = SrgbToLinear(Clamp(Vec3(r, g, b) / 255.f, 0.f, 1.f));
-        return linear / Max(MaxComponent(linear), 1e-6f);
+        return linear / Max(CompMax(linear), 1e-6f);
     }
 
     // ---- packing, as the GPU reads it ------------------------------------------------------------------
 
-    /// Four [0, 1] floats into RGBA8 (R in the lowest byte), rounded to nearest — GLSL's packUnorm4x8.
-    constexpr u32 PackUnorm4x8(const Vec4& c) {
-        u32 packed = 0;
-        for (int i = 0; i < 4; ++i) packed |= u32(Saturate(c[i]) * 255.f + 0.5f) << (8 * i);
-        return packed;
-    }
-    constexpr Vec4 UnpackUnorm4x8(u32 packed) {
-        return {float(packed & 0xffu) / 255.f, float((packed >> 8) & 0xffu) / 255.f,
-                float((packed >> 16) & 0xffu) / 255.f, float((packed >> 24) & 0xffu) / 255.f};
-    }
     constexpr U8Vec4 ToU8Vec4(const Vec4& c) {
         const u32 p = PackUnorm4x8(c);
         return {u8(p), u8(p >> 8), u8(p >> 16), u8(p >> 24)};
     }
     constexpr Vec4 FromU8Vec4(const U8Vec4& c) { return Vec4(c) / 255.f; }
 
-    /// IEEE half precision, round to nearest even; overflow becomes infinity, NaN stays NaN.
-    constexpr u16 FloatToHalf(float value) {
-        const u32 bits = std::bit_cast<u32>(value);
-        const u32 sign = (bits >> 16) & 0x8000u;
-        const u32 exponent = (bits >> 23) & 0xffu;
-        u32 mantissa = bits & 0x7fffffu;
-        if (exponent == 0xffu) return u16(sign | 0x7c00u | (mantissa ? 0x200u : 0u));
-        const int e = int(exponent) - 127 + 15;
-        if (e >= 31) return u16(sign | 0x7c00u);
-        if (e <= 0) {
-            if (e < -10) return u16(sign);
-            mantissa |= 0x800000u;
-            const u32 shift = u32(14 - e);
-            u32 half = mantissa >> shift;
-            const u32 rem = mantissa & ((1u << shift) - 1u), halfway = 1u << (shift - 1u);
-            if (rem > halfway || (rem == halfway && (half & 1u))) ++half;
-            return u16(sign | half);
-        }
-        u32 half = (u32(e) << 10) | (mantissa >> 13);
-        const u32 rem = mantissa & 0x1fffu;
-        if (rem > 0x1000u || (rem == 0x1000u && (half & 1u))) ++half;   // may carry into the exponent: correct
-        return u16(sign | half);
-    }
-    constexpr float HalfToFloat(u16 half) {
-        const u32 sign = u32(half & 0x8000u) << 16;
-        const u32 exponent = (half >> 10) & 0x1fu;
-        u32 mantissa = half & 0x3ffu;
-        if (exponent == 0) {
-            if (mantissa == 0) return std::bit_cast<float>(sign);
-            int e = -1;
-            do { ++e; mantissa <<= 1; } while ((mantissa & 0x400u) == 0);
-            return std::bit_cast<float>(sign | (u32(127 - 15 - e) << 23) | ((mantissa & 0x3ffu) << 13));
-        }
-        if (exponent == 31) return std::bit_cast<float>(sign | 0x7f800000u | (mantissa << 13));
-        return std::bit_cast<float>(sign | ((exponent + 127 - 15) << 23) | (mantissa << 13));
-    }
-    /// Two floats as halves, x in the low 16 bits — GLSL's packHalf2x16.
-    constexpr u32 PackHalf2x16(const Vec2& v) { return u32(FloatToHalf(v.x)) | (u32(FloatToHalf(v.y)) << 16); }
-    constexpr Vec2 UnpackHalf2x16(u32 packed) { return {HalfToFloat(u16(packed)), HalfToFloat(u16(packed >> 16))}; }
     /// A unit normal in two snorm16s (octahedral mapping): 4 bytes per normal, error under 0.01°.
     constexpr u32 PackOctahedral(const Vec3& n) {
         Vec2 p = Vec2(n) * (1.f / (Abs(n.x) + Abs(n.y) + Abs(n.z)));

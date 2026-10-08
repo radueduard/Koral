@@ -106,13 +106,84 @@ public static unsafe partial class Cases
             Check.That(ApproxEqual(EulerAngles(q), KoralMathNative.koral_quat_euler_angles(q), 1e-5f), "EulerAngles");
             Check.That(SameRotation(Slerp(q, Quat.Identity, 0.3f), KoralMathNative.koral_quat_slerp(q, Quat.Identity, 0.3f), 1e-5f), "Slerp");
         }
-        Check.That(ApproxEqual(Perspective(1.1f, 1.7f, 0.1f, 300f), KoralMathNative.koral_perspective(1.1f, 1.7f, 0.1f, 300f), 1e-6f), "Perspective");
-        Check.That(Same(Orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f), KoralMathNative.koral_orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f)), "Orthographic");
+        Check.That(ApproxEqual(Perspective(1.1f, 1.7f, 0.1f, 300f), KoralMathNative.koral_perspective(1.1f, 1.7f, 0.1f, 300f, 0), 1e-6f), "Perspective");
+        Check.That(Same(Orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f), KoralMathNative.koral_orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f, 0)), "Orthographic");
 
         var parent = new Transform(new Vec3(1, 2, 3), Quat.AngleAxis(0.5f, Vec3.Up), new Vec3(2f));
         var child = new Transform(new Vec3(-1, 0, 4), Quat.AngleAxis(-0.2f, Vec3.Right));
         Check.That(Same((parent * child).Matrix, KoralMathNative.koral_transform_matrix(KoralMathNative.koral_transform_mul(parent, child))), "Transform");
         Check.That(new Mat4() == Mat4.Identity && new Quat() == Quat.Identity && !new Aabb().Valid, "C++'s defaults");
+    }
+
+    public static void MathCamerasAndEulerMatchNative()
+    {
+        foreach (var clip in Enum.GetValues<ClipSpace>())
+        {
+            Check.That(Same(Perspective(1.1f, 1.7f, 0.1f, 300f, clip), KoralMathNative.koral_perspective(1.1f, 1.7f, 0.1f, 300f, (int)clip)), $"Perspective {clip}");
+            Check.That(Same(PerspectiveFov(1.1f, 640f, 480f, 0.1f, 300f, clip), KoralMathNative.koral_perspective_fov(1.1f, 640f, 480f, 0.1f, 300f, (int)clip)), $"PerspectiveFov {clip}");
+            Check.That(Same(InfinitePerspective(1.1f, 1.7f, 0.1f, clip), KoralMathNative.koral_infinite_perspective(1.1f, 1.7f, 0.1f, (int)clip)), $"InfinitePerspective {clip}");
+            Check.That(Same(FrustumProjection(-1f, 2f, -1.5f, 1f, 0.5f, 90f, clip), KoralMathNative.koral_frustum_projection(-1f, 2f, -1.5f, 1f, 0.5f, 90f, (int)clip)), $"FrustumProjection {clip}");
+            Check.That(Same(Orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f, clip), KoralMathNative.koral_orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f, (int)clip)), $"Orthographic {clip}");
+            Mat4 model = Compose(new Vec3(1f, -2f, 3f), Quat.AngleAxis(0.7f, new Vec3(1f, 2f, 3f)), new Vec3(2f, 0.5f, 1.5f));
+            Mat4 proj = Perspective(1f, 1.3f, 0.1f, 50f, clip) * LookAt(new Vec3(0f, 0f, 10f), Vec3.Zero);
+            var viewport = new Vec4(10f, 20f, 800f, 600f);
+            Vec3 w = Project(new Vec3(0.3f, -0.2f, 0.5f), model, proj, viewport, clip);
+            Check.That(Same(w, KoralMathNative.koral_project(new Vec3(0.3f, -0.2f, 0.5f), model, proj, viewport, (int)clip)), $"Project {clip}");
+            Check.That(Same(UnProject(w, model, proj, viewport, clip), KoralMathNative.koral_unproject(w, model, proj, viewport, (int)clip)), $"UnProject {clip}");
+        }
+        Check.That(Same(Orthographic(-3f, 4f, -1f, 2f), KoralMathNative.koral_orthographic_2d(-3f, 4f, -1f, 2f)), "Orthographic 2D");
+        Check.That(Same(LookAtLH(new Vec3(1f, 2f, 3f), new Vec3(-2f, 0f, 1f)), KoralMathNative.koral_look_at_lh(new Vec3(1f, 2f, 3f), new Vec3(-2f, 0f, 1f), Vec3.Up)), "LookAtLH");
+        Check.That(Same(PickMatrix(new Vec2(400f, 300f), new Vec2(5f, 3f), new Vec4(0f, 0f, 800f, 600f)),
+                        KoralMathNative.koral_pick_matrix(new Vec2(400f, 300f), new Vec2(5f, 3f), new Vec4(0f, 0f, 800f, 600f))), "PickMatrix");
+
+        var random = new Random(31);
+        for (int i = 0; i < 200; ++i)
+        {
+            var angles = new Vec3(random.NextFloat(-3f, 3f), random.NextFloat(-1.5f, 1.5f), random.NextFloat(-3f, 3f));
+            var order = (EulerOrder)(i % 12);
+            Mat4 m = EulerAngles(order, angles);
+            Check.That(ApproxEqual(m, KoralMathNative.koral_euler_angles((int)order, angles), 1e-6f), $"EulerAngles {order}");
+            Check.That(ApproxEqual(ExtractEulerAngles(order, m), KoralMathNative.koral_extract_euler_angles((int)order, m), 1e-4f), $"ExtractEulerAngles {order}");
+            Check.That(ApproxEqual(EulerAngles(order, ExtractEulerAngles(order, m)), m, 1e-4f), $"Euler round trip {order}");
+            Check.That(ApproxEqual(QuatFromEuler(order, angles), KoralMathNative.koral_quat_from_euler_order((int)order, angles), 1e-6f), $"QuatFromEuler {order}");
+            Quat q = random.Rotation();
+            Check.That(Same(Pitch(q), KoralMathNative.koral_quat_pitch(q)) && Same(Yaw(q), KoralMathNative.koral_quat_yaw(q)) && Same(Roll(q), KoralMathNative.koral_quat_roll(q)), "Pitch/Yaw/Roll");
+            Check.That(ApproxEqual(Rotate(q, 0.4f, angles), KoralMathNative.koral_quat_rotate_axis(q, 0.4f, angles), 1e-6f), "Rotate(Quat)");
+            Check.That(ApproxEqual(Rotate(angles, 0.4f, Vec3.UnitY), KoralMathNative.koral_vec3_rotate(angles, 0.4f, Vec3.UnitY), 1e-6f), "Rotate(Vec3)");
+            Check.That(Same(Lerp(q, Quat.Identity, 0.3f).X, KoralMathNative.koral_quat_lerp(q, Quat.Identity, 0.3f).X), "Lerp(Quat)");
+        }
+        Check.That(ApproxEqual(EulerAngleXYZ(0.1f, 0.2f, 0.3f), KoralMathNative.koral_euler_angle_xyz(0.1f, 0.2f, 0.3f), 1e-6f), "EulerAngleXYZ");
+        Check.That(ApproxEqual(EulerAngleZY(0.1f, 0.2f), KoralMathNative.koral_euler_angle_zy(0.1f, 0.2f), 1e-6f), "EulerAngleZY");
+        Check.That(ApproxEqual(YawPitchRoll(0.1f, 0.2f, 0.3f), KoralMathNative.koral_yaw_pitch_roll(0.1f, 0.2f, 0.3f), 1e-6f), "YawPitchRoll");
+
+        // The glm-shaped surface reads as in C++.
+        var v = new Vec4(1f, 2f, 3f, 4f);
+        Check.That(v.ZYX == new Vec3(3f, 2f, 1f) && v.XXYY == new Vec4(1f, 1f, 2f, 2f), "swizzles");
+        Check.That(All(LessThan(new IVec3(1, 2, 3), new IVec3(2, 3, 4))) && Any(Equal(new UVec2(1u, 2u), new UVec2(0u, 2u))), "relational");
+        Check.That(Transpose(new Mat2x3(new Vec3(1f, 2f, 3f), new Vec3(4f, 5f, 6f))) == new Mat3x2(new Vec2(1f, 4f), new Vec2(2f, 5f), new Vec2(3f, 6f)), "Mat2x3");
+        Check.That(new DMat4(2.0) * new DVec4(1.0) == new DVec4(2.0), "DMat4");
+    }
+
+    public static void MathMaterialColors()
+    {
+        Check.That(MaterialColors.Red500 == ColorFromHex(0xF44336) && MaterialColors.TealA400 == ColorFromHex(0x1DE9B6), "palette by name");
+        foreach (var hue in Enum.GetValues<MaterialHue>())
+            foreach (int shade in new[] { 50, 100, 250, 500, 900, 1000 })
+            {
+                Check.That(MaterialColor(hue, shade) == KoralMathNative.koral_material_color((int)hue, shade), $"MaterialColor {hue} {shade}");
+                Check.That(MaterialAccent(hue, shade) == KoralMathNative.koral_material_accent((int)hue, shade), $"MaterialAccent {hue} {shade}");
+            }
+        // Google's expectations (material-color-utilities' tests).
+        var blue = TonalPalette.FromColor(ColorFromHex(0x0000FF));
+        Check.That(blue.Tone(90f) == ColorFromHex(0xE0E0FF) && blue.Tone(40f) == ColorFromHex(0x343DFF), "TonalPalette");
+        var hct = Hct.FromColor(ColorFromHex(0x0000FF));
+        Check.That(MathF.Abs(hct.Hue - 282.788f) < 0.01f && hct.ToColor() == ColorFromHex(0x0000FF), $"Hct {hct}");
+        var dark = MaterialScheme.FromSeed(ColorFromHex(0x0000FF), dark: true, SchemeVariant.Monochrome);
+        Check.That(MathF.Abs(Hct.FromColor(dark.Primary).Tone - 100f) < 1f, "monochrome dark primary");
+        var scheme = MaterialScheme.FromSeed(ColorFromHex(0x6750A4), dark: false);
+        Check.That(ContrastRatio(scheme.OnPrimary, scheme.Primary) >= 4.5f, "onPrimary reads");
+        byte[] pixels = [.. Enumerable.Repeat(new byte[] { 128, 128, 128, 255 }, 100).SelectMany(p => p), .. Enumerable.Repeat(new byte[] { 255, 0, 0, 255 }, 20).SelectMany(p => p)];
+        Check.That(SeedColors(pixels)[0] == ColorFromHex(0xFF0000), "SeedColors");
     }
 
     public static void MathGeometryMatchesNative()
@@ -204,9 +275,13 @@ internal static class MathInterop
 #pragma warning restore CA2255
     internal static void Register() => NativeLibrary.SetDllImportResolver(typeof(MathInterop).Assembly, (name, _, _) =>
     {
-        if (name != "Koral") return IntPtr.Zero;
+        if (name != "Koral" && name != "koral-net") return IntPtr.Zero;
         Bulk.Bounds(ReadOnlySpan<Vec3>.Empty);   // any call into Koral makes the bindings find and load it
-        return NativeLibrary.Load(Koral.Native.NativeLibraryResolver.LoadedFrom!);
+        var koral = Koral.Native.NativeLibraryResolver.LoadedFrom!;
+        if (name == "Koral") return NativeLibrary.Load(koral);
+        // koral-net: in modules/ beside Koral, where the module's own binding loads it from.
+        var file = OperatingSystem.IsWindows() ? "koral-net.dll" : OperatingSystem.IsMacOS() ? "libkoral-net.dylib" : "libkoral-net.so";
+        return NativeLibrary.Load(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(koral))!, "modules", file));
     });
 }
 

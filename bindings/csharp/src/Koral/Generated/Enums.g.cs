@@ -328,6 +328,10 @@ public enum ErrorCode : byte
     eFileNotReadable = 27,
     eFrameGraphInvalid = 28,
     eWindowCreationFailed = 29,
+    eNetwork = 30,
+    eTimedOut = 31,
+    eConnectionClosed = 32,
+    eProtocol = 33,
 }
 
 /// <summary>kor::Key.</summary>

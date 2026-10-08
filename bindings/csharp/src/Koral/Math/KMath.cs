@@ -2,7 +2,9 @@ namespace Koral;
 
 /// <summary>
 /// kmath's free functions — kor::Dot, kor::Normalize, kor::Perspective, ... — under the same names. With
-/// <c>using static Koral.KMath;</c> they read exactly as in C++: <c>Normalize(Cross(a, b))</c>.
+/// <c>using static Koral.KMath;</c> they read exactly as in C++: <c>Normalize(Cross(a, b))</c>. The GLSL chapters
+/// (trigonometric, exponential, common, geometric, relational, integer, packing) and the matrices are generated
+/// (Generated/KMath.Glsl.g.cs, Generated/Matrices.g.cs) for every type C++ has them for; this file is the rest.
 /// </summary>
 /// <remarks>
 /// Each does its arithmetic in the order the C++ one does, so what is only additions, multiplications,
@@ -11,285 +13,6 @@ namespace Koral;
 /// </remarks>
 public static partial class KMath
 {
-    // ---- scalars (kmath/scalar.h) -------------------------------------------------------------------
-
-    public const float Pi = MathF.PI;
-    public const float Tau = 2f * MathF.PI;
-    public const float HalfPi = MathF.PI / 2f;
-    /// <summary>The tolerance ApproxEqual uses when given none.</summary>
-    public const float Epsilon = 1e-5f;
-    /// <summary>C's FLT_EPSILON: the gap between 1 and the next float (not .NET's float.Epsilon, the smallest denormal).</summary>
-    private const float FltEpsilon = 1.1920929E-07f;
-
-    public static float Radians(float degrees) => degrees * (Pi / 180f);
-    public static float Degrees(float radians) => radians * (180f / Pi);
-    public static float Min(float a, float b) => b < a ? b : a;
-    public static float Max(float a, float b) => a < b ? b : a;
-    public static int Min(int a, int b) => b < a ? b : a;
-    public static int Max(int a, int b) => a < b ? b : a;
-    public static float Clamp(float v, float lo, float hi) => Min(Max(v, lo), hi);
-    public static int Clamp(int v, int lo, int hi) => Min(Max(v, lo), hi);
-    public static float Saturate(float v) => Clamp(v, 0f, 1f);
-    public static float Abs(float v) => v < 0f ? -v : v;
-    public static float Sign(float v) => (0f < v ? 1 : 0) - (v < 0f ? 1 : 0);
-    public static float Floor(float v) => MathF.Floor(v);
-    public static float Ceil(float v) => MathF.Ceiling(v);
-    /// <summary>Halves away from zero, like C++'s std::round (not .NET's default banker's rounding).</summary>
-    public static float Round(float v) => MathF.Round(v, MidpointRounding.AwayFromZero);
-    public static float Trunc(float v) => MathF.Truncate(v);
-    /// <summary>v - Floor(v): in [0, 1), negative v included.</summary>
-    public static float Fract(float v) => v - MathF.Floor(v);
-    /// <summary>The GLSL mod: the result has the sign of <paramref name="m"/>.</summary>
-    public static float Mod(float v, float m) => v - m * MathF.Floor(v / m);
-    public static int Mod(int v, int m) { int r = v % m; return r != 0 && (r < 0) != (m < 0) ? r + m : r; }
-    public static float Sqrt(float v) => MathF.Sqrt(v);
-    public static float InverseSqrt(float v) => 1f / MathF.Sqrt(v);
-    public static float Pow(float v, float e) => MathF.Pow(v, e);
-    public static float Exp(float v) => MathF.Exp(v);
-    public static float Log(float v) => MathF.Log(v);
-    public static float Sin(float v) => MathF.Sin(v);
-    public static float Cos(float v) => MathF.Cos(v);
-    public static float Tan(float v) => MathF.Tan(v);
-    public static float Asin(float v) => MathF.Asin(v);
-    public static float Acos(float v) => MathF.Acos(v);
-    public static float Atan(float v) => MathF.Atan(v);
-    public static float Atan2(float y, float x) => MathF.Atan2(y, x);
-    public static bool IsFinite(float v) => float.IsFinite(v);
-    public static bool IsNan(float v) => float.IsNaN(v);
-    public static bool ApproxEqual(float a, float b, float epsilon = Epsilon) => Abs(a - b) <= epsilon;
-
-    /// <summary>a + (b - a) * t, not clamped.</summary>
-    public static float Lerp(float a, float b, float t) => a + (b - a) * t;
-    public static float InverseLerp(float a, float b, float v) => a == b ? 0f : (v - a) / (b - a);
-    public static float Remap(float v, float inMin, float inMax, float outMin, float outMax) => Lerp(outMin, outMax, InverseLerp(inMin, inMax, v));
-    public static float Step(float edge, float v) => v < edge ? 0f : 1f;
-    public static float SmoothStep(float edge0, float edge1, float v)
-    {
-        float t = Saturate((v - edge0) / (edge1 - edge0));
-        return t * t * (3f - 2f * t);
-    }
-    public static float SmootherStep(float edge0, float edge1, float v)
-    {
-        float t = Saturate((v - edge0) / (edge1 - edge0));
-        return t * t * t * (t * (t * 6f - 15f) + 10f);
-    }
-    public static float MoveTowards(float current, float target, float maxDelta) =>
-        Abs(target - current) <= maxDelta ? target : current + Sign(target - current) * maxDelta;
-    /// <summary>The shortest signed difference between two angles in radians, in [-Pi, Pi].</summary>
-    public static float DeltaAngle(float from, float to)
-    {
-        float d = Mod(to - from, Tau);
-        return d > Pi ? d - Tau : d;
-    }
-    public static float WrapAngle(float radians) => Mod(radians + Pi, Tau) - Pi;
-
-    /// <summary>A critically damped spring toward <paramref name="target"/>; <paramref name="velocity"/> is its state.</summary>
-    public static float SmoothDamp(float current, float target, ref float velocity, float smoothTime, float deltaTime, float maxSpeed = float.PositiveInfinity)
-    {
-        smoothTime = Max(0.0001f, smoothTime);
-        float omega = 2f / smoothTime;
-        float x = omega * deltaTime;
-        float exp = 1f / (1f + x + 0.48f * x * x + 0.235f * x * x * x);
-        float maxChange = maxSpeed * smoothTime;
-        float change = Clamp(current - target, -maxChange, maxChange);
-        float clampedTarget = current - change;
-        float temp = (velocity + omega * change) * deltaTime;
-        velocity = (velocity - omega * temp) * exp;
-        float output = clampedTarget + (change + temp) * exp;
-        if ((target - current > 0f) == (output > target))
-        {
-            output = target;
-            velocity = (output - target) / deltaTime;
-        }
-        return output;
-    }
-
-    public static uint NextPowerOfTwo(uint v) => v <= 1 ? 1 : System.Numerics.BitOperations.RoundUpToPowerOf2(v);
-    public static bool IsPowerOfTwo(uint v) => v != 0 && (v & (v - 1)) == 0;
-    public static uint AlignUp(uint v, uint alignment) => (v + alignment - 1) & ~(alignment - 1);
-    public static ulong AlignUp(ulong v, ulong alignment) => (v + alignment - 1) & ~(alignment - 1);
-    public static int DivideRoundUp(int a, int b) => (a + b - 1) / b;
-    public static uint DivideRoundUp(uint a, uint b) => (a + b - 1) / b;
-
-    // ---- vectors (kmath/vector.h) --------------------------------------------------------------------
-
-    public static float Dot(Vec2 a, Vec2 b) => a.X * b.X + a.Y * b.Y;
-    public static float Dot(Vec3 a, Vec3 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z;
-    public static float Dot(Vec4 a, Vec4 b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
-    public static Vec3 Cross(Vec3 a, Vec3 b) => new(a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X);
-    /// <summary>The z of the 3D cross product: positive when b is counter-clockwise from a.</summary>
-    public static float Cross(Vec2 a, Vec2 b) => a.X * b.Y - a.Y * b.X;
-    public static float LengthSquared(Vec2 v) => Dot(v, v);
-    public static float LengthSquared(Vec3 v) => Dot(v, v);
-    public static float LengthSquared(Vec4 v) => Dot(v, v);
-    public static float Length(Vec2 v) => MathF.Sqrt(Dot(v, v));
-    public static float Length(Vec3 v) => MathF.Sqrt(Dot(v, v));
-    public static float Length(Vec4 v) => MathF.Sqrt(Dot(v, v));
-    public static float Distance(Vec2 a, Vec2 b) => Length(b - a);
-    public static float Distance(Vec3 a, Vec3 b) => Length(b - a);
-    public static float DistanceSquared(Vec2 a, Vec2 b) => LengthSquared(b - a);
-    public static float DistanceSquared(Vec3 a, Vec3 b) => LengthSquared(b - a);
-    /// <summary>v / Length(v); a zero vector stays zero rather than becoming NaN.</summary>
-    public static Vec2 Normalize(Vec2 v) { float len = Length(v); return len > 0f ? v * (1f / len) : v; }
-    public static Vec3 Normalize(Vec3 v) { float len = Length(v); return len > 0f ? v * (1f / len) : v; }
-    public static Vec4 Normalize(Vec4 v) { float len = Length(v); return len > 0f ? v * (1f / len) : v; }
-    public static Vec2 NormalizeOr(Vec2 v, Vec2 fallback) { float len = Length(v); return len > FltEpsilon ? v * (1f / len) : fallback; }
-    public static Vec3 NormalizeOr(Vec3 v, Vec3 fallback) { float len = Length(v); return len > FltEpsilon ? v * (1f / len) : fallback; }
-    public static Vec2 ClampLength(Vec2 v, float maxLength) { float sq = LengthSquared(v); return sq > maxLength * maxLength ? v * (maxLength / MathF.Sqrt(sq)) : v; }
-    public static Vec3 ClampLength(Vec3 v, float maxLength) { float sq = LengthSquared(v); return sq > maxLength * maxLength ? v * (maxLength / MathF.Sqrt(sq)) : v; }
-    public static Vec2 Reflect(Vec2 i, Vec2 n) => i - n * (2f * Dot(n, i));
-    public static Vec3 Reflect(Vec3 i, Vec3 n) => i - n * (2f * Dot(n, i));
-    public static Vec3 Refract(Vec3 i, Vec3 n, float eta)
-    {
-        float d = Dot(n, i);
-        float k = 1f - eta * eta * (1f - d * d);
-        return k < 0f ? Vec3.Zero : i * eta - n * (eta * d + MathF.Sqrt(k));
-    }
-    public static Vec3 Project(Vec3 v, Vec3 onto) { float sq = Dot(onto, onto); return sq > 0f ? onto * (Dot(v, onto) / sq) : Vec3.Zero; }
-    public static Vec3 ProjectOnPlane(Vec3 v, Vec3 n) => v - n * Dot(v, n);
-    public static float Angle(Vec3 a, Vec3 b)
-    {
-        float denom = MathF.Sqrt(LengthSquared(a) * LengthSquared(b));
-        return denom > 0f ? MathF.Acos(Clamp(Dot(a, b) / denom, -1f, 1f)) : 0f;
-    }
-    public static float SignedAngle(Vec3 a, Vec3 b, Vec3 axis) => MathF.Atan2(Dot(Cross(a, b), axis), Dot(a, b));
-    public static Vec3 AnyPerpendicular(Vec3 v) => Normalize(Cross(v, Abs(v.X) < 0.9f ? Vec3.UnitX : Vec3.UnitY));
-    public static void OrthoNormalize(ref Vec3 normal, ref Vec3 tangent)
-    {
-        normal = Normalize(normal);
-        tangent = NormalizeOr(tangent - normal * Dot(tangent, normal), AnyPerpendicular(normal));
-    }
-    public static bool ApproxEqual(Vec2 a, Vec2 b, float epsilon = Epsilon) => ApproxEqual(a.X, b.X, epsilon) && ApproxEqual(a.Y, b.Y, epsilon);
-    public static bool ApproxEqual(Vec3 a, Vec3 b, float epsilon = Epsilon) => ApproxEqual(a.X, b.X, epsilon) && ApproxEqual(a.Y, b.Y, epsilon) && ApproxEqual(a.Z, b.Z, epsilon);
-    public static bool ApproxEqual(Vec4 a, Vec4 b, float epsilon = Epsilon) => ApproxEqual((Vec3)a, (Vec3)b, epsilon) && ApproxEqual(a.W, b.W, epsilon);
-    public static float MinComponent(Vec3 v) => Min(Min(v.X, v.Y), v.Z);
-    public static float MaxComponent(Vec3 v) => Max(Max(v.X, v.Y), v.Z);
-    public static float Sum(Vec3 v) => v.X + v.Y + v.Z;
-    public static float Product(Vec3 v) => v.X * v.Y * v.Z;
-
-    public static Vec2 Abs(Vec2 v) => new(Abs(v.X), Abs(v.Y));
-    public static Vec3 Abs(Vec3 v) => new(Abs(v.X), Abs(v.Y), Abs(v.Z));
-    public static Vec4 Abs(Vec4 v) => new(Abs(v.X), Abs(v.Y), Abs(v.Z), Abs(v.W));
-    public static Vec2 Floor(Vec2 v) => new(MathF.Floor(v.X), MathF.Floor(v.Y));
-    public static Vec3 Floor(Vec3 v) => new(MathF.Floor(v.X), MathF.Floor(v.Y), MathF.Floor(v.Z));
-    public static Vec2 Ceil(Vec2 v) => new(MathF.Ceiling(v.X), MathF.Ceiling(v.Y));
-    public static Vec3 Ceil(Vec3 v) => new(MathF.Ceiling(v.X), MathF.Ceiling(v.Y), MathF.Ceiling(v.Z));
-    public static Vec2 Round(Vec2 v) => new(Round(v.X), Round(v.Y));
-    public static Vec3 Round(Vec3 v) => new(Round(v.X), Round(v.Y), Round(v.Z));
-    public static Vec2 Fract(Vec2 v) => new(Fract(v.X), Fract(v.Y));
-    public static Vec3 Fract(Vec3 v) => new(Fract(v.X), Fract(v.Y), Fract(v.Z));
-    public static Vec3 Sqrt(Vec3 v) => new(MathF.Sqrt(v.X), MathF.Sqrt(v.Y), MathF.Sqrt(v.Z));
-    public static Vec3 Radians(Vec3 v) => new(Radians(v.X), Radians(v.Y), Radians(v.Z));
-    public static Vec3 Degrees(Vec3 v) => new(Degrees(v.X), Degrees(v.Y), Degrees(v.Z));
-    public static Vec2 Min(Vec2 a, Vec2 b) => new(Min(a.X, b.X), Min(a.Y, b.Y));
-    public static Vec3 Min(Vec3 a, Vec3 b) => new(Min(a.X, b.X), Min(a.Y, b.Y), Min(a.Z, b.Z));
-    public static Vec4 Min(Vec4 a, Vec4 b) => new(Min(a.X, b.X), Min(a.Y, b.Y), Min(a.Z, b.Z), Min(a.W, b.W));
-    public static Vec2 Max(Vec2 a, Vec2 b) => new(Max(a.X, b.X), Max(a.Y, b.Y));
-    public static Vec3 Max(Vec3 a, Vec3 b) => new(Max(a.X, b.X), Max(a.Y, b.Y), Max(a.Z, b.Z));
-    public static Vec4 Max(Vec4 a, Vec4 b) => new(Max(a.X, b.X), Max(a.Y, b.Y), Max(a.Z, b.Z), Max(a.W, b.W));
-    public static Vec2 Clamp(Vec2 v, Vec2 lo, Vec2 hi) => Min(Max(v, lo), hi);
-    public static Vec3 Clamp(Vec3 v, Vec3 lo, Vec3 hi) => Min(Max(v, lo), hi);
-    public static Vec4 Clamp(Vec4 v, Vec4 lo, Vec4 hi) => Min(Max(v, lo), hi);
-    public static Vec2 Clamp(Vec2 v, float lo, float hi) => Clamp(v, new Vec2(lo), new Vec2(hi));
-    public static Vec3 Clamp(Vec3 v, float lo, float hi) => Clamp(v, new Vec3(lo), new Vec3(hi));
-    public static Vec4 Clamp(Vec4 v, float lo, float hi) => Clamp(v, new Vec4(lo), new Vec4(hi));
-    public static Vec3 Saturate(Vec3 v) => Clamp(v, 0f, 1f);
-    public static Vec2 Lerp(Vec2 a, Vec2 b, float t) => a + (b - a) * t;
-    public static Vec3 Lerp(Vec3 a, Vec3 b, float t) => a + (b - a) * t;
-    public static Vec4 Lerp(Vec4 a, Vec4 b, float t) => a + (b - a) * t;
-    public static Vec3 MoveTowards(Vec3 current, Vec3 target, float maxDistance)
-    {
-        Vec3 d = target - current;
-        float len = Length(d);
-        return len <= maxDistance || len == 0f ? target : current + d * (maxDistance / len);
-    }
-    public static Vec3 SmoothDamp(Vec3 current, Vec3 target, ref Vec3 velocity, float smoothTime, float deltaTime, float maxSpeed = float.PositiveInfinity)
-    {
-        smoothTime = Max(0.0001f, smoothTime);
-        float omega = 2f / smoothTime;
-        float x = omega * deltaTime;
-        float exp = 1f / (1f + x + 0.48f * x * x + 0.235f * x * x * x);
-        Vec3 change = ClampLength(current - target, maxSpeed * smoothTime);
-        Vec3 clampedTarget = current - change;
-        Vec3 temp = (velocity + change * omega) * deltaTime;
-        velocity = (velocity - temp * omega) * exp;
-        Vec3 output = clampedTarget + (change + temp) * exp;
-        if (Dot(target - current, output - target) > 0f)
-        {
-            output = target;
-            velocity = (output - target) / deltaTime;
-        }
-        return output;
-    }
-    public static bool IsFinite(Vec3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
-
-    // ---- matrices (kmath/matrix.h) -------------------------------------------------------------------
-
-    public static Mat4 Transpose(Mat4 m) => new(m.Row(0), m.Row(1), m.Row(2), m.Row(3));
-    public static Mat3 Transpose(Mat3 m) => new(m.Row(0), m.Row(1), m.Row(2));
-    public static float Determinant(Mat3 m) => Dot(m.C0, Cross(m.C1, m.C2));
-    public static float Determinant(Mat4 m)
-    {
-        float s0 = m[2, 2] * m[3, 3] - m[3, 2] * m[2, 3], s1 = m[2, 1] * m[3, 3] - m[3, 1] * m[2, 3];
-        float s2 = m[2, 1] * m[3, 2] - m[3, 1] * m[2, 2], s3 = m[2, 0] * m[3, 3] - m[3, 0] * m[2, 3];
-        float s4 = m[2, 0] * m[3, 2] - m[3, 0] * m[2, 2], s5 = m[2, 0] * m[3, 1] - m[3, 0] * m[2, 1];
-        float c0 = +(m[1, 1] * s0 - m[1, 2] * s1 + m[1, 3] * s2);
-        float c1 = -(m[1, 0] * s0 - m[1, 2] * s3 + m[1, 3] * s4);
-        float c2 = +(m[1, 0] * s1 - m[1, 1] * s3 + m[1, 3] * s5);
-        float c3 = -(m[1, 0] * s2 - m[1, 1] * s4 + m[1, 2] * s5);
-        return m[0, 0] * c0 + m[0, 1] * c1 + m[0, 2] * c2 + m[0, 3] * c3;
-    }
-    public static Mat3 Inverse(Mat3 m)
-    {
-        Vec3 r0 = Cross(m.C1, m.C2), r1 = Cross(m.C2, m.C0), r2 = Cross(m.C0, m.C1);
-        float inv = 1f / Dot(m.C0, r0);
-        return Transpose(new Mat3(r0 * inv, r1 * inv, r2 * inv));
-    }
-    /// <summary>The inverse; a singular matrix gives non-finite elements.</summary>
-    public static Mat4 Inverse(Mat4 m)
-    {
-        float a2323 = m[2, 2] * m[3, 3] - m[2, 3] * m[3, 2], a1323 = m[2, 1] * m[3, 3] - m[2, 3] * m[3, 1];
-        float a1223 = m[2, 1] * m[3, 2] - m[2, 2] * m[3, 1], a0323 = m[2, 0] * m[3, 3] - m[2, 3] * m[3, 0];
-        float a0223 = m[2, 0] * m[3, 2] - m[2, 2] * m[3, 0], a0123 = m[2, 0] * m[3, 1] - m[2, 1] * m[3, 0];
-        float a2313 = m[1, 2] * m[3, 3] - m[1, 3] * m[3, 2], a1313 = m[1, 1] * m[3, 3] - m[1, 3] * m[3, 1];
-        float a1213 = m[1, 1] * m[3, 2] - m[1, 2] * m[3, 1], a2312 = m[1, 2] * m[2, 3] - m[1, 3] * m[2, 2];
-        float a1312 = m[1, 1] * m[2, 3] - m[1, 3] * m[2, 1], a1212 = m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1];
-        float a0313 = m[1, 0] * m[3, 3] - m[1, 3] * m[3, 0], a0213 = m[1, 0] * m[3, 2] - m[1, 2] * m[3, 0];
-        float a0312 = m[1, 0] * m[2, 3] - m[1, 3] * m[2, 0], a0212 = m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0];
-        float a0113 = m[1, 0] * m[3, 1] - m[1, 1] * m[3, 0], a0112 = m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0];
-
-        float det = m[0, 0] * (m[1, 1] * a2323 - m[1, 2] * a1323 + m[1, 3] * a1223)
-                  - m[0, 1] * (m[1, 0] * a2323 - m[1, 2] * a0323 + m[1, 3] * a0223)
-                  + m[0, 2] * (m[1, 0] * a1323 - m[1, 1] * a0323 + m[1, 3] * a0123)
-                  - m[0, 3] * (m[1, 0] * a1223 - m[1, 1] * a0223 + m[1, 2] * a0123);
-        float inv = 1f / det;
-
-        var r = Mat4.Zero;
-        r[0, 0] = inv * (m[1, 1] * a2323 - m[1, 2] * a1323 + m[1, 3] * a1223);
-        r[0, 1] = inv * -(m[0, 1] * a2323 - m[0, 2] * a1323 + m[0, 3] * a1223);
-        r[0, 2] = inv * (m[0, 1] * a2313 - m[0, 2] * a1313 + m[0, 3] * a1213);
-        r[0, 3] = inv * -(m[0, 1] * a2312 - m[0, 2] * a1312 + m[0, 3] * a1212);
-        r[1, 0] = inv * -(m[1, 0] * a2323 - m[1, 2] * a0323 + m[1, 3] * a0223);
-        r[1, 1] = inv * (m[0, 0] * a2323 - m[0, 2] * a0323 + m[0, 3] * a0223);
-        r[1, 2] = inv * -(m[0, 0] * a2313 - m[0, 2] * a0313 + m[0, 3] * a0213);
-        r[1, 3] = inv * (m[0, 0] * a2312 - m[0, 2] * a0312 + m[0, 3] * a0212);
-        r[2, 0] = inv * (m[1, 0] * a1323 - m[1, 1] * a0323 + m[1, 3] * a0123);
-        r[2, 1] = inv * -(m[0, 0] * a1323 - m[0, 1] * a0323 + m[0, 3] * a0123);
-        r[2, 2] = inv * (m[0, 0] * a1313 - m[0, 1] * a0313 + m[0, 3] * a0113);
-        r[2, 3] = inv * -(m[0, 0] * a1312 - m[0, 1] * a0312 + m[0, 3] * a0112);
-        r[3, 0] = inv * -(m[1, 0] * a1223 - m[1, 1] * a0223 + m[1, 2] * a0123);
-        r[3, 1] = inv * (m[0, 0] * a1223 - m[0, 1] * a0223 + m[0, 2] * a0123);
-        r[3, 2] = inv * -(m[0, 0] * a1213 - m[0, 1] * a0213 + m[0, 2] * a0113);
-        r[3, 3] = inv * (m[0, 0] * a1212 - m[0, 1] * a0212 + m[0, 2] * a0112);
-        return r;
-    }
-    /// <summary>The matrix that transforms normals for <paramref name="model"/>: inverse transpose of its 3x3.</summary>
-    public static Mat3 NormalMatrix(Mat4 model) => Transpose(Inverse(new Mat3(model)));
-    public static bool ApproxEqual(Mat4 a, Mat4 b, float epsilon = Epsilon) =>
-        ApproxEqual(a.C0, b.C0, epsilon) && ApproxEqual(a.C1, b.C1, epsilon) && ApproxEqual(a.C2, b.C2, epsilon) && ApproxEqual(a.C3, b.C3, epsilon);
-    public static bool ApproxEqual(Mat3 a, Mat3 b, float epsilon = Epsilon) =>
-        ApproxEqual(a.C0, b.C0, epsilon) && ApproxEqual(a.C1, b.C1, epsilon) && ApproxEqual(a.C2, b.C2, epsilon);
-
     // ---- quaternions (kmath/quaternion.h) ------------------------------------------------------------
 
     public static float Dot(Quat a, Quat b) => a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
@@ -339,6 +62,24 @@ public static partial class KMath
         float angle = 2f * MathF.Acos(Clamp(Abs(Dot(from, to)), 0f, 1f));
         return angle <= maxRadians || angle == 0f ? to : Slerp(from, to, maxRadians / angle);
     }
+    /// <summary>Rotation about X, as EulerAngles(q).X.</summary>
+    public static float Pitch(Quat q)
+    {
+        float py = 2f * (q.Y * q.Z + q.W * q.X), px = q.W * q.W - q.X * q.X - q.Y * q.Y + q.Z * q.Z;
+        return Abs(px) < 1e-7f && Abs(py) < 1e-7f ? 2f * MathF.Atan2(q.X, q.W) : MathF.Atan2(py, px);
+    }
+    /// <summary>Rotation about Y.</summary>
+    public static float Yaw(Quat q) => MathF.Asin(Clamp(-2f * (q.X * q.Z - q.W * q.Y), -1f, 1f));
+    /// <summary>Rotation about Z.</summary>
+    public static float Roll(Quat q) => MathF.Atan2(2f * (q.X * q.Y + q.W * q.Z), q.W * q.W + q.X * q.X - q.Y * q.Y - q.Z * q.Z);
+    /// <summary>q followed by <paramref name="angle"/> radians about <paramref name="axis"/> in q's frame: q * AngleAxis(angle, axis).</summary>
+    public static Quat Rotate(Quat q, float angle, Vec3 axis) => q * Quat.AngleAxis(angle, axis);
+    /// <summary><paramref name="v"/> turned <paramref name="angle"/> radians about <paramref name="axis"/>.</summary>
+    public static Vec3 Rotate(Vec3 v, float angle, Vec3 axis) => Quat.AngleAxis(angle, axis) * v;
+    /// <summary>Component-wise, not normalised: Slerp or Nlerp for rotations.</summary>
+    public static Quat Lerp(Quat a, Quat b, float t) => a + (b - a) * t;
+    /// <summary>glm::mix of quaternions: Slerp.</summary>
+    public static Quat Mix(Quat a, Quat b, float t) => Slerp(a, b, t);
     public static bool ApproxEqual(Quat a, Quat b, float epsilon = Epsilon) =>
         ApproxEqual(a.X, b.X, epsilon) && ApproxEqual(a.Y, b.Y, epsilon) && ApproxEqual(a.Z, b.Z, epsilon) && ApproxEqual(a.W, b.W, epsilon);
     /// <summary>The same rotation, whichever of q and -q was given.</summary>
@@ -375,23 +116,80 @@ public static partial class KMath
     /// <summary>m * Scaling(by).</summary>
     public static Mat4 Scale(Mat4 m, Vec3 by) => new(m.C0 * by.X, m.C1 * by.Y, m.C2 * by.Z, m.C3);
 
-    /// <summary>A right-handed view matrix: the camera at <paramref name="eye"/> looking at <paramref name="target"/>.</summary>
+    /// <summary>A right-handed view matrix: the camera at <paramref name="eye"/> looking at <paramref name="target"/> (down -Z).</summary>
     public static Mat4 LookAt(Vec3 eye, Vec3 target, Vec3? up = null)
     {
         Vec3 f = Normalize(target - eye), s = Normalize(Cross(f, up ?? Vec3.Up)), u = Cross(s, f);
         return new Mat4(new Vec4(s.X, u.X, -f.X, 0f), new Vec4(s.Y, u.Y, -f.Y, 0f), new Vec4(s.Z, u.Z, -f.Z, 0f),
                         new Vec4(-Dot(s, eye), -Dot(u, eye), Dot(f, eye), 1f));
     }
-    /// <summary>Perspective projection, vertical field of view in radians, depth 0 at near to 1 at far. Y is not flipped.</summary>
-    public static Mat4 Perspective(float fovY, float aspect, float near, float far)
+    /// <summary>LookAt by its right-handed name.</summary>
+    public static Mat4 LookAtRH(Vec3 eye, Vec3 target, Vec3? up = null) => LookAt(eye, target, up);
+    /// <summary>A left-handed view matrix: the camera looks down +Z.</summary>
+    public static Mat4 LookAtLH(Vec3 eye, Vec3 target, Vec3? up = null)
+    {
+        Vec3 f = Normalize(target - eye), s = Normalize(Cross(up ?? Vec3.Up, f)), u = Cross(f, s);
+        return new Mat4(new Vec4(s.X, u.X, f.X, 0f), new Vec4(s.Y, u.Y, f.Y, 0f), new Vec4(s.Z, u.Z, f.Z, 0f),
+                        new Vec4(-Dot(s, eye), -Dot(u, eye), -Dot(f, eye), 1f));
+    }
+
+    static bool LeftHanded(ClipSpace c) => c is ClipSpace.LeftHandedZeroToOne or ClipSpace.LeftHandedNegativeOneToOne;
+    static bool ZeroToOne(ClipSpace c) => c is ClipSpace.RightHandedZeroToOne or ClipSpace.LeftHandedZeroToOne;
+    static void PerspectiveDepth(ref Mat4 m, float near, float far, ClipSpace clip)
+    {
+        m[2, 3] = LeftHanded(clip) ? 1f : -1f;
+        if (ZeroToOne(clip))
+        {
+            m[2, 2] = LeftHanded(clip) ? far / (far - near) : far / (near - far);
+            m[3, 2] = -(far * near) / (far - near);
+        }
+        else
+        {
+            m[2, 2] = LeftHanded(clip) ? (far + near) / (far - near) : -(far + near) / (far - near);
+            m[3, 2] = -(2f * far * near) / (far - near);
+        }
+    }
+    /// <summary>Perspective projection, vertical field of view in radians; by default depth 0 at near to 1 at far. Y is not flipped.</summary>
+    public static Mat4 Perspective(float fovY, float aspect, float near, float far, ClipSpace clip = ClipSpace.RightHandedZeroToOne)
     {
         float f = 1f / MathF.Tan(fovY * 0.5f);
         var m = Mat4.Zero;
         m[0, 0] = f / aspect;
         m[1, 1] = f;
-        m[2, 2] = far / (near - far);
-        m[2, 3] = -1f;
-        m[3, 2] = -(far * near) / (far - near);
+        PerspectiveDepth(ref m, near, far, clip);
+        return m;
+    }
+    /// <summary>Perspective from a field of view and the viewport's size in pixels.</summary>
+    public static Mat4 PerspectiveFov(float fov, float width, float height, float near, float far, ClipSpace clip = ClipSpace.RightHandedZeroToOne)
+    {
+        float h = MathF.Cos(0.5f * fov) / MathF.Sin(0.5f * fov);
+        var m = Mat4.Zero;
+        m[0, 0] = h * height / width;
+        m[1, 1] = h;
+        PerspectiveDepth(ref m, near, far, clip);
+        return m;
+    }
+    /// <summary>Perspective with no far plane.</summary>
+    public static Mat4 InfinitePerspective(float fovY, float aspect, float near, ClipSpace clip = ClipSpace.RightHandedZeroToOne)
+    {
+        float range = MathF.Tan(fovY * 0.5f) * near;
+        var m = Mat4.Zero;
+        m[0, 0] = (2f * near) / (range * aspect * 2f);
+        m[1, 1] = (2f * near) / (range * 2f);
+        m[2, 2] = m[2, 3] = LeftHanded(clip) ? 1f : -1f;
+        m[3, 2] = ZeroToOne(clip) ? -near : -2f * near;
+        return m;
+    }
+    /// <summary>An off-centre perspective (glm::frustum): the view volume of the near-plane rectangle.</summary>
+    public static Mat4 FrustumProjection(float left, float right, float bottom, float top, float near, float far, ClipSpace clip = ClipSpace.RightHandedZeroToOne)
+    {
+        var m = Mat4.Zero;
+        m[0, 0] = (2f * near) / (right - left);
+        m[1, 1] = (2f * near) / (top - bottom);
+        float side = LeftHanded(clip) ? -1f : 1f;
+        m[2, 0] = side * (right + left) / (right - left);
+        m[2, 1] = side * (top + bottom) / (top - bottom);
+        PerspectiveDepth(ref m, near, far, clip);
         return m;
     }
     /// <summary>Reversed depth (1 at near, 0 at far); an infinite <paramref name="far"/> for no far plane.</summary>
@@ -413,17 +211,141 @@ public static partial class KMath
         }
         return m;
     }
-    public static Mat4 Orthographic(float left, float right, float bottom, float top, float near, float far)
+    /// <summary>Orthographic projection of the box [left, right] x [bottom, top] x [near, far] in front of the camera.</summary>
+    public static Mat4 Orthographic(float left, float right, float bottom, float top, float near, float far, ClipSpace clip = ClipSpace.RightHandedZeroToOne)
     {
         var m = Mat4.Identity;
         m[0, 0] = 2f / (right - left);
         m[1, 1] = 2f / (top - bottom);
-        m[2, 2] = -1f / (far - near);
         m[3, 0] = -(right + left) / (right - left);
         m[3, 1] = -(top + bottom) / (top - bottom);
-        m[3, 2] = -near / (far - near);
+        float sign = LeftHanded(clip) ? 1f : -1f;
+        if (ZeroToOne(clip))
+        {
+            m[2, 2] = sign / (far - near);
+            m[3, 2] = -near / (far - near);
+        }
+        else
+        {
+            m[2, 2] = sign * 2f / (far - near);
+            m[3, 2] = -(far + near) / (far - near);
+        }
         return m;
     }
+    /// <summary>A 2D orthographic projection: x and y only (glm's four-argument ortho).</summary>
+    public static Mat4 Orthographic(float left, float right, float bottom, float top)
+    {
+        var m = Mat4.Identity;
+        m[0, 0] = 2f / (right - left);
+        m[1, 1] = 2f / (top - bottom);
+        m[2, 2] = -1f;
+        m[3, 0] = -(right + left) / (right - left);
+        m[3, 1] = -(top + bottom) / (top - bottom);
+        return m;
+    }
+    /// <summary>Where <paramref name="obj"/> lands in window coordinates; <paramref name="viewport"/> is (x, y, width, height).</summary>
+    public static Vec3 Project(Vec3 obj, Mat4 model, Mat4 projection, Vec4 viewport, ClipSpace clip = ClipSpace.RightHandedZeroToOne)
+    {
+        Vec4 v = projection * (model * new Vec4(obj, 1f));
+        v /= v.W;
+        if (ZeroToOne(clip))
+        {
+            v.X = v.X * 0.5f + 0.5f;
+            v.Y = v.Y * 0.5f + 0.5f;
+        }
+        else
+        {
+            v = v * 0.5f + 0.5f;
+        }
+        return new Vec3(v.X * viewport.Z + viewport.X, v.Y * viewport.W + viewport.Y, v.Z);
+    }
+    /// <summary>The inverse of Project: the point in object space under window coordinates <paramref name="window"/>.</summary>
+    public static Vec3 UnProject(Vec3 window, Mat4 model, Mat4 projection, Vec4 viewport, ClipSpace clip = ClipSpace.RightHandedZeroToOne)
+    {
+        Mat4 inverse = Inverse(projection * model);
+        var v = new Vec4(window, 1f);
+        v.X = (v.X - viewport.X) / viewport.Z;
+        v.Y = (v.Y - viewport.Y) / viewport.W;
+        if (ZeroToOne(clip))
+        {
+            v.X = v.X * 2f - 1f;
+            v.Y = v.Y * 2f - 1f;
+        }
+        else
+        {
+            v = v * 2f - 1f;
+        }
+        Vec4 o = inverse * v;
+        o /= o.W;
+        return (Vec3)o;
+    }
+    /// <summary>A matrix that narrows a projection to the <paramref name="size"/>-pixel region around <paramref name="center"/>: for picking.</summary>
+    public static Mat4 PickMatrix(Vec2 center, Vec2 size, Vec4 viewport)
+    {
+        var m = Mat4.Identity;
+        if (!(size.X > 0f && size.Y > 0f)) return m;
+        var t = new Vec3((viewport.Z - 2f * (center.X - viewport.X)) / size.X, (viewport.W - 2f * (center.Y - viewport.Y)) / size.Y, 0f);
+        return Scale(Translate(m, t), new Vec3(viewport.Z / size.X, viewport.W / size.Y, 1f));
+    }
+
+    // ---- Euler angles (kmath/euler.h, glm's gtx/euler_angle) ---------------------------------------
+
+    static Mat4 AxisRotation(int axis, float angle)
+    {
+        float c = MathF.Cos(angle), s = MathF.Sin(angle);
+        var m = Mat4.Identity;
+        int u = (axis + 1) % 3, v = (axis + 2) % 3;
+        m[u, u] = c;
+        m[u, v] = s;
+        m[v, u] = -s;
+        m[v, v] = c;
+        return m;
+    }
+    static readonly int[][] EulerAxes = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0],
+                                         [0, 1, 0], [0, 2, 0], [1, 0, 1], [1, 2, 1], [2, 0, 2], [2, 1, 2]];
+    public static Mat4 EulerAngleX(float angle) => AxisRotation(0, angle);
+    public static Mat4 EulerAngleY(float angle) => AxisRotation(1, angle);
+    public static Mat4 EulerAngleZ(float angle) => AxisRotation(2, angle);
+    /// <summary>The rotation <paramref name="angles"/> = (first, second, third) describe in <paramref name="order"/>, outermost first.</summary>
+    public static Mat4 EulerAngles(EulerOrder order, Vec3 angles)
+    {
+        int[] a = EulerAxes[(int)order];
+        return AxisRotation(a[0], angles.X) * AxisRotation(a[1], angles.Y) * AxisRotation(a[2], angles.Z);
+    }
+    /// <summary>The angles that rebuild <paramref name="m"/>'s rotation in <paramref name="order"/>; at gimbal lock the third is 0.</summary>
+    public static Vec3 ExtractEulerAngles(EulerOrder order, Mat4 m)
+    {
+        int[] a = EulerAxes[(int)order];
+        float At(int row, int column) => m[column, row];
+        const float lockLimit = 1e-6f;
+        if (a[0] != a[2])
+        {
+            int i = a[0], j = a[1], k = a[2];
+            float e = (j - i + 3) % 3 == 1 ? 1f : -1f;
+            float cb = MathF.Sqrt(At(i, i) * At(i, i) + At(i, j) * At(i, j));
+            float b = MathF.Atan2(e * At(i, k), cb);
+            if (cb < lockLimit) return new Vec3(MathF.Atan2(e * At(k, j), At(j, j)), b, 0f);
+            return new Vec3(MathF.Atan2(-e * At(j, k), At(k, k)), b, MathF.Atan2(-e * At(i, j), At(i, i)));
+        }
+        {
+            int i = a[0], j = a[1], k = 3 - i - j;
+            float e = (j - i + 3) % 3 == 1 ? 1f : -1f;
+            float sb = MathF.Sqrt(At(i, j) * At(i, j) + At(i, k) * At(i, k));
+            float b = MathF.Atan2(sb, At(i, i));
+            if (sb < lockLimit) return new Vec3(MathF.Atan2(e * At(k, j), At(j, j)), b, 0f);
+            return new Vec3(MathF.Atan2(At(j, i), -e * At(k, i)), b, MathF.Atan2(At(i, j), e * At(i, k)));
+        }
+    }
+    /// <summary>glm::yawPitchRoll: Y(yaw) * X(pitch) * Z(roll).</summary>
+    public static Mat4 YawPitchRoll(float yaw, float pitch, float roll) => EulerAngles(EulerOrder.YXZ, new Vec3(yaw, pitch, roll));
+    /// <summary>The quaternion of EulerAngles(order, angles).</summary>
+    public static Quat QuatFromEuler(EulerOrder order, Vec3 angles)
+    {
+        int[] a = EulerAxes[(int)order];
+        static Vec3 Axis(int i) => i == 0 ? Vec3.UnitX : i == 1 ? Vec3.UnitY : Vec3.UnitZ;
+        return Quat.AngleAxis(angles.X, Axis(a[0])) * Quat.AngleAxis(angles.Y, Axis(a[1])) * Quat.AngleAxis(angles.Z, Axis(a[2]));
+    }
+
     /// <summary>m * (p, 1), without the projective divide.</summary>
     public static Vec3 TransformPoint(Mat4 m, Vec3 p) => (Vec3)m.C0 * p.X + (Vec3)m.C1 * p.Y + (Vec3)m.C2 * p.Z + (Vec3)m.C3;
     public static Vec3 TransformPointProjective(Mat4 m, Vec3 p) { Vec4 h = m * new Vec4(p, 1f); return (Vec3)h / h.W; }

@@ -439,7 +439,7 @@ namespace kor {
     void Input::Callbacks::ScrollCallback(GLFWwindow* handle, const double x, const double y) {
         Input* input = routeOf(handle);
         if (!input) return;
-        input->_state->scrollDelta += kor::Vec2 { x, y };
+        input->_state->scrollDelta += kor::Vec2 { float(x), float(y) };
     }
 
     void Input::Callbacks::FocusCallback(GLFWwindow* handle, const int focus) {

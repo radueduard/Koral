@@ -141,3 +141,10 @@ set_target_properties(koral_math_c_test PROPERTIES C_STANDARD 99 C_STANDARD_REQU
 target_compile_options(koral_math_c_test PRIVATE $<$<C_COMPILER_ID:GNU,Clang>:-Wall -Wextra -pedantic>)
 target_link_libraries(koral_math_c_test PRIVATE Koral $<$<NOT:$<PLATFORM_ID:Windows>>:m>)
 add_test(NAME CApi.MathFromC COMMAND koral_math_c_test)
+
+# kmath's code for every language (C++ swizzles, the C exports, the C# and Kotlin types and functions, and their
+# parity tests) comes from scripts/kmath: this fails when its description changed and it was not run again.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME Math.GeneratedCodeIsCurrent COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/kmath/generate.py" --check)
+endif()

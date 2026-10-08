@@ -94,7 +94,7 @@ class Framebuffer internal constructor(native: MemorySegment) : Resource(native)
     val resolveMethod: ResolveMode get() = ResolveMode.of(KoralNative.koral_framebuffer_resolve_method(native))
 
     fun resize(extent: UVec2) {
-        KoralNative.koral_framebuffer_resize(native, extent.x, extent.y)
+        KoralNative.koral_framebuffer_resize(native, extent.x.toInt(), extent.y.toInt())
         checkLastError()
     }
 }
@@ -130,7 +130,7 @@ class Mesh internal constructor(native: MemorySegment) : Resource(native) {
     val indexBuffer: Buffer? get() = borrowed(KoralNative.koral_mesh_index_buffer(native))
 
     companion object {
-        /** MakeBuffer(data, usage): a device-local buffer holding [data] (a primitive array or a MemorySegment), for a mesh. */
+        /** MakeBuffer(data, usage): a device-local buffer holding [data] (anything Buffer.Builder.setData takes), for a mesh. */
         fun makeBuffer(data: Any, vararg usage: BufferUsage): Buffer = Buffer.Builder().setData(data)
             .setUsage(*(usage.toList() + meshUsage()).toTypedArray()).setType(BufferType.eDeviceLocal).build()
 

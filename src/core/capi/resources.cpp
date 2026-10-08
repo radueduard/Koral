@@ -1069,3 +1069,5 @@ uint64_t koral_token_value(KoralToken* token) { return token ? token->token.Valu
 // ---- for modules' C interfaces (C++ linkage) --------------------------------------------------------------
 kor::ResourceRef<const kor::Image> kor::capi::ImageOf(KoralResource* handle) { return RefOf<Image>(handle); }
 KoralResource* kor::capi::BorrowImage(const ResourceRef<const Image>& image) { return Borrow(image); }
+KoralToken* kor::capi::MakeToken(const Token& token) { return new KoralToken{token}; }
+kor::Token kor::capi::TokenOf(const KoralToken* handle) { return handle ? handle->token : Token(); }

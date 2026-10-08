@@ -169,7 +169,7 @@ class PassBuilder internal constructor(private val native: MemorySegment) {
             val d = Fields(a, KoralLayouts.KoralImageDesc).int("format", desc.format.value)
                 .int("usage", desc.usage.fold(0) { acc, u -> acc or u.value }).float("scale", desc.scale)
                 .string(a, "size_of", desc.sizeOf).bool("has_extent", desc.extent != null).int("mip_levels", desc.mipLevels)
-            desc.extent?.let { d.ints("extent", it.x, it.y) }
+            desc.extent?.let { d.ints("extent", it.x.toInt(), it.y.toInt()) }
             KoralNative.koral_pass_builder_create_image(native, name, d.segment)
         }
     }

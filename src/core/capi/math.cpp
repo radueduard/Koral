@@ -65,18 +65,6 @@ namespace {
 
 extern "C" {
 
-KoralMat4 koral_mat4_identity(void) { return C(Mat4()); }
-KoralMat4 koral_mat4_mul(KoralMat4 a, KoralMat4 b) { return C(K(a) * K(b)); }
-KoralVec4 koral_mat4_mul_vec4(KoralMat4 m, KoralVec4 v) { return C(K(m) * K(v)); }
-KoralMat4 koral_mat4_inverse(KoralMat4 m) { return C(Inverse(K(m))); }
-KoralMat4 koral_mat4_transpose(KoralMat4 m) { return C(Transpose(K(m))); }
-float koral_mat4_determinant(KoralMat4 m) { return Determinant(K(m)); }
-KoralMat3 koral_mat4_normal_matrix(KoralMat4 model) { return C(NormalMatrix(K(model))); }
-KoralMat3 koral_mat3_mul(KoralMat3 a, KoralMat3 b) { return C(K(a) * K(b)); }
-KoralVec3 koral_mat3_mul_vec3(KoralMat3 m, KoralVec3 v) { return C(K(m) * K(v)); }
-KoralMat3 koral_mat3_inverse(KoralMat3 m) { return C(Inverse(K(m))); }
-KoralMat3 koral_mat3_transpose(KoralMat3 m) { return C(Transpose(K(m))); }
-float koral_mat3_determinant(KoralMat3 m) { return Determinant(K(m)); }
 
 KoralMat4 koral_translation(KoralVec3 by) { return C(Translation(K(by))); }
 KoralMat4 koral_scaling(KoralVec3 by) { return C(Scaling(K(by))); }
@@ -96,9 +84,33 @@ KoralMat4 koral_translate(KoralMat4 m, KoralVec3 by) { return C(Translate(K(m), 
 KoralMat4 koral_rotate(KoralMat4 m, float angle, KoralVec3 axis) { return C(Rotate(K(m), angle, K(axis))); }
 KoralMat4 koral_scale(KoralMat4 m, KoralVec3 by) { return C(Scale(K(m), K(by))); }
 KoralMat4 koral_look_at(KoralVec3 eye, KoralVec3 target, KoralVec3 up) { return C(LookAt(K(eye), K(target), K(up))); }
-KoralMat4 koral_perspective(float fovY, float aspect, float n, float f) { return C(Perspective(fovY, aspect, n, f)); }
+KoralMat4 koral_perspective(float fovY, float aspect, float n, float f, KoralClipSpace clip) { return C(Perspective(fovY, aspect, n, f, ClipSpace(clip))); }
+KoralMat4 koral_perspective_fov(float fov, float width, float height, float n, float f, KoralClipSpace clip) {
+    return C(PerspectiveFov(fov, width, height, n, f, ClipSpace(clip)));
+}
+KoralMat4 koral_infinite_perspective(float fovY, float aspect, float n, KoralClipSpace clip) { return C(InfinitePerspective(fovY, aspect, n, ClipSpace(clip))); }
+KoralMat4 koral_frustum_projection(float l, float r, float b, float t, float n, float f, KoralClipSpace clip) {
+    return C(FrustumProjection(l, r, b, t, n, f, ClipSpace(clip)));
+}
 KoralMat4 koral_perspective_reversed_z(float fovY, float aspect, float n, float f) { return C(PerspectiveReversedZ(fovY, aspect, n, f)); }
-KoralMat4 koral_orthographic(float l, float r, float b, float t, float n, float f) { return C(Orthographic(l, r, b, t, n, f)); }
+KoralMat4 koral_orthographic(float l, float r, float b, float t, float n, float f, KoralClipSpace clip) { return C(Orthographic(l, r, b, t, n, f, ClipSpace(clip))); }
+KoralMat4 koral_orthographic_2d(float l, float r, float b, float t) { return C(Orthographic(l, r, b, t)); }
+KoralMat4 koral_look_at_lh(KoralVec3 eye, KoralVec3 target, KoralVec3 up) { return C(LookAtLH(K(eye), K(target), K(up))); }
+KoralVec3 koral_project(KoralVec3 object, KoralMat4 model, KoralMat4 projection, KoralVec4 viewport, KoralClipSpace clip) {
+    return C(Project(K(object), K(model), K(projection), K(viewport), ClipSpace(clip)));
+}
+KoralVec3 koral_unproject(KoralVec3 window, KoralMat4 model, KoralMat4 projection, KoralVec4 viewport, KoralClipSpace clip) {
+    return C(UnProject(K(window), K(model), K(projection), K(viewport), ClipSpace(clip)));
+}
+KoralMat4 koral_pick_matrix(KoralVec2 center, KoralVec2 size, KoralVec4 viewport) { return C(PickMatrix(K(center), K(size), K(viewport))); }
+
+KoralMat4 koral_euler_angle_x(float angle) { return C(EulerAngleX(angle)); }
+KoralMat4 koral_euler_angle_y(float angle) { return C(EulerAngleY(angle)); }
+KoralMat4 koral_euler_angle_z(float angle) { return C(EulerAngleZ(angle)); }
+KoralMat4 koral_euler_angles(KoralEulerOrder order, KoralVec3 angles) { return C(EulerAngles(EulerOrder(order), K(angles))); }
+KoralVec3 koral_extract_euler_angles(KoralEulerOrder order, KoralMat4 m) { return C(ExtractEulerAngles(EulerOrder(order), K(m))); }
+KoralMat4 koral_yaw_pitch_roll(float yaw, float pitch, float roll) { return C(YawPitchRoll(yaw, pitch, roll)); }
+KoralQuat koral_quat_from_euler_order(KoralEulerOrder order, KoralVec3 angles) { return C(QuatFromEuler(EulerOrder(order), K(angles))); }
 KoralVec3 koral_transform_point(KoralMat4 m, KoralVec3 p) { return C(TransformPoint(K(m), K(p))); }
 KoralVec3 koral_transform_point_projective(KoralMat4 m, KoralVec3 p) { return C(TransformPointProjective(K(m), K(p))); }
 KoralVec3 koral_transform_direction(KoralMat4 m, KoralVec3 d) { return C(TransformDirection(K(m), K(d))); }
@@ -118,6 +130,12 @@ float koral_quat_dot(KoralQuat a, KoralQuat b) { return Dot(K(a), K(b)); }
 float koral_quat_angle(KoralQuat q) { return Angle(K(q)); }
 KoralVec3 koral_quat_axis(KoralQuat q) { return C(Axis(K(q))); }
 KoralVec3 koral_quat_euler_angles(KoralQuat q) { return C(EulerAngles(K(q))); }
+float koral_quat_pitch(KoralQuat q) { return Pitch(K(q)); }
+float koral_quat_yaw(KoralQuat q) { return Yaw(K(q)); }
+float koral_quat_roll(KoralQuat q) { return Roll(K(q)); }
+KoralQuat koral_quat_rotate_axis(KoralQuat q, float angle, KoralVec3 axis) { return C(Rotate(K(q), angle, K(axis))); }
+KoralVec3 koral_vec3_rotate(KoralVec3 v, float angle, KoralVec3 axis) { return C(Rotate(K(v), angle, K(axis))); }
+KoralQuat koral_quat_lerp(KoralQuat a, KoralQuat b, float t) { return C(Lerp(K(a), K(b), t)); }
 KoralMat3 koral_quat_to_mat3(KoralQuat q) { return C(ToMat3(K(q))); }
 KoralMat4 koral_quat_to_mat4(KoralQuat q) { return C(ToMat4(K(q))); }
 KoralQuat koral_quat_slerp(KoralQuat a, KoralQuat b, float t) { return C(Slerp(K(a), K(b), t)); }
@@ -261,12 +279,6 @@ KoralVec3 koral_linear_to_oklab(KoralVec3 linear) { return C(LinearToOklab(K(lin
 KoralVec3 koral_oklab_to_linear(KoralVec3 lab) { return C(OklabToLinear(K(lab))); }
 KoralVec3 koral_mix_oklab(KoralVec3 a, KoralVec3 b, float t) { return C(MixOklab(K(a), K(b), t)); }
 KoralVec3 koral_color_temperature(float kelvin) { return C(ColorTemperature(kelvin)); }
-uint32_t koral_pack_unorm4x8(KoralVec4 c) { return PackUnorm4x8(K(c)); }
-KoralVec4 koral_unpack_unorm4x8(uint32_t packed) { return C(UnpackUnorm4x8(packed)); }
-uint16_t koral_float_to_half(float value) { return FloatToHalf(value); }
-float koral_half_to_float(uint16_t half) { return HalfToFloat(half); }
-uint32_t koral_pack_half2x16(KoralVec2 v) { return PackHalf2x16(K(v)); }
-KoralVec2 koral_unpack_half2x16(uint32_t packed) { return C(UnpackHalf2x16(packed)); }
 uint32_t koral_pack_octahedral(KoralVec3 n) { return PackOctahedral(K(n)); }
 KoralVec3 koral_unpack_octahedral(uint32_t packed) { return C(UnpackOctahedral(packed)); }
 
@@ -296,5 +308,24 @@ size_t koral_bulk_cull_aabbs(KoralFrustum frustum, const KoralAabb* boxes, uint8
     return bulk::Cull(K(frustum), std::span{reinterpret_cast<const Aabb*>(boxes), count}, {visible, count});
 }
 void koral_bulk_normalize(KoralVec3* vectors, size_t count) { bulk::Normalize({reinterpret_cast<Vec3*>(vectors), count}); }
+
+
+KoralVec4 koral_material_color(KoralMaterialHue hue, int32_t shade) { return C(MaterialColor(MaterialHue(hue), shade)); }
+KoralVec4 koral_material_accent(KoralMaterialHue hue, int32_t shade) { return C(MaterialAccent(MaterialHue(hue), shade)); }
+KoralHct koral_hct_from_color(KoralVec4 srgb) { return As<KoralHct>(Hct::FromColor(K(srgb))); }
+KoralVec4 koral_hct_to_color(KoralHct hct) { return C(As<Hct>(hct).ToColor()); }
+KoralTonalPalette koral_tonal_palette_from_color(KoralVec4 srgb) { return As<KoralTonalPalette>(TonalPalette::FromColor(K(srgb))); }
+KoralVec4 koral_tonal_palette_tone(KoralTonalPalette palette, float tone) { return C(As<TonalPalette>(palette).Tone(tone)); }
+KoralMaterialScheme koral_material_scheme_from_seed(KoralVec4 seed, bool dark, KoralSchemeVariant variant, float contrast) {
+    return As<KoralMaterialScheme>(MaterialScheme::FromSeed(K(seed), dark, SchemeVariant(variant), contrast));
+}
+size_t koral_seed_colors(const uint8_t* rgba8, size_t pixelCount, KoralVec4* seeds, size_t max) {
+    const auto all = SeedColors({rgba8, pixelCount * 4}, int(max));
+    const size_t n = std::min(all.size(), max);
+    for (size_t i = 0; i < n; ++i) seeds[i] = C(all[i]);
+    return n;
+}
+KoralVec4 koral_harmonize(KoralVec4 design, KoralVec4 key) { return C(Harmonize(K(design), K(key))); }
+float koral_contrast_ratio(KoralVec4 a, KoralVec4 b) { return ContrastRatio(K(a), K(b)); }
 
 }

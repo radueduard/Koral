@@ -41,7 +41,7 @@ public record struct Plane(Vec3 Normal, float Distance)
 [StructLayout(LayoutKind.Sequential)]
 public record struct Sphere(Vec3 Center, float Radius)
 {
-    public readonly bool Contains(Vec3 p) => KMath.DistanceSquared(Center, p) <= Radius * Radius;
+    public readonly bool Contains(Vec3 p) => KMath.Distance2(Center, p) <= Radius * Radius;
 
     /// <summary>A sphere around all the points (Ritter's).</summary>
     public static Sphere FromPoints(ReadOnlySpan<Vec3> points)
@@ -53,7 +53,7 @@ public record struct Sphere(Vec3 Center, float Radius)
             float bestSq = -1f;
             foreach (var p in all)
             {
-                float sq = KMath.DistanceSquared(from, p);
+                float sq = KMath.Distance2(from, p);
                 if (sq > bestSq) { bestSq = sq; best = p; }
             }
             return best;
@@ -93,7 +93,7 @@ public record struct Aabb(Vec3 Min, Vec3 Max)
     public readonly Vec3 Center => (Min + Max) * 0.5f;
     public readonly Vec3 Size => Max - Min;
     public readonly Vec3 HalfExtents => (Max - Min) * 0.5f;
-    public readonly float Volume => Valid ? KMath.Product(Size) : 0f;
+    public readonly float Volume => Valid ? KMath.CompMul(Size) : 0f;
     public readonly float SurfaceArea
     {
         get
@@ -350,8 +350,8 @@ public static partial class KMath
     public static bool Overlaps(Aabb a, Aabb b) =>
         a.Min.X <= b.Max.X && a.Min.Y <= b.Max.Y && a.Min.Z <= b.Max.Z && b.Min.X <= a.Max.X && b.Min.Y <= a.Max.Y && b.Min.Z <= a.Max.Z;
     public static bool Overlaps(Aabb2 a, Aabb2 b) => a.Min.X <= b.Max.X && b.Min.X <= a.Max.X && a.Min.Y <= b.Max.Y && b.Min.Y <= a.Max.Y;
-    public static bool Overlaps(Sphere a, Sphere b) { float r = a.Radius + b.Radius; return DistanceSquared(a.Center, b.Center) <= r * r; }
-    public static bool Overlaps(Aabb box, Sphere sphere) => DistanceSquared(ClosestPoint(box, sphere.Center), sphere.Center) <= sphere.Radius * sphere.Radius;
+    public static bool Overlaps(Sphere a, Sphere b) { float r = a.Radius + b.Radius; return Distance2(a.Center, b.Center) <= r * r; }
+    public static bool Overlaps(Aabb box, Sphere sphere) => Distance2(ClosestPoint(box, sphere.Center), sphere.Center) <= sphere.Radius * sphere.Radius;
     public static bool Overlaps(Sphere sphere, Aabb box) => Overlaps(box, sphere);
     public static bool Overlaps(Frustum frustum, Aabb box) => frustum.Classify(box) != Containment.Outside;
     public static bool Overlaps(Frustum frustum, Sphere sphere) => frustum.Classify(sphere) != Containment.Outside;

@@ -986,7 +986,7 @@ namespace kor::vk
         {
             const kor::u64 copyBytes = Image::SizeOfRegion(
                 image->PixelFormat(),
-                { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
+                { kor::u32(copyInfo.bufferRowLength), kor::u32(copyInfo.bufferImageHeight), kor::u32(copyInfo.imageExtent.z) },
                 copyInfo.imageLayerCount);
             if (copyBytes + copyInfo.bufferOffset > vkBuffer.size())
                 return RecordError(ErrorCode::eCopySizeExceedsBuffer,
@@ -1072,7 +1072,7 @@ namespace kor::vk
         {
             const kor::u64 copyBytes = Image::SizeOfRegion(
                 image->PixelFormat(),
-                { copyInfo.bufferRowLength, copyInfo.bufferImageHeight, copyInfo.imageExtent.z },
+                { kor::u32(copyInfo.bufferRowLength), kor::u32(copyInfo.bufferImageHeight), kor::u32(copyInfo.imageExtent.z) },
                 copyInfo.imageLayerCount);
             if (copyBytes + copyInfo.bufferOffset > vkBuffer.size())
                 return RecordError(ErrorCode::eCopySizeExceedsBuffer,

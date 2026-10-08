@@ -8,7 +8,7 @@ namespace kor {
             const Vec3* best = &points[0];
             float bestSq = -1.f;
             for (const Vec3& p : points)
-                if (const float sq = DistanceSquared(from, p); sq > bestSq) { bestSq = sq; best = &p; }
+                if (const float sq = Distance2(from, p); sq > bestSq) { bestSq = sq; best = &p; }
             return *best;
         };
         const Vec3 a = farthestFrom(points[0]);
@@ -183,7 +183,7 @@ namespace kor {
         return TriangleHit{t, u, v};
     }
 
-    bool Overlaps(const Aabb& box, const Sphere& sphere) { return DistanceSquared(ClosestPoint(box, sphere.center), sphere.center) <= sphere.radius * sphere.radius; }
+    bool Overlaps(const Aabb& box, const Sphere& sphere) { return Distance2(ClosestPoint(box, sphere.center), sphere.center) <= sphere.radius * sphere.radius; }
 
     bool Overlaps(const Obb& a, const Obb& b) {
         // Ericson, Real-Time Collision Detection 4.4.1.

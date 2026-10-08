@@ -660,6 +660,10 @@ enum class ErrorCode(val value: Int) {
     eFileNotReadable(27),
     eFrameGraphInvalid(28),
     eWindowCreationFailed(29),
+    eNetwork(30),
+    eTimedOut(31),
+    eConnectionClosed(32),
+    eProtocol(33),
     ;
     companion object { fun of(value: Int): ErrorCode = entries.first { it.value == value } }
 }

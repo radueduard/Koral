@@ -25,6 +25,10 @@ TARGETS = [
      "api": "KORAL_API", "prefix": "koral_", "cls": "KoralMathNative", "ns": "Koral.Tests.Native", "library": '"Koral"'},
     {"header": ROOT / "modules" / "ui" / "include" / "koralUI_c.h", "out": SRC / "Koral.UI" / "Generated" / "KuiNative.g.cs",
      "api": "KUI_API", "prefix": "kui_", "cls": "KuiNative", "ns": "Koral.UI.Native"},
+    {"header": ROOT / "modules" / "net" / "include" / "koralNet_c.h", "out": SRC / "Koral.Net" / "Generated" / "KnetNative.g.cs",
+     "api": "KNET_API", "prefix": "knet_", "cls": "KnetNative", "ns": "Koral.Net.Native"},
+    {"header": ROOT / "modules" / "net" / "include" / "koralNet_c.h", "out": SRC.parent / "tests" / "Koral.Tests" / "Generated" / "KnetNative.g.cs",
+     "api": "KNET_API", "prefix": "knet_", "cls": "KnetNative", "ns": "Koral.Tests.Native", "library": '"koral-net"'},
 ]
 
 SCALARS = {"void": "void", "bool": "byte", "uint8_t": "byte", "uint16_t": "ushort", "uint32_t": "uint", "int32_t": "int", "uint64_t": "ulong", "int64_t": "long",
@@ -32,9 +36,11 @@ SCALARS = {"void": "void", "bool": "byte", "uint8_t": "byte", "uint16_t": "ushor
            "KoralStatus": "int", "KoralLogLevel": "int", "KoralResourceKind": "int", "KoralPlatform": "int"}
 HAND_WRITTEN = {"KoralClearColor"}   # the union
 # C structs that are a public C# type's exact layout: not generated, and named as that type.
-TYPES = {"KoralVec2": "Vec2", "KoralVec3": "Vec3", "KoralVec4": "Vec4", "KoralIVec2": "IVec2", "KoralIVec3": "IVec3",
-         "KoralIVec4": "IVec4", "KoralUVec2": "UVec2", "KoralUVec3": "UVec3", "KoralUVec4": "UVec4", "KoralQuat": "Quat",
-         "KoralMat3": "Mat3", "KoralMat4": "Mat4", "KoralTransform": "Transform", "KoralRay": "Ray", "KoralPlane": "Plane",
+TYPES = {**{f"Koral{p}Vec{n}": f"{p}Vec{n}" for p in ("", "D", "I", "U", "B") for n in (2, 3, 4)},
+         **{f"Koral{p}Mat{c}x{r}" if c != r else f"Koral{p}Mat{c}": f"{p}Mat{c}x{r}" if c != r else f"{p}Mat{c}"
+            for p in ("", "D") for c in (2, 3, 4) for r in (2, 3, 4)},
+         "KoralQuat": "Quat", "KoralHct": "Hct", "KoralTonalPalette": "TonalPalette", "KoralMaterialScheme": "MaterialScheme",
+         "KoralTransform": "Transform", "KoralRay": "Ray", "KoralPlane": "Plane",
          "KoralSphere": "Sphere", "KoralAabb": "Aabb", "KoralObb": "Obb", "KoralTriangle": "Triangle", "KoralAabb2": "Aabb2",
          "KoralFrustum": "Frustum", "KoralTriangleHit": "TriangleHit"}
 # Function-pointer typedefs, by name.

@@ -50,6 +50,8 @@ public sealed unsafe partial class Buffer : Resource
         }
 
         /// <summary>Its contents, copied now; its size follows them.</summary>
+        // Preferred for a collection expression — SetData([a, b]) — which every overload below could also take.
+        [System.Runtime.CompilerServices.OverloadResolutionPriority(1)]
         public Builder<T> SetData(ReadOnlySpan<T> data)
         {
             fixed (T* pointer = data)
@@ -61,6 +63,18 @@ public sealed unsafe partial class Buffer : Resource
         public Builder<T> SetData(List<T> data) => SetData(CollectionsMarshal.AsSpan(data));
         public Builder<T> SetData(IEnumerable<T> data) => SetData(data.ToArray());
         public Builder<T> SetData(in T value) => SetData(new ReadOnlySpan<T>(in value));
+
+        /// <summary>
+        /// Its contents laid out with <paramref name="packing"/> — std430 or std140 for a shader's blocks (C, the
+        /// default, is what the struct already is); its size follows them.
+        /// </summary>
+        public Builder<T> SetData(IEnumerable<T> data, GpuPacking packing)
+        {
+            var bytes = Gpu.Bytes(data.ToList(), packing);
+            fixed (byte* pointer = bytes)
+                KoralNative.koral_buffer_builder_set_data(Native, pointer, (ulong)bytes.Length);
+            return this;
+        }
 
         /// <summary>SetDataView: in C#, the same as SetData — the data is copied, as it must outlive nothing.</summary>
         public Builder<T> SetDataView(ReadOnlySpan<T> data) => SetData(data);
@@ -100,6 +114,21 @@ public sealed unsafe partial class Buffer : Resource
         public RawBuilder SetRawSize(long bytes)
         {
             KoralNative.koral_buffer_builder_set_instance_count(Native, bytes);
+            return this;
+        }
+
+        /// <summary>Room for <paramref name="count"/> values of <typeparamref name="T"/> laid out with <paramref name="packing"/>.</summary>
+        public RawBuilder SetInstanceCount<T>(long count, GpuPacking packing = GpuPacking.C) => SetRawSize(count * GpuLayout.Of<T>(packing).Stride);
+
+        /// <summary>
+        /// Its contents, copied now; its size follows them: a byte array as it is, or values of any type — a primitive
+        /// array, a list of vectors, of structs, classes or records, or one of them — laid out with <paramref name="packing"/>.
+        /// </summary>
+        public RawBuilder SetData(object data, GpuPacking packing = GpuPacking.C)
+        {
+            var bytes = Gpu.Bytes(data, packing);
+            fixed (byte* pointer = bytes)
+                KoralNative.koral_buffer_builder_set_data(Native, pointer, (ulong)bytes.Length);
             return this;
         }
 
@@ -189,6 +218,34 @@ public sealed unsafe partial class Buffer : Resource
     }
 
     public void Write<T>(T[] elements, ulong offset = 0) where T : unmanaged => Write(new ReadOnlySpan<T>(elements), offset);
+
+    /// <summary>Writes values of any type (what <see cref="RawBuilder.SetData"/> takes) at byte <paramref name="byteOffset"/>.</summary>
+    public void WriteValues(object data, ulong byteOffset = 0, GpuPacking packing = GpuPacking.C)
+    {
+        var bytes = Gpu.Bytes(data, packing);
+        fixed (byte* pointer = bytes)
+            KoralNative.Check(KoralNative.koral_buffer_write(Handle, pointer, (ulong)bytes.Length, byteOffset));
+    }
+
+    /// <summary>Values of any <typeparamref name="T"/> laid out with <paramref name="packing"/>, from the <paramref name="offset"/>th (or the rest).</summary>
+    public T[] ReadAs<T>(GpuPacking packing = GpuPacking.C, ulong count = WholeSize, ulong offset = 0)
+    {
+        var stride = (ulong)GpuLayout.Of<T>(packing).Stride;
+        if (count == WholeSize) count = Size / stride - offset;
+        var bytes = new byte[count * stride];
+        fixed (byte* pointer = bytes)
+            KoralNative.Check(KoralNative.koral_buffer_read(Handle, pointer, (ulong)bytes.Length, offset * stride));
+        return Gpu.FromBytes<T>(bytes, packing);
+    }
+
+    /// <summary><see cref="ReadAs{T}"/> without making the CPU wait for the GPU.</summary>
+    public Task<T[]> ReadAsAsync<T>(GpuPacking packing = GpuPacking.C, ulong count = WholeSize, ulong offset = 0)
+    {
+        var stride = (ulong)GpuLayout.Of<T>(packing).Stride;
+        if (count == WholeSize) count = Size / stride - offset;
+        return ReadAsync<byte>(count * stride, offset * stride).ContinueWith(t => Gpu.FromBytes<T>(t.Result, packing),
+            TaskContinuationOptions.ExecuteSynchronously);
+    }
 
     public T ReadAt<T>(ulong index = 0) where T : unmanaged
     {

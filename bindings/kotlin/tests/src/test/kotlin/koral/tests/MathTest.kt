@@ -26,6 +26,7 @@ class MathTest {
     private fun m4(m: Mat4): MemorySegment = a.allocateFrom(JAVA_FLOAT, *m.toArray())
     private fun vec3(s: MemorySegment) = Vec3(s.get(JAVA_FLOAT, 0), s.get(JAVA_FLOAT, 4), s.get(JAVA_FLOAT, 8))
     private fun quat(s: MemorySegment) = Quat(s.get(JAVA_FLOAT, 0), s.get(JAVA_FLOAT, 4), s.get(JAVA_FLOAT, 8), s.get(JAVA_FLOAT, 12))
+    private fun vec4(s: MemorySegment) = Vec4(s.get(JAVA_FLOAT, 0), s.get(JAVA_FLOAT, 4), s.get(JAVA_FLOAT, 8), s.get(JAVA_FLOAT, 12))
     private fun mat4(s: MemorySegment) = Mat4(s.asSlice(0, 64).toArray(JAVA_FLOAT))
 
     @Test
@@ -107,8 +108,8 @@ class MathTest {
             assertTrue(approxEqual(eulerAngles(r), vec3(KoralMathNative.koral_quat_euler_angles(a, q(r))), 1e-5f), "eulerAngles")
             assertTrue(sameRotation(slerp(r, Quat.Identity, 0.3f), quat(KoralMathNative.koral_quat_slerp(a, q(r), q(Quat.Identity), 0.3f)), 1e-5f), "slerp")
         }
-        assertTrue(approxEqual(perspective(1.1f, 1.7f, 0.1f, 300f), mat4(KoralMathNative.koral_perspective(a, 1.1f, 1.7f, 0.1f, 300f)), 1e-6f), "perspective")
-        assertTrue(same(orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f), mat4(KoralMathNative.koral_orthographic(a, -3f, 4f, -1f, 2f, 0.5f, 20f))), "orthographic")
+        assertTrue(approxEqual(perspective(1.1f, 1.7f, 0.1f, 300f), mat4(KoralMathNative.koral_perspective(a, 1.1f, 1.7f, 0.1f, 300f, 0)), 1e-6f), "perspective")
+        assertTrue(same(orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f), mat4(KoralMathNative.koral_orthographic(a, -3f, 4f, -1f, 2f, 0.5f, 20f, 0))), "orthographic")
         assertTrue(Mat4() == Mat4.Identity && Quat() == Quat.Identity && !Aabb().valid, "C++'s defaults")
     }
 
@@ -163,11 +164,11 @@ class MathTest {
             assertTrue(approxEqual(rgbToHsv(c), vec3(KoralMathNative.koral_rgb_to_hsv(a, v3(c))), 1e-6f), "rgbToHsv")
             assertTrue(approxEqual(linearToOklab(c), vec3(KoralMathNative.koral_linear_to_oklab(a, v3(c))), 1e-5f), "linearToOklab")
             val c4 = a.allocateFrom(JAVA_FLOAT, c.x, c.y, c.z, 1f)
-            assertEquals(KoralMathNative.koral_pack_unorm4x8(c4), packUnorm4x8(Vec4(c, 1f)), "packUnorm4x8")
+            assertEquals(KoralMathNative.koral_pack_unorm4x8(c4).toUInt(), packUnorm4x8(Vec4(c, 1f)), "packUnorm4x8")
             val f = random.nextFloat(-70000f, 70000f) * random.nextFloat() * random.nextFloat()
-            assertEquals(KoralMathNative.koral_float_to_half(f), floatToHalf(f), "floatToHalf($f)")
+            assertEquals(KoralMathNative.koral_float_to_half(f).toUShort(), floatToHalf(f), "floatToHalf($f)")
             val h = random.nextU32(65536u).toInt().toShort()
-            assertTrue(same(KoralMathNative.koral_half_to_float(h), halfToFloat(h)), "halfToFloat($h)")
+            assertTrue(same(KoralMathNative.koral_half_to_float(h), halfToFloat(h.toUShort())), "halfToFloat($h)")
             val n = random.onUnitSphere()
             assertEquals(KoralMathNative.koral_pack_octahedral(v3(n)), packOctahedral(n), "packOctahedral")
         }
@@ -178,5 +179,66 @@ class MathTest {
             assertTrue(same(samplePath(path, t, true), vec3(KoralMathNative.koral_sample_path(a, np, 4L, t, true))), "samplePath($t)")
             t += 0.25f
         }
+    }
+
+    @Test
+    fun camerasAndEulerMatchNative() {
+        for (clip in ClipSpace.entries) {
+            val c = clip.ordinal
+            assertTrue(same(perspective(1.1f, 1.7f, 0.1f, 300f, clip), mat4(KoralMathNative.koral_perspective(a, 1.1f, 1.7f, 0.1f, 300f, c))), "perspective $clip")
+            assertTrue(same(perspectiveFov(1.1f, 640f, 480f, 0.1f, 300f, clip), mat4(KoralMathNative.koral_perspective_fov(a, 1.1f, 640f, 480f, 0.1f, 300f, c))), "perspectiveFov $clip")
+            assertTrue(same(infinitePerspective(1.1f, 1.7f, 0.1f, clip), mat4(KoralMathNative.koral_infinite_perspective(a, 1.1f, 1.7f, 0.1f, c))), "infinitePerspective $clip")
+            assertTrue(same(frustumProjection(-1f, 2f, -1.5f, 1f, 0.5f, 90f, clip), mat4(KoralMathNative.koral_frustum_projection(a, -1f, 2f, -1.5f, 1f, 0.5f, 90f, c))), "frustumProjection $clip")
+            assertTrue(same(orthographic(-3f, 4f, -1f, 2f, 0.5f, 20f, clip), mat4(KoralMathNative.koral_orthographic(a, -3f, 4f, -1f, 2f, 0.5f, 20f, c))), "orthographic $clip")
+            val model = compose(Vec3(1f, -2f, 3f), Quat.angleAxis(0.7f, Vec3(1f, 2f, 3f)), Vec3(2f, 0.5f, 1.5f))
+            val proj = perspective(1f, 1.3f, 0.1f, 50f, clip) * lookAt(Vec3(0f, 0f, 10f), Vec3.Zero)
+            val viewport = Vec4(10f, 20f, 800f, 600f)
+            val vp = a.allocateFrom(JAVA_FLOAT, viewport.x, viewport.y, viewport.z, viewport.w)
+            val w = project(Vec3(0.3f, -0.2f, 0.5f), model, proj, viewport, clip)
+            assertTrue(same(w, vec3(KoralMathNative.koral_project(a, v3(Vec3(0.3f, -0.2f, 0.5f)), m4(model), m4(proj), vp, c))), "project $clip")
+            assertTrue(same(unProject(w, model, proj, viewport, clip), vec3(KoralMathNative.koral_unproject(a, v3(w), m4(model), m4(proj), vp, c))), "unProject $clip")
+        }
+        val random = Random(31uL)
+        repeat(200) { i ->
+            val angles = Vec3(random.nextFloat(-3f, 3f), random.nextFloat(-1.5f, 1.5f), random.nextFloat(-3f, 3f))
+            val order = EulerOrder.entries[i % 12]
+            val m = eulerAngles(order, angles)
+            assertTrue(approxEqual(m, mat4(KoralMathNative.koral_euler_angles(a, order.ordinal, v3(angles))), 1e-6f), "eulerAngles $order")
+            assertTrue(approxEqual(extractEulerAngles(order, m), vec3(KoralMathNative.koral_extract_euler_angles(a, order.ordinal, m4(m))), 1e-4f), "extract $order")
+            assertTrue(approxEqual(eulerAngles(order, extractEulerAngles(order, m)), m, 1e-4f), "round trip $order")
+            val r = random.rotation()
+            assertTrue(same(pitch(r), KoralMathNative.koral_quat_pitch(q(r))) && same(yaw(r), KoralMathNative.koral_quat_yaw(q(r))) &&
+                       same(roll(r), KoralMathNative.koral_quat_roll(q(r))), "pitch/yaw/roll")
+        }
+        assertTrue(approxEqual(eulerAngleXYZ(0.1f, 0.2f, 0.3f), mat4(KoralMathNative.koral_euler_angle_xyz(a, 0.1f, 0.2f, 0.3f)), 1e-6f), "eulerAngleXYZ")
+        assertTrue(approxEqual(yawPitchRoll(0.1f, 0.2f, 0.3f), mat4(KoralMathNative.koral_yaw_pitch_roll(a, 0.1f, 0.2f, 0.3f)), 1e-6f), "yawPitchRoll")
+
+        // The glm-shaped surface reads as in C++.
+        val v = Vec4(1f, 2f, 3f, 4f)
+        assertTrue(v.zyx == Vec3(3f, 2f, 1f) && v.xxyy == Vec4(1f, 1f, 2f, 2f), "swizzles")
+        assertTrue(all(lessThan(IVec3(1, 2, 3), IVec3(2, 3, 4))) && any(equal(UVec2(1, 2), UVec2(0, 2))), "relational")
+        assertTrue(transpose(Mat2x3(Vec3(1f, 2f, 3f), Vec3(4f, 5f, 6f))) == Mat3x2(Vec2(1f, 4f), Vec2(2f, 5f), Vec2(3f, 6f)), "Mat2x3")
+        assertTrue(DMat4(2.0) * DVec4(1.0) == DVec4(2.0), "DMat4")
+        assertTrue(floor(Vec3(-0.5f, 1.5f, 2f)) == Vec3(-1f, 1f, 2f) && mix(Vec2(0f), Vec2(10f), 0.5f) == Vec2(5f), "GLSL functions on vectors")
+    }
+
+    @Test
+    fun materialColors() {
+        assertTrue(MaterialColors.Red500 == colorFromHex(0xF44336) && MaterialColors.TealA400 == colorFromHex(0x1DE9B6), "palette by name")
+        for (hue in MaterialHue.entries) for (shade in listOf(50, 100, 250, 500, 900, 1000)) {
+            assertEquals(vec4(KoralMathNative.koral_material_color(a, hue.ordinal, shade)), materialColor(hue, shade), "materialColor $hue $shade")
+            assertEquals(vec4(KoralMathNative.koral_material_accent(a, hue.ordinal, shade)), materialAccent(hue, shade), "materialAccent $hue $shade")
+        }
+        val blue = TonalPalette.fromColor(colorFromHex(0x0000FF))
+        assertEquals(colorFromHex(0xE0E0FF), blue.tone(90f))
+        assertEquals(colorFromHex(0x343DFF), blue.tone(40f))
+        val hct = Hct.fromColor(colorFromHex(0x0000FF))
+        assertTrue(kotlin.math.abs(hct.hue - 282.788f) < 0.01f && hct.toColor() == colorFromHex(0x0000FF), "hct $hct")
+        val dark = MaterialScheme.fromSeed(colorFromHex(0x0000FF), dark = true, variant = SchemeVariant.Monochrome)
+        assertTrue(kotlin.math.abs(Hct.fromColor(dark.primary).tone - 100f) < 1f, "monochrome dark primary")
+        val scheme = MaterialScheme.fromSeed(colorFromHex(0x6750A4), dark = false)
+        assertTrue(contrastRatio(scheme.onPrimary, scheme.primary) >= 4.5f, "onPrimary reads")
+        val pixels = ByteArray(100 * 4) { if (it % 4 == 3) -1 else 128.toByte() } + ByteArray(20 * 4) { if (it % 4 == 1 || it % 4 == 2) 0 else -1 }
+        assertEquals(colorFromHex(0xFF0000), seedColors(pixels)[0], "seedColors")
     }
 }
