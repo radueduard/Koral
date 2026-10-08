@@ -24,20 +24,23 @@ namespace kui
         struct Hover final : StatefulWidget {
             std::function<Widget(bool hovered)> build;
             std::function<void()> onTap;
+            bool yield = false;   ///< Presses its content's own controls take are theirs alone.
             bool hovered = false;
 
-            Hover(std::function<Widget(bool)> b, std::function<void()> t) : build(std::move(b)), onTap(std::move(t)) {}
+            Hover(std::function<Widget(bool)> b, std::function<void()> t, const bool y = false) : build(std::move(b)), onTap(std::move(t)), yield(y) {}
 
             void DidUpdateWidget(const StatefulWidget& newer) override
             {
                 const auto& h = static_cast<const Hover&>(newer);
                 build = h.build;
                 onTap = h.onTap;
+                yield = h.yield;
             }
 
             Widget Build() override
             {
                 GestureOptions gestures;
+                gestures.yieldToChildren = yield;
                 gestures.onEnter = [this] { SetState([this] { hovered = true; }); };
                 gestures.onExit = [this] { SetState([this] { hovered = false; }); };
                 // Copied out first: what it runs may well take this widget away.
@@ -1175,7 +1178,10 @@ namespace kui
             const Theme t = Theme::Current();
             const bool leaf = options.leaf;
             const bool selected = options.selected;
-            Widget row = Make<Hover>([t, open, leaf, selected, label = label](const bool hovered) {
+            // With a title of its own, the arrow alone opens and shuts it, and the rest of the row only taps it — an
+            // outliner's row is picked far more often than it is opened.
+            const bool titled = static_cast<bool>(options.title);
+            Widget row = Make<Hover>([t, open, leaf, selected, titled, label = label, title = options.title, onToggled = onToggled](const bool hovered) {
                 TextStyle style = t.textStyle;
                 const float height = std::max(t.controlHeight - 10.f, 20.f);
                 Color fill = hovered ? t.surfaceHover : colors::Transparent, ink = t.textMuted;
@@ -1201,18 +1207,23 @@ namespace kui
                     if (selected) style.color = t.primary;
                     break;
                 }
+                // A title has no label to colour: where the chosen line is told by its text alone, it is washed in the
+                // accent instead.
+                if (titled && selected && t.design != ThemeDesign::eMaterial && t.design != ThemeDesign::eCupertino)
+                    fill = t.primary.WithAlpha(hovered ? 0.30f : 0.22f);
                 Widget mark = leaf ? CustomPaint([ink](Canvas& canvas, const kor::Vec2 size) { canvas.DrawCircle(size * 0.5f, 2.f, Paint::Fill(ink)); }, { 16.f, 16.f })
                                    : arrow(open, ink);
+                if (titled && !leaf) mark = GestureDetector({ .onTap = [open, onToggled] { if (onToggled) onToggled(!open); } }, std::move(mark));
                 return Container({
                     .height = height,
                     .padding = EdgeInsets::Symmetric(4.f, 0.f),
                     .decoration = { .color = fill, .radius = round },
                     .alignment = Alignment::CenterLeft(),
-                }, Row({ mark, Text(label, style, TextAlign::eStart, false) }, { .gap = 4.f }));
-            }, [open, leaf, onToggled = onToggled, onTap = options.onTap] {
+                }, Row({ mark, titled ? Expanded(title) : Text(label, style, TextAlign::eStart, false) }, { .gap = 4.f }));
+            }, [open, leaf, titled, onToggled = onToggled, onTap = options.onTap] {
                 if (onTap) onTap();
-                if (!leaf && onToggled) onToggled(!open);
-            });
+                if (!titled && !leaf && onToggled) onToggled(!open);
+            }, titled);
             if (leaf || !open || children.empty()) return row;
             return Column({ row, Padding(EdgeInsets::Only(options.indent, 0.f, 0.f, 0.f),
                                                     Column(children, { .crossAxisAlignment = CrossAxisAlignment::eStretch })) },

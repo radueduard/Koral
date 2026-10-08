@@ -124,6 +124,14 @@ public static unsafe partial class Widgets
                                   bool leaf = false, bool selected = false, Action? onTap = null) =>
         WithChildren(children ?? [], (p, n) => KuiNative.kui_tree_node(label, KuiNative.Bool(open), Callbacks.Bool(onToggled), (IntPtr*)p, n,
                                                                          KuiNative.Bool(leaf), KuiNative.Bool(selected), Callbacks.Action(onTap)));
+    /// <summary>
+    /// A node of a tree whose row is <paramref name="title"/> after the arrow: only the arrow opens and shuts it, and a press
+    /// one of the title's own controls takes does not tap it.
+    /// </summary>
+    public static Widget TreeNode(Widget title, bool open, Action<bool>? onToggled, IReadOnlyList<Widget?>? children = null,
+                                  bool leaf = false, bool selected = false, Action? onTap = null) =>
+        WithChild(title, t => WithChildren(children ?? [], (p, n) => KuiNative.kui_tree_node_titled(t, KuiNative.Bool(open), Callbacks.Bool(onToggled),
+                                                                         (IntPtr*)p, n, KuiNative.Bool(leaf), KuiNative.Bool(selected), Callbacks.Action(onTap))).NewHandle());
 
     /// <summary>A row of titles, the one in front underlined.</summary>
     public static Widget TabBar(IReadOnlyList<string> tabs, int selected, Action<int>? onSelected) =>

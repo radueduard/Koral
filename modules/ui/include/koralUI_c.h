@@ -529,6 +529,12 @@ KUI_API KuiWidget* kui_selectable(const char* label, bool selected, KuiAction on
 KUI_API KuiWidget* kui_collapsing_header(const char* title, bool open, KuiBoolAction on_toggled, KuiWidget* child);
 KUI_API KuiWidget* kui_tree_node(const char* label, bool open, KuiBoolAction on_toggled, KuiWidget* const* children, size_t count,
                                  bool leaf, bool selected, KuiAction on_tap);
+/**
+ * TreeNode with @p title (not given away) after its arrow in place of a label, filling the rest of the row: only the
+ * arrow opens and shuts it, and a press one of the title's own controls takes does not tap it.
+ */
+KUI_API KuiWidget* kui_tree_node_titled(KuiWidget* title, bool open, KuiBoolAction on_toggled, KuiWidget* const* children, size_t count,
+                                        bool leaf, bool selected, KuiAction on_tap);
 /** TabBar: @p on_selected hears the index picked (a whole number, as a float). */
 KUI_API KuiWidget* kui_tab_bar(const char* const* tabs, size_t count, int32_t selected, KuiFloatAction on_selected);
 KUI_API KuiWidget* kui_tooltip(const char* text, KuiWidget* child);

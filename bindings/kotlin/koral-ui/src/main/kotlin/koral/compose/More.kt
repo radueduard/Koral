@@ -108,6 +108,37 @@ fun TreeNode(label: String, expanded: Boolean = false, onExpandedChange: (Boolea
         }
     }, update = { onBool = onExpandedChange; this.onClick = onClick }) { if (expanded && !leaf) content() }
 
+/**
+ * A node of a tree whose row is [title] — an icon, a name, buttons at its end — after the arrow, as wide as the rest of
+ * the row. Only the arrow opens and shuts it; [onClick] hears a press anywhere else on the row, unless one of the
+ * title's own controls took it. [content] — more nodes — shows under it, further in, while [expanded].
+ *
+ * ```
+ * TreeNode(open, { open = it }, selected = picked == node, onClick = { picked = node }, title = {
+ *     Icon(Icons.Filled.Folder, null, Modifier.size(16.dp))
+ *     Text(node.name, Modifier.weight(1f))
+ *     IconButton({ node.visible = !node.visible }) { Icon(Icons.Filled.Visibility, "Hide") }
+ * }) { node.children.forEach { Child(it) } }
+ * ```
+ */
+@Composable
+fun TreeNode(expanded: Boolean, onExpandedChange: (Boolean) -> Unit, modifier: Modifier = Modifier, leaf: Boolean = false,
+             selected: Boolean = false, onClick: (() -> Unit)? = null, title: @Composable RowScope.() -> Unit,
+             content: @Composable () -> Unit = {}) =
+    Node(modifier, listOf(expanded, leaf, selected), { node, kids ->
+        // Its first child is the title's row; the nodes under it follow.
+        scratch { a ->
+            val children = kids.drop(1)
+            KuiNative.kui_tree_node_titled(kids.firstOrNull() ?: MemorySegment.NULL, expanded,
+                Callbacks.make(a, KuiLayouts.KuiBoolAction, Callbacks.boolAction, { v: Boolean -> node.onBool?.invoke(v) }),
+                handles(a, children), children.size.toLong(), leaf, selected,
+                Callbacks.make(a, KuiLayouts.KuiAction, Callbacks.action, { node.onClick?.invoke() }))
+        }
+    }, update = { onBool = onExpandedChange; this.onClick = onClick }) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically, content = title)
+        if (expanded && !leaf) content()
+    }
+
 /** A row of titles, the one at [selected] underlined in the accent; pressing another tells [onSelected] its index. */
 @Composable
 fun TabRow(tabs: List<String>, selected: Int, onSelected: (Int) -> Unit, modifier: Modifier = Modifier) =

@@ -950,6 +950,11 @@ KuiWidget* kui_tree_node(const char* label, const bool open, const KuiBoolAction
 {
     KUI_WIDGET(TreeNode(label ? label : "", open, F(onToggled), Children(children, count), TreeNodeOptions { leaf, selected, 18.f, F(onTap) }));
 }
+KuiWidget* kui_tree_node_titled(KuiWidget* title, const bool open, const KuiBoolAction onToggled, KuiWidget* const* children, const size_t count,
+                                const bool leaf, const bool selected, const KuiAction onTap)
+{
+    KUI_WIDGET(TreeNode({}, open, F(onToggled), Children(children, count), TreeNodeOptions { leaf, selected, 18.f, F(onTap), W(title) }));
+}
 KuiWidget* kui_tab_bar(const char* const* tabs, const size_t count, const int32_t selected, const KuiFloatAction onSelected)
 {
     return Guarded([&]() -> KuiWidget* {

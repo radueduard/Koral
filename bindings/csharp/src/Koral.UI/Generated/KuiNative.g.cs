@@ -694,6 +694,7 @@ internal static unsafe partial class KuiNative
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_selectable(string? label, byte selected, KuiAction on_tap);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_collapsing_header(string? title, byte open, KuiBoolAction on_toggled, IntPtr child);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_tree_node(string? label, byte open, KuiBoolAction on_toggled, IntPtr* children, nuint count, byte leaf, byte selected, KuiAction on_tap);
+    [LibraryImport(Library)] internal static partial IntPtr kui_tree_node_titled(IntPtr title, byte open, KuiBoolAction on_toggled, IntPtr* children, nuint count, byte leaf, byte selected, KuiAction on_tap);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_tab_bar(string[]? tabs, nuint count, int selected, KuiFloatAction on_selected);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial IntPtr kui_tooltip(string? text, IntPtr child);
     [LibraryImport(Library)] internal static partial IntPtr kui_size_observer(KuiPanAction on_changed, IntPtr child);

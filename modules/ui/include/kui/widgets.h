@@ -404,9 +404,15 @@ namespace kui
         std::function<bool(kor::Vec2 delta)> onScroll;   ///< Return true when used.
         /** Hit even where nothing it holds is drawn — a transparent area that still takes clicks. */
         bool opaque = true;
+        /**
+         * A press that something it holds has already taken — a button in a row — is not its own: it neither
+         * taps nor pans. Off, it hears every press on it as well as what it holds does.
+         */
+        bool yieldToChildren = false;
 
         // Chainable: `kui::GestureOptions{}.Set...(...).Set...(...)`.
         GestureOptions& SetOpaque(bool value) { opaque = value; return *this; }
+        GestureOptions& SetYieldToChildren(bool value) { yieldToChildren = value; return *this; }
         GestureOptions& OnTap(std::function<void()> f) { onTap = std::move(f); return *this; }
         GestureOptions& OnTapDown(std::function<void(kor::Vec2)> f) { onTapDown = std::move(f); return *this; }
         GestureOptions& OnTapUp(std::function<void()> f) { onTapUp = std::move(f); return *this; }
@@ -812,13 +818,19 @@ namespace kui
         bool selected = false;              ///< Its label in the accent.
         float indent = 18.f;                ///< How far in what is under it starts.
         std::function<void()> onTap;        ///< Pressed — as well as being opened or shut.
+        /**
+         * Shown after the arrow in place of the label, as wide as the rest of the row: an icon and a name,
+         * buttons at its end. A press one of its own controls takes neither opens the node nor taps it.
+         */
+        Widget title;
 
         TreeNodeOptions& SetLeaf(bool value) { leaf = value; return *this; }
         TreeNodeOptions& SetSelected(bool value) { selected = value; return *this; }
         TreeNodeOptions& SetIndent(float value) { indent = value; return *this; }
         TreeNodeOptions& OnTap(std::function<void()> f) { onTap = std::move(f); return *this; }
+        TreeNodeOptions& SetTitle(Widget value) { title = std::move(value); return *this; }
     };
-    /** @brief A node of a tree: its label after an arrow, and @p children under it, further in, while @p open. */
+    /** @brief A node of a tree: its label (or its options' title) after an arrow, and @p children under it, further in, while @p open. */
     KUI_API Widget TreeNode(std::string label, bool open, std::function<void(bool)> onToggled, std::vector<Widget> children = {},
                             TreeNodeOptions options = {});
 

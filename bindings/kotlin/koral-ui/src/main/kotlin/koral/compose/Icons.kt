@@ -47,6 +47,12 @@ abstract class IconSet internal constructor(private val style: IconStyle) {
         ImageVector(name, KuiNative.kui_material_icon(name, style.value))
     }
 
+    /**
+     * The icon [name]d as Material names it (`"account_tree"`) or as Compose does (`"AccountTree"`), or null when
+     * there is none — for icons a file names: `Icons.Filled.named(definition.icon) ?: Icons.Filled.Extension`.
+     */
+    fun named(name: String): ImageVector? = icon(name).takeIf { it.handle != MemorySegment.NULL }
+
     private companion object {
         val loaded = ConcurrentHashMap<Pair<Int, String>, ImageVector>()
     }

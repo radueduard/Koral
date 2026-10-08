@@ -763,6 +763,7 @@ namespace kui
         switch (event.type) {
         case PointerEvent::Type::eDown:
             if (event.button != kor::MouseButton::eLeft) return false;
+            if (o.yieldToChildren && event.taken) return false;
             _pressed = true;
             _panning = false;
             _down = event.local;
@@ -827,6 +828,9 @@ namespace kui
                 hotspot = { 8.f, 8.f };   // a feedback of another size is held by its corner, clear of the pointer
             }
             if (!_config.options.feedback || _config.options.feedbackInPlace) {
+                // In its place, it is as big as the thing it stands for: the overlay it is shown in has no end to its
+                // room, and what fills the room it is given — a row's Expanded — would run on without one.
+                if (_config.options.feedback) feedback = SizedBox(Size().x, Size().y, std::move(feedback));
                 // The thing itself: outlined in the accent, so that it is seen to be in hand — round it, not over it.
                 const Theme& t = Theme::Current();
                 constexpr float Line = 1.5f;
