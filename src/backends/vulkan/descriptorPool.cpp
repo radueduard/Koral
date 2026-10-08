@@ -50,10 +50,50 @@ namespace kor::vk
 		}
 
         _handle = vk::Context::Device()->createDescriptorPool(poolCreateInfo);
+        _pools.push_back(_handle);
     }
 
     DescriptorPool::~DescriptorPool() {
-        Context::Device()->destroyDescriptorPool(_handle);
+        for (const auto& pool : _pools) Context::Device()->destroyDescriptorPool(pool);
+    }
+
+    ::vk::DescriptorPool DescriptorPool::Grow() const
+    {
+        const auto poolCreateInfo = ::vk::DescriptorPoolCreateInfo()
+            .setPoolSizes(_poolSizes)
+            .setMaxSets(_maxSets)
+            .setFlags(_flags);
+        _pools.push_back(vk::Context::Device()->createDescriptorPool(poolCreateInfo));
+        return _pools.back();
+    }
+
+    std::size_t DescriptorPool::PoolCount() const
+    {
+        std::lock_guard lock(_mutex);
+        return _pools.size();
+    }
+
+    ::vk::DescriptorSet DescriptorPool::AllocateLocked(::vk::DescriptorSetAllocateInfo info) const
+    {
+        // The pool that last had room, then the others (sets freed since may have made some), then a new one.
+        const auto full = [](const ::vk::Result result) {
+            return result == ::vk::Result::eErrorOutOfPoolMemory || result == ::vk::Result::eErrorFragmentedPool;
+        };
+        ::vk::DescriptorSet set;
+        ::vk::Result result = ::vk::Result::eErrorOutOfPoolMemory;
+        for (std::size_t tried = 0; tried <= _pools.size() && full(result); ++tried) {
+            const std::size_t index = tried < _pools.size() ? (_current + tried) % _pools.size() : _pools.size();
+            const ::vk::DescriptorPool pool = index < _pools.size() ? _pools[index] : Grow();
+            info.setDescriptorPool(pool);
+            result = Context::Device()->allocateDescriptorSets(&info, &set);
+            if (result == ::vk::Result::eSuccess) {
+                _current = index;
+                _owners[static_cast<VkDescriptorSet>(set)] = pool;
+            }
+        }
+        if (result != ::vk::Result::eSuccess)
+            throw std::runtime_error("vk::Device::allocateDescriptorSets: " + ::vk::to_string(result));
+        return set;
     }
 
     ::vk::DescriptorSet DescriptorPool::Allocate(const kor::vk::DescriptorSetLayout& layout) const
@@ -77,18 +117,14 @@ namespace kor::vk
         const auto allocateInfo = ::vk::DescriptorSetAllocateInfo()
             .setPNext(&variableCountInfo)
             .setDescriptorPool(_handle)
-            .setSetLayouts({layoutHandle});
+            .setSetLayouts(layoutHandle);
 
         for (const auto& description : layout.Bindings() | std::views::values) {
             _allocatedBindingCounts[description.type]++;
         }
-        const auto allocatedSets = Context::Device()->allocateDescriptorSets(allocateInfo);
-        if (allocatedSets.empty()) {
-            throw std::runtime_error("Failed to allocate descriptor set!");
-        }
-
+        const ::vk::DescriptorSet set = AllocateLocked(allocateInfo);
         _allocatedSetCount++;
-        return allocatedSets[0];
+        return set;
     }
 
     std::vector<::vk::DescriptorSet> DescriptorPool::Allocate(const std::vector<kor::vk::DescriptorSetLayout>& layouts) const
@@ -109,10 +145,10 @@ namespace kor::vk
                 _allocatedBindingCounts[description.type]++;
             }
         }
-        const auto allocatedSets = Context::Device()->allocateDescriptorSets(allocateInfo);
-        if (allocatedSets.size() != layouts.size()) {
-            throw std::runtime_error("Failed to allocate descriptor sets!");
-        }
+        // One at a time: a pool with room for some of them and not the rest is not one to give up on.
+        std::vector<::vk::DescriptorSet> allocatedSets;
+        for (const auto& layoutHandle : layoutHandles)
+            allocatedSets.push_back(AllocateLocked(::vk::DescriptorSetAllocateInfo().setSetLayouts(layoutHandle)));
         _allocatedSetCount += static_cast<kor::u32>(layouts.size());
         return allocatedSets;
     }
@@ -120,14 +156,22 @@ namespace kor::vk
     void DescriptorPool::Free(const ::vk::DescriptorSet& descriptorSet) const
     {
         std::lock_guard lock(_mutex);
-        Context::Device()->freeDescriptorSets(_handle, descriptorSet);
+        const auto owner = _owners.find(static_cast<VkDescriptorSet>(descriptorSet));
+        if (owner == _owners.end()) return;     // not one of ours, or freed already
+        Context::Device()->freeDescriptorSets(owner->second, descriptorSet);
+        _owners.erase(owner);
     }
 
     void DescriptorPool::Free(const std::vector<::vk::DescriptorSet>& descriptorSets) const
     {
-        std::lock_guard lock(_mutex);
-        Context::Device()->freeDescriptorSets(_handle, descriptorSets);
+        for (const auto& set : descriptorSets) Free(set);
     }
 
-    void DescriptorPool::Reset() const { Context::Device()->resetDescriptorPool(_handle); }
+    void DescriptorPool::Reset() const
+    {
+        std::lock_guard lock(_mutex);
+        for (const auto& pool : _pools) Context::Device()->resetDescriptorPool(pool);
+        _owners.clear();
+        _current = 0;
+    }
 }

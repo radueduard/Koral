@@ -43,6 +43,18 @@ namespace kor::capi
     KORAL_API ResourceRef<const AccelerationStructure> AccelerationStructureOf(KoralResource* handle);
     /** @brief A borrowed KoralImage handle onto @p image, released with koral_resource_release; null for an empty ref. */
     KORAL_API KoralResource* BorrowImage(const ResourceRef<const Image>& image);
+    /**
+     * @brief An owned handle onto a resource made through the C++ interface, released with koral_resource_release:
+     *        for code that keeps handles, such as ones made from builder descriptions, and is given an object
+     *        made another way. The resource lives as long as the handle.
+     */
+    KORAL_API KoralResource* Adopt(Resource<Image> image);
+    KORAL_API KoralResource* Adopt(Resource<Buffer> buffer);
+    KORAL_API KoralResource* Adopt(Resource<ImageView> view);
+    KORAL_API KoralResource* Adopt(Resource<Sampler> sampler);
+    KORAL_API KoralResource* Adopt(Resource<BufferView> view);
+    KORAL_API KoralResource* Adopt(Resource<Mesh> mesh);
+    KORAL_API KoralResource* Adopt(Resource<AccelerationStructure> structure);
     /** @brief A KoralToken onto @p token, the caller's, freed with koral_token_destroy. */
     KORAL_API KoralToken* MakeToken(const Token& token);
     /** @brief The token a KoralToken handle holds. */

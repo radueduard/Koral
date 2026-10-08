@@ -625,6 +625,16 @@ namespace kor
         }
 
         /**
+         * @brief PushConstantBlock for bytes whose size is known only as the program runs: a block laid out
+         *        from a shader's reflection, with no C++ struct for it.
+         * @param data The bytes, laid out as the shader has them. Copied immediately.
+         * @param offset Byte offset into the push-constant block.
+         */
+        CommandBuffer& PushConstantBytes(const std::span<const std::byte> data, const kor::u32 offset = 0) {
+            return PushConstantBlock(data.data(), static_cast<kor::u32>(data.size()), offset);
+        }
+
+        /**
          * @brief Uploads one push constant, named the way the shader names it.
          * @tparam T Any trivially copyable type; it must be the size the shader declared.
          * @param name The field's name in the shader — the `tint` of `vec4 tint;`.

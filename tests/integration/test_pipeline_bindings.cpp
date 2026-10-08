@@ -239,3 +239,62 @@ TEST_F(GpuTest, TheCInterfaceListsAShadersParameters) {
 }
 
 }
+
+// A program with a descriptor set for each of thousands of objects — an engine with one an entity — is an ordinary
+// one. A Vulkan pool is a fixed size; the engine's makes another when one is full, and frees a set to the pool it
+// came from.
+TEST_F(GpuTest, MoreDescriptorSetsThanOnePoolHolds) {
+    const auto pipeline = ComputePipeline::Builder{}.SetComputeShader(SplitShader()).Build();
+    ASSERT_TRUE(pipeline.Valid());
+    const auto input = Buffer::Builder<float>{}.SetInstanceCount(Count).Build();
+    const auto output = Buffer::Builder<float>{}.SetInstanceCount(Count).Build();
+    const std::uint64_t before = kor::log::LastSequence();
+
+    const auto make = [&] { return DescriptorSet::Builder(pipeline, 0).Write("input", input).Write("output", output).Build(); };
+    std::vector<kor::Resource<DescriptorSet>> sets;
+    for (int i = 0; i < 2500; ++i) {
+        sets.push_back(make());
+        ASSERT_TRUE(sets.back().Valid()) << "set " << i << ": " << sets.back().Failure()->History();
+    }
+    // Freed and made again, over and over: the room freed is used, wherever it is.
+    for (int round = 0; round < 3; ++round) {
+        for (std::size_t i = 0; i < sets.size(); i += 2) sets[i] = {};
+        for (std::size_t i = 0; i < sets.size(); i += 2) {
+            sets[i] = make();
+            ASSERT_TRUE(sets[i].Valid()) << "round " << round << ", set " << i;
+        }
+    }
+    // The last of them is as good as the first.
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BindComputePipeline(pipeline).BindDescriptorSet(0, sets.back());
+        cb.PushConstant("count", Count).PushConstant("bias", 1.f).Dispatch((Count + 63) / 64, 1, 1);
+    }, CommandBuffer::Usage::eCompute).Wait();
+    EXPECT_FLOAT_EQ(output->Read<float>()[5], 0.f * 2 + 0.5f + 1.f);
+    ExpectNoValidationErrors(before);
+}
+
+// Push constants as bytes laid out from reflection: for code that has the shader's block and no C++ struct of it.
+TEST_F(GpuTest, PushConstantsAreGivenAsBytes) {
+    const auto pipeline = ComputePipeline::Builder{}.SetComputeShader(SplitShader()).Build();
+    ASSERT_TRUE(pipeline.Valid());
+    std::vector<float> values(Count, 3.f);
+    const auto input = Buffer::Builder<float>{}.SetData(values).Build();
+    const auto output = Buffer::Builder<float>{}.SetInstanceCount(Count).Build();
+    const auto set = DescriptorSet::Builder(pipeline, 0).Write("input", input).Write("output", output).Build();
+
+    // The block, as the pipeline says it is laid out.
+    const auto* count = pipeline->FindPushConstant("count");
+    const auto* bias = pipeline->FindPushConstant("bias");
+    ASSERT_TRUE(count && bias);
+    std::vector<std::byte> block(std::max(count->offset + count->size, bias->offset + bias->size));
+    const float biasValue = 10.f;
+    std::memcpy(block.data() + count->offset, &Count, sizeof(Count));
+    std::memcpy(block.data() + bias->offset, &biasValue, sizeof(biasValue));
+
+    const std::uint64_t before = kor::log::LastSequence();
+    CommandBuffer::SingleTimeCommand([&](CommandBuffer& cb) {
+        cb.BindComputePipeline(pipeline).BindDescriptorSet(0, set).PushConstantBytes(block).Dispatch((Count + 63) / 64, 1, 1);
+    }, CommandBuffer::Usage::eCompute).Wait();
+    EXPECT_FLOAT_EQ(output->Read<float>()[7], 3.f * 2 + 0.5f + 10.f);
+    ExpectNoValidationErrors(before);
+}

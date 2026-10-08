@@ -26,6 +26,11 @@ namespace kor::vk
 {
     class DescriptorSetLayout;
 
+    /**
+     * Where descriptor sets are allocated from. It grows: Vulkan's pools are a fixed size, so when one is full
+     * another like it is made, and a set is freed to the pool it came from. A program with a descriptor set for
+     * each of thousands of objects is an ordinary one.
+     */
     class DescriptorPool : public Wrapper<::vk::DescriptorPool> {
     public:
         class Builder {
@@ -52,9 +57,18 @@ namespace kor::vk
         void Free(const ::vk::DescriptorSet &descriptorSet) const;
         void Free(const std::vector<::vk::DescriptorSet> &descriptorSets) const;
         void Reset() const;
+        /** How many Vulkan pools it has come to. */
+        [[nodiscard]] std::size_t PoolCount() const;
 
     private:
+        /** Allocates from a pool with room, making one when none has. Called with the lock held. */
+        [[nodiscard]] ::vk::DescriptorSet AllocateLocked(::vk::DescriptorSetAllocateInfo info) const;
+        [[nodiscard]] ::vk::DescriptorPool Grow() const;
+
         mutable std::mutex _mutex;
+        mutable std::vector<::vk::DescriptorPool> _pools;       ///< _handle first, then those made when it filled.
+        mutable std::size_t _current = 0;                       ///< The pool that last had room.
+        mutable std::unordered_map<VkDescriptorSet, ::vk::DescriptorPool> _owners;  ///< Which pool each set is from.
         mutable kor::u32 _allocatedSetCount = 0;
         mutable std::unordered_map<DescriptorType, kor::u32> _allocatedBindingCounts;
 

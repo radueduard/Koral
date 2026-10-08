@@ -1171,5 +1171,12 @@ kor::ResourceRef<const kor::RayTracingPipeline> kor::capi::RayTracingPipelineOf(
 kor::ResourceRef<const kor::Framebuffer> kor::capi::FramebufferOf(KoralResource* handle) { return RefOf<Framebuffer>(handle); }
 kor::ResourceRef<const kor::Mesh> kor::capi::MeshOf(KoralResource* handle) { return RefOf<Mesh>(handle); }
 kor::ResourceRef<const kor::AccelerationStructure> kor::capi::AccelerationStructureOf(KoralResource* handle) { return RefOf<AccelerationStructure>(handle); }
+KoralResource* kor::capi::Adopt(Resource<Image> image) { return Own(std::move(image)); }
+KoralResource* kor::capi::Adopt(Resource<Buffer> buffer) { return Own(std::move(buffer)); }
+KoralResource* kor::capi::Adopt(Resource<ImageView> view) { return Own(std::move(view)); }
+KoralResource* kor::capi::Adopt(Resource<Sampler> sampler) { return Own(std::move(sampler)); }
+KoralResource* kor::capi::Adopt(Resource<BufferView> view) { return Own(std::move(view)); }
+KoralResource* kor::capi::Adopt(Resource<Mesh> mesh) { return Own(std::move(mesh)); }
+KoralResource* kor::capi::Adopt(Resource<AccelerationStructure> structure) { return Own(std::move(structure)); }
 KoralToken* kor::capi::MakeToken(const Token& token) { return new KoralToken{token}; }
 kor::Token kor::capi::TokenOf(const KoralToken* handle) { return handle ? handle->token : Token(); }
