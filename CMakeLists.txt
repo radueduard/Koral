@@ -500,7 +500,7 @@ endif()
 # The public headers. Without these the installed library is unusable as an SDK.
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING PATTERN "*.h")
+        FILES_MATCHING PATTERN "*.h" PATTERN "*.inl")
 
 # api.h is generated (generate_export_header), so it lives in the build tree, not include/ — and
 # every public header includes it. Miss it and the installed SDK fails on the consumer's first

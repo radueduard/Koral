@@ -394,6 +394,12 @@ namespace kor {
             return ref;
         }
 
+        /**
+         * @brief Takes @p pass out of the graph and destroys it. False when it is not this graph's, or while
+         *        passes record. What it made is freed when the graph is next worked out.
+         */
+        bool Remove(RenderPass& pass);
+
         /** @brief Makes a resource the graph does not own available to passes under a name. */
         void Import(std::string name, ResourceRef<const Image> image);
         void Import(std::string name, ResourceRef<const Buffer> buffer);

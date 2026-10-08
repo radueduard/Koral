@@ -1160,5 +1160,16 @@ uint64_t koral_token_value(KoralToken* token) { return token ? token->token.Valu
 // ---- for modules' C interfaces (C++ linkage) --------------------------------------------------------------
 kor::ResourceRef<const kor::Image> kor::capi::ImageOf(KoralResource* handle) { return RefOf<Image>(handle); }
 KoralResource* kor::capi::BorrowImage(const ResourceRef<const Image>& image) { return Borrow(image); }
+kor::ResourceRef<const kor::Buffer> kor::capi::BufferOf(KoralResource* handle) { return RefOf<Buffer>(handle); }
+kor::ResourceRef<const kor::ImageView> kor::capi::ImageViewOf(KoralResource* handle) { return RefOf<ImageView>(handle); }
+kor::ResourceRef<const kor::Sampler> kor::capi::SamplerOf(KoralResource* handle) { return RefOf<Sampler>(handle); }
+kor::ResourceRef<const kor::BufferView> kor::capi::BufferViewOf(KoralResource* handle) { return RefOf<BufferView>(handle); }
+kor::ResourceRef<const kor::Shader> kor::capi::ShaderOf(KoralResource* handle) { return RefOf<Shader>(handle); }
+kor::ResourceRef<const kor::GraphicsPipeline> kor::capi::GraphicsPipelineOf(KoralResource* handle) { return RefOf<GraphicsPipeline>(handle); }
+kor::ResourceRef<const kor::ComputePipeline> kor::capi::ComputePipelineOf(KoralResource* handle) { return RefOf<ComputePipeline>(handle); }
+kor::ResourceRef<const kor::RayTracingPipeline> kor::capi::RayTracingPipelineOf(KoralResource* handle) { return RefOf<RayTracingPipeline>(handle); }
+kor::ResourceRef<const kor::Framebuffer> kor::capi::FramebufferOf(KoralResource* handle) { return RefOf<Framebuffer>(handle); }
+kor::ResourceRef<const kor::Mesh> kor::capi::MeshOf(KoralResource* handle) { return RefOf<Mesh>(handle); }
+kor::ResourceRef<const kor::AccelerationStructure> kor::capi::AccelerationStructureOf(KoralResource* handle) { return RefOf<AccelerationStructure>(handle); }
 KoralToken* kor::capi::MakeToken(const Token& token) { return new KoralToken{token}; }
 kor::Token kor::capi::TokenOf(const KoralToken* handle) { return handle ? handle->token : Token(); }

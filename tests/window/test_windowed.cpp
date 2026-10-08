@@ -1057,6 +1057,25 @@ TEST_F(VkWindowTest, AFrameGraphDoesNotShareWhatAnAsyncPassUses) {
     EXPECT_EQ(after.readback->Read<float>(1).front(), 5.f);
 }
 
+// A pass taken out of the graph is gone: not run, not scheduled, and what was left runs as before.
+TEST_F(VkWindowTest, APassCanBeTakenOutOfTheGraph) {
+    auto& scene = VkEnvironment::scene();
+    kor::FrameGraph graph;
+    auto first = addFillAndRead(graph, "first", 3.f);
+    auto second = addFillAndRead(graph, "second", 8.f);
+    drawGraphFrame(scene, graph);
+    ASSERT_EQ(graph.Schedule().size(), 4u);
+
+    EXPECT_TRUE(graph.Remove(*second.read));
+    EXPECT_TRUE(graph.Remove(*second.fill));
+    kor::FrameGraph other;
+    EXPECT_FALSE(other.Remove(*first.fill)) << "not its pass";
+    drawGraphFrame(scene, graph);
+    ASSERT_EQ(graph.Schedule().size(), 2u);
+    EXPECT_EQ(graph.Passes().size(), 2u);
+    EXPECT_EQ(first.readback->Read<float>(1).front(), 3.f);
+}
+
 // A pass whose resources come from a set that changes as the graph runs — the images each entity holds. The set's
 // name orders the passes like any resource's; adding and taking out members rebuilds nothing, and every member is
 // synchronised by the commands that use it.

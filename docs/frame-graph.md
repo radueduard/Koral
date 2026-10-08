@@ -21,6 +21,10 @@ public:
 Graph().Add<SSAO>();
 ```
 
+`Add` returns the pass. `Graph().Remove(pass)` takes it out again and destroys it: the graph is worked out
+again on the next frame, and what only that pass used is freed. It returns false for a pass that is not
+this graph's, and while passes are recording.
+
 ## Passes
 
 | Hook | Thread | When |

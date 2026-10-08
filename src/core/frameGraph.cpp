@@ -360,6 +360,20 @@ namespace kor {
         _dirty = true;
     }
 
+    bool FrameGraph::Remove(RenderPass& pass) {
+        if (!Mutable(std::format("Removing pass '{}'", pass.Name()))) return false;
+        const auto it = std::ranges::find(_passes, &pass, &std::unique_ptr<RenderPass>::get);
+        if (it == _passes.end()) return false;
+        // Everything worked out for the frame names passes by pointer: all of it is worked out again.
+        _order.clear();
+        _schedule.clear();
+        _dependencies.clear();
+        _initializedWith.erase(&pass);
+        _passes.erase(it);
+        _dirty = true;
+        return true;
+    }
+
     void FrameGraph::Invalidate() {
         if (!Mutable("Invalidate")) return;
         _dirty = true;
