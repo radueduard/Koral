@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <format>
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <numbers>
@@ -2227,4 +2228,205 @@ TEST(IconSheet, Renders) {
         s_app->Close(*scene);
         settle();
     }
+}
+
+// ---- text at every weight and scale, when KUI_TEXT_SHEET names a path prefix --------------------------------
+
+namespace {
+    constexpr int TextSheetW = 760, TextSheetH = 560;   // in units: drawn at the scale times as many pixels
+    float s_textScale = 1.f;
+    bool s_textLight = false;
+
+    class TextSheetScene final : public kor::Scene {
+    public:
+        int w = 0, h = 0;
+        void Initialize() override {
+            w = static_cast<int>(std::lround(TextSheetW * s_textScale));
+            h = static_cast<int>(std::lround(TextSheetH * s_textScale));
+            readback = kor::Buffer::RawBuilder{}.SetRawSize(static_cast<kor::i64>(w) * h * 4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback).Build();
+            const kui::Theme theme = s_textLight ? kui::Theme::Light() : kui::Theme::Dark();
+            ui.SetTheme(theme);
+            ui.SetScale(s_textScale);
+            std::vector<kui::Widget> lines;
+            for (const char* weight : { "Regular", "Bold", "Black" }) {
+                const auto font = kui::Font::Load(std::format("fonts/Inter_28pt-{}.ttf", weight));
+                for (const float size : { 11.f, 13.f, 16.f, 22.f, 34.f }) {
+                    kui::TextStyle style = theme.textStyle;
+                    style.font = font;
+                    style.size = size;
+                    lines.push_back(kui::Text(std::format("{} {}  Hamburgefonstiv 0123 aeg@&%", weight, size), style));
+                }
+            }
+            ui.SetRoot(kui::Container({ .padding = kui::EdgeInsets::All(10.f), .decoration = { .color = theme.background } },
+                kui::Column(std::move(lines), { .crossAxisAlignment = kui::CrossAxisAlignment::eStart, .gap = 4.f })));
+            Graph().Add<ClearPass>();
+            Graph().Add<kui::UiPass>(ui);
+            Graph().Add<ReadPass>(kor::ResourceRef<const kor::Buffer>(readback));
+        }
+        void Update() override { ui.Update(); }
+        kui::Ui ui;
+        kor::Resource<kor::Buffer> readback;
+    };
+}
+
+TEST(TextSheet, Renders) {
+    const char* out = std::getenv("KUI_TEXT_SHEET");
+    if (!s_app || !out) GTEST_SKIP() << "set KUI_TEXT_SHEET to a path prefix to render text at each scale, light and dark";
+    for (const bool light : { true, false }) {
+        for (const float scale : { 1.f, 1.25f, 1.5f, 2.f }) {
+            s_textLight = light;
+            s_textScale = scale;
+            auto* scene = s_app->OpenOffscreen<TextSheetScene>({ .title = "text",
+                .extent = { static_cast<std::uint32_t>(std::lround(TextSheetW * scale)), static_cast<std::uint32_t>(std::lround(TextSheetH * scale)) },
+                .format = kor::Window::Format::eRGBA8_SRGB });
+            ASSERT_NE(scene, nullptr);
+            for (int i = 0; i < 4; ++i) settle();
+            const auto pixels = scene->readback->Read<kor::U8Vec4>(static_cast<std::size_t>(scene->w) * scene->h);
+            stbi_write_png(std::format("{}-{}-{}.png", out, light ? "light" : "dark", scale).c_str(), scene->w, scene->h, 4, pixels.data(), scene->w * 4);
+            s_app->Close(*scene);
+            settle();
+        }
+    }
+}
+
+// ---- text, against stb_truetype's own rasteriser -----------------------------------------------------------
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#define STBTT_STATIC
+#include <stb_truetype.h>
+
+namespace {
+    /**
+     * How much of each pixel stb_truetype's coverage rasteriser fills, drawing @p text (ASCII) where a Paragraph lays
+     * it out with its top-left at @p origin and its baseline on the pixel grid, as kui draws it. It fills a font's
+     * overlapping contours as the font means them: once.
+     */
+    std::vector<float> ReferenceCoverage(const std::string& file, const std::string& text, const float size, const kor::Vec2 origin)
+    {
+        std::ifstream in(kor::AssetPath(file), std::ios::binary);
+        const std::vector<unsigned char> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        stbtt_fontinfo info {};
+        stbtt_InitFont(&info, data.data(), stbtt_GetFontOffsetForIndex(data.data(), 0));
+        const float scale = stbtt_ScaleForMappingEmToPixels(&info, size);
+        kui::TextStyle style;
+        style.font = kui::Font::Load(file);
+        style.size = size;
+        const kui::Paragraph paragraph(text, style);
+        const auto& line = paragraph.Lines().front();
+        const float baseline = std::round(origin.y + line.baseline);
+        std::vector<float> cover(static_cast<std::size_t>(Size) * Size, 0.f);
+        for (std::size_t c = 0; c < text.size(); ++c) {
+            if (text[c] == ' ') continue;
+            const float pen = origin.x + line.carets[c];
+            const float whole = std::floor(pen), shift = pen - whole;
+            const int glyph = stbtt_FindGlyphIndex(&info, text[c]);
+            int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+            stbtt_GetGlyphBitmapBoxSubpixel(&info, glyph, scale, scale, shift, 0.f, &x0, &y0, &x1, &y1);
+            const int w = x1 - x0, h = y1 - y0;
+            if (w <= 0 || h <= 0) continue;
+            std::vector<unsigned char> bitmap(static_cast<std::size_t>(w) * h);
+            stbtt_MakeGlyphBitmapSubpixel(&info, bitmap.data(), w, h, w, scale, scale, shift, 0.f, glyph);
+            for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
+                const int px = static_cast<int>(whole) + x0 + x, py = static_cast<int>(baseline) + y0 + y;
+                if (px < 0 || py < 0 || px >= Size || py >= Size) continue;
+                float& to = cover[static_cast<std::size_t>(py) * Size + px];
+                to = std::min(1.f, to + bitmap[static_cast<std::size_t>(y) * w + x] / 255.f);
+            }
+        }
+        return cover;
+    }
+
+    float CoverageAt(const std::vector<float>& cover, const int x, const int y)
+    {
+        return x < 0 || y < 0 || x >= Size || y >= Size ? 0.f : cover[static_cast<std::size_t>(y) * Size + x];
+    }
+}
+
+// Fonts made from variable ones keep their contours overlapping where strokes meet, and the heaviest weights
+// most of all. A distance to every edge, buried ones too, once showed as light seams through the letters.
+TEST_F(Gpu, HeavyLettersAreSolidWhereTheirStrokesOverlap) {
+    const std::string file = "fonts/Inter_28pt-Black.ttf";
+    const std::string text = "k4e";
+    constexpr float size = 30.f;
+    const kor::Vec2 origin { 2.f, 4.f };
+    Draw([&](kui::Canvas& c) { c.DrawText(text, origin, { .font = kui::Font::Load(file), .size = size, .color = kui::colors::White }); });
+    const auto reference = ReferenceCoverage(file, text, size, origin);
+    int deep = 0;
+    for (int y = 0; y < Size; ++y) for (int x = 0; x < Size; ++x) {
+        bool inside = true;   // the pixel and all round it wholly covered
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) inside = inside && CoverageAt(reference, x + dx, y + dy) >= 1.f;
+        if (!inside) continue;
+        ++deep;
+        EXPECT_GE(scene->At(x, y).x, 235) << "a seam through the letters at " << x << "," << y;
+    }
+    EXPECT_GT(deep, 100) << "the reference and the drawing did not line up";
+}
+
+// A glyph is drawn as a quad grown by an anti-aliasing fringe of a pixel and a half, which in small text is
+// several texels of the atlas — past its own cell, into the glyph beside it there, which once showed as a
+// sliver of some other letter next to it.
+TEST_F(Gpu, SmallTextShowsNothingOfTheGlyphsBesideItInTheAtlas) {
+    const std::string file = "fonts/Inter_28pt-Regular.ttf";
+    const std::string text = "H1a1e1g1k4";
+    constexpr float size = 7.f;
+    const kor::Vec2 origin { 3.f, 20.f };
+    Draw([&](kui::Canvas& c) { c.DrawText(text, origin, { .font = kui::Font::Load(file), .size = size, .color = kui::colors::White }); });
+    const auto reference = ReferenceCoverage(file, text, size, origin);
+    for (int y = 0; y < Size; ++y) for (int x = 0; x < Size; ++x) {
+        bool clear = true;   // nothing of the text within a pixel of it
+        for (int dy = -1; dy <= 1; ++dy) for (int dx = -1; dx <= 1; ++dx) clear = clear && CoverageAt(reference, x + dx, y + dy) <= 0.f;
+        if (clear) EXPECT_LT(scene->At(x, y).x, 40) << "something drawn at " << x << "," << y << ", away from every letter";
+    }
+}
+
+// Text sits on whole pixels: drawn at a fraction of a pixel down, its baseline still falls between two rows,
+// so the foot of a letter is one sharp row rather than two grey ones (at a scale of 1.25 or 1.5, everything
+// falls at fractions of a pixel).
+TEST_F(Gpu, TextsBaselineFallsBetweenRowsOfPixels) {
+    const auto font = kui::Font::Load("fonts/Inter_28pt-Bold.ttf");
+    constexpr float size = 30.f;
+    for (const float fraction : { 0.f, 0.3f, 0.5f, 0.7f }) {
+        const kor::Vec2 origin { 4.f, 6.f + fraction };
+        Draw([&](kui::Canvas& c) { c.DrawText("H", origin, { .font = font, .size = size, .color = kui::colors::White }); });
+        const kui::Paragraph paragraph("H", { .font = font, .size = size });
+        const int baseline = static_cast<int>(std::round(origin.y + paragraph.Lines().front().baseline));
+        int stem = -1;   // the middle of the H's left stem, found a little above its foot
+        for (int x = 0; x < Size && stem < 0; ++x)
+            if (scene->At(x, baseline - 4).x > 240 && scene->At(x + 1, baseline - 4).x > 240) stem = x + 1;
+        ASSERT_GE(stem, 0) << "no H at " << fraction;
+        EXPECT_GE(scene->At(stem, baseline - 1).x, 235) << "the foot's row is not wholly lit, " << fraction << " of a pixel down";
+        EXPECT_LE(scene->At(stem, baseline).x, 20) << "the row under the foot is lit, " << fraction << " of a pixel down";
+    }
+}
+
+// Blended in linear light, as an sRGB target blends, a stem a pixel wide and partly covered once came out far
+// paler than its colour: black text on white read as thin and grey. Dark text is covered as if blended in sRGB,
+// where it is seen, so it carries as much ink as the letters cover.
+TEST(DarkText, IsAsDarkOnAnSrgbTargetAsItsLettersCover) {
+    if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
+    auto* scene = s_app->OpenOffscreen<Canvas>({ .title = "kui srgb", .extent = { Size, Size }, .format = kor::Window::Format::eRGBA8_SRGB });
+    ASSERT_NE(scene, nullptr);
+    const std::string file = "fonts/Inter_28pt-Regular.ttf", text = "lllll";
+    constexpr float size = 13.f;
+    const kor::Vec2 origin { 4.3f, 10.f };
+    kui::Canvas canvas;
+    canvas.DrawRect(kui::Rect::LTRB(0, 0, Size, Size), kui::Paint::Fill(kui::colors::White));
+    canvas.DrawText(text, origin, { .font = kui::Font::Load(file), .size = size, .color = kui::colors::Black });
+    scene->root->SetPicture(canvas.Finish());
+    settle();
+    settle();
+    // Along a row through the middle of the stems: how much darker than the white it is, against how much of
+    // it the letters cover.
+    const auto reference = ReferenceCoverage(file, text, size, origin);
+    const int row = 18;
+    float ink = 0.f, covered = 0.f;
+    for (int x = 0; x < Size; ++x) {
+        ink += (255.f - scene->At(x, row).x) / 255.f;
+        covered += CoverageAt(reference, x, row);
+    }
+    s_app->Close(*scene);
+    settle();
+    ASSERT_GT(covered, 3.f) << "the row misses the letters";
+    EXPECT_GT(ink / covered, 0.85f) << "black text is paler than what its letters cover: " << ink << " of " << covered;
 }

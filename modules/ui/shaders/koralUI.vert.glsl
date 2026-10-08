@@ -19,7 +19,16 @@ void main() {
     const vec2 lo = it.bounds.xy - pad, hi = it.bounds.zw + pad;
 
     const vec2 local = mix(lo, hi, corners[gl_VertexIndex % 6]);
-    const vec2 pixels = kuiToScreen(it, local) * kuiPush.scale;
+    vec2 pixels = kuiToScreen(it, local) * kuiPush.scale;
+
+    // Text sits on the pixel grid: its line is moved, by under half a pixel, so that its baseline falls
+    // between two rows of pixels, and the flat tops and bottoms of its letters stay sharp at any scale —
+    // at 1.25 or 1.5 they would otherwise fall across rows and come out as two grey lines. Only text that
+    // is not turned or slanted: what is snapped is how far down the line is.
+    if (kuiKind(it) == KUI_GLYPH && abs(j[0][1]) < 1e-5 && abs(j[1][0]) < 1e-5) {
+        const float baseline = kuiToScreen(it, vec2(it.bounds.x, it.shape0.x)).y * kuiPush.scale;
+        pixels.y += round(baseline) - baseline;
+    }
 
     vLocal = local;
     vInstance = id;

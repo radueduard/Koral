@@ -570,7 +570,7 @@ namespace kui
             while (line + 1 < lines.size() && glyph.byte >= lines[line].endByte) slant(++line);
             const Rect r = glyph.rect.Shift(position);
             Instance it = _state->Make(detail::eGlyph, r);
-            it.shape0 = { r.left, r.top, r.right, r.bottom };
+            it.shape0 = { position.y + lines[line].baseline, 0.f, 0.f, 0.f };   // what the shader puts on the pixel grid
             it.shape1 = { glyph.uv.left, glyph.uv.top, glyph.uv.right, glyph.uv.bottom };
             it.strokeWidth = glyph.distanceScale;
             it.fill = packed;

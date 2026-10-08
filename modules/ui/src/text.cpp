@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstring>
+#include <limits>
 #include <cmath>
 #include <fstream>
 #include <mutex>
@@ -12,6 +14,8 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include <stb_truetype.h>
+
+#include <clipper2/clipper.h>
 
 #include <buffer.h>
 #include <commandBuffer.h>
@@ -67,6 +71,110 @@ namespace kui
 
         Atlas& atlas() { static Atlas a; return a; }
 
+        /**
+         * @brief A glyph as distances from its outline, in a byte a texel: OnEdge on it, more inside, less outside.
+         *
+         * stb_truetype has one of these, but it measures to every contour's edge — and fonts made from variable
+         * ones (Inter's, among many) keep their contours overlapping where strokes meet: the edges buried inside
+         * the letter came out as light seams through it, worst in the heaviest weights. So the outline is first
+         * flattened and its contours united, and the distance is to what is left.
+         * @return The texels, w by h, the first at (x0, y0) baked pixels from the pen; empty for a glyph with no outline.
+         */
+        std::vector<std::uint8_t> GlyphDistances(const stbtt_fontinfo& info, const int glyph, const float scale, int& w, int& h, int& x0, int& y0)
+        {
+            int ix0 = 0, iy0 = 0, ix1 = 0, iy1 = 0;
+            stbtt_GetGlyphBitmapBoxSubpixel(&info, glyph, scale, scale, 0.f, 0.f, &ix0, &iy0, &ix1, &iy1);
+            if (ix0 == ix1 || iy0 == iy1) return {};
+            stbtt_vertex* vertices = nullptr;
+            const int count = stbtt_GetGlyphShape(&info, glyph, &vertices);
+            if (count <= 0) return {};
+
+            // The contours, flattened finely enough that no chord strays a fiftieth of a baked pixel from its
+            // curve, in baked pixels with y down.
+            constexpr double Tolerance = 0.02;
+            Clipper2Lib::PathsD contours;
+            Clipper2Lib::PointD pen {};
+            const auto at = [&](const double x, const double y) { return Clipper2Lib::PointD { x * scale, -y * scale }; };
+            for (int i = 0; i < count; ++i) {
+                const stbtt_vertex& v = vertices[i];
+                const Clipper2Lib::PointD to = at(v.x, v.y);
+                switch (v.type) {
+                case STBTT_vmove:
+                    contours.emplace_back();
+                    contours.back().push_back(to);
+                    break;
+                case STBTT_vline:
+                    if (!contours.empty()) contours.back().push_back(to);
+                    break;
+                case STBTT_vcurve: {
+                    if (contours.empty()) break;
+                    const Clipper2Lib::PointD c = at(v.cx, v.cy);
+                    const double dd = std::hypot(pen.x - 2 * c.x + to.x, pen.y - 2 * c.y + to.y);
+                    const int n = std::clamp(static_cast<int>(std::ceil(std::sqrt(dd / (8 * Tolerance)))), 1, 64);
+                    for (int k = 1; k <= n; ++k) {
+                        const double t = static_cast<double>(k) / n, u = 1 - t;
+                        contours.back().push_back({ u * u * pen.x + 2 * u * t * c.x + t * t * to.x, u * u * pen.y + 2 * u * t * c.y + t * t * to.y });
+                    }
+                    break;
+                }
+                case STBTT_vcubic: {
+                    if (contours.empty()) break;
+                    const Clipper2Lib::PointD c0 = at(v.cx, v.cy), c1 = at(v.cx1, v.cy1);
+                    const double dd = std::max(std::hypot(pen.x - 2 * c0.x + c1.x, pen.y - 2 * c0.y + c1.y),
+                                               std::hypot(c0.x - 2 * c1.x + to.x, c0.y - 2 * c1.y + to.y));
+                    const int n = std::clamp(static_cast<int>(std::ceil(std::sqrt(0.75 * dd / Tolerance))), 1, 64);
+                    for (int k = 1; k <= n; ++k) {
+                        const double t = static_cast<double>(k) / n, u = 1 - t;
+                        const double a = u * u * u, b = 3 * u * u * t, cc = 3 * u * t * t, d = t * t * t;
+                        contours.back().push_back({ a * pen.x + b * c0.x + cc * c1.x + d * to.x, a * pen.y + b * c0.y + cc * c1.y + d * to.y });
+                    }
+                    break;
+                }
+                default: break;
+                }
+                pen = to;
+            }
+            stbtt_FreeShape(&info, vertices);
+
+            // A TrueType outline is filled where the contours wind round it at all.
+            const Clipper2Lib::PathsD outline = Clipper2Lib::Union(contours, Clipper2Lib::FillRule::NonZero, 4);
+            struct Edge { double ax, ay, bx, by; };
+            std::vector<Edge> edges;
+            for (const auto& path : outline)
+                for (std::size_t i = 0; i < path.size(); ++i) {
+                    const auto& a = path[i];
+                    const auto& b = path[(i + 1) % path.size()];
+                    edges.push_back({ a.x, a.y, b.x, b.y });
+                }
+            if (edges.empty()) return {};
+
+            x0 = ix0 - Padding;
+            y0 = iy0 - Padding;
+            w = ix1 - ix0 + 2 * Padding;
+            h = iy1 - iy0 + 2 * Padding;
+            std::vector<std::uint8_t> texels(static_cast<std::size_t>(w) * h);
+            for (int y = 0; y < h; ++y) {
+                const double py = y0 + y + 0.5;
+                for (int x = 0; x < w; ++x) {
+                    const double px = x0 + x + 0.5;
+                    double nearest = std::numeric_limits<double>::max();
+                    bool inside = false;   // the united outline's contours do not overlap: its parity is its inside
+                    for (const Edge& e : edges) {
+                        const double ex = e.bx - e.ax, ey = e.by - e.ay;
+                        const double length2 = ex * ex + ey * ey;
+                        const double t = length2 > 0 ? std::clamp(((px - e.ax) * ex + (py - e.ay) * ey) / length2, 0.0, 1.0) : 0.0;
+                        const double dx = px - (e.ax + ex * t), dy = py - (e.ay + ey * t);
+                        nearest = std::min(nearest, dx * dx + dy * dy);
+                        if ((e.ay > py) != (e.by > py) && px < e.ax + (py - e.ay) / (e.by - e.ay) * ex) inside = !inside;
+                    }
+                    const double distance = std::sqrt(nearest) * (inside ? 1.0 : -1.0);
+                    texels[static_cast<std::size_t>(y) * w + x] =
+                        static_cast<std::uint8_t>(std::clamp(OnEdge + DistanceScale * distance, 0.0, 255.0));
+                }
+            }
+            return texels;
+        }
+
         // UTF-8 to code points, each with the byte it starts at. Malformed bytes become U+FFFD.
         struct Decoded { char32_t codepoint; std::uint32_t byte; };
         std::vector<Decoded> decode(const std::string_view text)
@@ -108,17 +216,16 @@ namespace kui
             if (it != glyphs.end()) return it->second;
             GlyphEntry entry;
             int w = 0, h = 0, xoff = 0, yoff = 0;
-            unsigned char* sdf = stbtt_GetGlyphSDF(&info, bakeScale, index, Padding, OnEdge, DistanceScale, &w, &h, &xoff, &yoff);
-            if (sdf && w > 0 && h > 0) {
+            const std::vector<std::uint8_t> sdf = GlyphDistances(info, index, bakeScale, w, h, xoff, yoff);
+            if (!sdf.empty()) {
                 auto& a = atlas();
                 int x = 0, y = 0;
                 if (a.Allocate(w, h, x, y)) {
                     for (int row = 0; row < h; ++row)
-                        std::memcpy(&a.pixels[static_cast<std::size_t>(y + row) * AtlasSize + x], sdf + static_cast<std::size_t>(row) * w, w);
+                        std::memcpy(&a.pixels[static_cast<std::size_t>(y + row) * AtlasSize + x], sdf.data() + static_cast<std::size_t>(row) * w, w);
                     entry = { false, x, y, w, h, static_cast<float>(xoff), static_cast<float>(yoff) };
                 }
             }
-            if (sdf) stbtt_FreeSDF(sdf, nullptr);
             return glyphs.emplace(index, entry).first->second;
         }
     };

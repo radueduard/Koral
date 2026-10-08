@@ -52,14 +52,26 @@ void main() {
 
     vec4 color = vec4(0.0);
     if (kind == KUI_GLYPH || kind == KUI_IMAGE) {
-        const vec2 t = (p - it.shape0.xy) / max(it.shape0.zw - it.shape0.xy, vec2(1e-6));
+        // A glyph's quad is its bounds grown by the fringe, which at a small size is several texels of the
+        // atlas: read no further than its own cell, or the edge of the glyph beside it in the atlas shows.
+        const vec4 rect = kind == KUI_GLYPH ? it.bounds : it.shape0;
+        vec2 t = (p - rect.xy) / max(rect.zw - rect.xy, vec2(1e-6));
+        if (kind == KUI_GLYPH) t = clamp(t, 0.0, 1.0);
         const vec2 uv = mix(it.shape1.xy, it.shape1.zw, t);
         const vec4 texel = texture(sampler2D(kuiTextures[nonuniformEXT(kuiTexture(it))], kuiSampler), uv);
         if (kind == KUI_GLYPH) {
             // The atlas holds distance from the outline, 0.5 on it; strokeWidth scales it to local units.
             // stroke carries how far the outline is moved out — text heavier than its font — or in.
             const float d = (0.50196 - texel.r) * it.strokeWidth - uintBitsToFloat(it.stroke);
-            color = kuiFillColor(it, p) * cover(d, w);
+            float a = cover(d, w);
+            if ((kuiPush.flags & 1u) != 0u) {
+                // Blended in linear light, a stem a pixel wide and partly covered comes out far paler than its
+                // colour: dark text on a light ground looks thin and grey. Dark text is covered as it would be
+                // blended where it is seen, in sRGB — light text keeps the linear blend, which suits it.
+                const float luminance = dot(kuiUnpack(it.fill).rgb, vec3(0.2126, 0.7152, 0.0722));
+                a = 1.0 - pow(1.0 - a, mix(2.2, 1.0, luminance));
+            }
+            color = kuiFillColor(it, p) * a;
         } else {
             // Clipped to the rectangle with an anti-aliased edge, like any other shape.
             const vec2 c = (it.shape0.xy + it.shape0.zw) * 0.5;

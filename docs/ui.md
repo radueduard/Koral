@@ -332,7 +332,10 @@ Graph().Add<kui::UiPass>(_ui);     // over the screen, or a graph image
 
 Every built-in shape is one instance of a signed-distance shader, which gives an exact anti-aliased
 edge at any scale and rotation. Glyphs come from a signed-distance atlas, so text at any size costs the
-same. Paths, and strokes with joins, are made clean with Clipper2 (overlaps united under the fill rule,
+same. Each glyph's contours are united before its distances are taken, because fonts made from variable
+ones (Inter among them) overlap their strokes. A line's baseline is put on the pixel grid unless the text
+is turned or slanted, which keeps it sharp at fractional scales. On an sRGB target, dark text is covered as
+if blended in sRGB, so black on white doesn't come out thin and grey. Paths, and strokes with joins, are made clean with Clipper2 (overlaps united under the fill rule,
 strokes offset into one outline) and triangulated on their own vertices with a one-pixel fringe that
 shares them. A translucent stroke never darkens where it crosses itself. A whole interface of shapes,
 text and images is usually one instanced draw; tessellated paths and element shaders start draws of

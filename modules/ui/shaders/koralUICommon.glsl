@@ -17,7 +17,7 @@
 #define KUI_SEGMENT   3u   // shape0 = p0.xy p1.xy; shape1.x = cap (0 butt, 1 round, 2 square)
 #define KUI_TRIANGLE  4u   // shape0 = p0.xy p1.xy; shape1.xy = p2
 #define KUI_BEZIER    5u   // shape0 = p0.xy p1.xy (p1 = control); shape1.xy = p2
-#define KUI_GLYPH     6u   // shape0 = rect; shape1 = uv rect; strokeWidth = SDF units -> local units
+#define KUI_GLYPH     6u   // bounds = rect; shape0.x = its line's baseline (local y); shape1 = uv rect; strokeWidth = SDF units -> local units
 #define KUI_IMAGE     7u   // shape0 = rect; shape1 = uv rect
 #define KUI_SHADOW    8u   // shape0 = rect; shape1.x = corner radius; strokeWidth = sigma
 #define KUI_MESH      9u   // tessellated: vertices point back at it for transform, clip and paint
