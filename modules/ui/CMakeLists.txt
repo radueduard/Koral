@@ -25,6 +25,7 @@ add_library(koral-ui SHARED
         src/list.cpp
         src/dock.cpp
         src/icons.cpp
+        src/nodes.cpp
         src/capi.cpp
         ${CMAKE_CURRENT_BINARY_DIR}/materialIcons.cpp
 )

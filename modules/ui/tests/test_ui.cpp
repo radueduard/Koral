@@ -2430,3 +2430,319 @@ TEST(DarkText, IsAsDarkOnAnSrgbTargetAsItsLettersCover) {
     ASSERT_GT(covered, 3.f) << "the row misses the letters";
     EXPECT_GT(ink / covered, 0.85f) << "black text is paler than what its letters cover: " << ink << " of " << covered;
 }
+
+// ---- the node editor ---------------------------------------------------------------------------------------
+
+namespace {
+    class NodeTest : public ::testing::Test {
+    protected:
+        static constexpr kor::u32 W = 400, H = 300;
+        void SetUp() override {
+            if (!s_app) GTEST_SKIP() << "no Vulkan device: " << s_reason;
+            scene = s_app->OpenOffscreen<DockScene>({ .title = "kui nodes", .extent = { W, H } });
+            ASSERT_NE(scene, nullptr);
+        }
+        void TearDown() override {
+            if (scene) { s_app->Close(*scene); settle(); }
+        }
+        void Show(kui::Widget root) { scene->ui.SetRoot(std::move(root)); settle(); settle(); }
+        void Move(const kor::Vec2 p) { scene->SceneInput().FeedMousePosition(p); settle(); }
+        void Button(const kor::MouseButton b, const bool down) { scene->SceneInput().FeedMouseButton(b, down); settle(); }
+        /** @brief Pressed at @p from, moved to @p to in steps, let go there. */
+        void Drag(const kor::Vec2 from, const kor::Vec2 to, const kor::MouseButton b = kor::MouseButton::eLeft) {
+            Move(from);
+            Button(b, true);
+            for (int i = 1; i <= 4; ++i) Move(from + (to - from) * (static_cast<float>(i) / 4.f));
+            Button(b, false);
+        }
+        void Click(const kor::Vec2 at) { Move(at); Button(kor::MouseButton::eLeft, true); Button(kor::MouseButton::eLeft, false); }
+        void Key(const kor::Key key, const bool control = false) {
+            auto& input = scene->SceneInput();
+            if (control) { input.FeedKey(kor::Key::eLeftControl, true); settle(); }
+            input.FeedKey(key, true); settle();
+            input.FeedKey(key, false); settle();
+            if (control) { input.FeedKey(kor::Key::eLeftControl, false); settle(); }
+        }
+
+        /** @brief Two nodes side by side: A's image out, B's image and number in. */
+        static kui::NodeGraph TwoNodes() {
+            kui::NodeGraph g;
+            g.nodes.push_back({ .id = "A", .title = "A", .position = { 20.f, 20.f },
+                                .outputs = { { .id = "out", .label = "Image", .type = "image" } } });
+            g.nodes.push_back({ .id = "B", .title = "B", .position = { 220.f, 20.f },
+                                .inputs = { { .id = "in", .label = "Image", .type = "image" }, { .id = "n", .label = "Count", .type = "number" } } });
+            return g;
+        }
+        /** @brief Where a port is in the view, at zoom 1 and no pan: nodes are 140 wide unless they need more. */
+        static kor::Vec2 PortAt(const kor::Vec2 node, const bool output, const std::size_t index, const float width = kui::nodes::MinWidth) {
+            return node + kui::nodes::PortOffset(output, index, width);
+        }
+        DockScene* scene = nullptr;
+    };
+}
+
+TEST_F(NodeTest, AWireIsDrawnBetweenPortsThatFit) {
+    std::vector<kui::GraphWire> made;
+    Show(kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}.OnConnect([&](const kui::GraphWire& w) { made.push_back(w); })));
+    const kor::Vec2 out = PortAt({ 20, 20 }, true, 0), in = PortAt({ 220, 20 }, false, 0), count = PortAt({ 220, 20 }, false, 1);
+
+    Drag(out, in);
+    ASSERT_EQ(made.size(), 1u);
+    EXPECT_EQ(made[0], (kui::GraphWire { { "A", "out" }, { "B", "in" } }));
+
+    Drag(out, count);
+    EXPECT_EQ(made.size(), 1u) << "an image does not go into a number";
+    Drag(in, out);
+    ASSERT_EQ(made.size(), 2u) << "drawn the other way, from the input";
+    EXPECT_EQ(made[1], (kui::GraphWire { { "A", "out" }, { "B", "in" } }));
+}
+
+TEST_F(NodeTest, ACustomRuleDecidesWhatFits) {
+    std::vector<kui::GraphWire> made;
+    Show(kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}
+        .CanConnect([](const kui::NodePort&, const kui::NodePort& to) { return to.type == "number"; })
+        .OnConnect([&](const kui::GraphWire& w) { made.push_back(w); })));
+    Drag(PortAt({ 20, 20 }, true, 0), PortAt({ 220, 20 }, false, 1));
+    ASSERT_EQ(made.size(), 1u);
+    EXPECT_EQ(made[0].to.port, "n");
+}
+
+TEST_F(NodeTest, DraggingANodeMovesEverythingPicked) {
+    std::vector<std::string> moved, picked;
+    kor::Vec2 by {};
+    Show(kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}
+        .OnMove([&](const std::vector<std::string>& n, const kor::Vec2 b) { moved = n; by = b; })
+        .OnSelectionChanged([&](const std::vector<std::string>& n) { picked = n; })));
+    Click({ 60.f, 30.f });   // A's title
+    EXPECT_EQ(picked, std::vector<std::string>{ "A" });
+    scene->SceneInput().FeedKey(kor::Key::eLeftShift, true);
+    Click({ 260.f, 30.f });
+    scene->SceneInput().FeedKey(kor::Key::eLeftShift, false);
+    EXPECT_EQ(picked, (std::vector<std::string>{ "A", "B" }));
+    Drag({ 60.f, 30.f }, { 90.f, 40.f });
+    EXPECT_EQ(moved, (std::vector<std::string>{ "A", "B" }));
+    EXPECT_NEAR(by.x, 30.f, 0.01f);
+    EXPECT_NEAR(by.y, 10.f, 0.01f);
+}
+
+TEST_F(NodeTest, ABoxPicksWhatItTouchesAndDeleteRemovesIt) {
+    std::vector<std::string> picked, deleted;
+    std::vector<kui::GraphWire> deletedWires;
+    auto graph = TwoNodes();
+    graph.wires.push_back({ { "A", "out" }, { "B", "in" } });
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}
+        .OnSelectionChanged([&](const std::vector<std::string>& n) { picked = n; })
+        .OnDelete([&](const std::vector<std::string>& n, const std::vector<kui::GraphWire>& w, const std::vector<std::string>&) {
+            deleted = n;
+            deletedWires = w;
+        })));
+    Drag({ 5.f, 200.f }, { 100.f, 30.f });   // from below A, up over its lower-left corner
+    EXPECT_EQ(picked, std::vector<std::string>{ "A" });
+    Key(kor::Key::eDelete);
+    EXPECT_EQ(deleted, std::vector<std::string>{ "A" });
+
+    // A wire, picked by clicking near it, and deleted.
+    const kor::Vec2 out = PortAt({ 20, 20 }, true, 0), in = PortAt({ 220, 20 }, false, 0);
+    Click((out + in) * 0.5f);
+    Key(kor::Key::eDelete);
+    ASSERT_EQ(deletedWires.size(), 1u);
+    EXPECT_EQ(deletedWires[0], graph.wires[0]);
+}
+
+TEST_F(NodeTest, TheWheelZoomsAboutThePointerAndTheRightButtonPans) {
+    std::vector<kui::GraphWire> made;
+    kor::Vec2 menuAt { -1.f };
+    Show(kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}
+        .OnConnect([&](const kui::GraphWire& w) { made.push_back(w); })
+        .OnContextMenu([&](const kor::Vec2 at, kor::Vec2) { menuAt = at; })));
+    const kor::Vec2 out = PortAt({ 20, 20 }, true, 0), in = PortAt({ 220, 20 }, false, 0);
+
+    // Zoomed in about A's port: it stays under the pointer, and B's port moves away from it.
+    Move(out);
+    scene->SceneInput().FeedScroll({ 0.f, 1.f });
+    settle();
+    const float zoom = 1.15f;
+    const kor::Vec2 zoomedIn = out + (in - out) * zoom;
+    Drag(out, zoomedIn);
+    ASSERT_EQ(made.size(), 1u) << "the ports were where zooming about the pointer put them";
+
+    // Dragged 50 to the left with the right button: everything is 50 to the left.
+    Drag({ 200.f, 250.f }, { 150.f, 250.f }, kor::MouseButton::eRight);
+    Drag(out - kor::Vec2(50.f, 0.f), zoomedIn - kor::Vec2(50.f, 0.f));
+    EXPECT_EQ(made.size(), 2u);
+
+    // A right click that does not drag is a context menu, at the point of the graph under it.
+    Move({ 300.f, 250.f });
+    Button(kor::MouseButton::eRight, true);
+    Button(kor::MouseButton::eRight, false);
+    const kor::Vec2 pan = out * (1.f - zoom) - kor::Vec2(50.f, 0.f);
+    EXPECT_NEAR(menuAt.x, (300.f - pan.x) / zoom, 0.1f);
+    EXPECT_NEAR(menuAt.y, (250.f - pan.y) / zoom, 0.1f);
+}
+
+TEST_F(NodeTest, AWireIsPickedUpOffTheInputItGoesInto) {
+    std::vector<kui::GraphWire> dropped, made;
+    kui::PortRef offeredFrom;
+    auto graph = TwoNodes();
+    graph.wires.push_back({ { "A", "out" }, { "B", "in" } });
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}
+        .OnDisconnect([&](const kui::GraphWire& w) { dropped.push_back(w); })
+        .OnConnect([&](const kui::GraphWire& w) { made.push_back(w); })
+        .OnWireDropped([&](const kui::PortRef& from, bool, kor::Vec2) { offeredFrom = from; })));
+    const kor::Vec2 in = PortAt({ 220, 20 }, false, 0);
+    Drag(in, { 200.f, 250.f });
+    ASSERT_EQ(dropped.size(), 1u) << "picked up and let go over nothing: taken away";
+    EXPECT_EQ(dropped[0], graph.wires[0]);
+    EXPECT_TRUE(made.empty());
+
+    // A new wire let go over nothing is offered, to make a node for it.
+    Drag(PortAt({ 20, 20 }, true, 0), { 150.f, 250.f });
+    EXPECT_EQ(offeredFrom, (kui::PortRef { "A", "out" }));
+}
+
+TEST_F(NodeTest, ANodesOwnControlsWorkAndDoNotDragIt) {
+    int pressed = 0;
+    std::vector<std::string> moved;
+    auto graph = TwoNodes();
+    graph.nodes[0].body = kui::Button("Go", [&] { ++pressed; });
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}.OnMove([&](const std::vector<std::string>& n, kor::Vec2) { moved = n; })));
+    // The button sits under A's one port row: from 20 + 28 + 24 + 8 down.
+    const kor::Vec2 button { 60.f, 20.f + kui::nodes::TitleHeight + kui::nodes::RowHeight + 20.f };
+    Click(button);
+    EXPECT_EQ(pressed, 1);
+    Drag(button, button + kor::Vec2(30.f, 80.f));   // let go off the button, which would count it a press
+    EXPECT_TRUE(moved.empty()) << "a press its button took does not drag the node";
+    EXPECT_EQ(pressed, 1);
+
+    // Zoomed out about the origin, the button is where the zoom put it, and still takes the click.
+    Move({ 0.f, 0.f });
+    scene->SceneInput().FeedScroll({ 0.f, -1.f });
+    settle();
+    Click(button / 1.15f);
+    EXPECT_EQ(pressed, 2);
+}
+
+TEST_F(NodeTest, KeysCopyPasteAndDuplicateWhatIsPicked) {
+    std::vector<std::string> copied, duplicated;
+    kor::Vec2 pastedAt { -1.f };
+    Show(kui::NodeEditor(TwoNodes(), kui::NodeEditorOptions{}
+        .OnCopy([&](const std::vector<std::string>& n) { copied = n; })
+        .OnPaste([&](const kor::Vec2 at) { pastedAt = at; })
+        .OnDuplicate([&](const std::vector<std::string>& n) { duplicated = n; })));
+    Click({ 260.f, 30.f });
+    Key(kor::Key::eC, true);
+    EXPECT_EQ(copied, std::vector<std::string>{ "B" });
+    Key(kor::Key::eD, true);
+    EXPECT_EQ(duplicated, std::vector<std::string>{ "B" });
+    Move({ 300.f, 200.f });
+    Key(kor::Key::eV, true);
+    EXPECT_NEAR(pastedAt.x, 300.f, 0.01f);
+    EXPECT_NEAR(pastedAt.y, 200.f, 0.01f);
+    Key(kor::Key::eA, true);
+    Key(kor::Key::eC, true);
+    EXPECT_EQ(copied, (std::vector<std::string>{ "A", "B" })) << "Control+A picked everything";
+}
+
+TEST_F(NodeTest, ACommentCarriesTheNodesInsideIt) {
+    std::vector<std::string> moved;
+    kui::Rect commentNow {};
+    auto graph = TwoNodes();
+    graph.comments.push_back({ .id = "group", .text = "Inputs", .rect = kui::Rect::LTRB(10.f, 0.f, 190.f, 150.f) });
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}
+        .OnMove([&](const std::vector<std::string>& n, kor::Vec2) { moved = n; })
+        .OnCommentChanged([&](const std::string&, const kui::Rect r) { commentNow = r; })));
+    Drag({ 100.f, 10.f }, { 120.f, 22.f });   // by its title: the strip along its top, above A
+    EXPECT_EQ(commentNow, graph.comments[0].rect.Shift({ 20.f, 12.f }));
+    EXPECT_EQ(moved, std::vector<std::string>{ "A" }) << "A is inside it, B is not";
+
+    Drag({ 184.f, 144.f }, { 214.f, 164.f });   // its corner
+    EXPECT_EQ(commentNow, kui::Rect::LTRB(10.f, 0.f, 220.f, 170.f));
+}
+
+TEST_F(NodeTest, ThreeHundredNodesPanAndDragWithoutBuildingAgain) {
+    kui::NodeGraph graph;
+    for (int i = 0; i < 300; ++i) {
+        graph.nodes.push_back({ .id = std::format("n{}", i), .title = std::format("Node {}", i),
+                                .position = { static_cast<float>(i % 20) * 170.f, static_cast<float>(i / 20) * 110.f },
+                                .inputs = { { .id = "in", .label = "In", .type = "t" } }, .outputs = { { .id = "out", .label = "Out", .type = "t" } } });
+        if (i > 0) graph.wires.push_back({ { std::format("n{}", i - 1), "out" }, { std::format("n{}", i), "in" } });
+    }
+    std::vector<std::string> moved;
+    Show(kui::NodeEditor(graph, kui::NodeEditorOptions{}.OnMove([&](const std::vector<std::string>& n, kor::Vec2) { moved = n; })));
+
+    std::size_t builds = 0;
+    double worst = 0.0;   // the view's own work in a frame: input, building, layout and painting
+    const auto sample = [&] {
+        const auto& s = scene->ui.Stats();
+        builds += s.builds;
+        worst = std::max(worst, s.inputMs + s.buildMs + s.layoutMs + s.paintMs);
+    };
+    Move({ 200.f, 280.f });
+    Button(kor::MouseButton::eMiddle, true);
+    for (int i = 0; i < 10; ++i) { Move({ 200.f - static_cast<float>(i) * 10.f, 280.f }); sample(); }
+    Button(kor::MouseButton::eMiddle, false);
+    // Panned 90 to the left: the first node is from -90 to 50 across now.
+    Move({ 20.f, 30.f });
+    Button(kor::MouseButton::eLeft, true);
+    for (int i = 0; i < 10; ++i) { Move({ 20.f + static_cast<float>(i) * 5.f, 30.f }); sample(); }
+    Button(kor::MouseButton::eLeft, false);
+    EXPECT_EQ(builds, 0u) << "panning and dragging built nothing again";
+    EXPECT_EQ(moved, std::vector<std::string>{ "n0" });
+    std::printf("300 nodes: the view's work in the worst dragged frame %.2f ms\n", worst);
+}
+
+namespace {
+    constexpr int NodeSheetW = 760, NodeSheetH = 420;
+    class NodeSheetScene final : public kor::Scene {
+    public:
+        void Initialize() override {
+            readback = kor::Buffer::RawBuilder{}.SetRawSize(NodeSheetW * NodeSheetH * 4).SetUsage(kor::Buffer::Usage::eTransferDst)
+                .SetType(kor::Buffer::Type::eReadback).Build();
+            kui::NodeGraph g;
+            const kui::Color image = kui::Color::Hex(0x4DB6AC), number = kui::Color::Hex(0xFFB74D), buffer = kui::Color::Hex(0x9575CD);
+            g.comments.push_back({ .id = "c", .text = "Inputs", .rect = kui::Rect::XYWH(20.f, 20.f, 210.f, 330.f) });
+            g.nodes.push_back({ .id = "tex", .title = "Image", .position = { 40.f, 60.f },
+                                .outputs = { { .id = "img", .label = "Image", .type = "image", .color = image } } });
+            g.nodes.push_back({ .id = "count", .title = "Particles", .position = { 40.f, 200.f },
+                                .outputs = { { .id = "n", .label = "Count", .type = "number", .color = number } },
+                                .body = kui::DragValue(4096.f, [](float) {}, { .label = "n" }) });
+            g.nodes.push_back({ .id = "blur", .title = "Blur (compute)", .position = { 300.f, 60.f },
+                                .inputs = { { .id = "src", .label = "Source", .type = "image", .color = image },
+                                            { .id = "radius", .label = "Radius", .type = "number", .color = number } },
+                                .outputs = { { .id = "dst", .label = "Result", .type = "image", .color = image } },
+                                .accent = kui::Color::Hex(0x3A4A6B) });
+            g.nodes.push_back({ .id = "sim", .title = "Simulate", .position = { 300.f, 240.f },
+                                .inputs = { { .id = "count", .label = "Count", .type = "number", .color = number } },
+                                .outputs = { { .id = "state", .label = "State", .type = "buffer", .color = buffer } },
+                                .error = "no shader named 'simulate'" });
+            g.nodes.push_back({ .id = "out", .title = "Screen", .position = { 560.f, 120.f },
+                                .inputs = { { .id = "color", .label = "Color", .type = "image", .color = image } } });
+            g.wires = { { { "tex", "img" }, { "blur", "src" } }, { { "count", "n" }, { "blur", "radius" } },
+                        { { "count", "n" }, { "sim", "count" } }, { { "blur", "dst" }, { "out", "color" } } };
+            ui.SetRoot(kui::NodeEditor(std::move(g)));
+            Graph().Add<ClearPass>();
+            Graph().Add<kui::UiPass>(ui);
+            Graph().Add<ReadPass>(kor::ResourceRef<const kor::Buffer>(readback));
+        }
+        void Update() override { ui.Update(); }
+        kui::Ui ui;
+        kor::Resource<kor::Buffer> readback;
+    };
+}
+
+TEST(NodeSheet, Renders) {
+    const char* out = std::getenv("KUI_NODE_SHEET");
+    if (!s_app || !out) GTEST_SKIP() << "set KUI_NODE_SHEET to a .png path to render a node graph";
+    auto* scene = s_app->OpenOffscreen<NodeSheetScene>({ .title = "nodes", .extent = { NodeSheetW, NodeSheetH }, .format = kor::Window::Format::eRGBA8_SRGB });
+    ASSERT_NE(scene, nullptr);
+    for (int i = 0; i < 3; ++i) settle();
+    // The blur node picked, as a click on its title does.
+    scene->SceneInput().FeedMousePosition({ 340.f, 70.f }); settle();
+    scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, true); settle();
+    scene->SceneInput().FeedMouseButton(kor::MouseButton::eLeft, false); settle();
+    for (int i = 0; i < 3; ++i) settle();
+    const auto pixels = scene->readback->Read<kor::U8Vec4>(static_cast<std::size_t>(NodeSheetW) * NodeSheetH);
+    stbi_write_png(out, NodeSheetW, NodeSheetH, 4, pixels.data(), NodeSheetW * 4);
+    s_app->Close(*scene);
+    settle();
+}

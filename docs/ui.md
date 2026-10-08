@@ -266,6 +266,37 @@ it, and its pointer and keys go to the same widgets. Closing that window docks t
 
 `modules/ui/samples/docking.cpp` (the `koral_ui_docking` target) has all of it in a window to try.
 
+## The node editor
+
+`kui::NodeEditor(graph, options)` (`kui/nodes.h`) shows nodes with typed ports and the wires between them.
+Like the other controls it shows what it is given and reports what the user did: the graph is yours, and
+each change arrives as a callback for you to apply and build again.
+
+```cpp
+kui::NodeGraph graph;
+graph.nodes.push_back({ .id = "blur", .title = "Blur", .position = { 40, 40 },
+                        .inputs = { { .id = "in", .label = "Image", .type = "image" } },
+                        .outputs = { { .id = "out", .label = "Image", .type = "image" } },
+                        .body = kui::DragValue(radius, onRadius) });        // any widgets, under the ports
+auto editor = kui::NodeEditor(graph, kui::NodeEditorOptions{}
+    .OnConnect([&](const kui::GraphWire& wire) { model.Connect(wire); })
+    .OnMove([&](const std::vector<std::string>& nodes, kor::Vec2 by) { model.Move(nodes, by); })
+    .OnDelete([&](const auto& nodes, const auto& wires, const auto& comments) { model.Delete(nodes, wires, comments); }));
+```
+
+| Does | How |
+|---|---|
+| Zoom, pan, frame | The wheel zooms about the pointer. The middle or right button drags the view. F frames what is picked, or everything. |
+| Pick | Click a node, a wire or a comment. Shift or Control adds. A drag over nothing picks what its box touches. Control+A, Escape. |
+| Move | Drag a node: everything picked moves. Drag a comment's title: it moves with the nodes inside it. Its corner resizes it. |
+| Wire | Drag from a port to one it fits: the same type, or whatever `canConnect` says. Drag off a wired input to pick the wire up. A wire let go over nothing goes to `onWireDropped`. |
+| Keys | Delete removes what is picked. Control+C, V and D copy, paste at the pointer and duplicate. |
+| Menu | A right click on nothing calls `onContextMenu` with where in the graph it was. |
+
+A node with an `error` is outlined in red and shows it. Where the view looks, how near, what is picked and
+any drag under way are the editor's own, so panning, zooming and dragging build nothing again, and what is
+out of view isn't drawn: 300 nodes cost under a millisecond a frame to drag. It is C++ only for now.
+
 ## The canvas
 
 Every call returns the canvas, so drawing chains:
@@ -464,7 +495,9 @@ Text fields read `kor::Input::TypedText()` (the code points typed this frame) an
   (no complex shaping). A `TextField` is one line: there is no multi-line field.
 - **Controls:** no vertical slider, no sortable or resizable table columns, and a `MenuBar`'s menus have
   no sub-menus or shortcuts.
-- **Keyboard:** no moving between controls with Tab or the arrows.
+- **Keyboard:** no moving between controls with the arrows.
+- **The node editor** has no C, C# or Kotlin layer yet. A control inside a zoomed node that opens a popup
+  (a dropdown) places it as if the node were not zoomed.
 - **C#:** the controls added after `ContextMenu` have C functions but no C# wrappers yet.
 - **Widgets from C#:** a C# `StatefulWidget` instance placed in two spots at once shares its state
   between them.

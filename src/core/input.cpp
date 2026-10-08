@@ -357,6 +357,16 @@ namespace kor {
         return std::nullopt;
     }
 
+    std::vector<Key> Input::KeysPressed(const bool repeats) const {
+        std::vector<Key> keys;
+        for (const auto& [key, state] : _state->keys)
+            if (state == KeyState::ePressed) keys.push_back(key);
+        if (repeats)
+            for (const Key key : _state->repeated)
+                if (std::ranges::find(keys, key) == keys.end()) keys.push_back(key);
+        return keys;
+    }
+
     std::optional<MouseButton> Input::FirstMouseButtonPressed() const {
         for (const auto& [button, state] : _state->buttons)
             if (state == KeyState::ePressed) return button;

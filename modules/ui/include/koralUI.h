@@ -31,3 +31,4 @@
 #include "kui/widgets.h"
 #include "kui/dock.h"
 #include "kui/icons.h"
+#include "kui/nodes.h"

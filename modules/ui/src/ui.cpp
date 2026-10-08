@@ -113,6 +113,7 @@ namespace kui
         std::optional<Drag> drag;
         std::vector<RenderObject*> hovered;     // deepest first
         std::vector<RenderObject*> captured;    // what the button went down on
+        kor::MouseButton gestureButton = kor::MouseButton::eLeft;   // whose press began the gesture captured is in
         RenderObject* claimed = nullptr;        // the one of them that took the drag
         bool overSomething = false;
 
@@ -381,8 +382,13 @@ namespace kui
                 if (button == kor::MouseButton::eLeft) {
                     // Clicking elsewhere takes the keyboard away from whatever had it.
                     if (auto* focused = owner.Focused(); focused && std::ranges::find(path, focused) == path.end()) owner.RequestFocus(nullptr);
+                }
+                // The gesture is the first button's: the rest of it, its moves and its letting go, goes to what
+                // it pressed on — the left's, or another's that drags (a canvas the right button pans).
+                if (button == kor::MouseButton::eLeft || captured.empty()) {
                     captured = path;
                     claimed = nullptr;
+                    gestureButton = button;
                 }
                 bool taken = false;
                 for (auto* target : std::vector(path))
@@ -390,12 +396,12 @@ namespace kui
             }
 
             // A drag: the first of them to want it takes it, and the rest are told the gesture is off.
-            if (moved && !captured.empty() && input.MouseButtonState(kor::MouseButton::eLeft) != kor::KeyState::eNotPressed) {
+            if (moved && !captured.empty() && input.MouseButtonState(gestureButton) != kor::KeyState::eNotPressed) {
                 if (claimed) {
-                    Send(*claimed, { .type = PointerEvent::Type::eMove, .position = position, .delta = delta });
+                    Send(*claimed, { .type = PointerEvent::Type::eMove, .position = position, .delta = delta, .button = gestureButton });
                 } else {
                     for (auto* target : std::vector(captured)) {
-                        if (!Send(*target, { .type = PointerEvent::Type::eMove, .position = position, .delta = delta })) continue;
+                        if (!Send(*target, { .type = PointerEvent::Type::eMove, .position = position, .delta = delta, .button = gestureButton })) continue;
                         claimed = target;
                         for (auto* other : std::vector(captured))
                             if (other != target) Send(*other, { .type = PointerEvent::Type::eCancel, .position = position });
@@ -405,8 +411,8 @@ namespace kui
                 }
             }
 
-            if (input.IsMouseButtonReleased(kor::MouseButton::eLeft)) {
-                for (auto* target : std::vector(captured)) Send(*target, { .type = PointerEvent::Type::eUp, .position = position });
+            if (!captured.empty() && input.IsMouseButtonReleased(gestureButton)) {
+                for (auto* target : std::vector(captured)) Send(*target, { .type = PointerEvent::Type::eUp, .position = position, .button = gestureButton });
                 captured.clear();
                 claimed = nullptr;
             }
@@ -461,9 +467,17 @@ namespace kui
                 if ((pressed || repeated) && owner.Focused()) owner.Focused()->HandleKey(key, repeated && !pressed);
             }
             // With Control: select all, copy, cut and paste.
+            constexpr std::array ClipboardKeys { kor::Key::eA, kor::Key::eC, kor::Key::eX, kor::Key::eV };
             if (owner.control)
-                for (const kor::Key key : { kor::Key::eA, kor::Key::eC, kor::Key::eX, kor::Key::eV })
+                for (const kor::Key key : ClipboardKeys)
                     if ((input.IsKeyPressed(key) || (key == kor::Key::eV && input.IsKeyRepeated(key))) && owner.Focused()) owner.Focused()->HandleKey(key, false);
+            // Every other key, to whatever has the keyboard and wants it: a canvas's shortcuts. Typed text has
+            // gone as text already, and what does not use a key says so.
+            for (const kor::Key key : input.KeysPressed(true)) {
+                if (!owner.Focused() || key == kor::Key::eTab || std::ranges::find(EditKeys, key) != EditKeys.end()) continue;
+                if (owner.control && std::ranges::find(ClipboardKeys, key) != ClipboardKeys.end()) continue;
+                owner.Focused()->HandleKey(key, !input.IsKeyPressed(key));
+            }
             if (owner.Focused()) owner.Focused()->FocusTick(dt);
         }
 

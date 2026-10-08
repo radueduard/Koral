@@ -313,6 +313,8 @@ namespace kor {
 
         /** @brief The first key that went down this frame, if any: what completes a rebind. */
         [[nodiscard]] std::optional<Key> FirstKeyPressed() const;
+        /** @brief Every key that went down this frame, and (with @p repeats) every one that repeated. */
+        [[nodiscard]] std::vector<Key> KeysPressed(bool repeats = false) const;
 
         /** @brief The first mouse button that went down this frame, if any. @see FirstKeyPressed */
         [[nodiscard]] std::optional<MouseButton> FirstMouseButtonPressed() const;
