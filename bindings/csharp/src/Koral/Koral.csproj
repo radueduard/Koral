@@ -14,5 +14,7 @@
     <InternalsVisibleTo Include="Koral.Scripting" />
     <InternalsVisibleTo Include="Koral.UI" />
     <InternalsVisibleTo Include="Koral.Net" />
+    <!-- Koral Engine's C# layer, in a repository of its own: it wraps the handles its C interface hands back. -->
+    <InternalsVisibleTo Include="Koral.Engine" />
   </ItemGroup>
 </Project>
