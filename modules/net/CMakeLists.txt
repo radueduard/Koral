@@ -10,6 +10,12 @@ add_library(koral-net SHARED
         src/export.cpp
         src/io.cpp
         src/socket.cpp
+        src/http.cpp
+        src/websocket.cpp
+        src/bits.cpp
+        src/host.cpp
+        src/replication.cpp
+        src/capi.cpp
 )
 target_include_directories(koral-net PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(koral-net PUBLIC

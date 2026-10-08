@@ -29,7 +29,7 @@ subprojects {
 // there with `publishAllPublicationsToSdkRepository`, at `-PkoralVersion` (Koral's own version).
 val koralVersion = (findProperty("koralVersion") as String?) ?: "0.1.0"
 val koralRepo = findProperty("koralRepo") as String?
-listOf(":koral", ":koral-ui").forEach { path ->
+listOf(":koral", ":koral-ui", ":koral-net").forEach { path ->
     project(path) {
         apply(plugin = "maven-publish")
         group = "koral"

@@ -7,4 +7,4 @@ dependencyResolutionManagement {
     repositories { mavenCentral(); google() }
 }
 rootProject.name = "koral-kotlin"
-include("koral", "koral-ui", "tests", "samples:counter")
+include("koral", "koral-ui", "koral-net", "tests", "samples:counter")

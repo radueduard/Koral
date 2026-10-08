@@ -77,6 +77,17 @@ namespace knet::detail
         co_return std::move(*op->result);
     }
 
+    /**
+     * `co_await ToIoThread()`: the rest of the coroutine runs on the I/O thread. What it then awaits resumes off the
+     * main thread (on the background pool, or the I/O thread with no application) — for code that must be waited for
+     * by blocking, on any thread, without a frame having to run.
+     */
+    struct ToIoThread {
+        bool await_ready() const noexcept { return Io::Get().OnIoThread(); }
+        void await_suspend(std::coroutine_handle<> h) const { asio::post(Io::Get().Context(), [h] { h.resume(); }); }
+        void await_resume() const noexcept {}
+    };
+
     /** Runs `work` on the I/O thread and waits for it: for the few synchronous calls that touch a socket. */
     template<class F>
     auto OnIo(F&& work) -> decltype(work()) {

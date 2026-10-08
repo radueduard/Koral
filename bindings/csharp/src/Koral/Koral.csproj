@@ -13,5 +13,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Koral.Scripting" />
     <InternalsVisibleTo Include="Koral.UI" />
+    <InternalsVisibleTo Include="Koral.Net" />
   </ItemGroup>
 </Project>

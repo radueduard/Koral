@@ -13,6 +13,7 @@ val reloadShape = sourceSets.create("reloadShape")
 
 dependencies {
     testImplementation(project(":koral-ui"))
+    testImplementation(project(":koral-net"))
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")

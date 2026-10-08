@@ -344,25 +344,36 @@ namespace knet
     }
 
     kor::Task<kor::Result<TcpStream>> TcpListener::Accept() {
-        if (!_state) return []() -> kor::Task<kor::Result<TcpStream>> {
-            co_return std::unexpected(detail::MakeError(ErrorCode::eInvalidArgument, "accept on a listener that is not listening"));
-        }();
-        return detail::Run<TcpStream>([state = _state](auto op) {
-            state->acceptor.async_accept(asio::bind_cancellation_slot(op->cancel.slot(), [state, op](const asio::error_code& ec, tcp::socket socket) {
-                if (ec) return op->Finish(std::unexpected(detail::FromAsio(ec, "accept")));
-                asio::error_code ignored;
-                socket.set_option(tcp::no_delay(true), ignored);
-                auto stream = std::make_shared<detail::StreamState>(std::move(socket));
-                if (!state->sslContext) return op->Finish(TcpStream(stream));
-                stream->sslContext = state->sslContext;
-                stream->ssl = std::make_unique<asio::ssl::stream<tcp::socket&>>(stream->socket, *stream->sslContext);
+        if (!_state) co_return std::unexpected(detail::MakeError(ErrorCode::eInvalidArgument, "accept on a listener that is not listening"));
+        auto state = _state;
+        for (;;) {
+            auto accepted = co_await detail::Run<TcpStream>([state](auto op) {
+                state->acceptor.async_accept(asio::bind_cancellation_slot(op->cancel.slot(), [op](const asio::error_code& ec, tcp::socket socket) {
+                    if (ec) return op->Finish(std::unexpected(detail::FromAsio(ec, "accept")));
+                    asio::error_code ignored;
+                    socket.set_option(tcp::no_delay(true), ignored);
+                    op->Finish(TcpStream(std::make_shared<detail::StreamState>(std::move(socket))));
+                }));
+            });
+            if (!accepted || !state->sslContext) co_return accepted;
+
+            // A client whose handshake fails is that client's problem, not the listener's: it is dropped, and
+            // the next one waited for, so one bad client cannot end a server's accept loop.
+            auto stream = accepted->_state;
+            stream->sslContext = state->sslContext;
+            stream->ssl = std::make_unique<asio::ssl::stream<tcp::socket&>>(stream->socket, *stream->sslContext);
+            auto handshake = co_await detail::Run<void>([stream](auto op) {
+                auto timer = Deadline(op, Duration(10'000), "TLS handshake");
                 stream->ssl->async_handshake(asio::ssl::stream_base::server, asio::bind_cancellation_slot(op->cancel.slot(),
-                    [stream, op](const asio::error_code& ec) {
-                        if (ec) return op->Finish(std::unexpected(detail::FromAsio(ec, "TLS handshake")));
-                        op->Finish(TcpStream(stream));
+                    [op, timer](const asio::error_code& ec) {
+                        if (timer) timer->cancel();
+                        if (ec) op->Finish(std::unexpected(detail::FromAsio(ec, "TLS handshake")));
+                        else op->Finish({});
                     }));
-            }));
-        });
+            });
+            if (handshake) co_return accepted;
+            accepted->Close();
+        }
     }
 
     std::uint16_t TcpListener::Port() const { return _state ? _state->port : 0; }

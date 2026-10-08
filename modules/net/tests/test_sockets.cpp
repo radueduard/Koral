@@ -101,12 +101,11 @@ TEST(Sockets, TlsWithASelfSignedCertificate) {
     ASSERT_TRUE(listener) << listener.error().message;
 
     auto server = [](TcpListener l) -> kor::Task<void> {
-        for (int i = 0; i < 2; ++i) {
-            auto client = co_await l.Accept();
-            if (!client) continue;
-            auto line = co_await client->ReadUntil("\n");
-            if (line) co_await client->Write("secure " + *line);
-        }
+        // The untrusting client's failed handshake is skipped: one Accept is the trusting client.
+        auto client = co_await l.Accept();
+        if (!client) co_return;
+        auto line = co_await client->ReadUntil("\n");
+        if (line) co_await client->Write("secure " + *line);
     }(*listener);
 
     // Not trusted: the handshake fails.

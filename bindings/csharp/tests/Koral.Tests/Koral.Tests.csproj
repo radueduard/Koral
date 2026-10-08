@@ -10,5 +10,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Koral.Scripting/Koral.Scripting.csproj" />
     <ProjectReference Include="../../src/Koral.UI/Koral.UI.csproj" />
+    <ProjectReference Include="../../src/Koral.Net/Koral.Net.csproj" />
   </ItemGroup>
 </Project>

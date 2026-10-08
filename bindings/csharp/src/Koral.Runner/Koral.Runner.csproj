@@ -8,7 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Koral.Scripting/Koral.Scripting.csproj" />
-    <!-- Shipped with the runtime so scripts can build interfaces: referenced, it is on their compile path. -->
+    <!-- Shipped with the runtime so scripts can build interfaces and use the network: referenced, they are on their compile path. -->
     <ProjectReference Include="../Koral.UI/Koral.UI.csproj" />
+    <ProjectReference Include="../Koral.Net/Koral.Net.csproj" />
   </ItemGroup>
 </Project>

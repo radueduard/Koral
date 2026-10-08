@@ -51,6 +51,8 @@ class Token internal constructor(internal val native: MemorySegment) {
     companion object {
         /** Token::Create: one of one's own, signalled with [signal]. */
         fun create(): Token = Token(checked(KoralNative.koral_token_create(), "making a token"))
+        /** A KoralToken handle a module's C interface handed over: the Token now owns (and frees) it. For modules' bindings. */
+        fun adopt(native: MemorySegment): Token = Token(native)
     }
 }
 

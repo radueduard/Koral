@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- koral-net from C#: sockets, HTTP and WebSockets awaited as Tasks, the game protocol, replication and
+       prediction, over koralNet_c.h. Managed code only; the native library is the SDK's koral-net module,
+       found beside Koral's. -->
+  <PropertyGroup>
+    <RootNamespace>Koral.Net</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsAotCompatible>false</IsAotCompatible>
+    <PackageId>Koral.Net</PackageId>
+    <Description>C# bindings for koral-net, Koral's networking library.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Koral/Koral.csproj" />
+  </ItemGroup>
+</Project>
