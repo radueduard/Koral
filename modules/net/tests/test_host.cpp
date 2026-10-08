@@ -154,6 +154,9 @@ TEST(Host, ReliableSurvivesABadNetwork) {
         client.Send(toServer, 0, w.Data());
         client.Send(toServer, 2, w.Data());   // sequenced
         if (i == 150) client.Send(toServer, 0, Bytes(50'000, std::byte{0x5a}));   // a large one in the middle
+        // Sent a few at a time, as a game sends them: all at once they are two or three datagrams, and a bad
+        // network sometimes loses every one, leaving nothing sequenced to check.
+        if (i % 10 == 9) pump.Until([] { return false; }, 2ms);
     }
     ASSERT_TRUE(pump.Until([&] {
         int n = 0;
@@ -180,7 +183,10 @@ TEST(Host, ReliableSurvivesABadNetwork) {
     }
     EXPECT_EQ(expected, Count);
     EXPECT_GT(sequencedCount, 0);
-    EXPECT_LT(sequencedCount, Count);   // some were lost, as unreliable ones may be
+    // Unreliable ones may be lost, and none can arrive twice. That some are lost is not for this to insist on: the
+    // 300 travel in a handful of datagrams, and one run in five loses none of those. packetsLost, below, counts
+    // every datagram of the run, and says the network was bad.
+    EXPECT_LE(sequencedCount, Count);
     EXPECT_GT(client.Stats(toServer).packetsLost, 0u);
 }
 
