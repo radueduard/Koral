@@ -598,6 +598,15 @@ bool koral_shader_specialization_constant(KoralShader* r, const size_t index, Ko
         return true;
     }, false);
 }
+void koral_shader_local_size(KoralShader* r, uint32_t out[3])
+{
+    if (!out) return;
+    out[0] = out[1] = out[2] = 0;
+    GuardedVoid([&] {
+        const auto& size = Get<Shader>(r).BlockLayout().localSize;
+        std::copy(size.begin(), size.end(), out);
+    });
+}
 
 // ---- pipelines -------------------------------------------------------------------------------------------------------
 

@@ -309,6 +309,8 @@ KORAL_API size_t koral_shader_push_constant_count(KoralShader* shader);
 KORAL_API bool koral_shader_push_constant(KoralShader* shader, size_t index, KoralShaderPushConstant* out);
 KORAL_API size_t koral_shader_specialization_constant_count(KoralShader* shader);
 KORAL_API bool koral_shader_specialization_constant(KoralShader* shader, size_t index, KoralShaderSpecializationConstant* out);
+/** The work group a compute, task or mesh shader declares (`[numthreads(x, y, z)]`), into @p out; zeros for any other stage. */
+KORAL_API void koral_shader_local_size(KoralShader* shader, uint32_t out[3]);
 
 /* ---- pipelines ---------------------------------------------------------------------------------------- */
 

@@ -607,6 +607,8 @@ object KoralNative {
     fun koral_shader_specialization_constant_count(shader: MemorySegment): Long = h_koral_shader_specialization_constant_count.invokeExact(shader) as Long
     private val h_koral_shader_specialization_constant by lazy { handle("koral_shader_specialization_constant", FunctionDescriptor.of(JAVA_BOOLEAN, ADDRESS, JAVA_LONG, ADDRESS)) }
     fun koral_shader_specialization_constant(shader: MemorySegment, index: Long, out: MemorySegment): Boolean = h_koral_shader_specialization_constant.invokeExact(shader, index, out) as Boolean
+    private val h_koral_shader_local_size by lazy { handle("koral_shader_local_size", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS)) }
+    fun koral_shader_local_size(shader: MemorySegment, out: MemorySegment): Unit { h_koral_shader_local_size.invokeExact(shader, out) }
     private val h_koral_graphics_pipeline_builder_new by lazy { handle("koral_graphics_pipeline_builder_new", FunctionDescriptor.of(ADDRESS)) }
     fun koral_graphics_pipeline_builder_new(): MemorySegment = h_koral_graphics_pipeline_builder_new.invokeExact() as MemorySegment
     private val h_koral_graphics_pipeline_builder_set_vertex_shader by lazy { handle("koral_graphics_pipeline_builder_set_vertex_shader", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }

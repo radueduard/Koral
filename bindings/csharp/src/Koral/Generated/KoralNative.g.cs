@@ -510,6 +510,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial byte koral_shader_push_constant(IntPtr shader, nuint index, KoralShaderPushConstant* @out);
     [LibraryImport(Library)] internal static partial nuint koral_shader_specialization_constant_count(IntPtr shader);
     [LibraryImport(Library)] internal static partial byte koral_shader_specialization_constant(IntPtr shader, nuint index, KoralShaderSpecializationConstant* @out);
+    [LibraryImport(Library)] internal static partial void koral_shader_local_size(IntPtr shader, uint* @out);
     [LibraryImport(Library)] internal static partial IntPtr koral_graphics_pipeline_builder_new();
     [LibraryImport(Library)] internal static partial void koral_graphics_pipeline_builder_set_vertex_shader(IntPtr builder, IntPtr shader, KoralVertexLayout* layout);
     [LibraryImport(Library)] internal static partial void koral_graphics_pipeline_builder_set_tessellation_state(IntPtr builder, IntPtr control, IntPtr evaluation, uint patch_control_points);

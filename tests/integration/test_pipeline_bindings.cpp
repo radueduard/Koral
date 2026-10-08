@@ -109,6 +109,8 @@ TEST_F(GpuTest, AShaderWithoutBindingsReflectsItsParametersAndConstants) {
     std::memcpy(&offset, &bits, 4);
     EXPECT_FLOAT_EQ(offset, 0.5f);
 
+    EXPECT_EQ(shader->BlockLayout().localSize, (std::array<kor::u32, 3> { 64, 1, 1 }));
+
     std::vector<std::string> pushed;
     for (const auto& block : shader->BlockLayout().pushConstants | std::views::values)
         for (const auto& field : block.members) pushed.push_back(field.name);
@@ -126,6 +128,7 @@ TEST_F(GpuTest, GlslWithoutBindingsCompilesAndReflects) {
     EXPECT_NE(std::pair(sourceSet, sourceBinding), std::pair(targetSet, targetBinding)) << "two descriptors numbered alike";
     ASSERT_TRUE(shader->BlockLayout().specializationConstants.contains(0));
     EXPECT_EQ(shader->BlockLayout().specializationConstants.at(0).name, "factor");
+    EXPECT_EQ(shader->BlockLayout().localSize, (std::array<kor::u32, 3> { 64, 1, 1 }));
 }
 
 // The same shader, built into a pipeline that keeps the compiler's numbering and one that moves its descriptors

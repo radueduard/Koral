@@ -5,6 +5,7 @@
 #pragma once
 #include <cstdint>
 #include <filesystem>
+#include <array>
 #include <map>
 #include <memory>
 #include <random>
@@ -307,6 +308,10 @@ namespace kor
             std::map<kor::u32, DescriptorSet> descriptorSets;   ///< Declared sets, keyed by set number.
             std::map<kor::u32, PushConstant> pushConstants;     ///< Declared push-constant blocks, keyed by offset.
             std::map<kor::u32, SpecializationConstant> specializationConstants;   ///< Declared specialization constants, by constant id.
+            /// The work group a compute, task or mesh shader declares (`[numthreads(8, 8, 1)]`,
+            /// `local_size_x = 8`): how many invocations one dispatched group is. Zeros for every
+            /// other stage. Where the shader sizes it by a specialization constant, the default.
+            std::array<kor::u32, 3> localSize {};
         };
 
         /**

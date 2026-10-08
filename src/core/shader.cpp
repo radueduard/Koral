@@ -1046,6 +1046,20 @@ namespace kor {
     		memoryLayout.specializationConstants.emplace(reflected.id, std::move(reflected));
     	}
 
+    	// The work group size, for the stages that have one. SPIR-V says it either as an execution
+    	// mode or as the WorkGroupSize constant (which is what a size given by specialization
+    	// constants becomes); the constant wins where both are there.
+    	if (stage == Stage::eCompute || stage == Stage::eTask || stage == Stage::eMesh) {
+    		spirv_cross::SpecializationConstant x, y, z;
+    		if (const auto sized = module.get_work_group_size_specialization_constants(x, y, z); sized != 0) {
+    			const auto& size = module.get_constant(sized);
+    			for (kor::u32 i = 0; i < 3; i++) memoryLayout.localSize[i] = size.scalar(0, i);
+    		} else {
+    			for (kor::u32 i = 0; i < 3; i++)
+    				memoryLayout.localSize[i] = module.get_execution_mode_argument(spv::ExecutionModeLocalSize, i);
+    		}
+    	}
+
     	// Which SPIR-V variables each descriptor is, by its name and by its block's type name: what
     	// SpirvWith rewrites the decorations of.
     	_descriptorVariables.clear();
