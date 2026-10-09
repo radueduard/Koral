@@ -107,7 +107,13 @@ namespace kor::vk
         // layer flags, so clamp up. maxImageCount == 0 means "no upper bound"; when it is set, stay
         // within it. The driver may still hand out more than requested; that actual count is adopted
         // from getSwapchainImagesKHR below.
-        kor::u32 requestedImageCount = std::max(_requestedImageCount, surfaceCapabilities.minImageCount);
+        //
+        // And one more than it demands, at least. With exactly the minimum, every image is either on screen or
+        // waiting to be: there is none to draw the next frame into until the compositor gives one back, and
+        // acquiring waits for that — which paces a program at the compositor's rate whatever its present mode,
+        // vsync off included (125 frames a second on a 240 Hz display, of a picture that takes a fifth of a
+        // millisecond to draw). The spare image is what lets mailbox and immediate run as fast as they are drawn.
+        kor::u32 requestedImageCount = std::max(_requestedImageCount, surfaceCapabilities.minImageCount + 1);
         if (surfaceCapabilities.maxImageCount > 0)
             requestedImageCount = std::min(requestedImageCount, surfaceCapabilities.maxImageCount);
 
