@@ -52,6 +52,8 @@ namespace kor
         eSamplerAnisotropy        = 0x100000,  ///< Anisotropic filtering.
         eMeshShader               = 0x200000,  ///< Mesh and task shaders. (Enabled where present whether asked for or not.)
         eRayTracing               = 0x400000,  ///< Ray tracing pipelines and acceleration structures. (The same.)
+        // Descriptors
+        eDescriptorHeap           = 0x800000,  ///< VK_EXT_descriptor_heap. Enabled exactly when the device is made for DescriptorModel::eHeap; requiring it asks for that model.
     };
     template <> struct enable_flags<Feature> : std::true_type {};
 

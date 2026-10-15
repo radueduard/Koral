@@ -14,7 +14,12 @@
 #include "buffer.h"
 #include "computePipeline.h"
 #include "context.h"
+#include "bindlessTables.h"
 #include "descriptorSet.h"
+#include "heaps.h"
+#include <descriptorHeap.h>
+#include "pipelineInterface.h"
+#include <bindless.h>
 #include "device.h"
 #include "framebuffer.h"
 #include "graphicsPipeline.h"
@@ -112,7 +117,44 @@ namespace kor::vk
         constexpr auto commandBufferBeginInfo = ::vk::CommandBufferBeginInfo()
             .setFlags(::vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
         _handle.begin(commandBufferBeginInfo);
+        // Under the descriptor heap, both heaps are bound once, first, for everything this buffer records.
+        if (const auto* heaps = Context::Heaps()) heaps->Bind(_handle);
         return *this;
+    }
+
+    void CommandBuffer::afterPipelineBind(const ::vk::PipelineBindPoint bindPoint, const kor::Pipeline& pipeline,
+                                          const ::vk::PipelineLayout layout,
+                                          const std::map<kor::u32, kor::ResourceRef<const kor::DescriptorSet>>& keptSets,
+                                          const bool changed)
+    {
+        if (Context::Heaps()) {
+            // Every byte of push data a shader reads has to have been pushed, and a draw that pushes only
+            // some of its constants is an ordinary one: a new pipeline's constants start out as zeros.
+            // Binding the same one again keeps what was pushed, as it does under descriptor sets.
+            if (const auto end = pipeline.PushConstantEnd(); changed && end > 0) {
+                const std::vector<std::byte> zeros(end);
+                _handle.pushDataEXT(::vk::PushDataInfoEXT()
+                    .setOffset(0)
+                    .setData(::vk::HostAddressRangeConstEXT().setAddress(zeros.data()).setSize(zeros.size())));
+            }
+            // Push data has no layout to be disturbed by, but the pipeline bound before may have pushed
+            // its own constants over where these sets' base slots sit. Pushed again, then.
+            for (const auto& [index, set] : keptSets)
+                if (set.Valid()) pushSetBase(index, *set);
+            return;
+        }
+        // Under sets, the bindless tables are one set of their own, bound wherever a pipeline reads them.
+        if (pipeline.UsesBindless())
+            _handle.bindDescriptorSets(bindPoint, layout, BindlessSet, Context::Bindless().Set(), nullptr);
+    }
+
+    void CommandBuffer::pushSetBase(const kor::u32 index, const kor::DescriptorSet& set)
+    {
+        const auto base = dynamic_cast<const kor::vk::DescriptorSet&>(set).HeapBaseNow();
+        const kor::u32 words[2] = { base.resource, base.sampler };
+        _handle.pushDataEXT(::vk::PushDataInfoEXT()
+            .setOffset(HeapSetPushOffset(index))
+            .setData(::vk::HostAddressRangeConstEXT().setAddress(words).setSize(sizeof(words))));
     }
 
     void CommandBuffer::DoEnd()
@@ -398,15 +440,23 @@ namespace kor::vk
 
     kor::CommandBuffer& CommandBuffer::DoBindComputePipeline(kor::ResourceRef<const kor::ComputePipeline> pipeline)
     {
+        const bool changed = BoundPipeline() != pipeline.Get();
         StateBindComputePipeline(pipeline);
         pipeline->Bind(*this);
+        afterPipelineBind(::vk::PipelineBindPoint::eCompute, *pipeline,
+                          dynamic_cast<const kor::vk::ComputePipeline&>(*pipeline).getPipelineLayout(),
+                          _state.boundComputeDescriptorSets, changed);
         return *this;
     }
 
     kor::CommandBuffer& CommandBuffer::DoBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline)
     {
+        const bool changed = BoundPipeline() != pipeline.Get();
         StateBindGraphicsPipeline(pipeline);
         pipeline->Bind(*this);
+        afterPipelineBind(::vk::PipelineBindPoint::eGraphics, *pipeline,
+                          dynamic_cast<const kor::vk::GraphicsPipeline&>(*pipeline).getPipelineLayout(),
+                          _state.boundGraphicsDescriptorSets, changed);
         // Dynamic state (front face included) is applied lazily before the first draw
         // via ApplyDynamicDefaults(), so nothing to emit here.
         return *this;
@@ -414,8 +464,12 @@ namespace kor::vk
 
     kor::CommandBuffer& CommandBuffer::DoBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline)
     {
+        const bool changed = BoundPipeline() != pipeline.Get();
         StateBindRayTracingPipeline(pipeline);
         pipeline->Bind(*this);
+        afterPipelineBind(::vk::PipelineBindPoint::eRayTracingKHR, *pipeline,
+                          dynamic_cast<const kor::vk::RayTracingPipeline&>(*pipeline).getPipelineLayout(),
+                          _state.boundRayTracingDescriptorSets, changed);
         return *this;
     }
 
@@ -434,6 +488,12 @@ namespace kor::vk
 
     kor::CommandBuffer& CommandBuffer::DoBindDescriptorSet(const kor::u32 index, kor::ResourceRef<const kor::DescriptorSet> set)
     {
+        if (Context::Heaps()) {
+            // Under the heap a set is a run of slots, and binding it is telling the shader where the run starts.
+            StateBindDescriptorSet(index, set);
+            pushSetBase(index, *set);
+            return *this;
+        }
 
         if (_state.boundComputePipeline.has_value()) {
             const auto& vkPipeline = dynamic_cast<const kor::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
@@ -472,6 +532,34 @@ namespace kor::vk
             std::cerr << "No pipeline bound when trying to bind descriptor set" << std::endl;
         }
         return *this;
+    }
+
+    void CommandBuffer::DoCopyDescriptors(const kor::ResourceRef<const kor::Buffer> source, const kor::u64 sourceOffset,
+                                          const kor::ResourceRef<const kor::DescriptorHeap> heap, const kor::u32 firstSlot,
+                                          const kor::u32 count)
+    {
+        const auto* heaps = Context::Heaps();
+        const auto role = heap->Role();
+        const auto slotSize = heaps->SlotSize(role);
+        const auto& buffer = dynamic_cast<const kor::vk::Buffer&>(*source);
+        _handle.copyBuffer(buffer[0], heaps->Buffer(role), ::vk::BufferCopy()
+            .setSrcOffset(sourceOffset)
+            .setDstOffset(heaps->BufferOffset(role) + static_cast<::vk::DeviceSize>(heap->FirstSlot() + firstSlot) * slotSize)
+            .setSize(static_cast<::vk::DeviceSize>(count) * slotSize));
+        DoDescriptorHeapBarrier();
+    }
+
+    void CommandBuffer::DoDescriptorHeapBarrier()
+    {
+        // Whatever wrote descriptors — a copy, or a shader through the heap's address — before every
+        // shader that reads the heap after.
+        const auto barrier = ::vk::MemoryBarrier2()
+            .setSrcStageMask(::vk::PipelineStageFlagBits2::eAllCommands)
+            .setSrcAccessMask(::vk::AccessFlagBits2::eTransferWrite | ::vk::AccessFlagBits2::eShaderWrite)
+            .setDstStageMask(::vk::PipelineStageFlagBits2::eAllCommands)
+            .setDstAccessMask(static_cast<::vk::AccessFlagBits2>(VK_ACCESS_2_RESOURCE_HEAP_READ_BIT_EXT)
+                              | static_cast<::vk::AccessFlagBits2>(VK_ACCESS_2_SAMPLER_HEAP_READ_BIT_EXT));
+        _handle.pipelineBarrier2(::vk::DependencyInfo().setMemoryBarriers(barrier));
     }
 
     kor::CommandBuffer& CommandBuffer::DoBindMesh(kor::ResourceRef<const kor::Mesh> mesh)
@@ -1317,6 +1405,13 @@ namespace kor::vk
         if (data && size) std::memcpy(bytes.data(), data, size);
         return defer("PushConstantBlock", [this, bytes = std::move(bytes), size, offset] {
             const void* data = bytes.data();
+            if (Context::Heaps()) {
+                // A heap pipeline has no layout: its push constants are push data, at the same offsets.
+                _handle.pushDataEXT(::vk::PushDataInfoEXT()
+                    .setOffset(offset)
+                    .setData(::vk::HostAddressRangeConstEXT().setAddress(data).setSize(size)));
+                return;
+            }
             if (_state.boundComputePipeline.has_value()) {
             const auto& vkPipeline = dynamic_cast<const kor::vk::ComputePipeline&>(*_state.boundComputePipeline.value());
             _handle.pushConstants(

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <functional>
+#include <map>
 #include "vk_wrapper.h"
 #include <vulkan/vulkan.hpp>
 
@@ -53,6 +54,9 @@ namespace kor::vk
         kor::CommandBuffer& DoBindGraphicsPipeline(kor::ResourceRef<const kor::GraphicsPipeline> pipeline) override;
         kor::CommandBuffer& DoBindRayTracingPipeline(kor::ResourceRef<const kor::RayTracingPipeline> pipeline) override;
         kor::CommandBuffer& DoBindDescriptorSet(kor::u32 index, kor::ResourceRef<const kor::DescriptorSet> set) override;
+        void DoCopyDescriptors(kor::ResourceRef<const kor::Buffer> source, kor::u64 sourceOffset,
+                               kor::ResourceRef<const kor::DescriptorHeap> heap, kor::u32 firstSlot, kor::u32 count) override;
+        void DoDescriptorHeapBarrier() override;
         kor::CommandBuffer& DoBindMesh(kor::ResourceRef<const Mesh> mesh) override;
         kor::CommandBuffer& DoBindVertexBuffer(kor::u32 binding, kor::ResourceRef<const kor::Buffer> buffer, kor::u64 offset) override;
         kor::CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) override;
@@ -122,6 +126,12 @@ namespace kor::vk
             return Enqueue(name, std::source_location::current(), std::move(uses), pass,
                            std::forward<F>(emit), /*transitions=*/false, dereferencesDeviceAddresses);
         }
+
+        // After a pipeline is bound: the bindless set under sets; the kept sets' base slots under the heap.
+        void afterPipelineBind(::vk::PipelineBindPoint bindPoint, const kor::Pipeline& pipeline, ::vk::PipelineLayout layout,
+                               const std::map<kor::u32, kor::ResourceRef<const kor::DescriptorSet>>& keptSets, bool changed);
+        // Under the heap: pushes where set @p index's slots start, where its pipeline's mapping reads them.
+        void pushSetBase(kor::u32 index, const kor::DescriptorSet& set);
 
     protected:
         kor::CommandBuffer & DoPushConstantBlock(const void *data, kor::u32 size, kor::u32 offset) override;

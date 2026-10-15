@@ -58,6 +58,7 @@ namespace kor
             std::optional<std::string> api;
             std::optional<std::string> platform;   // Linux windowing system: "auto" | "x11" | "wayland"
             std::optional<std::string> gpu;        // device index or name substring; Vulkan only
+            std::optional<std::string> descriptors; // "sets" | "heap"
             std::optional<WindowDocument> window;
         };
 
@@ -160,6 +161,19 @@ namespace kor
             return std::nullopt;
         }
 
+        std::optional<DescriptorModel> parseDescriptors(std::string_view name)
+        {
+            if (name.starts_with('e') || name.starts_with('E')) name.remove_prefix(1);
+            const auto equalsIgnoringCase = [name](const std::string_view other) {
+                return std::ranges::equal(name, other, [](const char a, const char b) {
+                    return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+                });
+            };
+            if (equalsIgnoringCase("sets")) return DescriptorModel::eSets;
+            if (equalsIgnoringCase("heap")) return DescriptorModel::eHeap;
+            return std::nullopt;
+        }
+
         // A directory from a config file is relative to that file, not to whatever directory the
         // user happened to launch from: the config travels with the project, so the paths in it
         // have to mean the same thing wherever the project is checked out or moved to.
@@ -223,6 +237,13 @@ namespace kor
                 // Vulkan instance exists, and an unmatched preference falls back to the automatic
                 // choice there rather than stopping the run.
                 if (r.gpu) config.gpu = *r.gpu;
+
+                if (r.descriptors) {
+                    const auto parsed = parseDescriptors(*r.descriptors);
+                    if (!parsed)
+                        return invalid(std::format("'rendering.descriptors' is '{}'; expected 'sets' or 'heap'", *r.descriptors));
+                    config.descriptors = *parsed;
+                }
 
                 if (r.window) {
                     const auto& w = *r.window;
@@ -405,6 +426,14 @@ namespace kor
                 if (!value(text)) return invalid("missing value for --gpu");
                 gpu = text;
             }
+            else if (arg == "--descriptors") {
+                std::string_view text;
+                if (!value(text)) return invalid("missing value for --descriptors");
+                const auto parsed = parseDescriptors(text);
+                if (!parsed)
+                    return invalid(std::format("--descriptors expects 'sets' or 'heap', got '{}'", text));
+                descriptors = *parsed;
+            }
             else if (arg == "--module") {
                 std::string_view text;
                 if (!value(text)) return invalid("missing value for --module");
@@ -494,6 +523,7 @@ namespace kor
             "  --api <name>        Graphics backend: Vulkan\n"
             "  --platform <name>   Windowing system: auto, x11 or wayland (Linux), or none (offscreen only)\n"
             "  --gpu <which>       GPU to use: an index from the startup listing, or part of a device name (Vulkan only)\n"
+            "  --descriptors <m>   Descriptor model: sets (default) or heap (VK_EXT_descriptor_heap)\n"
             "  --fullscreen        Open fullscreen             (--no-fullscreen)\n"
             "  --resizable         Allow the window to resize  (--no-resizable)\n"
             "  --borderless        Drop the window decorations (--decorated)\n"

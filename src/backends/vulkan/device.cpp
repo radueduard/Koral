@@ -172,7 +172,9 @@ namespace kor::vk {
 
         auto vk13Features = ::vk::PhysicalDeviceVulkan13Features()
             .setShaderDemoteToHelperInvocation(require(supported13.shaderDemoteToHelperInvocation, "shaderDemoteToHelperInvocation"))
-            .setDynamicRendering(require(supported13.dynamicRendering, "dynamicRendering"));
+            .setDynamicRendering(require(supported13.dynamicRendering, "dynamicRendering"))
+            // Core in 1.3; what a barrier naming the descriptor heap's own access flags is spelled with.
+            .setSynchronization2(supported13.synchronization2);
 
         if (meshShaderSupported) {
             vk13Features.setPNext(&deviceMeshShaderFeatures);
@@ -207,7 +209,23 @@ namespace kor::vk {
             .setDescriptorBindingPartiallyBound(require(supported12.descriptorBindingPartiallyBound, "descriptorBindingPartiallyBound"))
             .setDescriptorBindingVariableDescriptorCount(require(supported12.descriptorBindingVariableDescriptorCount, "descriptorBindingVariableDescriptorCount"))
             .setDescriptorIndexing(require(supported12.descriptorIndexing, "descriptorIndexing"))
+            // What a bindless table needs beyond sampled images, each where the device has it: a table
+            // is written while frames that read other slots of it are in flight. @see BindlessSupport
+            .setDescriptorBindingStorageBufferUpdateAfterBind(supported12.descriptorBindingStorageBufferUpdateAfterBind)
+            .setDescriptorBindingStorageImageUpdateAfterBind(supported12.descriptorBindingStorageImageUpdateAfterBind)
+            .setDescriptorBindingUniformBufferUpdateAfterBind(supported12.descriptorBindingUniformBufferUpdateAfterBind)
+            .setDescriptorBindingUpdateUnusedWhilePending(supported12.descriptorBindingUpdateUnusedWhilePending)
+            .setShaderStorageBufferArrayNonUniformIndexing(supported12.shaderStorageBufferArrayNonUniformIndexing)
+            .setShaderStorageImageArrayNonUniformIndexing(supported12.shaderStorageImageArrayNonUniformIndexing)
+            .setShaderUniformBufferArrayNonUniformIndexing(supported12.shaderUniformBufferArrayNonUniformIndexing)
 			.setPNext(&vk13Features);
+        _bindlessSupport.storageBuffers = supported12.descriptorBindingStorageBufferUpdateAfterBind
+            && supported12.shaderStorageBufferArrayNonUniformIndexing;
+        _bindlessSupport.storageImages = supported12.descriptorBindingStorageImageUpdateAfterBind
+            && supported12.shaderStorageImageArrayNonUniformIndexing;
+        _bindlessSupport.uniformBuffers = supported12.descriptorBindingUniformBufferUpdateAfterBind
+            && supported12.shaderUniformBufferArrayNonUniformIndexing;
+        _bindlessSupport.updateUnusedWhilePending = supported12.descriptorBindingUpdateUnusedWhilePending;
 
         auto vk11Features = ::vk::PhysicalDeviceVulkan11Features()
             .setShaderDrawParameters(require(supported11.shaderDrawParameters, "shaderDrawParameters"))
@@ -225,6 +243,18 @@ namespace kor::vk {
             if (atomicFloatExtension) { supportedAtomicFloat.pNext = chain; chain = &supportedAtomicFloat; }
             if (cooperativeMatrixExtension) { supportedCooperativeMatrix.pNext = chain; chain = &supportedCooperativeMatrix; }
             query.pNext = chain;
+            physicalDevice->getFeatures2(&query);
+        }
+        // The descriptor heap: present when the extension (and maintenance5, which it is built on) is there
+        // and the driver says the feature is. Enabled only for a device made for DescriptorModel::eHeap.
+        const bool descriptorHeapExtension = physicalDevice.supportsExtension(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME)
+            && physicalDevice.supportsExtension(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+        ::vk::PhysicalDeviceDescriptorHeapFeaturesEXT supportedDescriptorHeap;
+        ::vk::PhysicalDeviceMaintenance5FeaturesKHR supportedMaintenance5;
+        if (descriptorHeapExtension) {
+            supportedMaintenance5.pNext = &supportedDescriptorHeap;
+            ::vk::PhysicalDeviceFeatures2 query;
+            query.pNext = &supportedMaintenance5;
             physicalDevice->getFeatures2(&query);
         }
         const bool rayTracing = physicalDevice.supportsExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
@@ -257,6 +287,8 @@ namespace kor::vk {
         has(core.samplerAnisotropy, Feature::eSamplerAnisotropy);
         has(meshShaderSupported, Feature::eMeshShader);
         has(rayTracing, Feature::eRayTracing);
+        has(descriptorHeapExtension && supportedDescriptorHeap.descriptorHeap && supportedMaintenance5.maintenance5,
+            Feature::eDescriptorHeap);
 
         // Required and missing: refused here, naming each and who wanted it, rather than by vkCreateDevice.
         const auto wanted = detail::Wanted();
@@ -266,11 +298,18 @@ namespace kor::vk {
         }
         // Enabled: what was asked for and is there. The core ones are on wherever present anyway (below), and
         // mesh shaders and ray tracing are enabled wherever present, asked for or not.
-        const Flags<Feature> enabled = ((wanted.required | wanted.optional) & available)
+        // The descriptor model is a preference, not a request: a heap the GPU does not have is said once,
+        // and the device is made for sets. (Requiring Feature::eDescriptorHeap is what makes it a must.)
+        const bool wantsHeap = PreferredDescriptorModel() == DescriptorModel::eHeap;
+        if (wantsHeap && !(available & Feature::eDescriptorHeap))
+            log::Warn("[descriptors] The descriptor heap was asked for, but GPU '{}' has no VK_EXT_descriptor_heap: "
+                      "using descriptor sets instead.", std::string(physicalDevice.getProperties().deviceName.data()));
+        Flags<Feature> enabled = ((wanted.required | wanted.optional) & available)
             | (available & (Feature::eShaderFloat64 | Feature::eShaderInt64 | Feature::eShaderInt16 | Feature::eFragmentStoresAndAtomics
                             | Feature::eVertexStoresAndAtomics | Feature::eMultiDrawIndirect | Feature::eGeometryShader
                             | Feature::eTessellationShader | Feature::eFillModeNonSolid | Feature::eWideLines
                             | Feature::eSamplerAnisotropy | Feature::eMeshShader | Feature::eRayTracing));
+        if (wantsHeap && (available & Feature::eDescriptorHeap)) enabled |= Feature::eDescriptorHeap;
         if (enabled & Feature::eShaderFloat16) vk12Features.setShaderFloat16(true);
         if (enabled & Feature::eShaderInt8) vk12Features.setShaderInt8(true);
         if (enabled & Feature::eStorage16Bit) vk11Features.setStorageBuffer16BitAccess(true).setUniformAndStorageBuffer16BitAccess(true);
@@ -295,6 +334,12 @@ namespace kor::vk {
         };
         if (enabled & (Feature::eAtomicFloat32 | Feature::eAtomicFloat64)) chainIn(atomicFloatFeatures);
         if (enabled & Feature::eCooperativeMatrix) chainIn(cooperativeMatrixFeatures);
+        auto descriptorHeapFeatures = ::vk::PhysicalDeviceDescriptorHeapFeaturesEXT().setDescriptorHeap(true);
+        auto maintenance5Features = ::vk::PhysicalDeviceMaintenance5FeaturesKHR().setMaintenance5(true);
+        if (enabled & Feature::eDescriptorHeap) {
+            chainIn(descriptorHeapFeatures);
+            chainIn(maintenance5Features);
+        }
         _enabledFeatures = enabled;
         detail::SetDeviceFeatures(available, enabled);
 
@@ -309,9 +354,18 @@ namespace kor::vk {
                 "' is missing required Vulkan features: " + names);
         }
 
+        ::vk::PhysicalDeviceAccelerationStructureFeaturesKHR supportedAccelerationStructure;
+        if (rayTracing) {
+            ::vk::PhysicalDeviceFeatures2 query;
+            query.pNext = &supportedAccelerationStructure;
+            physicalDevice->getFeatures2(&query);
+        }
+        _bindlessSupport.accelerationStructures = rayTracing
+            && supportedAccelerationStructure.descriptorBindingAccelerationStructureUpdateAfterBind;
         auto accelerationStructureFeatures = ::vk::PhysicalDeviceAccelerationStructureFeaturesKHR()
             .setPNext(&vk11Features)
-            .setAccelerationStructure(true);
+            .setAccelerationStructure(true)
+            .setDescriptorBindingAccelerationStructureUpdateAfterBind(_bindlessSupport.accelerationStructures);
 
         auto rayTracingPipelineFeatures = ::vk::PhysicalDeviceRayTracingPipelineFeaturesKHR()
             .setPNext(&accelerationStructureFeatures)
@@ -328,6 +382,10 @@ namespace kor::vk {
         if (fifoLatestReady) deviceExtensions.push_back(fifoLatestReady);
         if (_enabledFeatures & (Feature::eAtomicFloat32 | Feature::eAtomicFloat64)) deviceExtensions.push_back(VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME);
         if (_enabledFeatures & Feature::eCooperativeMatrix) deviceExtensions.push_back(VK_KHR_COOPERATIVE_MATRIX_EXTENSION_NAME);
+        if (_enabledFeatures & Feature::eDescriptorHeap) {
+            deviceExtensions.push_back(VK_EXT_DESCRIPTOR_HEAP_EXTENSION_NAME);
+            deviceExtensions.push_back(VK_KHR_MAINTENANCE_5_EXTENSION_NAME);
+        }
 
         _supportsRayTracing = physicalDevice.supportsExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME)
             && physicalDevice.supportsExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME)

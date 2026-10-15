@@ -6,7 +6,9 @@
 #include "vulkanContext.h"
 
 #include "allocator.h"
+#include "bindlessTables.h"
 #include "descriptorPool.h"
+#include "heaps.h"
 #include "device.h"
 #include "runtime.h"
 #include "scheduler.h"
@@ -48,6 +50,18 @@ const kor::vk::DescriptorPool& kor::vk::Context::DescriptorPool()
     return *_descriptorPool;
 }
 
+kor::vk::DescriptorHeaps* kor::vk::Context::Heaps()
+{
+    return _heaps;
+}
+
+kor::vk::BindlessTables& kor::vk::Context::Bindless()
+{
+    if (!_bindless)
+        throw std::runtime_error("The bindless tables are not initialized");
+    return *_bindless;
+}
+
 void initDispatcher();
 
 void kor::vk::Context::Init()
@@ -79,6 +93,10 @@ void kor::vk::Context::Init()
         descriptorPoolBuilder.addPoolSize(::vk::DescriptorType::eAccelerationStructureKHR, 1000);
     }
     _descriptorPool = descriptorPoolBuilder.build();
+    // A device made for the heap gets its two heaps now: every descriptor set, bindless index and
+    // project heap from here on is a run of their slots.
+    if (_device->enabledFeatures() & Feature::eDescriptorHeap) _heaps = new kor::vk::DescriptorHeaps;
+    _bindless = new kor::vk::BindlessTables;
     _tokenReactor = new kor::vk::TokenReactor;
 }
 
@@ -109,6 +127,11 @@ void kor::vk::Context::Destroy()
     kor::detail::collectRetired(/*all=*/true); // in case StopTokens() was never reached
     delete _tokenReactor;
     _tokenReactor = nullptr;
+    // Before the heaps and the pool its tables live in; after the retired work that may still free into them.
+    delete _bindless;
+    _bindless = nullptr;
+    delete _heaps;
+    _heaps = nullptr;
     delete _descriptorPool;
     delete _allocator;
     delete _device;

@@ -16,6 +16,8 @@ object Context {
     fun supports(feature: Feature): Boolean = KoralNative.koral_context_supports_feature(feature.value.toLong())
     /** Whether the GPU has [feature], enabled or not. */
     fun gpuHas(feature: Feature): Boolean = KoralNative.koral_context_gpu_has_feature(feature.value.toLong())
+    /** The descriptor model the device was made for; eSets before there is one. */
+    val activeDescriptorModel: DescriptorModel get() = DescriptorModel.of(KoralNative.koral_context_descriptor_model())
 }
 
 /** Where assets are looked for: kor::AssetPath and its search paths. */

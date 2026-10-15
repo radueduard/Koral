@@ -14,6 +14,7 @@
 #include "vulkanContext.h"
 #include "commandBuffer.h"
 #include "framebuffer.h"
+#include "pipelineInterface.h"
 #include "vk_enum_conversions.h"
 
 namespace kor::vk
@@ -56,27 +57,8 @@ namespace kor::vk
             }
         }
 
-        std::vector<::vk::DescriptorSetLayout> setLayouts;
-        if (!_setLayouts.empty()) {
-            setLayouts = { std::ranges::max(_setLayouts | std::views::keys) + 1, nullptr };
-            for (const auto& [set, layout] : _setLayouts) {
-                setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.Get());
-            }
-        }
-
-        std::vector<::vk::PushConstantRange> pushConstantRanges = {};
-        for (const auto& [offset, pushConstant] : _pushConstantRanges) {
-            pushConstantRanges.push_back(::vk::PushConstantRange()
-                .setStageFlags(getVkShaderStageFlags(pushConstant.stages))
-                .setOffset(offset)
-                .setSize(pushConstant.size));
-        }
-
-        const auto pipelineLayoutCreateInfo = ::vk::PipelineLayoutCreateInfo()
-            .setSetLayouts(setLayouts)
-            .setPushConstantRanges(pushConstantRanges);
-
-        _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
+        PipelineInterface descriptors(_setLayouts, _pushConstantRanges, _bindlessBindings);
+        _pipelineLayout = descriptors.TakeLayout();
 
         std::vector<::vk::PipelineShaderStageCreateInfo> shaderStages = {};
         if (_vertexShader.has_value()) {
@@ -137,6 +119,9 @@ namespace kor::vk
             _pipelineStageFlags |= ::vk::ShaderStageFlagBits::eMeshEXT;
         }
 
+        // Under the heap, each stage carries the mapping that sends its bindings into the heap.
+        for (auto& stage : shaderStages) stage.setPNext(descriptors.StageNext());
+
         std::vector<::vk::SpecializationMapEntry> specializationMapEntries;
         for (const auto& [id, offset, size] : _specConstantsMetadata) {
             specializationMapEntries.emplace_back(::vk::SpecializationMapEntry()
@@ -160,7 +145,7 @@ namespace kor::vk
             .setDynamicStates(_dynamicStates);
 
         auto pipelineCreateInfo = ::vk::GraphicsPipelineCreateInfo()
-            .setPNext(&pipelineRenderingCreateInfo)
+            .setPNext(descriptors.CreateNext(&pipelineRenderingCreateInfo))
             .setPDynamicState(&dynamicStateCreateInfo)
             .setStages(shaderStages)
             .setLayout(_pipelineLayout);

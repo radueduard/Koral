@@ -54,6 +54,7 @@ public sealed unsafe class App : IDisposable, IResourceOwner
                 gpu = gpu,
                 required_features = (ulong)Settings.RequiredFeatures,
                 optional_features = (ulong)Settings.OptionalFeatures,
+                descriptors = (uint)Settings.Descriptors,
             };
             KoralNative.Check(KoralNative.koral_app_create(&native));
         }
@@ -425,6 +426,7 @@ public sealed unsafe class ProjectConfig : IDisposable
                 Gpu = s.gpu == IntPtr.Zero ? "" : KoralNative.Text((byte*)s.gpu),
                 RequiredFeatures = (Feature)s.required_features,
                 OptionalFeatures = (Feature)s.optional_features,
+                Descriptors = (DescriptorModel)s.descriptors,
             };
         }
     }

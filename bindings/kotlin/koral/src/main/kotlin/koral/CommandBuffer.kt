@@ -153,11 +153,41 @@ class CommandBuffer internal constructor(native: MemorySegment, private val owne
      * IVec, UVec or Mat4, or an array of floats, ints or uints — checked against the shader's type, as in C++.
      */
     fun pushConstant(name: String, value: Any) = apply {
+        if (value is DescriptorIndex) {
+            // A bindless index: into the uint the shader calls [name], and its resource into what follows' uses.
+            Arena.ofConfined().use { a -> KoralNative.koral_cmd_push_index(n, name, value.native(a)) }
+            return@apply
+        }
         Arena.ofConfined().use { a ->
             val (bytes, shape) = ValueShape.encode(a, value)
             KoralNative.koral_cmd_push_constant(n, name, bytes, bytes.byteSize().toInt(), shape.native(a))
         }
     }
+
+    // ---- by name, bindless and the descriptor heap ----------------------------------------------------------
+
+    /**
+     * Bind(name, resource): puts a buffer, buffer view, image, image view, sampler or acceleration structure at the
+     * binding the bound pipeline's shader calls [name], without a descriptor set; an image may come with the
+     * [sampler] to read it through.
+     */
+    fun bind(name: String, resource: Resource, sampler: Sampler? = null) = apply { KoralNative.koral_cmd_bind(n, name, resource.native, handleOf(sampler)) }
+
+    /** Uses(index): the resource behind a bindless index the shader reaches some other way than by a push. */
+    fun uses(index: DescriptorIndex) = apply { Arena.ofConfined().use { a -> KoralNative.koral_cmd_uses_index(n, index.native(a)) } }
+
+    /** Uses(resource, access): a buffer, image or image view the shader reaches without a binding. */
+    fun uses(resource: Resource, access: ResourceAccess = ResourceAccess.eAllShaderRead) = apply {
+        KoralNative.koral_cmd_uses(n, resource.native, access.value)
+    }
+
+    /** Copies encoded descriptors from [source] into slots of [heap]. Descriptor heap only. */
+    fun copyDescriptors(source: Buffer, sourceOffset: Long, heap: DescriptorHeap, firstSlot: Int, count: Int) = apply {
+        KoralNative.koral_cmd_copy_descriptors(n, source.native, sourceOffset, heap.native, firstSlot, count)
+    }
+
+    /** Makes descriptors a shader wrote into the heap visible to the shaders that follow. Descriptor heap only. */
+    fun descriptorHeapBarrier() = apply { KoralNative.koral_cmd_descriptor_heap_barrier(n) }
 
     // ---- synchronisation and labels -------------------------------------------------------------------------
 

@@ -143,6 +143,22 @@ namespace kor::vk {
         /** Whether a swap chain may ask for ::vk::PresentModeKHR::eFifoLatestReady: its extension is enabled. */
         [[nodiscard]] bool supportsFifoLatestReady() const { return _supportsFifoLatestReady; }
 
+        /**
+         * @brief Which descriptor kinds a bindless table can hold under descriptor sets: those whose
+         *        update-after-bind (and non-uniform indexing) the device has. Sampled images and
+         *        samplers always can — those two are what the device is required to have.
+         */
+        struct BindlessSupport {
+            bool storageBuffers = false;
+            bool storageImages = false;
+            bool uniformBuffers = false;
+            bool accelerationStructures = false;
+            bool updateUnusedWhilePending = false;  ///< A table slot may be written while a frame using another one runs.
+        };
+        [[nodiscard]] const BindlessSupport& bindlessSupport() const { return _bindlessSupport; }
+        /** @brief What of kor::Feature the device was made with. */
+        [[nodiscard]] Flags<Feature> enabledFeatures() const { return _enabledFeatures; }
+
     private:
         mutable std::vector<Queue::Family> _queueFamilies {};
         mutable std::vector<std::unique_ptr<Queue>> _queuesInUse {};
@@ -169,6 +185,7 @@ namespace kor::vk {
         mutable std::vector<::vk::CommandPool> _commandPools {};                             // every pool ever made
         bool _supportsRayTracing = false;
         bool _supportsFifoLatestReady = false;
+        BindlessSupport _bindlessSupport {};
         Flags<Feature> _enabledFeatures {};    ///< What of kor::Feature the device was made with.
     };
 }

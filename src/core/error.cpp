@@ -50,6 +50,7 @@ namespace kor
         case ErrorCode::eTimedOut:                   return "eTimedOut";
         case ErrorCode::eConnectionClosed:           return "eConnectionClosed";
         case ErrorCode::eProtocol:                   return "eProtocol";
+        case ErrorCode::eDescriptorHeapUnsupported:  return "eDescriptorHeapUnsupported";
         }
         return "eUnknown";
     }
@@ -125,6 +126,8 @@ namespace kor
             return "The connection was closed.";
         case ErrorCode::eProtocol:
             return "The other side broke its protocol.";
+        case ErrorCode::eDescriptorHeapUnsupported:
+            return "This needs the descriptor heap, and the device was made for descriptor sets.";
         }
         return "Unknown error.";
     }

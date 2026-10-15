@@ -320,4 +320,57 @@ void koral_cmd_run(KoralCommandBuffer* c, void (*command)(KoralCommandBuffer*, v
     Record(c, [&](auto& x) { x.Run([command, user](CommandBuffer& inner) { if (command) command(HandleOf(inner), user); }); });
 }
 
+
+void koral_cmd_bind(KoralCommandBuffer* c, const char* name, KoralResource* resource, KoralSampler* sampler)
+{
+    Record(c, [&](CommandBuffer& x) {
+        const std::string_view n = name ? name : "";
+        if (!resource) throw std::runtime_error("koral_cmd_bind was given no resource");
+        switch (resource->Kind()) {
+        case KORAL_RESOURCE_BUFFER: x.Bind(n, RefOf<Buffer>(resource)); break;
+        case KORAL_RESOURCE_BUFFER_VIEW: x.Bind(n, RefOf<BufferView>(resource)); break;
+        case KORAL_RESOURCE_IMAGE:
+            if (sampler) x.Bind(n, RefOf<Image>(resource), RefOf<Sampler>(sampler)); else x.Bind(n, RefOf<Image>(resource));
+            break;
+        case KORAL_RESOURCE_IMAGE_VIEW:
+            if (sampler) x.Bind(n, RefOf<ImageView>(resource), RefOf<Sampler>(sampler)); else x.Bind(n, RefOf<ImageView>(resource));
+            break;
+        case KORAL_RESOURCE_SAMPLER: x.Bind(n, RefOf<Sampler>(resource)); break;
+        case KORAL_RESOURCE_ACCELERATION_STRUCTURE: x.Bind(n, RefOf<AccelerationStructure>(resource)); break;
+        default: throw std::runtime_error(std::string("a ") + KindName(resource->Kind()) + " cannot be bound to a shader");
+        }
+    });
+}
+void koral_cmd_push_index(KoralCommandBuffer* c, const char* name, const KoralDescriptorIndex index)
+{
+    Record(c, [&](CommandBuffer& x) {
+        x.PushConstant(name ? name : "", DescriptorIndex{ index.index, static_cast<BindlessKind>(index.kind) });
+    });
+}
+void koral_cmd_uses_index(KoralCommandBuffer* c, const KoralDescriptorIndex index)
+{
+    Record(c, [&](CommandBuffer& x) { x.Uses(DescriptorIndex{ index.index, static_cast<BindlessKind>(index.kind) }); });
+}
+void koral_cmd_uses(KoralCommandBuffer* c, KoralResource* resource, const uint32_t access)
+{
+    Record(c, [&](CommandBuffer& x) {
+        const auto a = static_cast<ResourceAccess>(access);
+        if (!resource) throw std::runtime_error("koral_cmd_uses was given no resource");
+        switch (resource->Kind()) {
+        case KORAL_RESOURCE_BUFFER: x.Uses(RefOf<Buffer>(resource), a); break;
+        case KORAL_RESOURCE_IMAGE: x.Uses(RefOf<Image>(resource), a); break;
+        case KORAL_RESOURCE_IMAGE_VIEW: x.Uses(RefOf<ImageView>(resource), a); break;
+        default: throw std::runtime_error(std::string("a ") + KindName(resource->Kind()) + " is not something a shader reads or writes");
+        }
+    });
+}
+void koral_cmd_copy_descriptors(KoralCommandBuffer* c, KoralBuffer* source, const uint64_t sourceOffset, KoralDescriptorHeap* heap,
+                                const uint32_t firstSlot, const uint32_t count)
+{
+    Record(c, [&](CommandBuffer& x) {
+        x.CopyDescriptors(RefOf<Buffer>(source), sourceOffset, RefOf<DescriptorHeap>(heap), firstSlot, count);
+    });
+}
+void koral_cmd_descriptor_heap_barrier(KoralCommandBuffer* c) { Record(c, [](CommandBuffer& x) { x.DescriptorHeapBarrier(); }); }
+
 } // extern "C"

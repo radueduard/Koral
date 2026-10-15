@@ -16,6 +16,7 @@
 #include "buffer.h"
 #include "bufferView.h"
 #include "computePipeline.h"
+#include "descriptorHeap.h"
 #include "descriptorSet.h"
 #include "descriptorSetLayout.h"
 #include "framebuffer.h"
@@ -89,6 +90,7 @@ namespace kor::capi
     template<> constexpr KoralResourceKind KindOf<Framebuffer>() { return KORAL_RESOURCE_FRAMEBUFFER; }
     template<> constexpr KoralResourceKind KindOf<Mesh>() { return KORAL_RESOURCE_MESH; }
     template<> constexpr KoralResourceKind KindOf<AccelerationStructure>() { return KORAL_RESOURCE_ACCELERATION_STRUCTURE; }
+    template<> constexpr KoralResourceKind KindOf<DescriptorHeap>() { return KORAL_RESOURCE_DESCRIPTOR_HEAP; }
 
     const char* KindName(KoralResourceKind kind);
 }

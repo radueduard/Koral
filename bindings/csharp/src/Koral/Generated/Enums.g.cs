@@ -332,6 +332,7 @@ public enum ErrorCode : byte
     eTimedOut = 31,
     eConnectionClosed = 32,
     eProtocol = 33,
+    eDescriptorHeapUnsupported = 34,
 }
 
 /// <summary>kor::Key.</summary>
@@ -541,6 +542,32 @@ public enum WindowPlatform : byte
     eNone = 3,
 }
 
+/// <summary>kor::DescriptorModel.</summary>
+public enum DescriptorModel : byte
+{
+    eSets = 0,
+    eHeap = 1,
+}
+
+/// <summary>kor::BindlessKind.</summary>
+public enum BindlessKind : byte
+{
+    eNone = 0,
+    eSampledImage = 1,
+    eStorageImage = 2,
+    eStorageBuffer = 3,
+    eUniformBuffer = 4,
+    eSampler = 5,
+    eAccelerationStructure = 6,
+}
+
+/// <summary>kor::HeapRole.</summary>
+public enum HeapRole : byte
+{
+    eResource = 0,
+    eSampler = 1,
+}
+
 /// <summary>kor::ValueScalar.</summary>
 public enum ValueScalar : byte
 {
@@ -580,6 +607,7 @@ public enum Feature : ulong
     eSamplerAnisotropy = 1048576,
     eMeshShader = 2097152,
     eRayTracing = 4194304,
+    eDescriptorHeap = 8388608,
 }
 
 public sealed partial class Buffer

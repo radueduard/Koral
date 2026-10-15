@@ -47,6 +47,11 @@ include(GoogleTest)
 # validation layers are found via VK_ADD_LAYER_PATH set by the runtime itself.
 gtest_discover_tests(koral_window_tests
         DISCOVERY_MODE PRE_TEST)
+# And again under the descriptor heap, as Heap.* (see tests/integration/CMakeLists.txt).
+gtest_discover_tests(koral_window_tests
+        DISCOVERY_MODE PRE_TEST
+        TEST_PREFIX "Heap."
+        PROPERTIES ENVIRONMENT "KORAL_DESCRIPTORS=heap")
 
 # An application with no windowing system, running offscreen scenes only. Its own executable: an
 # application is one per process. Needs a Vulkan device but no display.
@@ -64,3 +69,5 @@ set_target_properties(koral_capi_test PROPERTIES C_STANDARD 11 LINKER_LANGUAGE C
 target_link_libraries(koral_capi_test PRIVATE Koral)
 target_include_directories(koral_capi_test PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include)
 add_test(NAME CApi.DrivesASceneFromC COMMAND koral_capi_test)
+add_test(NAME Heap.CApi.DrivesASceneFromC COMMAND koral_capi_test)
+set_tests_properties(Heap.CApi.DrivesASceneFromC PROPERTIES ENVIRONMENT "KORAL_DESCRIPTORS=heap")

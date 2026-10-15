@@ -38,6 +38,8 @@ namespace kor
         kor::u32 framesInFlight = 2;
         /** A GPU to prefer by name (Vulkan only); empty lets the runtime pick. */
         std::string gpu {};
+        /** How descriptors are held on the device: sets, or one heap where the GPU has one. @see DescriptorModel */
+        DescriptorModel descriptors = DescriptorModel::eSets;
         /**
          * Features of the GPU the application cannot run without, and features it uses where they are there:
          * the device is made with them. Libraries ask for theirs with KORAL_REQUIRE_FEATURES. @see Feature

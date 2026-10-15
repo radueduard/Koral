@@ -4,6 +4,7 @@
 
 #include "../../core/resourceState.h"
 #include "scheduler.h"
+#include <bindless.h>
 #include "commandBuffer.h"
 #include "log.h"
 #include "timeline.h"
@@ -143,6 +144,8 @@ namespace kor::vk
         // no longer is. Once a frame is the natural cadence for the deferred-deletion queue.
         detail::collectRetired();
         destroyRetiredWindows(false);
+        // Bindless indices of resources destroyed since go back, and those of resized images are rewritten.
+        detail::CollectBindless();
 
         // ---- an image from every window ------------------------------------------------------------
         // Held for the frame: a window a scene closes halfway through it is still presented by it.

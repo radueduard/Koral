@@ -16,6 +16,7 @@ share no code: this schema is the whole contract between them.
   "rendering": {
     "api": "Vulkan",
     "platform": "auto",
+    "descriptors": "sets",
     "window": {
       "width": 1280,
       "height": 720,
@@ -221,6 +222,7 @@ For compatibility, the original singular form is still read:
 | `--width <n>`, `--height <n>`        | Window size.                                                                         |
 | `--api <name>`                       | `Vulkan` (OpenGL is only in Koral v1).                                              |
 | `--platform <name>`                  | Windowing system: `auto`, `x11` or `wayland` (Linux only), or `none` (anywhere).     |
+| `--descriptors <model>`              | Descriptor model: `sets` (default) or `heap`. See [descriptors](descriptors.md).     |
 | `--fullscreen` / `--no-fullscreen`   | Open fullscreen.                                                                     |
 | `--resizable` / `--no-resizable`     | Allow the window to be resized.                                                      |
 | `--borderless` / `--decorated`       | Drop or keep the window decorations.                                                 |
@@ -236,6 +238,13 @@ directory**: a path typed at a shell prompt means what it means there.
 
 An unknown flag is an error and the runtime stops. Ignoring it would mean watching a setting fail to
 take effect with no clue as to why.
+
+## Descriptor model
+
+`rendering.descriptors` (or `--descriptors`) is `"sets"` — descriptor pools and sets, which every device has —
+or `"heap"`, which holds every descriptor in one `VK_EXT_descriptor_heap` table. A project's code is the same
+under both; a GPU without the extension runs a `"heap"` project on sets, with a warning. The `KORAL_DESCRIPTORS`
+environment variable overrides the file and the flag. [Descriptors](descriptors.md) has the whole story.
 
 ## Windowing platform (Linux)
 

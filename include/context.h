@@ -72,6 +72,37 @@ namespace kor {
     /** @brief The preference set by @ref setPreferredGpu; empty means automatic. */
     KORAL_API const std::string& PreferredGpu();
 
+    /**
+     * @brief How shaders reach the resources a descriptor set holds.
+     *
+     * Nothing a project writes depends on it: a DescriptorSet is built, bound and rebound the same
+     * way under both, and the barriers it implies are the same. What changes is what the device
+     * does underneath, and which of the extras that only a heap can hold are open
+     * (kor::DescriptorHeap).
+     */
+    enum class DescriptorModel : std::uint8_t {
+        eSets,  ///< Descriptor pools and sets: what every Vulkan device has. The default.
+        eHeap,  ///< VK_EXT_descriptor_heap: every descriptor lives in one context-wide table, and a bound set is an offset into it.
+    };
+
+    /** @brief The model's name as koral.json spells it: "sets" or "heap". */
+    [[nodiscard]] KORAL_API const char* DescriptorModelName(DescriptorModel model);
+
+    /**
+     * @brief Which descriptor model the device should be made for.
+     *
+     * Must be set before the device exists, like SetPreferredGpu. A preference for the heap on a
+     * device without VK_EXT_descriptor_heap is reported once and the device is made for sets: it
+     * never turns a startable run into a failed one. Context::ActiveDescriptorModel() says which one
+     * a run actually got. The runtime sets this from `rendering.descriptors` in koral.json or the
+     * `--descriptors` flag, and the KORAL_DESCRIPTORS environment variable overrides both (which is
+     * how the test suites run twice, once under each).
+     */
+    KORAL_API void SetPreferredDescriptorModel(DescriptorModel model);
+
+    /** @brief The preference set by @ref SetPreferredDescriptorModel, after the KORAL_DESCRIPTORS override. */
+    [[nodiscard]] KORAL_API DescriptorModel PreferredDescriptorModel();
+
     /** @brief The graphics backend a context runs on. */
     enum class API : std::uint8_t {
         eVulkan,    ///< Vulkan: the only one on the v2 line (OpenGL stays on v1).
@@ -172,6 +203,12 @@ namespace kor {
         [[nodiscard]] static KORAL_API bool Supports(Feature feature);
         /** @brief Whether the GPU has @p feature, enabled or not. False before the device exists. */
         [[nodiscard]] static KORAL_API bool GpuHas(Feature feature);
+
+        /**
+         * @brief The descriptor model the device was made for: the preference, unless the GPU could
+         *        not honour it. eSets before the device exists.
+         */
+        [[nodiscard]] static KORAL_API DescriptorModel ActiveDescriptorModel();
 
         /**
          * @brief Whether the device has a second queue for compute to run alongside the frame's

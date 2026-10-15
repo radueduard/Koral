@@ -23,6 +23,7 @@ add_executable(koral_integration_tests
         test_camera_aspect.cpp
         test_slang_shader.cpp
         test_poison.cpp
+        test_descriptor_model.cpp
 )
 
 target_link_libraries(koral_integration_tests PRIVATE
@@ -56,3 +57,9 @@ include(GoogleTest)
 # DISCOVERY_MODE PRE_TEST: enumerate tests at run time, not build time, so a build
 # host without a GPU/display never has to launch the binary just to list tests.
 gtest_discover_tests(koral_integration_tests DISCOVERY_MODE PRE_TEST)
+# The same suite again on a device made for the descriptor heap (DescriptorModel::eHeap), as Heap.*:
+# nothing a project writes may depend on which model it got. On a GPU without VK_EXT_descriptor_heap the
+# device falls back to sets and these repeat the first run.
+gtest_discover_tests(koral_integration_tests DISCOVERY_MODE PRE_TEST
+        TEST_PREFIX "Heap."
+        PROPERTIES ENVIRONMENT "KORAL_DESCRIPTORS=heap")

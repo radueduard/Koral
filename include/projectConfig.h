@@ -164,6 +164,14 @@ namespace kor
          */
         std::string gpu;
 
+        /**
+         * @brief How descriptors are held on the device: pools and sets (the default) or one
+         *        descriptor heap. In koral.json, `rendering.descriptors`: "sets" or "heap". A heap
+         *        asked of a GPU without VK_EXT_descriptor_heap falls back to sets with a warning.
+         *        @see DescriptorModel
+         */
+        DescriptorModel descriptors = DescriptorModel::eSets;
+
         /** @brief Whether to open fullscreen on the primary monitor. */
         bool fullscreen = false;
 

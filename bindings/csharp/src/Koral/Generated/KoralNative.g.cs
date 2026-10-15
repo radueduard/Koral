@@ -155,6 +155,13 @@ internal unsafe struct KoralVertexLayout
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal unsafe struct KoralDescriptorIndex
+{
+    public uint index;
+    public uint kind;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal unsafe struct KoralRenderInfo
 {
     public IntPtr framebuffer;
@@ -285,6 +292,7 @@ internal unsafe struct KoralAppSettings
     public IntPtr gpu;
     public ulong required_features;
     public ulong optional_features;
+    public uint descriptors;
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -527,12 +535,14 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_graphics_pipeline_builder_set_specialization_constant(IntPtr builder, uint id, void* value, uint bytes);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_graphics_pipeline_builder_set_specialization_constant_named(IntPtr builder, string? name, void* value, uint bytes);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_graphics_pipeline_builder_set_binding(IntPtr builder, string? name, uint set, uint binding);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_graphics_pipeline_builder_set_sampler(IntPtr builder, string? name, IntPtr sampler);
     [LibraryImport(Library)] internal static partial IntPtr koral_graphics_pipeline_builder_build(IntPtr builder);
     [LibraryImport(Library)] internal static partial IntPtr koral_compute_pipeline_builder_new();
     [LibraryImport(Library)] internal static partial void koral_compute_pipeline_builder_set_compute_shader(IntPtr builder, IntPtr shader);
     [LibraryImport(Library)] internal static partial void koral_compute_pipeline_builder_set_specialization_constant(IntPtr builder, uint id, void* value, uint bytes);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_compute_pipeline_builder_set_specialization_constant_named(IntPtr builder, string? name, void* value, uint bytes);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_compute_pipeline_builder_set_binding(IntPtr builder, string? name, uint set, uint binding);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_compute_pipeline_builder_set_sampler(IntPtr builder, string? name, IntPtr sampler);
     [LibraryImport(Library)] internal static partial IntPtr koral_compute_pipeline_builder_build(IntPtr builder);
     [LibraryImport(Library)] internal static partial IntPtr koral_ray_tracing_pipeline_builder_new();
     [LibraryImport(Library)] internal static partial void koral_ray_tracing_pipeline_builder_set_raygen_shader(IntPtr builder, IntPtr shader);
@@ -543,6 +553,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_ray_tracing_pipeline_builder_set_specialization_constant(IntPtr builder, uint id, void* value, uint bytes);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_ray_tracing_pipeline_builder_set_specialization_constant_named(IntPtr builder, string? name, void* value, uint bytes);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_ray_tracing_pipeline_builder_set_binding(IntPtr builder, string? name, uint set, uint binding);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_ray_tracing_pipeline_builder_set_sampler(IntPtr builder, string? name, IntPtr sampler);
     [LibraryImport(Library)] internal static partial IntPtr koral_ray_tracing_pipeline_builder_build(IntPtr builder);
     [LibraryImport(Library)] internal static partial uint koral_ray_tracing_pipeline_max_recursion_depth(IntPtr pipeline);
     [LibraryImport(Library)] internal static partial IntPtr koral_pipeline_set_layout(IntPtr pipeline, uint index);
@@ -558,6 +569,23 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_descriptor_set_builder_write_sampler(IntPtr builder, string? name, uint binding, uint index, IntPtr sampler);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_descriptor_set_builder_write_acceleration_structure(IntPtr builder, string? name, uint binding, uint index, IntPtr structure);
     [LibraryImport(Library)] internal static partial IntPtr koral_descriptor_set_builder_build(IntPtr builder);
+    [LibraryImport(Library)] internal static partial KoralDescriptorIndex koral_bindless_sampled(IntPtr image_or_view, uint shape);
+    [LibraryImport(Library)] internal static partial KoralDescriptorIndex koral_bindless_storage(IntPtr image_or_view, uint shape);
+    [LibraryImport(Library)] internal static partial KoralDescriptorIndex koral_bindless_storage_buffer(IntPtr buffer);
+    [LibraryImport(Library)] internal static partial KoralDescriptorIndex koral_bindless_uniform_buffer(IntPtr buffer);
+    [LibraryImport(Library)] internal static partial KoralDescriptorIndex koral_bindless_sampler(IntPtr sampler);
+    [LibraryImport(Library)] internal static partial KoralDescriptorIndex koral_bindless_acceleration_structure(IntPtr structure);
+    [LibraryImport(Library)] internal static partial void koral_bindless_release(KoralDescriptorIndex index);
+    [LibraryImport(Library)] internal static partial uint koral_bindless_capacity(uint kind);
+    [LibraryImport(Library)] internal static partial nuint koral_bindless_count();
+    [LibraryImport(Library)] internal static partial IntPtr koral_descriptor_heap_new(uint role, uint slot_count);
+    [LibraryImport(Library)] internal static partial int koral_descriptor_heap_write(IntPtr heap, uint slot, IntPtr resource, uint type);
+    [LibraryImport(Library)] internal static partial KoralDescriptorIndex koral_descriptor_heap_index(IntPtr heap, uint slot, uint kind);
+    [LibraryImport(Library)] internal static partial uint koral_descriptor_heap_slot_count(IntPtr heap);
+    [LibraryImport(Library)] internal static partial uint koral_descriptor_heap_first_slot(IntPtr heap);
+    [LibraryImport(Library)] internal static partial ulong koral_descriptor_heap_device_address(IntPtr heap, uint slot);
+    [LibraryImport(Library)] internal static partial uint koral_descriptor_heap_slot_size(uint role);
+    [LibraryImport(Library)] internal static partial nuint koral_descriptor_heap_encode(IntPtr resource, uint type, void* @out, nuint capacity);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial int koral_descriptor_set_rebind_buffer(IntPtr set, string? name, uint binding, uint index, IntPtr buffer);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial int koral_descriptor_set_rebind_buffer_slice(IntPtr set, string? name, uint binding, uint index, IntPtr buffer, long offset, long size);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial int koral_descriptor_set_rebind_buffer_view(IntPtr set, string? name, uint binding, uint index, IntPtr view);
@@ -666,6 +694,12 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial void koral_cmd_bind_vertex_buffer(IntPtr commands, uint binding, IntPtr buffer, ulong offset);
     [LibraryImport(Library)] internal static partial void koral_cmd_push_constant_block(IntPtr commands, void* data, uint bytes, uint offset);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_push_constant(IntPtr commands, string? name, void* data, uint bytes, KoralValueShape* shape);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_bind(IntPtr commands, string? name, IntPtr resource, IntPtr sampler);
+    [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_push_index(IntPtr commands, string? name, KoralDescriptorIndex index);
+    [LibraryImport(Library)] internal static partial void koral_cmd_uses_index(IntPtr commands, KoralDescriptorIndex index);
+    [LibraryImport(Library)] internal static partial void koral_cmd_uses(IntPtr commands, IntPtr resource, uint access);
+    [LibraryImport(Library)] internal static partial void koral_cmd_copy_descriptors(IntPtr commands, IntPtr source, ulong source_offset, IntPtr heap, uint first_slot, uint count);
+    [LibraryImport(Library)] internal static partial void koral_cmd_descriptor_heap_barrier(IntPtr commands);
     [LibraryImport(Library)] internal static partial void koral_cmd_barrier(IntPtr commands, KoralBufferBarrier* buffers, nuint buffer_count, KoralImageBarrier* images, nuint image_count);
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial void koral_cmd_begin_debug_label(IntPtr commands, string? label, float* color);
     [LibraryImport(Library)] internal static partial void koral_cmd_end_debug_label(IntPtr commands);
@@ -915,6 +949,7 @@ internal static unsafe partial class KoralNative
     [LibraryImport(Library)] internal static partial byte koral_context_supports_async_compute();
     [LibraryImport(Library)] internal static partial byte koral_context_supports_feature(ulong feature);
     [LibraryImport(Library)] internal static partial byte koral_context_gpu_has_feature(ulong feature);
+    [LibraryImport(Library)] internal static partial uint koral_context_descriptor_model();
     [LibraryImport(Library)] internal static partial byte* koral_feature_name(ulong feature);
     [LibraryImport(Library)] internal static partial byte koral_context_async_compute_is_separate_family();
     [LibraryImport(Library, StringMarshalling = StringMarshalling.Utf8)] internal static partial byte* koral_asset_path(string? relative);

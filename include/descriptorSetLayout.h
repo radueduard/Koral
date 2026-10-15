@@ -23,6 +23,8 @@
 
 namespace kor
 {
+    class Sampler;
+
     /**
      * @brief The shape of a descriptor set: what kind of resource sits at each binding.
      *
@@ -80,6 +82,11 @@ namespace kor
             /// interface comparison below, like the names. @see Shader::ImageShape
             Shader::ImageShape shape = Shader::ImageShape::eUnknown;
 
+            /// A sampler the pipeline embeds at this binding (PipelineSettings::SetSampler): a sampler
+            /// binding then needs nothing written to it, and a combined image sampler only its image.
+            /// Part of the interface: two layouts embedding different samplers are not compatible.
+            ResourceRef<const Sampler> embeddedSampler;
+
             /** @brief Whether @p wanted names this binding, under either of the names it has. */
             [[nodiscard]] bool NamedBy(const std::string_view wanted) const {
                 return (!name.empty() && name == wanted) || (!blockName.empty() && blockName == wanted);
@@ -96,7 +103,7 @@ namespace kor
              * the layout over it would orphan every set written against the old one.
              */
             bool operator==(const Binding& other) const {
-                return type == other.type && count == other.count;
+                return type == other.type && count == other.count && embeddedSampler.Get() == other.embeddedSampler.Get();
             }
         };
 

@@ -25,6 +25,8 @@
 #include "mesh.h"
 #include "descriptorSet.h"
 #include "descriptorSetLayout.h"
+#include "descriptorHeap.h"
+#include <set>
 #include "graphicsPipeline.h"
 #include "computePipeline.h"
 #include "rayTracingPipeline.h"
@@ -442,6 +444,7 @@ namespace kor
                     uses.push_back(ResourceUse{ .buffer = buffer, .access = ResourceAccess::eVertexBuffer });
         }
 
+        AppendIndirectUses(uses);
         return uses;
     }
 
@@ -750,6 +753,7 @@ namespace kor
         _state.viewportSet = false;
         _state.scissorSet = false;
         _state.dynamicStateSet = Flags<DynamicState>{};
+        ForgetPipelineScopedState();
     }
 
     void CommandBuffer::EmitRecords()
@@ -1091,6 +1095,7 @@ namespace kor
         if (Reject(pipeline, "compute pipeline")) return *this;
 
         StateBindComputePipeline(pipeline);
+        ForgetPipelineScopedState();
         return Enqueue("BindComputePipeline", where, {}, PassEdge::eNone,
             [this, pipeline] { DoBindComputePipeline(pipeline); });
     }
@@ -1118,6 +1123,7 @@ namespace kor
         if (Reject(pipeline, "graphics pipeline")) return *this;
 
         StateBindGraphicsPipeline(pipeline);
+        ForgetPipelineScopedState();
         return Enqueue("BindGraphicsPipeline", where, {}, PassEdge::eNone,
             [this, pipeline] { DoBindGraphicsPipeline(pipeline); });
     }
@@ -1142,6 +1148,7 @@ namespace kor
         if (Reject(pipeline, "ray tracing pipeline")) return *this;
 
         StateBindRayTracingPipeline(pipeline);
+        ForgetPipelineScopedState();
         return Enqueue("BindRayTracingPipeline", where, {}, PassEdge::eNone,
             [this, pipeline] { DoBindRayTracingPipeline(pipeline); });
     }
@@ -1151,6 +1158,8 @@ namespace kor
         if (_failed) return *this;
         if (!_state.boundRayTracingPipeline.has_value())
             return RecordError(ErrorCode::eNoRayTracingPipelineBound, "Cannot trace rays without a ray-tracing pipeline bound.");
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         return DoTraceRays(width, height, depth, where);
     }
 
@@ -1394,6 +1403,8 @@ namespace kor
             vertexCount = _state.boundMesh.value()->VertexCount();
         }
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         EnsureViewportAndScissor();
         return DoDraw(vertexCount, instanceCount, firstVertex, firstInstance, where);
     }
@@ -1410,6 +1421,8 @@ namespace kor
         if (indexCount == WholeSize)
             indexCount = _state.boundMesh.value()->IndexCount().value();
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         EnsureViewportAndScissor();
         return DoDrawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, where);
     }
@@ -1419,6 +1432,8 @@ namespace kor
         if (!_state.boundGraphicsPipeline.has_value())
             return RecordError(ErrorCode::eNoGraphicsPipelineBound, "Cannot draw mesh tasks without a graphics pipeline bound.");
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         EnsureViewportAndScissor();
         return DoDrawMeshTasks(taskCountX, taskCountY, taskCountZ, where);
     }
@@ -1443,6 +1458,8 @@ namespace kor
         if (_failed) return *this;
         if (!_state.boundComputePipeline.has_value())
             return RecordError(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         return DoDispatch(groupCountX, groupCountY, groupCountZ, where);
     }
 
@@ -1456,6 +1473,8 @@ namespace kor
     {
         ResetErrors();
         ClearRecords();
+        ForgetPipelineScopedState();
+        _transientSets.clear();
         // Before the backend resets anything the results live in: re-recording is proof the GPU is
         // done with the last submission, so this is the earliest the timestamps can be read.
         RetireTimers();
@@ -1796,6 +1815,8 @@ namespace kor
         if (_failed) return *this;
         if (Reject(descriptorSet, "descriptor set")) return *this;
         StateBindDescriptorSet(index, descriptorSet);
+        _state.directBinds.erase(index);
+        std::erase(_state.directBindsDirty, index);
         return Enqueue("BindDescriptorSet", where, {}, PassEdge::eNone,
             [this, index, descriptorSet] { DoBindDescriptorSet(index, descriptorSet); });
     }
@@ -1824,6 +1845,8 @@ namespace kor
             return RecordError(ErrorCode::eNoComputePipelineBound, "Cannot dispatch without a compute pipeline bound.");
         if (Reject(indirectBuffer, "indirect buffer")) return *this;
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         auto uses = UsesForBoundResources(false);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return Enqueue("DispatchIndirect", where, std::move(uses), PassEdge::eNone,
@@ -1847,6 +1870,8 @@ namespace kor
         if (!_state.scissorSet)
             SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return Enqueue("DrawIndirect", where, std::move(uses), PassEdge::eNone,
@@ -1872,6 +1897,8 @@ namespace kor
         if (!_state.scissorSet)
             SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return Enqueue("DrawIndexedIndirect", where, std::move(uses), PassEdge::eNone,
@@ -1926,6 +1953,8 @@ namespace kor
         if (!_state.scissorSet)
             SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         uses.push_back(ResourceUse{ .buffer = countBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = countOffset });
@@ -1953,6 +1982,8 @@ namespace kor
         if (!_state.scissorSet)
             SetScissor(0, 0, DefaultViewportExtent().x, DefaultViewportExtent().y);
 
+        FlushDirectBinds(where);
+        if (_failed) return *this;
         auto uses = UsesForBoundResources(true);
         uses.push_back(ResourceUse{ .buffer = indirectBuffer, .access = ResourceAccess::eIndirectBuffer, .offset = offset });
         return Enqueue("DrawMeshTasksIndirect", where, std::move(uses), PassEdge::eNone,
@@ -2156,5 +2187,271 @@ namespace kor
                              .baseMipLevel = resolveInfo.dstMipLevel, .levelCount = 1u,
                              .baseArrayLayer = resolveInfo.dstBaseArrayLayer, .layerCount = resolveInfo.layerCount },
             }, PassEdge::eNone, [this, srcImage, dstImage, resolveInfo] { DoResolve(srcImage, dstImage, resolveInfo); });
+    }
+}
+
+// ---- Binding by name, uses, and the descriptor heap --------------------------------------------------
+namespace kor
+{
+    namespace
+    {
+        // The name without its `[n]`, which is what the set's layout knows a binding by.
+        std::string_view baseName(const std::string_view name)
+        {
+            if (!name.ends_with(']')) return name;
+            const auto open = name.rfind('[');
+            return open == std::string_view::npos ? name : name.substr(0, open);
+        }
+
+        // A storage resource is written as well as read; the layout it needs follows from that.
+        ResourceAccess accessFor(const BindlessKind kind)
+        {
+            return kind == BindlessKind::eStorageImage || kind == BindlessKind::eStorageBuffer
+                ? ResourceAccess::eAllShaderReadWrite : ResourceAccess::eAllShaderRead;
+        }
+    }
+
+    CommandBuffer& CommandBuffer::BindDirect(const std::string_view name, DirectBind bind, const std::source_location where)
+    {
+        if (_failed) return *this;
+        const auto* pipeline = BoundPipeline();
+        if (!pipeline)
+            return RecordError(Error{ .code = ErrorCode::eNoPipelineBound,
+                .message = std::format("Cannot bind '{}': no pipeline is bound to look the name up in. Bind the pipeline first.", name),
+                .where = where });
+
+        // Which set declares the name: the first that does, as the builder would find it.
+        const auto base = baseName(name);
+        std::optional<kor::u32> setIndex;
+        std::string known;
+        for (const auto index : pipeline->SetIndices()) {
+            const auto layout = pipeline->SetLayoutRef(index);
+            if (!layout.Valid()) continue;
+            if (layout->FindBinding(base)) { setIndex = index; break; }
+            for (const auto& candidate : layout->BindingNames()) {
+                if (!known.empty()) known += ", ";
+                known += '\'' + candidate + '\'';
+            }
+        }
+        if (!setIndex)
+            return RecordError(Error{ .code = ErrorCode::eInvalidArgument,
+                .message = std::format("The bound pipeline has no binding called '{}'.{}", base,
+                                       known.empty() ? std::string(" None of its bindings are named.") : std::format(" It has: {}.", known)),
+                .where = where });
+
+        _state.directBinds[*setIndex].insert_or_assign(std::string(name), std::move(bind));
+        if (std::ranges::find(_state.directBindsDirty, *setIndex) == _state.directBindsDirty.end())
+            _state.directBindsDirty.push_back(*setIndex);
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const Buffer>& buffer, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .descriptor = Descriptor(buffer) }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const BufferView>& bufferView, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .descriptor = Descriptor(bufferView) }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const ImageView>& imageView, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .descriptor = Descriptor(imageView) }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const ImageView>& imageView,
+                                       const ResourceRef<const Sampler>& sampler, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .descriptor = Descriptor(imageView, sampler) }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const Image>& image, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .image = image }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const Image>& image,
+                                       const ResourceRef<const Sampler>& sampler, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .image = image, .imageSampler = sampler }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const Sampler>& sampler, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .descriptor = Descriptor(sampler) }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const ResourceRef<const AccelerationStructure>& structure,
+                                       const std::source_location where)
+    { return BindDirect(name, DirectBind{ .descriptor = Descriptor(structure) }, where); }
+
+    CommandBuffer& CommandBuffer::Bind(const std::string_view name, const Descriptor& descriptor, const std::source_location where)
+    { return BindDirect(name, DirectBind{ .descriptor = descriptor }, where); }
+
+    void CommandBuffer::FlushDirectBinds(const std::source_location where)
+    {
+        if (_state.directBindsDirty.empty() || _failed) return;
+        const auto dirty = std::exchange(_state.directBindsDirty, {});
+
+        ResourceRef<const Pipeline> pipeline;
+        std::map<kor::u32, ResourceRef<const DescriptorSet>>* bound = nullptr;
+        if (_state.boundComputePipeline) { pipeline = *_state.boundComputePipeline; bound = &_state.boundComputeDescriptorSets; }
+        else if (_state.boundGraphicsPipeline) { pipeline = *_state.boundGraphicsPipeline; bound = &_state.boundGraphicsDescriptorSets; }
+        else if (_state.boundRayTracingPipeline) { pipeline = *_state.boundRayTracingPipeline; bound = &_state.boundRayTracingDescriptorSets; }
+        if (!pipeline.Valid()) return;
+
+        for (const auto index : dirty) {
+            // A copy: binding the set below forgets this index's binds, and they are put back after.
+            const auto binds = _state.directBinds[index];
+            const auto layout = pipeline->SetLayoutRef(index);
+            if (!layout.Valid()) continue;
+
+            DescriptorSet::Builder builder(pipeline, index);
+
+            // What a bound set already holds, under every binding Bind() did not name: Bind patches a
+            // set, rather than requiring every binding of it be named.
+            std::set<kor::u32> named;
+            for (const auto& name : binds | std::views::keys)
+                if (const auto binding = layout->FindBinding(baseName(name))) named.insert(*binding);
+            if (const auto it = bound->find(index); it != bound->end() && it->second.Valid()) {
+                for (const auto& [binding, descriptors] : it->second->Writes()) {
+                    if (named.contains(binding) || !layout->Bindings().contains(binding)) continue;
+                    for (kor::u32 element = 0; element < descriptors.size(); ++element)
+                        if (descriptors[element].IsValid()) builder.Write(binding, descriptors[element], element);
+                }
+            }
+            for (const auto& [name, bind] : binds) {
+                if (bind.image.Alive() || bind.image.Poisoned()) {
+                    if (bind.imageSampler.Alive() || bind.imageSampler.Poisoned()) builder.Write(name, bind.image, bind.imageSampler);
+                    else builder.Write(name, bind.image);
+                } else {
+                    builder.Write(name, bind.descriptor);
+                }
+            }
+
+            auto made = builder.Create();
+            if (!made) {
+                auto error = made.error();
+                error.message = std::format("The set Bind() made for set {} could not be built: {}", index, error.message);
+                error.where = where;
+                RecordError(std::move(error));
+                return;
+            }
+            Resource<DescriptorSet> set(std::move(*made), std::format("Bind() set {}", index));
+            const ResourceRef<const DescriptorSet> ref(set);
+            // Held until this buffer is recorded again: the record emitted at End() reads it, and the set
+            // itself gives its descriptors back only once the GPU is done with them.
+            _transientSets.push_back(std::make_shared<Resource<DescriptorSet>>(std::move(set)));
+            BindDescriptorSet(index, ref, where);
+            // BindDescriptorSet forgets this index's binds; these are still what a later Bind() builds on.
+            _state.directBinds[index] = binds;
+        }
+    }
+
+    CommandBuffer& CommandBuffer::Uses(const DescriptorIndex handle)
+    {
+        if (_failed) return *this;
+        if (!handle.Valid())
+            return RecordError(ErrorCode::eInvalidArgument, "Uses() was given an invalid bindless index.");
+        const auto target = detail::BindlessResource(handle);
+        if (!target) return *this;   // given back, or not a kind with a resource to synchronise
+        if (target->buffer.Valid()) return Uses(target->buffer, accessFor(handle.kind));
+        return Uses(target->view, accessFor(handle.kind));
+    }
+
+    CommandBuffer& CommandBuffer::Uses(const ResourceRef<const Buffer>& buffer, const ResourceAccess access)
+    {
+        if (_failed) return *this;
+        if (Reject(buffer, "buffer")) return *this;
+        _state.declaredUses.push_back(ResourceUse{ .buffer = buffer, .access = access });
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::Uses(const ResourceRef<const ImageView>& view, const ResourceAccess access)
+    {
+        if (_failed) return *this;
+        if (Reject(view, "image view")) return *this;
+        const auto image = view->SourceImage();
+        if (Reject(image, "image")) return *this;
+        _state.declaredUses.push_back(ResourceUse{
+            .image = image, .access = access,
+            .baseMipLevel = view->BaseMipLevel(), .levelCount = view->MipLevelCount(),
+            .baseArrayLayer = view->BaseArrayLayer(), .layerCount = view->ArrayLayerCount() });
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::Uses(const ResourceRef<const Image>& image, const ResourceAccess access)
+    {
+        if (_failed) return *this;
+        if (Reject(image, "image")) return *this;
+        _state.declaredUses.push_back(ResourceUse{ .image = image, .access = access });
+        return *this;
+    }
+
+    CommandBuffer& CommandBuffer::PushConstant(const std::string_view name, const DescriptorIndex handle, const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (!handle.Valid())
+            return RecordError(Error{ .code = ErrorCode::eInvalidArgument,
+                .message = std::format("The bindless index pushed as '{}' is invalid: the call that made it said why.", name),
+                .where = where });
+        _state.pushedHandles.insert_or_assign(std::string(name), handle);
+        return PushConstant(name, &handle.index, sizeof(handle.index), ShapeOf<kor::u32>(), where);
+    }
+
+    void CommandBuffer::AppendIndirectUses(std::vector<ResourceUse>& uses) const
+    {
+        uses.insert(uses.end(), _state.declaredUses.begin(), _state.declaredUses.end());
+        for (const auto& handle : _state.pushedHandles | std::views::values) {
+            const auto target = detail::BindlessResource(handle);
+            if (!target) continue;
+            if (target->buffer.Valid()) {
+                uses.push_back(ResourceUse{ .buffer = target->buffer, .access = accessFor(handle.kind) });
+            } else if (target->view.Valid() && target->view->SourceImage().Valid()) {
+                const auto& view = target->view;
+                uses.push_back(ResourceUse{
+                    .image = view->SourceImage(), .access = accessFor(handle.kind),
+                    .baseMipLevel = view->BaseMipLevel(), .levelCount = view->MipLevelCount(),
+                    .baseArrayLayer = view->BaseArrayLayer(), .layerCount = view->ArrayLayerCount() });
+            }
+        }
+    }
+
+    void CommandBuffer::ForgetPipelineScopedState()
+    {
+        _state.declaredUses.clear();
+        _state.pushedHandles.clear();
+        _state.directBinds.clear();
+        _state.directBindsDirty.clear();
+    }
+
+    CommandBuffer& CommandBuffer::CopyDescriptors(ResourceRef<const Buffer> source, const kor::u64 sourceOffset,
+                                                  ResourceRef<const DescriptorHeap> heap, const kor::u32 firstSlot,
+                                                  const kor::u32 count, const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Reject(source, "source buffer") || Reject(heap, "descriptor heap")) return *this;
+        if (Context::ActiveDescriptorModel() != DescriptorModel::eHeap)
+            return RecordError(Error{ .code = ErrorCode::eDescriptorHeapUnsupported,
+                .message = "CopyDescriptors copies into the descriptor heap, and this device was made for descriptor sets.", .where = where });
+        if (count == 0 || firstSlot >= heap->SlotCount() || count > heap->SlotCount() - firstSlot)
+            return RecordError(Error{ .code = ErrorCode::eInvalidArgument,
+                .message = std::format("CopyDescriptors would fill slots {}..{} of a heap of {}.", firstSlot, firstSlot + count, heap->SlotCount()),
+                .where = where });
+        const kor::u64 bytes = static_cast<kor::u64>(count) * DescriptorHeap::SlotSize(heap->Role());
+        if (sourceOffset + bytes > source->size())
+            return RecordError(Error{ .code = ErrorCode::eCopySizeExceedsBuffer,
+                .message = std::format("CopyDescriptors reads {} bytes from offset {} of a {}-byte buffer.", bytes, sourceOffset, source->size()),
+                .where = where });
+        return Enqueue("CopyDescriptors", where,
+            { ResourceUse{ .buffer = source, .access = ResourceAccess::eTransferSrc, .offset = sourceOffset, .size = bytes } },
+            PassEdge::eNone,
+            [this, source, sourceOffset, heap, firstSlot, count] { DoCopyDescriptors(source, sourceOffset, heap, firstSlot, count); });
+    }
+
+    CommandBuffer& CommandBuffer::DescriptorHeapBarrier(const std::source_location where)
+    {
+        if (_failed) return *this;
+        if (Context::ActiveDescriptorModel() != DescriptorModel::eHeap)
+            return RecordError(Error{ .code = ErrorCode::eDescriptorHeapUnsupported,
+                .message = "DescriptorHeapBarrier guards the descriptor heap, and this device was made for descriptor sets.", .where = where });
+        return Enqueue("DescriptorHeapBarrier", where, {}, PassEdge::eNone, [this] { DoDescriptorHeapBarrier(); });
+    }
+
+    void CommandBuffer::DoCopyDescriptors(ResourceRef<const Buffer>, kor::u64, ResourceRef<const DescriptorHeap>, kor::u32, kor::u32)
+    {
+        RecordError(ErrorCode::eDescriptorHeapUnsupported, "This backend has no descriptor heap.");
+    }
+
+    void CommandBuffer::DoDescriptorHeapBarrier()
+    {
+        RecordError(ErrorCode::eDescriptorHeapUnsupported, "This backend has no descriptor heap.");
     }
 }

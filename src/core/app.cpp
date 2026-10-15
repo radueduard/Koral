@@ -391,6 +391,7 @@ namespace kor
         const auto& s = _impl->settings;
         Context::_activeAPI = s.api;
         if (!s.gpu.empty()) SetPreferredGpu(s.gpu);
+        SetPreferredDescriptorModel(s.descriptors);
 
         // The windowing platform (X11 or Wayland) is an init hint, so it is chosen before glfwInit.
         int platform = GLFW_ANY_PLATFORM;

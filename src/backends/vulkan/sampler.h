@@ -15,5 +15,11 @@ namespace kor::vk
     public:
         explicit Sampler(const Builder& builder);
         ~Sampler() override;
+
+        /** @brief What the sampler was made from: also what a descriptor heap writes, and embeds, it as. */
+        [[nodiscard]] const ::vk::SamplerCreateInfo& CreateInfo() const { return _createInfo; }
+
+    private:
+        ::vk::SamplerCreateInfo _createInfo {};
     };
 }

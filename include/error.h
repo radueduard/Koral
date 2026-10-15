@@ -92,6 +92,7 @@ namespace kor
         eTimedOut,             ///< A network operation took longer than it was allowed.
         eConnectionClosed,     ///< The other side closed the connection (or this side did) before the operation finished.
         eProtocol,             ///< The other side sent what its protocol does not allow: malformed HTTP, WebSocket or game packets.
+        eDescriptorHeapUnsupported, ///< Something only the descriptor heap holds was asked of a device made for descriptor sets.
     };
 
     /** @brief Stable, human-readable one-line description of an error code. */

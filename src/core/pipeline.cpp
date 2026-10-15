@@ -10,6 +10,7 @@
 #include <ranges>
 #include <unordered_map>
 
+#include <bindless.h>
 #include <descriptorSetLayout.h>
 #include <log.h>
 
@@ -31,6 +32,20 @@ namespace kor
         if (!_setLayouts.contains(index))
             throw std::runtime_error("This pipeline does not contain a set with that index!");
         return ResourceRef<const DescriptorSetLayout>(_setLayouts.at(index));
+    }
+
+    kor::u32 Pipeline::PushConstantEnd() const
+    {
+        kor::u32 end = 0;
+        for (const auto& range : _pushConstantRanges | std::views::values) end = std::max(end, range.offset + range.size);
+        return end;
+    }
+
+    std::vector<kor::u32> Pipeline::SetIndices() const
+    {
+        std::vector<kor::u32> indices;
+        for (const auto index : _setLayouts | std::views::keys) indices.push_back(index);
+        return indices;
     }
 
     const Pipeline::PushConstantMember* Pipeline::FindPushConstant(const std::string_view name) const
@@ -86,10 +101,16 @@ namespace kor
             }
         }
 
-        DescriptorSetLayout::Builder layoutBuilder(const std::map<kor::u32, Shader::Descriptor>& setDescription) {
+        using EmbeddedSamplers = std::map<std::string, ResourceRef<const Sampler>, std::less<>>;
+
+        DescriptorSetLayout::Builder layoutBuilder(const std::map<kor::u32, Shader::Descriptor>& setDescription,
+                                                   const EmbeddedSamplers& samplers = {}) {
             auto builder = DescriptorSetLayout::Builder();
             for (const auto& [binding, descriptor] : setDescription)
             {
+                ResourceRef<const Sampler> embedded;
+                if (const auto it = samplers.find(descriptor.name); !descriptor.name.empty() && it != samplers.end())
+                    embedded = it->second;
                 builder.AddBinding(binding, DescriptorSetLayout::Binding{
                     .type = descriptor.type,
                     .count = descriptor.count,
@@ -104,6 +125,7 @@ namespace kor
                     .blockName = descriptor.blockName,
                     // What an Image bound directly at this binding is turned into a view by.
                     .shape = descriptor.shape,
+                    .embeddedSampler = embedded,
                 });
             }
             return builder;
@@ -163,11 +185,47 @@ namespace kor
                     "SetBinding names '{}', which no shader of this pipeline declares as a descriptor.", name));
         }
 
+        // The bindless tables are not a set of the pipeline's: they are declared at kor::BindlessSet by
+        // koral_bindless, bound (or mapped onto the heap) by the engine, and may alias — several array
+        // types at one binding, one per texture shape — which no ordinary set may. Taken out here,
+        // checked against the kinds they have to be, and never merged.
+        _bindlessBindings.clear();
+        const auto bindlessKind = [](const kor::u32 binding) {
+            for (const auto kind : { BindlessKind::eSampledImage, BindlessKind::eStorageImage, BindlessKind::eStorageBuffer,
+                                     BindlessKind::eUniformBuffer, BindlessKind::eSampler, BindlessKind::eAccelerationStructure })
+                if (BindlessBinding(kind) == binding) return kind;
+            return BindlessKind::eNone;
+        };
+        const auto expectedType = [](const BindlessKind kind) {
+            switch (kind) {
+            case BindlessKind::eSampledImage:          return DescriptorType::eSampledImage;
+            case BindlessKind::eStorageImage:          return DescriptorType::eStorageImage;
+            case BindlessKind::eStorageBuffer:         return DescriptorType::eStorageBuffer;
+            case BindlessKind::eUniformBuffer:         return DescriptorType::eUniformBuffer;
+            case BindlessKind::eSampler:               return DescriptorType::eSampler;
+            default:                                   return DescriptorType::eAccelerationStructure;
+            }
+        };
+
         for (const auto& shader : shaders)
         {
             const auto& memoryLayout = shader->BlockLayout();
-            const auto moved = shader->LayoutWith(_bindings);
+            auto moved = shader->LayoutWith(_bindings);
             if (!moved) { conflict(moved.error().code, moved.error().message); continue; }
+            if (const auto bindless = moved->descriptorSets.find(BindlessSet); bindless != moved->descriptorSets.end()) {
+                for (const auto& [binding, descriptor] : bindless->second.descriptors) {
+                    const auto kind = bindlessKind(binding);
+                    if (kind == BindlessKind::eNone || descriptor.type != expectedType(kind)) {
+                        conflict(ErrorCode::eDescriptorConflict, std::format(
+                            "Set {} is the bindless tables' (kor::BindlessSet), and its binding {} ('{}') is not one of them. "
+                            "Declare the tables by importing koral_bindless rather than by hand, and give the "
+                            "pipeline's own sets lower numbers.", BindlessSet, binding, descriptor.name));
+                        continue;
+                    }
+                    _bindlessBindings[binding] = descriptor.type;
+                }
+                moved->descriptorSets.erase(bindless);
+            }
             mergeDescriptors(*moved, mergedSetLayouts, conflict);
             for (const auto& [offset, pushConstant] : memoryLayout.pushConstants)
             {
@@ -194,6 +252,29 @@ namespace kor
                 _usesDeviceAddresses = true;
         }
 
+        // Every embedded sampler has to land on a sampler binding of some set: a name nothing answers to
+        // would otherwise leave the binding expecting a sampler that is never written.
+        for (const auto& [name, sampler] : _samplers) {
+            if (!sampler.Valid()) {
+                conflict(ErrorCode::eInvalidArgument, std::format("SetSampler('{}') was given a sampler that is missing or failed to build.", name));
+                continue;
+            }
+            bool found = false;
+            for (const auto& set : mergedSetLayouts | std::views::values) {
+                for (const auto& descriptor : set | std::views::values) {
+                    if (descriptor.name != name) continue;
+                    found = true;
+                    if (descriptor.type != DescriptorType::eSampler && descriptor.type != DescriptorType::eCombinedImageSampler)
+                        conflict(ErrorCode::eInvalidArgument, std::format(
+                            "SetSampler('{}') names a binding that holds no sampler; only a sampler or a combined image "
+                            "sampler (a texture read through one) can embed one.", name));
+                }
+            }
+            if (!found)
+                conflict(ErrorCode::eInvalidArgument, std::format(
+                    "SetSampler names '{}', which no shader of this pipeline declares as a sampler binding.", name));
+        }
+
         _pushConstantRanges.clear();
         _pushConstants.clear();
 
@@ -204,7 +285,7 @@ namespace kor
 
         for (const auto& [setIndex, setDescription] : mergedSetLayouts)
         {
-            auto builder = layoutBuilder(setDescription);
+            auto builder = layoutBuilder(setDescription, _samplers);
 
             if (const auto existing = _setLayouts.find(setIndex);
                 existing != _setLayouts.end() && existing->second.Valid() &&

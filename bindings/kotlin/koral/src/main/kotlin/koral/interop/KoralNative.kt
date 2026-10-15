@@ -134,6 +134,10 @@ object KoralLayouts {
         JAVA_LONG.withName("attribute_count"),
         JAVA_LONG.withName("position_attribute"),
     )
+    val KoralDescriptorIndex: StructLayout = MemoryLayout.structLayout(
+        JAVA_INT.withName("index"),
+        JAVA_INT.withName("kind"),
+    )
     val KoralClearColor: StructLayout = MemoryLayout.structLayout(
         JAVA_INT.withName("scalar_type"),
         JAVA_INT.withName("components"),
@@ -247,6 +251,8 @@ object KoralLayouts {
         ADDRESS.withName("gpu"),
         JAVA_LONG.withName("required_features"),
         JAVA_LONG.withName("optional_features"),
+        JAVA_INT.withName("descriptors"),
+        MemoryLayout.paddingLayout(4),
     )
     val KoralWindowSettings: StructLayout = MemoryLayout.structLayout(
         ADDRESS.withName("title"),
@@ -641,6 +647,8 @@ object KoralNative {
     fun koral_graphics_pipeline_builder_set_specialization_constant_named(builder: MemorySegment, name: String?, value: MemorySegment, bytes: Int): Unit { Arena.ofConfined().use { a -> h_koral_graphics_pipeline_builder_set_specialization_constant_named.invokeExact(builder, Native.cString(a, name), value, bytes); Unit } }
     private val h_koral_graphics_pipeline_builder_set_binding by lazy { handle("koral_graphics_pipeline_builder_set_binding", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)) }
     fun koral_graphics_pipeline_builder_set_binding(builder: MemorySegment, name: String?, set: Int, binding: Int): Unit { Arena.ofConfined().use { a -> h_koral_graphics_pipeline_builder_set_binding.invokeExact(builder, Native.cString(a, name), set, binding); Unit } }
+    private val h_koral_graphics_pipeline_builder_set_sampler by lazy { handle("koral_graphics_pipeline_builder_set_sampler", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_graphics_pipeline_builder_set_sampler(builder: MemorySegment, name: String?, sampler: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_graphics_pipeline_builder_set_sampler.invokeExact(builder, Native.cString(a, name), sampler); Unit } }
     private val h_koral_graphics_pipeline_builder_build by lazy { handle("koral_graphics_pipeline_builder_build", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_graphics_pipeline_builder_build(builder: MemorySegment): MemorySegment = h_koral_graphics_pipeline_builder_build.invokeExact(builder) as MemorySegment
     private val h_koral_compute_pipeline_builder_new by lazy { handle("koral_compute_pipeline_builder_new", FunctionDescriptor.of(ADDRESS)) }
@@ -653,6 +661,8 @@ object KoralNative {
     fun koral_compute_pipeline_builder_set_specialization_constant_named(builder: MemorySegment, name: String?, value: MemorySegment, bytes: Int): Unit { Arena.ofConfined().use { a -> h_koral_compute_pipeline_builder_set_specialization_constant_named.invokeExact(builder, Native.cString(a, name), value, bytes); Unit } }
     private val h_koral_compute_pipeline_builder_set_binding by lazy { handle("koral_compute_pipeline_builder_set_binding", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)) }
     fun koral_compute_pipeline_builder_set_binding(builder: MemorySegment, name: String?, set: Int, binding: Int): Unit { Arena.ofConfined().use { a -> h_koral_compute_pipeline_builder_set_binding.invokeExact(builder, Native.cString(a, name), set, binding); Unit } }
+    private val h_koral_compute_pipeline_builder_set_sampler by lazy { handle("koral_compute_pipeline_builder_set_sampler", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_compute_pipeline_builder_set_sampler(builder: MemorySegment, name: String?, sampler: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_compute_pipeline_builder_set_sampler.invokeExact(builder, Native.cString(a, name), sampler); Unit } }
     private val h_koral_compute_pipeline_builder_build by lazy { handle("koral_compute_pipeline_builder_build", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_compute_pipeline_builder_build(builder: MemorySegment): MemorySegment = h_koral_compute_pipeline_builder_build.invokeExact(builder) as MemorySegment
     private val h_koral_ray_tracing_pipeline_builder_new by lazy { handle("koral_ray_tracing_pipeline_builder_new", FunctionDescriptor.of(ADDRESS)) }
@@ -673,6 +683,8 @@ object KoralNative {
     fun koral_ray_tracing_pipeline_builder_set_specialization_constant_named(builder: MemorySegment, name: String?, value: MemorySegment, bytes: Int): Unit { Arena.ofConfined().use { a -> h_koral_ray_tracing_pipeline_builder_set_specialization_constant_named.invokeExact(builder, Native.cString(a, name), value, bytes); Unit } }
     private val h_koral_ray_tracing_pipeline_builder_set_binding by lazy { handle("koral_ray_tracing_pipeline_builder_set_binding", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT, JAVA_INT)) }
     fun koral_ray_tracing_pipeline_builder_set_binding(builder: MemorySegment, name: String?, set: Int, binding: Int): Unit { Arena.ofConfined().use { a -> h_koral_ray_tracing_pipeline_builder_set_binding.invokeExact(builder, Native.cString(a, name), set, binding); Unit } }
+    private val h_koral_ray_tracing_pipeline_builder_set_sampler by lazy { handle("koral_ray_tracing_pipeline_builder_set_sampler", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_ray_tracing_pipeline_builder_set_sampler(builder: MemorySegment, name: String?, sampler: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_ray_tracing_pipeline_builder_set_sampler.invokeExact(builder, Native.cString(a, name), sampler); Unit } }
     private val h_koral_ray_tracing_pipeline_builder_build by lazy { handle("koral_ray_tracing_pipeline_builder_build", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_ray_tracing_pipeline_builder_build(builder: MemorySegment): MemorySegment = h_koral_ray_tracing_pipeline_builder_build.invokeExact(builder) as MemorySegment
     private val h_koral_ray_tracing_pipeline_max_recursion_depth by lazy { handle("koral_ray_tracing_pipeline_max_recursion_depth", FunctionDescriptor.of(JAVA_INT, ADDRESS)) }
@@ -703,6 +715,40 @@ object KoralNative {
     fun koral_descriptor_set_builder_write_acceleration_structure(builder: MemorySegment, name: String?, binding: Int, index: Int, structure: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_descriptor_set_builder_write_acceleration_structure.invokeExact(builder, Native.cString(a, name), binding, index, structure); Unit } }
     private val h_koral_descriptor_set_builder_build by lazy { handle("koral_descriptor_set_builder_build", FunctionDescriptor.of(ADDRESS, ADDRESS)) }
     fun koral_descriptor_set_builder_build(builder: MemorySegment): MemorySegment = h_koral_descriptor_set_builder_build.invokeExact(builder) as MemorySegment
+    private val h_koral_bindless_sampled by lazy { handle("koral_bindless_sampled", FunctionDescriptor.of(KoralLayouts.KoralDescriptorIndex, ADDRESS, JAVA_INT)) }
+    fun koral_bindless_sampled(allocator: SegmentAllocator, image_or_view: MemorySegment, shape: Int): MemorySegment = h_koral_bindless_sampled.invokeExact(allocator, image_or_view, shape) as MemorySegment
+    private val h_koral_bindless_storage by lazy { handle("koral_bindless_storage", FunctionDescriptor.of(KoralLayouts.KoralDescriptorIndex, ADDRESS, JAVA_INT)) }
+    fun koral_bindless_storage(allocator: SegmentAllocator, image_or_view: MemorySegment, shape: Int): MemorySegment = h_koral_bindless_storage.invokeExact(allocator, image_or_view, shape) as MemorySegment
+    private val h_koral_bindless_storage_buffer by lazy { handle("koral_bindless_storage_buffer", FunctionDescriptor.of(KoralLayouts.KoralDescriptorIndex, ADDRESS)) }
+    fun koral_bindless_storage_buffer(allocator: SegmentAllocator, buffer: MemorySegment): MemorySegment = h_koral_bindless_storage_buffer.invokeExact(allocator, buffer) as MemorySegment
+    private val h_koral_bindless_uniform_buffer by lazy { handle("koral_bindless_uniform_buffer", FunctionDescriptor.of(KoralLayouts.KoralDescriptorIndex, ADDRESS)) }
+    fun koral_bindless_uniform_buffer(allocator: SegmentAllocator, buffer: MemorySegment): MemorySegment = h_koral_bindless_uniform_buffer.invokeExact(allocator, buffer) as MemorySegment
+    private val h_koral_bindless_sampler by lazy { handle("koral_bindless_sampler", FunctionDescriptor.of(KoralLayouts.KoralDescriptorIndex, ADDRESS)) }
+    fun koral_bindless_sampler(allocator: SegmentAllocator, sampler: MemorySegment): MemorySegment = h_koral_bindless_sampler.invokeExact(allocator, sampler) as MemorySegment
+    private val h_koral_bindless_acceleration_structure by lazy { handle("koral_bindless_acceleration_structure", FunctionDescriptor.of(KoralLayouts.KoralDescriptorIndex, ADDRESS)) }
+    fun koral_bindless_acceleration_structure(allocator: SegmentAllocator, structure: MemorySegment): MemorySegment = h_koral_bindless_acceleration_structure.invokeExact(allocator, structure) as MemorySegment
+    private val h_koral_bindless_release by lazy { handle("koral_bindless_release", FunctionDescriptor.ofVoid(KoralLayouts.KoralDescriptorIndex)) }
+    fun koral_bindless_release(index: MemorySegment): Unit { h_koral_bindless_release.invokeExact(index) }
+    private val h_koral_bindless_capacity by lazy { handle("koral_bindless_capacity", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_bindless_capacity(kind: Int): Int = h_koral_bindless_capacity.invokeExact(kind) as Int
+    private val h_koral_bindless_count by lazy { handle("koral_bindless_count", FunctionDescriptor.of(JAVA_LONG)) }
+    fun koral_bindless_count(): Long = h_koral_bindless_count.invokeExact() as Long
+    private val h_koral_descriptor_heap_new by lazy { handle("koral_descriptor_heap_new", FunctionDescriptor.of(ADDRESS, JAVA_INT, JAVA_INT)) }
+    fun koral_descriptor_heap_new(role: Int, slot_count: Int): MemorySegment = h_koral_descriptor_heap_new.invokeExact(role, slot_count) as MemorySegment
+    private val h_koral_descriptor_heap_write by lazy { handle("koral_descriptor_heap_write", FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT)) }
+    fun koral_descriptor_heap_write(heap: MemorySegment, slot: Int, resource: MemorySegment, `type`: Int): Int = h_koral_descriptor_heap_write.invokeExact(heap, slot, resource, `type`) as Int
+    private val h_koral_descriptor_heap_index by lazy { handle("koral_descriptor_heap_index", FunctionDescriptor.of(KoralLayouts.KoralDescriptorIndex, ADDRESS, JAVA_INT, JAVA_INT)) }
+    fun koral_descriptor_heap_index(allocator: SegmentAllocator, heap: MemorySegment, slot: Int, kind: Int): MemorySegment = h_koral_descriptor_heap_index.invokeExact(allocator, heap, slot, kind) as MemorySegment
+    private val h_koral_descriptor_heap_slot_count by lazy { handle("koral_descriptor_heap_slot_count", FunctionDescriptor.of(JAVA_INT, ADDRESS)) }
+    fun koral_descriptor_heap_slot_count(heap: MemorySegment): Int = h_koral_descriptor_heap_slot_count.invokeExact(heap) as Int
+    private val h_koral_descriptor_heap_first_slot by lazy { handle("koral_descriptor_heap_first_slot", FunctionDescriptor.of(JAVA_INT, ADDRESS)) }
+    fun koral_descriptor_heap_first_slot(heap: MemorySegment): Int = h_koral_descriptor_heap_first_slot.invokeExact(heap) as Int
+    private val h_koral_descriptor_heap_device_address by lazy { handle("koral_descriptor_heap_device_address", FunctionDescriptor.of(JAVA_LONG, ADDRESS, JAVA_INT)) }
+    fun koral_descriptor_heap_device_address(heap: MemorySegment, slot: Int): Long = h_koral_descriptor_heap_device_address.invokeExact(heap, slot) as Long
+    private val h_koral_descriptor_heap_slot_size by lazy { handle("koral_descriptor_heap_slot_size", FunctionDescriptor.of(JAVA_INT, JAVA_INT)) }
+    fun koral_descriptor_heap_slot_size(role: Int): Int = h_koral_descriptor_heap_slot_size.invokeExact(role) as Int
+    private val h_koral_descriptor_heap_encode by lazy { handle("koral_descriptor_heap_encode", FunctionDescriptor.of(JAVA_LONG, ADDRESS, JAVA_INT, ADDRESS, JAVA_LONG)) }
+    fun koral_descriptor_heap_encode(resource: MemorySegment, `type`: Int, out: MemorySegment, capacity: Long): Long = h_koral_descriptor_heap_encode.invokeExact(resource, `type`, out, capacity) as Long
     private val h_koral_descriptor_set_rebind_buffer by lazy { handle("koral_descriptor_set_rebind_buffer", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT, ADDRESS)) }
     fun koral_descriptor_set_rebind_buffer(set: MemorySegment, name: String?, binding: Int, index: Int, buffer: MemorySegment): Int = Arena.ofConfined().use { a -> h_koral_descriptor_set_rebind_buffer.invokeExact(set, Native.cString(a, name), binding, index, buffer) as Int }
     private val h_koral_descriptor_set_rebind_buffer_slice by lazy { handle("koral_descriptor_set_rebind_buffer_slice", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, JAVA_INT, JAVA_INT, ADDRESS, JAVA_LONG, JAVA_LONG)) }
@@ -919,6 +965,18 @@ object KoralNative {
     fun koral_cmd_push_constant_block(commands: MemorySegment, data: MemorySegment, bytes: Int, offset: Int): Unit { h_koral_cmd_push_constant_block.invokeExact(commands, data, bytes, offset) }
     private val h_koral_cmd_push_constant by lazy { handle("koral_cmd_push_constant", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, JAVA_INT, ADDRESS)) }
     fun koral_cmd_push_constant(commands: MemorySegment, name: String?, data: MemorySegment, bytes: Int, shape: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_cmd_push_constant.invokeExact(commands, Native.cString(a, name), data, bytes, shape); Unit } }
+    private val h_koral_cmd_bind by lazy { handle("koral_cmd_bind", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS, ADDRESS)) }
+    fun koral_cmd_bind(commands: MemorySegment, name: String?, resource: MemorySegment, sampler: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_cmd_bind.invokeExact(commands, Native.cString(a, name), resource, sampler); Unit } }
+    private val h_koral_cmd_push_index by lazy { handle("koral_cmd_push_index", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, KoralLayouts.KoralDescriptorIndex)) }
+    fun koral_cmd_push_index(commands: MemorySegment, name: String?, index: MemorySegment): Unit { Arena.ofConfined().use { a -> h_koral_cmd_push_index.invokeExact(commands, Native.cString(a, name), index); Unit } }
+    private val h_koral_cmd_uses_index by lazy { handle("koral_cmd_uses_index", FunctionDescriptor.ofVoid(ADDRESS, KoralLayouts.KoralDescriptorIndex)) }
+    fun koral_cmd_uses_index(commands: MemorySegment, index: MemorySegment): Unit { h_koral_cmd_uses_index.invokeExact(commands, index) }
+    private val h_koral_cmd_uses by lazy { handle("koral_cmd_uses", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_INT)) }
+    fun koral_cmd_uses(commands: MemorySegment, resource: MemorySegment, access: Int): Unit { h_koral_cmd_uses.invokeExact(commands, resource, access) }
+    private val h_koral_cmd_copy_descriptors by lazy { handle("koral_cmd_copy_descriptors", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_INT, JAVA_INT)) }
+    fun koral_cmd_copy_descriptors(commands: MemorySegment, source: MemorySegment, source_offset: Long, heap: MemorySegment, first_slot: Int, count: Int): Unit { h_koral_cmd_copy_descriptors.invokeExact(commands, source, source_offset, heap, first_slot, count) }
+    private val h_koral_cmd_descriptor_heap_barrier by lazy { handle("koral_cmd_descriptor_heap_barrier", FunctionDescriptor.ofVoid(ADDRESS)) }
+    fun koral_cmd_descriptor_heap_barrier(commands: MemorySegment): Unit { h_koral_cmd_descriptor_heap_barrier.invokeExact(commands) }
     private val h_koral_cmd_barrier by lazy { handle("koral_cmd_barrier", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, JAVA_LONG, ADDRESS, JAVA_LONG)) }
     fun koral_cmd_barrier(commands: MemorySegment, buffers: MemorySegment, buffer_count: Long, images: MemorySegment, image_count: Long): Unit { h_koral_cmd_barrier.invokeExact(commands, buffers, buffer_count, images, image_count) }
     private val h_koral_cmd_begin_debug_label by lazy { handle("koral_cmd_begin_debug_label", FunctionDescriptor.ofVoid(ADDRESS, ADDRESS, ADDRESS)) }
@@ -1417,6 +1475,8 @@ object KoralNative {
     fun koral_context_supports_feature(feature: Long): Boolean = h_koral_context_supports_feature.invokeExact(feature) as Boolean
     private val h_koral_context_gpu_has_feature by lazy { handle("koral_context_gpu_has_feature", FunctionDescriptor.of(JAVA_BOOLEAN, JAVA_LONG)) }
     fun koral_context_gpu_has_feature(feature: Long): Boolean = h_koral_context_gpu_has_feature.invokeExact(feature) as Boolean
+    private val h_koral_context_descriptor_model by lazy { handle("koral_context_descriptor_model", FunctionDescriptor.of(JAVA_INT)) }
+    fun koral_context_descriptor_model(): Int = h_koral_context_descriptor_model.invokeExact() as Int
     private val h_koral_feature_name by lazy { handle("koral_feature_name", FunctionDescriptor.of(ADDRESS, JAVA_LONG)) }
     fun koral_feature_name(feature: Long): String = Native.kString(h_koral_feature_name.invokeExact(feature) as MemorySegment)
     private val h_koral_context_async_compute_is_separate_family by lazy { handle("koral_context_async_compute_is_separate_family", FunctionDescriptor.of(JAVA_BOOLEAN)) }

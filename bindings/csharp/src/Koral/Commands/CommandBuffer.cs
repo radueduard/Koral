@@ -246,6 +246,42 @@ public sealed unsafe partial class CommandBuffer : IDisposable
         return this;
     }
 
+    // ---- by name, bindless and the descriptor heap ----------------------------------------------------------------
+
+    /// <summary>
+    /// Bind(name, resource): puts a buffer, buffer view, image, image view, sampler or acceleration structure at
+    /// the binding the bound pipeline's shader calls <paramref name="name"/>, without a descriptor set. An image
+    /// may come with the <paramref name="sampler"/> to read it through.
+    /// </summary>
+    public CommandBuffer Bind(string name, Resource resource, Sampler? sampler = null)
+    {
+        KoralNative.koral_cmd_bind(N, name, resource.Handle, Resource.HandleOf(sampler));
+        return this;
+    }
+
+    /// <summary>PushConstant(name, index): the index into the uint the shader calls <paramref name="name"/>, and the resource behind it into the uses of what follows.</summary>
+    public CommandBuffer PushConstant(string name, DescriptorIndex index) { KoralNative.koral_cmd_push_index(N, name, index.Native); return this; }
+
+    /// <summary>Uses(index): the resource behind a bindless index the shader reaches some other way than by a push.</summary>
+    public CommandBuffer Uses(DescriptorIndex index) { KoralNative.koral_cmd_uses_index(N, index.Native); return this; }
+
+    /// <summary>Uses(resource, access): a buffer, image or image view the shader reaches without a binding.</summary>
+    public CommandBuffer Uses(Resource resource, ResourceAccess access = ResourceAccess.eAllShaderRead)
+    {
+        KoralNative.koral_cmd_uses(N, resource.Handle, (uint)access);
+        return this;
+    }
+
+    /// <summary>Copies encoded descriptors from <paramref name="source"/> into slots of <paramref name="heap"/>. Descriptor heap only.</summary>
+    public CommandBuffer CopyDescriptors(Buffer source, ulong sourceOffset, DescriptorHeap heap, uint firstSlot, uint count)
+    {
+        KoralNative.koral_cmd_copy_descriptors(N, source.Handle, sourceOffset, heap.Handle, firstSlot, count);
+        return this;
+    }
+
+    /// <summary>Makes descriptors a shader wrote into the heap visible to the shaders that follow. Descriptor heap only.</summary>
+    public CommandBuffer DescriptorHeapBarrier() { KoralNative.koral_cmd_descriptor_heap_barrier(N); return this; }
+
     // ---- synchronisation and labels ----------------------------------------------------------------------------
 
     public CommandBuffer Barrier(IEnumerable<BufferBarrier>? bufferBarriers = null, IEnumerable<ImageBarrier>? imageBarriers = null)

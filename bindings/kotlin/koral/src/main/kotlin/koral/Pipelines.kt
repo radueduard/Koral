@@ -84,6 +84,8 @@ class GraphicsPipeline internal constructor(native: MemorySegment) : Pipeline(na
         }
         /** SetBinding(name, set, binding): puts the descriptor there, whatever its shader said. */
         fun setBinding(name: String, set: Int, binding: Int) = apply { KoralNative.koral_graphics_pipeline_builder_set_binding(native, name, set, binding) }
+        /** SetSampler(name, sampler): embeds [sampler] at the sampler binding the shader calls [name]. */
+        fun setSampler(name: String, sampler: Sampler) = apply { KoralNative.koral_graphics_pipeline_builder_set_sampler(native, name, sampler.native) }
         fun build(): GraphicsPipeline = built(KoralNative.koral_graphics_pipeline_builder_build(native), "building a graphics pipeline")
     }
 }
@@ -108,6 +110,8 @@ class ComputePipeline internal constructor(native: MemorySegment) : Pipeline(nat
         }
         /** SetBinding(name, set, binding): puts the descriptor there, whatever its shader said. */
         fun setBinding(name: String, set: Int, binding: Int) = apply { KoralNative.koral_compute_pipeline_builder_set_binding(native, name, set, binding) }
+        /** SetSampler(name, sampler): embeds [sampler] at the sampler binding the shader calls [name]. */
+        fun setSampler(name: String, sampler: Sampler) = apply { KoralNative.koral_compute_pipeline_builder_set_sampler(native, name, sampler.native) }
         fun build(): ComputePipeline = built(KoralNative.koral_compute_pipeline_builder_build(native), "building a compute pipeline")
     }
 }
@@ -143,6 +147,8 @@ class RayTracingPipeline internal constructor(native: MemorySegment) : Pipeline(
         }
         /** SetBinding(name, set, binding): puts the descriptor there, whatever its shader said. */
         fun setBinding(name: String, set: Int, binding: Int) = apply { KoralNative.koral_ray_tracing_pipeline_builder_set_binding(native, name, set, binding) }
+        /** SetSampler(name, sampler): embeds [sampler] at the sampler binding the shader calls [name]. */
+        fun setSampler(name: String, sampler: Sampler) = apply { KoralNative.koral_ray_tracing_pipeline_builder_set_sampler(native, name, sampler.native) }
         fun build(): RayTracingPipeline = built(KoralNative.koral_ray_tracing_pipeline_builder_build(native), "building a ray-tracing pipeline")
     }
 

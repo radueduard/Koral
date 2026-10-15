@@ -343,6 +343,36 @@ TEST(ProjectConfig, GpuFlagOverridesTheFile)
     EXPECT_EQ(config.gpu, "1");
 }
 
+TEST(ProjectConfig, ReadsTheDescriptorModel)
+{
+    ProjectConfig config;
+    EXPECT_EQ(config.descriptors, kor::DescriptorModel::eSets) << "sets unless told";
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "descriptors": "heap" } })", kBase));
+    EXPECT_EQ(config.descriptors, kor::DescriptorModel::eHeap);
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "api": "Vulkan" } })", kBase));
+    EXPECT_EQ(config.descriptors, kor::DescriptorModel::eHeap) << "an absent key must not reset it";
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "descriptors": "eSets" } })", kBase));
+    EXPECT_EQ(config.descriptors, kor::DescriptorModel::eSets) << "the enumerator's spelling is read too";
+}
+
+TEST(ProjectConfig, AnUnknownDescriptorModelIsRefused)
+{
+    ProjectConfig config;
+    const auto result = config.Merge(R"({ "rendering": { "descriptors": "buffers" } })", kBase);
+    ASSERT_FALSE(result);
+    EXPECT_NE(result.error().message.find("rendering.descriptors"), std::string::npos);
+}
+
+TEST(ProjectConfig, DescriptorsFlagOverridesTheFile)
+{
+    ProjectConfig config;
+    ASSERT_TRUE(config.Merge(R"({ "rendering": { "descriptors": "sets" } })", kBase));
+    ASSERT_TRUE(override_(config, { "--descriptors", "heap" }));
+    EXPECT_EQ(config.descriptors, kor::DescriptorModel::eHeap);
+    EXPECT_FALSE(override_(config, { "--descriptors", "pool" }));
+    EXPECT_FALSE(override_(config, { "--descriptors" }));
+}
+
 TEST(ProjectConfig, MissingGpuFlagValueIsAnError)
 {
     ProjectConfig config;

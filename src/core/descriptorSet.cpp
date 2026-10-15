@@ -621,13 +621,17 @@ namespace kor
                     break;
                 case DescriptorType::eCombinedImageSampler:
                     (void)descriptor.BoundImageView();
-                    (void)descriptor.BoundSampler();
+                    // The pipeline's own sampler, when it embeds one: then the image is all there is to write.
+                    if (!description.embeddedSampler.Valid()) (void)descriptor.BoundSampler();
                     break;
                 case DescriptorType::eSampledImage:
                 case DescriptorType::eStorageImage:
                     (void)descriptor.BoundImageView();
                     break;
                 case DescriptorType::eSampler:
+                    if (description.embeddedSampler.Valid())
+                        return reject(std::format(
+                            "Binding {} is a sampler the pipeline embeds (SetSampler), so nothing is written to it.", binding));
                     (void)descriptor.BoundSampler();
                     break;
                 case DescriptorType::eAccelerationStructure:

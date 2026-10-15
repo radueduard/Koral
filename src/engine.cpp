@@ -94,6 +94,7 @@ namespace kor
         // Before the device exists — the Vulkan backend reads it while picking the physical
         // device, which happens inside InitHeadless / the window build below.
         if (!config.gpu.empty()) SetPreferredGpu(config.gpu);
+        SetPreferredDescriptorModel(config.descriptors);
         // What koral.json asks of the GPU, alongside what the project's library asked for when it was loaded.
         if (config.requiredFeatures || config.optionalFeatures)
             detail::RegisterFeatures("koral.json", config.requiredFeatures, config.optionalFeatures);
@@ -136,6 +137,7 @@ namespace kor
                 .api = config.api,
                 .platform = config.platform,
                 .gpu = config.gpu,
+                .descriptors = config.descriptors,
             });
         } catch (const std::exception& e) {
             log::Error("[engine] {}", e.what());

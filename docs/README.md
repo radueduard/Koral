@@ -6,6 +6,8 @@
   matrices and instancing.
 - [Shaders, pipelines and GPU features](pipelines.md) — shaders and reflection, pipelines, descriptor sets, push
   constants, and asking the device for features (`kor::Feature`).
+- [Descriptors: sets, the heap, and bindless](descriptors.md) — the descriptor model (`rendering.descriptors`),
+  binding by name, bindless indices, embedded samplers, and a heap a project fills itself.
 - [Command buffers](commands.md) — recording, automatic barriers, End/Submit and threads, one-off work, work in
   the frame, timers.
 - [Tokens and tasks](tokens.md) — events, timelines, coroutines, cancelling a task.

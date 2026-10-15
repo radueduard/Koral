@@ -664,6 +664,7 @@ enum class ErrorCode(val value: Int) {
     eTimedOut(31),
     eConnectionClosed(32),
     eProtocol(33),
+    eDescriptorHeapUnsupported(34),
     ;
     companion object { fun of(value: Int): ErrorCode = entries.first { it.value == value } }
 }
@@ -883,6 +884,35 @@ enum class WindowPlatform(val value: Int) {
     companion object { fun of(value: Int): WindowPlatform = entries.first { it.value == value } }
 }
 
+/** kor::DescriptorModel: the same names and values, so a value crosses the C interface as itself. */
+enum class DescriptorModel(val value: Int) {
+    eSets(0),
+    eHeap(1),
+    ;
+    companion object { fun of(value: Int): DescriptorModel = entries.first { it.value == value } }
+}
+
+/** kor::BindlessKind: the same names and values, so a value crosses the C interface as itself. */
+enum class BindlessKind(val value: Int) {
+    eNone(0),
+    eSampledImage(1),
+    eStorageImage(2),
+    eStorageBuffer(3),
+    eUniformBuffer(4),
+    eSampler(5),
+    eAccelerationStructure(6),
+    ;
+    companion object { fun of(value: Int): BindlessKind = entries.first { it.value == value } }
+}
+
+/** kor::HeapRole: the same names and values, so a value crosses the C interface as itself. */
+enum class HeapRole(val value: Int) {
+    eResource(0),
+    eSampler(1),
+    ;
+    companion object { fun of(value: Int): HeapRole = entries.first { it.value == value } }
+}
+
 /** kor::ValueScalar: the same names and values, so a value crosses the C interface as itself. */
 enum class ValueScalar(val value: Int) {
     eFloat(0),
@@ -921,6 +951,7 @@ enum class Feature(val value: Int) {
     eSamplerAnisotropy(1048576),
     eMeshShader(2097152),
     eRayTracing(4194304),
+    eDescriptorHeap(8388608),
     ;
     companion object {
         fun of(value: Int): Feature = entries.first { it.value == value }

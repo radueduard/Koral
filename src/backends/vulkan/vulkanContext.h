@@ -21,6 +21,8 @@ namespace kor::vk
     class Surface;
     class Scheduler;
     class DescriptorPool;
+    class DescriptorHeaps;
+    class BindlessTables;
     class Allocator;
     class Runtime;
     class Device;
@@ -37,6 +39,10 @@ namespace kor::vk
         static const kor::vk::Device& Device();
         static const kor::vk::Allocator& Allocator();
         static const kor::vk::DescriptorPool& DescriptorPool();
+        /** @brief The descriptor heaps, on a device made for DescriptorModel::eHeap; null under descriptor sets. */
+        static kor::vk::DescriptorHeaps* Heaps();
+        /** @brief The bindless tables, under either model. */
+        static kor::vk::BindlessTables& Bindless();
         /** What turns kor::Tokens into timeline semaphores, and wakes their coroutines. */
         static kor::vk::TokenReactor& Tokens();
 
@@ -60,6 +66,8 @@ namespace kor::vk
         inline static kor::vk::Device* _device = nullptr;
         inline static kor::vk::Allocator* _allocator = nullptr;
         inline static kor::vk::DescriptorPool* _descriptorPool = nullptr;
+        inline static kor::vk::DescriptorHeaps* _heaps = nullptr;
+        inline static kor::vk::BindlessTables* _bindless = nullptr;
         inline static kor::vk::TokenReactor* _tokenReactor = nullptr;
         // Set once StopTokens() has drained the device: from then on nothing is in flight and
         // nothing more is submitted, so destruction no longer needs deferring.

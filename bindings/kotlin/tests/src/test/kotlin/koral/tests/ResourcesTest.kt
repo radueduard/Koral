@@ -4,6 +4,8 @@ import java.nio.file.Files
 import kotlin.io.path.writeText
 import kotlinx.coroutines.delay
 import koral.App
+import koral.Bindless
+import koral.BindlessKind
 import koral.Buffer
 import koral.BufferType
 import koral.BufferUsage
@@ -11,9 +13,12 @@ import koral.ChannelType
 import koral.CommandBuffer
 import koral.CommandBufferUsage
 import koral.ComputePipeline
+import koral.Context
 import koral.Debug
 import koral.DebugDrawPass
 import koral.DebugStyle
+import koral.DescriptorHeap
+import koral.DescriptorModel
 import koral.DescriptorSet
 import koral.DescriptorType
 import koral.ErrorCode
@@ -23,6 +28,7 @@ import koral.GizmoMode
 import koral.GizmoPointer
 import koral.GpuLayout
 import koral.GraphicsPipeline
+import koral.HeapRole
 import koral.Image
 import koral.ImageFormat
 import koral.ImageUsage
@@ -148,6 +154,45 @@ class ResourcesTest {
             errors += it.errors
         }.waitBlocking()
         assertTrue(errors.size == 1 && "add" in errors[0], "a push constant of the wrong type is kept as an error: $errors")
+    }
+
+    @Test
+    fun bindlessIndicesAndBindingByName() = headlessApp().use {
+        val path = shaderFile("bindless.comp", """
+            #version 450
+            #extension GL_EXT_nonuniform_qualifier : require
+            layout(local_size_x = 4) in;
+            layout(std430, set = 7, binding = 2) readonly buffer Table { uint values[]; } tables[];
+            layout(std430, set = 0, binding = 0) buffer Data { uint values[]; } data;
+            layout(push_constant) uniform Push { uint source; } push;
+            void main() { data.values[gl_GlobalInvocationID.x] = tables[nonuniformEXT(push.source)].values[gl_GlobalInvocationID.x] + 1u; }
+        """)
+        val pipeline = ComputePipeline.Builder().setComputeShader(Shader.Builder().setPath(path).setStage(ShaderStage.eCompute).build()).build()
+        assertTrue(pipeline.isValid, "a pipeline reading the bindless tables: ${pipeline.failure}")
+
+        val input = Buffer.Builder().setData(intArrayOf(10, 20, 30, 40)).setUsage(BufferUsage.eStorage, BufferUsage.eTransferDst).build()
+        val output = Buffer.Builder().setInstanceCount(4, GpuLayout.Int)
+            .setUsage(BufferUsage.eStorage, BufferUsage.eTransferSrc, BufferUsage.eTransferDst).setType(BufferType.eDynamic).build()
+        val index = Bindless.storageBuffer(input)
+        assertTrue(index.valid && index.kind == BindlessKind.eStorageBuffer, "an index: $index")
+
+        CommandBuffer.singleTimeCommand(CommandBufferUsage.eCompute) {
+            it.bindComputePipeline(pipeline).bind("data", output).pushConstant("source", index).dispatch()
+        }.waitBlocking()
+        assertEquals(listOf(11, 21, 31, 41), output.readInts().toList(), "read through the index")
+
+        val heap = DescriptorHeap.Builder().setSlotCount(2).build()
+        if (Context.activeDescriptorModel != DescriptorModel.eHeap) {
+            assertTrue(heap.isPoisoned, "no project heap under descriptor sets")
+            return@use
+        }
+        heap.write(1, input, DescriptorType.eStorageBuffer)
+        CommandBuffer.singleTimeCommand(CommandBufferUsage.eCompute) {
+            it.bindComputePipeline(pipeline).bind("data", output).uses(input)
+                .pushConstant("source", heap.index(1, BindlessKind.eStorageBuffer)).dispatch()
+        }.waitBlocking()
+        assertEquals(listOf(11, 21, 31, 41), output.readInts().toList(), "read through a slot of the project's heap")
+        assertEquals(DescriptorHeap.slotSize(HeapRole.eResource), DescriptorHeap.encode(input, DescriptorType.eStorageBuffer).size)
     }
 
     @Test

@@ -415,6 +415,8 @@ public sealed record AppSettings
     public Feature RequiredFeatures { get; init; }
     /// <summary>Features it uses where the GPU has them: Context.Supports says which.</summary>
     public Feature OptionalFeatures { get; init; }
+    /// <summary>How descriptors are held: sets, or one heap where the GPU has VK_EXT_descriptor_heap.</summary>
+    public DescriptorModel Descriptors { get; init; } = DescriptorModel.eSets;
 }
 
 /// <summary>kor::WindowSettings.</summary>
@@ -503,6 +505,8 @@ public static class Context
     public static bool AsyncComputeIsSeparateFamily => KoralNative.koral_context_async_compute_is_separate_family().AsBool();
     /// <summary>Whether the device was made with <paramref name="feature"/> enabled: asked for, and the GPU has it.</summary>
     public static bool Supports(Feature feature) => KoralNative.koral_context_supports_feature((ulong)feature).AsBool();
+    /// <summary>The descriptor model the device was made for; eSets before there is one.</summary>
+    public static DescriptorModel ActiveDescriptorModel => (DescriptorModel)KoralNative.koral_context_descriptor_model();
     /// <summary>Whether the GPU has <paramref name="feature"/>, enabled or not.</summary>
     public static bool GpuHas(Feature feature) => KoralNative.koral_context_gpu_has_feature((ulong)feature).AsBool();
 }

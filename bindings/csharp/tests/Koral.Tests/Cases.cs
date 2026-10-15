@@ -282,6 +282,71 @@ public static partial class Cases
         }
     }
 
+    private const string BindlessShader = """
+        #version 450
+        #extension GL_EXT_nonuniform_qualifier : require
+        layout(local_size_x = 4) in;
+        layout(std430, set = 7, binding = 2) readonly buffer Table { uint values[]; } tables[];
+        layout(std430, set = 0, binding = 0) buffer Data { uint values[]; } data;
+        layout(push_constant) uniform Push { uint source; } push;
+        void main() { data.values[gl_GlobalInvocationID.x] = tables[nonuniformEXT(push.source)].values[gl_GlobalInvocationID.x] + 1u; }
+        """;
+
+    /// <summary>A buffer read through its bindless index, the output bound by name — and the heap a project fills, where there is one.</summary>
+    public static void BindlessIndicesAndBindingByName()
+    {
+        using var app = Check.HeadlessApp();
+        var directory = Directory.CreateTempSubdirectory("koral-bindless-");
+        try
+        {
+            var path = Path.Combine(directory.FullName, "bindless.comp");
+            File.WriteAllText(path, BindlessShader);
+            var pipeline = new ComputePipeline.Builder()
+                .SetComputeShader(new Shader.Builder().SetPath(path).SetStage(Shader.Stage.eCompute).Build())
+                .Build();
+            Check.That(pipeline.Valid, $"a pipeline reading the bindless tables: {pipeline.Failure}");
+
+            var input = new Buffer.Builder<uint>().SetData([10u, 20u, 30u, 40u])
+                .SetUsage(Buffer.Usage.eStorage | Buffer.Usage.eTransferDst).Build();
+            var output = new Buffer.Builder<uint>().SetInstanceCount(4)
+                .SetUsage(Buffer.Usage.eStorage | Buffer.Usage.eTransferSrc | Buffer.Usage.eTransferDst)
+                .SetType(Buffer.Type.eDynamic).Build();
+            var index = Bindless.StorageBuffer(input);
+            Check.That(index.Valid && index.Kind == BindlessKind.eStorageBuffer, $"an index: {index}");
+
+            CommandBuffer.SingleTimeCommand(cb => cb
+                .BindComputePipeline(pipeline)
+                .Bind("data", output)
+                .PushConstant("source", index)
+                .Dispatch(), CommandBuffer.Usage.eCompute).Wait();
+            var read = output.Read<uint>();
+            Check.That(read.SequenceEqual([11u, 21u, 31u, 41u]), $"read through the index: [{string.Join(", ", read)}]");
+
+            var heap = new DescriptorHeap.Builder().SetSlotCount(2).Build();
+            if (Context.ActiveDescriptorModel != DescriptorModel.eHeap)
+            {
+                Check.That(!heap.Valid, "no project heap under descriptor sets");
+                return;
+            }
+            Check.That(heap.Valid, $"a project heap: {heap.Failure}");
+            heap.Write(1, input, DescriptorType.eStorageBuffer);
+            CommandBuffer.SingleTimeCommand(cb => cb
+                .BindComputePipeline(pipeline)
+                .Bind("data", output)
+                .Uses(input)
+                .PushConstantBlock(heap.Index(1, BindlessKind.eStorageBuffer).Index)
+                .Dispatch(), CommandBuffer.Usage.eCompute).Wait();
+            read = output.Read<uint>();
+            Check.That(read.SequenceEqual([11u, 21u, 31u, 41u]), $"read through a slot of the project's heap: [{string.Join(", ", read)}]");
+            Check.Equal(DescriptorHeap.SlotSize(HeapRole.eResource), (uint)DescriptorHeap.Encode(input, DescriptorType.eStorageBuffer).Length,
+                        "a descriptor's bytes fill a slot");
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     private const string UnboundShader = """
         #version 450
         layout(local_size_x = 4) in;

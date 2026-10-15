@@ -25,6 +25,8 @@ data class AppSettings(
     val requiredFeatures: Set<Feature> = emptySet(),
     /** Features it uses where the GPU has them: [Context.supports] says which. */
     val optionalFeatures: Set<Feature> = emptySet(),
+    /** How descriptors are held: sets, or one heap where the GPU has VK_EXT_descriptor_heap. */
+    val descriptors: DescriptorModel = DescriptorModel.eSets,
 )
 
 internal fun Set<Feature>.bits(): Long = fold(0L) { bits, feature -> bits or feature.value.toLong() }
@@ -161,6 +163,7 @@ class App(val settings: AppSettings = AppSettings()) : Owner(), AutoCloseable {
                 settings.gpu?.let { string(a, "gpu", it) }
                 long("required_features", settings.requiredFeatures.bits())
                 long("optional_features", settings.optionalFeatures.bits())
+                int("descriptors", settings.descriptors.value)
             }
             checked(KoralNative.koral_app_create(s), "creating the application")
         }
@@ -377,7 +380,8 @@ class ProjectConfig private constructor(private var handle: MemorySegment) : Aut
                 s.get(ADDRESS, KoralLayouts.KoralAppSettings.byteOffset(java.lang.foreign.MemoryLayout.PathElement.groupElement(field)))
                     .takeIf { it != MemorySegment.NULL }?.let(Native::kString)?.takeIf { it.isNotEmpty() }
             AppSettings(API.of(f.readInt("api")), WindowPlatform.of(f.readInt("platform")), f.readInt("frames_in_flight"),
-                        text("gpu"), featuresOf(f.readLong("required_features")), featuresOf(f.readLong("optional_features")))
+                        text("gpu"), featuresOf(f.readLong("required_features")), featuresOf(f.readLong("optional_features")),
+                        DescriptorModel.of(f.readInt("descriptors")))
         }
 
     val windowSettings: WindowSettings

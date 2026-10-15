@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <mutex>
 #include <utility>
 
@@ -31,6 +32,7 @@ namespace kor
             { Feature::eFillModeNonSolid, "FillModeNonSolid" },     { Feature::eWideLines, "WideLines" },
             { Feature::eSamplerAnisotropy, "SamplerAnisotropy" },   { Feature::eMeshShader, "MeshShader" },
             { Feature::eRayTracing, "RayTracing" },
+            { Feature::eDescriptorHeap, "DescriptorHeap" },
         };
 
         struct Registry {
@@ -180,5 +182,58 @@ namespace kor
         auto& r = registry();
         std::lock_guard lock(r.mutex);
         return r.available & feature;
+    }
+
+    // ---- descriptor model ----------------------------------------------------------------------
+
+    namespace
+    {
+        // Process-wide and out of line, like the GPU preference: an inline static in the header would
+        // give the executable and the library a copy each, and a preference set by one would not reach
+        // the device the other makes.
+        DescriptorModel& preferredDescriptorModelStorage()
+        {
+            static DescriptorModel model = DescriptorModel::eSets;
+            return model;
+        }
+
+        bool equalsIgnoringCase(const std::string_view a, const std::string_view b)
+        {
+            return std::ranges::equal(a, b, [](const char x, const char y) {
+                return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+            });
+        }
+    }
+
+    const char* DescriptorModelName(const DescriptorModel model)
+    {
+        return model == DescriptorModel::eHeap ? "heap" : "sets";
+    }
+
+    void SetPreferredDescriptorModel(const DescriptorModel model)
+    {
+        preferredDescriptorModelStorage() = model;
+    }
+
+    DescriptorModel PreferredDescriptorModel()
+    {
+        // The environment wins over everything a project says, because it is how a whole test suite is
+        // run under the other model without touching a line of it.
+        if (const char* forced = std::getenv("KORAL_DESCRIPTORS"); forced && *forced) {
+            if (equalsIgnoringCase(forced, "heap")) return DescriptorModel::eHeap;
+            if (equalsIgnoringCase(forced, "sets")) return DescriptorModel::eSets;
+            static bool warned = false;
+            if (!std::exchange(warned, true))
+                log::Warn("[descriptors] KORAL_DESCRIPTORS is '{}'; expected 'sets' or 'heap'. Ignored.", forced);
+        }
+        // A project that requires the heap feature has asked for the heap, whichever way it said so.
+        for (const auto& request : detail::FeatureRequests())
+            if (request.required & Feature::eDescriptorHeap) return DescriptorModel::eHeap;
+        return preferredDescriptorModelStorage();
+    }
+
+    DescriptorModel Context::ActiveDescriptorModel()
+    {
+        return Supports(Feature::eDescriptorHeap) ? DescriptorModel::eHeap : DescriptorModel::eSets;
     }
 }

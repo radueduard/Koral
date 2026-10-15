@@ -31,6 +31,7 @@
 namespace kor
 {
     class CommandBuffer;
+    class Sampler;
 
     /** @brief A specialization constant given to a pipeline builder: by its constant id, or by the name its shader gave it. */
     struct KORAL_API SpecializationValue {
@@ -56,6 +57,29 @@ namespace kor
     struct PipelineSettings {
         Shader::BindingAssignment bindings;                         ///< Descriptors moved, by name. @see SetBinding
         std::vector<SpecializationValue> specializationConstants;   ///< In the order given; a later one for the same constant wins.
+        std::map<std::string, ResourceRef<const Sampler>, std::less<>> samplers;   ///< Embedded, by binding name. @see SetSampler
+
+        /**
+         * @brief Embeds @p sampler in the pipeline, at the binding the shader calls @p name.
+         *
+         * The binding has to be a sampler or a combined image sampler. It then needs no sampler
+         * written to it — a sampler binding nothing at all, a texture binding only its image — and
+         * every set and draw of the pipeline uses this one:
+         *
+         * @code
+         * kor::GraphicsPipeline::Builder()
+         *     .SetSampler("albedoSampler", linear)
+         *     ...;
+         * DescriptorSet::Builder(pipeline, 0).Write("albedo", texture);   // no sampler
+         * @endcode
+         *
+         * An immutable sampler under descriptor sets, an embedded one under the heap. Keep the sampler
+         * alive as long as the pipeline: it is the pipeline's, but held by reference.
+         */
+        Derived& SetSampler(std::string name, ResourceRef<const Sampler> sampler) {
+            samplers.insert_or_assign(std::move(name), std::move(sampler));
+            return static_cast<Derived&>(*this);
+        }
 
         /**
          * @brief Puts the descriptor @p name at @p set, @p binding, overriding what its shader said.
@@ -213,6 +237,18 @@ namespace kor
          */
         [[nodiscard]] bool UsesDeviceAddresses() const { return _usesDeviceAddresses; }
 
+        /** @brief Whether a shader of this pipeline declares the bindless tables (kor::BindlessSet). */
+        [[nodiscard]] bool UsesBindless() const { return !_bindlessBindings.empty(); }
+
+        /** @brief Which bindless tables the shaders declare, by binding of kor::BindlessSet. */
+        [[nodiscard]] const std::map<kor::u32, DescriptorType>& BindlessBindings() const { return _bindlessBindings; }
+
+        /** @brief One past the last byte of push constants any stage declares; 0 with none. */
+        [[nodiscard]] kor::u32 PushConstantEnd() const;
+
+        /** @brief The pipeline's own descriptor sets' indices, highest last (the bindless set is not one of them). */
+        [[nodiscard]] std::vector<kor::u32> SetIndices() const;
+
         /** @brief Where this pipeline puts its shaders' descriptors, beyond where they put themselves. @see PipelineSettings::SetBinding */
         [[nodiscard]] const Shader::BindingAssignment& Bindings() const { return _bindings; }
 
@@ -224,6 +260,7 @@ namespace kor
         void TakeSettings(const PipelineSettings<B>& settings) {
             _bindings = settings.bindings;
             _specializationValues = settings.specializationConstants;
+            _samplers = settings.samplers;
         }
 
         /**
@@ -273,6 +310,8 @@ namespace kor
         /// The same ranges' fields, flattened by name and unioned across stages. @see findPushConstant
         std::map<std::string, PushConstantMember, std::less<>> _pushConstants;
         bool _usesDeviceAddresses = false;
+        std::map<kor::u32, DescriptorType> _bindlessBindings;
+        std::map<std::string, ResourceRef<const Sampler>, std::less<>> _samplers;
 
         Shader::BindingAssignment _bindings;
         std::vector<SpecializationValue> _specializationValues;

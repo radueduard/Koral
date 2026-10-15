@@ -596,7 +596,8 @@ file(WRITE ${CMAKE_BINARY_DIR}/capabilities.json "{
   \"apis\": [\"Vulkan\"],
   \"sceneAbiVersion\": ${KORAL_SCENE_ABI_VERSION},
   \"features\": [\"sceneTable\", \"offscreenScenes\", \"views\", \"hotReload\", \"stateReload\", \"cApi\",
-               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\", \"math\", \"networking\"${KORAL_CAPABILITY_EXTRA}],
+               \"reflection\", \"inputActions\", \"gamepads\", \"debugDraw\", \"asyncCompute\", \"fixedUpdate\", \"math\", \"networking\",
+               \"descriptorHeap\", \"bindless\"${KORAL_CAPABILITY_EXTRA}],
   \"providedPorts\": [\"spdlog\", \"fmt\"]
 }
 ")

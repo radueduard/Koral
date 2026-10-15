@@ -282,113 +282,122 @@ namespace kor::builders::detail
     const Type type213 { .kind = Kind::eUInt, .bits = 32 };
     const Type type214 { .kind = Kind::eUInt, .bits = 32 };
     const Field fields215[] = { { "name", &type212, "" }, { "set", &type213, "" }, { "binding", &type214, "" } };
-    const std::span<const Field> fields216;
-    const Type type217 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
-    const Field fields218[] = { { "shader", &type217, "" } };
-    const Type type219 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type220 { .kind = Kind::eBytes, .bits = 32 };
-    const Field fields221[] = { { "id", &type219, "" }, { "value", &type220, "" } };
-    const Type type222 { .kind = Kind::eString, .bits = 32 };
+    const Type type216 { .kind = Kind::eString, .bits = 32 };
+    const Type type217 { .kind = Kind::eResource, .bits = 32, .name = "Sampler" };
+    const Field fields218[] = { { "name", &type216, "" }, { "sampler", &type217, "" } };
+    const std::span<const Field> fields219;
+    const Type type220 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
+    const Field fields221[] = { { "shader", &type220, "" } };
+    const Type type222 { .kind = Kind::eUInt, .bits = 32 };
     const Type type223 { .kind = Kind::eBytes, .bits = 32 };
-    const Field fields224[] = { { "name", &type222, "" }, { "value", &type223, "" } };
+    const Field fields224[] = { { "id", &type222, "" }, { "value", &type223, "" } };
     const Type type225 { .kind = Kind::eString, .bits = 32 };
-    const Type type226 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type227 { .kind = Kind::eUInt, .bits = 32 };
-    const Field fields228[] = { { "name", &type225, "" }, { "set", &type226, "" }, { "binding", &type227, "" } };
-    const std::span<const Field> fields229;
-    const Type type230 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
-    const Field fields231[] = { { "shader", &type230, "" } };
-    const Type type232 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
-    const Field fields233[] = { { "shader", &type232, "" } };
-    const Type type234 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
-    const Type type235 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
+    const Type type226 { .kind = Kind::eBytes, .bits = 32 };
+    const Field fields227[] = { { "name", &type225, "" }, { "value", &type226, "" } };
+    const Type type228 { .kind = Kind::eString, .bits = 32 };
+    const Type type229 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type230 { .kind = Kind::eUInt, .bits = 32 };
+    const Field fields231[] = { { "name", &type228, "" }, { "set", &type229, "" }, { "binding", &type230, "" } };
+    const Type type232 { .kind = Kind::eString, .bits = 32 };
+    const Type type233 { .kind = Kind::eResource, .bits = 32, .name = "Sampler" };
+    const Field fields234[] = { { "name", &type232, "" }, { "sampler", &type233, "" } };
+    const std::span<const Field> fields235;
     const Type type236 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
-    const Field fields237[] = { { "closestHit", &type234, "" }, { "anyHit", &type235, "" }, { "intersection", &type236, "" } };
+    const Field fields237[] = { { "shader", &type236, "" } };
     const Type type238 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
     const Field fields239[] = { { "shader", &type238, "" } };
-    const Type type240 { .kind = Kind::eUInt, .bits = 32 };
-    const Field fields241[] = { { "depth", &type240, "" } };
-    const Type type242 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type243 { .kind = Kind::eBytes, .bits = 32 };
-    const Field fields244[] = { { "id", &type242, "" }, { "value", &type243, "" } };
-    const Type type245 { .kind = Kind::eString, .bits = 32 };
-    const Type type246 { .kind = Kind::eBytes, .bits = 32 };
-    const Field fields247[] = { { "name", &type245, "" }, { "value", &type246, "" } };
-    const Type type248 { .kind = Kind::eString, .bits = 32 };
-    const Type type249 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type250 { .kind = Kind::eUInt, .bits = 32 };
-    const Field fields251[] = { { "name", &type248, "" }, { "set", &type249, "" }, { "binding", &type250, "" } };
-    const std::span<const Field> fields252;
-    const Type type253 { .kind = Kind::eString, .bits = 32 };
-    const Type type254 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
-    const Type type255 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
-    const Type type256 { .kind = Kind::eChoice, .bits = 32, .name = "ClearColorScalar", .enumeration = &Enum_ClearColorScalar };
-    const Type type257 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type258 { .kind = Kind::eFloat, .bits = 32 };
-    const Type type259 { .kind = Kind::eArray, .bits = 32, .length = 4, .element = &type258 };
-    const Type type260 { .kind = Kind::eInt, .bits = 32 };
-    const Type type261 { .kind = Kind::eArray, .bits = 32, .length = 4, .element = &type260 };
-    const Type type262 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type263 { .kind = Kind::eArray, .bits = 32, .length = 4, .element = &type262 };
-    const Field fields264[] = { { "f", &type259, "" }, { "i", &type261, "" }, { "u", &type263, "" } };
-    const Type type265 { .kind = Kind::eUnion, .bits = 32, .fields = fields264 };
-    const Field fields266[] = { { "scalarType", &type256, "" }, { "components", &type257, "" }, { "value", &type265, "" } };
-    const Type type267 { .kind = Kind::eStruct, .bits = 32, .name = "KoralClearColor", .fields = fields266 };
-    const Field fields268[] = { { "name", &type253, "" }, { "view", &type254, "" }, { "resolve", &type255, "" }, { "clear", &type267, "" } };
-    const Type type269 { .kind = Kind::eChoice, .bits = 32, .name = "DepthStencilAttachment", .enumeration = &Enum_DepthStencilAttachment };
-    const Type type270 { .kind = Kind::eString, .bits = 32 };
-    const Type type271 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
-    const Type type272 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
-    const Type type273 { .kind = Kind::eFloat, .bits = 32 };
-    const Type type274 { .kind = Kind::eInt, .bits = 32 };
-    const Field fields275[] = { { "which", &type269, "" }, { "name", &type270, "" }, { "view", &type271, "" }, { "resolve", &type272, "" }, { "depth", &type273, "" }, { "stencil", &type274, "" } };
-    const Type type276 { .kind = Kind::eEnum, .bits = 32, .name = "kor::ResolveMode", .enumeration = &Enum_kor__ResolveMode };
-    const Field fields277[] = { { "mode", &type276, "" } };
-    const std::span<const Field> fields278;
-    const Type type279 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type280 { .kind = Kind::eResource, .bits = 32, .name = "Buffer" };
-    const Field fields281[] = { { "binding", &type279, "" }, { "buffer", &type280, "" } };
-    const Type type282 { .kind = Kind::eResource, .bits = 32, .name = "Buffer" };
-    const Type type283 { .kind = Kind::eEnum, .bits = 32, .name = "kor::ChannelType", .enumeration = &Enum_kor__ChannelType };
-    const Field fields284[] = { { "buffer", &type282, "" }, { "indexType", &type283, "" } };
-    const Type type285 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type286 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type287 { .kind = Kind::eEnum, .bits = 32, .name = "kor::VertexInputRate", .enumeration = &Enum_kor__VertexInputRate };
-    const Field fields288[] = { { "binding", &type285, "" }, { "stride", &type286, "" }, { "inputRate", &type287, "" } };
-    const Type type289 { .kind = Kind::eStruct, .bits = 32, .name = "KoralVertexBinding", .fields = fields288 };
-    const Type type290 { .kind = Kind::eList, .bits = 32, .element = &type289 };
-    const Type type291 { .kind = Kind::eString, .bits = 32 };
-    const Type type292 { .kind = Kind::eString, .bits = 32 };
-    const Type type293 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type240 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
+    const Type type241 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
+    const Type type242 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
+    const Field fields243[] = { { "closestHit", &type240, "" }, { "anyHit", &type241, "" }, { "intersection", &type242, "" } };
+    const Type type244 { .kind = Kind::eResource, .bits = 32, .name = "Shader" };
+    const Field fields245[] = { { "shader", &type244, "" } };
+    const Type type246 { .kind = Kind::eUInt, .bits = 32 };
+    const Field fields247[] = { { "depth", &type246, "" } };
+    const Type type248 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type249 { .kind = Kind::eBytes, .bits = 32 };
+    const Field fields250[] = { { "id", &type248, "" }, { "value", &type249, "" } };
+    const Type type251 { .kind = Kind::eString, .bits = 32 };
+    const Type type252 { .kind = Kind::eBytes, .bits = 32 };
+    const Field fields253[] = { { "name", &type251, "" }, { "value", &type252, "" } };
+    const Type type254 { .kind = Kind::eString, .bits = 32 };
+    const Type type255 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type256 { .kind = Kind::eUInt, .bits = 32 };
+    const Field fields257[] = { { "name", &type254, "" }, { "set", &type255, "" }, { "binding", &type256, "" } };
+    const Type type258 { .kind = Kind::eString, .bits = 32 };
+    const Type type259 { .kind = Kind::eResource, .bits = 32, .name = "Sampler" };
+    const Field fields260[] = { { "name", &type258, "" }, { "sampler", &type259, "" } };
+    const std::span<const Field> fields261;
+    const Type type262 { .kind = Kind::eString, .bits = 32 };
+    const Type type263 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
+    const Type type264 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
+    const Type type265 { .kind = Kind::eChoice, .bits = 32, .name = "ClearColorScalar", .enumeration = &Enum_ClearColorScalar };
+    const Type type266 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type267 { .kind = Kind::eFloat, .bits = 32 };
+    const Type type268 { .kind = Kind::eArray, .bits = 32, .length = 4, .element = &type267 };
+    const Type type269 { .kind = Kind::eInt, .bits = 32 };
+    const Type type270 { .kind = Kind::eArray, .bits = 32, .length = 4, .element = &type269 };
+    const Type type271 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type272 { .kind = Kind::eArray, .bits = 32, .length = 4, .element = &type271 };
+    const Field fields273[] = { { "f", &type268, "" }, { "i", &type270, "" }, { "u", &type272, "" } };
+    const Type type274 { .kind = Kind::eUnion, .bits = 32, .fields = fields273 };
+    const Field fields275[] = { { "scalarType", &type265, "" }, { "components", &type266, "" }, { "value", &type274, "" } };
+    const Type type276 { .kind = Kind::eStruct, .bits = 32, .name = "KoralClearColor", .fields = fields275 };
+    const Field fields277[] = { { "name", &type262, "" }, { "view", &type263, "" }, { "resolve", &type264, "" }, { "clear", &type276, "" } };
+    const Type type278 { .kind = Kind::eChoice, .bits = 32, .name = "DepthStencilAttachment", .enumeration = &Enum_DepthStencilAttachment };
+    const Type type279 { .kind = Kind::eString, .bits = 32 };
+    const Type type280 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
+    const Type type281 { .kind = Kind::eResource, .bits = 32, .name = "Resource" };
+    const Type type282 { .kind = Kind::eFloat, .bits = 32 };
+    const Type type283 { .kind = Kind::eInt, .bits = 32 };
+    const Field fields284[] = { { "which", &type278, "" }, { "name", &type279, "" }, { "view", &type280, "" }, { "resolve", &type281, "" }, { "depth", &type282, "" }, { "stencil", &type283, "" } };
+    const Type type285 { .kind = Kind::eEnum, .bits = 32, .name = "kor::ResolveMode", .enumeration = &Enum_kor__ResolveMode };
+    const Field fields286[] = { { "mode", &type285, "" } };
+    const std::span<const Field> fields287;
+    const Type type288 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type289 { .kind = Kind::eResource, .bits = 32, .name = "Buffer" };
+    const Field fields290[] = { { "binding", &type288, "" }, { "buffer", &type289, "" } };
+    const Type type291 { .kind = Kind::eResource, .bits = 32, .name = "Buffer" };
+    const Type type292 { .kind = Kind::eEnum, .bits = 32, .name = "kor::ChannelType", .enumeration = &Enum_kor__ChannelType };
+    const Field fields293[] = { { "buffer", &type291, "" }, { "indexType", &type292, "" } };
     const Type type294 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type295 { .kind = Kind::eEnum, .bits = 32, .name = "kor::ChannelType", .enumeration = &Enum_kor__ChannelType };
-    const Type type296 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type297 { .kind = Kind::eInt, .bits = 64 };
-    const Type type298 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type299 { .kind = Kind::eUInt, .bits = 32 };
-    const Field fields300[] = { { "semantic", &type291, "" }, { "semanticNamespace", &type292, "" }, { "binding", &type293, "" }, { "offset", &type294, "" }, { "channelType", &type295, "" }, { "channelCount", &type296, "" }, { "location", &type297, "" }, { "locations", &type298, "" }, { "locationStride", &type299, "" } };
-    const Type type301 { .kind = Kind::eStruct, .bits = 32, .name = "KoralVertexAttribute", .fields = fields300 };
-    const Type type302 { .kind = Kind::eList, .bits = 32, .element = &type301 };
-    const Type type303 { .kind = Kind::eInt, .bits = 64 };
-    const Field fields304[] = { { "bindings", &type290, "" }, { "attributes", &type302, "" }, { "positionAttribute", &type303, "" } };
-    const Type type305 { .kind = Kind::eStruct, .bits = 32, .name = "KoralVertexLayout", .fields = fields304 };
-    const Field fields306[] = { { "layout", &type305, "" } };
-    const std::span<const Field> fields307;
-    const Type type308 { .kind = Kind::eResource, .bits = 32, .name = "Mesh" };
-    const Field fields309[] = { { "mesh", &type308, "" } };
-    const Type type310 { .kind = Kind::eResource, .bits = 32, .name = "Mesh" };
-    const Type type311 { .kind = Kind::eUInt, .bits = 64 };
-    const Type type312 { .kind = Kind::eUInt, .bits = 64 };
-    const Type type313 { .kind = Kind::eUInt, .bits = 64 };
-    const Type type314 { .kind = Kind::eUInt, .bits = 64 };
-    const Field fields315[] = { { "mesh", &type310, "" }, { "firstVertex", &type311, "" }, { "vertexCount", &type312, "" }, { "firstIndex", &type313, "" }, { "indexCount", &type314, "" } };
-    const Type type316 { .kind = Kind::eResource, .bits = 32, .name = "AccelerationStructure" };
-    const Type type317 { .kind = Kind::eFloat, .bits = 32 };
-    const Type type318 { .kind = Kind::eArray, .bits = 32, .length = 16, .element = &type317 };
-    const Type type319 { .kind = Kind::eUInt, .bits = 32 };
-    const Type type320 { .kind = Kind::eUInt, .bits = 32 };
-    const Field fields321[] = { { "blas", &type316, "" }, { "transform", &type318, "" }, { "customIndex", &type319, "" }, { "hitGroupIndex", &type320, "" } };
-    const std::span<const Field> fields322;
+    const Type type295 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type296 { .kind = Kind::eEnum, .bits = 32, .name = "kor::VertexInputRate", .enumeration = &Enum_kor__VertexInputRate };
+    const Field fields297[] = { { "binding", &type294, "" }, { "stride", &type295, "" }, { "inputRate", &type296, "" } };
+    const Type type298 { .kind = Kind::eStruct, .bits = 32, .name = "KoralVertexBinding", .fields = fields297 };
+    const Type type299 { .kind = Kind::eList, .bits = 32, .element = &type298 };
+    const Type type300 { .kind = Kind::eString, .bits = 32 };
+    const Type type301 { .kind = Kind::eString, .bits = 32 };
+    const Type type302 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type303 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type304 { .kind = Kind::eEnum, .bits = 32, .name = "kor::ChannelType", .enumeration = &Enum_kor__ChannelType };
+    const Type type305 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type306 { .kind = Kind::eInt, .bits = 64 };
+    const Type type307 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type308 { .kind = Kind::eUInt, .bits = 32 };
+    const Field fields309[] = { { "semantic", &type300, "" }, { "semanticNamespace", &type301, "" }, { "binding", &type302, "" }, { "offset", &type303, "" }, { "channelType", &type304, "" }, { "channelCount", &type305, "" }, { "location", &type306, "" }, { "locations", &type307, "" }, { "locationStride", &type308, "" } };
+    const Type type310 { .kind = Kind::eStruct, .bits = 32, .name = "KoralVertexAttribute", .fields = fields309 };
+    const Type type311 { .kind = Kind::eList, .bits = 32, .element = &type310 };
+    const Type type312 { .kind = Kind::eInt, .bits = 64 };
+    const Field fields313[] = { { "bindings", &type299, "" }, { "attributes", &type311, "" }, { "positionAttribute", &type312, "" } };
+    const Type type314 { .kind = Kind::eStruct, .bits = 32, .name = "KoralVertexLayout", .fields = fields313 };
+    const Field fields315[] = { { "layout", &type314, "" } };
+    const std::span<const Field> fields316;
+    const Type type317 { .kind = Kind::eResource, .bits = 32, .name = "Mesh" };
+    const Field fields318[] = { { "mesh", &type317, "" } };
+    const Type type319 { .kind = Kind::eResource, .bits = 32, .name = "Mesh" };
+    const Type type320 { .kind = Kind::eUInt, .bits = 64 };
+    const Type type321 { .kind = Kind::eUInt, .bits = 64 };
+    const Type type322 { .kind = Kind::eUInt, .bits = 64 };
+    const Type type323 { .kind = Kind::eUInt, .bits = 64 };
+    const Field fields324[] = { { "mesh", &type319, "" }, { "firstVertex", &type320, "" }, { "vertexCount", &type321, "" }, { "firstIndex", &type322, "" }, { "indexCount", &type323, "" } };
+    const Type type325 { .kind = Kind::eResource, .bits = 32, .name = "AccelerationStructure" };
+    const Type type326 { .kind = Kind::eFloat, .bits = 32 };
+    const Type type327 { .kind = Kind::eArray, .bits = 32, .length = 16, .element = &type326 };
+    const Type type328 { .kind = Kind::eUInt, .bits = 32 };
+    const Type type329 { .kind = Kind::eUInt, .bits = 32 };
+    const Field fields330[] = { { "blas", &type325, "" }, { "transform", &type327, "" }, { "customIndex", &type328, "" }, { "hitGroupIndex", &type329, "" } };
+    const std::span<const Field> fields331;
 
 
     void Fill(KoralVertexLayout& out, const Value& value, Keep& keep);
@@ -910,13 +919,18 @@ namespace kor::builders::detail
         Keep keep;
         koral_graphics_pipeline_builder_set_binding(builder, At(arguments, 0).CString(), static_cast<uint32_t>(At(arguments, 1).UInt()), static_cast<uint32_t>(At(arguments, 2).UInt()));
     }
+    void Invoke_koral_graphics_pipeline_builder_set_sampler(KoralBuilder* builder, const std::span<const Value> arguments)
+    {
+        Keep keep;
+        koral_graphics_pipeline_builder_set_sampler(builder, At(arguments, 0).CString(), At(arguments, 1).Resource());
+    }
     KoralBuilder* Create_koral_graphics_pipeline_builder_new(const std::span<const Value> arguments)
     {
         Keep keep;
         return koral_graphics_pipeline_builder_new();
     }
     KoralResource* Finish_koral_graphics_pipeline_builder_new(KoralBuilder* builder) { return koral_graphics_pipeline_builder_build(builder); }
-    const Setting Settings_GraphicsPipeline[] = { { "vertexShader", "koral_graphics_pipeline_builder_set_vertex_shader", false, fields121, "SetVertexShader(shader), or SetVertexShader(shader, layout) when @p layout is not null.", &Invoke_koral_graphics_pipeline_builder_set_vertex_shader }, { "tessellationState", "koral_graphics_pipeline_builder_set_tessellation_state", false, fields125, "", &Invoke_koral_graphics_pipeline_builder_set_tessellation_state }, { "geometryShader", "koral_graphics_pipeline_builder_set_geometry_shader", false, fields127, "", &Invoke_koral_graphics_pipeline_builder_set_geometry_shader }, { "fragmentShader", "koral_graphics_pipeline_builder_set_fragment_shader", false, fields129, "", &Invoke_koral_graphics_pipeline_builder_set_fragment_shader }, { "taskShader", "koral_graphics_pipeline_builder_set_task_shader", false, fields131, "", &Invoke_koral_graphics_pipeline_builder_set_task_shader }, { "meshShader", "koral_graphics_pipeline_builder_set_mesh_shader", false, fields133, "", &Invoke_koral_graphics_pipeline_builder_set_mesh_shader }, { "inputAssemblyState", "koral_graphics_pipeline_builder_set_input_assembly_state", false, fields138, "", &Invoke_koral_graphics_pipeline_builder_set_input_assembly_state }, { "rasterizationState", "koral_graphics_pipeline_builder_set_rasterization_state", false, fields151, "", &Invoke_koral_graphics_pipeline_builder_set_rasterization_state }, { "multisampleState", "koral_graphics_pipeline_builder_set_multisample_state", false, fields157, "", &Invoke_koral_graphics_pipeline_builder_set_multisample_state }, { "depthStencilState", "koral_graphics_pipeline_builder_set_depth_stencil_state", false, fields185, "", &Invoke_koral_graphics_pipeline_builder_set_depth_stencil_state }, { "colorBlendState", "koral_graphics_pipeline_builder_set_color_blend_state", false, fields203, "", &Invoke_koral_graphics_pipeline_builder_set_color_blend_state }, { "framebuffer", "koral_graphics_pipeline_builder_set_framebuffer", false, fields205, "", &Invoke_koral_graphics_pipeline_builder_set_framebuffer }, { "specializationConstant", "koral_graphics_pipeline_builder_set_specialization_constant", false, fields208, "SetSpecializationConstant(id, value): a 4- or 8-byte value.", &Invoke_koral_graphics_pipeline_builder_set_specialization_constant }, { "specializationConstantNamed", "koral_graphics_pipeline_builder_set_specialization_constant_named", false, fields211, "SetSpecializationConstant(name, value), by the name its shader gave it: a 4- or 8-byte value.", &Invoke_koral_graphics_pipeline_builder_set_specialization_constant_named }, { "binding", "koral_graphics_pipeline_builder_set_binding", false, fields215, "SetBinding(name, set, binding): puts the descriptor @p name there, whatever its shader said.", &Invoke_koral_graphics_pipeline_builder_set_binding } };
+    const Setting Settings_GraphicsPipeline[] = { { "vertexShader", "koral_graphics_pipeline_builder_set_vertex_shader", false, fields121, "SetVertexShader(shader), or SetVertexShader(shader, layout) when @p layout is not null.", &Invoke_koral_graphics_pipeline_builder_set_vertex_shader }, { "tessellationState", "koral_graphics_pipeline_builder_set_tessellation_state", false, fields125, "", &Invoke_koral_graphics_pipeline_builder_set_tessellation_state }, { "geometryShader", "koral_graphics_pipeline_builder_set_geometry_shader", false, fields127, "", &Invoke_koral_graphics_pipeline_builder_set_geometry_shader }, { "fragmentShader", "koral_graphics_pipeline_builder_set_fragment_shader", false, fields129, "", &Invoke_koral_graphics_pipeline_builder_set_fragment_shader }, { "taskShader", "koral_graphics_pipeline_builder_set_task_shader", false, fields131, "", &Invoke_koral_graphics_pipeline_builder_set_task_shader }, { "meshShader", "koral_graphics_pipeline_builder_set_mesh_shader", false, fields133, "", &Invoke_koral_graphics_pipeline_builder_set_mesh_shader }, { "inputAssemblyState", "koral_graphics_pipeline_builder_set_input_assembly_state", false, fields138, "", &Invoke_koral_graphics_pipeline_builder_set_input_assembly_state }, { "rasterizationState", "koral_graphics_pipeline_builder_set_rasterization_state", false, fields151, "", &Invoke_koral_graphics_pipeline_builder_set_rasterization_state }, { "multisampleState", "koral_graphics_pipeline_builder_set_multisample_state", false, fields157, "", &Invoke_koral_graphics_pipeline_builder_set_multisample_state }, { "depthStencilState", "koral_graphics_pipeline_builder_set_depth_stencil_state", false, fields185, "", &Invoke_koral_graphics_pipeline_builder_set_depth_stencil_state }, { "colorBlendState", "koral_graphics_pipeline_builder_set_color_blend_state", false, fields203, "", &Invoke_koral_graphics_pipeline_builder_set_color_blend_state }, { "framebuffer", "koral_graphics_pipeline_builder_set_framebuffer", false, fields205, "", &Invoke_koral_graphics_pipeline_builder_set_framebuffer }, { "specializationConstant", "koral_graphics_pipeline_builder_set_specialization_constant", false, fields208, "SetSpecializationConstant(id, value): a 4- or 8-byte value.", &Invoke_koral_graphics_pipeline_builder_set_specialization_constant }, { "specializationConstantNamed", "koral_graphics_pipeline_builder_set_specialization_constant_named", false, fields211, "SetSpecializationConstant(name, value), by the name its shader gave it: a 4- or 8-byte value.", &Invoke_koral_graphics_pipeline_builder_set_specialization_constant_named }, { "binding", "koral_graphics_pipeline_builder_set_binding", false, fields215, "SetBinding(name, set, binding): puts the descriptor @p name there, whatever its shader said.", &Invoke_koral_graphics_pipeline_builder_set_binding }, { "sampler", "koral_graphics_pipeline_builder_set_sampler", false, fields218, "SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name.", &Invoke_koral_graphics_pipeline_builder_set_sampler } };
     void Invoke_koral_compute_pipeline_builder_set_compute_shader(KoralBuilder* builder, const std::span<const Value> arguments)
     {
         Keep keep;
@@ -939,13 +953,18 @@ namespace kor::builders::detail
         Keep keep;
         koral_compute_pipeline_builder_set_binding(builder, At(arguments, 0).CString(), static_cast<uint32_t>(At(arguments, 1).UInt()), static_cast<uint32_t>(At(arguments, 2).UInt()));
     }
+    void Invoke_koral_compute_pipeline_builder_set_sampler(KoralBuilder* builder, const std::span<const Value> arguments)
+    {
+        Keep keep;
+        koral_compute_pipeline_builder_set_sampler(builder, At(arguments, 0).CString(), At(arguments, 1).Resource());
+    }
     KoralBuilder* Create_koral_compute_pipeline_builder_new(const std::span<const Value> arguments)
     {
         Keep keep;
         return koral_compute_pipeline_builder_new();
     }
     KoralResource* Finish_koral_compute_pipeline_builder_new(KoralBuilder* builder) { return koral_compute_pipeline_builder_build(builder); }
-    const Setting Settings_ComputePipeline[] = { { "computeShader", "koral_compute_pipeline_builder_set_compute_shader", false, fields218, "", &Invoke_koral_compute_pipeline_builder_set_compute_shader }, { "specializationConstant", "koral_compute_pipeline_builder_set_specialization_constant", false, fields221, "", &Invoke_koral_compute_pipeline_builder_set_specialization_constant }, { "specializationConstantNamed", "koral_compute_pipeline_builder_set_specialization_constant_named", false, fields224, "", &Invoke_koral_compute_pipeline_builder_set_specialization_constant_named }, { "binding", "koral_compute_pipeline_builder_set_binding", false, fields228, "", &Invoke_koral_compute_pipeline_builder_set_binding } };
+    const Setting Settings_ComputePipeline[] = { { "computeShader", "koral_compute_pipeline_builder_set_compute_shader", false, fields221, "", &Invoke_koral_compute_pipeline_builder_set_compute_shader }, { "specializationConstant", "koral_compute_pipeline_builder_set_specialization_constant", false, fields224, "", &Invoke_koral_compute_pipeline_builder_set_specialization_constant }, { "specializationConstantNamed", "koral_compute_pipeline_builder_set_specialization_constant_named", false, fields227, "", &Invoke_koral_compute_pipeline_builder_set_specialization_constant_named }, { "binding", "koral_compute_pipeline_builder_set_binding", false, fields231, "", &Invoke_koral_compute_pipeline_builder_set_binding }, { "sampler", "koral_compute_pipeline_builder_set_sampler", false, fields234, "SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name.", &Invoke_koral_compute_pipeline_builder_set_sampler } };
     void Invoke_koral_ray_tracing_pipeline_builder_set_raygen_shader(KoralBuilder* builder, const std::span<const Value> arguments)
     {
         Keep keep;
@@ -988,13 +1007,18 @@ namespace kor::builders::detail
         Keep keep;
         koral_ray_tracing_pipeline_builder_set_binding(builder, At(arguments, 0).CString(), static_cast<uint32_t>(At(arguments, 1).UInt()), static_cast<uint32_t>(At(arguments, 2).UInt()));
     }
+    void Invoke_koral_ray_tracing_pipeline_builder_set_sampler(KoralBuilder* builder, const std::span<const Value> arguments)
+    {
+        Keep keep;
+        koral_ray_tracing_pipeline_builder_set_sampler(builder, At(arguments, 0).CString(), At(arguments, 1).Resource());
+    }
     KoralBuilder* Create_koral_ray_tracing_pipeline_builder_new(const std::span<const Value> arguments)
     {
         Keep keep;
         return koral_ray_tracing_pipeline_builder_new();
     }
     KoralResource* Finish_koral_ray_tracing_pipeline_builder_new(KoralBuilder* builder) { return koral_ray_tracing_pipeline_builder_build(builder); }
-    const Setting Settings_RayTracingPipeline[] = { { "raygenShader", "koral_ray_tracing_pipeline_builder_set_raygen_shader", false, fields231, "", &Invoke_koral_ray_tracing_pipeline_builder_set_raygen_shader }, { "missShader", "koral_ray_tracing_pipeline_builder_add_miss_shader", true, fields233, "", &Invoke_koral_ray_tracing_pipeline_builder_add_miss_shader }, { "hitGroup", "koral_ray_tracing_pipeline_builder_add_hit_group", true, fields237, "AddHitGroup: any of the three may be null.", &Invoke_koral_ray_tracing_pipeline_builder_add_hit_group }, { "callableShader", "koral_ray_tracing_pipeline_builder_add_callable_shader", true, fields239, "", &Invoke_koral_ray_tracing_pipeline_builder_add_callable_shader }, { "maxRecursionDepth", "koral_ray_tracing_pipeline_builder_set_max_recursion_depth", false, fields241, "", &Invoke_koral_ray_tracing_pipeline_builder_set_max_recursion_depth }, { "specializationConstant", "koral_ray_tracing_pipeline_builder_set_specialization_constant", false, fields244, "", &Invoke_koral_ray_tracing_pipeline_builder_set_specialization_constant }, { "specializationConstantNamed", "koral_ray_tracing_pipeline_builder_set_specialization_constant_named", false, fields247, "", &Invoke_koral_ray_tracing_pipeline_builder_set_specialization_constant_named }, { "binding", "koral_ray_tracing_pipeline_builder_set_binding", false, fields251, "", &Invoke_koral_ray_tracing_pipeline_builder_set_binding } };
+    const Setting Settings_RayTracingPipeline[] = { { "raygenShader", "koral_ray_tracing_pipeline_builder_set_raygen_shader", false, fields237, "", &Invoke_koral_ray_tracing_pipeline_builder_set_raygen_shader }, { "missShader", "koral_ray_tracing_pipeline_builder_add_miss_shader", true, fields239, "", &Invoke_koral_ray_tracing_pipeline_builder_add_miss_shader }, { "hitGroup", "koral_ray_tracing_pipeline_builder_add_hit_group", true, fields243, "AddHitGroup: any of the three may be null.", &Invoke_koral_ray_tracing_pipeline_builder_add_hit_group }, { "callableShader", "koral_ray_tracing_pipeline_builder_add_callable_shader", true, fields245, "", &Invoke_koral_ray_tracing_pipeline_builder_add_callable_shader }, { "maxRecursionDepth", "koral_ray_tracing_pipeline_builder_set_max_recursion_depth", false, fields247, "", &Invoke_koral_ray_tracing_pipeline_builder_set_max_recursion_depth }, { "specializationConstant", "koral_ray_tracing_pipeline_builder_set_specialization_constant", false, fields250, "", &Invoke_koral_ray_tracing_pipeline_builder_set_specialization_constant }, { "specializationConstantNamed", "koral_ray_tracing_pipeline_builder_set_specialization_constant_named", false, fields253, "", &Invoke_koral_ray_tracing_pipeline_builder_set_specialization_constant_named }, { "binding", "koral_ray_tracing_pipeline_builder_set_binding", false, fields257, "", &Invoke_koral_ray_tracing_pipeline_builder_set_binding }, { "sampler", "koral_ray_tracing_pipeline_builder_set_sampler", false, fields260, "SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name.", &Invoke_koral_ray_tracing_pipeline_builder_set_sampler } };
     void Invoke_koral_framebuffer_builder_add_color(KoralBuilder* builder, const std::span<const Value> arguments)
     {
         Keep keep;
@@ -1019,7 +1043,7 @@ namespace kor::builders::detail
         return koral_framebuffer_builder_new();
     }
     KoralResource* Finish_koral_framebuffer_builder_new(KoralBuilder* builder) { return koral_framebuffer_builder_build(builder); }
-    const Setting Settings_Framebuffer[] = { { "color", "koral_framebuffer_builder_add_color", true, fields268, "AddColor: @p view is an ImageView or an Image (an AttachmentSource), @p resolve may be null.", &Invoke_koral_framebuffer_builder_add_color }, { "depthStencil", "koral_framebuffer_builder_set_depth_stencil", false, fields275, "SetDepth, SetStencil or SetDepthStencil (which: 0, 1, 2).", &Invoke_koral_framebuffer_builder_set_depth_stencil }, { "resolveMode", "koral_framebuffer_builder_set_resolve_mode", false, fields277, "", &Invoke_koral_framebuffer_builder_set_resolve_mode } };
+    const Setting Settings_Framebuffer[] = { { "color", "koral_framebuffer_builder_add_color", true, fields277, "AddColor: @p view is an ImageView or an Image (an AttachmentSource), @p resolve may be null.", &Invoke_koral_framebuffer_builder_add_color }, { "depthStencil", "koral_framebuffer_builder_set_depth_stencil", false, fields284, "SetDepth, SetStencil or SetDepthStencil (which: 0, 1, 2).", &Invoke_koral_framebuffer_builder_set_depth_stencil }, { "resolveMode", "koral_framebuffer_builder_set_resolve_mode", false, fields286, "", &Invoke_koral_framebuffer_builder_set_resolve_mode } };
     void Invoke_koral_mesh_builder_set_vertex_buffer(KoralBuilder* builder, const std::span<const Value> arguments)
     {
         Keep keep;
@@ -1044,7 +1068,7 @@ namespace kor::builders::detail
         return koral_mesh_builder_new();
     }
     KoralResource* Finish_koral_mesh_builder_new(KoralBuilder* builder) { return koral_mesh_builder_build(builder); }
-    const Setting Settings_Mesh[] = { { "vertexBuffer", "koral_mesh_builder_set_vertex_buffer", false, fields281, "", &Invoke_koral_mesh_builder_set_vertex_buffer }, { "indexBuffer", "koral_mesh_builder_set_index_buffer", false, fields284, "", &Invoke_koral_mesh_builder_set_index_buffer }, { "vertexLayout", "koral_mesh_builder_set_vertex_layout", false, fields306, "", &Invoke_koral_mesh_builder_set_vertex_layout } };
+    const Setting Settings_Mesh[] = { { "vertexBuffer", "koral_mesh_builder_set_vertex_buffer", false, fields290, "", &Invoke_koral_mesh_builder_set_vertex_buffer }, { "indexBuffer", "koral_mesh_builder_set_index_buffer", false, fields293, "", &Invoke_koral_mesh_builder_set_index_buffer }, { "vertexLayout", "koral_mesh_builder_set_vertex_layout", false, fields315, "", &Invoke_koral_mesh_builder_set_vertex_layout } };
     void Invoke_koral_acceleration_structure_builder_add_mesh(KoralBuilder* builder, const std::span<const Value> arguments)
     {
         Keep keep;
@@ -1068,7 +1092,7 @@ namespace kor::builders::detail
         return koral_acceleration_structure_builder_new();
     }
     KoralResource* Finish_koral_acceleration_structure_builder_new(KoralBuilder* builder) { return koral_acceleration_structure_builder_build(builder); }
-    const Setting Settings_AccelerationStructure[] = { { "mesh", "koral_acceleration_structure_builder_add_mesh", true, fields309, "", &Invoke_koral_acceleration_structure_builder_add_mesh }, { "geometry", "koral_acceleration_structure_builder_add_geometry", true, fields315, "", &Invoke_koral_acceleration_structure_builder_add_geometry }, { "instance", "koral_acceleration_structure_builder_add_instance", true, fields321, "AddInstance: @p transform is 16 floats, column-major.", &Invoke_koral_acceleration_structure_builder_add_instance } };
+    const Setting Settings_AccelerationStructure[] = { { "mesh", "koral_acceleration_structure_builder_add_mesh", true, fields318, "", &Invoke_koral_acceleration_structure_builder_add_mesh }, { "geometry", "koral_acceleration_structure_builder_add_geometry", true, fields324, "", &Invoke_koral_acceleration_structure_builder_add_geometry }, { "instance", "koral_acceleration_structure_builder_add_instance", true, fields330, "AddInstance: @p transform is 16 floats, column-major.", &Invoke_koral_acceleration_structure_builder_add_instance } };
     const Description Descriptions[] = {
         { "Buffer", "Buffer", fields13, Settings_Buffer, "---- kor::Buffer (sizes and offsets in bytes: the C++ Builder<std::byte>) -----------------------------", &Create_koral_buffer_builder_new, &Finish_koral_buffer_builder_new },
         { "Image", "Image", fields36, Settings_Image, "---- kor::Image --------------------------------------------------------------------------------------", &Create_koral_image_builder_new, &Finish_koral_image_builder_new },
@@ -1076,12 +1100,12 @@ namespace kor::builders::detail
         { "Sampler", "Sampler", fields80, Settings_Sampler, "", &Create_koral_sampler_builder_new, &Finish_koral_sampler_builder_new },
         { "BufferView", "BufferView", fields88, Settings_BufferView, "", &Create_koral_buffer_view_builder_new, &Finish_koral_buffer_view_builder_new },
         { "Shader", "Shader", fields98, Settings_Shader, "---- kor::Shader ---------------------------------------------------------------------------------------", &Create_koral_shader_builder_new, &Finish_koral_shader_builder_new },
-        { "GraphicsPipeline", "GraphicsPipeline", fields216, Settings_GraphicsPipeline, "", &Create_koral_graphics_pipeline_builder_new, &Finish_koral_graphics_pipeline_builder_new },
-        { "ComputePipeline", "ComputePipeline", fields229, Settings_ComputePipeline, "", &Create_koral_compute_pipeline_builder_new, &Finish_koral_compute_pipeline_builder_new },
-        { "RayTracingPipeline", "RayTracingPipeline", fields252, Settings_RayTracingPipeline, "", &Create_koral_ray_tracing_pipeline_builder_new, &Finish_koral_ray_tracing_pipeline_builder_new },
-        { "Framebuffer", "Framebuffer", fields278, Settings_Framebuffer, "", &Create_koral_framebuffer_builder_new, &Finish_koral_framebuffer_builder_new },
-        { "Mesh", "Mesh", fields307, Settings_Mesh, "---- kor::Mesh, kor::AccelerationStructure -------------------------------------------------------------", &Create_koral_mesh_builder_new, &Finish_koral_mesh_builder_new },
-        { "AccelerationStructure", "AccelerationStructure", fields322, Settings_AccelerationStructure, "", &Create_koral_acceleration_structure_builder_new, &Finish_koral_acceleration_structure_builder_new },
+        { "GraphicsPipeline", "GraphicsPipeline", fields219, Settings_GraphicsPipeline, "", &Create_koral_graphics_pipeline_builder_new, &Finish_koral_graphics_pipeline_builder_new },
+        { "ComputePipeline", "ComputePipeline", fields235, Settings_ComputePipeline, "", &Create_koral_compute_pipeline_builder_new, &Finish_koral_compute_pipeline_builder_new },
+        { "RayTracingPipeline", "RayTracingPipeline", fields261, Settings_RayTracingPipeline, "", &Create_koral_ray_tracing_pipeline_builder_new, &Finish_koral_ray_tracing_pipeline_builder_new },
+        { "Framebuffer", "Framebuffer", fields287, Settings_Framebuffer, "", &Create_koral_framebuffer_builder_new, &Finish_koral_framebuffer_builder_new },
+        { "Mesh", "Mesh", fields316, Settings_Mesh, "---- kor::Mesh, kor::AccelerationStructure -------------------------------------------------------------", &Create_koral_mesh_builder_new, &Finish_koral_mesh_builder_new },
+        { "AccelerationStructure", "AccelerationStructure", fields331, Settings_AccelerationStructure, "", &Create_koral_acceleration_structure_builder_new, &Finish_koral_acceleration_structure_builder_new },
     };
     const Enumeration* const EnumerationList[] = { &Enum_kor__Buffer__Usage, &Enum_kor__Buffer__Type, &Enum_kor__Image__Type, &Enum_kor__Image__Format, &Enum_kor__SampleCount, &Enum_kor__Image__Usage, &Enum_kor__ImageView__Type, &Enum_kor__ImageView__Swizzle, &Enum_kor__Filter, &Enum_kor__Sampler__MipmapMode, &Enum_kor__Sampler__AddressMode, &Enum_kor__CompareOp, &Enum_kor__Shader__Stage, &Enum_kor__Shader__Lang, &Enum_kor__VertexInputRate, &Enum_kor__ChannelType, &Enum_kor__Topology, &Enum_kor__PolygonMode, &Enum_kor__CullMode, &Enum_kor__FrontFace, &Enum_kor__StencilOp, &Enum_kor__BlendFactor, &Enum_kor__BlendOp, &Enum_kor__ColorComponent, &Enum_kor__LogicOp, &Enum_kor__ResolveMode };
 }

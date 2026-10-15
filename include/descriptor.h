@@ -7,6 +7,8 @@
 #include <variant>
 #include <optional>
 
+#include <kmath/setup.h>
+
 #include "api.h"
 #include "resource.h"
 #include "error.h"

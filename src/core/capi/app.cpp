@@ -234,7 +234,7 @@ KoralAppSettings koral_app_settings_default(void)
 {
     const AppSettings d;
     return {.api = static_cast<uint32_t>(d.api), .platform = static_cast<KoralPlatform>(d.platform), .frames_in_flight = d.framesInFlight,
-            .gpu = nullptr};
+            .gpu = nullptr, .descriptors = static_cast<uint32_t>(d.descriptors)};
 }
 
 KoralWindowSettings koral_window_settings_default(void)
@@ -282,6 +282,7 @@ KoralStatus koral_app_create(const KoralAppSettings* settings)
             if (settings->gpu) s.gpu = settings->gpu;
             s.requiredFeatures = Flags<Feature>(static_cast<Feature>(settings->required_features));
             s.optionalFeatures = Flags<Feature>(static_cast<Feature>(settings->optional_features));
+            s.descriptors = settings->descriptors == 1 ? DescriptorModel::eHeap : DescriptorModel::eSets;
         }
         g_app = std::make_unique<App>(std::move(s));
         return KORAL_OK;
@@ -817,6 +818,7 @@ bool koral_context_supports_ray_tracing(void) { return Guarded([] { return Conte
 bool koral_context_supports_async_compute(void) { return Guarded([] { return Context::SupportsAsyncCompute(); }, false); }
 bool koral_context_supports_feature(const uint64_t f) { return Guarded([&] { return Context::Supports(static_cast<Feature>(f)); }, false); }
 bool koral_context_gpu_has_feature(const uint64_t f) { return Guarded([&] { return Context::GpuHas(static_cast<Feature>(f)); }, false); }
+uint32_t koral_context_descriptor_model(void) { return Guarded([] { return static_cast<uint32_t>(Context::ActiveDescriptorModel()); }, 0u); }
 const char* koral_feature_name(const uint64_t f) { return Guarded([&] { return FeatureName(static_cast<Feature>(f)); }, "None"); }
 bool koral_context_async_compute_is_separate_family(void) { return Guarded([] { return Context::AsyncComputeIsSeparateFamily(); }, false); }
 const char* koral_asset_path(const char* relative) { return Guarded([&] { return Keep(AssetPath(relative ? relative : "").string()); }, Keep("")); }
@@ -873,6 +875,7 @@ void koral_project_app_settings(KoralProject* project, KoralAppSettings* setting
     settings->gpu = project->gpu.empty() ? nullptr : project->gpu.c_str();
     settings->required_features = c.requiredFeatures.Value();
     settings->optional_features = c.optionalFeatures.Value();
+    settings->descriptors = static_cast<uint32_t>(c.descriptors);
 }
 
 void koral_project_window_settings(KoralProject* project, KoralWindowSettings* settings)

@@ -259,7 +259,8 @@ TEST_F(GpuTest, TheCInterfaceListsAShadersParameters) {
 TEST_F(GpuTest, MoreDescriptorSetsThanOnePoolHolds) {
     const auto pipeline = ComputePipeline::Builder{}.SetComputeShader(SplitShader()).Build();
     ASSERT_TRUE(pipeline.Valid());
-    const auto input = Buffer::Builder<float>{}.SetInstanceCount(Count).Build();
+    // Zeros said rather than assumed: a buffer made without data holds whatever its memory last did.
+    const auto input = Buffer::Builder<float>{}.SetData(std::vector<float>(Count, 0.f)).Build();
     const auto output = Buffer::Builder<float>{}.SetInstanceCount(Count).Build();
     const std::uint64_t before = kor::log::LastSequence();
 

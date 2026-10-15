@@ -23,14 +23,21 @@
 #include <kmath/matrix.h>
 
 #include "structs.h"
+#include "bindless.h"
+#include "descriptor.h"
 #include "shaderValue.h"
 #include "token.h"
 
 namespace kor
 {
     class Buffer;
+    class BufferView;
     class Image;
+    class ImageView;
+    class Sampler;
+    class AccelerationStructure;
     class DescriptorSet;
+    class DescriptorHeap;
     class GraphicsPipeline;
     class ComputePipeline;
     class RayTracingPipeline;
@@ -581,6 +588,81 @@ namespace kor
                                          std::source_location where = std::source_location::current());
 
         /**
+         * @name Binding a resource by name, without a descriptor set
+         *
+         * Puts a resource at the binding the bound pipeline's shader calls @p name, for the draws and
+         * dispatches that follow:
+         *
+         * @code
+         * cb.BindGraphicsPipeline(pipeline)
+         *   .Bind("camera", cameraBuffer)
+         *   .Bind("albedo", texture, linearSampler)
+         *   .DrawMesh(mesh);
+         * @endcode
+         *
+         * A set is still what the shader reads: the next draw builds one for each set these name,
+         * starting from whatever set is bound at that index and putting these on top, and binds it.
+         * So a set bound with BindDescriptorSet can be patched one binding at a time, and a binding
+         * no set ever covered can be filled without making one. Names follow DescriptorSet::Builder's
+         * rules — `"textures[3]"` picks an element — and the barriers follow from what was bound,
+         * exactly as for a set.
+         *
+         * Bind after binding the pipeline: binding another pipeline forgets them (the sets they made
+         * stay bound, as any set does), and so does BindDescriptorSet at the same set index. Each
+         * draw that follows a change builds a set, so in a loop over thousands of objects a set per
+         * object built once is still the cheaper way.
+         *
+         * @param where Source location the command was recorded at. Leave it defaulted.
+         */
+        ///@{
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const Buffer>& buffer,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const BufferView>& bufferView,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const ImageView>& imageView,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const ImageView>& imageView,
+                            const ResourceRef<const Sampler>& sampler,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const Image>& image,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const Image>& image,
+                            const ResourceRef<const Sampler>& sampler,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const Sampler>& sampler,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const ResourceRef<const AccelerationStructure>& structure,
+                            std::source_location where = std::source_location::current());
+        CommandBuffer& Bind(std::string_view name, const Descriptor& descriptor,
+                            std::source_location where = std::source_location::current());
+        ///@}
+
+        /**
+         * @name Saying what a shader reaches without a binding
+         *
+         * The barriers follow what is bound. What a shader reaches some other way — a bindless index it
+         * read out of a buffer, a slot of a DescriptorHeap — they cannot see; name it here and the draws
+         * and dispatches that follow are synchronised for it as for a bound resource:
+         *
+         * @code
+         * cb.BindComputePipeline(cull)
+         *   .Uses(materialTexture)                                 // an index in a buffer the shader reads
+         *   .Uses(output, kor::ResourceAccess::eAllShaderReadWrite)
+         *   .Dispatch(groups, 1, 1);
+         * @endcode
+         *
+         * Holds until the next pipeline is bound. An index handed over with PushConstant needs none of
+         * this: the push says which resource it is.
+         */
+        ///@{
+        /** @brief The resource behind a bindless index; written to, when the index is a storage one. */
+        CommandBuffer& Uses(DescriptorIndex handle);
+        CommandBuffer& Uses(const ResourceRef<const Buffer>& buffer, ResourceAccess access = ResourceAccess::eAllShaderRead);
+        CommandBuffer& Uses(const ResourceRef<const ImageView>& view, ResourceAccess access = ResourceAccess::eAllShaderRead);
+        CommandBuffer& Uses(const ResourceRef<const Image>& image, ResourceAccess access = ResourceAccess::eAllShaderRead);
+        ///@}
+
+        /**
          * @brief Binds a mesh's vertex and index buffers.
          * @param mesh The mesh whose buffers the following draws read from.
          * @param where Source location the command was recorded at, used to point error messages back at your code. Leave it defaulted.
@@ -691,6 +773,36 @@ namespace kor
                                     const std::source_location where = std::source_location::current()) {
             return PushConstant(name, &data, sizeof(T), ShapeOf<T>(), where);
         }
+
+        /**
+         * @brief Pushes a bindless index into the `uint` the shader calls @p name — and with it, the
+         *        resource behind it into the uses of the draws that follow, so they are synchronised
+         *        for it as for a bound one.
+         */
+        CommandBuffer& PushConstant(std::string_view name, DescriptorIndex handle,
+                                    std::source_location where = std::source_location::current());
+
+        // ---- Descriptor heap ------------------------------------------------------------------
+
+        /**
+         * @brief Copies descriptors already encoded into @p source (DescriptorHeap::Encode, or written by a
+         *        shader) into slots of @p heap, and makes them visible to every shader that follows.
+         * @param sourceOffset Where in @p source the first descriptor's bytes start.
+         * @param firstSlot The first of @p heap's slots to fill.
+         * @param count How many: each DescriptorHeap::SlotSize bytes of @p source.
+         *
+         * Descriptor heap only. @p source needs Buffer::Usage::eTransferSrc. Outside a render pass,
+         * as every copy is.
+         */
+        CommandBuffer& CopyDescriptors(ResourceRef<const Buffer> source, kor::u64 sourceOffset,
+                                       ResourceRef<const DescriptorHeap> heap, kor::u32 firstSlot, kor::u32 count,
+                                       std::source_location where = std::source_location::current());
+
+        /**
+         * @brief Makes descriptors a shader wrote into the heap (at DescriptorHeap::DeviceAddress) visible to
+         *        the shaders that follow. Descriptor heap only; outside a render pass.
+         */
+        CommandBuffer& DescriptorHeapBarrier(std::source_location where = std::source_location::current());
 
         // ---- Barriers -------------------------------------------------------------------------
 
@@ -1162,6 +1274,32 @@ namespace kor
         }
 
     protected:
+        /// One resource a command touches, and how. Exactly one of buffer/image is set; the other
+        /// is left default-constructed, for which Alive() is false.
+        struct ResourceUse {
+            kor::ResourceRef<const Buffer> buffer;
+            kor::ResourceRef<const Image>  image;
+            ResourceAccess access = ResourceAccess::eAllShaderRead;
+
+            /// Image subresource range; nullopt means the whole image, matching ImageBarrier.
+            std::optional<kor::u32> baseMipLevel;
+            std::optional<kor::u32> levelCount;
+            std::optional<kor::u32> baseArrayLayer;
+            std::optional<kor::u32> layerCount;
+
+            /// Buffer range.
+            kor::u64 offset = 0;
+            kor::u64 size = WholeSize;
+        };
+
+        /// One Bind(): what goes at the binding a name picks. An image waits to be viewed as the shader's
+        /// binding declares it, which is the set builder's to work out.
+        struct DirectBind {
+            Descriptor descriptor;
+            ResourceRef<const Image> image;
+            ResourceRef<const Sampler> imageSampler;
+        };
+
         /// Pipeline, framebuffer and descriptor bindings as of the current point in the recording.
         /// The backends advance this from inside their do* implementations, so that during the
         /// emit walk it reflects the point being emitted rather than the end of recording.
@@ -1177,6 +1315,16 @@ namespace kor
             std::map<kor::u32, kor::ResourceRef<const DescriptorSet>> boundGraphicsDescriptorSets;
             std::map<kor::u32, kor::ResourceRef<const DescriptorSet>> boundComputeDescriptorSets;
             std::map<kor::u32, kor::ResourceRef<const DescriptorSet>> boundRayTracingDescriptorSets;
+
+            /// Resources a shader reaches without a binding, named by Uses(): what every draw and dispatch
+            /// that follows touches, until the next pipeline is bound.
+            std::vector<ResourceUse> declaredUses;
+            /// Bindless indices pushed by name, by the name: the resource behind each is a use too.
+            std::map<std::string, DescriptorIndex, std::less<>> pushedHandles;
+            /// What Bind() put where, by set index then name, until the next draw makes them into a set.
+            std::map<kor::u32, std::map<std::string, DirectBind, std::less<>>> directBinds;
+            /// Which of those set indices changed since a set was last made for them.
+            std::vector<kor::u32> directBindsDirty;
 
             bool viewportSet = false;
             bool scissorSet = false;
@@ -1236,24 +1384,6 @@ namespace kor
             eNone,      ///< Ordinary command, inside or outside a pass.
             eOpens,     ///< Opens a render pass.
             eCloses     ///< Closes one.
-        };
-
-        /// One resource a command touches, and how. Exactly one of buffer/image is set; the other
-        /// is left default-constructed, for which Alive() is false.
-        struct ResourceUse {
-            kor::ResourceRef<const Buffer> buffer;
-            kor::ResourceRef<const Image>  image;
-            ResourceAccess access = ResourceAccess::eAllShaderRead;
-
-            /// Image subresource range; nullopt means the whole image, matching ImageBarrier.
-            std::optional<kor::u32> baseMipLevel;
-            std::optional<kor::u32> levelCount;
-            std::optional<kor::u32> baseArrayLayer;
-            std::optional<kor::u32> layerCount;
-
-            /// Buffer range.
-            kor::u64 offset = 0;
-            kor::u64 size = WholeSize;
         };
 
         /// One parked command: what it will do, and what it will touch when it does.
@@ -1337,6 +1467,21 @@ namespace kor
          * buffer barrier applies to.
          */
         [[nodiscard]] std::vector<ResourceUse> UsesForBoundResources(bool includeMesh) const;
+
+        /** @brief Appends what Uses() named and what the pushed bindless indices point at. */
+        void AppendIndirectUses(std::vector<ResourceUse>& uses) const;
+
+        /** @brief Records one Bind(): finds the set that declares @p name, and queues the write for it. */
+        CommandBuffer& BindDirect(std::string_view name, DirectBind bind, std::source_location where);
+
+        /** @brief Makes and binds a set for each set index Bind() changed since. Every draw and dispatch runs it first. */
+        void FlushDirectBinds(std::source_location where);
+
+        /** @brief Forgets what holds only until the next pipeline: Uses(), pushed indices, Bind(). */
+        void ForgetPipelineScopedState();
+
+        /// The sets Bind() made, held until this buffer is recorded again. Type-erased: a Resource of an incomplete type.
+        std::vector<std::shared_ptr<void>> _transientSets;
 
         /** @brief Inserts the barriers the recorded commands imply. Called by End(). */
         void ResolveBarriers();
@@ -1458,6 +1603,11 @@ namespace kor
         /// Defaults to reporting ray tracing as unsupported, like TraceRays.
         virtual CommandBuffer& DoBindRayTracingPipeline(ResourceRef<const RayTracingPipeline> pipeline);
         virtual CommandBuffer& DoBindDescriptorSet(kor::u32 index, ResourceRef<const DescriptorSet> descriptorSet) = 0;
+        /// Copies encoded descriptors into the heap and makes them visible to the shaders after. Heap backends only.
+        virtual void DoCopyDescriptors(ResourceRef<const Buffer> source, kor::u64 sourceOffset,
+                                       ResourceRef<const DescriptorHeap> heap, kor::u32 firstSlot, kor::u32 count);
+        /// A barrier from descriptor writes (a shader's, a copy's) to the heap reads after. Heap backends only.
+        virtual void DoDescriptorHeapBarrier();
         virtual CommandBuffer& DoBindMesh(ResourceRef<const Mesh> mesh) = 0;
         virtual CommandBuffer& DoBindVertexBuffer(kor::u32 binding, ResourceRef<const Buffer> buffer, kor::u64 offset) = 0;
         virtual CommandBuffer& DoBarrier(std::vector<kor::BufferBarrier> bufferBarriers, std::vector<kor::ImageBarrier> imageBarriers) = 0;

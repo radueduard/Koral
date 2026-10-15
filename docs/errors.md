@@ -81,6 +81,7 @@ This table is kept in sync with `gfx::Describe()` in `src/core/error.cpp`.
 | `eImageSubresourceOutOfRange` | A copy referenced a mip level / array layer outside the image. | Check mip level and array layer against the image. |
 | `eResolveRequiresMultisample` | Resolve needs a multisampled source and a single-sampled destination. | Resolve only from an MSAA image into a non-MSAA image. |
 | `eRayTracingUnsupported` | Ray tracing is not supported on the active backend. | Use the Vulkan backend with ray tracing available. |
+| `eDescriptorHeapUnsupported` | Something only the descriptor heap holds (a `DescriptorHeap`, `DescriptorHeap::Encode`) was asked of a device made for descriptor sets. | Set `rendering.descriptors` to `"heap"` on a GPU with `VK_EXT_descriptor_heap`; check `Context::ActiveDescriptorModel()`. |
 | `eMissingShaderStage` | The pipeline is missing a required shader stage. | Provide the required shader (e.g. vertex or mesh). |
 | `eShaderStageMismatch` | A shader was supplied for the wrong pipeline stage. | Pass a shader whose stage matches the slot. |
 | `eDescriptorConflict` | Descriptor declarations conflict across the pipeline's shader stages. | Align (set, binding) declarations across stages. |

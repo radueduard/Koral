@@ -73,13 +73,14 @@ typedef KoralResource KoralDescriptorSetLayout;
 typedef KoralResource KoralFramebuffer;
 typedef KoralResource KoralMesh;
 typedef KoralResource KoralAccelerationStructure;
+typedef KoralResource KoralDescriptorHeap;
 
 typedef enum KoralResourceKind {
     KORAL_RESOURCE_BUFFER = 1, KORAL_RESOURCE_IMAGE, KORAL_RESOURCE_IMAGE_VIEW, KORAL_RESOURCE_SAMPLER,
     KORAL_RESOURCE_BUFFER_VIEW, KORAL_RESOURCE_SHADER, KORAL_RESOURCE_GRAPHICS_PIPELINE,
     KORAL_RESOURCE_COMPUTE_PIPELINE, KORAL_RESOURCE_RAY_TRACING_PIPELINE, KORAL_RESOURCE_DESCRIPTOR_SET,
     KORAL_RESOURCE_DESCRIPTOR_SET_LAYOUT, KORAL_RESOURCE_FRAMEBUFFER, KORAL_RESOURCE_MESH,
-    KORAL_RESOURCE_ACCELERATION_STRUCTURE
+    KORAL_RESOURCE_ACCELERATION_STRUCTURE, KORAL_RESOURCE_DESCRIPTOR_HEAP
 } KoralResourceKind;
 
 /** Frees the handle — and, for an owned one, the resource. Null is fine. */
@@ -394,6 +395,8 @@ KORAL_API void koral_graphics_pipeline_builder_set_specialization_constant_named
 /** SetBinding(name, set, binding): puts the descriptor @p name there, whatever its shader said. */
 KORAL_API void koral_graphics_pipeline_builder_set_binding(KoralGraphicsPipelineBuilder* builder, const char* name, uint32_t set,
                                                             uint32_t binding);
+/** SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name. */
+KORAL_API void koral_graphics_pipeline_builder_set_sampler(KoralGraphicsPipelineBuilder* builder, const char* name, KoralSampler* sampler);
 KORAL_API KoralGraphicsPipeline* koral_graphics_pipeline_builder_build(KoralGraphicsPipelineBuilder* builder);
 
 KORAL_API KoralComputePipelineBuilder* koral_compute_pipeline_builder_new(void);
@@ -404,6 +407,8 @@ KORAL_API void koral_compute_pipeline_builder_set_specialization_constant_named(
                                                                                  const void* value, uint32_t bytes);
 KORAL_API void koral_compute_pipeline_builder_set_binding(KoralComputePipelineBuilder* builder, const char* name, uint32_t set,
                                                            uint32_t binding);
+/** SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name. */
+KORAL_API void koral_compute_pipeline_builder_set_sampler(KoralComputePipelineBuilder* builder, const char* name, KoralSampler* sampler);
 KORAL_API KoralComputePipeline* koral_compute_pipeline_builder_build(KoralComputePipelineBuilder* builder);
 
 KORAL_API KoralRayTracingPipelineBuilder* koral_ray_tracing_pipeline_builder_new(void);
@@ -420,6 +425,8 @@ KORAL_API void koral_ray_tracing_pipeline_builder_set_specialization_constant_na
                                                                                      const void* value, uint32_t bytes);
 KORAL_API void koral_ray_tracing_pipeline_builder_set_binding(KoralRayTracingPipelineBuilder* builder, const char* name, uint32_t set,
                                                                uint32_t binding);
+/** SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name. */
+KORAL_API void koral_ray_tracing_pipeline_builder_set_sampler(KoralRayTracingPipelineBuilder* builder, const char* name, KoralSampler* sampler);
 KORAL_API KoralRayTracingPipeline* koral_ray_tracing_pipeline_builder_build(KoralRayTracingPipelineBuilder* builder);
 KORAL_API uint32_t koral_ray_tracing_pipeline_max_recursion_depth(KoralRayTracingPipeline* pipeline);
 
@@ -455,6 +462,39 @@ KORAL_API void koral_descriptor_set_builder_write_acceleration_structure(KoralDe
                                                                           uint32_t binding, uint32_t index,
                                                                           KoralAccelerationStructure* structure);
 KORAL_API KoralDescriptorSet* koral_descriptor_set_builder_build(KoralDescriptorSetBuilder* builder);
+/* ---- kor::Bindless and kor::DescriptorHeap --------------------------------------------------------------- */
+
+/** kor::DescriptorIndex: the slot of a bindless table, and which (kor::BindlessKind). An invalid one has kind 0. */
+typedef struct KoralDescriptorIndex {
+    uint32_t index;
+    uint32_t kind;
+} KoralDescriptorIndex;
+/** Bindless::Sampled / Storage: of an image (viewed as @p shape, a kor::ImageShape; 0 means 2D) or an image view. */
+KORAL_API KoralDescriptorIndex koral_bindless_sampled(KoralResource* image_or_view, uint32_t shape);
+KORAL_API KoralDescriptorIndex koral_bindless_storage(KoralResource* image_or_view, uint32_t shape);
+KORAL_API KoralDescriptorIndex koral_bindless_storage_buffer(KoralBuffer* buffer);
+KORAL_API KoralDescriptorIndex koral_bindless_uniform_buffer(KoralBuffer* buffer);
+KORAL_API KoralDescriptorIndex koral_bindless_sampler(KoralSampler* sampler);
+KORAL_API KoralDescriptorIndex koral_bindless_acceleration_structure(KoralAccelerationStructure* structure);
+KORAL_API void koral_bindless_release(KoralDescriptorIndex index);
+KORAL_API uint32_t koral_bindless_capacity(uint32_t kind);
+KORAL_API size_t koral_bindless_count(void);
+
+/** DescriptorHeap::Builder: @p role a kor::HeapRole. Owned; poisoned under descriptor sets. */
+KORAL_API KoralDescriptorHeap* koral_descriptor_heap_new(uint32_t role, uint32_t slot_count);
+/**
+ * DescriptorHeap::Write: @p resource a buffer, buffer view, image view, image (viewed as 2D), sampler or
+ * acceleration structure, written as @p type (a kor::DescriptorType).
+ */
+KORAL_API KoralStatus koral_descriptor_heap_write(KoralDescriptorHeap* heap, uint32_t slot, KoralResource* resource, uint32_t type);
+KORAL_API KoralDescriptorIndex koral_descriptor_heap_index(KoralDescriptorHeap* heap, uint32_t slot, uint32_t kind);
+KORAL_API uint32_t koral_descriptor_heap_slot_count(KoralDescriptorHeap* heap);
+KORAL_API uint32_t koral_descriptor_heap_first_slot(KoralDescriptorHeap* heap);
+KORAL_API uint64_t koral_descriptor_heap_device_address(KoralDescriptorHeap* heap, uint32_t slot);
+KORAL_API uint32_t koral_descriptor_heap_slot_size(uint32_t role);
+/** DescriptorHeap::Encode into @p out (at least slot_size bytes): the bytes written, or 0 when it could not be. */
+KORAL_API size_t koral_descriptor_heap_encode(KoralResource* resource, uint32_t type, void* out, size_t capacity);
+
 /* The Rebind overloads, the same way round. */
 KORAL_API KoralStatus koral_descriptor_set_rebind_buffer(KoralDescriptorSet* set, const char* name, uint32_t binding, uint32_t index,
                                                          KoralBuffer* buffer);
@@ -663,6 +703,17 @@ KORAL_API void koral_cmd_bind_vertex_buffer(KoralCommandBuffer* commands, uint32
 KORAL_API void koral_cmd_push_constant_block(KoralCommandBuffer* commands, const void* data, uint32_t bytes, uint32_t offset);
 KORAL_API void koral_cmd_push_constant(KoralCommandBuffer* commands, const char* name, const void* data, uint32_t bytes,
                                         const KoralValueShape* shape);
+/** CommandBuffer::Bind(name, ...): @p resource a buffer, buffer view, image, image view, sampler or acceleration
+ *  structure; @p sampler (may be null) pairs with an image or image view. */
+KORAL_API void koral_cmd_bind(KoralCommandBuffer* commands, const char* name, KoralResource* resource, KoralSampler* sampler);
+/** PushConstant(name, index): the index into the uint @p name, and its resource into the uses of what follows. */
+KORAL_API void koral_cmd_push_index(KoralCommandBuffer* commands, const char* name, KoralDescriptorIndex index);
+/** Uses(index), and Uses(resource, access) for a buffer, image or image view (@p access a kor::ResourceAccess). */
+KORAL_API void koral_cmd_uses_index(KoralCommandBuffer* commands, KoralDescriptorIndex index);
+KORAL_API void koral_cmd_uses(KoralCommandBuffer* commands, KoralResource* resource, uint32_t access);
+KORAL_API void koral_cmd_copy_descriptors(KoralCommandBuffer* commands, KoralBuffer* source, uint64_t source_offset,
+                                           KoralDescriptorHeap* heap, uint32_t first_slot, uint32_t count);
+KORAL_API void koral_cmd_descriptor_heap_barrier(KoralCommandBuffer* commands);
 KORAL_API void koral_cmd_barrier(KoralCommandBuffer* commands, const KoralBufferBarrier* buffers, size_t buffer_count,
                                   const KoralImageBarrier* images, size_t image_count);
 KORAL_API void koral_cmd_begin_debug_label(KoralCommandBuffer* commands, const char* label, const float color[4]);
@@ -838,6 +889,7 @@ typedef struct KoralAppSettings {
     const char* gpu;
     uint64_t required_features;       /* kor::Feature bits: the device must have them */
     uint64_t optional_features;       /* kor::Feature bits: enabled where the GPU has them */
+    uint32_t descriptors;             /* kor::DescriptorModel: 0 sets, 1 heap (falls back to sets where the GPU has none) */
 } KoralAppSettings;
 typedef struct KoralWindowSettings {
     const char* title;
@@ -1144,6 +1196,8 @@ KORAL_API bool koral_context_supports_async_compute(void);
 KORAL_API bool koral_context_supports_feature(uint64_t feature);
 /** Context::GpuHas: whether the GPU has @p feature, enabled or not. */
 KORAL_API bool koral_context_gpu_has_feature(uint64_t feature);
+/** kor::Context::ActiveDescriptorModel: 0 sets, 1 heap. 0 before the device exists. */
+KORAL_API uint32_t koral_context_descriptor_model(void);
 /** kor::FeatureName: "AtomicFloat32". The text lives as long as the library. */
 KORAL_API const char* koral_feature_name(uint64_t feature);
 KORAL_API bool koral_context_async_compute_is_separate_family(void);

@@ -47,6 +47,9 @@ ENUMS = [
     ("input.h", None, "SpecialKey", None, None),
     ("context.h", None, "API", None, None),
     ("context.h", None, "WindowPlatform", None, None),
+    ("context.h", None, "DescriptorModel", None, None),
+    ("bindless.h", None, "BindlessKind", None, None),
+    ("descriptorHeap.h", None, "HeapRole", None, None),
     ("shaderValue.h", None, "ValueScalar", None, None),
     ("deviceFeatures.h", None, "Feature", None, None),
 ]

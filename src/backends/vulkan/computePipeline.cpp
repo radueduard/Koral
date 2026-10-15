@@ -8,6 +8,7 @@
 
 #include "commandBuffer.h"
 #include "descriptorSetLayout.h"
+#include "pipelineInterface.h"
 #include "device.h"
 #include "shader.h"
 #include "shaderModules.h"
@@ -29,24 +30,8 @@ namespace kor::vk
     {
         ShaderModules modules(_bindings);
 
-        std::vector<::vk::DescriptorSetLayout> setLayouts = {};
-        for (const auto& layout : _setLayouts | std::views::values) {
-            setLayouts.push_back(**dynamic_cast<const DescriptorSetLayout*>(layout.Get()));
-        }
-
-        std::vector<::vk::PushConstantRange> pushConstantRanges = {};
-        for (const auto& [offset, pushConstant] : _pushConstantRanges) {
-            pushConstantRanges.push_back(::vk::PushConstantRange()
-                 .setStageFlags(::vk::ShaderStageFlagBits::eCompute)
-                 .setOffset(offset)
-                 .setSize(pushConstant.size));
-        }
-
-        const auto pipelineLayoutCreateInfo = ::vk::PipelineLayoutCreateInfo()
-            .setSetLayouts(setLayouts)
-            .setPushConstantRanges(pushConstantRanges);
-
-        _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
+        PipelineInterface descriptors(_setLayouts, _pushConstantRanges, _bindlessBindings);
+        _pipelineLayout = descriptors.TakeLayout();
 
         std::vector<::vk::SpecializationMapEntry> specializationMapEntries;
         for (const auto& [id, offset, size] : _specConstantsMetadata) {
@@ -64,9 +49,11 @@ namespace kor::vk
                                      .setStage(::vk::ShaderStageFlagBits::eCompute)
                                      .setModule(modules.For(**_shader))
                                      .setPSpecializationInfo(_specConstantsMetadata.empty() ? nullptr : &specializationInfo)
-                                     .setPName("main");
+                                     .setPName("main")
+                                     .setPNext(descriptors.StageNext());
 
         const auto pipelineCreateInfo = ::vk::ComputePipelineCreateInfo()
+                                        .setPNext(descriptors.CreateNext(nullptr))
                                         .setStage(stageCreateInfo)
                                         .setLayout(_pipelineLayout);
 

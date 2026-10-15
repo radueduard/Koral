@@ -147,6 +147,36 @@ int main(void) {
     koral_resource_release(pipeline);
     koral_resource_release(broken);
 
+    /* Bindless indices, and the descriptor heap where the device was made for one. */
+    {
+        KoralBufferBuilder* buffer_builder = koral_buffer_builder_new();
+        koral_buffer_builder_set_instance_count(buffer_builder, 64);
+        koral_buffer_builder_set_usage(buffer_builder, 16u | 2u);   /* eStorage | eTransferDst */
+        KoralBuffer* storage = koral_buffer_builder_build(buffer_builder);
+        koral_builder_destroy(buffer_builder);
+        const KoralDescriptorIndex index = koral_bindless_storage_buffer(storage);
+        CHECK(index.kind == 3u && index.index != 0xFFFFFFFFu, "a storage buffer's bindless index");
+        const KoralDescriptorIndex again = koral_bindless_storage_buffer(storage);
+        CHECK(again.index == index.index, "the same buffer keeps its index");
+        CHECK(koral_bindless_capacity(3u) > index.index, "inside its table");
+        CHECK(koral_bindless_uniform_buffer(storage).kind == 0u, "no uniform index for a buffer made without eUniform");
+
+        KoralDescriptorHeap* heap = koral_descriptor_heap_new(0u, 4u);
+        if (koral_context_descriptor_model() == 1u) {
+            CHECK(koral_resource_valid(heap) && koral_descriptor_heap_slot_count(heap) == 4u, "a project heap");
+            CHECK(koral_descriptor_heap_write(heap, 1u, storage, 1u) == KORAL_OK, "a buffer written into it");   /* eStorageBuffer */
+            const KoralDescriptorIndex slot = koral_descriptor_heap_index(heap, 1u, 3u);
+            CHECK(slot.index == koral_descriptor_heap_first_slot(heap) + 1u, "its slot is a bindless index");
+            unsigned char bytes[256];
+            CHECK(koral_descriptor_heap_encode(storage, 1u, bytes, sizeof bytes) == koral_descriptor_heap_slot_size(0u), "a descriptor's bytes");
+        } else {
+            CHECK(koral_resource_poisoned(heap) && koral_resource_error_code(heap) == 34u, "no project heap under descriptor sets");
+        }
+        koral_resource_release(heap);
+        koral_bindless_release(index);
+        koral_resource_release(storage);
+    }
+
     KoralOffscreenSettings target = koral_offscreen_settings_default();
     target.extent[0] = target.extent[1] = 16;
     CHECK(koral_app_open_offscreen("Nothing", &target, NULL) == NULL, "a factory that fails opens nothing");

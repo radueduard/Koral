@@ -80,6 +80,10 @@ Bindless arrays are written element by element (`Write(binding, view, index)`). 
 where the shader doesn't read it. The access a binding gets (read, write, or both) is read from the shader, and
 that's how the command buffer knows what barriers a dispatch or draw needs.
 
+A binding can also be filled without building a set (`cb.Bind("camera", buffer)`), a resource can be reached by a
+bindless index instead of a binding, and a pipeline can carry its own samplers (`SetSampler`). All three work
+under either descriptor model — sets or the descriptor heap: see [descriptors](descriptors.md).
+
 ## Push constants
 
 `cb.PushConstant("tint", kor::Vec4{1, 0, 0, 1})` writes one member of the push constant block, by name. Members

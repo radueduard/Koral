@@ -36,6 +36,7 @@ add_executable(koral_tests
         test_input_bindings.cpp
         test_debug_draw.cpp
         test_math.cpp
+        test_descriptor_heap.cpp
 )
 
 target_link_libraries(koral_tests PRIVATE
@@ -99,6 +100,11 @@ if(KORAL_BUILD_DOTNET)
     set_tests_properties(CSharp.Bindings PROPERTIES
             ENVIRONMENT "KORAL_LIBRARY=$<TARGET_FILE:Koral>"
             TIMEOUT 600)
+    # And under the descriptor heap: the same answers, through the bindings too.
+    add_test(NAME Heap.CSharp.Bindings COMMAND "${KORAL_DOTNET_EXECUTABLE}" "${KORAL_DOTNET_OUT}/tests/Koral.Tests.dll")
+    set_tests_properties(Heap.CSharp.Bindings PROPERTIES
+            ENVIRONMENT "KORAL_LIBRARY=$<TARGET_FILE:Koral>;KORAL_DESCRIPTORS=heap"
+            TIMEOUT 600)
 
     # The C# enumerations and P/Invokes are generated from the C++ headers and koral_c.h: these fail when
     # one of those changed and the bindings were not generated again.
@@ -120,6 +126,15 @@ if(KORAL_BUILD_KOTLIN)
             WORKING_DIRECTORY "${KORAL_KOTLIN_DIR}")
     set_tests_properties(Kotlin.Bindings PROPERTIES
             ENVIRONMENT "JAVA_HOME=${KORAL_JAVA_HOME};KORAL_JBR=${KORAL_JBR};KORAL_LIBRARY=$<TARGET_FILE:Koral>"
+            RESOURCE_LOCK gradle
+            TIMEOUT 900)
+    # And under the descriptor heap. One Gradle build at a time: they share the project's build directory.
+    add_test(NAME Heap.Kotlin.Bindings
+            COMMAND "${KORAL_GRADLEW}" :tests:test --console=plain --rerun-tasks
+            WORKING_DIRECTORY "${KORAL_KOTLIN_DIR}")
+    set_tests_properties(Heap.Kotlin.Bindings PROPERTIES
+            ENVIRONMENT "JAVA_HOME=${KORAL_JAVA_HOME};KORAL_JBR=${KORAL_JBR};KORAL_LIBRARY=$<TARGET_FILE:Koral>;KORAL_DESCRIPTORS=heap"
+            RESOURCE_LOCK gradle
             TIMEOUT 900)
     find_package(Python3 COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)

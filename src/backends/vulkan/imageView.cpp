@@ -18,7 +18,7 @@ namespace kor::vk
         build();
     }
 
-    void ImageView::build() const
+    ::vk::ImageViewCreateInfo ImageView::CreateInfo(const size_t i) const
     {
         ::vk::ImageAspectFlags aspectMask = ::vk::ImageAspectFlagBits::eColor;
         if (kor::IsDepthStencilFormat(_image->PixelFormat())) {
@@ -29,24 +29,29 @@ namespace kor::vk
         }
 
         const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*_image);
-        for (const auto& image : vkImage._images) {
-            auto viewInfo = ::vk::ImageViewCreateInfo()
-                .setImage(image)
-                .setViewType(getVkImageViewType(_viewType))
-                .setFormat(dynamic_cast<const Image&>(*_image).getFormat())
-                .setComponents(::vk::ComponentMapping()
-                    .setR(getVkComponentSwizzle(_componentMapping.r))
-                    .setG(getVkComponentSwizzle(_componentMapping.g))
-                    .setB(getVkComponentSwizzle(_componentMapping.b))
-                    .setA(getVkComponentSwizzle(_componentMapping.a)))
-                .setSubresourceRange(::vk::ImageSubresourceRange()
-                    .setAspectMask(aspectMask)
-                    .setBaseMipLevel(_baseMipLevel)
-                    .setLevelCount(_mipLevelCount)
-                    .setBaseArrayLayer(_baseArrayLayer)
-                    .setLayerCount(_arrayLayerCount));
-            _imageViews.emplace_back(vk::Context::Device()->createImageView(viewInfo));
-        }
+        const auto copy = i < vkImage._images.size() ? i : 0;
+        return ::vk::ImageViewCreateInfo()
+            .setImage(vkImage._images[copy])
+            .setViewType(getVkImageViewType(_viewType))
+            .setFormat(vkImage.getFormat())
+            .setComponents(::vk::ComponentMapping()
+                .setR(getVkComponentSwizzle(_componentMapping.r))
+                .setG(getVkComponentSwizzle(_componentMapping.g))
+                .setB(getVkComponentSwizzle(_componentMapping.b))
+                .setA(getVkComponentSwizzle(_componentMapping.a)))
+            .setSubresourceRange(::vk::ImageSubresourceRange()
+                .setAspectMask(aspectMask)
+                .setBaseMipLevel(_baseMipLevel)
+                .setLevelCount(_mipLevelCount)
+                .setBaseArrayLayer(_baseArrayLayer)
+                .setLayerCount(_arrayLayerCount));
+    }
+
+    void ImageView::build() const
+    {
+        const auto& vkImage = dynamic_cast<const kor::vk::Image&>(*_image);
+        for (size_t i = 0; i < vkImage._images.size(); ++i)
+            _imageViews.emplace_back(vk::Context::Device()->createImageView(CreateInfo(i)));
         _imageGeneration = _image->Generation();
     }
 

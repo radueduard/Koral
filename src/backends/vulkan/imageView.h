@@ -19,6 +19,12 @@ namespace kor::vk
         ::vk::ImageView operator*() const;
         ::vk::ImageView operator[](size_t i) const;
 
+        /**
+         * @brief What the view of copy @p i of the image is made from. A descriptor heap describes an
+         *        image by this rather than by a view object, so it is also how a heap writes this one.
+         */
+        [[nodiscard]] ::vk::ImageViewCreateInfo CreateInfo(size_t i) const;
+
     private:
         // (Re)creates one view per copy of the image. Called by the constructor, and again by the
         // accessors when the image has been rebuilt underneath them. @see kor::Image::Generation

@@ -50,6 +50,7 @@ namespace kor::capi
         case KORAL_RESOURCE_FRAMEBUFFER: return "framebuffer";
         case KORAL_RESOURCE_MESH: return "mesh";
         case KORAL_RESOURCE_ACCELERATION_STRUCTURE: return "acceleration structure";
+        case KORAL_RESOURCE_DESCRIPTOR_HEAP: return "descriptor heap";
         }
         return "resource";
     }
@@ -756,6 +757,10 @@ void koral_graphics_pipeline_builder_set_binding(KoralGraphicsPipelineBuilder* b
 {
     Set<GraphicsPipeline::Builder>(b, [&](auto& x) { x.SetBinding(name ? name : "", set, binding); });
 }
+void koral_graphics_pipeline_builder_set_sampler(KoralGraphicsPipelineBuilder* b, const char* name, KoralSampler* sampler)
+{
+    Set<GraphicsPipeline::Builder>(b, [&](auto& x) { x.SetSampler(name ? name : "", RefOf<Sampler>(sampler)); });
+}
 KoralGraphicsPipeline* koral_graphics_pipeline_builder_build(KoralGraphicsPipelineBuilder* b)
 {
     return Build<GraphicsPipeline::Builder>(b, [](auto& x) { return x.Build(); });
@@ -777,6 +782,10 @@ void koral_compute_pipeline_builder_set_specialization_constant_named(KoralCompu
 void koral_compute_pipeline_builder_set_binding(KoralComputePipelineBuilder* b, const char* name, const uint32_t set, const uint32_t binding)
 {
     Set<ComputePipeline::Builder>(b, [&](auto& x) { x.SetBinding(name ? name : "", set, binding); });
+}
+void koral_compute_pipeline_builder_set_sampler(KoralComputePipelineBuilder* b, const char* name, KoralSampler* sampler)
+{
+    Set<ComputePipeline::Builder>(b, [&](auto& x) { x.SetSampler(name ? name : "", RefOf<Sampler>(sampler)); });
 }
 KoralComputePipeline* koral_compute_pipeline_builder_build(KoralComputePipelineBuilder* b)
 {
@@ -822,6 +831,10 @@ void koral_ray_tracing_pipeline_builder_set_specialization_constant_named(KoralR
 void koral_ray_tracing_pipeline_builder_set_binding(KoralRayTracingPipelineBuilder* b, const char* name, const uint32_t set, const uint32_t binding)
 {
     Set<RayTracingPipeline::Builder>(b, [&](auto& x) { x.SetBinding(name ? name : "", set, binding); });
+}
+void koral_ray_tracing_pipeline_builder_set_sampler(KoralRayTracingPipelineBuilder* b, const char* name, KoralSampler* sampler)
+{
+    Set<RayTracingPipeline::Builder>(b, [&](auto& x) { x.SetSampler(name ? name : "", RefOf<Sampler>(sampler)); });
 }
 KoralRayTracingPipeline* koral_ray_tracing_pipeline_builder_build(KoralRayTracingPipelineBuilder* b)
 {
@@ -1190,3 +1203,125 @@ KoralResource* kor::capi::Adopt(Resource<Mesh> mesh) { return Own(std::move(mesh
 KoralResource* kor::capi::Adopt(Resource<AccelerationStructure> structure) { return Own(std::move(structure)); }
 KoralToken* kor::capi::MakeToken(const Token& token) { return new KoralToken{token}; }
 kor::Token kor::capi::TokenOf(const KoralToken* handle) { return handle ? handle->token : Token(); }
+
+// ---- kor::Bindless and kor::DescriptorHeap ---------------------------------------------------------------
+
+namespace
+{
+    KoralDescriptorIndex IndexOf(const kor::DescriptorIndex index)
+    {
+        return { index.index, static_cast<uint32_t>(index.kind) };
+    }
+
+    kor::DescriptorIndex IndexFrom(const KoralDescriptorIndex index)
+    {
+        return { index.index, static_cast<kor::BindlessKind>(index.kind) };
+    }
+
+    kor::ImageShape ShapeFrom(const uint32_t shape)
+    {
+        return shape == 0 ? kor::ImageShape::e2D : static_cast<kor::ImageShape>(shape);
+    }
+
+    // The descriptor a C caller's resource stands for: the kind of handle says which.
+    kor::Descriptor DescriptorFrom(KoralResource* resource)
+    {
+        if (!resource) throw std::runtime_error("no resource was given");
+        switch (resource->Kind()) {
+        case KORAL_RESOURCE_BUFFER: return kor::Descriptor(RefOf<Buffer>(resource));
+        case KORAL_RESOURCE_BUFFER_VIEW: return kor::Descriptor(RefOf<BufferView>(resource));
+        case KORAL_RESOURCE_IMAGE_VIEW: return kor::Descriptor(RefOf<ImageView>(resource));
+        case KORAL_RESOURCE_IMAGE: return kor::Descriptor(RefOf<Image>(resource)->View(kor::ImageShape::e2D));
+        case KORAL_RESOURCE_SAMPLER: return kor::Descriptor(RefOf<Sampler>(resource));
+        case KORAL_RESOURCE_ACCELERATION_STRUCTURE: return kor::Descriptor(RefOf<AccelerationStructure>(resource));
+        default: throw std::runtime_error(std::string("a ") + KindName(resource->Kind()) + " is not something a descriptor holds");
+        }
+    }
+
+    template<typename Make>
+    KoralDescriptorIndex ImageIndex(KoralResource* imageOrView, const uint32_t shape, Make&& make)
+    {
+        return Guarded([&] {
+            if (imageOrView && imageOrView->Kind() == KORAL_RESOURCE_IMAGE)
+                return IndexOf(make(RefOf<Image>(imageOrView), ShapeFrom(shape)));
+            return IndexOf(make(RefOf<ImageView>(imageOrView)));
+        }, KoralDescriptorIndex{ ~0u, 0 });
+    }
+}
+
+extern "C" {
+
+KoralDescriptorIndex koral_bindless_sampled(KoralResource* r, const uint32_t shape)
+{
+    return ImageIndex(r, shape, []<typename... A>(A&&... a) { return kor::Bindless::Sampled(std::forward<A>(a)...); });
+}
+KoralDescriptorIndex koral_bindless_storage(KoralResource* r, const uint32_t shape)
+{
+    return ImageIndex(r, shape, []<typename... A>(A&&... a) { return kor::Bindless::Storage(std::forward<A>(a)...); });
+}
+KoralDescriptorIndex koral_bindless_storage_buffer(KoralBuffer* b)
+{
+    return Guarded([&] { return IndexOf(kor::Bindless::StorageBuffer(RefOf<Buffer>(b))); }, KoralDescriptorIndex{ ~0u, 0 });
+}
+KoralDescriptorIndex koral_bindless_uniform_buffer(KoralBuffer* b)
+{
+    return Guarded([&] { return IndexOf(kor::Bindless::UniformBuffer(RefOf<Buffer>(b))); }, KoralDescriptorIndex{ ~0u, 0 });
+}
+KoralDescriptorIndex koral_bindless_sampler(KoralSampler* s)
+{
+    return Guarded([&] { return IndexOf(kor::Bindless::Sampler(RefOf<Sampler>(s))); }, KoralDescriptorIndex{ ~0u, 0 });
+}
+KoralDescriptorIndex koral_bindless_acceleration_structure(KoralAccelerationStructure* a)
+{
+    return Guarded([&] { return IndexOf(kor::Bindless::AccelerationStructure(RefOf<AccelerationStructure>(a))); },
+                   KoralDescriptorIndex{ ~0u, 0 });
+}
+void koral_bindless_release(const KoralDescriptorIndex index) { GuardedVoid([&] { kor::Bindless::Release(IndexFrom(index)); }); }
+uint32_t koral_bindless_capacity(const uint32_t kind)
+{
+    return Guarded([&] { return kor::Bindless::Capacity(static_cast<kor::BindlessKind>(kind)); }, 0u);
+}
+size_t koral_bindless_count(void) { return Guarded([] { return kor::Bindless::Count(); }, std::size_t{ 0 }); }
+
+KoralDescriptorHeap* koral_descriptor_heap_new(const uint32_t role, const uint32_t slotCount)
+{
+    return Guarded([&] {
+        return Own(kor::DescriptorHeap::Builder{}.SetRole(static_cast<kor::HeapRole>(role)).SetSlotCount(slotCount).Build());
+    }, static_cast<KoralDescriptorHeap*>(nullptr));
+}
+KoralStatus koral_descriptor_heap_write(KoralDescriptorHeap* h, const uint32_t slot, KoralResource* resource, const uint32_t type)
+{
+    return Guarded([&] {
+        auto& heap = const_cast<kor::DescriptorHeap&>(*RefOf<kor::DescriptorHeap>(h));
+        if (auto written = heap.Write(slot, DescriptorFrom(resource), static_cast<kor::DescriptorType>(type)); !written)
+            return Fail(written.error().message);
+        return KORAL_OK;
+    }, KORAL_ERROR);
+}
+KoralDescriptorIndex koral_descriptor_heap_index(KoralDescriptorHeap* h, const uint32_t slot, const uint32_t kind)
+{
+    return Guarded([&] { return IndexOf(RefOf<kor::DescriptorHeap>(h)->Index(slot, static_cast<kor::BindlessKind>(kind))); },
+                   KoralDescriptorIndex{ ~0u, 0 });
+}
+uint32_t koral_descriptor_heap_slot_count(KoralDescriptorHeap* h) { return Guarded([&] { return RefOf<kor::DescriptorHeap>(h)->SlotCount(); }, 0u); }
+uint32_t koral_descriptor_heap_first_slot(KoralDescriptorHeap* h) { return Guarded([&] { return RefOf<kor::DescriptorHeap>(h)->FirstSlot(); }, 0u); }
+uint64_t koral_descriptor_heap_device_address(KoralDescriptorHeap* h, const uint32_t slot)
+{
+    return Guarded([&] { return RefOf<kor::DescriptorHeap>(h)->DeviceAddress(slot); }, uint64_t{ 0 });
+}
+uint32_t koral_descriptor_heap_slot_size(const uint32_t role)
+{
+    return Guarded([&] { return kor::DescriptorHeap::SlotSize(static_cast<kor::HeapRole>(role)); }, 0u);
+}
+size_t koral_descriptor_heap_encode(KoralResource* resource, const uint32_t type, void* out, const size_t capacity)
+{
+    return Guarded([&]() -> std::size_t {
+        const auto bytes = kor::DescriptorHeap::Encode(DescriptorFrom(resource), static_cast<kor::DescriptorType>(type));
+        if (!bytes) { Fail(bytes.error().message); return 0; }
+        if (!out || capacity < bytes->size()) { Fail("the buffer given is smaller than a descriptor's slot"); return 0; }
+        std::memcpy(out, bytes->data(), bytes->size());
+        return bytes->size();
+    }, std::size_t{ 0 });
+}
+
+} // extern "C"

@@ -1535,6 +1535,27 @@
               }
             }
           ]
+        },
+        {
+          "name": "sampler",
+          "function": "koral_graphics_pipeline_builder_set_sampler",
+          "repeatable": false,
+          "doc": "SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name.",
+          "arguments": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "eString"
+              }
+            },
+            {
+              "name": "sampler",
+              "type": {
+                "kind": "eResource",
+                "name": "Sampler"
+              }
+            }
+          ]
         }
       ]
     },
@@ -1624,6 +1645,27 @@
               "type": {
                 "kind": "eUInt",
                 "bits": 32
+              }
+            }
+          ]
+        },
+        {
+          "name": "sampler",
+          "function": "koral_compute_pipeline_builder_set_sampler",
+          "repeatable": false,
+          "doc": "SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name.",
+          "arguments": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "eString"
+              }
+            },
+            {
+              "name": "sampler",
+              "type": {
+                "kind": "eResource",
+                "name": "Sampler"
               }
             }
           ]
@@ -1790,6 +1832,27 @@
               "type": {
                 "kind": "eUInt",
                 "bits": 32
+              }
+            }
+          ]
+        },
+        {
+          "name": "sampler",
+          "function": "koral_ray_tracing_pipeline_builder_set_sampler",
+          "repeatable": false,
+          "doc": "SetSampler(name, sampler): embeds @p sampler at the sampler binding the shader calls @p name.",
+          "arguments": [
+            {
+              "name": "name",
+              "type": {
+                "kind": "eString"
+              }
+            },
+            {
+              "name": "sampler",
+              "type": {
+                "kind": "eResource",
+                "name": "Sampler"
               }
             }
           ]

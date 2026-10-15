@@ -65,9 +65,14 @@ namespace kor::vk
 			break;
 		}
 
+		// Under the descriptor heap a buffer is described by its address, so any buffer a shader can be
+		// bound to has to have one.
+		auto usage = getVkBufferUsageFlags(_usage);
+		if (Context::Heaps() && (_usage & (Usage::eUniform | Usage::eStorage | Usage::eTexel)))
+			usage |= ::vk::BufferUsageFlagBits::eShaderDeviceAddress;
 		auto bufferInfo = ::vk::BufferCreateInfo()
 			.setSize(_size)
-			.setUsage(getVkBufferUsageFlags(_usage))
+			.setUsage(usage)
 			.setSharingMode(::vk::SharingMode::eExclusive);
 		const auto families = _sharedAcrossQueues ? Context::Device().sharedFamilies() : std::vector<kor::u32>{};
 		if (!families.empty()) bufferInfo.setSharingMode(::vk::SharingMode::eConcurrent).setQueueFamilyIndices(families);

@@ -10,6 +10,7 @@
 #include "allocator.h"
 #include "commandBuffer.h"
 #include "descriptorSetLayout.h"
+#include "pipelineInterface.h"
 #include "device.h"
 #include "physicalDevice.h"
 #include "runtime.h"
@@ -64,27 +65,9 @@ namespace kor::vk
                                       "VK_KHR_acceleration_structure are not available).");
         }
 
-        // Pipeline layout from the merged descriptor set layouts and push constants.
-        std::vector<::vk::DescriptorSetLayout> setLayouts;
-        if (!_setLayouts.empty()) {
-            setLayouts = { std::ranges::max(_setLayouts | std::views::keys) + 1, nullptr };
-            for (const auto& [set, layout] : _setLayouts) {
-                setLayouts[set] = **dynamic_cast<const DescriptorSetLayout*>(layout.Get());
-            }
-        }
-
-        std::vector<::vk::PushConstantRange> pushConstantRanges;
-        for (const auto& [offset, pushConstant] : _pushConstantRanges) {
-            pushConstantRanges.push_back(::vk::PushConstantRange()
-                .setStageFlags(getVkShaderStageFlags(pushConstant.stages))
-                .setOffset(offset)
-                .setSize(pushConstant.size));
-        }
-
-        const auto pipelineLayoutCreateInfo = ::vk::PipelineLayoutCreateInfo()
-            .setSetLayouts(setLayouts)
-            .setPushConstantRanges(pushConstantRanges);
-        _pipelineLayout = Context::Device()->createPipelineLayout(pipelineLayoutCreateInfo);
+        // The pipeline layout, or under the heap the mapping every stage carries instead.
+        PipelineInterface descriptors(_setLayouts, _pushConstantRanges, _bindlessBindings);
+        _pipelineLayout = descriptors.TakeLayout();
 
         // Build the shader stages and groups. The group order is:
         // [raygen][miss...][hit...][callable...], which mirrors the SBT layout.
@@ -106,7 +89,8 @@ namespace kor::vk
                 .setStage(stage)
                 .setModule(modules.For(*shaderRef))
                 .setPSpecializationInfo(_specConstantsMetadata.empty() ? nullptr : &specializationInfo)
-                .setPName("main"));
+                .setPName("main")
+                .setPNext(descriptors.StageNext()));
             return index;
         };
 
@@ -152,6 +136,7 @@ namespace kor::vk
         }
 
         const auto pipelineCreateInfo = ::vk::RayTracingPipelineCreateInfoKHR()
+            .setPNext(descriptors.CreateNext(nullptr))
             .setStages(shaderStages)
             .setGroups(shaderGroups)
             .setMaxPipelineRayRecursionDepth(_maxRecursionDepth)

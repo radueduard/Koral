@@ -153,6 +153,13 @@ public sealed unsafe class GraphicsPipeline : Pipeline
             return this;
         }
 
+        /// <summary>SetSampler(name, sampler): embeds the sampler at the sampler binding the shader calls <paramref name="name"/>.</summary>
+        public Builder SetSampler(string name, Sampler sampler)
+        {
+            KoralNative.koral_graphics_pipeline_builder_set_sampler(Native, name, sampler.Handle);
+            return this;
+        }
+
         private static void SetConstant(IntPtr b, uint id, void* v, uint n) => KoralNative.koral_graphics_pipeline_builder_set_specialization_constant(b, id, v, n);
         private static void SetNamed(IntPtr b, string name, void* v, uint n) => KoralNative.koral_graphics_pipeline_builder_set_specialization_constant_named(b, name, v, n);
 
@@ -194,6 +201,13 @@ public sealed unsafe class ComputePipeline : Pipeline
             return this;
         }
 
+        /// <summary>SetSampler(name, sampler): embeds the sampler at the sampler binding the shader calls <paramref name="name"/>.</summary>
+        public Builder SetSampler(string name, Sampler sampler)
+        {
+            KoralNative.koral_compute_pipeline_builder_set_sampler(Native, name, sampler.Handle);
+            return this;
+        }
+
         private static void SetConstant(IntPtr b, uint id, void* v, uint n) => KoralNative.koral_compute_pipeline_builder_set_specialization_constant(b, id, v, n);
         private static void SetNamed(IntPtr b, string name, void* v, uint n) => KoralNative.koral_compute_pipeline_builder_set_specialization_constant_named(b, name, v, n);
 
@@ -227,6 +241,8 @@ public sealed unsafe class RayTracingPipeline : Pipeline
         public Builder SetSpecializationConstant<T>(string name, T value) where T : unmanaged { SpecializationConstant(Native, name, value, &SetNamed); return this; }
         /// <summary>SetBinding(name, set, binding): puts the descriptor there, whatever its shader said.</summary>
         public Builder SetBinding(string name, uint set, uint binding) { KoralNative.koral_ray_tracing_pipeline_builder_set_binding(Native, name, set, binding); return this; }
+        /// <summary>SetSampler(name, sampler): embeds the sampler at the sampler binding the shader calls <paramref name="name"/>.</summary>
+        public Builder SetSampler(string name, Sampler sampler) { KoralNative.koral_ray_tracing_pipeline_builder_set_sampler(Native, name, sampler.Handle); return this; }
         private static void SetConstant(IntPtr b, uint id, void* v, uint n) => KoralNative.koral_ray_tracing_pipeline_builder_set_specialization_constant(b, id, v, n);
         private static void SetNamed(IntPtr b, string name, void* v, uint n) => KoralNative.koral_ray_tracing_pipeline_builder_set_specialization_constant_named(b, name, v, n);
         public RayTracingPipeline Build() => Built<RayTracingPipeline>(KoralNative.koral_ray_tracing_pipeline_builder_build(Native));
